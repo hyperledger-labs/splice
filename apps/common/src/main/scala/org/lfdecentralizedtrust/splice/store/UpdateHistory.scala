@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   DestinationBackfillingInfo,
@@ -1344,13 +1345,30 @@ class UpdateHistory(
     }
   }
 
+  /** Decodes the result of fetching one import contract ([[SelectFromImportUpdates]]) into
+    * an artificial update ([[UpdateHistoryResponse]]) with exactly one create event.
+    *
+    * The result of this method should be consistent and stable. Values of fields that could
+    * differ across SVs or across Canton versions are rewritten using determinisitic values.
+    *
+    * The deterministic values chosen here will be persisted in the UpdateHistory database
+    * of late-joining SVs when they backfill import updates.
+    * If you change any of the deterministic values here, it will lead to BFT consistency
+    * warnings until all SV nodes have deployed the new version.
+    */
   private def decodeImportTransaction(
       updateRow: SelectFromImportUpdates
   ): UpdateHistoryResponse = {
-    // The result should be consistent across SVs, so we generate a deterministic update id and event id.
     // We don't use any prefix so that we can use an index on contract ids when fetching import updates.
     val updateId = updateRow.contractId
     val eventNodeId = 0
+    // The prefix needs to be preserved, because we're relying on it to determine whether a given update
+    // was an import update.
+    val workflowId = s"${IMPORT_ACS_WORKFLOW_ID_PREFIX}-${updateId}"
+    // Command id and participant offset are not included in API responses,
+    // but we're making them consistent anyway.
+    val commandId = ""
+    val offset = 0L
 
     val createEvent = new CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
@@ -1377,10 +1395,10 @@ class UpdateHistory(
       update = TransactionTreeUpdate(
         new TransactionTree(
           /*updateId = */ updateId,
-          /*commandId = */ updateRow.commandId.getOrElse(missingString),
-          /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
+          /*commandId = */ commandId,
+          /*workflowId = */ workflowId,
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
-          /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
+          /*offset = */ offset,
           /*eventsById = */ java.util.Map.of(eventNodeId, createEvent),
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,

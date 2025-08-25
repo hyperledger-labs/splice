@@ -67,7 +67,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   override def beforeAll() = {
     super.beforeAll()
-    logger.info(s"Creating BigQuery dataset: $datasetName")
+    logger.info(s"Creating BigQuery dataset: $datasetName as user: ${inferBQUser()}")
 
     // Create a temporary BigQuery dataset for testing
     // 1hr is the minimum per https://github.com/googleapis/java-bigquery/blob/v2.53.0/google-cloud-bigquery/src/main/java/com/google/cloud/bigquery/DatasetInfo.java#L97-L108
@@ -76,6 +76,16 @@ class ScanTotalSupplyBigQueryIntegrationTest
     bigquery.create(datasetInfo)
 
     createEmptyTables()
+  }
+
+  private[this] def inferBQUser(): String = {
+    import com.google.auth.oauth2 as o
+    val credentials = bigquery.getOptions.getCredentials
+    credentials match {
+      case sa: o.ServiceAccountCredentials => sa.getClientEmail
+      case sa: o.ServiceAccountJwtAccessCredentials => sa.getClientEmail
+      case _ => "unknown"
+    }
   }
 
   override def afterAll() = {
