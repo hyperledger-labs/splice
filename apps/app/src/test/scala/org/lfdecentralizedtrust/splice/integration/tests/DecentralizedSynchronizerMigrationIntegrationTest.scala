@@ -58,6 +58,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.scan.config.CacheConfig
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
@@ -219,8 +220,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             InstanceName.tryCreate("splitwellValidatorLocal") -> {
               val splitwellValidatorConfig = config
                 .validatorApps(InstanceName.tryCreate("splitwellValidator"))
+              val sv1ScanConfig = config
+                .scanApps(InstanceName.tryCreate("sv1Scan"))
               splitwellValidatorConfig
                 .copy(
+                  // Disable bft connections as we only start sv1 scan.
+                  scanClient = TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
