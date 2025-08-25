@@ -176,6 +176,7 @@ class SvApp(
                     config.participantBootstrappingDump,
                     loggerFactory,
                     retryProvider,
+                    config.domains.global.alias,
                   )
               }
           }

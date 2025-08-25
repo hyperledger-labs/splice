@@ -143,6 +143,7 @@ class SV1Initializer(
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
       )
+      synchronizerId <- participantAdminConnection.getSynchronizerId(config.domains.global.alias)
       _ <-
         if (!config.skipSynchronizerInitialization) {
           SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
@@ -151,6 +152,7 @@ class SV1Initializer(
             clock,
             loggerFactory,
             retryProvider,
+            synchronizerId,
           )
         } else {
           logger.info(
