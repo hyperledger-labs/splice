@@ -239,8 +239,8 @@ testUSDSubscription = script do
   let amounts = map (\(_, c) -> c.amount.initialAmount) (amulets4 `diffContracts` amulets3)
   amounts === [1.0]
 
-  -- alice has no amulets left, as all her amulets have been used up
-  aliceAmulets <- query @Amulet alice.primaryParty
+  -- alice has only change left, as all her amulet has been used up
+  aliceAmulets <- queryFilter @Amulet alice.primaryParty (\a -> a.amount.initialAmount > 0.05)
   aliceAmulets === []
 
   pure ()
