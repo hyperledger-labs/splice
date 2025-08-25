@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- SV Deployment
+
+  - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
+
 
 0.4.12
 ------
