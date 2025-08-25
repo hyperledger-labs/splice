@@ -19,7 +19,12 @@ import io.circe.parser.parse as circeParse
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
-import org.lfdecentralizedtrust.splice.util.{Contract, LegacyOffset, QualifiedName}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  LegacyOffset,
+  PackageQualifiedName,
+  QualifiedName,
+}
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
 import com.digitalasset.canton.LfValue
@@ -190,6 +195,11 @@ trait AcsJdbcTypes {
 
   protected implicit val qualifiedNameGetResult: GetResult[QualifiedName] =
     GetResult.GetString.andThen { s => QualifiedName.assertFromString(s) }
+
+  protected implicit val packageQualifiedNameGetResult: GetResult[PackageQualifiedName] =
+    implicitly[GetResult[(QualifiedName, String)]].andThen { case (qualifiedName, packageName) =>
+      PackageQualifiedName(packageName, qualifiedName)
+    }
 
   protected implicit lazy val qualifiedNameJdbcType: JdbcType[QualifiedName] =
     MappedColumnType.base[QualifiedName, String](

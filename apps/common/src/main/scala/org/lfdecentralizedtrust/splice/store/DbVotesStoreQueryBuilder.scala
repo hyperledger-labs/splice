@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, TxLogQueries}
-import org.lfdecentralizedtrust.splice.util.QualifiedName
 import slick.dbio.{Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.sql.SqlStreamingAction
@@ -110,10 +109,8 @@ trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with Name
       acsTableName,
       acsStoreId,
       domainMigrationId,
-      where = (sql""" template_id_qualified_name = ${QualifiedName(
-          VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-        )}
-                          and #$trackingCidColumnName in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
+      VoteRequest.COMPANION,
+      where = (sql""" #$trackingCidColumnName in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
       orderLimit = sql"""limit ${sqlLimit(limit)}""",
     )
   }
@@ -133,10 +130,8 @@ trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with Name
       acsTableName,
       acsStoreId,
       domainMigrationId,
-      where = (sql""" template_id_qualified_name = ${QualifiedName(
-          VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-        )}
-                       and #$trackingCidColumnName = $voteRequestCid """).toActionBuilder,
+      VoteRequest.COMPANION,
+      where = (sql""" #$trackingCidColumnName = $voteRequestCid """).toActionBuilder,
     ).headOption
   }
 
