@@ -11,7 +11,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.SingleScanConnection
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{ScanConnection, SingleScanConnection}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
@@ -67,8 +67,8 @@ class AggregatingScanConnection(
       url: String
   )(f: SingleScanConnection => Future[T])(implicit
       tc: TraceContext
-  ): Future[T] =
-    SingleScanConnection.withSingleScanConnection(
+  ): Future[T] = {
+    val connection = ScanConnection.directConnection(
       ScanAppClientConfig(
         NetworkAppClientConfig(
           url
@@ -78,6 +78,10 @@ class AggregatingScanConnection(
       clock,
       retryProvider,
       loggerFactory,
-    )(f)
+    )
+    f(
+      connection
+    ).andThen(_ => connection.close())
+  }
 
 }
