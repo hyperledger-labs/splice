@@ -18,7 +18,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
-import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
@@ -61,7 +60,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanAppClientConfig}
+import org.lfdecentralizedtrust.splice.scan.config.CacheConfig
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellDomains,
@@ -164,7 +163,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               config
                 .validatorApps(InstanceName.tryCreate("sv1Validator"))
                 .copy(
-                  scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
@@ -194,11 +192,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             InstanceName.tryCreate("aliceValidatorLocal") -> {
               val aliceValidatorConfig = config
                 .validatorApps(InstanceName.tryCreate("aliceValidator"))
+              val sv1ScanConfig = config
+                .scanApps(InstanceName.tryCreate("sv1Scan"))
               aliceValidatorConfig
                 .copy(
-                  adminApi =
-                    aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
-                  scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
+                  // Disable bft connections as we only start sv1 scan.
+                  scanClient =
+                    TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
@@ -217,13 +217,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   restoreFromMigrationDump = Some(
                     (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
                   ),
-                  onboarding = aliceValidatorConfig.onboarding.map(onboarding =>
-                    onboarding.copy(
-                      svClient = onboarding.svClient.copy(adminApi =
-                        NetworkAppClientConfig(url = "http://localhost:27114")
-                      )
-                    )
-                  ),
                   domainMigrationId = 1L,
                 )
 
@@ -232,12 +225,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             InstanceName.tryCreate("splitwellValidatorLocal") -> {
               val splitwellValidatorConfig = config
                 .validatorApps(InstanceName.tryCreate("splitwellValidator"))
+              val sv1ScanConfig = config
+                .scanApps(InstanceName.tryCreate("sv1Scan"))
               splitwellValidatorConfig
                 .copy(
-                  adminApi = splitwellValidatorConfig.adminApi.copy(internalPort =
-                    Some(Port.tryCreate(27703))
-                  ),
-                  scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
+                  // Disable bft connections as we only start sv1 scan.
+                  scanClient =
+                    TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
@@ -267,49 +261,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )
             }
           ),
-          walletAppClients = config.walletAppClients + (
-            InstanceName.tryCreate("sv1WalletLocal") ->
-              config
-                .walletAppClients(InstanceName.tryCreate("sv1Wallet"))
-                .copy(
-                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27103")
-                )
-          ) + (
-            InstanceName.tryCreate("aliceWalletLocal") ->
-              config
-                .walletAppClients(InstanceName.tryCreate("aliceWallet"))
-                .copy(
-                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27603")
-                )
-          ) + (
-            InstanceName.tryCreate("charlieWalletLocal") ->
-              config
-                .walletAppClients(InstanceName.tryCreate("charlieWallet"))
-                .copy(
-                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27603")
-                )
-          ) + (
-            InstanceName.tryCreate("splitwellProviderWalletLocal") ->
-              config
-                .walletAppClients(InstanceName.tryCreate("splitwellProviderWallet"))
-                .copy(
-                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27703")
-                )
-          ),
           splitwellApps = config.splitwellApps + (
             InstanceName.tryCreate("providerSplitwellBackendLocal") -> {
               val splitwellBackendConfig =
                 config.splitwellApps(InstanceName.tryCreate("providerSplitwellBackend"))
               splitwellBackendConfig
                 .copy(
-                  scanClient = ScanAppClientConfig(
-                    adminApi = NetworkAppClientConfig(
-                      Uri("http://127.0.0.1:27012")
-                    )
-                  ),
-                  adminApi = splitwellBackendConfig.adminApi.copy(internalPort =
-                    Some(Port.tryCreate(27113))
-                  ),
                   participantClient = ParticipantClientConfig(
                     FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellBackendConfig.participantClient.ledgerApi.copy(
@@ -336,13 +293,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               val aliceSplitwellAppClientConfig = config
                 .splitwellAppClients(InstanceName.tryCreate("aliceSplitwell"))
               aliceSplitwellAppClientConfig.copy(
-                scanClient = ScanAppClientConfig(
-                  adminApi = NetworkAppClientConfig(
-                    Uri("http://127.0.0.1:27012")
-                  )
-                ),
-                adminApi =
-                  aliceSplitwellAppClientConfig.adminApi.copy(url = Uri("http://127.0.0.1:27113")),
                 participantClient = ParticipantClientConfig(
                   FullClientConfig(port = Port.tryCreate(27502)),
                   aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
@@ -351,7 +301,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                         port = Port.tryCreate(27501)
                       )
                   ),
-                ),
+                )
               )
             }
           ),
@@ -359,7 +309,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       })
       .addConfigTransforms((_, conf) =>
         (ConfigTransforms
-          .bumpSomeSvAppPortsBy(
+          .bumpSomeSvAppCantonPortsBy(
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           ) compose
@@ -368,9 +318,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           ) compose
           ConfigTransforms
-            .bumpSomeScanAppPortsBy(22_000, Seq("sv1ScanLocal")) compose
+            .bumpSomeScanAppCantonPortsBy(22_000, Seq("sv1ScanLocal")) compose
           ConfigTransforms
-            .bumpSomeValidatorAppPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
+            .bumpSomeValidatorAppCantonPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
       )
       .addConfigTransform(
         // update validator app config for the aliceValidator and splitwellValidator to set the migrationDumpPath
@@ -861,19 +811,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             )
 
             val aliceValidatorLocal = v("aliceValidatorLocal")
-            val aliceWalletLocalClient = uwc("aliceWalletLocal")
             withClueAndLog("validator can migrate to the new domain") {
               val validatorThatMigrates = aliceValidatorLocal
               startValidatorAndTapAmulet(
                 validatorThatMigrates,
-                aliceWalletLocalClient,
+                aliceWalletClient,
                 // tap 2 times (100) minus splitwell transfer (42)
                 expectedAmulets = 57 to 58,
               )
             }
             withClueAndLog("User automation works before user is reonboarded") {
-              val aliceUser = aliceWalletLocalClient.config.ledgerApiUser
-              val charlieUser = uwc("charlieWalletLocal").config.ledgerApiUser
+              val aliceUser = aliceWalletClient.config.ledgerApiUser
+              val charlieUser = charlieWalletClient.config.ledgerApiUser
               clue("Pause expiration so we can catch the contract") {
                 aliceValidatorLocal
                   .userWalletAutomation(aliceUser)
@@ -890,7 +839,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               }
               actAndCheck(
                 "Alice creates almost expired transfer",
-                aliceWalletLocalClient.createTransferOffer(
+                aliceWalletClient.createTransferOffer(
                   charlieUserParty,
                   10,
                   "transfer 10 amulets to Charlie",
@@ -899,7 +848,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 ),
               )(
                 "Alice sees expired transfer offer",
-                _ => aliceWalletLocalClient.listTransferOffers() should have length 1,
+                _ => aliceWalletClient.listTransferOffers() should have length 1,
               )
               actAndCheck(
                 "Unpause Charlie's expiration automation",
@@ -911,7 +860,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               )(
                 "Transfer offer was expired by Charlie's automation",
                 _ => {
-                  aliceWalletLocalClient.listTransferOffers() should have length 0
+                  aliceWalletClient.listTransferOffers() should have length 0
                 },
               )
             }
@@ -1022,7 +971,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             startValidatorAndTapAmulet(
               v("splitwellValidatorLocal"),
-              uwc("splitwellProviderWalletLocal"),
+              splitwellWalletClient,
             )
 
             startAllSync(
@@ -1033,7 +982,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             clue("Old wallet balance is recorded") {
               eventually() {
-                assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+                assertInRange(sv1WalletClient.balance().unlockedQty, (1000, 2000))
               }
             }
             clue("Old scan transaction history is recorded") {
@@ -1042,12 +991,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
               }
             }
-            actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
+            actAndCheck("Create some new transaction history", sv1WalletClient.tap(1338))(
               "New transaction history is recorded and balance is updated",
               _ => {
                 countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
                 countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
-                assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
+                assertInRange(sv1WalletClient.balance().unlockedQty, (2000, 4000))
                 inside(listTapsFromScan(sv1ScanLocalBackend, sv1Party, 1337, 1338)) {
                   case Seq(formerTap, laterTap) =>
                     BigDecimal(formerTap.amuletAmount) shouldBe BigDecimal(1337)
@@ -1157,13 +1106,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )(
                   "alice sees payment request",
                   _ => {
-                    getSingleAppPaymentRequest(uwc("aliceWalletLocal"))
+                    getSingleAppPaymentRequest(aliceWalletClient)
                   },
                 )
 
               actAndCheck(
                 "alice initiates payment accept request after domain migration",
-                uwc("aliceWalletLocal").acceptAppPaymentRequest(paymentRequest.contractId),
+                aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
               )(
                 "alice sees balance update",
                 _ =>

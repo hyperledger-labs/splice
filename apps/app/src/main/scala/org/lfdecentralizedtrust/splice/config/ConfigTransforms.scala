@@ -456,12 +456,22 @@ object ConfigTransforms {
     updateAllSvAppConfigs((name, config) => {
       if (svApps.contains(name)) {
         config
+          .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    }) compose bumpSomeSvAppCantonPortsBy(bump, svApps)
+  }
+
+  def bumpSomeSvAppCantonPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
+    updateAllSvAppConfigs((name, config) => {
+      if (svApps.contains(name)) {
+        config
           .focus(_.participantClient)
           .modify(portTransform(bump, _))
           .focus(_.localSynchronizerNode)
           .modify(_.map(portTransform(bump, _)))
-          .focus(_.adminApi)
-          .modify(portTransform(bump, _))
       } else {
         config
       }
@@ -542,9 +552,19 @@ object ConfigTransforms {
     updateAllScanAppConfigs((name, config) => {
       if (scanApps.contains(name)) {
         config
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
           .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    }) compose bumpSomeScanAppCantonPortsBy(bump, scanApps)
+  }
+
+  def bumpSomeScanAppCantonPortsBy(bump: Int, scanApps: Seq[String]): ConfigTransform = {
+    updateAllScanAppConfigs((name, config) => {
+      if (scanApps.contains(name)) {
+        config
+          .focus(_.participantClient)
           .modify(portTransform(bump, _))
           .focus(_.sequencerAdminClient)
           .modify(portTransform(bump, _))
@@ -578,9 +598,19 @@ object ConfigTransforms {
     updateAllValidatorAppConfigs((name, config) => {
       if (validatorApps.contains(name)) {
         config
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
           .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    }) compose bumpSomeValidatorAppCantonPortsBy(bump, validatorApps)
+  }
+
+  def bumpSomeValidatorAppCantonPortsBy(bump: Int, validatorApps: Seq[String]): ConfigTransform = {
+    updateAllValidatorAppConfigs((name, config) => {
+      if (validatorApps.contains(name)) {
+        config
+          .focus(_.participantClient)
           .modify(portTransform(bump, _))
       } else {
         config
