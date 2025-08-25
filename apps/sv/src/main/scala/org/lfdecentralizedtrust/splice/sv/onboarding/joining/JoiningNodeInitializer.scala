@@ -4,10 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
-import cats.syntax.option.*
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
+import cats.syntax.apply.*
 import cats.syntax.foldable.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
@@ -353,6 +354,12 @@ class JoiningNodeInitializer(
       logger,
     )
     for {
+      // Do this at the very start as scan depends on it to start up.
+      _ <- SetupUtil.ensureDsoPartyMetadataAnnotation(
+          svSvAutomationService.connection,
+          config,
+          dsoPartyId,
+        )
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "dso_rules_visible",
@@ -378,11 +385,6 @@ class JoiningNodeInitializer(
         waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
         waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator,
-        SetupUtil.ensureDsoPartyMetadataAnnotation(
-          svSvAutomationService.connection,
-          config,
-          dsoPartyId,
-        ),
       ).tupled
       _ <-
         if (!config.skipSynchronizerInitialization) {
