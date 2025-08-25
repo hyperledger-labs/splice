@@ -369,7 +369,8 @@ object MultiDomainAcsStore {
     override val ingestionFilter =
       IngestionFilter(
         primaryParty,
-        interfaceFilters.values.map(_.interfaceId).toSeq,
+        // In interface filters the ledger API warns when using a package id so we convert to a package name here.
+        interfaceFilters.keys.map(PackageQualifiedName.getFromResources(_)).toSeq,
       )
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
@@ -512,7 +513,7 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
-      includeInterfaces: Seq[Identifier],
+      includeInterfaces: Seq[PackageQualifiedName],
       includeCreatedEventBlob: Boolean = true,
   ) {
 
@@ -530,9 +531,9 @@ object MultiDomainAcsStore {
                   com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
                     Some(
                       com.daml.ledger.api.v2.value.Identifier(
-                        packageId = interfaceId.getPackageId,
-                        moduleName = interfaceId.getModuleName,
-                        entityName = interfaceId.getEntityName,
+                        packageId = s"#${interfaceId.packageName}",
+                        moduleName = interfaceId.qualifiedName.moduleName,
+                        entityName = interfaceId.qualifiedName.entityName,
                       )
                     ),
                     includeInterfaceView = true,
