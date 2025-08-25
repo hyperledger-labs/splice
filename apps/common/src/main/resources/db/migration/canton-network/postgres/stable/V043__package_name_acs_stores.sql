@@ -1,5 +1,6 @@
 -- strictly not necessary, but lets us define the constraint as mandatory afterwards,
 -- and also makes index creation faster since there's no data to index
+truncate table store_last_ingested_offsets cascade;
 truncate table acs_store_template cascade;
 truncate table user_wallet_acs_store cascade;
 truncate table external_party_wallet_acs_store cascade;
