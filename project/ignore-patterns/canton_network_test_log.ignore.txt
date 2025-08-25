@@ -123,5 +123,7 @@ GENERIC_CONFIG_ERROR.*SpliceConfigTest
 # ExecutorServiceMetrics closes the gauges twice through shutdown and shutownNow in cases where shutdown times out
 .*InstrumentDescriptor.*name=daml.executor.* has called close() multiple times
 
+# flyway update
+cleanOnValidationError is deprecated and will be removed in a later release
 
 # Make sure to have a trailing newline
