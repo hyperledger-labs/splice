@@ -192,8 +192,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             InstanceName.tryCreate("aliceValidatorLocal") -> {
               val aliceValidatorConfig = config
                 .validatorApps(InstanceName.tryCreate("aliceValidator"))
+              val sv1ScanConfig = config
+                .scanApps(InstanceName.tryCreate("sv1Scan"))
               aliceValidatorConfig
                 .copy(
+                  // Disable bft connections as we only start sv1 scan.
+                  scanClient = TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
@@ -805,19 +809,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             )
 
             val aliceValidatorLocal = v("aliceValidatorLocal")
-            val aliceWalletLocalClient = uwc("aliceWalletLocal")
             withClueAndLog("validator can migrate to the new domain") {
               val validatorThatMigrates = aliceValidatorLocal
               startValidatorAndTapAmulet(
                 validatorThatMigrates,
-                aliceWalletLocalClient,
+                aliceWalletClient,
                 // tap 2 times (100) minus splitwell transfer (42)
                 expectedAmulets = 57 to 58,
               )
             }
             withClueAndLog("User automation works before user is reonboarded") {
-              val aliceUser = aliceWalletLocalClient.config.ledgerApiUser
-              val charlieUser = uwc("charlieWalletLocal").config.ledgerApiUser
+              val aliceUser = aliceWalletClient.config.ledgerApiUser
+              val charlieUser = charlieWalletClient.config.ledgerApiUser
               clue("Pause expiration so we can catch the contract") {
                 aliceValidatorLocal
                   .userWalletAutomation(aliceUser)
@@ -834,7 +837,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               }
               actAndCheck(
                 "Alice creates almost expired transfer",
-                aliceWalletLocalClient.createTransferOffer(
+                aliceWalletClient.createTransferOffer(
                   charlieUserParty,
                   10,
                   "transfer 10 amulets to Charlie",
@@ -843,7 +846,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 ),
               )(
                 "Alice sees expired transfer offer",
-                _ => aliceWalletLocalClient.listTransferOffers() should have length 1,
+                _ => aliceWalletClient.listTransferOffers() should have length 1,
               )
               actAndCheck(
                 "Unpause Charlie's expiration automation",
@@ -855,7 +858,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               )(
                 "Transfer offer was expired by Charlie's automation",
                 _ => {
-                  aliceWalletLocalClient.listTransferOffers() should have length 0
+                  aliceWalletClient.listTransferOffers() should have length 0
                 },
               )
             }
@@ -966,7 +969,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             startValidatorAndTapAmulet(
               v("splitwellValidatorLocal"),
-              uwc("splitwellProviderWalletLocal"),
+              splitwellWalletClient,
             )
 
             startAllSync(
@@ -977,7 +980,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             clue("Old wallet balance is recorded") {
               eventually() {
-                assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+                assertInRange(sv1WalletClient.balance().unlockedQty, (1000, 2000))
               }
             }
             clue("Old scan transaction history is recorded") {
@@ -986,12 +989,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
               }
             }
-            actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
+            actAndCheck("Create some new transaction history", sv1WalletClient.tap(1338))(
               "New transaction history is recorded and balance is updated",
               _ => {
                 countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
                 countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
-                assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
+                assertInRange(sv1WalletClient.balance().unlockedQty, (2000, 4000))
                 inside(listTapsFromScan(sv1ScanLocalBackend, sv1Party, 1337, 1338)) {
                   case Seq(formerTap, laterTap) =>
                     BigDecimal(formerTap.amuletAmount) shouldBe BigDecimal(1337)
@@ -1101,13 +1104,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )(
                   "alice sees payment request",
                   _ => {
-                    getSingleAppPaymentRequest(uwc("aliceWalletLocal"))
+                    getSingleAppPaymentRequest(aliceWalletClient)
                   },
                 )
 
               actAndCheck(
                 "alice initiates payment accept request after domain migration",
-                uwc("aliceWalletLocal").acceptAppPaymentRequest(paymentRequest.contractId),
+                aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
               )(
                 "alice sees balance update",
                 _ =>
