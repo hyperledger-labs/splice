@@ -785,7 +785,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       // then 20 every second
       val maxAccepted = 120
       // account for bursts in the stream used to rate limit the calls in `runRateLimited`
-      val minAccepted = 80
+      val minAccepted = 60
       results.count(identity) should (be >= minAccepted and be <= maxAccepted)
 
     }

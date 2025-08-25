@@ -57,7 +57,6 @@ describe('Set DSO Config Rules Form', () => {
     expect(urlInput.getAttribute('value')).toBe('');
 
     const configLabels = screen.getAllByTestId('config-label', { exact: false });
-    console.log('configLabels', configLabels);
     expect(configLabels.length).toBeGreaterThan(15);
 
     const configFields = screen.getAllByTestId('config-field', { exact: false });

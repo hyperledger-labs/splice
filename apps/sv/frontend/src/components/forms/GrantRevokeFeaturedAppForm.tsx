@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { CommonFormData } from './CreateProposalform';
-import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDsoInfos } from '../../contexts/SvContext';
 import dayjs from 'dayjs';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useAppForm } from '../../hooks/form';
-import { SupportedActionTag } from '../../utils/types';
+import { CommonProposalFormData, SupportedActionTag } from '../../utils/types';
 import { ContractId } from '@daml/types';
 import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet';
 import {
@@ -22,7 +20,8 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -31,7 +30,7 @@ interface ExtraFormField {
   idValue: ProviderId | FeaturedAppRightId;
 }
 
-type GrantRevokeFeaturedAppFormData = CommonFormData & ExtraFormField;
+type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormField;
 
 export interface GrantRevokeFeaturedAppFormProps {
   selectedAction: GrantRevokeFeaturedAppActions;
@@ -48,7 +47,6 @@ export type GrantRevokeFeaturedAppActions = Extract<
 
 export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProps> = props => {
   const { onSubmit, selectedAction } = props;
-  const [effectivityType, setEffectivityType] = useState('custom');
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
@@ -68,7 +66,10 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const defaultValues: GrantRevokeFeaturedAppFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
-    effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    effectiveDate: {
+      type: 'custom',
+      effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    },
     url: '',
     summary: '',
     idValue: '',
@@ -110,7 +111,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
           expiration: value.expiryDate,
-          effectiveDate: value.effectiveDate,
+          effectiveDate: value.effectiveDate.effectiveDate,
         });
       },
     },
@@ -144,59 +145,18 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
         )}
       </form.AppField>
 
-      <form.Field
+      <form.AppField
         name="effectiveDate"
         validators={{
           onChange: ({ value }) => validateEffectiveDate(value),
           onBlur: ({ value }) => validateEffectiveDate(value),
         }}
-        children={_ => {
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="h5" gutterBottom>
-                Vote Proposal Effectivity
-              </Typography>
-
-              <RadioGroup
-                value={effectivityType}
-                onChange={e => setEffectivityType(e.target.value)}
-              >
-                <FormControlLabel
-                  value="custom"
-                  control={<Radio />}
-                  label={<Typography>Custom</Typography>}
-                />
-
-                {effectivityType === 'custom' && (
-                  <form.AppField name="effectiveDate">
-                    {field => (
-                      <field.DateField
-                        description="Select the date and time the proposal will take effect"
-                        minDate={dayjs(form.getFieldValue('expiryDate'))}
-                        id={`${testIdPrefix}-effective-date`}
-                      />
-                    )}
-                  </form.AppField>
-                )}
-
-                <FormControlLabel
-                  value="threshold"
-                  control={<Radio />}
-                  label={
-                    <Box>
-                      <Typography>Make effective at threshold</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        This will allow the vote proposal to take effect immediately when 2/3 vote
-                        in favor
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mt: 2 }}
-                />
-              </RadioGroup>
-            </Box>
-          );
-        }}
+        children={_ => (
+          <EffectiveDateField
+            initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+            id={`${testIdPrefix}-effective-date`}
+          />
+        )}
       />
 
       <form.AppField
@@ -240,6 +200,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
       </Box>
 
       <form.AppForm>
+        <form.FormErrors />
         <form.FormControls />
       </form.AppForm>
     </FormLayout>

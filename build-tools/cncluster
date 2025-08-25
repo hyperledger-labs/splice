@@ -336,9 +336,9 @@ function _prompt_to_confirm() {
 
 function _get_logging_components() {
     if env-bool SELF_HOSTED_FLUENT_BIT; then
-        echo "SYSTEM,API_SERVER,CONTROLLER_MANAGER,SCHEDULER"
+        echo "SYSTEM"
     else
-        echo "SYSTEM,API_SERVER,CONTROLLER_MANAGER,SCHEDULER,WORKLOAD"
+        echo "SYSTEM,WORKLOAD"
     fi
 }
 
@@ -666,15 +666,14 @@ function subcmd_create() {
             location_arg=(--region "${CLOUDSDK_COMPUTE_REGION}" --node-locations "${CLOUDSDK_COMPUTE_REGION}-a")
         fi
 
-        #### Cluster can be resized from deployment directories with the following command:
-        ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
+        ### The default cluster pool should be removed after running the pulumi cluster project that creates the node pools we actually use
         gcloud container clusters create "${GCP_CLUSTER_NAME}" \
                --create-subnetwork name="${GCP_CLUSTER_NAME}-subnet" \
                --enable-dataplane-v2 \
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
-               --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
+               --machine-type "e2-standard-8" \
                --num-nodes 1 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
@@ -684,8 +683,7 @@ function subcmd_create() {
                --cluster-dns-scope=cluster \
                --enable-autoscaling \
                --min-nodes 0 \
-               --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
-               --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
+               --max-nodes 2 \
                --logging="$(_get_logging_components)" \
                "${location_arg[@]}"
 
@@ -808,7 +806,7 @@ function subcmd_cluster_update_logging() {
 maintenance_windows=(
   # CI-ish window
   "FREQ=WEEKLY;BYDAY=SA,SU" "2024-01-01T08:00:00Z" "2024-01-01T20:00:00Z"
-  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciupgradenet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
+  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
   # prod-like window
   "FREQ=WEEKLY;BYDAY=TU,WE,TH" "2024-01-01T08:00:00Z" "2024-01-01T12:00:00Z"
   "cn-cilrnet,cn-token-std-devnet,cn-testnet,cn-devnet,cn-testzrhnet,cn-mainnet,cn-mainzrhnet"
@@ -1288,7 +1286,7 @@ function subcmd_partial_upgrade() {
 
 ###
 
-subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in ciupgrade"
+subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in upgrade test"
 
 function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"

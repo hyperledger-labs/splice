@@ -5,7 +5,7 @@ import {
   installLoopback,
   numInstances,
   imagePullSecret,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';
@@ -45,7 +45,7 @@ export async function installNode(): Promise<void> {
         participant: { address: participant.service.metadata.name },
         postgres: { ...postgresConf, db: `cantonnet_v` },
       },
-      { dependsOn: [postgres] }
+      { dependsOn: [postgres, participant] }
     );
   }
 }

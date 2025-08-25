@@ -3,12 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.daml.ledger.javaapi.data.Identifier
+import com.daml.ledger.javaapi.data.{Event, Identifier}
 import org.lfdecentralizedtrust.splice.environment.DarResources
 
-/** To support upgrading templates are addressed
-  * using their qualified name, ignoring the package id.
-  */
 final case class QualifiedName(moduleName: String, entityName: String) {
   override def toString = s"$moduleName:$entityName"
 }
@@ -18,13 +15,26 @@ final case class PackageQualifiedName(packageName: String, qualifiedName: Qualif
 }
 
 object PackageQualifiedName {
-  def apply(identifier: Identifier): PackageQualifiedName = {
-    val resource = DarResources
+  def lookupFromResources(identifier: Identifier): Option[PackageQualifiedName] = {
+    DarResources
       .lookupPackageId(identifier.getPackageId)
+      .map { resource =>
+        PackageQualifiedName(
+          resource.metadata.name,
+          QualifiedName(identifier),
+        )
+      }
+  }
+
+  def getFromResources(identifier: Identifier): PackageQualifiedName = {
+    lookupFromResources(identifier)
       .getOrElse(throw new IllegalArgumentException(s"No package found for template $identifier"))
+  }
+
+  def fromEvent(event: Event): PackageQualifiedName = {
     PackageQualifiedName(
-      resource.metadata.name,
-      QualifiedName(identifier),
+      event.getPackageName,
+      QualifiedName(event.getTemplateId.getModuleName, event.getTemplateId.getEntityName),
     )
   }
 }

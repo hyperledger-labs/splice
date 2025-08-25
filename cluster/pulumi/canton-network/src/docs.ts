@@ -7,7 +7,7 @@ import {
   exactNamespace,
   imagePullSecret,
   installSpliceHelmChart,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export function installDocs(): pulumi.Resource {
   const xns = exactNamespace('docs');

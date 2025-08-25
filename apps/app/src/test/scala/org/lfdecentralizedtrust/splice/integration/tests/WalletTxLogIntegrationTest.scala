@@ -1621,6 +1621,27 @@ class WalletTxLogIntegrationTest
       )
     }
 
+    "not blow up with failed CO_TransferPreapprovalSend" in { implicit env =>
+      // Note: using Alice and Charlie because manually creating subscriptions requires both
+      // the sender and the receiver to be hosted on the same participant.
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+
+      aliceValidatorWalletClient.tap(100) // funds to create preapproval
+      charlieWalletClient.createTransferPreapproval()
+
+      assertCommandFailsDueToInsufficientFunds(
+        aliceWalletClient.transferPreapprovalSend(
+          charlieUserParty,
+          BigDecimal(10000000),
+          UUID.randomUUID().toString,
+          Some("this should not go through"),
+        )
+      )
+
+      aliceWalletClient.listTransactions(None, Limit.MaxPageSize) shouldBe empty
+    }
+
   }
 
   private def assertCommandFailsDueToInsufficientFunds[T](cmd: => Unit): Unit = {
