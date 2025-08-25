@@ -73,8 +73,6 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
-import scala.annotation.unused
-
 final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
