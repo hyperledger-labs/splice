@@ -228,13 +228,7 @@ class DomainMigrationInitializer(
         dsoAutomationService,
       )
       _ <- rotateGenesisGovernanceKeyForSV1(newCometBftNode, domainMigrationConfig.name)
-      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
-        decentralizedSynchronizerId,
-        dsoAutomationService,
-        svAutomation,
-        skipTrafficReconciliationTriggers = true,
-        unpauseSynchronizer = true,
-      )
+      // Do this first as scan depends on it
       _ <- new ParticipantUsersDataRestorer(
         svAutomation.connection,
         loggerFactory,
@@ -244,6 +238,13 @@ class DomainMigrationInitializer(
         upgradesConfig,
         packageVersionSupport,
         svStore.key.svParty,
+      )
+      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
+        decentralizedSynchronizerId,
+        dsoAutomationService,
+        svAutomation,
+        skipTrafficReconciliationTriggers = true,
+        unpauseSynchronizer = true,
       )
     } yield (
       decentralizedSynchronizerId,
