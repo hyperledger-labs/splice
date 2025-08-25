@@ -11,6 +11,11 @@ export function createGrafanaDashboards(namespace: Input<string>): void {
     namespace,
     `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
   );
+  createConfigMapForFolder(
+    namespace,
+    `${SPLICE_ROOT}/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/block/bftordering/examples/observability/grafana/dashboards/Canton/`,
+    'canton-bft'
+  );
 }
 
 function createdNestedConfigMapForFolder(namespace: Input<string>, folderPath: string) {

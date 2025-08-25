@@ -50,6 +50,13 @@ export default {
   ...config,
   options: {
     scenarios: {
+      adaptive_load: {
+        executor: 'externally-controlled',
+        vus: 1,
+        maxVUs: 50,
+        // How long the test lasts
+        duration: config.test.duration,
+      },
       generate_load: {
         executor: 'constant-arrival-rate',
 
