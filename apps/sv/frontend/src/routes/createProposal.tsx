@@ -4,12 +4,12 @@
 import { useSearchParams } from 'react-router-dom';
 import { createProposalActions } from '../utils/governance';
 import { SelectAction } from '../components/forms/SelectAction';
-import { CreateProposalForm } from '../components/forms/CreateProposalform';
 import { SupportedActionTag } from '../utils/types';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
 import { OffboardSvForm } from '../components/forms/OffboardSvForm';
 import { GrantRevokeFeaturedAppForm } from '../components/forms/GrantRevokeFeaturedAppForm';
 import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm';
+import { SetAmuletConfigRulesForm } from '../components/forms/SetAmuletConfigRulesForm';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
@@ -41,8 +41,8 @@ export const CreateProposal: React.FC = () => {
         );
       case 'SRARC_SetConfig':
         return <SetDsoConfigRulesForm onSubmit={onSubmit} />;
-      default:
-        return <CreateProposalForm action={selectedAction} />;
+      case 'CRARC_SetConfig':
+        return <SetAmuletConfigRulesForm onSubmit={onSubmit} />;
     }
   } else {
     return <SelectAction />;

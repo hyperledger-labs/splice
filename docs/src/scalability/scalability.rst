@@ -44,13 +44,32 @@ It does not apply to:
    preapproval when it expires. Refer to :ref:`docs
    <preapproval_renewal>` for more details.
 
-In most cases, the preferred option of bypassing the limit is to set up
-an external party directly through the `Canton APIs for external
-signing
-<https://docs.digitalasset.com/build/3.3/explanations/external-signing/external_signing_overview.html>`_.
-Either don't create a preapproval for the party or if you would like
-one ensure that you set it up with a provider party that is different
-from the validator operator as described above.
+
+Bypassing the Limit
+^^^^^^^^^^^^^^^^^^^
+
+The preferred option of bypassing the limit is to set up an external
+party either directly through the `Canton APIs for external signing
+<https://docs.digitalasset.com/build/3.3/explanations/external-signing/external_signing_overview.html>`_
+or ``/v0/admin/external-party/topology/{generate,submit}`` on the
+validator API or but *not* use the endpoints under
+``/v0/admin/external-party/setup-proposal``.
+
+If you do not need preapprovals, this is sufficient.
+
+If you do need to create preapprovals, you must ensure that you do not
+create ``ValidatorRight`` contract with the ``validator`` party set to
+the validator operator. The best option for this is to use ``#splice-wallet:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal`` to gather
+authorization from both the external party and the validator operator
+which creates the ``TransferPreapproval`` but
+does not create a ``ValidatorRight`` contract. As long as the
+``provider`` on the resulting ``TransferPreapproval`` is the validator
+operator party, the renewal automation for transfer preapprovals in
+the validator will still continue functioning. If you set it to a
+different party, you need to build your own renewal automation.
+
+Implications of bypassing the Limit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Note that bypassing the validator limit does mean that the validator
 app does not process any contracts for that party. Most notably, this
@@ -59,3 +78,7 @@ party including the fact that ``ValidatorRewardCoupon`` activity
 records generated for that party cannot be minted by the validator
 operator as this relies on the ``ValidatorRight`` contract. If this is
 required, you must build your own minting automation.
+
+You also cannot use any of the validator endpoints under
+``/v0/admin/external-party/`` for this party, e.g., to initiate a
+transfer. Instead, interact with the external party through the :ref:`token standard <token_standard>` over the ledger API.

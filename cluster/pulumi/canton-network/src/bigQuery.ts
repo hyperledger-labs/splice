@@ -5,20 +5,23 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
-import { InstalledHelmChart, installPostgresPasswordSecret } from 'splice-pulumi-common';
-import { config } from 'splice-pulumi-common/src/config';
+import {
+  InstalledHelmChart,
+  installPostgresPasswordSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import {
   Postgres,
   CloudPostgres,
   generatePassword,
   privateNetwork,
   protectCloudSql,
-} from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   ExactNamespace,
   CLUSTER_BASENAME,
   commandScriptPath,
-} from 'splice-pulumi-common/src/utils';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
 interface ScanBigQueryConfig {
   dataset: string;

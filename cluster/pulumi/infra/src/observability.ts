@@ -5,9 +5,6 @@ import * as pulumi from '@pulumi/pulumi';
 import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { local } from '@pulumi/command';
-import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
-import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
@@ -23,8 +20,11 @@ import {
   loadTesterConfig,
   ObservabilityReleaseName,
   SPLICE_ROOT,
-} from 'splice-pulumi-common';
-import { infraAffinityAndTolerations } from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { local } from '@pulumi/command';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
+import { Input } from '@pulumi/pulumi';
 
 import {
   clusterIsResetPeriodically,
@@ -158,7 +158,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
               {
                 name: 'null',
               },
-              ...(enableAlerts && enablePrometheusAlerts
+              ...(enableAlerts && enablePrometheusAlerts && slackAlertNotificationChannel
                 ? [
                     {
                       name: 'slack',
@@ -515,7 +515,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   createGrafanaDashboards(namespaceName);
   // enable the slack alerts only for "prod" clusters
   const slackAccessToken = enableAlerts ? slackToken() : 'None';
-  const slackNotificationChannel = enableAlerts ? slackAlertNotificationChannel : 'None';
+  const slackNotificationChannel = (enableAlerts && slackAlertNotificationChannel) || 'None';
   const slackHighPrioNotificationChannel =
     enableAlerts && slackHighPrioAlertNotificationChannel
       ? slackHighPrioAlertNotificationChannel

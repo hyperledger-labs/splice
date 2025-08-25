@@ -60,7 +60,7 @@ repos:
       - id: gha_lint
         name: static check github actions
         language: system
-        entry: "actionlint"
+        entry: "scripts/actionlint.sh"
         files: '^.github/.*$'
         pass_filenames: false
       - id: check-trailing-whitespace

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { CommonFormData } from './CreateProposalform';
 import { useAppForm } from '../../hooks/form';
 import { useDsoInfos } from '../../contexts/SvContext';
 import dayjs from 'dayjs';
@@ -17,14 +16,16 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { Alert, Box, Typography } from '@mui/material';
+import { useMemo } from 'react';
+import { CommonProposalFormData } from '../../utils/types';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
 
 interface ExtraFormFields {
   sv: string;
 }
 
-type OffboardSvFormData = CommonFormData & ExtraFormFields;
+type OffboardSvFormData = CommonProposalFormData & ExtraFormFields;
 
 export interface OffboardSvFormProps {
   onSubmit: (data: OffboardSvFormData, action: ActionRequiringConfirmation) => Promise<void>;
@@ -32,8 +33,6 @@ export interface OffboardSvFormProps {
 
 export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
   const { onSubmit } = props;
-
-  const [effectivityType, setEffectivityType] = useState('custom');
 
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
@@ -54,7 +53,10 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
   const defaultValues: OffboardSvFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
-    effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    effectiveDate: {
+      type: 'custom',
+      effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    },
     url: '',
     summary: '',
     sv: '',
@@ -81,7 +83,7 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
           expiration: value.expiryDate,
-          effectiveDate: value.effectiveDate,
+          effectiveDate: value.effectiveDate.effectiveDate,
         });
       },
     },
@@ -115,59 +117,20 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
         )}
       </form.AppField>
 
-      <form.Field
+      <form.AppField
         name="effectiveDate"
         validators={{
           onChange: ({ value }) => validateEffectiveDate(value),
           onBlur: ({ value }) => validateEffectiveDate(value),
         }}
-        children={_ => {
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="h5" gutterBottom>
-                Vote Proposal Effectivity
-              </Typography>
-
-              <RadioGroup
-                value={effectivityType}
-                onChange={e => setEffectivityType(e.target.value)}
-              >
-                <FormControlLabel
-                  value="custom"
-                  control={<Radio />}
-                  label={<Typography>Custom</Typography>}
-                />
-
-                {effectivityType === 'custom' && (
-                  <form.AppField name="effectiveDate">
-                    {field => (
-                      <field.DateField
-                        description="Select the date and time the proposal will take effect"
-                        minDate={dayjs(form.getFieldValue('expiryDate'))}
-                        id="offboard-sv-effective-date"
-                      />
-                    )}
-                  </form.AppField>
-                )}
-
-                <FormControlLabel
-                  value="threshold"
-                  control={<Radio />}
-                  label={
-                    <Box>
-                      <Typography>Make effective at threshold</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        This will allow the vote proposal to take effect immediately when 2/3 vote
-                        in favor
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mt: 2 }}
-                />
-              </RadioGroup>
-            </Box>
-          );
-        }}
+        children={_ => (
+          <EffectiveDateField
+            title="Vote Proposal Effectivity"
+            description="Select the date and time the proposal will take effect"
+            initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+            id="offboard-sv-effective-date"
+          />
+        )}
       />
 
       <form.AppField
@@ -211,6 +174,7 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
       </Box>
 
       <form.AppForm>
+        <form.FormErrors />
         <form.FormControls />
       </form.AppForm>
     </FormLayout>

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
-import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
+import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
+import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 
 import { isDevNet, isMainNet } from '../../common';
 import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';

@@ -3,6 +3,7 @@
 
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ConfigFieldState } from '../components/form-components/ConfigField';
 
 export interface OffBoardMemberProposal {
   memberToOffboard: string;
@@ -139,3 +140,20 @@ export type ProposalVote = {
       reason: VoteReason;
     }
 );
+
+export type ConfigFormData = Record<string, ConfigFieldState>;
+
+export interface CommonProposalFormData {
+  action: string;
+  expiryDate: string;
+  effectiveDate: Effectivity;
+  url: string;
+  summary: string;
+}
+
+export type EffectivityType = 'custom' | 'threshold';
+
+export interface Effectivity {
+  type: EffectivityType;
+  effectiveDate: string | undefined;
+}

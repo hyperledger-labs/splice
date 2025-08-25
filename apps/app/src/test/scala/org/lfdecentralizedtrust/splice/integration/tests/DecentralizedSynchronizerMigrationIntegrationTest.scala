@@ -1124,7 +1124,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
                       AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID,
                     ).map(
-                      PackageQualifiedName(_)
+                      PackageQualifiedName.getFromResources(_)
                     )
                   ),
                 )
