@@ -197,7 +197,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               aliceValidatorConfig
                 .copy(
                   // Disable bft connections as we only start sv1 scan.
-                  scanClient = TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
+                  scanClient =
+                    TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
@@ -229,7 +230,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               splitwellValidatorConfig
                 .copy(
                   // Disable bft connections as we only start sv1 scan.
-                  scanClient = TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
+                  scanClient =
+                    TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = SynchronizerAlias.tryCreate("global"),
