@@ -369,7 +369,8 @@ object MultiDomainAcsStore {
     override val ingestionFilter =
       IngestionFilter(
         primaryParty,
-        interfaceFilters.keys.toSeq,
+        // In interface filters the ledger API warns when using a package id so we convert to a package name here.
+        interfaceFilters.keys.map(PackageQualifiedName.getFromResources(_)).toSeq,
       )
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
