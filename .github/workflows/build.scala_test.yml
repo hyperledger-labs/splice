@@ -62,7 +62,7 @@ on:
         description: "Whether to disable immediate flush of logs to disk (may improve test performance, but may lose logs if the job is killed)"
         required: false
         type: boolean
-        default: "false"
+        default: false
 
 jobs:
 
