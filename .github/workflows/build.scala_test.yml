@@ -62,7 +62,7 @@ on:
 jobs:
 
   split_tests:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     name: Split the tests into parallel runs
     outputs:
       indices: ${{ steps.prep.outputs.indices }}
