@@ -19,7 +19,9 @@ Upcoming
 
   - Fix a bug where activity record expiration had a reference to the ``AmuletRules`` contract which resulted in transactions
     failing when trying to expire an activity record for a party that has not upgraded to the latest version of the
-    Daml models.
+    Daml models. This caused an issue on DevNet where transactions submitted by the SV app
+    failed repeatedly which resulted in the circuit breaker getting triggered and blocking
+    all submissions.
 
      These Daml changes requires an upgrade to the following Daml versions:
 
