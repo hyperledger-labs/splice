@@ -157,6 +157,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               config
                 .scanApps(InstanceName.tryCreate("sv1Scan"))
                 .copy(domainMigrationId = 1L)
+          ) + (
+            InstanceName.tryCreate("sv2ScanLocal") ->
+              config
+                .scanApps(InstanceName.tryCreate("sv2Scan"))
+                .copy(domainMigrationId = 1L)
           ),
           validatorApps = config.validatorApps + (
             InstanceName.tryCreate("sv1ValidatorLocal") ->
@@ -318,7 +323,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           ) compose
           ConfigTransforms
-            .bumpSomeScanAppCantonPortsBy(22_000, Seq("sv1ScanLocal")) compose
+            .bumpSomeScanAppCantonPortsBy(22_000, Seq("sv1ScanLocal", "sv2ScanLocal")) compose
           ConfigTransforms
             .bumpSomeValidatorAppCantonPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
       )
@@ -805,6 +810,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             startAllSync(
               sv1ScanLocalBackend,
+              sv2ScanLocalBackend,
               sv1ValidatorLocalBackend,
               v("splitwellValidatorLocal"),
               sw("providerSplitwellBackendLocal"),

@@ -76,6 +76,11 @@ trait CommonAppInstanceReferences {
       "sv1ScanLocal"
     )
 
+  def sv2ScanLocalBackend(implicit env: SpliceTestConsoleEnvironment): ScanAppBackendReference =
+    scanb(
+      "sv2ScanLocal"
+    )
+
   def sv2ScanBackend(implicit env: SpliceTestConsoleEnvironment): ScanAppBackendReference = scanb(
     "sv2Scan"
   )
