@@ -401,11 +401,6 @@ case class EnvironmentDefinition(
         )
     )
       .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(10_000)(conf))
-      // we bump remote app ports separately in order to not confuse
-      // the PreflightIntegrationTest which also uses bumpCantonPortsBy
-      .addConfigTransformsToFront((_, conf) =>
-        ConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
-      )
       .withTrafficTopupsDisabled
       .addConfigTransform((_, conf) =>
         ConfigTransforms
