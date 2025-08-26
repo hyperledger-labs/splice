@@ -84,10 +84,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SvTestUtil,
   WalletTestUtil,
 }
-import org.lfdecentralizedtrust.splice.validator.config.{
-  ValidatorDecentralizedSynchronizerConfig,
-  ValidatorSynchronizerConfig,
-}
 import org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
@@ -122,9 +118,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
-      )
       .addConfigTransforms((_, config) => {
         config.copy(
           svApps = config.svApps ++
@@ -163,13 +156,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               config
                 .validatorApps(InstanceName.tryCreate("sv1Validator"))
                 .copy(
-                  domains = ValidatorSynchronizerConfig(global =
-                    ValidatorDecentralizedSynchronizerConfig(
-                      alias = SynchronizerAlias.tryCreate("global"),
-                      url = Some("http://localhost:27108"),
-                    )
-                  ),
-                  domainMigrationId = 1L,
+                  domainMigrationId = 1L
                 )
           ) + (
             InstanceName.tryCreate("bobValidatorLocal") -> {
@@ -199,21 +186,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   // Disable bft connections as we only start sv1 scan.
                   scanClient =
                     TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
-                  domains = ValidatorSynchronizerConfig(global =
-                    ValidatorDecentralizedSynchronizerConfig(
-                      alias = SynchronizerAlias.tryCreate("global"),
-                      url = None,
-                    )
-                  ),
-                  participantClient = ParticipantClientConfig(
-                    FullClientConfig(port = Port.tryCreate(27502)),
-                    aliceValidatorConfig.participantClient.ledgerApi.copy(
-                      clientConfig =
-                        aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
-                          port = Port.tryCreate(27501)
-                        )
-                    ),
-                  ),
                   restoreFromMigrationDump = Some(
                     (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
                   ),
@@ -232,21 +204,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   // Disable bft connections as we only start sv1 scan.
                   scanClient =
                     TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
-                  domains = ValidatorSynchronizerConfig(global =
-                    ValidatorDecentralizedSynchronizerConfig(
-                      alias = SynchronizerAlias.tryCreate("global"),
-                      url = Some("http://localhost:27108"),
-                    )
-                  ),
-                  participantClient = ParticipantClientConfig(
-                    FullClientConfig(port = Port.tryCreate(27702)),
-                    splitwellValidatorConfig.participantClient.ledgerApi.copy(
-                      clientConfig =
-                        splitwellValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
-                          port = Port.tryCreate(27701)
-                        )
-                    ),
-                  ),
                   restoreFromMigrationDump = Some(
                     (migrationDumpDir("splitwellValidator") / "domain_migration_dump.json").path
                   ),
@@ -267,15 +224,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 config.splitwellApps(InstanceName.tryCreate("providerSplitwellBackend"))
               splitwellBackendConfig
                 .copy(
-                  participantClient = ParticipantClientConfig(
-                    FullClientConfig(port = Port.tryCreate(27702)),
-                    splitwellBackendConfig.participantClient.ledgerApi.copy(
-                      clientConfig =
-                        splitwellBackendConfig.participantClient.ledgerApi.clientConfig.copy(
-                          port = Port.tryCreate(27701)
-                        )
-                    ),
-                  ),
                   domains = SplitwellSynchronizerConfig(
                     splitwell = SplitwellDomains(
                       preferred = SynchronizerConfig(
@@ -289,34 +237,21 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             }
           ),
           splitwellAppClients = config.splitwellAppClients + (
-            InstanceName.tryCreate("aliceSplitwellLocal") -> {
-              val aliceSplitwellAppClientConfig = config
-                .splitwellAppClients(InstanceName.tryCreate("aliceSplitwell"))
-              aliceSplitwellAppClientConfig.copy(
-                participantClient = ParticipantClientConfig(
-                  FullClientConfig(port = Port.tryCreate(27502)),
-                  aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
-                    clientConfig =
-                      aliceSplitwellAppClientConfig.participantClient.ledgerApi.clientConfig.copy(
-                        port = Port.tryCreate(27501)
-                      )
-                  ),
-                )
-              )
-            }
+            InstanceName.tryCreate("aliceSplitwellLocal") -> config
+              .splitwellAppClients(InstanceName.tryCreate("aliceSplitwell"))
           ),
         )
       })
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      )
       .addConfigTransforms((_, conf) =>
-        (ConfigTransforms
-          .bumpSomeSvAppCantonPortsBy(
-            22_000,
-            Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
-          ) compose
-          ConfigTransforms
-            .bumpSomeScanAppCantonPortsBy(22_000, Seq("sv1ScanLocal")) compose
-          ConfigTransforms
-            .bumpSomeValidatorAppCantonPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
+        ConfigTransforms.bumpCantonPortsBy(
+          22_000,
+          name =>
+            // Bob actually doesn't migrate and is instead used to test unavailable validators
+            name != "bobValidatorLocal" && name.contains("Local"),
+        )(conf)
       )
       .addConfigTransform(
         // update validator app config for the aliceValidator and splitwellValidator to set the migrationDumpPath

@@ -357,19 +357,29 @@ object ConfigTransforms {
         .seq
     )
 
+  def updateAllSplitwellAppConfigs(
+      update: (String, SplitwellAppBackendConfig) => SplitwellAppBackendConfig
+  ): ConfigTransform =
+    _.focus(_.splitwellApps).modify(_.map { case (name, config) =>
+      (name, update(name.unwrap, config))
+    })
+
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform
   ): ConfigTransform =
-    _.focus(_.splitwellApps).modify(_.map { case (name, config) =>
-      (name, update(config))
+    updateAllSplitwellAppConfigs((_, config) => update(config))
+
+  def updateAllRemoteSplitwellAppConfigs(
+      update: (String, SplitwellAppClientConfig) => SplitwellAppClientConfig
+  ): ConfigTransform =
+    _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
+      (name, update(name.unwrap, config))
     })
 
   def updateAllRemoteSplitwellAppConfigs_(
       update: RemoteSplitwellAppTransform
   ): ConfigTransform =
-    _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
+    updateAllRemoteSplitwellAppConfigs((_, config) => update(config))
 
   def bumpScanCantonDomainPortsBy(bump: Int) = {
     updateAllScanAppConfigs_(
@@ -387,35 +397,51 @@ object ConfigTransforms {
     o.map(bumpUrl(bump, _))
   }
 
-  def bumpCantonPortsBy(bump: Int): ConfigTransform = {
+  def bumpCantonPortsBy(bump: Int, predicate: String => Boolean = _ => true): ConfigTransform = {
 
     val transforms = Seq(
-      updateAllSvAppConfigs_(
-        _.focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.domains.global.url)
-          .modify(_.map(bumpUrl(bump, _)))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(portTransform(bump, _)))
+      updateAllSvAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+            .focus(_.domains.global.url)
+            .modify(_.map(bumpUrl(bump, _)))
+            .focus(_.localSynchronizerNode)
+            .modify(_.map(portTransform(bump, _)))
+        else conf
       ),
-      updateAllScanAppConfigs_(
-        _.focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.sequencerAdminClient)
-          .modify(portTransform(bump, _))
-          .focus(_.bftSequencers)
-          .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
+      updateAllScanAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+            .focus(_.sequencerAdminClient)
+            .modify(portTransform(bump, _))
+            .focus(_.bftSequencers)
+            .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
+        else conf
       ),
-      updateAllValidatorConfigs_(
-        _.focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.domains.global.url)
-          .modify(bumpOptionalUrl(_, bump))
-          .focus(_.domains.extra)
-          .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
+      updateAllValidatorConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+            .focus(_.domains.global.url)
+            .modify(bumpOptionalUrl(_, bump))
+            .focus(_.domains.extra)
+            .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
+        else conf
       ),
-      updateAllSplitwellAppConfigs_(
-        _.focus(_.participantClient).modify(portTransform(bump, _))
+      updateAllSplitwellAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf.focus(_.participantClient).modify(portTransform(bump, _))
+        else conf
+      ),
+      updateAllRemoteSplitwellAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf.focus(_.participantClient).modify(portTransform(bump, _))
+        else conf
       ),
     )
 
@@ -778,16 +804,15 @@ object ConfigTransforms {
     })
 
   def useDecentralizedSynchronizerSplitwell(): ConfigTransform =
-    updateAllSplitwellAppConfigs_(c => {
-      c.copy(
-        domains = c.domains.copy(
-          splitwell = SplitwellDomains(
+    updateAllSplitwellAppConfigs_(
+      _.focus(_.domains.splitwell)
+        .replace(
+          SplitwellDomains(
             SynchronizerConfig(SynchronizerAlias.tryCreate("global")),
             Seq.empty,
           )
         )
-      )
-    })
+    ) compose updateAllValidatorAppConfigs_(_.focus(_.domains.extra).replace(Seq.empty))
 
   def modifyAllANStorageConfigs(
       storageConfigModifier: (
