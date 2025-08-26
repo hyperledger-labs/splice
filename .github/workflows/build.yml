@@ -163,8 +163,8 @@ jobs:
     with:
       runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names.log'
-      start_canton_options: -w
-      # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
+      start_canton_options: -w -I
+      disable_immediate_flush: true
       parallelism: 10
       test_name: wall-clock-time
       with_gcp_creds: true
