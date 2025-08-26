@@ -19,6 +19,8 @@
   <appender name="FILE" class="ch.qos.logback.core.FileAppender">
     <file>${LOG_FILE_NAME:-log/canton_network_test.clog}</file>
     <append>${LOG_APPEND:-true}</append>
+    <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+    <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
     <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
       <fieldNames>
         <version>[ignore]</version>
