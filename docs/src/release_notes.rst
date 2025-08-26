@@ -11,10 +11,18 @@ Release Notes
 Upcoming
 --------
 
-- SV Deployment
+- Deployment
 
-  - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
+  - SV
+    - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
 
+  - Cometbft
+    - State sync is disabled by default.
+      - State sync introduces a dependency on the sponsoring node for fetching the state snapshot on
+       startup and therefore a single point of failure. It should only be enabled when joining a
+       new node to a chain that has already been running for a while. In all other cases including
+       for a new node after it has completed initialization and after network resets, state sync
+       should be disabled.
 
 0.4.12
 ------
