@@ -27,6 +27,7 @@ abstract class SequencerBftPeerReconciler(
   override protected def diffDsoRulesWithTopology(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
+    logger.debug(s"Diffing bft peers")
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       sequencers = dsoRulesAndState
@@ -48,7 +49,9 @@ abstract class SequencerBftPeerReconciler(
             )
         )
       dsoSequencersWithoutSelf = sequencers.filter(_ != sequencerId)
+      _ = logger.debug(s"Querying sequencers from scan")
       sequencersFromScan <- getAllBftSequencers()
+      _ = logger.debug(s"Sequencers from scan: $sequencersFromScan")
       dsoSequencersWithScanInfo = dsoSequencersWithoutSelf.map { sequencerId =>
         sequencerId -> sequencersFromScan.find(scanSequencer =>
           scanSequencer.id == sequencerId && scanSequencer.migrationId == migrationId

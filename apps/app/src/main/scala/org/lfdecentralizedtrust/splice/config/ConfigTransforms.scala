@@ -678,10 +678,8 @@ object ConfigTransforms {
     transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
   }
 
-  def withBftSequencers(): ConfigTransform = {
-    updateAllSvAppConfigs_(appConfig =>
-      appConfig
-        .focus(_.localSynchronizerNode)
+  def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
+    config.focus(_.localSynchronizerNode)
         .modify(
           _.map(
             _.focus(_.sequencer).modify(
@@ -691,18 +689,21 @@ object ConfigTransforms {
             )
           )
         )
-    ) compose {
-      updateAllScanAppConfigs((scan, config) =>
+
+  def withBftSequencer(name: String, config: ScanAppBackendConfig, migrationId: Long = 0, basePort: Int = 5010): ScanAppBackendConfig =
         config.copy(
           bftSequencers = Seq(
             BftSequencerConfig(
-              0,
+              migrationId,
               config.sequencerAdminClient,
-              s"http://localhost:${5010 + Integer.parseInt(scan.stripPrefix("sv").take(1)) * 100}",
+              s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}",
             )
           )
         )
-      )
+
+  def withBftSequencers(): ConfigTransform = {
+    updateAllSvAppConfigs_(withBftSequencer(_)) compose {
+      updateAllScanAppConfigs((scan, config) => withBftSequencer(scan, config))
     }
   }
 
