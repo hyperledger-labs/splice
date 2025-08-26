@@ -1,6 +1,15 @@
--- strictly not necessary, but lets us define the constraint as mandatory afterwards,
+-- truncates are not strictly necessary, but lets us define the constraint as mandatory afterwards,
 -- and also makes index creation faster since there's no data to index
-truncate table store_last_ingested_offsets cascade;
+delete
+from store_last_ingested_offsets
+where store_id in (select id
+                   from store_descriptors
+                   where descriptor ->> 'name' IN
+                         -- these are ACS only, so we can delete everything
+                         ('DbSplitwellStore', 'DbSvSvStore', 'DbValidatorStore', 'DbExternalPartyWalletStore')
+                      -- these have txlog, preserve it. Version matches that of the txlog descriptor
+                      OR (descriptor ->> 'name' = 'DbUserWalletStore' AND descriptor ->> 'version' != 2)
+                      OR (descriptor ->> 'name' = 'DbScanStore' AND descriptor ->> 'version' != 1));
 truncate table acs_store_template cascade;
 truncate table user_wallet_acs_store cascade;
 truncate table external_party_wallet_acs_store cascade;
