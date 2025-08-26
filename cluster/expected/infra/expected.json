@@ -368,7 +368,7 @@
       },
       "helmOptions": {
         "namespace": "cert-manager",
-        "version": "1.14.5"
+        "version": "1.18.2"
       },
       "installCRDs": true,
       "tolerations": [
