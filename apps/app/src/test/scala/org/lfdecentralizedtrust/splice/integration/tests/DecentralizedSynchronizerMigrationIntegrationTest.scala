@@ -313,10 +313,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           ) compose
-          ConfigTransforms.bumpSomeSvAppCantonDomainPortsBy(
-            22_000,
-            Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
-          ) compose
           ConfigTransforms
             .bumpSomeScanAppCantonPortsBy(22_000, Seq("sv1ScanLocal")) compose
           ConfigTransforms
