@@ -90,6 +90,10 @@ inputs:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
     default: "false"
+  disable_immediate_flush:
+    description: "Whether to disable immediate flush of logs to disk (may improve test performance, but may lose logs if the job is killed)"
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -267,6 +271,9 @@ runs:
           fi
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
             ./start-frontends.sh -d -s
+          fi
+          if [[ "${{ inputs.disable_immediate_flush }}" == "true" ]]; then
+            export LOG_IMMEDIATE_FLUSH=false KMS_LOG_IMMEDIATE_FLUSH=false
           fi
           ${{ inputs.pre_sbt_cmd }}
         post_sbt_cmd: |

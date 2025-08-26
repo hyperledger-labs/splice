@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      disable_immediate_flush:
+        description: "Whether to disable immediate flush of logs to disk (may improve test performance, but may lose logs if the job is killed)"
+        required: false
+        type: boolean
+        default: "false"
 
 jobs:
 
@@ -139,5 +144,6 @@ jobs:
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
           daml_base_version: ${{ inputs.daml_base_version }}
           oss_only: ${{ inputs.oss_only }}
+          disable_immediate_flush: ${{ inputs.disable_immediate_flush }}
           artifactory_user: ${{ inputs.oss_only && '' || vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ inputs.oss_only && '' || secrets.ARTIFACTORY_PASSWORD }}
