@@ -81,7 +81,9 @@ class DbUserWalletStore(
         ),
       ),
       txLogStoreDescriptor = StoreDescriptor(
-        version = 3,
+        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
+        // to version 2 descriptors.
+        version = 2,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
