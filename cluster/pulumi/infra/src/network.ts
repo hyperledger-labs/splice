@@ -81,7 +81,7 @@ function certManager(certManagerNamespaceName: string): certmanager.CertManager 
     installCRDs: true,
     helmOptions: {
       namespace: ns.metadata.name,
-      version: '1.14.5',
+      version: '1.18.2',
     },
     ...infraAffinityAndTolerations,
     webhook: {
