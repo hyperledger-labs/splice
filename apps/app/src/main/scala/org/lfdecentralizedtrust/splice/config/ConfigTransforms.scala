@@ -371,29 +371,6 @@ object ConfigTransforms {
       (name, update(config))
     })
 
-  def bumpCantonDomainPortsBy(bump: Int): ConfigTransform =
-    bumpSvAppCantonDomainPortsBy(bump) compose bumpValidatorAppCantonDomainPortsBy(
-      bump
-    ) compose bumpScanCantonDomainPortsBy(bump)
-
-  def bumpSvAppCantonDomainPortsBy(bump: Int): ConfigTransform = {
-    updateAllSvAppConfigs_(
-      _.focus(_.domains.global.url)
-        .modify(_.map(bumpUrl(bump, _)))
-        .focus(_.localSynchronizerNode)
-        .modify(
-          _.map(d =>
-            d.copy(
-              sequencer = d.sequencer
-                .copy(
-                  externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl)
-                )
-            )
-          )
-        )
-    )
-  }
-
   def bumpScanCantonDomainPortsBy(bump: Int) = {
     updateAllScanAppConfigs_(
       _.focus(_.bftSequencers).modify(
@@ -406,20 +383,8 @@ object ConfigTransforms {
     )
   }
 
-  def bumpValidatorAppCantonDomainPortsBy(bump: Int): ConfigTransform = {
-    def bumpUrl(s: String): String = {
-      val uri = Uri(s)
-      uri.withPort(uri.effectivePort + bump).toString
-    }
-    def bumpOptionalUrl(o: Option[String]): Option[String] = {
-      o.map(bumpUrl(_))
-    }
-    updateAllValidatorConfigs_(
-      _.focus(_.domains.global.url)
-        .modify(bumpOptionalUrl(_))
-        .focus(_.domains.extra)
-        .modify(_.map(d => d.copy(url = bumpUrl(d.url))))
-    )
+  def bumpOptionalUrl(o: Option[String], bump: Int): Option[String] = {
+    o.map(bumpUrl(bump, _))
   }
 
   def bumpCantonPortsBy(bump: Int): ConfigTransform = {
@@ -428,6 +393,8 @@ object ConfigTransforms {
       updateAllSvAppConfigs_(
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
+          .focus(_.domains.global.url)
+          .modify(_.map(bumpUrl(bump, _)))
           .focus(_.localSynchronizerNode)
           .modify(_.map(portTransform(bump, _)))
       ),
@@ -442,6 +409,10 @@ object ConfigTransforms {
       updateAllValidatorConfigs_(
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
+          .focus(_.domains.global.url)
+          .modify(bumpOptionalUrl(_, bump))
+          .focus(_.domains.extra)
+          .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
       ),
       updateAllSplitwellAppConfigs_(
         _.focus(_.participantClient).modify(portTransform(bump, _))
@@ -468,6 +439,8 @@ object ConfigTransforms {
     updateAllSvAppConfigs((name, config) => {
       if (svApps.contains(name)) {
         config
+          .focus(_.domains.global.url)
+          .modify(_.map(bumpUrl(bump, _)))
           .focus(_.participantClient)
           .modify(portTransform(bump, _))
           .focus(_.localSynchronizerNode)
@@ -475,25 +448,6 @@ object ConfigTransforms {
       } else {
         config
       }
-    })
-  }
-
-  def bumpSomeSvAppCantonDomainPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
-    updateAllSvAppConfigs((name, config) => {
-      if (svApps.contains(name)) {
-        config
-          .focus(_.domains.global.url)
-          .modify(_.map(bumpUrl(bump, _)))
-          .focus(_.localSynchronizerNode)
-          .modify(
-            _.map(d =>
-              d.copy(
-                sequencer = d.sequencer
-                  .copy(externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl))
-              )
-            )
-          )
-      } else config
     })
   }
 
@@ -750,6 +704,8 @@ object ConfigTransforms {
       .modify(portTransform(bump, _))
       .focus(_.internalApi)
       .modify(portTransform(bump, _))
+      .focus(_.externalPublicApiUrl)
+      .modify(bumpUrl(bump, _))
 
   private def portTransform(bump: Int, c: SvMediatorConfig): SvMediatorConfig =
     c.focus(_.adminApi).modify(portTransform(bump, _))
