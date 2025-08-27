@@ -15,6 +15,27 @@ Upcoming
 
   - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
 
+- Daml
+
+  - Fix a bug where activity record expiration had a reference to the ``AmuletRules`` contract which resulted in transactions
+    failing when trying to expire an activity record for a party that has not upgraded to the latest version of the
+    Daml models. This caused an issue on DevNet where transactions submitted by the SV app
+    failed repeatedly which resulted in the circuit breaker getting triggered and blocking
+    all submissions.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.18
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
+
 
 0.4.12
 ------
