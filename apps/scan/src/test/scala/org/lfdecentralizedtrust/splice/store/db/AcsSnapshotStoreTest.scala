@@ -852,7 +852,7 @@ class AcsSnapshotStoreTest
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
-      storage.underlying, // not under test
+      rawStorage, // not under test
       new DomainMigrationInfo(migrationId, None),
       "update_history_acs_snapshot_test",
       mkParticipantId(participantId),
@@ -872,7 +872,7 @@ class AcsSnapshotStoreTest
     new AcsSnapshotStore(
       // we're guaranteed to only execute the insert once (in the context of AcsSnapshotTrigger),
       // and the insert query is already complicated enough as-is, so I'm not gonna make it worse just for tests.
-      storage.underlying,
+      rawStorage,
       updateHistory,
       migrationId,
       loggerFactory,

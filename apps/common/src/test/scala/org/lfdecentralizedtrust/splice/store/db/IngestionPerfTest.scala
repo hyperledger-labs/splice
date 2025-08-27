@@ -4,6 +4,7 @@ import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
@@ -22,6 +23,7 @@ import scala.concurrent.Future
 class IngestionPerfTest
     extends MultiDomainAcsStoreTest[DbMultiDomainAcsStore[TestTxLogEntry]]
     with SplicePostgresTest
+    with DbTest.DisableDbStorageIdempotency
     with HasActorSystem
     with AcsJdbcTypes {
 

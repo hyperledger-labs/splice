@@ -16,10 +16,9 @@ import slick.sql.SqlAction
 trait DatabaseLimitNbParamTest
     extends BaseTestWordSpec
     with BeforeAndAfterAll
-    with HasExecutionContext {
-  this: DbTest =>
+    with HasExecutionContext
+    with DbTest.DisableDbStorageIdempotency {
 
-  lazy val rawStorage: DbStorage = storage.underlying
   import rawStorage.api.*
 
   def createTableAction: SqlAction[Int, NoStream, Effect.Write]
