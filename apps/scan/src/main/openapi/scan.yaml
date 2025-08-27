@@ -1551,6 +1551,63 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/events/:
+    post:
+      x-jvm-package: scan
+      operationId: "getEventHistory"
+      description: |
+        Returns the event history in ascending order, paged, from ledger begin or optionally starting after a record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/EventHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/events/{event_id}:
+    get:
+      x-jvm-package: scan
+      operationId: "getEventById"
+      description: |
+        Returns the event with the given update_id.
+      parameters:
+        - name: "event_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "lossless"
+          in: "query"
+          description: |
+            Whether contract payload should be encoded into json using a lossless, but much harder to process, encoding.
+            This is mostly used for backend calls, and is not recommended for external users.
+            Optional and defaults to false.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -3617,3 +3674,103 @@ components:
 
             To determine the progress of individual backfilling processes, inspect the corresponding metrics.
           type: boolean
+    EventHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The events returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of events returned for this request.
+          type: integer
+          format: int32
+        daml_value_encoding:
+          $ref: "#/components/schemas/DamlValueEncoding"
+    EventHistoryResponse:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventHistoryItem"
+    EventHistoryItem:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a verdict.
+      properties:
+        update:
+          $ref: "#/components/schemas/UpdateHistoryItemV2"
+          nullable: true
+        verdict:
+          $ref: "#/components/schemas/EventHistoryVerdict"
+          nullable: true
+    EventHistoryVerdict:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - domain_id
+        - mediator_group
+        - submitting_participant_uid
+        - submitting_parties
+        - record_time
+        - finalization_time
+        - verdict_result
+        - transaction_root_views
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        migration_id:
+          description: |
+            The migration_id of this verdict
+          type: integer
+          format: int64
+        domain_id:
+          description: |
+            The id of the domain through which this transaction was sequenced.
+          type: string
+        mediator_group:
+          description: |
+            XXX
+          type: integer
+          format: int32
+        submitting_participant_uid:
+          description: |
+            XXX
+          type: string
+        submitting_parties:
+          description: |
+            XXX
+          type: array
+          items:
+            type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced.
+          type: string
+        finalization_time:
+          description: |
+            XXX
+          type: string
+        verdict_result:
+          description: |
+            XXX
+          type: integer
+          format: int32
+        transaction_root_views:
+          description: |
+            XXX
+          type: array
+          items:
+            type: integer
+            format: int32
