@@ -39,10 +39,14 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   MaybeCachedContractWithState,
   UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
+  EventHistoryItem,
+  EventHistoryRequest,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -100,6 +104,7 @@ class HttpScanHandler(
     sequencerAdminConnection: SequencerAdminConnection,
     protected val store: ScanStore,
     snapshotStore: AcsSnapshotStore,
+    verdictStore: DbScanVerdictStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
@@ -830,6 +835,115 @@ class HttpScanHandler(
         extracted,
       )
         .map(items => definitions.UpdateHistoryResponseV2(items.map(toUpdateV2)))
+    }
+  }
+
+  def getEventById(
+      updateId: String,
+      encoding: definitions.DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Either[definitions.ErrorResponse, definitions.EventHistoryItem]] = {
+    implicit val tc = extracted
+    for {
+      tx <- store.updateHistory.getUpdate(updateId)
+      verdict <- verdictStore.getVerdictByUpdateId(updateId)
+    } yield {
+      (tx.isEmpty && verdict.isEmpty) match {
+        case true => Left(
+          definitions.ErrorResponse(s"Event with id $updateId not found")
+        )
+        case false => Right(
+          ScanHttpEncodings.encodeEvent(tx, verdict, encoding, ScanHttpEncodings.V1)
+        )
+      }
+    }
+  }
+
+  override def getEventById(respond: ScanResource.GetEventByIdResponse.type)(
+      updateId: String,
+      lossless: Option[Boolean],
+  )(extracted: TraceContext): Future[ScanResource.GetEventByIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getEventById") { _ => _ =>
+      val encoding = if (lossless.getOrElse(false)) {
+        definitions.DamlValueEncoding.ProtobufJson
+      } else {
+        definitions.DamlValueEncoding.CompactJson
+      }
+      getEventById(
+        updateId = updateId,
+        encoding = encoding,
+        extracted,
+      ).map {
+        case Left(error) => ScanResource.GetEventByIdResponse.NotFound(error)
+        case Right(update) => ScanResource.GetEventByIdResponse.OK(update)
+      }
+    }
+  }
+
+
+  def getEventHistory(
+      after: Option[definitions.UpdateHistoryRequestAfter] = None,
+      pageSize: Int,
+      encoding: definitions.DamlValueEncoding,
+      includeImportUpdates: Boolean,
+      extracted: TraceContext,
+  ): Future[Vector[definitions.EventHistoryItem]] = {
+    implicit val tc: TraceContext = extracted
+    val updateHistory = store.updateHistory
+    val afterO = after.map { after =>
+      val afterRecordTime = parseTimestamp(after.afterRecordTime)
+      (
+        after.afterMigrationId,
+        afterRecordTime,
+      )
+    }
+    updateHistory
+      .getBackfillingState()
+      .flatMap {
+        case BackfillingState.NotInitialized =>
+          throw Status.UNAVAILABLE
+            .withDescription(
+              "This scan instance has not yet loaded its events history. Wait a short time and retry."
+            )
+            .asRuntimeException()
+        case BackfillingState.InProgress(_, _) =>
+          throw Status.UNAVAILABLE
+            .withDescription(
+              "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
+                "Wait until replication is complete, or connect to a different scan instance."
+            )
+            .asRuntimeException()
+        case BackfillingState.Complete =>
+          for {
+            events <- Future.successful(List.empty) // stub
+          } yield events.toVector
+            // .map(
+            //   ScanHttpEncodings.encodeEvent(
+            //     _,
+            //     _,
+            //     encoding = encoding,
+            //     version = ScanHttpEncodings.V1
+            //   )
+            // )
+            // .toVector
+      }
+  }
+
+
+  override def getEventHistory(respond: ScanResource.GetEventHistoryResponse.type)(
+      request: EventHistoryRequest
+  )(extracted: TraceContext): Future[ScanResource.GetEventHistoryResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getEventHistory") { _ => _ =>
+      getEventHistory(
+        after = request.after,
+        pageSize = request.pageSize,
+        encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+        includeImportUpdates = false,
+        extracted,
+      )
+        .map(items => definitions.EventHistoryResponse(items))
     }
   }
 
