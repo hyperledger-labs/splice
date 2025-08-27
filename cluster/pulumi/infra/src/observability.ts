@@ -756,7 +756,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   .join('')
               )
               .replaceAll(
-                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE',
+                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
               )
               .replaceAll(
@@ -764,7 +764,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
               )
               .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE',
+                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
               )
               .replaceAll(

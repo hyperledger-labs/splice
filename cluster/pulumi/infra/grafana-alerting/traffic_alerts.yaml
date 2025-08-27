@@ -75,7 +75,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (migration_id) (sum by (namespace, migration_id) (rate(daml_sequencer_block_events_total{type="send-confirmation-request"}[$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGEm])))
+              expr: max by (migration_id) (sum by (namespace, migration_id) (rate(daml_sequencer_block_events_total{type="send-confirmation-request"}[$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINSm])))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -114,9 +114,9 @@ groups:
         annotations:
           __dashboardUid__: fdjrxql2alblsd
           __panelId__: "1"
-          description: The total confirmation requests send rate on migration ID {{ $labels.migration_id }} exceeded the threshold with a value of {{ $CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD }} in the last $CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGEm
+          description: The total confirmation requests send rate on migration ID {{ $labels.migration_id }} exceeded the threshold with a value of {{ $CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD }} in the last $CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINSm
           severity: critical
-          summary: Total confirmation requests on migration ID {{ $labels.migration_id }} exceeded the threshold ($CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD in the last $CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGEm)
+          summary: Total confirmation requests on migration ID {{ $labels.migration_id }} exceeded the threshold ($CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD in the last $CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINSm)
         labels: {}
         isPaused: false
       - uid: 88b8827c8d09
@@ -130,7 +130,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (member, migration_id) (rate(daml_sequencer_block_events_total{type="send-confirmation-request"}[$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGEm]))
+              expr: max by (member, migration_id) (rate(daml_sequencer_block_events_total{type="send-confirmation-request"}[$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINSm]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -169,8 +169,8 @@ groups:
         annotations:
           __dashboardUid__: fdjrxql2alblsd
           __panelId__: "1"
-          description: The confirmation requests send rate of member {{ $labels.member }} on migration ID {{ $labels.migration_id }} exceeded the threshold with a value of {{ $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD }} in the last $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGEm
+          description: The confirmation requests send rate of member {{ $labels.member }} on migration ID {{ $labels.migration_id }} exceeded the threshold with a value of {{ $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD }} in the last $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINSm
           severity: critical
-          summary: Confirmation requests by member {{ $labels.member }} on migration ID {{ $labels.migration_id }} exceeded the threshold ($CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD in the last $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGEm)
+          summary: Confirmation requests by member {{ $labels.member }} on migration ID {{ $labels.migration_id }} exceeded the threshold ($CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD in the last $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINSm)
         labels: {}
         isPaused: false
