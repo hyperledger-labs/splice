@@ -123,10 +123,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def providerParty(i: Int) = mkPartyId(s"provider-$i")
 
-  /** @param n must 0-9
+  /** @param n must 0-999999
     * @param suffix must be a hex string
     */
-  protected def validContractId(n: Int, suffix: String = "00"): String = "00" + s"0$n" * 31 + suffix
+  protected def validContractId(n: Int, suffix: String = "00"): String = "00" + (() match {
+    case _ if n < 0 => fail(s"negative validContractId: $n")
+    case _ if n <= 999999 => ("%06d" format n) * 10 + "00"
+    case _ => fail(s"too large validContractId: $n")
+  }) + suffix
 
   private var cIdCounter = 0
 
