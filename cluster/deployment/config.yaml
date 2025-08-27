@@ -73,6 +73,8 @@ monitoring:
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
+      # confirmation requests correspond to new ledger submissions;
+      # we alert if the rate is higher than expected to spot potential overload situations
       confirmationRequests:
         total:
           rate: 10
