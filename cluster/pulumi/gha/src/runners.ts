@@ -1,20 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
-import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kubernetes/core/v1';
-import { Release } from '@pulumi/kubernetes/helm/v3';
-import { Role } from '@pulumi/kubernetes/rbac/v1';
-import { Resource } from '@pulumi/pulumi';
-import yaml from 'js-yaml';
 import {
   appsAffinityAndTolerations,
   DOCKER_REPO,
   HELM_MAX_HISTORY_SIZE,
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
-} from 'splice-pulumi-common';
-import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/dockerConfig';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
+import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kubernetes/core/v1';
+import { Release } from '@pulumi/kubernetes/helm/v3';
+import { Role } from '@pulumi/kubernetes/rbac/v1';
+import { Resource } from '@pulumi/pulumi';
+import yaml from 'js-yaml';
 
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
@@ -123,6 +123,20 @@ const runnerSpecs = [
   },
 ];
 
+const localnetHostAliases = [
+  {
+    ip: '127.0.0.1',
+    hostnames: [
+      // Used by the localnet tests
+      'ans.localhost',
+      'canton.localhost',
+      'scan.localhost',
+      'sv.localhost',
+      'wallet.localhost',
+    ],
+  },
+];
+
 function installDockerRunnerScaleSet(
   name: string,
   runnersNamespace: Namespace,
@@ -153,6 +167,7 @@ function installDockerRunnerScaleSet(
         },
         template: {
           spec: {
+            hostAliases: localnetHostAliases,
             initContainers: [
               {
                 name: 'init-dind-externals',
@@ -396,6 +411,7 @@ function installK8sRunnerScaleSet(
       data: {
         'pod.yaml': yaml.dump({
           spec: {
+            hostAliases: localnetHostAliases,
             volumes: [
               {
                 name: 'cache',

@@ -1,14 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { RestHandler, rest } from 'msw';
-import { LookupTransferPreapprovalByPartyResponse } from 'scan-openapi';
+import { LookupTransferPreapprovalByPartyResponse } from '@lfdecentralizedtrust/scan-openapi';
 import {
   GetAmuletRulesProxyResponse,
   GetOpenAndIssuingMiningRoundsProxyResponse,
   LookupEntryByPartyResponse,
-} from 'scan-proxy-openapi';
-import { ListTransferOffersResponse } from 'wallet-external-openapi';
-import { GetBalanceResponse, ListTransactionsResponse, UserStatusResponse } from 'wallet-openapi';
+} from '@lfdecentralizedtrust/scan-proxy-openapi';
+import { ListTransferOffersResponse } from '@lfdecentralizedtrust/wallet-external-openapi';
+import {
+  GetBalanceResponse,
+  ListTransactionsResponse,
+  UserStatusResponse,
+} from '@lfdecentralizedtrust/wallet-openapi';
 
 import {
   aliceEntry,

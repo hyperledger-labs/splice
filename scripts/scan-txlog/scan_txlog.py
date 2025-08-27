@@ -3282,12 +3282,19 @@ class State:
         return HandleTransactionResult.empty()
 
     def handle_claim_expired_rewards(self, transaction, event):
-        assert len(event.child_event_ids) == 1
-        amulet_rules_event = transaction.events_by_id[event.child_event_ids[0]]
+        # We support both the new models where DsoRules_ClaimExpiredRewardCoupons directly archives
+        # and the old models where it goes through AmuletRules_ClaimExpiredRewardCoupons
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(event, ExercisedEvent)
+                and event.choice_name == "AmuletRules_ClaimExpiredRewardCoupons"
+            ):
+                event = child_event
         rewards = []
         rewards_lines = []
         round = 0
-        for event_id in amulet_rules_event.child_event_ids:
+        for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
             if isinstance(event, CreatedEvent):
                 match event.template_id.qualified_name:

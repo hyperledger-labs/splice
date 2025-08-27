@@ -100,8 +100,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       },
     )
     actAndCheck(
-      "sv1 updates his vote, sv2, sv3 and sv4 reject the vote request",
-      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
+      "sv1 updates his vote, sv2 and sv3 reject the vote request",
+      Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
         sv.castVote(
           voteRequest.contractId,
           false,

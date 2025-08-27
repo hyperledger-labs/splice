@@ -3,7 +3,6 @@
 
 app_charts := \
 	splice-cluster-ingress-runbook \
-	splice-cluster-loopback-gateway \
 	splice-cometbft \
 	cn-docs \
 	splice-domain \

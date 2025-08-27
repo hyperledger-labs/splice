@@ -123,13 +123,26 @@ class AnsSubscriptionInitialPaymentTrigger(
                                   s"skipping as collection of this initial payment has already been confirmed with confirmation ${c}"
                                 ).pure[Future]
                               case None =>
-                                confirmCollectPayment(
-                                  ansContext.contract.contractId,
-                                  payment.contractId,
-                                  entryName,
-                                  transferContext,
-                                  offset,
-                                )
+                                // there is the chance that the confirmation got used and archived already,
+                                // so we do one last check before collecting the payment
+                                dsoStore
+                                  .lookupAnsEntryByName(entryName, context.clock.now)
+                                  .flatMap {
+                                    case Some(entry) =>
+                                      confirmToReject(
+                                        s"entry already exists and owned by ${entry.payload.user}."
+                                      )
+                                    case None =>
+                                      // most likely a relevant confirmation never existed;
+                                      // possibly it did but got archived without resulting in an ans entry, which is safe too
+                                      confirmCollectPayment(
+                                        ansContext.contract.contractId,
+                                        payment.contractId,
+                                        entryName,
+                                        transferContext,
+                                        offset,
+                                      )
+                                  }
                             }
                         }
                     }

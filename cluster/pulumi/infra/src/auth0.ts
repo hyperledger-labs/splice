@@ -8,7 +8,7 @@ import {
   ansDomainPrefix,
   config,
   isMainNet,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 function newUiApp(
   resourceName: string,

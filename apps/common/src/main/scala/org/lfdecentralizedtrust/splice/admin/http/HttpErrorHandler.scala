@@ -30,6 +30,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Printer
 import io.circe.syntax.*
 import io.grpc.{Status, StatusRuntimeException}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
@@ -152,6 +153,14 @@ final class HttpErrorHandler(
         extractUri { uri =>
           logger.info(s"Request to $uri resulted in an HTTP exception: ${message}")
           completeErrorResponse(code, message)
+        }
+      case HttpCommandException(request, status, responseBody) =>
+        extractUri { uri =>
+          logger.info(
+            s"Request to $uri resulted in an HTTP command exception: ${responseBody.message}",
+            request,
+          )
+          completeErrorResponse(status, responseBody.message)
         }
       case e: StatusRuntimeException =>
         extractUri { uri =>

@@ -278,6 +278,10 @@ spec:
               tx-log-backfill-batch-size = "{{ .batchSize }}"
             }
         {{- end }}
+        {{- with .Values.maxVettingDelay }}
+        - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
+          value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http

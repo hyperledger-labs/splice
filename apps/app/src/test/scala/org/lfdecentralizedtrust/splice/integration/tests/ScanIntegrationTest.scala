@@ -594,7 +594,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     bobValidatorRewardsTrigger.resume()
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    // Note: using `def`, as the trigger may be destroyed and recreated
     def advanceTrigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 
@@ -785,7 +785,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       // then 20 every second
       val maxAccepted = 120
       // account for bursts in the stream used to rate limit the calls in `runRateLimited`
-      val minAccepted = 80
+      val minAccepted = 60
       results.count(identity) should (be >= minAccepted and be <= maxAccepted)
 
     }

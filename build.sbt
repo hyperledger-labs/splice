@@ -848,16 +848,16 @@ lazy val `apps-validator` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "validator-openapi",
+        npmName = "@lfdecentralizedtrust/validator-openapi",
         openApiSpec = "validator-internal.yaml",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "ans-external-openapi",
+        npmName = "@lfdecentralizedtrust/ans-external-openapi",
         openApiSpec = "ans-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "scan-proxy-openapi",
+        npmName = "@lfdecentralizedtrust/scan-proxy-openapi",
         openApiSpec = "scan-proxy.yaml",
         directory = "scan-proxy-openapi-ts-client",
       ),
@@ -899,7 +899,7 @@ lazy val `apps-sv` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "sv-openapi",
+        npmName = "@lfdecentralizedtrust/sv-openapi",
         openApiSpec = "sv-internal.yaml",
       ),
       Compile / guardrailTasks :=
@@ -925,7 +925,7 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "scan-openapi",
+        npmName = "@lfdecentralizedtrust/scan-openapi",
         openApiSpec = "scan.yaml",
       ),
       Compile / guardrailTasks :=
@@ -1304,12 +1304,12 @@ lazy val `apps-wallet` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "wallet-external-openapi",
+        npmName = "@lfdecentralizedtrust/wallet-external-openapi",
         openApiSpec = "wallet-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "wallet-openapi",
+        npmName = "@lfdecentralizedtrust/wallet-openapi",
         openApiSpec = "wallet-internal.yaml",
       ),
       Compile / guardrailTasks :=
@@ -1342,7 +1342,7 @@ lazy val `apps-splitwell` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "splitwell-openapi",
+        npmName = "@lfdecentralizedtrust/splitwell-openapi",
         openApiSpec = "splitwell-internal.yaml",
       ),
       BuildCommon.sharedAppSettings,

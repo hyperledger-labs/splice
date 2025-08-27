@@ -1,13 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { Resource } from '@pulumi/pulumi';
 import {
   DecentralizedSynchronizerUpgradeConfig,
   GCP_PROJECT,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { Resource } from '@pulumi/pulumi';
 
 export type ChaosMeshArguments = {
   dependsOn: Resource[];
@@ -153,9 +153,6 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
       },
       values: {
         controllerManager: {
-          leaderElection: {
-            enabled: false,
-          },
           ...infraAffinityAndTolerations,
         },
         chaosDaemon: {

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import * as pulumi from '@pulumi/pulumi';
-import * as postgres from 'splice-pulumi-common/src/postgres';
 import {
   activeVersion,
   ansDomainPrefix,
@@ -17,11 +17,15 @@ import {
   failOnAppVersionMismatch,
   imagePullSecret,
   installAuth0Secret,
+  installLoopback,
   installSpliceHelmChart,
   ValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { installParticipant, splitwellDarPaths } from 'splice-pulumi-common-validator';
-import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  installParticipant,
+  splitwellDarPaths,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
 import { splitwellConfig } from '../../common/src/config/splitwellConfig';
 
@@ -47,18 +51,7 @@ export async function installSplitwell(
         splitPostgresInstances
       );
 
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -73,7 +66,7 @@ export async function installSplitwell(
     decentralizedSynchronizerMigrationConfig.active.version,
     sharedPostgres,
     {
-      dependsOn: imagePullDeps.concat([loopback]),
+      dependsOn: imagePullDeps.concat(loopback),
     }
   );
 

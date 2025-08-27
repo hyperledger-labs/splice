@@ -3,7 +3,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
-import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   CLUSTER_BASENAME,
@@ -21,8 +20,9 @@ import {
   SpliceCustomResourceOptions,
   svCometBftKeysFromSecret,
   withAddedDependencies,
-} from 'splice-pulumi-common';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
+import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 
 import { svsConfig } from '../config';
 import { SingleSvConfiguration } from '../singleSvConfig';
@@ -76,6 +76,7 @@ export function installCometBftNode(
   enableStateSync: boolean = !disableCometBftStateSync,
   enableTimeoutCommit: boolean = false,
   imagePullServiceAccountName?: string,
+  disableProtection?: boolean,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
@@ -116,20 +117,6 @@ export function installCometBftNode(
       enableTimeoutCommit,
     },
     logLevel: svConfiguration.logging?.cometbftLogLevel,
-    peers: nodeConfigs.peers
-      .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
-      .map(peer => {
-        /*
-         * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
-         * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
-         * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
-         * sending the traffic through the loopback to satisfy the firewall rules
-         * */
-        return {
-          nodeId: peer.id,
-          externalAddress: nodeConfigs.p2pServiceAddress(peer.id),
-        };
-      }),
     stateSync: {
       ...cometBftValues.stateSync,
       enable: stateSyncEnabled,
@@ -209,6 +196,7 @@ export function installCometBftNode(
       ),
     ];
   }
+  const protectCometBft = svsConfig?.cometbft?.protected ?? false;
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -220,6 +208,7 @@ export function installCometBftNode(
       ...withAddedDependencies(opts, volumeDependecies.concat(keysSecret ? [keysSecret] : [])),
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
+      protect: disableProtection ? false : protectCometBft,
     }
   );
   return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };

@@ -1,9 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { CLUSTER_HOSTNAME } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 import { Lifted, OutputInstance } from '@pulumi/pulumi';
-import { CLUSTER_HOSTNAME } from 'splice-pulumi-common/src/utils';
 
-import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './cometbftConfig';
+import {
+  StaticCometBftConfig,
+  StaticCometBftConfigWithNodeName,
+  cometBFTExternalPort,
+} from './cometbftConfig';
 
 export interface CometBftNodeConfig extends Omit<StaticCometBftConfig, 'nodeIndex'> {
   istioPort: number;
@@ -37,7 +41,7 @@ export class CometBftNodeConfigs {
       privateKey: staticConf.privateKey,
       identifier: this.nodeIdentifier,
       externalAddress: this.p2pExternalAddress(staticConf.nodeIndex),
-      istioPort: this.istioExternalPort(staticConf.nodeIndex),
+      istioPort: cometBFTExternalPort(this._domainMigrationId, staticConf.nodeIndex),
       retainBlocks: staticConf.retainBlocks,
       validator: staticConf.validator,
     };
@@ -82,13 +86,6 @@ export class CometBftNodeConfigs {
   }
 
   private p2pExternalAddress(nodeIndex: number): string {
-    return `${CLUSTER_HOSTNAME}:${this.istioExternalPort(nodeIndex)}`;
-  }
-
-  private istioExternalPort(nodeIndex: number) {
-    // TODO(DACH-NY/canton-network-node#10482) Revisit port scheme
-    return nodeIndex >= 10
-      ? Number(`26${this._domainMigrationId}${nodeIndex}`)
-      : Number(`26${this._domainMigrationId}${nodeIndex}6`);
+    return `cometbft.${CLUSTER_HOSTNAME}:${cometBFTExternalPort(this._domainMigrationId, nodeIndex)}`;
   }
 }

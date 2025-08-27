@@ -10,8 +10,10 @@ import com.digitalasset.canton.admin.api.client.commands.{
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.DarDescription
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.{VettedPackage, VettedPackages}
@@ -70,11 +72,16 @@ trait ParticipantAdminDarsConnection {
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
       _ <- MonadUtil.sequentialTraverse(domains) { domainId =>
-        vetDars(domainId, Seq(darResource), None)
+        vetDars(domainId, Seq(darResource), None, maxVettingDelay = None)
       }
     } yield ()
 
-  def vetDars(domainId: SynchronizerId, dars: Seq[DarResource], fromDate: Option[Instant])(implicit
+  def vetDars(
+      domainId: SynchronizerId,
+      dars: Seq[DarResource],
+      fromDate: Option[Instant],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+  )(implicit
       tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
@@ -105,6 +112,7 @@ trait ParticipantAdminDarsConnection {
           )
         ),
       RetryFor.Automation,
+      maxSubmissionDelay = maxVettingDelay,
     ).flatMap(_ =>
       retryProvider.waitUntil(
         RetryFor.Automation,

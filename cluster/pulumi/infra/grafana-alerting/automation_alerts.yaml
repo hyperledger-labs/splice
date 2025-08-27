@@ -184,7 +184,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_completed_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger|TxLogBackfillingTrigger"}[5m]))
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_completed_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger|TxLogBackfillingTrigger|ReportValidatorLicenseMetricsExportTrigger"}[5m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -231,7 +231,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
           runbook_url: ""
           severity: |-
-              {{- if (gt $values.runs.Value 2) -}}
+              {{- if and $values.runs (gt $values.runs.Value 2.0) -}}
               critical
               {{- else -}}
               warning
@@ -299,7 +299,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
           runbook_url: ""
           severity: |-
-              {{- if (gt $values.runs.Value 2) -}}
+              {{- if and $values.runs (gt $values.runs.Value 2.0) -}}
               critical
               {{- else -}}
               warning
@@ -376,7 +376,15 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by(namespace)(rate(splice_history_txlog_backfilling_transaction_count[5m]) > 0 or splice_history_txlog_backfilling_completed)
+              expr: |-
+                max by(namespace)(
+                  rate(splice_history_txlog_backfilling_transaction_count[5m]) > 0 or
+                  splice_history_txlog_backfilling_completed or
+                  # TxLog backfilling can't start until history backfilling is completed
+                  absent(splice_history_backfilling_completed) or
+                  # Note: "== bool" is a boolean operator, "==" is a filter
+                  (splice_history_backfilling_completed == bool 0)
+                )
               instant: true
               intervalMs: 1000
               legendFormat: __auto

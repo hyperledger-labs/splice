@@ -294,10 +294,6 @@ class SvDsoAutomationService(
     if (config.automation.enableClosedRoundArchival)
       registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, dsoStore, connection))
 
-    if (config.automation.enableDsoDelegateReplacementTrigger) {
-      registerTrigger(new ElectionRequestTrigger(triggerContext, dsoStore, connection))
-    }
-
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
     registerTrigger(
@@ -313,6 +309,7 @@ class SvDsoAutomationService(
         participantAdminConnection,
         dsoStore,
         triggerContext,
+        config.maxVettingDelay,
       )
     )
 
@@ -459,7 +456,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[ReceiveSvRewardCouponTrigger],
       aTrigger[ArchiveClosedMiningRoundsTrigger],
-      aTrigger[ElectionRequestTrigger],
       aTrigger[RestartDsoDelegateBasedAutomationTrigger],
       aTrigger[AnsSubscriptionInitialPaymentTrigger],
       aTrigger[SvPackageVettingTrigger],

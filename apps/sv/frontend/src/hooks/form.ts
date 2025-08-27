@@ -8,16 +8,23 @@ import { TextField } from '../components/form-components/TextField';
 import { TextArea } from '../components/form-components/TextArea';
 import { SelectField } from '../components/form-components/SelectField';
 import { ConfigField } from '../components/form-components/ConfigField';
+import { FormControls } from '../components/form-components/FormControls';
+import { EffectiveDateField } from '../components/form-components/EffectiveDateField';
+import { FormErrors } from '../components/form-components/FormErrors';
 
 export const { useAppForm } = createFormHook({
   fieldComponents: {
     ConfigField,
     DateField,
+    EffectiveDateField,
     SelectField,
     TextArea,
     TextField,
   },
-  formComponents: {},
+  formComponents: {
+    FormControls,
+    FormErrors,
+  },
   fieldContext,
   formContext,
 });

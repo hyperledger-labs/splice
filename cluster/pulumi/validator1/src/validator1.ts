@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import * as pulumi from '@pulumi/pulumi';
-import * as postgres from 'splice-pulumi-common/src/postgres';
 import {
   Auth0Client,
   BackupConfig,
@@ -18,14 +18,17 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
-  DecentralizedSynchronizerUpgradeConfig,
-} from 'splice-pulumi-common';
-import { installParticipant, splitwellDarPaths } from 'splice-pulumi-common-validator';
+  installLoopback,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  installParticipant,
+  splitwellDarPaths,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
   installValidatorSecrets,
-} from 'splice-pulumi-common-validator/src/validator';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
 import { validator1Config } from './config';
 
@@ -44,22 +47,7 @@ export async function installValidator1(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-      cometbftPorts: {
-        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
-        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
 
   const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
@@ -80,7 +68,7 @@ export async function installValidator1(
     auth0AppName: 'validator1',
   });
 
-  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat([loopback]);
+  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
   const participant = installParticipant(
     validator1Config,

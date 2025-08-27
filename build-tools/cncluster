@@ -334,6 +334,14 @@ function _prompt_to_confirm() {
    USER_PROMPT_CONFIRMED=1
 }
 
+function _get_logging_components() {
+    if env-bool SELF_HOSTED_FLUENT_BIT; then
+        echo "SYSTEM"
+    else
+        echo "SYSTEM,WORKLOAD"
+    fi
+}
+
 ###
 
 subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to administer the cluster.'
@@ -658,15 +666,14 @@ function subcmd_create() {
             location_arg=(--region "${CLOUDSDK_COMPUTE_REGION}" --node-locations "${CLOUDSDK_COMPUTE_REGION}-a")
         fi
 
-        #### Cluster can be resized from deployment directories with the following command:
-        ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
+        ### The default cluster pool should be removed after running the pulumi cluster project that creates the node pools we actually use
         gcloud container clusters create "${GCP_CLUSTER_NAME}" \
                --create-subnetwork name="${GCP_CLUSTER_NAME}-subnet" \
                --enable-dataplane-v2 \
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
-               --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
+               --machine-type "e2-standard-8" \
                --num-nodes 1 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
@@ -676,8 +683,8 @@ function subcmd_create() {
                --cluster-dns-scope=cluster \
                --enable-autoscaling \
                --min-nodes 0 \
-               --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
-               --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
+               --max-nodes 2 \
+               --logging="$(_get_logging_components)" \
                "${location_arg[@]}"
 
         #### Set maintenance window
@@ -790,10 +797,16 @@ function subcmd_cluster_update_access() {
            --master-authorized-networks "${K8S_CONTROL_PLANE_NETS}"
 }
 
+subcommand_whitelist[cluster_update_logging]='Update cluster logging config.'
+
+function subcmd_cluster_update_logging() {
+    gcloud container clusters update "${GCP_CLUSTER_NAME}" --logging="$(_get_logging_components)"
+}
+
 maintenance_windows=(
   # CI-ish window
   "FREQ=WEEKLY;BYDAY=SA,SU" "2024-01-01T08:00:00Z" "2024-01-01T20:00:00Z"
-  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciupgradenet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
+  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
   # prod-like window
   "FREQ=WEEKLY;BYDAY=TU,WE,TH" "2024-01-01T08:00:00Z" "2024-01-01T12:00:00Z"
   "cn-cilrnet,cn-token-std-devnet,cn-testnet,cn-devnet,cn-testzrhnet,cn-mainnet,cn-mainzrhnet"
@@ -1273,7 +1286,7 @@ function subcmd_partial_upgrade() {
 
 ###
 
-subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in ciupgrade"
+subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in upgrade test"
 
 function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"
@@ -1999,7 +2012,7 @@ function _create_grafana_silence() {
     _info "Adding silence with the following: $startsAt, $endsAt, $createdBy, $comment"
 
     curl -sSL --fail-with-body \
-        "https://public.${GCP_CLUSTER_HOSTNAME}/grafana/api/alertmanager/grafana/api/v2/silences" \
+        "https://grafana.${GCP_CLUSTER_HOSTNAME}/api/alertmanager/grafana/api/v2/silences" \
         -H 'content-type: application/json' \
         --request POST \
         -H "x-non-jwt-auth: Bearer ${token}" \
@@ -2011,7 +2024,6 @@ function _create_grafana_silence() {
             \"matchers\":$matchers
             }" || _warning "Failed to silence alerts (see comment in the cncluster code)"
     # If the above fails with a 401 Unauthorized:
-    # - Confirm that the observability namespace has a label: istio-injection=enabled
     # - Restart the grafana pod so that the sidecar is injected (the pod should have 5 containers including the istio-proxy sidecar):
     #   `kubectl delete pod -n observability -l 'app.kubernetes.io/name=grafana'`
     # - Delete the grafana-authorization-header-filter EnvoyFilter if one exists:

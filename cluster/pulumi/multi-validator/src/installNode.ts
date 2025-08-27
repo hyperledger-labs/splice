@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   exactNamespace,
-  CLUSTER_HOSTNAME,
   installLoopback,
   numInstances,
-  activeVersion,
   imagePullSecret,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';
@@ -15,7 +13,7 @@ import { installPostgres } from './postgres';
 
 export async function installNode(): Promise<void> {
   const namespace = exactNamespace('multi-validator', true);
-  installLoopback(namespace, CLUSTER_HOSTNAME, activeVersion);
+  installLoopback(namespace);
 
   const imagePullDeps = imagePullSecret(namespace);
 
@@ -47,7 +45,7 @@ export async function installNode(): Promise<void> {
         participant: { address: participant.service.metadata.name },
         postgres: { ...postgresConf, db: `cantonnet_v` },
       },
-      { dependsOn: [postgres] }
+      { dependsOn: [postgres, participant] }
     );
   }
 }

@@ -370,7 +370,7 @@ components:
     FeatureSupportResponse:
       type: object
       required:
-        - delegateless_automation
+        - my_feature
       properties:
-        delegateless_automation:
+        my_feature:
           type: boolean

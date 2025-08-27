@@ -177,6 +177,19 @@ object SvOnboardingConfig {
         walletPaymentsVersion = fromResources.walletPayments,
       )
     }
+
+    val minimumInitialPackageConfig: InitialPackageConfig = InitialPackageConfig(
+      amuletVersion = DarResources.amulet.minimumInitialization.metadata.version.toString,
+      amuletNameServiceVersion =
+        DarResources.amuletNameService.minimumInitialization.metadata.version.toString,
+      dsoGovernanceVersion =
+        DarResources.dsoGovernance.minimumInitialization.metadata.version.toString,
+      validatorLifecycleVersion =
+        DarResources.validatorLifecycle.minimumInitialization.metadata.version.toString,
+      walletVersion = DarResources.wallet.minimumInitialization.metadata.version.toString,
+      walletPaymentsVersion =
+        DarResources.walletPayments.minimumInitialization.metadata.version.toString,
+    )
   }
 
   // TODO(DACH-NY/canton-network-internal#498) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
@@ -306,15 +319,20 @@ case class SvAppBackendConfig(
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMillis(250),
-    delegatelessAutomation: Boolean = true,
-    expectedTaskDuration: Long = 5000, // milliseconds
-    expiredRewardCouponBatchSize: Int = 100,
+    delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
+    delegatelessAutomationExpiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
     // 1. try to reset one of your sequencers or mediators
     // 2. change sequencer URLs that need to get published externally.
     skipSynchronizerInitialization: Boolean = false,
+    // The maximum delay before submitting a package vetting
+    // change. The actual delay will be chosen randomly (uniformly
+    // distributed between 0 and the maximum delay) to ensure that not
+    // all validators submit the transaction at the same time
+    // overloading the network.
+    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

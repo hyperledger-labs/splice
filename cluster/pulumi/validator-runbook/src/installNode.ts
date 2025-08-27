@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -39,13 +38,15 @@ import {
   InstalledHelmChart,
   ansDomainPrefix,
   failOnAppVersionMismatch,
-} from 'splice-pulumi-common';
+  networkWideConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   installParticipant,
   ValidatorNodeConfig,
   ValidatorNodeConfigSchema,
-} from 'splice-pulumi-common-validator';
-import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import _ from 'lodash';
 
 import { clusterSubConfig } from '../../common/src/config/configLoader';
 import {
@@ -89,7 +90,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -137,7 +138,7 @@ type ValidatorConfig = {
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
   otherDeps: CnInput<pulumi.Resource>[];
-  loopback: InstalledHelmChart | null;
+  loopback: pulumi.Resource[] | null;
   backupConfigSecret?: pulumi.Resource;
   nodeIdentifier: string;
 };
@@ -271,6 +272,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret
@@ -305,7 +307,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     throw new Error('No validator ui client id in auth0 config');
   }
   const dependsOn = imagePullDeps
-    .concat(loopback ? [loopback] : [])
+    .concat(loopback ? loopback : [])
     .concat([validatorAppSecret, validatorUISecret])
     .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])

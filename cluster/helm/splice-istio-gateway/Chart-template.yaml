@@ -5,6 +5,7 @@ apiVersion: v2
 name: splice-istio-gateway
 type: application
 description: Splice Istio Gateway
+deprecated: true
 
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER

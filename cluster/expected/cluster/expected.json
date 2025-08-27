@@ -14,7 +14,6 @@
         "labels": {
           "cn_apps": "true"
         },
-        "loggingVariant": "MAX_THROUGHPUT",
         "machineType": "n2-standard-16",
         "taints": [
           {
@@ -44,7 +43,6 @@
         "labels": {
           "cn_infra": "true"
         },
-        "loggingVariant": "MAX_THROUGHPUT",
         "machineType": "e2-standard-8",
         "taints": [
           {
@@ -71,7 +69,6 @@
       "initialNodeCount": 1,
       "name": "gke-pool",
       "nodeConfig": {
-        "loggingVariant": "MAX_THROUGHPUT",
         "machineType": "e2-standard-4",
         "taints": [
           {

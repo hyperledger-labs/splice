@@ -83,7 +83,7 @@
         },
         "rateLimit": {
           "scan": {
-            "acs": {}
+            "enable": false
           }
         },
         "spliceDomainNames": {
@@ -202,49 +202,221 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "sv",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "hostname": "mock.global.canton.network.digitalasset.com"
-        },
-        "cometbftPorts": {
-          "domains": 5
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "tolerations": [
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "cometbft-loopback",
+        "namespace": "sv"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "tcp": [
           {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress-cometbft.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
           }
         ]
-      },
-      "version": "0.3.20"
+      }
     },
-    "name": "loopback",
+    "name": "loopback-cometbft-sv",
     "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "ServiceEntry",
+      "metadata": {
+        "name": "loopback",
+        "namespace": "sv"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "ports": [
+          {
+            "name": "http-port",
+            "number": 80,
+            "protocol": "HTTP"
+          },
+          {
+            "name": "tls",
+            "number": 443,
+            "protocol": "TLS"
+          },
+          {
+            "name": "grpc-domain",
+            "number": 5008,
+            "protocol": "GRPC"
+          },
+          {
+            "name": "cometbft-0-0-p2p",
+            "number": 26006,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-0-1-p2p",
+            "number": 26016,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-0-p2p",
+            "number": 26106,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-1-p2p",
+            "number": 26116,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-0-p2p",
+            "number": 26206,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-1-p2p",
+            "number": 26216,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-0-p2p",
+            "number": 26306,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-1-p2p",
+            "number": 26316,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-0-p2p",
+            "number": 26406,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-1-p2p",
+            "number": 26416,
+            "protocol": "TCP"
+          }
+        ],
+        "resolution": "DNS"
+      }
+    },
+    "name": "loopback-service-entry-sv",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:ServiceEntry"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "direct-loopback-through-ingress-gateway",
+        "namespace": "sv"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com",
+          "validator.mock.global.canton.network.digitalasset.com",
+          "*.validator.mock.global.canton.network.digitalasset.com",
+          "validator1.mock.global.canton.network.digitalasset.com",
+          "*.validator1.mock.global.canton.network.digitalasset.com",
+          "splitwell.mock.global.canton.network.digitalasset.com",
+          "*.splitwell.mock.global.canton.network.digitalasset.com",
+          "sv-2.mock.global.canton.network.digitalasset.com",
+          "*.sv-2.mock.global.canton.network.digitalasset.com"
+        ],
+        "http": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ],
+        "tls": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ],
+                "sniHosts": [
+                  "mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com",
+                  "validator.mock.global.canton.network.digitalasset.com",
+                  "*.validator.mock.global.canton.network.digitalasset.com",
+                  "validator1.mock.global.canton.network.digitalasset.com",
+                  "*.validator1.mock.global.canton.network.digitalasset.com",
+                  "splitwell.mock.global.canton.network.digitalasset.com",
+                  "*.splitwell.mock.global.canton.network.digitalasset.com",
+                  "sv-2.mock.global.canton.network.digitalasset.com",
+                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "name": "loopback-virtual-service-sv",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
   },
   {
     "custom": true,
@@ -427,6 +599,14 @@
     "type": "kubernetes:core/v1:Secret"
   },
   {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "splice-sv-scan-app-rate-limit",
+    "provider": "",
+    "type": "splice:RateLimit"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -513,8 +693,16 @@
       "values": {
         "additionalEnvVars": [
           {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          },
+          {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
             "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
           }
         ],
         "affinity": {
@@ -598,6 +786,7 @@
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
         "logLevel": "DEBUG",
+        "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
         },
@@ -684,6 +873,159 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "EnvoyFilter",
+      "metadata": {
+        "annotations": {
+          "proxy.istio.io/config": "proxyStatsMatcher:\n  inclusionRegexps:\n  - \".*http_local_rate_limit.*\""
+        },
+        "name": "scan-app-rate-limit",
+        "namespace": "sv"
+      },
+      "spec": {
+        "configPatches": [
+          {
+            "applyTo": "HTTP_FILTER",
+            "match": {
+              "context": "SIDECAR_INBOUND",
+              "listener": {
+                "filterChain": {
+                  "filter": {
+                    "name": "envoy.filters.network.http_connection_manager"
+                  }
+                }
+              }
+            },
+            "patch": {
+              "operation": "INSERT_BEFORE",
+              "value": {
+                "name": "envoy.filters.http.local_ratelimit",
+                "typed_config": {
+                  "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                  "type_url": "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit",
+                  "value": {
+                    "stat_prefix": "http_local_rate_limiter"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "applyTo": "HTTP_ROUTE",
+            "match": {
+              "context": "SIDECAR_INBOUND",
+              "routeConfiguration": {
+                "vhost": {
+                  "name": "inbound|http|5012",
+                  "route": {
+                    "action": "ANY"
+                  }
+                }
+              }
+            },
+            "patch": {
+              "operation": "MERGE",
+              "value": {
+                "route": {
+                  "rate_limits": [
+                    {
+                      "actions": [
+                        {
+                          "header_value_match": {
+                            "descriptor_value": "acs",
+                            "expect_match": true,
+                            "headers": [
+                              {
+                                "name": ":path",
+                                "string_match": {
+                                  "ignore_case": true,
+                                  "prefix": "/api/scan/v0/acs"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "request_headers": {
+                            "descriptor_key": "client_ip",
+                            "header_name": "x-forwarded-for"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "typed_per_filter_config": {
+                  "envoy.filters.http.local_ratelimit": {
+                    "@type": "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit",
+                    "descriptors": [
+                      {
+                        "entries": [
+                          {
+                            "key": "header_match",
+                            "value": "acs"
+                          },
+                          {
+                            "key": "client_ip"
+                          }
+                        ],
+                        "token_bucket": {
+                          "fill_interval": "60s",
+                          "max_tokens": 10,
+                          "tokens_per_fill": 5
+                        }
+                      }
+                    ],
+                    "filter_enabled": {
+                      "default_value": {
+                        "denominator": "HUNDRED",
+                        "numerator": 100
+                      },
+                      "runtime_key": "local_rate_limit_enabled"
+                    },
+                    "filter_enforced": {
+                      "default_value": {
+                        "denominator": "HUNDRED",
+                        "numerator": 100
+                      },
+                      "runtime_key": "local_rate_limit_enforced"
+                    },
+                    "response_headers_to_add": [
+                      {
+                        "append_action": "OVERWRITE_IF_EXISTS_OR_ADD",
+                        "header": {
+                          "key": "x-local-rate-limit",
+                          "value": "true"
+                        }
+                      }
+                    ],
+                    "stat_prefix": "http_local_rate_limiter",
+                    "token_bucket": {
+                      "fill_interval": "60s",
+                      "max_tokens": 2147483647,
+                      "tokens_per_fill": 2147483647
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "workloadSelector": {
+          "labels": {
+            "app": "scan-app"
+          }
+        }
+      }
+    },
+    "name": "sv-scan-app-rate-limit",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:EnvoyFilter"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -708,6 +1050,12 @@
       "namespace": "sv",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+          }
+        ],
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -729,9 +1077,11 @@
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
         },
@@ -779,6 +1129,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64553aa683015a9687d9cc2e"

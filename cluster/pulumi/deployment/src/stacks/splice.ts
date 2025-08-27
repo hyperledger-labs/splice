@@ -6,13 +6,19 @@ import {
   config,
   DeploySvRunbook,
   DeployValidatorRunbook,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
-} from 'splice-pulumi-common-validator/src/validators';
-import { GitFluxRef, StackFromRef } from 'splice-pulumi-common/src/operator/flux-source';
-import { createStackCR, EnvRefs } from 'splice-pulumi-common/src/operator/stack';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
+import {
+  GitFluxRef,
+  StackFromRef,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/flux-source';
+import {
+  createStackCR,
+  EnvRefs,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
 export function getSpliceStacksFromMainReference(): StackFromRef[] {
   const ret: StackFromRef[] = [];
@@ -63,10 +69,7 @@ export function installSpliceStacks(
       envRefs,
       gcpSecret,
       {},
-      [],
-      // reduce parallelism to ensure rolling updates as during startup the nodes use lots of memory, leading to memory pressure on the nodes
-      // and in some cases the pods get evicted
-      10
+      []
     );
   }
   if (DeployValidatorRunbook) {

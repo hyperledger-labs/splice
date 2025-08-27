@@ -11,14 +11,92 @@ Release Notes
 Upcoming
 --------
 
-- SV Application
+- SV Deployment
 
-  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
-    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
+  - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
 
 - Daml
 
+  - Fix a bug where activity record expiration had a reference to the ``AmuletRules`` contract which resulted in transactions
+    failing when trying to expire an activity record for a party that has not upgraded to the latest version of the
+    Daml models. This caused an issue on DevNet where transactions submitted by the SV app
+    failed repeatedly which resulted in the circuit breaker getting triggered and blocking
+    all submissions.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.18
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
+
+
+0.4.12
+------
+
+- Docs
+
+  - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
+  - Add how-to docs for :ref:`Token Standard usage <token_standard>`.
+
+- Cometbft
+
+  - Doubled the default mempool size and deduplication cache size as they get exceeded on prod networks occasionally.
+
+- Splice Development
+
+  - Vagrant (new)
+
+    - Add Vagrantfile as a convenient way to spin up a local development
+      environment for Splice. See `README.vagrant.md
+      <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+      and `Vagrantfile
+      <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+      details.
+
+  - A subset of the tests now run on PRs from forks without approval from a maintainer
+    (see `TESTING.md <https://github.com/hyperledger-labs/splice/blob/0.4.12/TESTING.md>` for details)
+
+- Performance improvements
+
+  - Improve sequencer performance when processing events from CometBFT, this should allow the sequencer to catch-up after downtime much faster.
+
+0.4.11
+------
+
+- SV and Validator apps
+
+  - Add a randomized delay to broadcasting of package vetting changes used on Daml upgrades. This ensures that
+    there is no load spike when all validators try to do so at the same time. This has no impact on behavior as
+    Daml upgrades are announced ahead of time and the broadcasting still happens before the switchover.
+
+  - The CometBFT PVC is now annotated with ``helm.sh/resource-policy: keep``, so that in the event of a (potentially accidental)
+    ``helm uninstall`` the CometBFT data is not deleted and the node can more easily be recovered.
+
+- Docs
+
+  - Mark the workflows in the ``splice-wallet-payments`` :ref:`package <reference_docs_splice_wallet_payments>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.
+  - Mark the :ref:`Splice Wallet transfer offers <validator-api-user-wallet-transfer-offers>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.
+
+0.4.10
+------
+
+- SV Application
+
+  - Fully remove the automation and logic around DSO delegate elections.
+  - UI enhancements.
+
+- Daml
+
+  - Deprecate Daml choices related to DSO delegate elections.
   - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
 
      These Daml changes requires an upgrade to the following Daml versions:
 
@@ -32,6 +110,22 @@ Upcoming
      wallet             0.1.13
      walletPayments     0.1.13
      ================== =======
+
+- Helm
+
+  - The `splice-istio-gateway` Helm chart has been deprecated, and will be removed in a future release.
+    It has been replaced with explicit instructions in the :ref:`validator docs <helm-validator-ingress>`
+    and :ref:`SV docs <helm-sv-ingress>` on how to set up Istio ingress for the validator and SV nodes.
+
+- Docs
+
+  - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
+
+- Stability improvements
+
+  - Add circuit breaker functionality for ledger API command submissions in all splice apps;
+    causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
 
 0.4.9
 -----

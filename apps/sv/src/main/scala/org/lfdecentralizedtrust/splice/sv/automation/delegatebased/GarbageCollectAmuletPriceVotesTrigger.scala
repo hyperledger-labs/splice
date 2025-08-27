@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -52,10 +53,6 @@ class GarbageCollectAmuletPriceVotesTrigger(
       (svVotes, nonSvVotes) = amuletPriceVotes.partition(v =>
         dsoRules.payload.svs.asScala.contains(v.payload.sv)
       )
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       nonSvVoteCids = nonSvVotes.map(_.contractId)
       svDuplicatedVoteCids =
         svVotes
@@ -70,7 +67,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
             _.exerciseDsoRules_GarbageCollectAmuletPriceVotes(
               nonSvVoteCids.asJava,
               svDuplicatedVoteCids.asJava,
-              controllerArgument,
+              Optional.of(controller),
             )
           )
           svTaskContext.connection
@@ -80,7 +77,6 @@ class GarbageCollectAmuletPriceVotesTrigger(
               cmd,
             )
             .noDedup
-            .withPreferredPackage(preferredPackageIds)
             .yieldUnit()
         } else Future.successful(())
     } yield TaskSuccess(

@@ -39,6 +39,7 @@ import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   holdingv1,
+  metadatav1,
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
@@ -201,10 +202,13 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       aliceWalletClient.createTransferPreapproval()
       aliceValidatorWalletClient.createTransferPreapproval()
 
+      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+
       logger.info(
         s"Generating CLI data for" +
           s" alice: ${alice.partyId.toProtoPrimitive}" +
           s" bob: ${bob.partyId.toProtoPrimitive}" +
+          s" charlie: ${charlieParty.toProtoPrimitive}" +
           s" validator: ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"
       )
 
@@ -508,6 +512,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               ) { holdings =>
                 holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
               }
+              // Also wait for scan to process the archive
+              clue("Scan processes locked amulet expiry") {
+                eventually() {
+                  val choiceContext =
+                    sv1ScanBackend.getTransferInstructionRejectContext(instrAboutToExpire)
+                  choiceContext.choiceContext.values.get(
+                    "expire-lock"
+                  ) shouldBe new metadatav1.anyvalue.AV_Bool(false)
+                }
+              }
             }
             actAndCheck(
               "Bob rejects instruction #4, whose backing amulet has already been archived", {
@@ -532,6 +546,21 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               },
             )
 
+            // another one transferred from charlie to alice, but not via token standard
+            // TransferIn (derived by tx-kind), while making sure that charlie has no leftovers
+            val charlieAmount = 500.0
+            charlieWalletClient.tap(walletAmuletToUsd(charlieAmount))
+            aliceWalletClient.createTransferPreapproval() // it was deleted before
+            charlieWalletClient.transferPreapprovalSend(
+              alice.partyId,
+              charlieAmount - 11,
+              UUID.randomUUID().toString,
+              Some("non-ts-transfer"),
+            )
+            eventually() {
+              charlieWalletClient.balance().unlockedQty should be(BigDecimal("0"))
+            }
+
             // DummyHolding holdings
             Seq("30.0", "40.0").foreach { amount =>
               aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -555,7 +584,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val activeHoldingsResponse =
               listContractsOfInterface(alice, holdingv1.Holding.TEMPLATE_ID)
 
-            activeHoldingsResponse should have size 5 // 2 unlocked amulets, 1 locked amulet, 2 sample holdings
+            activeHoldingsResponse should have size 6 // 3 unlocked amulets, 1 locked amulet, 2 sample holdings
 
             val activeTransferInstructionsResponse =
               listContractsOfInterface(bob, transferinstructionv1.TransferInstruction.TEMPLATE_ID)
@@ -619,6 +648,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           .getValidatorPartyId()
           .toProtoPrimitive -> "aliceValidator::normalized",
         bob.partyId.toProtoPrimitive -> "bob::normalized",
+        charlieParty.toProtoPrimitive -> "charlie::normalized",
       )
       val dateFields =
         Seq(

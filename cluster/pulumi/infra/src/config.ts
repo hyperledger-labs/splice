@@ -1,10 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
+import {
+  config,
+  loadJsonFromFile,
+  externalIpRangesFile,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
-import { config, loadJsonFromFile, externalIpRangesFile } from 'splice-pulumi-common';
-import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const clusterBasename = pulumi.getStack().replace(/.*[.]/, '');
@@ -25,6 +29,16 @@ const MonitoringConfigSchema = z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
       }),
+      confirmationRequests: z.object({
+        total: z.object({
+          rate: z.number(),
+          overMinutes: z.number(),
+        }),
+        perMember: z.object({
+          rate: z.number(),
+          overMinutes: z.number(),
+        }),
+      }),
       cloudSql: z.object({
         maintenance: z.boolean(),
       }),
@@ -33,6 +47,10 @@ const MonitoringConfigSchema = z.object({
       }),
       loadTester: z.object({
         minRate: z.number(),
+      }),
+      svNames: z.array(z.string()).default([]),
+      mediators: z.object({
+        acknowledgementLagSeconds: z.number(),
       }),
     }),
     logAlerts: z.object({}).catchall(z.string()).default({}),
@@ -76,15 +94,22 @@ export const monitoringConfig = fullConfig.monitoring;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 
-function extractIpRanges(x: IpRangesDict): string[] {
-  return Array.isArray(x)
-    ? x
-    : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
+  if (svsOnly) {
+    if (Array.isArray(x)) {
+      throw new Error('Cannot distinguish SV IP ranges from non-SV IP ranges in an array');
+    }
+    return extractIpRanges(x['svs'], false);
+  } else {
+    return Array.isArray(x)
+      ? x
+      : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+  }
 }
 
-export function loadIPRanges(): pulumi.Output<string[]> {
+export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> {
   const file = externalIpRangesFile();
-  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file)) : [];
+  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file), svsOnly) : [];
 
   const internalWhitelistedIps = getSecretVersionOutput({
     secret: 'pulumi-internal-whitelists',

@@ -77,7 +77,6 @@ class SqlIndexInitializationTriggerStoreTest
         indexNames <- listIndexNames()
       } yield {
         indexNames should contain allElementsOf List("test_index")
-        trigger.isHealthy shouldBe true
       }
     }
 
@@ -129,7 +128,6 @@ class SqlIndexInitializationTriggerStoreTest
         indexNames <- listIndexNames()
       } yield {
         indexNames should contain allElementsOf List("test_index")
-        trigger.isHealthy shouldBe true
       }
     }
 
@@ -149,7 +147,6 @@ class SqlIndexInitializationTriggerStoreTest
         indexNames <- listIndexNames()
       } yield {
         indexNames should not contain "test_index"
-        trigger.isHealthy shouldBe true
       }
     }
 

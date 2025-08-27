@@ -91,11 +91,9 @@ inputs:
     required: false
     default: "false"
 
-
 runs:
   using: "composite"
   steps:
-
     - name: Setup
       uses: ./.github/actions/tests/common_test_setup
       with:
@@ -202,6 +200,21 @@ runs:
         echo "Setting max_user_watches..."
         echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
+    # Make sure the directory "$HOME/.docker" has the right permissions (this
+    # is needed when the runner mounts file to inside the folder and created
+    # .docker with root permissions)
+    # See https://github.com/hyperledger-labs/splice/blob/f11ef2ba697be68cad218decd09a9fd9d4e41444/cluster/pulumi/gha/src/runners.ts#L196
+    - name: Make sure .docker directory is owned by the current user
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      shell: bash
+      run: |
+        [[ -d "$HOME/.docker" ]] && sudo chown "$(id -u):$(id -g)" "$HOME/.docker"
+
+    # Install QEMU to support building multi-arch images
+    - name: Set up QEMU
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 #v3.6.0
+
     - name: Build Docker images
       if: ${{ fromJson(inputs.with_docker_images) }}
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -220,16 +233,16 @@ runs:
     - name: Wait for Canton to be ready
       shell: bash
       run: |
-          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
-            echo "This job does not require Canton"
-            exit 0
-          fi
-          start_canton_options="${{ inputs.start_canton_options }}"
-          if [[ "$start_canton_options" == *"-w"* ]]; then
-            ./wait-for-canton.sh -w
-          elif [[ "$start_canton_options" == *"-s"* ]]; then
-            ./wait-for-canton.sh -s
-          fi
+        if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+          echo "This job does not require Canton"
+          exit 0
+        fi
+        start_canton_options="${{ inputs.start_canton_options }}"
+        if [[ "$start_canton_options" == *"-w"* ]]; then
+          ./wait-for-canton.sh -w
+        elif [[ "$start_canton_options" == *"-s"* ]]; then
+          ./wait-for-canton.sh -s
+        fi
 
     - name: Run tests
       uses: ./.github/actions/sbt/execute_sbt_command
@@ -261,7 +274,6 @@ runs:
             ./stop-frontends.sh
           fi
 
-
     - name: Check logs for errors
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
@@ -290,7 +302,7 @@ runs:
       if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./.github/actions/tests/failure_notifications
       with:
-        workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'
-        service_account: '${{ inputs.failure_notifications_invoker_sa }}'
-        notifications_url: '${{ inputs.failure_notifications_invoker_url }}'
-        slack_channel: '${{ inputs.failure_notifications_slack_channel }}'
+        workload_identity_provider: "${{ inputs.google_workload_identity_provider }}"
+        service_account: "${{ inputs.failure_notifications_invoker_sa }}"
+        notifications_url: "${{ inputs.failure_notifications_invoker_url }}"
+        slack_channel: "${{ inputs.failure_notifications_slack_channel }}"

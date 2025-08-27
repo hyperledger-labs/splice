@@ -15,10 +15,11 @@ import {
   loadYamlFromFile,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-} from 'splice-pulumi-common';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
+import { svsConfig } from './config';
 import { SingleSvConfiguration } from './singleSvConfig';
 
 export interface SvParticipant {
@@ -78,6 +79,9 @@ export function installSvParticipant(
     'splice-participant',
     {
       ...participantValuesWithOverwrites,
+      additionalEnvVars: (participantValuesWithOverwrites.additionalEnvVars || []).concat(
+        svConfig.participant?.additionalEnvVars || []
+      ),
       logLevel: svConfig.logging?.cantonLogLevel,
       participantAdminUserNameFrom,
       metrics: {
@@ -89,14 +93,7 @@ export function installSvParticipant(
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
-      resources: {
-        limits: {
-          memory: '18Gi',
-        },
-        requests: {
-          memory: '12Gi',
-        },
-      },
+      resources: svsConfig?.participant.resources,
     },
     version,
     {
