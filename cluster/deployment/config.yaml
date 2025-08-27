@@ -78,7 +78,7 @@ monitoring:
           rate: 10
           overMinutes: 5
         perMember:
-          rate: 0.5
+          rate: 2
           overMinutes: 5
       cloudSql:
         maintenance: false
