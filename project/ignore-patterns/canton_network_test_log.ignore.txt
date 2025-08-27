@@ -120,8 +120,11 @@ Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 # Log suppression doesn't seem to work here as the tests use a different logger
 GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
+# shutdown can be slower than the timeouts
+shutdown did not complete gracefully in allotted 3 seconds
+
 # ExecutorServiceMetrics closes the gauges twice through shutdown and shutownNow in cases where shutdown times out
-.*InstrumentDescriptor.*name=daml.executor.* has called close() multiple times
+.*InstrumentDescriptor.*name=daml.executor.* has called close\(\) multiple times
 
 
 # Make sure to have a trailing newline
