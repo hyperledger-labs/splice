@@ -114,6 +114,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
+  // We manually force a snapshot on sv1 in the test. The other SVs
+  // won't have a snapshot at that time so the assertions in the
+  // update history sanity plugin wil fail.
+  override lazy val skipAcsSnapshotChecks = true
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)

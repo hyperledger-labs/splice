@@ -40,6 +40,7 @@ import scala.util.control.NonFatal
 class UpdateHistorySanityCheckPlugin(
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
+    skipAcsSnapshotChecks: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
 ) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
     with Matchers
@@ -75,7 +76,9 @@ class UpdateHistorySanityCheckPlugin(
           if (initializedScans.exists(_.config.updateHistoryBackfillEnabled)) {
             initializedScans.foreach(waitUntilBackfillingComplete)
             compareHistories(initializedScans)
-            compareSnapshots(initializedScans)
+            if (!skipAcsSnapshotChecks) {
+              compareSnapshots(initializedScans)
+            }
             initializedScans.foreach(checkScanTxLogScript)
           } else {
             // Just call the /updates endpoint, make sure whatever happened in the test doesn't blow it up,
