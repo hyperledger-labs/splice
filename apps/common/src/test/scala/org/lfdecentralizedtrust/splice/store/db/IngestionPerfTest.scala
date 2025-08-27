@@ -42,8 +42,8 @@ class IngestionPerfTest
         nrEvents = 1000
         coupons = (0 to nrEvents).map(i => c(i))
         start = System.currentTimeMillis()
-        _ <- Future.sequence(coupons.map(c => d1.create(c)(store)))
-        _ <- Future.sequence(coupons.map(c => d1.archive(c)(store)))
+        _ <- Future.traverse(coupons)(c => d1.create(c)(store))
+        _ <- Future.traverse(coupons)(c => d1.archive(c)(store))
         end = System.currentTimeMillis()
         duration = end - start
         _ = println(s"Ingestion of $nrEvents took $duration ms")
