@@ -55,6 +55,7 @@ abstract class InStackDecentralizedSynchronizerNode
   }
 
   protected installDecentralizedSynchronizer(
+    svConfig: SingleSvConfiguration,
     dbs: {
       setCoreDbNames: boolean;
       sequencerPostgres: Postgres;
@@ -104,6 +105,7 @@ abstract class InStackDecentralizedSynchronizerNode
             },
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
+            additionalEnvVars: svConfig.sequencer?.additionalEnvVars,
             ...sequencerResources,
           },
           mediator: {
@@ -215,6 +217,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     this.cometbft = { ...cometbft, onboardingName };
     this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
     this.installDecentralizedSynchronizer(
+      svConfig,
       dbs,
       active,
       {
@@ -232,6 +235,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
 
 export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecentralizedSynchronizerNode {
   constructor(
+    svConfig: SingleSvConfiguration,
     migrationId: DomainMigrationIndex,
     ingressName: string,
     xns: ExactNamespace,
@@ -248,6 +252,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
   ) {
     super(migrationId, xns, version);
     this.installDecentralizedSynchronizer(
+      svConfig,
       dbs,
       active,
       {
