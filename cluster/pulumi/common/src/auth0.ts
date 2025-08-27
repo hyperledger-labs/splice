@@ -5,7 +5,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
-import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
+import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
 import type {
   Auth0Client,
@@ -66,7 +66,7 @@ export class Auth0Fetch implements Auth0Client {
       domain: this.cfg.auth0Domain,
       clientId: this.cfg.auth0MgtClientId,
       clientSecret: this.cfg.auth0MgtClientSecret,
-      scope: 'read:clients read:client_keys',
+      // scope: 'read:clients read:client_keys',
       retry: {
         enabled: true,
         maxRetries: 10,
@@ -77,15 +77,16 @@ export class Auth0Fetch implements Auth0Client {
     let page = 0;
     /* eslint-disable no-constant-condition */
     while (true) {
-      const clients = await client.getClients({
+      const clients = await client.clients.getAll({
         per_page: 50, // Even though 50 is the default, if it's not given explicitly, the page argument is ignored
         page: page++,
       });
-      if (clients.length === 0) {
+
+      if (clients.data.length === 0) {
         return secrets;
       }
 
-      for (const client of clients) {
+      for (const client of clients.data) {
         if (client.client_id && client.client_secret) {
           secrets.set(client.client_id, client as Auth0ClientSecret);
         }
@@ -211,11 +212,11 @@ export class Auth0Fetch implements Auth0Client {
       clientSecret: clientSecret,
     });
 
-    const tokenResponse = await auth0.clientCredentialsGrant({
+    const tokenResponse = await auth0.oauth.clientCredentialsGrant({
       audience: aud,
     });
 
-    const { expires_in } = tokenResponse;
+    const { expires_in } = tokenResponse.data;
 
     if (expires_in < REQUIRED_TOKEN_LIFETIME) {
       /* If you see this error, you either need to decrease the required token
@@ -230,12 +231,12 @@ export class Auth0Fetch implements Auth0Client {
 
     const expiry = addTimeSeconds(now, expires_in);
 
-    await this.cacheNewToken(clientId, expiry, tokenResponse);
+    await this.cacheNewToken(clientId, expiry, tokenResponse.data);
 
-    return tokenResponse.access_token;
+    return tokenResponse.data.access_token;
   }
 
-  private async cacheNewToken(clientId: string, expiry: Date, tokenResponse: TokenResponse) {
+  private async cacheNewToken(clientId: string, expiry: Date, tokenResponse: TokenSet) {
     await pulumi.log.debug(
       'Caching access token for Auth0 client: ' + clientId + ' expiry: ' + expiry.toJSON()
     );
