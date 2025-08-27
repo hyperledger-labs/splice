@@ -36,6 +36,9 @@ Upcoming
      walletPayments     0.1.13
      ================== =======
 
+- Docs
+
+  - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
 
 0.4.12
 ------

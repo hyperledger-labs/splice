@@ -171,3 +171,37 @@ the validator app will
 
 For configuring the built-in top-up automation, please refer to the :ref:`validator deployment guide <helm_validator_topup>`.
 Configuring alternative methods for buying traffic, e.g., using third-party services, exceeds the scope of this documentation.
+
+.. _traffic_wasted:
+
+Wasted traffic
+--------------
+
+`Wasted traffic` is defined as synchronizer events that have been sequenced but will not be delivered to their recipients.
+Wasted traffic is problematic for validators because of traffic fees:
+it means that :ref:`traffic <traffic_accounting>` has been charged for a message that was ultimately not delivered.
+Not all failed submissions result in wasted traffic:
+wasted traffic only occurs whenever a synchronizer event is rejected after sequencing but before delivery.
+
+Validator perspective
++++++++++++++++++++++
+
+Validator operators are encouraged to investigate failed submissions eagerly to avoid systemic causes for wasted traffic that are due
+to their individual configuration and/or the specific applications using their validators.
+The Splice distribution contains a :ref:`Grafana dashboard <metrics_grafana_dashboards>` about `Synchronizer Fees (validator view)` that can be helpful in addition to inspecting logs;
+see, for example, the `Rejected Event Traffic` panel there.
+
+SV perspective
+++++++++++++++
+
+SV operators are encouraged to monitor wasted traffic across all synchronizer members,
+as reported for example by sequencer :ref:`metrics <metrics>`,
+to avoid cases where misconfiguration incurs excessive monetary losses for validators.
+The Splice distribution contains a :ref:`Grafana dashboard <metrics_grafana_dashboards>` about `Synchronizer Fees (SV view)` that can be helpful,
+as well as an alert definition that focuses on validator participants.
+
+Note that wasted traffic is less relevant for SVs themselves as SV components have unlimited traffic.
+Note also that SV mediators and sequencers waste traffic as part of their regular operation;
+they frequently use aggregate submissions where all composite submission requests beyond the aggregation threshold get discarded.
+All that said, should an SV component suddenly exhibit a significant increase in wasted traffic,
+this likely points to an actual issue that should be investigated.
