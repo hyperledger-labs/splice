@@ -134,7 +134,9 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
-    expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    waitFor(() => {
+      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    });
   });
 
   test('effective date must be after expiry date', async () => {

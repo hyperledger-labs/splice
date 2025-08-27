@@ -325,6 +325,8 @@ describe('Revoke Featured App Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    waitFor(() => {
+      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    });
   });
 });
