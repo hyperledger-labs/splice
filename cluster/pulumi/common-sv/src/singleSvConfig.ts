@@ -14,6 +14,9 @@ const EnvVarConfigSchema = z.object({
   value: z.string(),
 });
 
+const SvSequencerConfigSchema = z.object({
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+});
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
   bftSequencerConnection: z.boolean().default(true),
@@ -28,6 +31,7 @@ const SingleSvConfigSchema = z
   .object({
     cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
+    sequencer: SvSequencerConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     logging: z
       .object({

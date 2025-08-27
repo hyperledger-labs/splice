@@ -131,6 +131,7 @@ spec:
               value: "{{ . }}"
             {{- end }}
             {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}
+            {{- include "splice-util-lib.additional-env-vars" .Values.sequencer.additionalEnvVars | indent 12}}
             {{- include "splice-util-lib.log-level" .Values | indent 12}}
           {{- with .Values.imagePullPolicy }}
           imagePullPolicy: {{ . }}
