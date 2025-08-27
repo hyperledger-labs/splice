@@ -18,9 +18,93 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3397,
+  "id": 5075,
   "links": [],
   "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "The average per second messages for the last 24h",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": [],
+          "unit": "mps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 7,
+        "x": 0,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "displayLabels": [
+          "name",
+          "value",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "percent",
+            "value"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.0.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(type) (rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[24h]))",
+          "format": "time_series",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B",
+          "useBackend": false
+        }
+      ],
+      "title": "Last 24h messages / s",
+      "type": "piechart"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -94,9 +178,9 @@
         ]
       },
       "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
+        "h": 11,
+        "w": 17,
+        "x": 7,
         "y": 0
       },
       "id": 1,
@@ -124,6 +208,7 @@
           "editorMode": "builder",
           "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[$__rate_interval]))",
           "fullMetaSearch": false,
+          "hide": false,
           "includeNullMetadata": true,
           "instant": false,
           "legendFormat": "__auto",
@@ -146,6 +231,40 @@
           "legendFormat": "__auto",
           "range": true,
           "refId": "type",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[1h]))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "hourly total",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[1h] offset 30d))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "hourly total 30 days ago",
+          "range": true,
+          "refId": "B",
           "useBackend": false
         }
       ],
@@ -215,7 +334,7 @@
         "h": 11,
         "w": 20,
         "x": 0,
-        "y": 12
+        "y": 11
       },
       "id": 4,
       "options": {
@@ -292,7 +411,7 @@
         "h": 11,
         "w": 4,
         "x": 20,
-        "y": 12
+        "y": 11
       },
       "id": 6,
       "options": {
@@ -405,7 +524,7 @@
         "h": 15,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 22
       },
       "id": 2,
       "options": {
@@ -415,7 +534,9 @@
           ],
           "displayMode": "table",
           "placement": "right",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -508,7 +629,7 @@
         "h": 15,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 37
       },
       "id": 7,
       "options": {
@@ -611,7 +732,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 52
       },
       "id": 5,
       "options": {
@@ -653,7 +774,7 @@
     }
   ],
   "preload": false,
-  "refresh": "30s",
+  "refresh": "",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
@@ -705,12 +826,12 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Sequencer Traffic",
+  "title": "Sequencer Messages",
   "uid": "fdjrxql2alblsd",
-  "version": 4
+  "version": 5
 }

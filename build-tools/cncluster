@@ -806,7 +806,7 @@ function subcmd_cluster_update_logging() {
 maintenance_windows=(
   # CI-ish window
   "FREQ=WEEKLY;BYDAY=SA,SU" "2024-01-01T08:00:00Z" "2024-01-01T20:00:00Z"
-  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciupgradenet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
+  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
   # prod-like window
   "FREQ=WEEKLY;BYDAY=TU,WE,TH" "2024-01-01T08:00:00Z" "2024-01-01T12:00:00Z"
   "cn-cilrnet,cn-token-std-devnet,cn-testnet,cn-devnet,cn-testzrhnet,cn-mainnet,cn-mainzrhnet"
@@ -1286,7 +1286,7 @@ function subcmd_partial_upgrade() {
 
 ###
 
-subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in ciupgrade"
+subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in upgrade test"
 
 function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"

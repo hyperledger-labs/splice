@@ -30,7 +30,8 @@ class WalletAppRewardsTimeBasedIntegrationTest
 
   "A wallet" should {
 
-    "handles rewards correctly in the context of 3rd party apps" in { implicit env =>
+    // TODO(#2036) Reenable once the Canton issue is fixed
+    "handles rewards correctly in the context of 3rd party apps" ignore { implicit env =>
       val (_, bobUserParty, _, splitwellProviderParty, key, _) =
         initSplitwellTest()
 

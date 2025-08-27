@@ -1207,6 +1207,12 @@
           }
         },
         "sequencer": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "driver": {
             "host": "global-domain-3-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
             "port": 26657,
@@ -1294,6 +1300,12 @@
           }
         },
         "sequencer": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "driver": {
             "host": "global-domain-4-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
             "port": 26657,
@@ -3035,6 +3047,12 @@
           }
         },
         "sequencer": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "driver": {
             "host": "global-domain-3-cometbft-cometbft-rpc.sv.svc.cluster.local",
             "port": 26657,
@@ -3122,6 +3140,12 @@
           }
         },
         "sequencer": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "driver": {
             "host": "global-domain-4-cometbft-cometbft-rpc.sv.svc.cluster.local",
             "port": 26657,

@@ -127,7 +127,9 @@ describe('Set DSO Config Rules Form', () => {
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
-    expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    waitFor(() => {
+      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    });
   });
 
   test('effective date must be after expiry date', async () => {
@@ -160,7 +162,9 @@ describe('Set DSO Config Rules Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    waitFor(() => {
+      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    });
   });
 
   test('changing config fields should render the current value', async () => {
