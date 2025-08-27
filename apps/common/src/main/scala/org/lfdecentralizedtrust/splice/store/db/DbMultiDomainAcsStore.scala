@@ -1055,7 +1055,7 @@ final class DbMultiDomainAcsStore[TXE](
                 s"Initializing the ACS at an offset chosen by the ingestion service, and resuming ingestion from there."
             )
             initState(acsStoreId, Some(txLogStoreId), None)
-            IngestionStart.InitializeAcsAtParticipantBegin
+            IngestionStart.InitializeAtParticipantBegin
           case (StoreHasNoData(acsStoreId), StoreNotUsed()) =>
             logger.info(
               s"Acs store $acsStoreDescriptor with id $acsStoreId has not ingested any data for migration $domainMigrationId. " +

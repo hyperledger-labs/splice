@@ -59,7 +59,7 @@ class UpdateIngestionService(
           for {
             _ <- ingestAcsAndInFlight(offset)
           } yield offset
-        case IngestionStart.InitializeAcsAtParticipantBegin =>
+        case IngestionStart.InitializeAtParticipantBegin =>
           for {
             participantBegin <- connection.latestPrunedOffset()
             _ = logger.debug(

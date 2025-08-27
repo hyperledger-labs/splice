@@ -276,9 +276,8 @@ class UpdateHistory(
               IngestionStart.ResumeAtOffset(offset)
             case None =>
               logger.info(s"${description()} initialized")
-              // In case the latest offset is not the beginning of the network,
-              // missing updates will be later backfilled using `ScanHistoryBackfillingTrigger`.
-              IngestionStart.InitializeAcsAtLatestOffset
+              // Missing updates will be later backfilled using `ScanHistoryBackfillingTrigger`.
+              IngestionStart.InitializeAtParticipantBegin
           }
         }
       }
