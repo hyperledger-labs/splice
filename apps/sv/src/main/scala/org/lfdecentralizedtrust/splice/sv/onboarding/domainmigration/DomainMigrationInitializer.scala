@@ -228,7 +228,8 @@ class DomainMigrationInitializer(
         dsoAutomationService,
       )
       _ <- rotateGenesisGovernanceKeyForSV1(newCometBftNode, domainMigrationConfig.name)
-      // Do this first as scan depends on it
+      // Restore users and user metadata first as scan depends on metadata
+      // for startup and we depend on scan starting for BFT peer reconciliation.
       _ <- new ParticipantUsersDataRestorer(
         svAutomation.connection,
         loggerFactory,

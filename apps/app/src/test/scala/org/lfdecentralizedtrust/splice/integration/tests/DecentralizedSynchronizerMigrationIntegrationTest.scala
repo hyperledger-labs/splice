@@ -653,6 +653,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               ).futureValue
             }
 
+            // TODO(#2035) Start sv-1 only later once Canton issue is fixed.
             withClueAndLog("starting sv1-4 upgraded nodes") {
               startAllSync(
                 sv1LocalBackend,
