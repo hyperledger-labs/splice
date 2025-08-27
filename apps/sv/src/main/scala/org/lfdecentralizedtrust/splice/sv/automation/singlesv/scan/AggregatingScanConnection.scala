@@ -38,7 +38,6 @@ class AggregatingScanConnection(
   ): Future[Seq[T]] = {
     for {
       scanUrls <- getScanUrls(includeSelf)
-      _ = logger.debug(s"SCAN URLS: $scanUrls")
       result <- MonadUtil.sequentialTraverse(scanUrls)(url => withScanConnection(url)(f))
     } yield result
   }
