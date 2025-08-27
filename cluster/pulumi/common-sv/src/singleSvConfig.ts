@@ -41,7 +41,6 @@ const SingleSvConfigSchema = z
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
-    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
