@@ -25,6 +25,9 @@ const SvParticipantConfigSchema = z.object({
 const SvAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
 });
+const ScanAppConfigSchema = z.object({
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+});
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 const SingleSvConfigSchema = z
@@ -33,6 +36,7 @@ const SingleSvConfigSchema = z
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
+    scanApp: ScanAppConfigSchema.optional(),
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,
