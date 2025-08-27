@@ -30,6 +30,7 @@ case class ScanAppBackendConfig(
     svUser: String,
     override val participantClient: ParticipantClientConfig,
     sequencerAdminClient: FullClientConfig,
+    mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     isFirstSv: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
