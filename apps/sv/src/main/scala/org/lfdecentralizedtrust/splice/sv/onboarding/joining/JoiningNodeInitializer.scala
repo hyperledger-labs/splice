@@ -370,8 +370,8 @@ class JoiningNodeInitializer(
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
       _ <-
-      // Unpause the synchronizer after the post onboarding triggers are started
-      // that start the BFT peer reconciliation
+        // Unpause the synchronizer after the post onboarding triggers are started
+        // that start the BFT peer reconciliation
         if (unpauseSynchronizer)
           participantAdminConnection
             .ensureDomainParameters(
