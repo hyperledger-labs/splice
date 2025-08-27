@@ -190,8 +190,6 @@ export const CreateVoteRequest: React.FC = () => {
     expiresAt = undefined;
   }
 
-  const expirationInDays = dayjs(expiresAt).diff(dayjs(), 'day');
-
   const handleConfirmationAccept = () => {
     createVoteRequestMutation.mutate();
     setConfirmDialogOpen(false);
@@ -441,7 +439,6 @@ export const CreateVoteRequest: React.FC = () => {
                 }
                 expiresAt={new Date(expiresAt!)}
                 effectiveAt={effectivity?.toDate()}
-                expirationInDays={expirationInDays}
                 confirmationDialogProps={{
                   showDialog: confirmDialogOpen,
                   onAccept: handleConfirmationAccept,
