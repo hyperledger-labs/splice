@@ -758,6 +758,10 @@ object MultiDomainAcsStore {
         */
       final case object InitializeAcsAtLatestOffset extends IngestionStart
 
+      /** Ingestion service should not ingest the ACS, and instead start from the participant's begin
+        */
+      final case object InitializeAcsAtParticipantBegin extends IngestionStart
+
       /** Ingestion service should ingest the ACS at the specified offset,
         * then resume ingesting updates from there
         */
