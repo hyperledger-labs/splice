@@ -108,8 +108,8 @@ or the
 depending on which setup you chose.
 
 Once the new validator is up and running, you should be able to login as the administrator
-and see its balance. Other users hosted on the validator would need to re-onboard, but their
-coin balance and CNS entries should be recovered.
+and see its balance. Other users hosted on the validator will need to re-onboard, but their
+coin balance and CNS entries should be recovered and will accessible to users that have re-onboarded.
 
 In case of issues, please consult the :ref:`troubleshooting <validator_disaster_recovery_troubleshooting>` section below.
 
@@ -219,23 +219,27 @@ of at least one of the parties hosted on your node. To address this, you can usu
    with the old participant id or they have been migrated to the new
    node. You can check by opening a :ref:`Canton console
    <console_access>` to any participant on the network (i.e., you can also ask another validator or SV operator for this information) and running the
-   following query where <namespace> is the part after the ``::`` in
-   your participant id.
+   following query where <namespace> is the part after the ``::`` in, for example, your validator party id
 
    .. code::
 
       val syncId = participant.synchronizers.list_connected().head.synchronizerId
       participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
 
-   If all parties are on the same node, proceed with the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node through (adjust the parameters as required for your parties):
+   If all parties are on the same node, proceed with the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node by opening a console to the new node and running the following command
+   (adjust the parameters as required for your parties):
 
    .. code::
 
-      participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((<participant-id>, <participant-permission>)), store = syncId)
+      val participantId = participant.id // id of the new participant
+      participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
 
 2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
-   If your parties have been migrated already, take a new identities dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant id of the new node.
-   You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different ``<new_participant_id>``.
+   If your parties have been migrated to the new node already, take a new identities dump from the new node.
+   If the new node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant id of the new node.
+   You can obtain the ``id`` in the correct format by, for example, running ``participant.id.toProtoPrimitive`` in a Canton console to the participant.
+   You can now take down the node to which you originally tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different participant ID prefix
+   (i.e., a different ``newParticipantIdentifier`` / ``<new_participant_id>`` depending on your deployment model).
 
 .. _validator_recover_external_party:
 
