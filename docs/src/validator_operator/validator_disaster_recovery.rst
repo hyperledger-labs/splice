@@ -85,15 +85,17 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 .. _validator_reonboard:
 
-Re-onboard a validator and recover balances of all users it hosts
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Recovery from an identity dump: Re-onboard a validator and recover balances of all users it hosts
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 In the case of a catastrophic failure of the validator node, some data owned by the validator and users
 it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved
-by deploying a new validator node with control over the original validator's participant keys.
+by deploying a new validator node with control over the original validator's namespace key.
 
 In order to be able to recover the data, you must have a backup of the identities of the
 validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
+In case you do not have such a backup but instead have a backup of the validator participant's database,
+you can :ref:`assemble an identity dump manually <validator_manual_dump>`.
 
 To recover from the identities backup, we deploy a new validator with
 some special configuration described below. Refer to either the
@@ -150,6 +152,13 @@ To re-onboard a validator in a Docker-compose deployment and recover the balance
 where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
 ``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
 Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
+
+.. _validator_manual_dump:
+
+Obtaining an Identity Dump from a Participant Database Backup
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TODO
 
 Limitations and Troubleshooting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
