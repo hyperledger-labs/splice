@@ -249,11 +249,13 @@ class SvTimeBasedRewardCouponIntegrationTest
 
       clue("The claims appear in the wallet history") {
         eventually() {
-          val txs = sv1WalletClient
-            .listTransactions(
-              None,
-              Limit.MaxPageSize,
-            )
+          val txs = withoutNonDevNetTopups(
+            sv1WalletClient
+              .listTransactions(
+                None,
+                Limit.MaxPageSize,
+              )
+          )
             .collect {
               case b: TransferTxLogEntry
                   if b.subtype.value == TransferTransactionSubtype.WalletAutomation.toProto =>
