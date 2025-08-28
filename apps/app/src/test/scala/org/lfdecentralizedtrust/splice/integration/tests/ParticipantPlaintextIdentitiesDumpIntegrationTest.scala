@@ -178,7 +178,9 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
       participantHandle: String,
       dumpPath: Path,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    val originalDumpScriptPath = File("apps/app/src/pack/examples/recovery/manual-identities-dump.sc")
+    val originalDumpScriptPath = File(
+      "apps/app/src/pack/examples/recovery/manual-identities-dump.sc"
+    )
 
     // the original script assumes that the participant is called `participant`
     // and that the dump will be written to `identities-dump.json`; we need to adjust both
