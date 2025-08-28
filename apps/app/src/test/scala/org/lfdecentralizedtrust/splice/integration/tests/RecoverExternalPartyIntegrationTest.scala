@@ -256,7 +256,7 @@ class RecoverExternalPartyIntegrationTest
         usage = SigningKeyUsage.ProtocolOnly,
       )
       .value
-    SignedTopologyTransaction.create(
+    SignedTopologyTransaction.tryCreate(
       tx,
       NonEmpty(Set, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,

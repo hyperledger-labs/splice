@@ -28,6 +28,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission as PP
 
 import java.util.Collections
+import scala.annotation.nowarn
 
 sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
     extends UseSilentSynchronizerInTest
@@ -103,6 +104,8 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
       (contract.id, disclosedContract)
     }
 
+    val beforeActivationOffset = participant1.ledger_api.state.end()
+
     PartyToParticipantDeclarative.forParty(Set(participant1, participant2), daId)(
       participant1,
       alice,
@@ -113,15 +116,6 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
       ),
     )
 
-    val onboardingTx = participant1.topology.party_to_participant_mappings
-      .list(
-        synchronizerId = daId,
-        filterParty = alice.filterString,
-        filterParticipant = participant2.filterString,
-      )
-      .loneElement
-      .context
-
     silenceSynchronizerAndAwaitEffectiveness(daId, sequencer1, participant1, simClock)
 
     // Replicate `alice` from `participant1` to `participant2`
@@ -131,7 +125,7 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
       participant1,
       participant2.id,
       acsSnapshotPath,
-      onboardingTx.validFrom,
+      beforeActivationOffset,
     )
     repair.party_replication.step2_import_acs(alice, daId, participant2, acsSnapshotPath)
 
@@ -171,6 +165,7 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
     )
   }
 
+  @nowarn("cat=deprecation")
   private def filter(f: (PartyId, Identifier)): TransactionFilter = {
     import scala.jdk.CollectionConverters.MapHasAsJava
     import scala.jdk.OptionConverters.RichOption
