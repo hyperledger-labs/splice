@@ -20,8 +20,9 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, Typography } from '@mui/material';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { useState } from 'react';
+import { ConfirmProposal } from '../governance/ConfirmProposal';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -50,17 +51,25 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   // TODO(#1819): use either search params or props and not both.
   const formAction: GrantRevokeFeaturedAppActions =
     (useSearchParams()[0]?.get('action') as GrantRevokeFeaturedAppActions) || selectedAction;
-  const idValueFieldTitle =
-    formAction === 'SRARC_GrantFeaturedAppRight'
-      ? 'Provider'
-      : 'Featured Application Right Contract Id';
-  const testIdPrefix =
-    formAction === 'SRARC_GrantFeaturedAppRight' ? 'grant-featured-app' : 'revoke-featured-app';
+  const keysMap = {
+    SRARC_GrantFeaturedAppRight: {
+      idValueFieldTitle: 'Provider',
+      testIdPrefix: 'grant-featured-app',
+      reviewFormKey: 'grant-right' as const,
+    },
+    SRARC_RevokeFeaturedAppRight: {
+      idValueFieldTitle: 'Featured Application Right Contract Id',
+      testIdPrefix: 'revoke-featured-app',
+      reviewFormKey: 'revoke-right' as const,
+    },
+  };
 
+  const { idValueFieldTitle, testIdPrefix, reviewFormKey } = keysMap[formAction];
   const createProposalAction = createProposalActions.find(a => a.value === formAction);
 
   const defaultValues: GrantRevokeFeaturedAppFormData = {
@@ -77,6 +86,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
 
   const form = useAppForm({
     defaultValues,
+
     onSubmit: ({ value }) => {
       const actionMap: Record<
         'SRARC_GrantFeaturedAppRight' | 'SRARC_RevokeFeaturedAppRight',
@@ -104,9 +114,14 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
 
       const action = actionMap[formAction](value.idValue);
 
-      console.log(`submit ${formAction} sv form data: `, value, 'with action:', action);
-      onSubmit(value, action);
+      if (!showConfirmation) {
+        setShowConfirmation(true);
+      } else {
+        console.log(`submit ${formAction} sv form data: `, value, 'with action:', action);
+        onSubmit(value, action);
+      }
     },
+
     validators: {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
@@ -118,91 +133,105 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   });
 
   return (
-    <FormLayout form={form} id={`${testIdPrefix}-form`}>
-      <form.AppField name="action">
-        {field => (
-          <field.TextField
-            title="Action"
-            id={`${testIdPrefix}-action`}
-            muiTextFieldProps={{ disabled: true }}
+    <>
+      <FormLayout form={form} id={`${testIdPrefix}-form`}>
+        {showConfirmation ? (
+          <ConfirmProposal
+            actionName={form.state.values.action}
+            url={form.state.values.url}
+            summary={form.state.values.summary}
+            expiryDate={form.state.values.expiryDate}
+            effectiveDate={form.state.values.effectiveDate.effectiveDate}
+            formType={reviewFormKey}
+            grantRight={form.state.values.idValue}
+            revokeRight={form.state.values.idValue}
+            onEdit={() => setShowConfirmation(false)}
+            onSubmit={() => {}}
           />
-        )}
-      </form.AppField>
+        ) : (
+          <>
+            <form.AppField name="action">
+              {field => (
+                <field.TextField
+                  title="Action"
+                  id={`${testIdPrefix}-action`}
+                  muiTextFieldProps={{ disabled: true }}
+                />
+              )}
+            </form.AppField>
 
-      <form.AppField
-        name="expiryDate"
-        validators={{
-          onChange: ({ value }) => validateExpiration(value),
-          onBlur: ({ value }) => validateExpiration(value),
-        }}
-      >
-        {field => (
-          <field.DateField
-            title="Vote Proposal Expiration"
-            description="This is the last day voters can vote on this proposal"
-            id={`${testIdPrefix}-expiry-date`}
+            <form.AppField
+              name="expiryDate"
+              validators={{
+                onChange: ({ value }) => validateExpiration(value),
+                onBlur: ({ value }) => validateExpiration(value),
+              }}
+            >
+              {field => (
+                <field.DateField
+                  title="Vote Proposal Expiration"
+                  description="This is the last day voters can vote on this proposal"
+                  id={`${testIdPrefix}-expiry-date`}
+                />
+              )}
+            </form.AppField>
+
+            <form.AppField
+              name="effectiveDate"
+              validators={{
+                onChange: ({ value }) => validateEffectiveDate(value),
+                onBlur: ({ value }) => validateEffectiveDate(value),
+              }}
+              children={_ => (
+                <EffectiveDateField
+                  initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+                  id={`${testIdPrefix}-effective-date`}
+                />
+              )}
+            />
+
+            <form.AppField
+              name="summary"
+              validators={{
+                onBlur: ({ value }) => validateSummary(value),
+                onChange: ({ value }) => validateSummary(value),
+              }}
+            >
+              {field => <field.TextArea title="Proposal Summary" id={`${testIdPrefix}-summary`} />}
+            </form.AppField>
+
+            <form.AppField
+              name="url"
+              validators={{
+                onBlur: ({ value }) => validateUrl(value),
+                onChange: ({ value }) => validateUrl(value),
+              }}
+            >
+              {field => <field.TextField title="URL" id={`${testIdPrefix}-url`} />}
+            </form.AppField>
+
+            <form.AppField
+              name="idValue"
+              validators={{
+                onBlur: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
+                onChange: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
+              }}
+            >
+              {field => (
+                <field.TextField title={idValueFieldTitle} id={`${testIdPrefix}-idValue`} />
+              )}
+            </form.AppField>
+          </>
+        )}
+
+        <form.AppForm>
+          <form.FormErrors />
+          <form.FormControls
+            showConfirmation={showConfirmation}
+            onEdit={() => setShowConfirmation(false)}
           />
-        )}
-      </form.AppField>
-
-      <form.AppField
-        name="effectiveDate"
-        validators={{
-          onChange: ({ value }) => validateEffectiveDate(value),
-          onBlur: ({ value }) => validateEffectiveDate(value),
-        }}
-        children={_ => (
-          <EffectiveDateField
-            initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
-            id={`${testIdPrefix}-effective-date`}
-          />
-        )}
-      />
-
-      <form.AppField
-        name="summary"
-        validators={{
-          onBlur: ({ value }) => validateSummary(value),
-          onChange: ({ value }) => validateSummary(value),
-        }}
-      >
-        {field => <field.TextArea title="Proposal Summary" id={`${testIdPrefix}-summary`} />}
-      </form.AppField>
-
-      <form.AppField
-        name="url"
-        validators={{
-          onBlur: ({ value }) => validateUrl(value),
-          onChange: ({ value }) => validateUrl(value),
-        }}
-      >
-        {field => <field.TextField title="URL" id={`${testIdPrefix}-url`} />}
-      </form.AppField>
-
-      <form.AppField
-        name="idValue"
-        validators={{
-          onBlur: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
-          onChange: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
-        }}
-      >
-        {field => <field.TextField title={idValueFieldTitle} id={`${testIdPrefix}-idValue`} />}
-      </form.AppField>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {form.state.errors.map((error, index) => (
-          <Alert severity="error" key={index}>
-            <Typography key={index} variant="h6" color="error">
-              {error}
-            </Typography>
-          </Alert>
-        ))}
-      </Box>
-
-      <form.AppForm>
-        <form.FormErrors />
-        <form.FormControls />
-      </form.AppForm>
-    </FormLayout>
+        </form.AppForm>
+      </FormLayout>
+    </>
   );
 };
