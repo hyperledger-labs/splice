@@ -71,7 +71,7 @@ class UseExternalProcess(
     val removeConfigPaths: Set[(String, Option[(String, Any)])] = Set.empty,
     val configTransforms: Seq[ConfigTransform] = Seq.empty,
 ) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
-  with UseExternalProcessBase[LocalNodeConfig] {
+    with UseExternalProcessBase[LocalNodeConfig] {
 
   val configs: TrieMap[String, CantonConfig] = TrieMap.empty
 

@@ -178,7 +178,7 @@ class TopologyAdministrationGroup(
     )
 
   private def getIdCommand(): ConsoleCommandResult[UniqueIdentifier] =
-    adminCommand(TopologyAdminCommands.Init.GetId()).flatMap {r =>
+    adminCommand(TopologyAdminCommands.Init.GetId()).flatMap { r =>
       ConsoleCommandResult.fromEither(r.uniqueIdentifier.toRight("Node is not initialized"))
     }
 
