@@ -43,7 +43,6 @@ export const configSchema = z.object({
   }),
   adaptiveScenario: z.object({
     enabled: z.boolean(),
-    minVUs: z.number(),
     maxVUs: z.number(),
   }),
 });
@@ -68,7 +67,7 @@ export default {
         ? {
             adaptive_load: {
               executor: 'externally-controlled',
-              vus: config.adaptiveScenario.minVUs,
+              vus: 1,
               maxVUs: config.adaptiveScenario.maxVUs,
               // How long the test lasts
               duration: config.test.duration,
