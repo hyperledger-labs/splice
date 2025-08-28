@@ -158,7 +158,27 @@ Note that in subsequent restarts of the validator, you should keep providing ``-
 Obtaining an Identity Dump from a Participant Database Backup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TODO
+In case you do not have a usable identities backup but instead have a backup of the validator participant's database,
+you can assemble an identity dump manually.
+Here is one possible way to do so:
+
+#. Restore the database backup into a temporary postgres instance and deploy a temporary participant against that instance.
+
+   * See the section on :ref:`restoring a validator from backups <validator_backup_restore>` for pointers that match your deployment model.
+   * You only need to restore and scale up the participant, i.e., you can ignore the validator app and its database.
+   * In case the restored participant shuts down immediately due to failures, add the following :ref:`additional configuration <configuration_ad_hoc>`:
+
+    .. code-block:: yaml
+
+        additionalEnvVars:
+            - name: ADDITIONAL_CONFIG_EXIT_ON_FATAL_FAILURES
+              value: canton.parameters.exit-on-fatal-failures = false
+
+#. Open a :ref:`Canton console <console_access>` to the temporary participant.
+#. Run below commands in the opened console. This will store the identity dump into a *local* file
+   (relative to the local directory from which you opened the console) called ``identity-dump.json``.
+
+  .. literalinclude:: ../../../apps/app/src/pack/examples/recovery/manual-identity-dump.sc
 
 Limitations and Troubleshooting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
