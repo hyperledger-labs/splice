@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as util from 'node:util';
 import { z } from 'zod';
 
 const oAuthSchema = z.object({
@@ -50,14 +49,6 @@ export const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>;
 
 const config: Config = configSchema.parse(JSON.parse(__ENV.EXTERNAL_CONFIG));
-
-console.error(
-  'Loaded load tester configuration',
-  util.inspect(config, {
-    depth: null,
-    maxStringLength: null,
-  }),
-);
 
 export default {
   ...config,
