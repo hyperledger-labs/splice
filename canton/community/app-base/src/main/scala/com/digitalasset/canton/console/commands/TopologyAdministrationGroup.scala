@@ -8,7 +8,6 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
@@ -41,7 +40,6 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
@@ -82,8 +80,6 @@ class TopologyAdministrationGroup(
 ) extends ConsoleCommandGroup
     with Helpful
     with FeatureFlagFilter {
-
-  import TopologyAdministrationGroup.*
 
   protected val runner: AdminCommandRunner = instance
   import runner.*
@@ -664,6 +660,7 @@ class TopologyAdministrationGroup(
         sequencers: Seq[SequencerId],
         mediators: Seq[MediatorId],
         store: TopologyStoreId,
+        mediatorThreshold: PositiveInt,
     ): Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] = {
       val isSynchronizerOwner = synchronizerOwners.contains(instance.id)
       require(isSynchronizerOwner, s"Only synchronizer owners should call $functionFullName.")
@@ -711,7 +708,7 @@ class TopologyAdministrationGroup(
           .when(isSynchronizerCollectivelyOwned || maybeExistingMediatorState.isEmpty)(
             instance.topology.mediators.propose(
               synchronizerId,
-              threshold = PositiveInt.one,
+              threshold = mediatorThreshold,
               group = NonNegativeInt.zero,
               active = mediators,
               signedBy = None,
@@ -734,18 +731,16 @@ class TopologyAdministrationGroup(
           )
 
       val genesisTopology =
-        NonEmpty.from(
-          Seq(
-            maybeExistingSynchronizerParameterState,
-            maybeProposedSynchronizerParameterState,
-            maybeExistingMediatorState,
-            maybeProposedMediatorState,
-            maybeExistingSequencerState,
-            maybeProposedSequencerState,
-          ).flatten
-        )
+        Seq(
+          maybeExistingSynchronizerParameterState,
+          maybeProposedSynchronizerParameterState,
+          maybeExistingMediatorState,
+          maybeProposedMediatorState,
+          maybeExistingSequencerState,
+          maybeProposedSequencerState,
+        ).flatten
 
-      genesisTopology.map(merge(_)).getOrElse(Seq.empty)
+      SignedTopologyTransactions.compact(genesisTopology)
     }
 
     @Help.Summary(
@@ -760,6 +755,7 @@ class TopologyAdministrationGroup(
         mediators: Seq[MediatorId],
         outputFile: String,
         store: TopologyStoreId,
+        mediatorThreshold: PositiveInt = PositiveInt.one,
     ): Unit = {
 
       val transactions =
@@ -769,6 +765,7 @@ class TopologyAdministrationGroup(
           sequencers,
           mediators,
           store,
+          mediatorThreshold,
         )
 
       SignedTopologyTransactions(transactions, ProtocolVersion.latest).writeToFile(outputFile)
@@ -2359,6 +2356,14 @@ class TopologyAdministrationGroup(
   @Help.Summary("Inspect mediator synchronizer state")
   @Help.Group("Mediator Synchronizer State")
   object mediators extends Helpful {
+
+    @Help.Summary("List mediator synchronizer topology state")
+    @Help.Description(
+      """
+     synchronizerId: the optional target synchronizer
+     proposals: if true then proposals are shown, otherwise actual validated state
+     """
+    )
     def list(
         synchronizerId: Option[SynchronizerId] = None,
         proposals: Boolean = false,
@@ -2682,7 +2687,7 @@ class TopologyAdministrationGroup(
         filterSynchronizer: String = "",
         filterSigningKey: String = "",
         protocolVersion: Option[String] = None,
-    ): DynamicSynchronizerParameters = consoleEnvironment.run {
+    ): ConsoleDynamicSynchronizerParameters = consoleEnvironment.run {
       val commandResult = adminCommand(
         TopologyAdminCommands.Read.SynchronizerParametersState(
           BaseQuery(
@@ -2696,13 +2701,15 @@ class TopologyAdministrationGroup(
           filterSynchronizer,
         )
       )
-      commandResult.map(
-        _.headOption
-          .getOrElse(
-            consoleEnvironment.raiseError("No latest dynamic synchronizer parameters found.")
-          )
-          .item
-      )
+      commandResult
+        .map(
+          _.headOption
+            .getOrElse(
+              consoleEnvironment.raiseError("No latest dynamic synchronizer parameters found.")
+            )
+            .item
+        )
+        .map(ConsoleDynamicSynchronizerParameters(_))
     }
 
     @Help.Summary("Get the configured dynamic synchronizer parameters")
@@ -2760,7 +2767,9 @@ class TopologyAdministrationGroup(
     ): SignedTopologyTransaction[TopologyChangeOp, SynchronizerParametersState] = { // TODO(#15815): Don't expose internal TopologyMapping and TopologyChangeOp classes
 
       val parametersInternal =
-        parameters.toInternal.valueOr(err => throw new IllegalArgumentException(err))
+        parameters.toInternal.valueOr(err =>
+          consoleEnvironment.raiseError(s"Cannot convert parameters to internal format: $err")
+        )
 
       runAdminCommand(
         TopologyAdminCommands.Write.Propose(
@@ -3074,32 +3083,4 @@ class TopologyAdministrationGroup(
   private def expectExactlyOneResult[R](seq: Seq[R]): R = expectAtMostOneResult(seq).getOrElse(
     throw new IllegalStateException(s"Expected exactly one result, but found none")
   )
-}
-
-object TopologyAdministrationGroup {
-
-  private[console] def merge(
-      txs: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-      updateIsProposal: Option[Boolean] = None,
-  ): Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] = {
-    // remember order of transactions in the initial topology state
-    // so we don't mess up certificate chains
-    val orderingMap =
-      txs.zipWithIndex.map { case (tx, idx) =>
-        (tx.mapping.uniqueKey, idx)
-      }.toMap
-
-    txs
-      .groupBy1(_.hash)
-      .values
-      .map { txs =>
-        // combine signatures of transactions with the same hash
-        val result = txs.reduceLeft { (a, b) =>
-          a.addSignaturesFromTransaction(b)
-        }
-        updateIsProposal.fold(result)(result.updateIsProposal)
-      }
-      .toSeq
-      .sortBy(tx => orderingMap(tx.mapping.uniqueKey))
-  }
 }
