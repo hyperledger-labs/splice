@@ -101,6 +101,8 @@ final case class LogEntry(
     Seq(
       "com.digitalasset.canton.integration.EnvironmentDefinition",
       "com.digitalasset.canton.integration.EnvironmentDefinition",
+      // TODO(M1-90): add as parameter for Canton library-isation
+      "org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition",
     )
 
   def shouldBeCommandFailure(code: ErrorCode, message: String = "")(implicit

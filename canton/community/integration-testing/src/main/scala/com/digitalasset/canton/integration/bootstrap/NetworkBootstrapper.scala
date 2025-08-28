@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.bootstrap
 
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{
   InstanceReference,
@@ -11,6 +12,7 @@ import com.digitalasset.canton.console.{
   MediatorReference,
   SequencerReference,
 }
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.SynchronizerId
@@ -22,7 +24,7 @@ import com.digitalasset.canton.{SynchronizerAlias, protocol}
   * Starts all sequencers and mediators, and all participants that auto-initialize.
   */
 class NetworkBootstrapper(networks: NetworkTopologyDescription*)(implicit
-    env: TestConsoleEnvironment
+    env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
 ) {
   def bootstrap(): Unit = {
     // Start all local nodes needed for bootstrap
@@ -67,7 +69,7 @@ class NetworkBootstrapper(networks: NetworkTopologyDescription*)(implicit
 
 object NetworkBootstrapper {
   def apply(networks: Seq[NetworkTopologyDescription])(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): NetworkBootstrapper = new NetworkBootstrapper(networks*)
 }
 

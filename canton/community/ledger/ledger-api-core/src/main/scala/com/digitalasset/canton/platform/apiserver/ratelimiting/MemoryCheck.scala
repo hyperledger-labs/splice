@@ -103,6 +103,7 @@ object MemoryCheck {
     }
 
     // Delegated methods
+    @deprecated("method deprecated by Java", since = "Java 18")
     override def getObjectPendingFinalizationCount: Int = delegate.getObjectPendingFinalizationCount
     override def getHeapMemoryUsage: MemoryUsage = delegate.getHeapMemoryUsage
     override def getNonHeapMemoryUsage: MemoryUsage = delegate.getNonHeapMemoryUsage

@@ -54,6 +54,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionFilter,
   TransactionTree,
 }
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.metrics.api.MetricsContext
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
@@ -112,7 +113,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
   implicit protected[canton] lazy val executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
 
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
 
   protected val name: String
 
@@ -132,13 +133,13 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     )
   )
 
-  protected def optionallyAwait[Tx](
+  def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       txSynchronizerId: String,
       optTimeout: Option[config.NonNegativeDuration],
   ): Tx
-  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
+  def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
   protected def defaultLimit: PositiveInt =
     consoleEnvironment.environment.config.parameters.console.defaultLimit
 
@@ -1278,6 +1279,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
+            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -1291,6 +1293,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1316,6 +1319,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                   Set(party.toLf),
                   limit,
                   filterTemplates,
+                  filterInterfaces,
                   activeAt,
                   verbose,
                   timeout.asFiniteApproximation,
@@ -1350,6 +1354,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1359,6 +1364,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1387,6 +1393,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1396,6 +1403,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1425,6 +1433,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1434,6 +1443,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1466,6 +1476,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             identityProviderId: String = "",
@@ -1496,6 +1507,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                             localParties.toSet,
                             limit,
                             filterTemplates,
+                            filterInterfaces,
                             activeAtOffsetO.getOrElse(end()),
                             verbose,
                             timeout.asFiniteApproximation,
@@ -2774,7 +2786,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 trait LedgerApiAdministration extends BaseLedgerApiAdministration {
   this: LedgerApiCommandRunner & AdminCommandRunner & NamedLogging & FeatureFlagFilter =>
 
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
   protected val name: String
 
   import com.digitalasset.canton.util.ShowUtil.*
@@ -2866,7 +2878,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  protected def optionallyAwait[Tx](
+  def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       txSynchronizerId: String,

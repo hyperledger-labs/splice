@@ -3,13 +3,18 @@
 
 package com.digitalasset.canton.integration
 
-import com.digitalasset.canton.config.{CantonEdition, CommunityCantonEdition}
-import com.digitalasset.canton.environment.{CommunityEnvironmentFactory, EnvironmentFactory}
+import com.digitalasset.canton.config.{CantonConfig, CantonEdition, CommunityCantonEdition}
+import com.digitalasset.canton.environment.{
+  CantonEnvironment,
+  CommunityEnvironmentFactory,
+  EnvironmentFactory,
+}
 
-trait CommunityIntegrationTest extends BaseIntegrationTest {
-  this: EnvironmentSetup =>
+trait CommunityIntegrationTest extends BaseIntegrationTest[CantonConfig, CantonEnvironment] {
+  this: EnvironmentSetup[CantonConfig, CantonEnvironment] =>
 
   override val edition: CantonEdition = CommunityCantonEdition
 
-  override protected val environmentFactory: EnvironmentFactory = CommunityEnvironmentFactory
+  override protected val environmentFactory: EnvironmentFactory[CantonConfig, CantonEnvironment] =
+    CommunityEnvironmentFactory
 }

@@ -155,10 +155,8 @@ class InitialTopologySnapshotValidator(
                      |result  : $retainedTransaction""".stripMargin)
               }
               (
-                (
-                  retainedTransaction,
-                  minIndex,
-                ),
+                retainedTransaction,
+                minIndex,
               )
 
             }

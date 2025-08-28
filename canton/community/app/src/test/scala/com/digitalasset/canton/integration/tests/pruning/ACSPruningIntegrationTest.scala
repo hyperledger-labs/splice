@@ -3,7 +3,8 @@
 
 package com.digitalasset.canton.integration.tests.pruning
 
-import com.digitalasset.canton.config.{DbConfig, PositiveDurationSeconds}
+import com.digitalasset.canton.config.{CantonConfig, DbConfig, PositiveDurationSeconds}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.{
   UseCommunityReferenceBlockSequencer,
@@ -16,7 +17,7 @@ import scala.math.Ordering.Implicits.*
 
 trait ACSPruningIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasCycleUtils {
 
   // These three parameters are needed to be able to wait sufficiently long to trigger a pruning timeout
