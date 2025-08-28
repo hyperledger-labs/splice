@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import util from 'node:util';
 import { z } from 'zod';
 
 const oAuthSchema = z.object({
@@ -40,23 +41,40 @@ export const configSchema = z.object({
     duration: z.string().min(1),
     iterationsPerMinute: z.coerce.number().min(1),
   }),
+  adaptiveScenario: z.object({
+    enabled: z.boolean(),
+    minVUs: z.number(),
+    maxVUs: z.number(),
+  }),
 });
 
 export type Config = z.infer<typeof configSchema>;
 
 const config: Config = configSchema.parse(JSON.parse(__ENV.EXTERNAL_CONFIG));
 
+console.error(
+  'Loaded load tester configuration',
+  util.inspect(config, {
+    depth: null,
+    maxStringLength: null,
+  }),
+);
+
 export default {
   ...config,
   options: {
     scenarios: {
-      adaptive_load: {
-        executor: 'externally-controlled',
-        vus: 1,
-        maxVUs: 50,
-        // How long the test lasts
-        duration: config.test.duration,
-      },
+      ...(config.adaptiveScenario.enabled
+        ? {
+            adaptive_load: {
+              executor: 'externally-controlled',
+              vus: config.adaptiveScenario.minVUs,
+              maxVUs: config.adaptiveScenario.maxVUs,
+              // How long the test lasts
+              duration: config.test.duration,
+            },
+          }
+        : {}),
       generate_load: {
         executor: 'constant-arrival-rate',
 
