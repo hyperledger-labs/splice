@@ -741,7 +741,7 @@ class LocalParticipantReference(
   @Help.Group("Commitments")
   override def commitments: LocalCommitmentsAdministrationGroup = commitments_
 
-  override protected[console] def ledgerApiCommand[Result](
+  override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
