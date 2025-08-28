@@ -11,7 +11,12 @@ Release Notes
 Upcoming
 --------
 
-- Documentation
+- Canton
+
+    - SV
+        - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
+
+- Docs
 
   - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
     including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
