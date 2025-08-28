@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Canton
+
+    - SV
+        - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
+
 0.4.13
 ------
 
