@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import util from 'node:util';
+import * as util from 'node:util';
 import { z } from 'zod';
 
 const oAuthSchema = z.object({
