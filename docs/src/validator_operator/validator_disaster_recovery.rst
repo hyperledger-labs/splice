@@ -214,29 +214,29 @@ If you still observe issues, in particular you observe
 something has likely gone wrong while importing the active contracts
 of at least one of the parties hosted on your node. To address this, you can usually:
 
-1. First make sure all parties are on a consistent node. The most
+1. First make sure all parties are hosted on the same node. The most
    common case is that either the parties are still on the old node
-   with the old participant id or they have been migrated to the new
+   with the old participant ID or they have been migrated to the new
    node. You can check by opening a :ref:`Canton console
    <console_access>` to any participant on the network (i.e., you can also ask another validator or SV operator for this information) and running the
-   following query where <namespace> is the part after the ``::`` in, for example, your validator party id
+   following query where <namespace> is the part after the ``::`` in, for example, your validator party ID.
 
    .. code::
 
       val syncId = participant.synchronizers.list_connected().head.synchronizerId
       participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
 
-   If all parties are on the same node, proceed with the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node by opening a console to the new node and running the following command
+   If all parties are on the same node, proceed to the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node by opening a console to the new node and running the following command
    (adjust the parameters as required for your parties):
 
    .. code::
 
-      val participantId = participant.id // id of the new participant
+      val participantId = participant.id // ID of the new participant
       participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
 
 2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
    If your parties have been migrated to the new node already, take a new identities dump from the new node.
-   If the new node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant id of the new node.
+   If the new node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant ID of the new node.
    You can obtain the ``id`` in the correct format by, for example, running ``participant.id.toProtoPrimitive`` in a Canton console to the participant.
    You can now take down the node to which you originally tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different participant ID prefix
    (i.e., a different ``newParticipantIdentifier`` / ``<new_participant_id>`` depending on your deployment model).
@@ -273,7 +273,7 @@ it on multiple nodes, you will need to adjust this.
 
 .. code::
 
-   // replace YOUR_PARTY_ID by the id of your external party
+   // replace YOUR_PARTY_ID by the ID of your external party
    val partyId = PartyId.tryFromProtoPrimitive("YOUR_PARTY_ID")
    val participantId = participant.id
    val synchronizerId = participant.synchronizers.id_of("global")
@@ -337,7 +337,7 @@ We can now check that the topology transaction got correctly applied and get the
 
 .. code::
 
-    // The detailed output will slightly vary. Make sure that you see the new participant id though.
+    // The detailed output will slightly vary. Make sure that you see the new participant ID though.
     participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
       res36: Seq[topology.ListPartyToParticipantResult] = Vector(
         ListPartyToParticipantResult(
