@@ -12,5 +12,5 @@ val combinedJson = s"""{ "id" : "$id", "keys" : $keys, "authorizedStoreSnapshot"
 
 // Write to file
 import java.nio.file.{Files, Paths}
-val dumpPath = Paths.get("identity-dump.json")
+val dumpPath = Paths.get("identities-dump.json")
 Files.writeString(dumpPath, combinedJson)

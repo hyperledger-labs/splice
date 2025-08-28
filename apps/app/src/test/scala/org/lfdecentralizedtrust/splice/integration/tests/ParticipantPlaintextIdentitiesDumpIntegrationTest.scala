@@ -178,17 +178,17 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
       participantHandle: String,
       dumpPath: Path,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    val originalDumpScriptPath = File("apps/app/src/pack/examples/recovery/manual-identity-dump.sc")
+    val originalDumpScriptPath = File("apps/app/src/pack/examples/recovery/manual-identities-dump.sc")
 
     // the original script assumes that the participant is called `participant`
-    // and that the dump will be written to `identity-dump.json`; we need to adjust both
-    val modifiedDumpScriptPath = Files.createTempFile("modified-manual-identity-dump", ".sc")
+    // and that the dump will be written to `identities-dump.json`; we need to adjust both
+    val modifiedDumpScriptPath = Files.createTempFile("modified-manual-identities-dump", ".sc")
 
     clue("Modifying dump script") {
       val originalScript = originalDumpScriptPath.contentAsString
       val modifiedScript = originalScript
         .replaceAll("participant.", s"$participantHandle.")
-        .replaceAll("identity-dump.json", dumpPath.toAbsolutePath.toString)
+        .replaceAll("identities-dump.json", dumpPath.toAbsolutePath.toString)
       File(modifiedDumpScriptPath).writeText(modifiedScript)
     }
 

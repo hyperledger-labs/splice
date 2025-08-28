@@ -15,7 +15,7 @@ There are three ways to recover from disasters:
    network is still healthy, a :ref:`Restore from backup <validator_backup_restore>` is
    usually sufficient.
 
-#. If a full backup is unavailable but an identity backup has been
+#. If a full backup is unavailable but an identities backup has been
    created, the balance of the validator can be :ref:`recovered <validator_reonboard>` on a new
    validator.
 
@@ -85,26 +85,33 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 .. _validator_reonboard:
 
-Recovery from an identity dump: Re-onboard a validator and recover balances of all users it hosts
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Recovery from an identities backup: Re-onboard a validator and recover balances of all users it hosts
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 In the case of a catastrophic failure of the validator node, some data owned by the validator and users
 it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved
 by deploying a new validator node with control over the original validator's namespace key.
+The namespace key must be provided via an identities backup file.
+It is used by the new validator for migrating the parties hosted on the original validator to the new validator.
+SVs assist this process by providing information about all contracts known to them that the migrated parties are stakeholders of.
 
-In order to be able to recover the data, you must have a backup of the identities of the
-validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
+The following steps assume that you have a backup of the identities of the
+validator, as created in the :ref:`Backup of Node Identities <validator-identities-backup>` section.
 In case you do not have such a backup but instead have a backup of the validator participant's database,
-you can :ref:`assemble an identity dump manually <validator_manual_dump>`.
+you can :ref:`assemble an identities backup manually <validator_manual_dump>`.
 
 To recover from the identities backup, we deploy a new validator with
 some special configuration described below. Refer to either the
-docker-compose deployment instructions or the kubernetes instructions
+:ref:`docker-compose deployment instructions <validator_disaster_recovery-docker-compose-deployment>`
+or the
+:ref:`kubernetes instructions <validator_reonboard_k8s>`
 depending on which setup you chose.
 
 Once the new validator is up and running, you should be able to login as the administrator
 and see its balance. Other users hosted on the validator would need to re-onboard, but their
 coin balance and CNS entries should be recovered.
+
+In case of issues, please consult the :ref:`troubleshooting <validator_disaster_recovery_troubleshooting>` section below.
 
 .. warning:: This process preserves all party IDs and all contracts shared
              with the DSO party.  This means that you *must* keep
@@ -113,6 +120,8 @@ coin balance and CNS entries should be recovered.
              new onboarding secret, double check your configuration
              instead of requesting a new secret.
 
+.. _validator_reonboard_k8s:
+
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -120,8 +129,8 @@ To re-onboard a validator in a Kubernetes deployment and recover the balances of
 repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
 While doing so, please note the following:
 
-* Create a Kubernetes secret with the content of the identities dump file.
-  Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
+* Create a Kubernetes secret with the content of the identities backup file.
+  Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a backup file path, you can create the secret with the following command:
 
 .. code-block:: bash
 
@@ -149,17 +158,17 @@ To re-onboard a validator in a Docker-compose deployment and recover the balance
 
     ./start.sh -s "<SPONSOR_SV_URL>" -o "" -p <party_hint> -m "<MIGRATION_ID>" -i "<node_identities_dump_file>" -P "<new_participant_id>" -w
 
-where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
+where ``<node_identities_dump_file>`` is the path to the file containing the node identities backup, and
 ``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
 Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
 
 .. _validator_manual_dump:
 
-Obtaining an Identity Dump from a Participant Database Backup
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Obtaining an Identities Backup from a Participant Database Backup
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In case you do not have a usable identities backup but instead have a backup of the validator participant's database,
-you can assemble an identity dump manually.
+you can assemble an identities backup manually.
 Here is one possible way to do so:
 
 #. Restore the database backup into a temporary postgres instance and deploy a temporary participant against that instance.
@@ -175,10 +184,12 @@ Here is one possible way to do so:
               value: canton.parameters.exit-on-fatal-failures = false
 
 #. Open a :ref:`Canton console <console_access>` to the temporary participant.
-#. Run below commands in the opened console. This will store the identity dump into a *local* file
-   (relative to the local directory from which you opened the console) called ``identity-dump.json``.
+#. Run below commands in the opened console. This will store the backup into a *local* file
+   (relative to the local directory from which you opened the console) called ``identities-dump.json``.
 
-  .. literalinclude:: ../../../apps/app/src/pack/examples/recovery/manual-identity-dump.sc
+  .. literalinclude:: ../../../apps/app/src/pack/examples/recovery/manual-identities-dump.sc
+
+.. _validator_disaster_recovery_troubleshooting:
 
 Limitations and Troubleshooting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -222,9 +233,8 @@ of at least one of the parties hosted on your node. To address this, you can usu
 
       participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((<participant-id>, <participant-permission>)), store = syncId)
 
-2. If your parties are still on the original node that you took identity dumps from, you can use your existing dump.
-   If your parties have been migrated already, take a new dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id``
-   field in your identity dump to the participant id of the new node.
+2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
+   If your parties have been migrated already, take a new identities dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant id of the new node.
    You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different ``<new_participant_id>``.
 
 .. _validator_recover_external_party:
@@ -240,7 +250,7 @@ hosting it becomes unusable for whatever reason.
              recovery **must** be a **completely new validator**. An existing validator
              may brick completely due to some limitations around party
              migrations and there is no way to recover from that at
-             this point. Recovering a validator from an identity backup does not classify
+             this point. Recovering a validator from an identities backup does not classify
              as a completely new validator here. You must setup it with a completely new identity
              and a completely clean database.
              This limitation is expected to be lifted in
