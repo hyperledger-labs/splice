@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Documentation
+
+  - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
+    including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
+
+
 0.4.13
 ------
 
