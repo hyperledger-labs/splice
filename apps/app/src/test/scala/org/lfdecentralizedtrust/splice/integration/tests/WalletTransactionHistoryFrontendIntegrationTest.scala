@@ -347,7 +347,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val validatorTxLogBefore =
-        withoutNonDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
+        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
 
       val (offerCid, _) =
         actAndCheck(
@@ -379,7 +379,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
       val validatorTxLogAfter =
-        withoutNonDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
+        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
       validatorTxLogBefore should be(validatorTxLogAfter)
       checkTxHistory(bobWalletClient, Seq.empty)
 

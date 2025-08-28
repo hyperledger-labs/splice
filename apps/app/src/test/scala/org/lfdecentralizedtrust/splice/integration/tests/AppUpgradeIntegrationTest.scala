@@ -175,7 +175,7 @@ class AppUpgradeIntegrationTest
 
           val bobTxsBeforeUpgrade =
             clue("Check that bob validator can see the tap in the wallet tx history") {
-              val txs = withoutNonDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
+              val txs = withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
               inside(txs(0)) { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.amount shouldBe walletUsdToAmulet(BigDecimal(1_000_001))
               }
@@ -191,7 +191,7 @@ class AppUpgradeIntegrationTest
 
           clue("Check that bob still sees the same wallet tx history") {
             val txsAfter =
-              withoutNonDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
+              withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
             txsAfter should contain allElementsOf bobTxsBeforeUpgrade
           }
 

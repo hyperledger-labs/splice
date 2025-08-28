@@ -249,7 +249,7 @@ class SvTimeBasedRewardCouponIntegrationTest
 
       clue("The claims appear in the wallet history") {
         eventually() {
-          val txs = withoutNonDevNetTopups(
+          val txs = withoutDevNetTopups(
             sv1WalletClient
               .listTransactions(
                 None,
