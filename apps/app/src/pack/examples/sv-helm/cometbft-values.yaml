@@ -29,8 +29,12 @@ genesis:
   chainIdSuffix: "0"  # must be a string value
 
 stateSync:
-  # Uncomment the line below to disable state sync
-  # enable: false
+  # WARNING : State sync introduces a dependency on the sponsoring node for fetching the state snapshot on
+  #           startup and therefore a single point of failure. It should only be enabled when joining a
+  #           new node to a chain that has already been running for a while. In all other cases including
+  #           for a new node after it has completed initialization and after network resets, state sync
+  #           should be disabled.
+  enable: false
 
   # Note that the port number is significant in the list of rpcServers
   rpcServers: "https://sv.sv-2.TARGET_HOSTNAME:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.TARGET_HOSTNAME:443/api/sv/v0/admin/domain/cometbft/json-rpc"
