@@ -85,7 +85,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
                 <OnboardingRow
                   key={onboarding.encodedSecret}
                   expiresAt={onboarding.contract.payload.expiresAt}
-                  secret={onboarding.contract.payload.candidateSecret}
+                  secret={onboarding.encodedSecret}
                 />
               );
             })}
