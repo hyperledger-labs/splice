@@ -185,7 +185,7 @@ wasted traffic only occurs whenever a synchronizer event is rejected after seque
 Some level of wasted traffic is expected and unavoidable, due to factors such as:
 
 - Submission request amplification.
-  Participants that use BFT sequencer connections duplicate submission requests after a timeout to ensure speedy delivery in the face of nonresponsive sequencers;
+  Participants that use BFT sequencer connections retry submission requests after a timeout to ensure speedy delivery in the face of nonresponsive sequencers;
   if processing was simply slower than usual but the sequencer was not faulty, the duplicate request counts as wasted traffic.
 - Duplication of messages within the ordering layer, typically linked to transient networking issues or load spikes.
 - Duplication of submissions on the participant/app side, for example when catching up after restoring from a backup or after some crashes.
@@ -193,7 +193,7 @@ Some level of wasted traffic is expected and unavoidable, due to factors such as
 Validator perspective
 +++++++++++++++++++++
 
-Validator operators are encouraged to monitor the rate of failed submissions on their validators and investigate the causes of repeatedly failing submissions eagerly.
+Validator operators are encouraged to investigate the causes of repeatedly failing submissions.
 As stated above, not all failed submissions result in wasted traffic, and some wasted traffic is unavoidable.
 Attention is warranted, however, if the rate of wasted traffic increases significantly at some point in time.
 
