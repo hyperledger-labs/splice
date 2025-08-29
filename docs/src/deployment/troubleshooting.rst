@@ -165,7 +165,7 @@ MemberDisabled error when connecting to sequencer
 
 A log of the form below in your participant indicates that it has been down for so long
 that the SVs have disabled it. Any attempts to connect will fail with the same error.
-The only solition is to :ref:`reonboard your node <validator_reonboard>`.
+The only solution is to :ref:`reonboard your node <validator_reonboard>`.
 
 
 .. code::
