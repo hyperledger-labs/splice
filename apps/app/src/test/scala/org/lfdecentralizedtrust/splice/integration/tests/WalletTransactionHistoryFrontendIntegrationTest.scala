@@ -346,7 +346,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
     "show notification transactions" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogBefore =
+        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
 
       val (offerCid, _) =
         actAndCheck(
@@ -377,7 +378,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogAfter =
+        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
       validatorTxLogBefore should be(validatorTxLogAfter)
       checkTxHistory(bobWalletClient, Seq.empty)
 

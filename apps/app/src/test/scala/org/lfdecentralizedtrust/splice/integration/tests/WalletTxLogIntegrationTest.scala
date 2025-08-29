@@ -1552,9 +1552,10 @@ class WalletTxLogIntegrationTest
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
-      val previousEventId = sv1WalletClient
-        .listTransactions(None, Limit.MaxPageSize)
-        .headOption
+      val previousEventId = withoutDevNetTopups(
+        sv1WalletClient
+          .listTransactions(None, Limit.MaxPageSize)
+      ).headOption
         .map(_.eventId)
 
       val amuletAmount = BigDecimal(42)
