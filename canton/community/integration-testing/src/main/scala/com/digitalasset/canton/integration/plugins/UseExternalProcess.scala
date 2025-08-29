@@ -6,7 +6,6 @@ package com.digitalasset.canton.integration.plugins
 import better.files.File
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.integration.plugins.UseExternalProcess.{RunVersion, ShutdownPhase}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -69,7 +68,7 @@ class UseExternalProcess(
     val externalSequencers: Set[String] = Set.empty,
     val externalMediators: Set[String] = Set.empty,
     val removeConfigPaths: Set[(String, Option[(String, Any)])] = Set.empty,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with UseExternalProcessBase[LocalNodeConfig] {
 
   val configs: TrieMap[String, CantonConfig] = TrieMap.empty

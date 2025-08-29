@@ -68,9 +68,8 @@ object SequencerUtils {
     val maxPossibleDecisionTime = parameterChanges.foldLeft(startBound) {
       (previousBound, parameterChanges) =>
         // We compute here latest possible sequencing time, where parameterChanges apply, and add the timeout
-        val newBound = parameterChanges.validUntil.getOrElse(
-          startBound
-        ) + parameterChanges.parameters.decisionTimeout
+        val newBound = parameterChanges.validUntil.getOrElse(startBound)
+          + parameterChanges.parameters.decisionTimeout
         if (newBound > previousBound) newBound else previousBound
     }
     NonNegativeFiniteDuration.tryCreate(maxPossibleDecisionTime - startBound)

@@ -185,10 +185,10 @@ class SegmentState(
   def commitVotes: Map[BftNodeId, Long] = sumOverInProgressBlocks(_.commitVoters)
 
   def discardedMessageCount: Int =
-    discardedViewMessagesCount +
-      discardedRetransmittedCommitCertsCount +
-      segmentBlocks.forgetNE.map(_.discardedMessages).sum +
-      viewChangeState.values.map(_.discardedMessages).sum
+    discardedViewMessagesCount
+      + discardedRetransmittedCommitCertsCount
+      + segmentBlocks.forgetNE.map(_.discardedMessages).sum
+      + viewChangeState.values.map(_.discardedMessages).sum
 
   private[iss] def retransmittedMessages = retransmittedMessagesCount
   private[iss] def retransmittedCommitCertificates = retransmittedCommitCertificatesCount
