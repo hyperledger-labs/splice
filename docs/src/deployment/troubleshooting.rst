@@ -163,14 +163,14 @@ the values back to what you had before.
 MemberDisabled error when connecting to sequencer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A log of the form below in your participant indicates that it has been down for so long
-that the SVs have disabled it. Any attempts to connect will fail with the same error.
-The only solution is to :ref:`reonboard your node <validator_reonboard>`.
+A log of the form below in your participant indicates that it has been down longer
+than the 30 day sequencer pruning window so the SVs have disabled it.
+Any attempts to connect will fail with the same error.
+You can recover your CC balance by spinning up a new node via :ref:`validator_reonboard`.
 
 
 .. code::
 
-    2025-04-16T08:18:06.451Z [⋮] DEBUG - c.d.c.s.c.t.GrpcSequencerSubscription:participant=participant/domainId=some-domain::12206d339948/sequencerAlias=Some-Alias (---) - Completed subscription with Success(GrpcSubscriptionError(Request failed for sequencer.
+    2025-04-16T08:18:06.451Z [⋮] DEBUG - c.d.c.s.c.t.GrpcSequencerSubscription:participant=participant/domainId=global-domain::12206d339948/sequencerAlias=Some-Alias (---) - Completed subscription with Success(GrpcSubscriptionError(Request failed for sequencer.
       GrpcRequestRefusedByServer: FAILED_PRECONDITION/MemberDisabled(PAR::validator1::12203d9ed85f...)
       Request: subscription
-      Trailers: Metadata(content-type=application/grpc,x-envoy-upstream-service-time=4,date=Wed, 16 Apr 2025 08:18:06 GMT,server=istio-envoy)))
