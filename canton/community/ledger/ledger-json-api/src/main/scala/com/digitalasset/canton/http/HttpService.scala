@@ -74,7 +74,10 @@ class HttpService(
       import startSettings.*
       val DummyUserId: UserId = UserId("HTTP-JSON-API-Gateway")
 
-      implicit val settings: ServerSettings = ServerSettings(asys).withTransparentHeadRequests(true)
+      val settings: ServerSettings = ServerSettings(asys)
+        .withTransparentHeadRequests(true)
+        .mapTimeouts(_.withRequestTimeout(startSettings.server.requestTimeout))
+
       implicit val wsConfig = startSettings.websocketConfig.getOrElse(WebsocketConfig())
 
       val clientConfig = LedgerClientConfiguration(
@@ -223,7 +226,10 @@ object HttpService extends NoTracing {
   //              and inline.
   // Decode JWT without any validation
   private val decodeJwt: EndpointsCompanion.ValidateJwt =
-    jwt => JwtDecoder.decode(jwt).leftMap(e => EndpointsCompanion.Unauthorized(e.shows))
+    jwt =>
+      \/.fromEither(
+        JwtDecoder.decode(jwt).leftMap(e => EndpointsCompanion.Unauthorized(e.prettyPrint))
+      )
 
   private[http] def createPortFile(
       file: Path,

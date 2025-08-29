@@ -13,23 +13,29 @@ import com.digitalasset.canton.auth.{
   AuthorizedUser,
   JwksVerifier,
 }
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.*
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.NamedLoggerFactory
+
+import scala.concurrent.duration.Duration
 
 sealed trait AuthServiceConfig extends UniformCantonConfigValidation {
 
   def create(
       jwtTimestampLeeway: Option[JwtTimestampLeeway],
       loggerFactory: NamedLoggerFactory,
+      maxTokenLife: NonNegativeDuration = NonNegativeDuration(Duration.Inf),
   ): AuthService
   def privileged: Boolean = false
   def users: Seq[AuthorizedUser] = Seq.empty
   def targetAudience: Option[String] = None
   def targetScope: Option[String] = None
+  def maxTokenLife: NonNegativeDuration = NonNegativeDuration(Duration.Inf)
 }
 
 object AuthServiceConfig {
+  import NonNegativeDurationConverter.*
 
   implicit val authServiceConfigCantonConfigValidator: CantonConfigValidator[AuthServiceConfig] = {
     import CantonConfigValidatorInstances.*
@@ -42,6 +48,7 @@ object AuthServiceConfig {
     override def create(
         jwtTimestampLeeway: Option[JwtTimestampLeeway],
         loggerFactory: NamedLoggerFactory,
+        maxTokenLife: NonNegativeDuration,
     ): AuthService =
       AuthServiceWildcard
   }
@@ -56,20 +63,30 @@ object AuthServiceConfig {
       override val privileged: Boolean = false,
       accessLevel: AccessLevel = AccessLevel.Wildcard,
       override val users: Seq[AuthorizedUser] = Seq.empty,
+      override val maxTokenLife: config.NonNegativeDuration = NonNegativeDuration(Duration.Inf),
   ) extends AuthServiceConfig {
-    private def verifier(jwtTimestampLeeway: Option[JwtTimestampLeeway]): JwtVerifier =
-      HMAC256Verifier(secret.unwrap, jwtTimestampLeeway).valueOr(err =>
-        throw new IllegalArgumentException(
-          s"Failed to create HMAC256 verifier (secret: $secret): $err"
-        )
+    private def verifier(
+        jwtTimestampLeeway: Option[JwtTimestampLeeway],
+        maxTokenLife: Option[Long],
+    ): JwtVerifier =
+      HMAC256Verifier(secret.unwrap, jwtTimestampLeeway, maxTokenLife).fold(
+        err =>
+          throw new IllegalArgumentException(
+            s"Failed to create HMAC256 verifier (secret: $secret): $err"
+          ),
+        identity,
       )
 
     override def create(
         jwtTimestampLeeway: Option[JwtTimestampLeeway],
         loggerFactory: NamedLoggerFactory,
+        globalMaxTokenLife: NonNegativeDuration,
     ): AuthService =
       AuthServiceJWT(
-        verifier(jwtTimestampLeeway),
+        verifier(
+          jwtTimestampLeeway,
+          maxTokenLife.toMillisOrNone().orElse(globalMaxTokenLife.toMillisOrNone()),
+        ),
         targetAudience,
         targetScope,
         privileged,
@@ -90,17 +107,28 @@ object AuthServiceConfig {
       override val privileged: Boolean = false,
       accessLevel: AccessLevel = AccessLevel.Wildcard,
       override val users: Seq[AuthorizedUser] = Seq.empty,
+      override val maxTokenLife: config.NonNegativeDuration = NonNegativeDuration(Duration.Inf),
   ) extends AuthServiceConfig {
-    private def verifier(jwtTimestampLeeway: Option[JwtTimestampLeeway]) = RSA256Verifier
-      .fromCrtFile(certificate, jwtTimestampLeeway)
-      .valueOr(err => throw new IllegalArgumentException(s"Failed to create RSA256 verifier: $err"))
+    private def verifier(
+        jwtTimestampLeeway: Option[JwtTimestampLeeway],
+        maxTokenLife: Option[Long],
+    ) = RSA256Verifier
+      .fromCrtFile(certificate, jwtTimestampLeeway, maxTokenLife)
+      .fold(
+        err => throw new IllegalArgumentException(s"Failed to create RSA256 verifier: $err"),
+        identity,
+      )
 
     override def create(
         jwtTimestampLeeway: Option[JwtTimestampLeeway],
         loggerFactory: NamedLoggerFactory,
+        globalMaxTokenLife: NonNegativeDuration,
     ): AuthService =
       AuthServiceJWT(
-        verifier(jwtTimestampLeeway),
+        verifier(
+          jwtTimestampLeeway,
+          maxTokenLife.toMillisOrNone().orElse(globalMaxTokenLife.toMillisOrNone()),
+        ),
         targetAudience,
         targetScope,
         privileged,
@@ -123,18 +151,26 @@ object AuthServiceConfig {
       override val users: Seq[AuthorizedUser] = Seq.empty,
   ) extends AuthServiceConfig {
     @SuppressWarnings(Array("org.wartremover.warts.Null"))
-    private def verifier(jwtTimestampLeeway: Option[JwtTimestampLeeway]) = ECDSAVerifier
-      .fromCrtFile(certificate, Algorithm.ECDSA256(_, null), jwtTimestampLeeway)
-      .valueOr(err =>
-        throw new IllegalArgumentException(s"Failed to create ECDSA256 verifier: $err")
+    private def verifier(
+        jwtTimestampLeeway: Option[JwtTimestampLeeway],
+        maxTokenLife: Option[Long],
+    ) = ECDSAVerifier
+      .fromCrtFile(certificate, Algorithm.ECDSA256(_, null), jwtTimestampLeeway, maxTokenLife)
+      .fold(
+        err => throw new IllegalArgumentException(s"Failed to create ECDSA256 verifier: $err"),
+        identity,
       )
 
     override def create(
         jwtTimestampLeeway: Option[JwtTimestampLeeway],
         loggerFactory: NamedLoggerFactory,
+        globalMaxTokenLife: NonNegativeDuration,
     ): AuthService =
       AuthServiceJWT(
-        verifier(jwtTimestampLeeway),
+        verifier(
+          jwtTimestampLeeway,
+          maxTokenLife.toMillisOrNone().orElse(globalMaxTokenLife.toMillisOrNone()),
+        ),
         targetAudience,
         targetScope,
         privileged,
@@ -157,18 +193,26 @@ object AuthServiceConfig {
       override val users: Seq[AuthorizedUser] = Seq.empty,
   ) extends AuthServiceConfig {
     @SuppressWarnings(Array("org.wartremover.warts.Null"))
-    private def verifier(jwtTimestampLeeway: Option[JwtTimestampLeeway]) = ECDSAVerifier
-      .fromCrtFile(certificate, Algorithm.ECDSA512(_, null), jwtTimestampLeeway)
-      .valueOr(err =>
-        throw new IllegalArgumentException(s"Failed to create ECDSA512 verifier: $err")
+    private def verifier(
+        jwtTimestampLeeway: Option[JwtTimestampLeeway],
+        maxTokenLife: Option[Long],
+    ) = ECDSAVerifier
+      .fromCrtFile(certificate, Algorithm.ECDSA512(_, null), jwtTimestampLeeway, maxTokenLife)
+      .fold(
+        err => throw new IllegalArgumentException(s"Failed to create ECDSA512 verifier: $err"),
+        identity,
       )
 
     override def create(
         jwtTimestampLeeway: Option[JwtTimestampLeeway],
         loggerFactory: NamedLoggerFactory,
+        globalMaxTokenLife: NonNegativeDuration,
     ): AuthService =
       AuthServiceJWT(
-        verifier(jwtTimestampLeeway),
+        verifier(
+          jwtTimestampLeeway,
+          maxTokenLife.toMillisOrNone().orElse(globalMaxTokenLife.toMillisOrNone()),
+        ),
         targetAudience,
         targetScope,
         privileged,
@@ -190,15 +234,22 @@ object AuthServiceConfig {
       accessLevel: AccessLevel = AccessLevel.Wildcard,
       override val users: Seq[AuthorizedUser] = Seq.empty,
   ) extends AuthServiceConfig {
-    private def verifier(jwtTimestampLeeway: Option[JwtTimestampLeeway]) =
-      JwksVerifier(url.unwrap, jwtTimestampLeeway)
+    private def verifier(
+        jwtTimestampLeeway: Option[JwtTimestampLeeway],
+        maxTokenLife: Option[Long],
+    ) =
+      JwksVerifier(url.unwrap, jwtTimestampLeeway, maxTokenLife)
 
     override def create(
         jwtTimestampLeeway: Option[JwtTimestampLeeway],
         loggerFactory: NamedLoggerFactory,
+        globalMaxTokenLife: NonNegativeDuration,
     ): AuthService =
       AuthServiceJWT(
-        verifier(jwtTimestampLeeway),
+        verifier(
+          jwtTimestampLeeway,
+          maxTokenLife.toMillisOrNone().orElse(globalMaxTokenLife.toMillisOrNone()),
+        ),
         targetAudience,
         targetScope,
         privileged,
@@ -208,4 +259,14 @@ object AuthServiceConfig {
       )
   }
 
+}
+
+object NonNegativeDurationConverter {
+  implicit class NonNegativeDurationToMillisConverter(duration: NonNegativeDuration) {
+    def toMillisOrNone(): Option[Long] =
+      duration.duration match {
+        case Duration.Inf => None
+        case finite => Some(finite.toMillis)
+      }
+  }
 }

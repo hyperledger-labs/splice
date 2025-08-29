@@ -28,7 +28,6 @@ import com.digitalasset.canton.console.{
   AdminCommandRunner,
   ConsoleCommandResult,
   ConsoleEnvironment,
-  ConsoleMacros,
   FeatureFlag,
   FeatureFlagFilter,
   Help,
@@ -41,9 +40,8 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{LedgerParticipantId, SynchronizerAlias}
+import com.digitalasset.canton.{LedgerParticipantId, SynchronizerAlias, config}
 import io.grpc.Context
 
 import java.time.Instant
@@ -158,12 +156,10 @@ class ParticipantPartiesAdministrationGroup(
   def enable(
       name: String,
       namespace: Namespace = participantId.namespace,
-      participants: Seq[ParticipantId] = Seq(participantId),
-      threshold: PositiveInt = PositiveInt.one,
       synchronizer: Option[SynchronizerAlias] = None,
       synchronizeParticipants: Seq[ParticipantReference] = consoleEnvironment.participants.all,
       mustFullyAuthorize: Boolean = true,
-      synchronize: Option[NonNegativeDuration] = Some(
+      synchronize: Option[config.NonNegativeDuration] = Some(
         consoleEnvironment.commandTimeouts.unbounded
       ),
   ): PartyId = {
@@ -220,8 +216,6 @@ class ParticipantPartiesAdministrationGroup(
           synchronizerId <- lookupOrDetectSynchronizerId(synchronizer)
           _ <- runPartyCommand(
             partyId,
-            participants,
-            threshold,
             synchronizerId,
             mustFullyAuthorize,
             synchronize,
@@ -259,11 +253,9 @@ class ParticipantPartiesAdministrationGroup(
 
   private def runPartyCommand(
       partyId: PartyId,
-      participants: Seq[ParticipantId],
-      threshold: PositiveInt,
       synchronizerId: PhysicalSynchronizerId,
       mustFullyAuthorize: Boolean,
-      synchronize: Option[NonNegativeDuration],
+      synchronize: Option[config.NonNegativeDuration],
   ): ConsoleCommandResult[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
     // determine the next serial
     val nextSerial = reference.topology.party_to_participant_mappings
@@ -276,12 +268,11 @@ class ParticipantPartiesAdministrationGroup(
         TopologyAdminCommands.Write.Propose(
           mapping = PartyToParticipant.create(
             partyId,
-            threshold,
-            participants.map(pid =>
+            PositiveInt.one,
+            Seq(
               HostingParticipant(
-                pid,
-                if (threshold.value > 1) ParticipantPermission.Confirmation
-                else ParticipantPermission.Submission,
+                participantId,
+                ParticipantPermission.Submission,
               )
             ),
           ),
@@ -352,19 +343,6 @@ class ParticipantPartiesAdministrationGroup(
       )
     }
   }
-
-  @Help.Summary("Waits for any topology changes to be observed", FeatureFlag.Preview)
-  @Help.Description(
-    "Will throw an exception if the given topology has not been observed within the given timeout."
-  )
-  def await_topology_observed[T <: ParticipantReference](
-      partyAssignment: Set[(PartyId, T)],
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded,
-  )(implicit env: ConsoleEnvironment): Unit =
-    check(FeatureFlag.Preview) {
-      reference.health.wait_for_initialized()
-      TopologySynchronisation.awaitTopologyObserved(reference, partyAssignment, timeout)
-    }
 
   @Help.Summary("Finds a party's highest activation offset.")
   @Help.Description(
@@ -582,9 +560,9 @@ class ParticipantPartiesAdministrationGroup(
   )
   def export_acs(
       parties: Set[PartyId],
+      ledgerOffset: NonNegativeLong,
       synchronizerId: Option[SynchronizerId] = None,
       exportFilePath: String = "canton-acs-export.gz",
-      ledgerOffset: NonNegativeLong,
       contractSynchronizerRenames: Map[SynchronizerId, SynchronizerId] = Map.empty,
       timeout: NonNegativeDuration = timeouts.unbounded,
   ): Unit =
@@ -662,33 +640,6 @@ class ParticipantPartiesAdministrationGroup(
         request = "exporting acs at timestamp",
         cleanupOnError = () => file.delete(),
       )
-    }
-}
-
-object TopologySynchronisation {
-
-  def awaitTopologyObserved[T <: ParticipantReference](
-      participant: ParticipantReference,
-      partyAssignment: Set[(PartyId, T)],
-      timeout: NonNegativeDuration,
-  )(implicit env: ConsoleEnvironment): Unit =
-    TraceContext.withNewTraceContext("await_topology") { _ =>
-      ConsoleMacros.utils.retry_until_true(timeout) {
-        val partiesWithId = partyAssignment.map { case (party, participantRef) =>
-          (party, participantRef.id)
-        }
-        env.sequencers.all.map(_.physical_synchronizer_id).distinct.forall { synchronizerId =>
-          !participant.synchronizers.is_connected(synchronizerId) || {
-            val timestamp = participant.testing.fetch_synchronizer_time(synchronizerId)
-            partiesWithId.subsetOf(
-              participant.parties
-                .list(asOf = Some(timestamp.toInstant))
-                .flatMap(res => res.participants.map(par => (res.party, par.participant)))
-                .toSet
-            )
-          }
-        }
-      }
     }
 }
 

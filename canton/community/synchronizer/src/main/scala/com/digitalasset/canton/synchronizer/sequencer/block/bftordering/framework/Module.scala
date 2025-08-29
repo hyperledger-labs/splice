@@ -189,27 +189,67 @@ trait P2PNetworkRef[-P2PMessageT] extends FlagCloseable {
 }
 
 trait P2PConnectionEventListener {
-  def onConnect(endpointId: P2PEndpoint.Id): Unit
-  def onDisconnect(endpointId: P2PEndpoint.Id): Unit
-  def onSequencerId(endpointId: P2PEndpoint.Id, nodeId: BftNodeId): Unit
+  def onConnect(p2pEndpointId: P2PEndpoint.Id)(implicit traceContext: TraceContext): Unit
+  def onDisconnect(p2pEndpointId: P2PEndpoint.Id)(implicit traceContext: TraceContext): Unit
+  def onSequencerId(p2pEndpointId: P2PEndpoint.Id, nodeId: BftNodeId)(implicit
+      traceContext: TraceContext
+  ): Unit
 }
 object P2PConnectionEventListener {
   val NoOp: P2PConnectionEventListener = new P2PConnectionEventListener {
-    override def onConnect(endpointId: P2PEndpoint.Id): Unit = ()
-    override def onDisconnect(endpointId: P2PEndpoint.Id): Unit = ()
-    override def onSequencerId(endpointId: P2PEndpoint.Id, nodeId: BftNodeId): Unit = ()
+    override def onConnect(p2pEndpointId: P2PEndpoint.Id)(implicit
+        traceContext: TraceContext
+    ): Unit = ()
+    override def onDisconnect(p2pEndpointId: P2PEndpoint.Id)(implicit
+        traceContext: TraceContext
+    ): Unit = ()
+    override def onSequencerId(p2pEndpointId: P2PEndpoint.Id, nodeId: BftNodeId)(implicit
+        traceContext: TraceContext
+    ): Unit = ()
+  }
+}
+
+sealed trait P2PAddress extends Product with Serializable {
+
+  val maybeP2PEndpoint: Option[P2PEndpoint]
+
+  lazy val maybeBftNodeId: Option[BftNodeId] =
+    this match {
+      case P2PAddress.Endpoint(_) => None
+      case P2PAddress.NodeId(bftNodeId, _) => Some(bftNodeId)
+    }
+
+  lazy val id: P2PAddress.Id =
+    this match {
+      case P2PAddress.Endpoint(p2pEndpoint) => Left(p2pEndpoint.id)
+      case P2PAddress.NodeId(bftNodeId, _) => Right(bftNodeId)
+    }
+}
+object P2PAddress {
+
+  type Id = Either[P2PEndpoint.Id, BftNodeId]
+
+  final case class Endpoint(p2pEndpoint: P2PEndpoint) extends P2PAddress {
+    override val maybeP2PEndpoint: Option[P2PEndpoint] = Some(p2pEndpoint)
+  }
+
+  final case class NodeId(
+      bftNodeId: BftNodeId,
+      maybeCommunicatedEndpoint: Option[P2PEndpoint] = None,
+  ) extends P2PAddress {
+    override val maybeP2PEndpoint: Option[P2PEndpoint] = maybeCommunicatedEndpoint
   }
 }
 
 /** An abstraction of the P2P network reference factory for deterministic simulation testing
   * purposes.
   */
-trait P2PNetworkRefFactory[E <: Env[E], -P2PMessageT] extends FlagCloseable {
+trait P2PNetworkManager[E <: Env[E], -P2PMessageT] extends FlagCloseable {
 
   def createNetworkRef[ActorContextT](
       context: E#ActorContextT[ActorContextT],
-      endpoint: P2PEndpoint,
-  ): P2PNetworkRef[P2PMessageT]
+      p2pAddress: P2PAddress,
+  )(implicit traceContext: TraceContext): P2PNetworkRef[P2PMessageT]
 }
 
 /** An abstraction of cancelable delayedEvent for deterministic simulation testing purposes.
@@ -472,14 +512,17 @@ object Module {
     */
   trait SystemInitializer[
       E <: Env[E],
-      P2PNetworkRefFactoryT <: P2PNetworkRefFactory[E, P2PMessageT],
+      P2PNetworkManagerT <: P2PNetworkManager[E, P2PMessageT],
       P2PMessageT,
       InputMessageT,
   ] {
     def initialize(
         moduleSystem: ModuleSystem[E],
-        createP2PNetworkRefFactory: P2PConnectionEventListener => P2PNetworkRefFactoryT,
-    ): SystemInitializationResult[E, P2PNetworkRefFactoryT, P2PMessageT, InputMessageT]
+        createP2PNetworkManager: (
+            P2PConnectionEventListener,
+            ModuleRef[P2PMessageT],
+        ) => P2PNetworkManagerT,
+    ): SystemInitializationResult[E, P2PNetworkManagerT, P2PMessageT, InputMessageT]
   }
 
   /** The result of initializing a module system independent of the actor framework, to be used
@@ -487,7 +530,7 @@ object Module {
     */
   final case class SystemInitializationResult[
       E <: Env[E],
-      P2PNetworkRefFactoryT <: P2PNetworkRefFactory[E, P2PMessageT],
+      P2PNetworkManagerT <: P2PNetworkManager[E, P2PMessageT],
       P2PMessageT,
       InputMessageT,
   ](
@@ -497,6 +540,6 @@ object Module {
       consensusAdminModuleRef: ModuleRef[Consensus.Admin],
       outputModuleRef: ModuleRef[Output.SequencerSnapshotMessage],
       pruningModuleRef: ModuleRef[Pruning.Message],
-      p2pNetworkRefFactory: P2PNetworkRefFactoryT,
+      p2pNetworkManager: P2PNetworkManagerT,
   )
 }

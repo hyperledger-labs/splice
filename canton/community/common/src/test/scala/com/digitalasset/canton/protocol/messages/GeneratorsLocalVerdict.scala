@@ -24,6 +24,7 @@ import com.digitalasset.canton.protocol.LocalRejectError.TimeRejects.{
 }
 import com.digitalasset.canton.protocol.LocalRejectError.UnassignmentRejects.ActivenessCheckFailed
 import com.digitalasset.canton.protocol.{LocalAbstainError, LocalRejectErrorImpl, Malformed}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{GeneratorsLf, LfPartyId}
 import org.scalacheck.{Arbitrary, Gen}
@@ -36,7 +37,6 @@ final case class GeneratorsLocalVerdict(
   import com.digitalasset.canton.Generators.*
   import generatorsLf.*
 
-  // TODO(#14515) Check that the generator is exhaustive
   private def localVerdictRejectGen: Gen[LocalReject] = {
     val resources = List("resource1", "resource2")
     val details = "details"
@@ -57,7 +57,6 @@ final case class GeneratorsLocalVerdict(
       .map(_.toLocalReject(protocolVersion))
   }
 
-  // TODO(#14515) Check that the generator is exhaustive
   private def localVerdictMalformedGen: Gen[LocalReject] = {
     val resources = List("resource1", "resource2")
     val details = "details"
@@ -75,7 +74,6 @@ final case class GeneratorsLocalVerdict(
       .map(_.toLocalReject(protocolVersion))
   }
 
-  // TODO(#14515) Check that the generator is exhaustive
   private def localRejectGen: Gen[LocalReject] =
     Gen.oneOf(localVerdictRejectGen, localVerdictMalformedGen)
 
@@ -100,11 +98,12 @@ final case class GeneratorsLocalVerdict(
     Gen.oneOf(localApproveGen, localRejectGen, localAbstainGen)
   )
 
-  implicit val participantRejectReasonArb: Arbitrary[(Set[LfPartyId], LocalReject)] =
+  implicit val participantRejectReasonArb: Arbitrary[(Set[LfPartyId], ParticipantId, LocalReject)] =
     Arbitrary(
       for {
         parties <- boundedSetGen[LfPartyId]
         reject <- localRejectGen
-      } yield (parties, reject)
+        participantId <- generatorsLf.generatorsTopology.participantIdArb.arbitrary
+      } yield (parties, participantId, reject)
     )
 }

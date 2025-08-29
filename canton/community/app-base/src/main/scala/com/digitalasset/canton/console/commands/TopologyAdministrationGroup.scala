@@ -645,36 +645,6 @@ class TopologyAdministrationGroup(
         else Seq.empty
       (latestAuthorized ++ latestProposal).maxByOption(_.serial)
     }
-
-    @Help.Summary("Manage topology transaction purging", FeatureFlag.Preview)
-    @Help.Group("Purge Topology Transactions")
-    object purge extends Helpful {
-      def list(
-          store: TopologyStoreId,
-          proposals: Boolean = false,
-          timeQuery: TimeQuery = TimeQuery.HeadState,
-          operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
-          filterSynchronizer: String = "",
-          filterSigningKey: String = "",
-          protocolVersion: Option[String] = None,
-      ): Seq[ListPurgeTopologyTransactionResult] = consoleEnvironment.run {
-        adminCommand(
-          TopologyAdminCommands.Read.ListPurgeTopologyTransaction(
-            BaseQuery(
-              store,
-              proposals,
-              timeQuery,
-              operation,
-              filterSigningKey,
-              protocolVersion.map(ProtocolVersion.tryCreate),
-            ),
-            filterSynchronizer,
-          )
-        )
-      }
-
-      // TODO(#15236): implement write service for purging
-    }
   }
 
   object synchronizer_bootstrap {
@@ -1340,13 +1310,13 @@ class TopologyAdministrationGroup(
         maybePreviousState match {
           case None =>
             (
-              OwnerToKeyMapping(keyOwner, publicKeys),
+              OwnerToKeyMapping.create(keyOwner, publicKeys),
               PositiveInt.one,
               TopologyChangeOp.Replace,
             )
           case Some((_, TopologyChangeOp.Remove, previousSerial)) =>
             (
-              OwnerToKeyMapping(keyOwner, publicKeys),
+              OwnerToKeyMapping.create(keyOwner, publicKeys),
               previousSerial.increment,
               TopologyChangeOp.Replace,
             )
@@ -1356,7 +1326,7 @@ class TopologyAdministrationGroup(
               "The owner-to-key mapping already contains the specified keys to add",
             )
             (
-              okm.copy(keys = okm.keys ++ publicKeys),
+              OwnerToKeyMapping.create(okm.member, okm.keys ++ publicKeys),
               previousSerial.increment,
               TopologyChangeOp.Replace,
             )
@@ -1377,27 +1347,34 @@ class TopologyAdministrationGroup(
             // Remove publicKeys from okm.keys
             NonEmpty.from(okm.keys.filterNot(publicKeys.contains)) match {
               case Some(fewerKeys) =>
-                (okm.copy(keys = fewerKeys), previousSerial.increment, TopologyChangeOp.Replace)
+                (
+                  OwnerToKeyMapping.create(okm.member, keys = fewerKeys),
+                  previousSerial.increment,
+                  TopologyChangeOp.Replace,
+                )
               case None =>
-                (okm, previousSerial.increment, TopologyChangeOp.Remove)
+                (Right(okm), previousSerial.increment, TopologyChangeOp.Remove)
             }
         }
       }
 
-      propose(
-        proposedMapping,
-        Some(serial),
-        ops,
-        signedBy,
-        TopologyStoreId.Authorized,
-        synchronize,
-        mustFullyAuthorize,
-        force,
+      runAdminCommand(
+        TopologyAdminCommands.Write.Propose(
+          mapping = proposedMapping,
+          signedBy = signedBy,
+          store = TopologyStoreId.Authorized,
+          change = ops,
+          serial = Some(serial),
+          mustFullyAuthorize = mustFullyAuthorize,
+          forceChanges = force,
+          waitToBecomeEffective = synchronize,
+        )
       ).discard
     }
 
     def propose(
-        proposedMapping: OwnerToKeyMapping,
+        member: Member,
+        keys: NonEmpty[Seq[PublicKey]],
         serial: Option[PositiveInt] = None,
         ops: TopologyChangeOp = TopologyChangeOp.Replace,
         signedBy: Seq[Fingerprint] = Seq.empty,
@@ -1411,7 +1388,7 @@ class TopologyAdministrationGroup(
     ): SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping] =
       runAdminCommand(
         TopologyAdminCommands.Write.Propose(
-          mapping = proposedMapping,
+          mapping = OwnerToKeyMapping.create(member, keys),
           signedBy = signedBy,
           store = store,
           change = ops,
@@ -1455,7 +1432,9 @@ class TopologyAdministrationGroup(
 
     @Help.Summary("Propose a party to key mapping")
     def propose(
-        proposedMapping: PartyToKeyMapping,
+        partyId: PartyId,
+        threshold: PositiveInt,
+        signingKeys: NonEmpty[Seq[SigningPublicKey]],
         serial: Option[PositiveInt] = None,
         ops: TopologyChangeOp = TopologyChangeOp.Replace,
         signedBy: Option[Fingerprint] = None,
@@ -1469,7 +1448,7 @@ class TopologyAdministrationGroup(
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToKeyMapping] =
       runAdminCommand(
         TopologyAdminCommands.Write.Propose(
-          mapping = proposedMapping,
+          mapping = PartyToKeyMapping.create(partyId, threshold, signingKeys),
           signedBy = signedBy.toList,
           store = store,
           change = ops,
@@ -1790,32 +1769,35 @@ class TopologyAdministrationGroup(
       * synchronizer `synchronizerId`.
       * @param synchronizerId
       *   Synchronizer on which the party should be hosted
-      * @param parties
-      *   The parties which needs to be hosted
-      * @param hostingParticipants
-      *   Expected hosting participants
+      * @param hostingRelationship
+      *   Hosting relationship that must be known. The parties which needs to be hosted
       */
     def are_known(
         synchronizerId: SynchronizerId,
-        parties: Seq[PartyId],
-        hostingParticipants: Seq[ParticipantId],
+        hostingRelationship: Set[(PartyId, ParticipantId)],
     ): Boolean = {
-      val partyToParticipants: Map[PartyId, Seq[ParticipantId]] = list(synchronizerId)
+      val foundPTP: Map[PartyId, Set[ParticipantId]] = list(synchronizerId)
         .map(_.item)
-        .map(mapping => mapping.partyId -> mapping.participants.map(p => p.participantId))
+        .map(mapping => mapping.partyId -> mapping.participants.map(p => p.participantId).toSet)
         .toMap
 
-      parties.forall { party =>
+      val expectedPTP: Map[PartyId, Set[ParticipantId]] = hostingRelationship.groupMap {
+        case (party, _) => party
+      } { case (_, participant) =>
+        participant
+      }
+
+      expectedPTP.forall { case (party, participants) =>
         val missingParticipants =
-          hostingParticipants.diff(partyToParticipants.getOrElse(party, Seq.empty))
+          participants.diff(foundPTP.getOrElse(party, Set.empty))
 
         if (missingParticipants.isEmpty)
           logger.debug(
-            s"Node knows about $party being hosted on $hostingParticipants"
+            s"Node knows about $party being hosted on $participants"
           )(TraceContext.empty)
         else
           logger.debug(
-            s"Node knows that $party is hosted on ${hostingParticipants.diff(missingParticipants)} but not on $missingParticipants"
+            s"Node knows that $party is hosted on ${participants.diff(missingParticipants)} but not on $missingParticipants"
           )(TraceContext.empty)
 
         missingParticipants.isEmpty

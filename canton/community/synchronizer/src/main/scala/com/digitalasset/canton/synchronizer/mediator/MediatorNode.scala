@@ -585,7 +585,6 @@ class MediatorNodeBootstrap(
           )
           .leftMap(error => error.toString)
       )
-
     } yield connectionPool
 
     val mediatorRuntimeET = for {
@@ -598,7 +597,7 @@ class MediatorNodeBootstrap(
         timeouts,
         synchronizerLoggerFactory,
       )
-      sendTrackerStore = SendTrackerStore(storage)
+      sendTrackerStore = SendTrackerStore()
       sequencerCounterTrackerStore = SequencerCounterTrackerStore(
         storage,
         physicalSynchronizerIdx,
@@ -730,12 +729,11 @@ class MediatorNodeBootstrap(
       // TODO(i12076): Request topology information from all sequencers and reconcile
       _ <- MonadUtil.unlessM(
         EitherT.right[String](synchronizerConfigurationStore.isTopologyInitialized())
-      ) {
+      )(
         new StoreBasedSynchronizerTopologyInitializationCallback(
           mediatorId
         ).callback(
           new InitialTopologySnapshotValidator(
-            staticSynchronizerParameters.protocolVersion,
             crypto.pureCrypto,
             synchronizerTopologyStore,
             arguments.parameterConfig.processingTimeouts,
@@ -745,7 +743,7 @@ class MediatorNodeBootstrap(
           sequencerClient,
           staticSynchronizerParameters.protocolVersion,
         ).semiflatMap(_ => synchronizerConfigurationStore.setTopologyInitialized())
-      }
+      )
 
       mediatorRuntime <- MediatorRuntimeFactory.create(
         mediatorId,
