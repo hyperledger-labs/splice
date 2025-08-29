@@ -134,10 +134,8 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
       }
 
       clue("Manually dumped identities match the ones dumped via the API") {
-        svParticipantDumpManual.id shouldBe svParticipantDump.id
-        svParticipantDumpManual.keys should contain theSameElementsAs svParticipantDump.keys
-        svParticipantDumpManual.authorizedStoreSnapshot shouldBe svParticipantDump.authorizedStoreSnapshot
         // we don't care about the version
+        svParticipantDumpManual shouldBe svParticipantDump.copy(version = None)
       }
 
       withCanton(

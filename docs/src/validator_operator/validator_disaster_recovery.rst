@@ -187,7 +187,9 @@ Here is one possible way to do so:
 #. Run below commands in the opened console. This will store the backup into a *local* file
    (relative to the local directory from which you opened the console) called ``identities-dump.json``.
 
-  .. literalinclude:: ../../../apps/app/src/pack/examples/recovery/manual-identities-dump.sc
+    .. literalinclude:: ../../../apps/app/src/pack/examples/recovery/manual-identities-dump.sc
+
+   Note that above commands need to be adapted if your participant is configured to store keys in an :ref:`external KMS <validator-kms>`.
 
 .. _validator_disaster_recovery_troubleshooting:
 
