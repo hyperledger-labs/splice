@@ -49,12 +49,11 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigra
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import org.lfdecentralizedtrust.splice.util.{SynchronizerMigrationUtil, TemplateJsonDecoder}
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
@@ -273,16 +272,10 @@ class DomainMigrationInitializer(
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
-      _ <- participantAdminConnection
-        .ensureDomainParameters(
-          domainMigrationDump.nodeIdentities.synchronizerId,
-          // TODO(DACH-NY/canton-network-node#8761) hard code for now
-          _.tryUpdate(
-            confirmationRequestsMaxRate =
-              DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
-            mediatorReactionTimeout = DynamicSynchronizerParameters.defaultMediatorReactionTimeout,
-          ),
-        )
+      _ <- SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+        participantAdminConnection,
+        domainMigrationDump.nodeIdentities.synchronizerId,
+      )
       _ = logger.info("resumed domain")
     } yield {}
   }

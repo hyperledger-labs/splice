@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.migration
 import cats.data.OptionT
 import cats.instances.future.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,9 +37,7 @@ class SynchronizerParametersStateTopologyConnection(connection: TopologyAdminCon
     }
     lastUnpaused <- OptionT.fromOption {
       domainParamsHistory
-        .filter(p =>
-          p.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero && p.mapping.parameters.mediatorReactionTimeout > com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
-        )
+        .filter(SynchronizerMigrationUtil.synchronizerIsUnpaused(_))
         .maxByOption(_.base.validFrom)
     }
   } yield PausedSynchronizersState(
@@ -55,10 +53,10 @@ final case class PausedSynchronizersState(
     lastUnpausedState: TopologyAdminConnection.TopologyResult[SynchronizerParametersState],
 ) {
   def exportTimestamp: Instant = {
-    require(pausedState.mapping.parameters.confirmationRequestsMaxRate == NonNegativeInt.zero)
-    require(
-      pausedState.mapping.parameters.mediatorReactionTimeout == com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
-    )
+    // We only check this here as some places invoke `firstAuthorizedStateForTheLatestSynchronizerParametersState`
+    // to wait for the synchronizer to be paused so it is not always paused but when someone
+    // wants to export, it definitely must be paused.
+    require(SynchronizerMigrationUtil.synchronizerIsPaused(pausedState))
     pausedState.base.validFrom
   }
   def acsExportWaitTimestamp: Instant = {

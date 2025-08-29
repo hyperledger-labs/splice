@@ -39,19 +39,22 @@ import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 
 import java.util.Optional
-import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, Contract, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  BackupDump,
+  Codec,
+  Contract,
+  SynchronizerMigrationUtil,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.config.{
   NonNegativeDuration,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.syntax.EncoderOps
@@ -458,10 +461,9 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.pauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-        _ <- changeDomainRatePerParticipant(
+        _ <- SynchronizerMigrationUtil.ensureSynchronizerIsPaused(
+          participantAdminConnection,
           decentralizedSynchronizer,
-          NonNegativeInt.zero,
-          com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero,
         )
       } yield v0.SvAdminResource.PauseDecentralizedSynchronizerResponseOK
     }
@@ -476,10 +478,9 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.unpauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-        _ <- changeDomainRatePerParticipant(
+        _ <- SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+          participantAdminConnection,
           decentralizedSynchronizer,
-          DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
-          DynamicSynchronizerParameters.defaultMediatorReactionTimeout,
         )
       } yield v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponseOK
     }
@@ -616,24 +617,6 @@ class HttpSvAdminHandler(
       notFound(definitions.ErrorResponse("Mediator is not configured."))
         .pure[Future]
     } { call }
-
-  private def changeDomainRatePerParticipant(
-      decentralizedSynchronizerId: SynchronizerId,
-      rate: NonNegativeInt,
-      mediatorReactionTimeout: com.digitalasset.canton.time.NonNegativeFiniteDuration,
-  )(implicit
-      tc: TraceContext
-  ) = for {
-    id <- participantAdminConnection.getId()
-    result <- participantAdminConnection
-      .ensureDomainParameters(
-        decentralizedSynchronizerId,
-        _.tryUpdate(
-          confirmationRequestsMaxRate = rate,
-          mediatorReactionTimeout = mediatorReactionTimeout,
-        ),
-      )
-  } yield result
 
   override def triggerDomainMigrationDump(
       respond: SvAdminResource.TriggerDomainMigrationDumpResponse.type

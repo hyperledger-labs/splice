@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   TopologyAdminConnection,
 }
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
@@ -78,7 +78,7 @@ final class DomainParamsStore(
         case None =>
           None
         case Some(lastParams) =>
-          val unpaused = isDomainUnpaused(lastParams)
+          val unpaused = SynchronizerMigrationUtil.synchronizerIsUnpaused(lastParams)
           if (unpaused) {
             None
           } else {
@@ -102,7 +102,7 @@ final class DomainParamsStore(
         SynchronizerParametersState
       ]
   )(implicit tc: TraceContext): Future[Unit] = Future {
-    val unpaused = isDomainUnpaused(params)
+    val unpaused = SynchronizerMigrationUtil.synchronizerIsPaused(params)
     metrics.confirmationRequestsMaxRate.updateValue(
       params.mapping.parameters.confirmationRequestsMaxRate.value
     )
@@ -128,11 +128,6 @@ final class DomainParamsStore(
       }
     }
   }
-
-  private def isDomainUnpaused(
-      params: TopologyAdminConnection.TopologyResult[SynchronizerParametersState]
-  ) =
-    params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero && params.mapping.parameters.mediatorReactionTimeout > com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
 
   override def close(): Unit = {
     metrics.close()

@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -76,7 +76,7 @@ class AcsExporter(
         .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
         .toRight(AcsExporter.DomainStateNotFound)
       _ <- EitherT.cond[Future](
-        paramsState.pausedState.mapping.parameters.confirmationRequestsMaxRate == NonNegativeInt.zero && paramsState.pausedState.mapping.parameters.mediatorReactionTimeout == com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero,
+        SynchronizerMigrationUtil.synchronizerIsPaused(paramsState.pausedState),
         (),
         AcsExporter.DomainNotPaused,
       )
