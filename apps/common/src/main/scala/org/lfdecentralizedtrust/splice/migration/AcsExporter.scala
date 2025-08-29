@@ -76,7 +76,7 @@ class AcsExporter(
         .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
         .toRight(AcsExporter.DomainStateNotFound)
       _ <- EitherT.cond[Future](
-        SynchronizerMigrationUtil.synchronizerIsPaused(paramsState.pausedState),
+        SynchronizerMigrationUtil.synchronizerIsPaused(paramsState.currentState),
         (),
         AcsExporter.DomainNotPaused,
       )

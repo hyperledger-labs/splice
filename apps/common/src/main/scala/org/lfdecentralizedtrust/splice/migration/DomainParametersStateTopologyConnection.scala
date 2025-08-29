@@ -17,19 +17,19 @@ import scala.concurrent.{ExecutionContext, Future}
 @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
 class SynchronizerParametersStateTopologyConnection(connection: TopologyAdminConnection) {
 
-  // Selects the topology transaction that has the highest serial number and the smallest number of signatories.
-  // This ensures that everyone will choose the same timestamp as to when the domain was paused.
   def firstAuthorizedStateForTheLatestSynchronizerParametersState(
       domain: SynchronizerId
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): OptionT[Future, PausedSynchronizersState] = for {
+  ): OptionT[Future, MigrationSynchronizersState] = for {
     domainParamsHistory <- OptionT.liftF(
       connection
         .listSynchronizerParametersStateHistory(domain)
     )
-    pausedState <- OptionT.fromOption {
+    // Selects the topology transaction that has the highest serial number and the smallest number of signatories.
+    // This ensures that everyone will choose the same timestamp as to when the domain was paused.
+    currentState <- OptionT.fromOption {
       val latestState = domainParamsHistory.map(_.base.serial).maxOption
       domainParamsHistory
         .filter(state => latestState.contains(state.base.serial))
@@ -40,14 +40,14 @@ class SynchronizerParametersStateTopologyConnection(connection: TopologyAdminCon
         .filter(SynchronizerMigrationUtil.synchronizerIsUnpaused(_))
         .maxByOption(_.base.validFrom)
     }
-  } yield PausedSynchronizersState(
-    pausedState,
+  } yield MigrationSynchronizersState(
+    currentState,
     lastUnpaused,
   )
 }
 
-final case class PausedSynchronizersState(
-    pausedState: TopologyAdminConnection.TopologyResult[
+final case class MigrationSynchronizersState(
+    currentState: TopologyAdminConnection.TopologyResult[
       SynchronizerParametersState
     ],
     lastUnpausedState: TopologyAdminConnection.TopologyResult[SynchronizerParametersState],
@@ -56,8 +56,8 @@ final case class PausedSynchronizersState(
     // We only check this here as some places invoke `firstAuthorizedStateForTheLatestSynchronizerParametersState`
     // to wait for the synchronizer to be paused so it is not always paused but when someone
     // wants to export, it definitely must be paused.
-    require(SynchronizerMigrationUtil.synchronizerIsPaused(pausedState))
-    pausedState.base.validFrom
+    require(SynchronizerMigrationUtil.synchronizerIsPaused(currentState))
+    currentState.base.validFrom
   }
   def acsExportWaitTimestamp: Instant = {
     // At exportTimestamp we set mediatorReactionTimeout = 0. This means any confirmation request after exportTimestamp

@@ -100,11 +100,11 @@ class DomainDataSnapshotGenerator(
             )
           } yield {
             if (
-              sequencerDomainParameters.base.serial < participantParamsState.pausedState.base.serial
+              sequencerDomainParameters.base.serial < participantParamsState.currentState.base.serial
             ) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${participantParamsState.pausedState.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
+                  s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${participantParamsState.currentState.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
                 )
                 .asRuntimeException()
             }

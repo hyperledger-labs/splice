@@ -14,6 +14,8 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import scala.concurrent.Future
 
 final object SynchronizerMigrationUtil {
+  // We only check mediatorReactionTimeout here as that is what matters for safety and it ensures that
+  // synchronizerIsUnpaused = !synchronizerIsUnpaused instead of checking that both are 0 or both are non-zero.
   def synchronizerIsPaused(params: TopologyResult[SynchronizerParametersState]): Boolean =
     params.mapping.parameters.mediatorReactionTimeout == NonNegativeFiniteDuration.Zero
 
@@ -45,7 +47,7 @@ final object SynchronizerMigrationUtil {
     topologyConnection.ensureDomainParameters(
       synchronizerId,
       _.tryUpdate(
-        // TODO(DACH-NY/canton-network-node#8761) hard code unpaused parameters for now
+        // hard code unpaused parameters for now as we don't change these parameters otherwise.
         confirmationRequestsMaxRate =
           DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
         mediatorReactionTimeout = DynamicSynchronizerParameters.defaultMediatorReactionTimeout,
