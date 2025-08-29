@@ -37,6 +37,15 @@ object PackageQualifiedName {
       QualifiedName(event.getTemplateId.getModuleName, event.getTemplateId.getEntityName),
     )
   }
+
+  def fromJavaCodegenCompanion(
+      companion: com.daml.ledger.javaapi.data.codegen.ContractCompanion[?, ?, ?]
+  ): PackageQualifiedName = {
+    PackageQualifiedName(
+      companion.PACKAGE_NAME,
+      QualifiedName(companion.TEMPLATE_ID.getModuleName, companion.TEMPLATE_ID.getEntityName),
+    )
+  }
 }
 
 object QualifiedName {

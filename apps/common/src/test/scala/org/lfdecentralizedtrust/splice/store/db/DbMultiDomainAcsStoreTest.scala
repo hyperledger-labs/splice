@@ -629,7 +629,6 @@ class DbMultiDomainAcsStoreTest
         migrationId,
         None,
       ),
-      participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
   }

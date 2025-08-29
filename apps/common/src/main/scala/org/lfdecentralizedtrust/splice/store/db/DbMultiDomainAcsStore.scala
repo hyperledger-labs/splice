@@ -87,7 +87,6 @@ final class DbMultiDomainAcsStore[TXE](
     ],
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
-    participantId: ParticipantId,
     retryProvider: RetryProvider,
     /** Allows processing the summary in a store-specific manner, e.g., to produce metrics
       * on ingestion of certain contracts.
@@ -174,7 +173,8 @@ final class DbMultiDomainAcsStore[TXE](
           acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = sql"""acs.contract_id = ${lengthLimited(id.contractId)}""",
+          companion,
+          additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
         ).headOption,
         "lookupContractById",
       )
@@ -188,7 +188,6 @@ final class DbMultiDomainAcsStore[TXE](
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = waitUntilAcsIngested {
-    val templateId = companionClass.typeId(companion)
     for {
       resultWithOffset <- storage
         .querySingle(
@@ -196,7 +195,7 @@ final class DbMultiDomainAcsStore[TXE](
             acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}""",
+            companion,
             orderLimit = sql"limit 1",
           ).headOption,
           "findAnyContractWithOffset",
@@ -216,12 +215,14 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Option[ContractState]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_mid_cid
-        selectFromAcsTableWithState(
-          acsTableName,
-          acsStoreId,
-          domainMigrationId,
-          where = sql"""acs.contract_id = ${lengthLimited(id.contractId)}""",
-        ).headOption,
+        (sql"""
+         select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+         from #$acsTableName acs
+         where acs.store_id = $acsStoreId
+           and acs.migration_id = $domainMigrationId
+           and acs.contract_id = ${lengthLimited(id.contractId)}""").toActionBuilder
+          .as[AcsQueries.SelectFromAcsTableWithStateResult]
+          .headOption,
         "lookupContractStateById",
       )
       .map(result => contractStateFromRow(result.stateRow))
@@ -257,15 +258,15 @@ final class DbMultiDomainAcsStore[TXE](
     val opName = s"listContracts:${templateId.getEntityName}"
     val afterCondition =
       after.fold(sql"")(a => (sql" and " ++ sortOrder.whereEventNumber(a)).toActionBuilder)
+
     for {
       result <- storage.query( // index: acs_store_template_sid_mid_tid_en
         selectFromAcsTableWithState(
           acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = (sql"""template_id_qualified_name = ${QualifiedName(
-              templateId
-            )} """ ++ afterCondition).toActionBuilder,
+          companion,
+          additionalWhere = afterCondition,
           orderLimit =
             (sortOrder.orderByAcsEventNumber ++ sql""" limit ${sqlLimit(limit)}""").toActionBuilder,
         ),
@@ -291,12 +292,11 @@ final class DbMultiDomainAcsStore[TXE](
           acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = sql"""template_id_qualified_name = ${QualifiedName(
-              templateId
-            )} and assigned_domain is not null""",
+          companion,
+          additionalWhere = sql"""and assigned_domain is not null""",
           orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
-        "listAssignedContracts",
+        s"listAssignedContracts:$templateId",
       )
       limited = applyLimit("listAssignedContracts", limit, result)
       assigned = limited.map(assignedContractFromRow(companion)(_))
@@ -308,7 +308,6 @@ final class DbMultiDomainAcsStore[TXE](
   ], T <: Template](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): ListExpiredContracts[TCid, T] = { (now, limit) => implicit traceContext =>
-    val templateId = companionClass.typeId(companion)
     for {
       _ <- waitUntilAcsIngested()
       result <- storage
@@ -317,9 +316,8 @@ final class DbMultiDomainAcsStore[TXE](
             acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                templateId
-              )} and acs.contract_expires_at < $now""",
+            companion,
+            additionalWhere = sql"""and acs.contract_expires_at < $now""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listExpiredFromPayloadExpiry",
@@ -337,16 +335,14 @@ final class DbMultiDomainAcsStore[TXE](
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]] = waitUntilAcsIngested {
-    val templateId = companionClass.typeId(companion)
     for {
       result <- storage.query(
         selectFromAcsTableWithState(
           acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = sql"""template_id_qualified_name = ${QualifiedName(
-              templateId
-            )} and assigned_domain = $domain""",
+          companion,
+          additionalWhere = sql"""and assigned_domain = $domain""",
           orderLimit = sql"""limit ${sqlLimit(limit)}""",
         ),
         "listContractsOnDomain",
@@ -356,50 +352,16 @@ final class DbMultiDomainAcsStore[TXE](
     } yield contracts
   }
 
-  override def listAssignedContractsNotOnDomainN(
-      excludedDomain: SynchronizerId,
-      companions: Seq[ConstrainedTemplate],
-      limit: notOnDomainsTotalLimit.type,
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
-    val templateIdMap = companions
-      .map(c => QualifiedName(c.getTemplateIdWithPackageId) -> c)
-      .toMap
-    val templateIds = inClause(templateIdMap.keys)
-    for {
-      result <- storage.query(
-        selectFromAcsTableWithState(
-          acsTableName,
-          acsStoreId,
-          domainMigrationId,
-          where =
-            (sql"""template_id_qualified_name IN """ ++ templateIds ++ sql""" and assigned_domain is not null and assigned_domain != $excludedDomain""").toActionBuilder,
-          // bytea comparison in PG is left-to-right unsigned ascending, shorter
-          // array is lesser if bytes are otherwise equal; there's an equivalent
-          // soft implementation in
-          // InMemoryMultiDomainAcsStore.reassignmentContractOrder
-          orderLimit =
-            sql"""order by extensions.digest((contract_id || $participantId)::bytea, 'md5'::text)
-              limit ${(limit: PageLimit).limit}""",
-        ),
-        "listAssignedContractsNotOnDomainN",
-      )
-    } yield result.map { row =>
-      assignedContractFromRow(
-        templateIdMap(row.acsRow.templateIdQualifiedName)
-      )(row)
-    }
-  }
-
   override def streamAssignedContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Source[AssignedContract[TCid, T], NotUsed] = {
-    val templateId = companionClass.typeId(companion)
+    val packageQualifiedName = companionClass.packageQualifiedName(companion)
     streamContractsWithState(
       pageSize = defaultPageSizeForContractStream,
-      where = sql"""assigned_domain is not null and template_id_qualified_name = ${QualifiedName(
-          templateId
-        )}""",
+      where = sql"""assigned_domain is not null
+                and package_name = ${packageQualifiedName.packageName}
+                and template_id_qualified_name = ${packageQualifiedName.qualifiedName}""",
     )
       .map(assignedContractFromRow(companion)(_))
   }
@@ -674,14 +636,15 @@ final class DbMultiDomainAcsStore[TXE](
             val offsetPromise = state.get().offsetChanged
             storage
               .query(
-                selectFromAcsTableWithState(
-                  acsTableName,
-                  acsStoreId,
-                  domainMigrationId,
-                  where = (where ++ sql" and state_number >= $fromNumber").toActionBuilder,
-                  orderLimit =
-                    (sql"order by state_number limit ${sqlLimit(pageSize)}").toActionBuilder,
-                ),
+                (sql"""
+                   select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+                   from #$acsTableName acs
+                   where acs.store_id = $acsStoreId
+                     and acs.migration_id = $domainMigrationId
+                     and state_number >= $fromNumber
+                     and """ ++ where ++ sql"""
+                   order by state_number limit ${sqlLimit(pageSize)}""").toActionBuilder
+                  .as[AcsQueries.SelectFromAcsTableWithStateResult],
                 "streamContractsWithState",
               )
               .flatMap { rows =>
@@ -720,12 +683,14 @@ final class DbMultiDomainAcsStore[TXE](
     waitUntilAcsIngested {
       storage
         .querySingle(
-          selectFromAcsTableWithState(
-            acsTableName,
-            acsStoreId,
-            domainMigrationId,
-            where = sql"""acs.contract_id = ${contractId}""",
-          ).headOption,
+          (sql"""
+             select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+             from #$acsTableName acs
+             where acs.store_id = $acsStoreId
+               and acs.migration_id = $domainMigrationId
+               and acs.contract_id = $contractId""").toActionBuilder
+            .as[AcsQueries.SelectFromAcsTableWithStateResult]
+            .headOption,
           "isReadyForAssign",
         )
         .value
@@ -1631,6 +1596,7 @@ final class DbMultiDomainAcsStore[TXE](
       val templateId = rowData.identifier
       val templateIdQualifiedName = QualifiedName(templateId)
       val templateIdPackageId = lengthLimited(rowData.identifier.getPackageId)
+      val packageName = createdEvent.getPackageName
       val createArguments = rowData.payload
       val createdAt = Timestamp.assertFromInstant(rowData.createdAt)
       val contractExpiresAt = rowData.contractExpiresAt
@@ -1649,12 +1615,12 @@ final class DbMultiDomainAcsStore[TXE](
 
       import storage.DbStorageConverters.setParameterByteArray
       (sql"""
-                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name,
+                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name, package_name,
                                            create_arguments, created_event_blob, created_at, contract_expires_at,
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$indexColumnNames)
-                values ($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
+                values ($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName, $packageName,
                         $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId

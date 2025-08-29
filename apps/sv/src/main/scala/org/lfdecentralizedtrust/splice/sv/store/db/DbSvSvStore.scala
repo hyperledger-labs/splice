@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescr
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{MultiDomainAcsStore, StoreErrors}
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.util.{Contract, QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -44,7 +44,7 @@ class DbSvSvStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbSvSvStore",
         party = key.svParty,
         participant = participantId,
@@ -82,12 +82,8 @@ class DbSvSvStore(
             DbSvSvStore.tableName,
             acsStoreId,
             domainMigrationId,
-            sql"""
-            template_id_qualified_name = ${QualifiedName(
-                ValidatorOnboarding.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              and onboarding_secret = ${lengthLimited(secret)}
-          """,
+            ValidatorOnboarding.COMPANION,
+            where = sql"""onboarding_secret = ${lengthLimited(secret)}""",
           ).headOption,
           "lookupValidatorOnboardingBySecretWithOffset",
         )
@@ -108,12 +104,8 @@ class DbSvSvStore(
               DbSvSvStore.tableName,
               acsStoreId,
               domainMigrationId,
-              sql"""
-                  template_id_qualified_name = ${QualifiedName(
-                  UsedSecret.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-                    and onboarding_secret = ${lengthLimited(secret)}
-                """,
+              UsedSecret.COMPANION,
+              where = sql"""onboarding_secret = ${lengthLimited(secret)}""",
             ).headOption,
             "lookupUsedSecretWithOffset",
           )
