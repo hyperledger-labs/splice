@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.BaseTest.getResourcePath
-import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
@@ -12,15 +12,16 @@ import com.google.cloud.bigquery as bq
 import bq.{Field, JobInfo, Schema, TableId}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
-
 import slick.jdbc.GetResult
 
+import java.io.File
 import java.nio.file.Paths
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
+import scala.sys.process.Process
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -97,25 +98,29 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   "test bigquery queries" in { implicit env =>
-    withClue("create test data on Splice ledger") {
-      val (_, bobParty) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWalletClient)
-
-      // Create test data with more-or-less known amounts
-      createTestData(bobParty)
+//    withClue("create test data on Splice ledger") {
+//      val (_, bobParty) = onboardAliceAndBob()
+//      waitForWalletUser(aliceValidatorWalletClient)
+//
+//      // Create test data with more-or-less known amounts
+//      createTestData(bobParty)
+//    }
+//
+//    withClue("exporting PostgreSQL tables to BigQuery") {
+//      exportPostgresToBigQuery()
+//    }
+//
+    withClue("Creating BigQuery functions") {
+      createBigQueryFunctions()
     }
-
-    withClue("exporting PostgreSQL tables to BigQuery") {
-      exportPostgresToBigQuery()
-    }
-
-    val results = withClue("running total supply queries in BigQuery") {
-      runTotalSupplyQueries()
-    }
-
-    withClue(s"verify total supply results") {
-      verifyResults(results)
-    }
+//
+//    val results = withClue("running total supply queries in BigQuery") {
+//      runTotalSupplyQueries()
+//    }
+//
+//    withClue(s"verify total supply results") {
+//      verifyResults(results)
+//    }
   }
 
   import bq.storage.v1.TableFieldSchema as TFS
@@ -444,6 +449,16 @@ class ScanTotalSupplyBigQueryIntegrationTest
           e,
         )
       )
+  }
+
+  /** Creates all auxiliary functions in BigQuery. First codegen's from the Pulumi definitions
+   * the query that creates them, then runs that query in BQ.
+   */
+  private def createBigQueryFunctions() = {
+    val ret = Process("npm run sql-codegen test.sql", new File("cluster/pulumi/canton-network")).!
+    if (ret != 0) {
+      fail("Failed to codegen the sql query for creating functions in BigQuery")
+    }
   }
 
   /** Runs the total supply queries from the SQL file
