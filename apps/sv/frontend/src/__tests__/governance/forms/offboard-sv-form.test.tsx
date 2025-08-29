@@ -27,7 +27,7 @@ describe('SV user can', () => {
     await user.type(input, 'sv1');
 
     const button = screen.getByRole('button', { name: 'Log In' });
-    user.click(button);
+    await user.click(button);
 
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
@@ -59,6 +59,8 @@ describe('Offboard SV Form', () => {
     const memberInput = screen.getByTestId('offboard-sv-member-dropdown');
     expect(memberInput).toBeDefined();
     expect(memberInput.getAttribute('value')).toBe('');
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -73,6 +75,7 @@ describe('Offboard SV Form', () => {
     const actionInput = screen.getByTestId('offboard-sv-action');
     const submitButton = screen.getByTestId('submit-button');
     expect(submitButton).toBeDefined();
+    expect(screen.getByText('Review Proposal')).toBeDefined();
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
@@ -80,18 +83,18 @@ describe('Offboard SV Form', () => {
       /Unable to perform pointer interaction/
     );
 
-    screen.getByText('Summary is required');
-    screen.getByText('Invalid URL');
-    screen.getByText('SV is required');
+    expect(screen.getByText('Summary is required')).toBeDefined();
+    expect(screen.getByText('Invalid URL')).toBeDefined();
+    expect(screen.getByText('SV is required')).toBeDefined();
 
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('offboard-sv-summary');
     expect(summaryInput).toBeDefined();
-    user.type(summaryInput, 'Summary of the proposal');
+    await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('offboard-sv-url');
     expect(urlInput).toBeDefined();
-    user.type(urlInput, 'https://example.com');
+    await user.type(urlInput, 'https://example.com');
 
     const memberDropdown = screen.getByTestId('offboard-sv-member-dropdown');
     expect(memberDropdown).toBeDefined();
@@ -127,14 +130,14 @@ describe('Offboard SV Form', () => {
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeNull();
     });
   });
@@ -160,7 +163,7 @@ describe('Offboard SV Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
@@ -169,7 +172,7 @@ describe('Offboard SV Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
     });
   });
@@ -192,5 +195,43 @@ describe('Offboard SV Form', () => {
     expect(svOptions.map(option => option.textContent)).toEqual(
       expect.arrayContaining(['Digital-Asset-2', 'Digital-Asset-Eng-2'])
     );
+  });
+
+  test('should show proposal review page after form completion', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('offboard-sv-action');
+
+    const summaryInput = screen.getByTestId('offboard-sv-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('offboard-sv-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      await user.click(memberToSelect);
+    });
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
+    const submitButton = screen.getByTestId('submit-button');
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton);
+
+    expect(screen.getByText('Proposal Summary')).toBeDefined();
   });
 });
