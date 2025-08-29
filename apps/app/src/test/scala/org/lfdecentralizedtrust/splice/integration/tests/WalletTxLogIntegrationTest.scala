@@ -1629,7 +1629,7 @@ class WalletTxLogIntegrationTest
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       aliceValidatorWalletClient.tap(100) // funds to create preapproval
-      charlieWalletClient.createTransferPreapproval()
+      createTransferPreapprovalIfNotExists(charlieWalletClient)
 
       assertCommandFailsDueToInsufficientFunds(
         aliceWalletClient.transferPreapprovalSend(

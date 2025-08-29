@@ -106,6 +106,8 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
   chartVersion: 1.2.3
+  adaptiveScenario:
+    enabled: true
 svs:
   default:
     scanApp:
