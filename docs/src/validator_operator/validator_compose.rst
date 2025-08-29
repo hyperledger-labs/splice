@@ -138,6 +138,27 @@ You can open your browser at http://ans.localhost (note that this is currently b
 `ans` and not `cns`), and login using the same administrator user, or any other user that has been onboarded
 via the wallet, in order to purchase a CNS entry for that user.
 
+.. _compose_canton_apis:
+
+Accessing the Canton Participant APIs
+-------------------------------------
+
+The `JSON Ledger API <https://docs.digitalasset.com/build/3.3/tutorials/json-api/canton_and_the_json_ledger_api.html>`_
+is exposed under ``json-ledger-api.localhost:80``. Note that for some
+clients you may explicitly need to set the ``Host:
+json-ledger-api.localhost`` header for this to get resolved correctly.
+
+The `gRPC Ledger API
+<https://docs.digitalasset.com/build/3.3/explanations/ledger-api-services.html>`_
+is exposed under ``grpc-ledger-api.localhost:80``. Note that for some
+clients you may explicitly need to set the ``:authority:
+json-ledger-api.localhost`` pseudo-header for this to get resolved correctly.
+
+The Canton Admin API is not exposed by default as it does not yet
+support auth.  There is a commented out section in ``nginx.conf`` that
+you can enable to expose it if you ensure that it is not exposed
+publicly, e.g., through network restrictions.
+
 
 .. _compose_validator_auth:
 

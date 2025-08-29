@@ -45,6 +45,10 @@ Upcoming
     - Canton/Sequencer Messages dashboard now includes hourly totals, and a pie chart of the
       distribution of message types over the last 24 hours.
 
+- Validator Compose Deployment
+
+  - Expose Canton ledger API by default. Reference the  :ref:`docs <compose_canton_apis>` for details.
+
 - Daml
 
   - Fix a bug where activity record expiration had a reference to the ``AmuletRules`` contract which resulted in transactions
