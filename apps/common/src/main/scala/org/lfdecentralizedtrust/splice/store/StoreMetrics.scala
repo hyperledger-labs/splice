@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Timer}
+import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.SynchronizerId
@@ -36,6 +36,34 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
       0L,
     )(metricsContext)
 
+  val lastIngestedOffset: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      name = prefix :+ "last-ingested-offset",
+      summary = "The last offset ingested by this store",
+      Latency,
+      "The latest offset ingested by this store in numeric form.",
+    ),
+    0L,
+  )(metricsContext)
+
+  val ingestedTxLogEntries: Counter = metricsFactory.counter(
+    MetricInfo(
+      name = prefix :+ "ingested-tx-log-entries",
+      summary = "The number of transaction log entries ingested by this store",
+      Traffic,
+      "The number of transaction log entries ingested by this store. Note that there can be more than one entry per transaction.",
+    )
+  )(metricsContext)
+
+  val completedIngestions: Counter = metricsFactory.counter(
+    MetricInfo(
+      name = prefix :+ "completed-ingestions",
+      summary = "The number of completed ingestions by this store",
+      Traffic,
+      "The number of completed ingestions by this store. This is one for each ACS, transaction tree or reassignment.",
+    )
+  )(metricsContext)
+
   private val perSynchronizerLastIngestedRecordTimeMs: TrieMap[SynchronizerId, Gauge[Long]] =
     TrieMap.empty
 
@@ -55,6 +83,7 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
 
   override def close(): Unit = {
     acsSize.close()
+    lastIngestedOffset.close()
     perSynchronizerLastIngestedRecordTimeMs.values.foreach(_.close())
   }
 }
