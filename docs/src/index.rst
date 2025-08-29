@@ -35,7 +35,6 @@ Global Synchronizer for the Canton Network
 
 
    app_dev/overview/index
-   app_dev/app_val_tokenomics/index
    app_dev/overview/version_information
    app_dev/testing/index
    app_dev/ledger_api/index
@@ -51,13 +50,13 @@ Global Synchronizer for the Canton Network
    :caption: Background
 
    background/architecture
+   background/tokenomics/index.rst
    background/preapprovals
 
 .. todo:: Add Background sections containing
 
           - security (starting from key usage doc and risk of key compromise)
           - comparison to other chains
-          - tokenomics
 
 .. toctree::
    :maxdepth: 2

@@ -16,6 +16,12 @@ Upcoming
     - SV
         - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
 
+- Docs
+
+  - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
+    including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
+  - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
+
 0.4.13
 ------
 
@@ -38,6 +44,10 @@ Upcoming
     - Global Synchronizer Utilization dashboard now includes an average over an hour of the transaction rate.
     - Canton/Sequencer Messages dashboard now includes hourly totals, and a pie chart of the
       distribution of message types over the last 24 hours.
+
+- Validator Compose Deployment
+
+  - Expose Canton ledger API by default. Reference the  :ref:`docs <compose_canton_apis>` for details.
 
 - Daml
 
