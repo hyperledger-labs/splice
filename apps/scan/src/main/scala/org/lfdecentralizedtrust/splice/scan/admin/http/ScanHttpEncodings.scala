@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictT
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
@@ -439,6 +440,64 @@ object ScanHttpEncodings {
   sealed trait ApiVersion
   case object V0 extends ApiVersion
   case object V1 extends ApiVersion
+
+  private def toUpdateV2(update: definitions.UpdateHistoryItem): definitions.UpdateHistoryItemV2 =
+    update match {
+      case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        definitions.UpdateHistoryItemV2(
+          definitions.UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
+        )
+      case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        definitions.UpdateHistoryItemV2(
+          definitions.UpdateHistoryTransactionV2(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = scala.collection.immutable.SortedMap.from(t.eventsById),
+          )
+        )
+    }
+
+  def encodeEvent(
+    update: Option[TreeUpdateWithMigrationId],
+    verdict: Option[VerdictT],
+    encoding: definitions.DamlValueEncoding,
+    version: ApiVersion,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.EventHistoryItem = {
+    val encodedUpdateV2 = update
+      .map(encodeUpdate(_, encoding, version))
+      .map(toUpdateV2)
+    httpApi.EventHistoryItem(encodedUpdateV2, verdict.map(encodeVerdict(_, encoding)))
+  }
+  def encodeVerdict(
+    verdict: VerdictT,
+    encoding: definitions.DamlValueEncoding,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.EventHistoryVerdict = {
+    val encodings: ScanHttpEncodings = encoding match {
+      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings
+      case definitions.DamlValueEncoding.members.ProtobufJson => ProtobufJsonScanHttpEncodings
+    }
+    httpApi.EventHistoryVerdict(
+        verdict.updateId,
+        verdict.migrationId,
+        verdict.domainId.toString(),
+        verdict.mediatorGroup,
+        verdict.submittingParticipantUid,
+        verdict.submittingParties.toVector,
+        encodings.formatRecordTime(verdict.recordTime.toInstant),
+        encodings.formatRecordTime(verdict.finalizationTime.toInstant),
+        verdict.verdictResult.toInt,
+        verdict.transactionRootViews.toVector,
+      )
+  }
 
   def encodeUpdate(
       update: TreeUpdateWithMigrationId,
