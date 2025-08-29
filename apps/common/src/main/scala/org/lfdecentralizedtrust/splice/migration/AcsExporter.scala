@@ -81,7 +81,7 @@ class AcsExporter(
         .toRight(AcsExporter.DomainStateNotFound)
       domainParamsState = domainParamsStateTopology.mapping.parameters
       _ <- EitherT.cond[Future](
-        domainParamsState.confirmationRequestsMaxRate == NonNegativeInt.zero,
+        domainParamsState.confirmationRequestsMaxRate == NonNegativeInt.zero && domainParamsState.mediatorReactionTimeout == com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero,
         (),
         AcsExporter.DomainNotPaused,
       )

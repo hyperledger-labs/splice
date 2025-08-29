@@ -106,6 +106,9 @@ final class DomainParamsStore(
     metrics.confirmationRequestsMaxRate.updateValue(
       params.mapping.parameters.confirmationRequestsMaxRate.value
     )
+    metrics.mediatorReactionTimeout.updateValue(
+      params.mapping.parameters.mediatorReactionTimeout.toScala.toMillis
+    )
     blocking {
       synchronized {
         val newState = state.copy(lastParams = Some(params))
@@ -128,7 +131,7 @@ final class DomainParamsStore(
 
   private def isDomainUnpaused(
       params: TopologyAdminConnection.TopologyResult[SynchronizerParametersState]
-  ) = params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero
+  ) = params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero && params.mapping.parameters.mediatorReactionTimeout > com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
 
   override def close(): Unit = {
     metrics.close()
@@ -158,8 +161,21 @@ object DomainParamsStore {
         -1,
       )(MetricsContext.Empty)
 
+    val mediatorReactionTimeout: Gauge[Long] =
+      metricsFactory.gauge(
+        MetricInfo(
+          name = prefix :+ "mediator-reaction-timeout-ms",
+          summary = "DynamicSynchronizerParameters.mediatorReactionTimeout",
+          description =
+            "Last known value of DynamicSynchronizerParameters.mediatorReactionTimeout in ms on the configured global domain.",
+          qualification = Traffic,
+        ),
+        -1L,
+      )(MetricsContext.Empty)
+
     override def close(): Unit = {
       confirmationRequestsMaxRate.close()
+      mediatorReactionTimeout.close()
     }
   }
 }

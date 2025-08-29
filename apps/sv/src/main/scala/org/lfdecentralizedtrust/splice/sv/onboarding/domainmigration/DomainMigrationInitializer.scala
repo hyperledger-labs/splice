@@ -277,8 +277,10 @@ class DomainMigrationInitializer(
         .ensureDomainParameters(
           domainMigrationDump.nodeIdentities.synchronizerId,
           // TODO(DACH-NY/canton-network-node#8761) hard code for now
-          _.tryUpdate(confirmationRequestsMaxRate =
-            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
+          _.tryUpdate(
+            confirmationRequestsMaxRate =
+              DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
+            mediatorReactionTimeout = DynamicSynchronizerParameters.defaultMediatorReactionTimeout,
           ),
         )
       _ = logger.info("resumed domain")
