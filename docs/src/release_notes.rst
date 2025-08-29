@@ -20,7 +20,7 @@ Upcoming
 
   - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
     including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
-
+  - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
 
 0.4.13
 ------
