@@ -47,11 +47,14 @@ trait DbTest
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
   private var setup: DbStorageSetup = _
 
+  protected[this] lazy val rawStorage: DbStorage =
+    Option(setup).map(_.storage).getOrElse(sys.error("Test has not started"))
+
+  protected[this] def setupStorage(underlying: DbStorage): DbStorage =
+    new DbStorageIdempotency(underlying, timeouts, loggerFactory)
+
   /** Stores the db storage implementation. Will throw if accessed before the test has started */
-  protected lazy val storage: DbStorageIdempotency = {
-    val s = Option(setup).map(_.storage).getOrElse(sys.error("Test has not started"))
-    new DbStorageIdempotency(s, timeouts, loggerFactory)
-  }
+  protected final lazy val storage: DbStorage = setupStorage(rawStorage)
 
   override def beforeAll(): Unit = TraceContext.withNewTraceContext { implicit tc =>
     // Non-standard order. Setup needs to be created first, because super can be MyDbTest and therefore super.beforeAll
@@ -105,7 +108,14 @@ trait DbTest
     // Use the underlying storage for clean-up operations, so we don't run clean-ups twice
     // cleanDB is usually implemented by a TRUNCATE statement, which can be very slow,
     // we therefore use a long timeout.
-    Await.result(cleanDb(storage.underlying), 120.seconds)
+    Await.result(cleanDb(rawStorage), 120.seconds)
+  }
+}
+
+object DbTest {
+  trait DisableDbStorageIdempotency extends DbTest { this: Suite =>
+    override final protected[this] def setupStorage(underlying: DbStorage): DbStorage =
+      underlying
   }
 }
 
