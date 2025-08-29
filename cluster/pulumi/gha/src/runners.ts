@@ -133,6 +133,8 @@ const localnetHostAliases = [
       'scan.localhost',
       'sv.localhost',
       'wallet.localhost',
+      'json-ledger-api.localhost',
+      'grpc-ledger-api.localhost',
     ],
   },
 ];

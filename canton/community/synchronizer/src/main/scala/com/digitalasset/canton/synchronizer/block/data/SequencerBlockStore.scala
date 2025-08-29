@@ -4,7 +4,7 @@
 package com.digitalasset.canton.synchronizer.block.data
 
 import cats.data.EitherT
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -57,8 +57,19 @@ trait SequencerBlockStore extends AutoCloseable {
   /** The state at the end of the block that contains the given timestamp. This will typically be
     * used to inform other sequencer nodes being initialized of the initial state they should use
     * based on the timestamp they provide which is typically the timestamp of their signing key.
+    *
+    * @param timestamp
+    *   timestamp within the block being requested (i.e. BlockInfo.lastTs)
+    * @param maxSequencingTimeBound
+    *   optional bound for requesting the state for the sequencer snapshot, that may be far in the
+    *   past, thus needing to bound the db io. Can be computed with
+    *   `SequencerUtils.maxSequencingTimeBoundAt`. For requesting the latest state during the
+    *   sequencer startup, this can be set to `CantonTimestamp.MaxValue`.
     */
-  def readStateForBlockContainingTimestamp(timestamp: CantonTimestamp)(implicit
+  def readStateForBlockContainingTimestamp(
+      timestamp: CantonTimestamp,
+      maxSequencingTimeBound: CantonTimestamp,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerError, BlockEphemeralState]
 
@@ -98,6 +109,7 @@ object SequencerBlockStore {
       sequencerStore: SequencerStore,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
+      batchingConfig: BatchingConfig,
   )(implicit
       executionContext: ExecutionContext
   ): SequencerBlockStore =
@@ -110,6 +122,7 @@ object SequencerBlockStore {
           protocolVersion,
           timeouts,
           loggerFactory,
+          batchingConfig,
         )
       case otherwise =>
         sys.error(s"Invalid combination of stores: $otherwise")
