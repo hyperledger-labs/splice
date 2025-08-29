@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   TopologyAdminConnection,
 }
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
@@ -78,7 +78,7 @@ final class DomainParamsStore(
         case None =>
           None
         case Some(lastParams) =>
-          val unpaused = isDomainUnpaused(lastParams)
+          val unpaused = SynchronizerMigrationUtil.synchronizerIsUnpaused(lastParams)
           if (unpaused) {
             None
           } else {
@@ -102,9 +102,12 @@ final class DomainParamsStore(
         SynchronizerParametersState
       ]
   )(implicit tc: TraceContext): Future[Unit] = Future {
-    val unpaused = isDomainUnpaused(params)
+    val unpaused = SynchronizerMigrationUtil.synchronizerIsPaused(params)
     metrics.confirmationRequestsMaxRate.updateValue(
       params.mapping.parameters.confirmationRequestsMaxRate.value
+    )
+    metrics.mediatorReactionTimeout.updateValue(
+      params.mapping.parameters.mediatorReactionTimeout.toScala.toMillis
     )
     blocking {
       synchronized {
@@ -125,10 +128,6 @@ final class DomainParamsStore(
       }
     }
   }
-
-  private def isDomainUnpaused(
-      params: TopologyAdminConnection.TopologyResult[SynchronizerParametersState]
-  ) = params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero
 
   override def close(): Unit = {
     metrics.close()
@@ -158,8 +157,21 @@ object DomainParamsStore {
         -1,
       )(MetricsContext.Empty)
 
+    val mediatorReactionTimeout: Gauge[Long] =
+      metricsFactory.gauge(
+        MetricInfo(
+          name = prefix :+ "mediator-reaction-timeout-ms",
+          summary = "DynamicSynchronizerParameters.mediatorReactionTimeout",
+          description =
+            "Last known value of DynamicSynchronizerParameters.mediatorReactionTimeout in ms on the configured global domain.",
+          qualification = Traffic,
+        ),
+        -1L,
+      )(MetricsContext.Empty)
+
     override def close(): Unit = {
       confirmationRequestsMaxRate.close()
+      mediatorReactionTimeout.close()
     }
   }
 }
