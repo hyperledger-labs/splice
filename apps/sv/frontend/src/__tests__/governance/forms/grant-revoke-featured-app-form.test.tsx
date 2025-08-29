@@ -27,7 +27,7 @@ describe('SV user can', () => {
     await user.type(input, 'sv1');
 
     const button = screen.getByRole('button', { name: 'Log In' });
-    user.click(button);
+    await user.click(button);
 
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
@@ -66,6 +66,8 @@ describe('Grant Featured App Form', () => {
     const providerInput = screen.getByTestId('grant-featured-app-idValue-title');
     expect(providerInput).toBeDefined();
     expect(providerInput.textContent).toBe('Provider');
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -97,19 +99,19 @@ describe('Grant Featured App Form', () => {
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('grant-featured-app-summary');
     expect(summaryInput).toBeDefined();
-    user.type(summaryInput, 'Summary of the proposal');
+    await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('grant-featured-app-url');
     expect(urlInput).toBeDefined();
-    user.type(urlInput, 'https://example.com');
+    await user.type(urlInput, 'https://example.com');
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue');
     expect(providerInput).toBeDefined();
-    user.type(providerInput, 'abcde12345');
+    await user.type(providerInput, 'abcde12345');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBeNull();
   });
 
   test('expiry date must be in the future', async () => {
@@ -132,14 +134,14 @@ describe('Grant Featured App Form', () => {
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeNull();
     });
   });
@@ -168,7 +170,7 @@ describe('Grant Featured App Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
@@ -177,9 +179,45 @@ describe('Grant Featured App Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
     });
+  });
+
+  test('should show proposal review page after form completion', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <GrantRevokeFeaturedAppForm
+          onSubmit={() => Promise.resolve()}
+          selectedAction="SRARC_GrantFeaturedAppRight"
+        />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('grant-featured-app-action');
+
+    const summaryInput = screen.getByTestId('grant-featured-app-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('grant-featured-app-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const providerInput = screen.getByTestId('grant-featured-app-idValue');
+    await user.type(providerInput, 'abcde12345');
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
+    const submitButton = screen.getByTestId('submit-button');
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton);
+
+    expect(screen.getByText('Proposal Summary')).toBeDefined();
   });
 });
 
@@ -247,19 +285,19 @@ describe('Revoke Featured App Form', () => {
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('revoke-featured-app-summary');
     expect(summaryInput).toBeDefined();
-    user.type(summaryInput, 'Summary of the proposal');
+    await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('revoke-featured-app-url');
     expect(urlInput).toBeDefined();
-    user.type(urlInput, 'https://example.com');
+    await user.type(urlInput, 'https://example.com');
 
     const providerInput = screen.getByTestId('revoke-featured-app-idValue');
     expect(providerInput).toBeDefined();
-    user.type(providerInput, 'abcde12345');
+    await user.type(providerInput, 'abcde12345');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBeNull();
   });
 
   test('expiry date must be in the future', async () => {
@@ -282,7 +320,7 @@ describe('Revoke Featured App Form', () => {
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
@@ -316,7 +354,7 @@ describe('Revoke Featured App Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
@@ -325,8 +363,44 @@ describe('Revoke Featured App Form', () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
     });
+  });
+
+  test('should show proposal review page after form completion', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <GrantRevokeFeaturedAppForm
+          onSubmit={() => Promise.resolve()}
+          selectedAction="SRARC_RevokeFeaturedAppRight"
+        />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('revoke-featured-app-action');
+
+    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('revoke-featured-app-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
+    await user.type(providerInput, 'abcde12345');
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton);
+
+    expect(screen.getByText('Proposal Summary')).toBeDefined();
   });
 });

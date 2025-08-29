@@ -16,10 +16,10 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, Typography } from '@mui/material';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CommonProposalFormData } from '../../utils/types';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
 interface ExtraFormFields {
   sv: string;
@@ -37,6 +37,7 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const svs = useMemo(
     () => dsoInfosQuery.data?.dsoRules.payload.svs.entriesArray() || [],
@@ -76,9 +77,15 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
           },
         },
       };
-      console.log('submit offboard sv form data: ', value, 'with action:', action);
-      onSubmit(value, action);
+
+      if (!showConfirmation) {
+        setShowConfirmation(true);
+      } else {
+        console.log('submit offboard sv form data: ', value, 'with action:', action);
+        onSubmit(value, action);
+      }
     },
+
     validators: {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
@@ -90,93 +97,105 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
   });
 
   return (
-    <FormLayout form={form} id="offboard-sv-form">
-      <form.AppField name="action">
-        {field => (
-          <field.TextField
-            title="Action"
-            id="offboard-sv-action"
-            muiTextFieldProps={{ disabled: true }}
+    <>
+      <FormLayout form={form} id="offboard-sv-form">
+        {showConfirmation ? (
+          <ProposalSummary
+            actionName={form.state.values.action}
+            url={form.state.values.url}
+            summary={form.state.values.summary}
+            expiryDate={form.state.values.expiryDate}
+            effectiveDate={form.state.values.effectiveDate.effectiveDate}
+            formType="offboard"
+            offboardMember={form.state.values.sv}
+            onEdit={() => setShowConfirmation(false)}
+            onSubmit={() => {}}
           />
-        )}
-      </form.AppField>
+        ) : (
+          <>
+            <form.AppField name="action">
+              {field => (
+                <field.TextField
+                  title="Action"
+                  id="offboard-sv-action"
+                  muiTextFieldProps={{ disabled: true }}
+                />
+              )}
+            </form.AppField>
 
-      <form.AppField
-        name="expiryDate"
-        validators={{
-          onChange: ({ value }) => validateExpiration(value),
-          onBlur: ({ value }) => validateExpiration(value),
-        }}
-      >
-        {field => (
-          <field.DateField
-            title="Vote Proposal Expiration"
-            description="This is the last day voters can vote on this proposal"
-            id="offboard-sv-expiry-date"
+            <form.AppField
+              name="expiryDate"
+              validators={{
+                onChange: ({ value }) => validateExpiration(value),
+                onBlur: ({ value }) => validateExpiration(value),
+              }}
+            >
+              {field => (
+                <field.DateField
+                  title="Vote Proposal Expiration"
+                  description="This is the last day voters can vote on this proposal"
+                  id="offboard-sv-expiry-date"
+                />
+              )}
+            </form.AppField>
+
+            <form.AppField
+              name="effectiveDate"
+              validators={{
+                onChange: ({ value }) => validateEffectiveDate(value),
+                onBlur: ({ value }) => validateEffectiveDate(value),
+              }}
+              children={_ => (
+                <EffectiveDateField
+                  title="Vote Proposal Effectivity"
+                  description="Select the date and time the proposal will take effect"
+                  initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+                  id="offboard-sv-effective-date"
+                />
+              )}
+            />
+
+            <form.AppField
+              name="summary"
+              validators={{
+                onBlur: ({ value }) => validateSummary(value),
+                onChange: ({ value }) => validateSummary(value),
+              }}
+            >
+              {field => <field.TextArea title="Proposal Summary" id="offboard-sv-summary" />}
+            </form.AppField>
+
+            <form.AppField
+              name="url"
+              validators={{
+                onBlur: ({ value }) => validateUrl(value),
+                onChange: ({ value }) => validateUrl(value),
+              }}
+            >
+              {field => <field.TextField title="URL" id="offboard-sv-url" />}
+            </form.AppField>
+
+            <form.AppField
+              name="sv"
+              validators={{
+                onBlur: ({ value }) => validateSvSelection(value),
+                onChange: ({ value }) => validateSvSelection(value),
+              }}
+            >
+              {field => (
+                <field.SelectField title="Member" options={svOptions} id="offboard-sv-member" />
+              )}
+            </form.AppField>
+          </>
+        )}
+        <form.AppForm>
+          <form.FormErrors />
+          <form.FormControls
+            showConfirmation={showConfirmation}
+            onEdit={() => setShowConfirmation(false)}
           />
-        )}
-      </form.AppField>
-
-      <form.AppField
-        name="effectiveDate"
-        validators={{
-          onChange: ({ value }) => validateEffectiveDate(value),
-          onBlur: ({ value }) => validateEffectiveDate(value),
-        }}
-        children={_ => (
-          <EffectiveDateField
-            title="Vote Proposal Effectivity"
-            description="Select the date and time the proposal will take effect"
-            initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
-            id="offboard-sv-effective-date"
-          />
-        )}
-      />
-
-      <form.AppField
-        name="summary"
-        validators={{
-          onBlur: ({ value }) => validateSummary(value),
-          onChange: ({ value }) => validateSummary(value),
-        }}
-      >
-        {field => <field.TextArea title="Proposal Summary" id="offboard-sv-summary" />}
-      </form.AppField>
-
-      <form.AppField
-        name="url"
-        validators={{
-          onBlur: ({ value }) => validateUrl(value),
-          onChange: ({ value }) => validateUrl(value),
-        }}
-      >
-        {field => <field.TextField title="URL" id="offboard-sv-url" />}
-      </form.AppField>
-
-      <form.AppField
-        name="sv"
-        validators={{
-          onBlur: ({ value }) => validateSvSelection(value),
-          onChange: ({ value }) => validateSvSelection(value),
-        }}
-      >
-        {field => <field.SelectField title="Member" options={svOptions} id="offboard-sv-member" />}
-      </form.AppField>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {form.state.errors.map((error, index) => (
-          <Alert severity="error" key={index}>
-            <Typography key={index} variant="h6" color="error">
-              {error}
-            </Typography>
-          </Alert>
-        ))}
-      </Box>
-
-      <form.AppForm>
-        <form.FormErrors />
-        <form.FormControls />
-      </form.AppForm>
-    </FormLayout>
+        </form.AppForm>
+      </FormLayout>
+    </>
   );
 };
