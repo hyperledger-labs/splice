@@ -579,6 +579,7 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
+    additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     ...updateHistoryBackfillingValues,
   };
 
