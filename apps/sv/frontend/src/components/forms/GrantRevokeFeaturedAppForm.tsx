@@ -22,7 +22,7 @@ import {
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { useState } from 'react';
-import { ConfirmProposal } from '../governance/ConfirmProposal';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -136,7 +136,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     <>
       <FormLayout form={form} id={`${testIdPrefix}-form`}>
         {showConfirmation ? (
-          <ConfirmProposal
+          <ProposalSummary
             actionName={form.state.values.action}
             url={form.state.values.url}
             summary={form.state.values.summary}

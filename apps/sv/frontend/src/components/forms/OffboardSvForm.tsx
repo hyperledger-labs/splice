@@ -19,7 +19,7 @@ import { FormLayout } from './FormLayout';
 import { useMemo, useState } from 'react';
 import { CommonProposalFormData } from '../../utils/types';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { ConfirmProposal } from '../governance/ConfirmProposal';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
 interface ExtraFormFields {
   sv: string;
@@ -100,7 +100,7 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
     <>
       <FormLayout form={form} id="offboard-sv-form">
         {showConfirmation ? (
-          <ConfirmProposal
+          <ProposalSummary
             actionName={form.state.values.action}
             url={form.state.values.url}
             summary={form.state.values.summary}

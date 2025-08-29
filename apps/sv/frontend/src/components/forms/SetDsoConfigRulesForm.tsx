@@ -23,7 +23,7 @@ import { Box, Typography } from '@mui/material';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { useMemo, useState } from 'react';
-import { ConfirmProposal } from '../governance/ConfirmProposal';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
 type SetDsoConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -111,7 +111,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
   return (
     <FormLayout form={form} id="set-dso-config-rules-form">
       {showConfirmation ? (
-        <ConfirmProposal
+        <ProposalSummary
           actionName={form.state.values.common.action}
           url={form.state.values.common.url}
           summary={form.state.values.common.summary}

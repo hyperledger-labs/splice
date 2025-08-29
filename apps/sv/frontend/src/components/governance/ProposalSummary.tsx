@@ -5,7 +5,7 @@ import { Box, TextField, Typography } from '@mui/material';
 import { ConfigChange } from '../../utils/types';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
 
-interface BaseConfirmProposalProps {
+interface BaseProposalSummaryProps {
   actionName: string;
   url: string;
   summary: string;
@@ -15,7 +15,7 @@ interface BaseConfirmProposalProps {
   onSubmit: () => void;
 }
 
-type ConfirmProposalProps = BaseConfirmProposalProps &
+type ProposalSummaryProps = BaseProposalSummaryProps &
   (
     | {
         formType: 'sv-reward-weight';
@@ -40,7 +40,7 @@ type ConfirmProposalProps = BaseConfirmProposalProps &
       }
   );
 
-export const ConfirmProposal: React.FC<ConfirmProposalProps> = props => {
+export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
   const { formType, actionName, url, summary, expiryDate, effectiveDate } = props;
 
   return (

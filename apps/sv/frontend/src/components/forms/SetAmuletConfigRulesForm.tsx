@@ -23,7 +23,7 @@ import {
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { Box, Typography } from '@mui/material';
-import { ConfirmProposal } from '../governance/ConfirmProposal';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
 type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -111,7 +111,7 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
   return (
     <FormLayout form={form} id="set-amulet-config-rules-form">
       {showConfirmation ? (
-        <ConfirmProposal
+        <ProposalSummary
           actionName={form.state.values.common.action}
           url={form.state.values.common.url}
           summary={form.state.values.common.summary}

@@ -20,7 +20,7 @@ import {
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { CommonProposalFormData } from '../../utils/types';
-import { ConfirmProposal } from '../governance/ConfirmProposal';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
 interface ExtraFormField {
   sv: string;
@@ -109,7 +109,7 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
     <>
       <FormLayout form={form} id="update-sv-reward-weight-form">
         {showConfirmation ? (
-          <ConfirmProposal
+          <ProposalSummary
             actionName={form.state.values.action}
             url={form.state.values.url}
             summary={form.state.values.summary}
@@ -220,7 +220,6 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
           />
         </form.AppForm>
       </FormLayout>
-      {/* } */}
     </>
   );
 };
