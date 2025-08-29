@@ -1,10 +1,4 @@
 # Reference configuration options
-svs:
-  default:
-    logging:
-      appsLogLevel: DEBUG
-      cantonLogLevel: DEBUG
-      cometbftLogLevel: debug
 cluster:
   nodePools:
     apps:
@@ -135,3 +129,11 @@ sv:
             maxTokens: 10
             tokensPerFill: 5
             fillInterval: 60s
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      cantonLogLevel: DEBUG
+      cometbftLogLevel: debug
+    participant:
+      bftSequencerConnection: true
