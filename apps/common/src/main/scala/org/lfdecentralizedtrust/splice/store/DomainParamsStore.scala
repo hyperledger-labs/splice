@@ -131,7 +131,8 @@ final class DomainParamsStore(
 
   private def isDomainUnpaused(
       params: TopologyAdminConnection.TopologyResult[SynchronizerParametersState]
-  ) = params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero && params.mapping.parameters.mediatorReactionTimeout > com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
+  ) =
+    params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero && params.mapping.parameters.mediatorReactionTimeout > com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
 
   override def close(): Unit = {
     metrics.close()

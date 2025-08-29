@@ -4,11 +4,14 @@
 package org.lfdecentralizedtrust.splice.migration
 
 import cats.data.OptionT
+import cats.instances.future.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -21,19 +24,49 @@ class SynchronizerParametersStateTopologyConnection(connection: TopologyAdminCon
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): OptionT[Future, TopologyAdminConnection.TopologyResult[
-    SynchronizerParametersState
-  ]] = {
-    OptionT(
+  ): OptionT[Future, PausedSynchronizersState] = for {
+    domainParamsHistory <- OptionT.liftF(
       connection
-        .listSynchronizerParametersState(domain)
-        .map { domainParamsHistory =>
-          val latestState = domainParamsHistory.map(_.base.serial).maxOption
-          domainParamsHistory
-            .filter(state => latestState.contains(state.base.serial))
-            .minByOption(_.base.validFrom)
-        }
+        .listSynchronizerParametersStateHistory(domain)
     )
-  }
+    pausedState <- OptionT.fromOption {
+      val latestState = domainParamsHistory.map(_.base.serial).maxOption
+      domainParamsHistory
+        .filter(state => latestState.contains(state.base.serial))
+        .minByOption(_.base.validFrom)
+    }
+    lastUnpaused <- OptionT.fromOption {
+      domainParamsHistory
+        .filter(p =>
+          p.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero && p.mapping.parameters.mediatorReactionTimeout > com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
+        )
+        .maxByOption(_.base.validFrom)
+    }
+  } yield PausedSynchronizersState(
+    pausedState,
+    lastUnpaused,
+  )
+}
 
+final case class PausedSynchronizersState(
+    pausedState: TopologyAdminConnection.TopologyResult[
+      SynchronizerParametersState
+    ],
+    lastUnpausedState: TopologyAdminConnection.TopologyResult[SynchronizerParametersState],
+) {
+  def exportTimestamp: Instant = {
+    require(pausedState.mapping.parameters.confirmationRequestsMaxRate == NonNegativeInt.zero)
+    require(
+      pausedState.mapping.parameters.mediatorReactionTimeout == com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero
+    )
+    pausedState.base.validFrom
+  }
+  def acsExportWaitTimestamp: Instant = {
+    // At exportTimestamp we set mediatorReactionTimeout = 0. This means any confirmation request after exportTimestamp
+    // will fail. Confirmation requests before exportTimestamp can take confirmationResponseTimeout + mediatorReactionTimeout to time out
+    // so if we wait until then we know that there are no more in-flight requests.
+    exportTimestamp
+      .plus(lastUnpausedState.mapping.parameters.confirmationResponseTimeout.duration)
+      .plus(lastUnpausedState.mapping.parameters.mediatorReactionTimeout.duration)
+  }
 }

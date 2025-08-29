@@ -95,7 +95,10 @@ final class DecentralizedSynchronizerMigrationTrigger(
     domainParamsTopologyResult <- participantAdminConnection
       .ensureDomainParameters(
         decentralizedSynchronizerId,
-        _.tryUpdate(confirmationRequestsMaxRate = NonNegativeInt.zero, mediatorReactionTimeout = com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero),
+        _.tryUpdate(
+          confirmationRequestsMaxRate = NonNegativeInt.zero,
+          mediatorReactionTimeout = com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero,
+        ),
       )
   } yield domainParamsTopologyResult
 

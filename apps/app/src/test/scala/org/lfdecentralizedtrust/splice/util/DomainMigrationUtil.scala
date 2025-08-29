@@ -84,7 +84,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
       "domain is unpaused on the new nodes"
     )(
       _.newParticipantConnection.getSynchronizerParametersState(synchronizerId)
-    ){params =>
+    ) { params =>
       params.mapping.parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
       params.mapping.parameters.mediatorReactionTimeout should be > NonNegativeFiniteDuration.Zero
     }

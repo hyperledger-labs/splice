@@ -458,7 +458,11 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.pauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-        _ <- changeDomainRatePerParticipant(decentralizedSynchronizer, NonNegativeInt.zero, com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero)
+        _ <- changeDomainRatePerParticipant(
+          decentralizedSynchronizer,
+          NonNegativeInt.zero,
+          com.digitalasset.canton.time.NonNegativeFiniteDuration.Zero,
+        )
       } yield v0.SvAdminResource.PauseDecentralizedSynchronizerResponseOK
     }
   }
@@ -624,7 +628,10 @@ class HttpSvAdminHandler(
     result <- participantAdminConnection
       .ensureDomainParameters(
         decentralizedSynchronizerId,
-        _.tryUpdate(confirmationRequestsMaxRate = rate, mediatorReactionTimeout = mediatorReactionTimeout),
+        _.tryUpdate(
+          confirmationRequestsMaxRate = rate,
+          mediatorReactionTimeout = mediatorReactionTimeout,
+        ),
       )
   } yield result
 
