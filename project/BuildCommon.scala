@@ -394,7 +394,7 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          grpc_netty,
+          grpc_netty_shaded,
           netty_handler,
           netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           scopt,
@@ -822,7 +822,7 @@ object BuildCommon {
           jul_to_slf4j % Test,
           bouncycastle_bcprov_jdk15on,
           bouncycastle_bcpkix_jdk15on,
-          grpc_netty,
+          grpc_netty_shaded,
           grpc_services,
           scalapb_runtime_grpc,
           scalapb_runtime,
@@ -1210,7 +1210,7 @@ object BuildCommon {
           slf4j_api,
           grpc_api,
           reflections,
-          grpc_netty,
+          grpc_netty_shaded,
           netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           netty_handler,
           caffeine,
@@ -1280,7 +1280,7 @@ object BuildCommon {
           bouncycastle_bcprov_jdk15on % Test,
           bouncycastle_bcpkix_jdk15on % Test,
           scalaz_scalacheck % Test,
-          grpc_netty,
+          grpc_netty_shaded,
           grpc_services,
           grpc_protobuf,
           postgres,
