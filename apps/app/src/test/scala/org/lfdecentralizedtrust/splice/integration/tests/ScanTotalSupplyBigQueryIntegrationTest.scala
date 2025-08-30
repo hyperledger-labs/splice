@@ -35,7 +35,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
     with FlagCloseable
     with HasCloseContext
     with UpdateHistoryTestUtil {
-  private val totalSupplySqlPath = getResourcePath("total-supply-bigquery.sql")
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
