@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+/** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSK_CORE_PROJECT` * */
+
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -15,7 +17,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 import slick.jdbc.GetResult
 
 import java.io.File
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.Future
@@ -48,8 +50,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
+  private val uuid = UUID.randomUUID().toString.replace("-", "_")
   private val datasetName =
-    s"scantotalsupply_test_dataset_${UUID.randomUUID().toString.replace("-", "_")}"
+    s"scantotalsupply_test_dataset_$uuid"
   private val (createsBqTableName, exercisesBqTableName) = {
     val prefix = "scan_sv_1_"
     (
@@ -57,6 +60,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       s"${prefix}update_history_exercises",
     )
   }
+  private val functionsDatasetName = s"functions_$uuid"
 
   // Test data parameters
   private val mintedAmount = BigDecimal("2587519.0258740704")
@@ -77,6 +81,13 @@ class ScanTotalSupplyBigQueryIntegrationTest
     bigquery.create(datasetInfo)
 
     createEmptyTables()
+
+    val functionsDatasetInfo =
+      bq.DatasetInfo
+        .newBuilder(functionsDatasetName)
+        .setDefaultTableLifetime(1.hour.toMillis)
+        .build()
+    bigquery.create(functionsDatasetInfo)
   }
 
   private[this] def inferBQUser(): String = {
@@ -92,35 +103,36 @@ class ScanTotalSupplyBigQueryIntegrationTest
   override def afterAll() = {
     logger.info(s"Cleaning up BigQuery dataset: $datasetName")
 
-    // Delete the temporary BigQuery dataset after tests
+    // Delete the temporary BigQuery datasets after tests
     bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     super.afterAll()
   }
 
   "test bigquery queries" in { implicit env =>
-//    withClue("create test data on Splice ledger") {
-//      val (_, bobParty) = onboardAliceAndBob()
-//      waitForWalletUser(aliceValidatorWalletClient)
-//
-//      // Create test data with more-or-less known amounts
-//      createTestData(bobParty)
-//    }
-//
-//    withClue("exporting PostgreSQL tables to BigQuery") {
-//      exportPostgresToBigQuery()
-//    }
-//
+    withClue("create test data on Splice ledger") {
+      val (_, bobParty) = onboardAliceAndBob()
+      waitForWalletUser(aliceValidatorWalletClient)
+
+      // Create test data with more-or-less known amounts
+      createTestData(bobParty)
+    }
+
+    withClue("exporting PostgreSQL tables to BigQuery") {
+      exportPostgresToBigQuery()
+    }
+
     withClue("Creating BigQuery functions") {
       createBigQueryFunctions()
     }
-//
-//    val results = withClue("running total supply queries in BigQuery") {
-//      runTotalSupplyQueries()
-//    }
-//
-//    withClue(s"verify total supply results") {
-//      verifyResults(results)
-//    }
+
+    val results = withClue("running total supply queries in BigQuery") {
+      runTotalSupplyQueries()
+    }
+
+    withClue(s"verify total supply results") {
+      verifyResults(results)
+    }
   }
 
   import bq.storage.v1.TableFieldSchema as TFS
@@ -452,38 +464,47 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   /** Creates all auxiliary functions in BigQuery. First codegen's from the Pulumi definitions
-   * the query that creates them, then runs that query in BQ.
-   */
+    * the query that creates them, then runs that query in BQ.
+    */
   private def createBigQueryFunctions() = {
-    val ret = Process("npm run sql-codegen test.sql", new File("cluster/pulumi/canton-network")).!
+    val sqlDir: Path = Paths.get("apps/app/src/test/resources/dumps/sql")
+    if (!sqlDir.toFile.exists())
+      sqlDir.toFile.mkdirs()
+    val sqlFile = sqlDir.resolve("functions.sql")
+
+    val ret = Process(
+      s"npm run sql-codegen ${sys.env("CLOUDSDK_CORE_PROJECT")} ${functionsDatasetName} ${datasetName} ${sqlFile.toAbsolutePath}",
+      new File("cluster/pulumi/canton-network"),
+    ).!
     if (ret != 0) {
       fail("Failed to codegen the sql query for creating functions in BigQuery")
     }
+
+    val sqlContent =
+      java.nio.file.Files.readString(sqlFile, java.nio.charset.StandardCharsets.UTF_8)
+
+    // Execute the query
+    val queryConfig = bq.QueryJobConfiguration
+      .newBuilder(sqlContent)
+      .setUseLegacySql(false)
+      .build()
+
+    val jobId = bq.JobId.of(UUID.randomUUID().toString)
+    val job = bigquery.create(JobInfo.newBuilder(queryConfig).setJobId(jobId).build())
+
+    job.waitFor()
   }
 
   /** Runs the total supply queries from the SQL file
     */
   private def runTotalSupplyQueries(): ExpectedMetrics = {
-    // slurp BigQuery SQL file
-    val sqlContent = java.nio.file.Files
-      .readString(Paths get totalSupplySqlPath, java.nio.charset.StandardCharsets.UTF_8)
-
-    val modifiedSql = Seq(
-      ("mainnet_da2_scan".r, datasetName), // Replace prod dataset name with test dataset name
-      (raw"SET migration_id = \d+".r, "SET migration_id = 0"), // migration ID with 0
-      (
-        raw"SET as_of_record_time = iso_timestamp\('\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'\)".r,
-        "SET as_of_record_time = iso_timestamp('1971-01-01T00:00:00Z')",
-      ), // as-of time with later canton timestamp
-    ).foldLeft(sqlContent) { case (sqlContent, (origin, replacement)) =>
-      val modifiedSql = origin.replaceAllIn(sqlContent, replacement)
-      modifiedSql should not be sqlContent withClue s"inserting $replacement"
-      modifiedSql
-    }
+    val project = sys.env("CLOUDSDK_CORE_PROJECT")
+    val sql =
+      s"SELECT * FROM `$project.$functionsDatasetName.total_supply`('1971-01-01T00:00:00Z', 0);"
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
-      .newBuilder(modifiedSql)
+      .newBuilder(sql)
       .setUseLegacySql(false)
       .build()
 

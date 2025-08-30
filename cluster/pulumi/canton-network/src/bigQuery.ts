@@ -185,7 +185,7 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
-function installFunctions(): gcp.bigquery.Dataset {
+function installFunctions(scanDataset: gcp.bigquery.Dataset): gcp.bigquery.Dataset {
   const datasetName = 'functions';
   const dataset = new gcp.bigquery.Dataset(datasetName, {
     datasetId: datasetName,
@@ -197,7 +197,9 @@ function installFunctions(): gcp.bigquery.Dataset {
     },
   });
 
-  allFunctions.map(f => f.toPulumi(dataset));
+  scanDataset.project.apply(project =>
+    allFunctions.map(f => f.toPulumi(project, dataset, scanDataset))
+  );
 
   return dataset;
 }
@@ -410,7 +412,7 @@ export function configureScanBigQuery(
 
   const natVm = installNatVm(postgres);
   const dataset = installBigqueryDataset(scanBigQuery);
-  installFunctions();
+  installFunctions(dataset);
   const pcc = installPrivateConnectivityConfiguration(postgres);
   const destinationProfile = installBigqueryConnectionProfile(postgres, dataset, pcc);
   const sourceProfile = installPostgresConnectionProfile(

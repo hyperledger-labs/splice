@@ -1,6 +1,9 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
 
 abstract class BQType {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract toPulumi(): any;
   abstract toSql(): string;
 }
@@ -11,6 +14,7 @@ class BQBasicType extends BQType {
     super();
     this.type = type;
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public toPulumi(): any {
     return { typeKind: this.type };
   }
@@ -27,15 +31,15 @@ const BIGNUMERIC = new BQBasicType('BIGNUMERIC');
 const json = new BQBasicType('JSON'); // JSON is a reserved word in TypeScript
 const BOOL = new BQBasicType('BOOL');
 
-
 class BQArray extends BQType {
   private readonly elementType: BQType;
   public constructor(elementType: BQType) {
     super();
     this.elementType = elementType;
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public toPulumi(): any {
-    return { typeKind: "ARRAY", arrayElementType: this.elementType.toPulumi() };
+    return { typeKind: 'ARRAY', arrayElementType: this.elementType.toPulumi() };
   }
 
   public toSql(): string {
@@ -74,40 +78,61 @@ abstract class BQFunction {
     this.arguments = args;
     this.definitionBody = definitionBody;
   }
-  public abstract toPulumi(dataset: gcp.bigquery.Dataset): gcp.bigquery.Routine;
-  public abstract toSql(dataset: string): string;
+  public abstract toPulumi(
+    project: string,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset
+  ): gcp.bigquery.Routine;
+  public abstract toSql(project: string, functionsDataset: string, scanDataset: string): string;
 }
 
 class BQScalarFunction extends BQFunction {
   private readonly returnType: BQType;
 
-  public constructor(name: string, args: BQFunctionArgument[], returnType: BQType, definitionBody: string) {
+  public constructor(
+    name: string,
+    args: BQFunctionArgument[],
+    returnType: BQType,
+    definitionBody: string
+  ) {
     super(name, args, definitionBody);
     this.returnType = returnType;
   }
 
-  public toPulumi(dataset: gcp.bigquery.Dataset): gcp.bigquery.Routine {
+  public toPulumi(
+    project: string,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset
+  ): gcp.bigquery.Routine {
     return new gcp.bigquery.Routine(this.name, {
-      datasetId: dataset.datasetId,
+      datasetId: functionsDataset.datasetId,
       routineId: this.name,
       routineType: 'SCALAR_FUNCTION',
       language: 'SQL',
-      definitionBody: this.definitionBody,
-      arguments: this.arguments.map(arg => (
-        arg.toPulumi()
-      )),
+      definitionBody: functionsDataset.datasetId.apply(fd =>
+        scanDataset.datasetId.apply(sd =>
+          this.definitionBody
+            .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
+            .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
+        )
+      ),
+      arguments: this.arguments.map(arg => arg.toPulumi()),
       returnType: JSON.stringify(this.returnType.toPulumi()),
     });
   }
 
-  public toSql(dataset: string): string {
+  public toSql(project: string, functionsDataset: string, scanDataset: string): string {
+    const body = this.definitionBody
+      .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${functionsDataset}`)
+      .replaceAll('$$SCAN_DATASET$$', `${project}.${scanDataset}`);
+
     return `
-      CREATE OR REPLACE FUNCTION ${dataset}.${this.name}(
+      CREATE OR REPLACE FUNCTION ${functionsDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
       RETURNS ${this.returnType.toSql()}
       AS (
-      ${this.definitionBody}
+      ${body}
       );
     `;
   }
@@ -122,6 +147,7 @@ class BQColumn {
     this.type = type;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public toPulumi(): any {
     return {
       name: this.name,
@@ -137,37 +163,54 @@ class BQColumn {
 class BQTableFunction extends BQFunction {
   private readonly returnTableType: BQColumn[];
 
-  public constructor(name: string, args: BQFunctionArgument[], returnTableType: BQColumn[], definitionBody: string) {
+  public constructor(
+    name: string,
+    args: BQFunctionArgument[],
+    returnTableType: BQColumn[],
+    definitionBody: string
+  ) {
     super(name, args, definitionBody);
     this.returnTableType = returnTableType;
   }
 
-  public toPulumi(dataset: gcp.bigquery.Dataset): gcp.bigquery.Routine {
+  public toPulumi(
+    project: string,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset
+  ): gcp.bigquery.Routine {
     return new gcp.bigquery.Routine(this.name, {
-      datasetId: dataset.datasetId,
+      datasetId: functionsDataset.datasetId,
       routineId: this.name,
       routineType: 'TABLE_VALUED_FUNCTION',
       language: 'SQL',
-      definitionBody: this.definitionBody,
-      arguments: this.arguments.map(arg => (
-        arg.toPulumi()
-      )),
+      definitionBody: functionsDataset.datasetId.apply(fd =>
+        scanDataset.datasetId.apply(sd =>
+          this.definitionBody
+            .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
+            .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
+        )
+      ),
+      arguments: this.arguments.map(arg => arg.toPulumi()),
       returnTableType: JSON.stringify({
         columns: this.returnTableType.map(col => col.toPulumi()),
       }),
     });
   }
 
-  public toSql(dataset: string): string {
+  public toSql(project: string, functionsDataset: string, scanDataset: string): string {
+    const body = this.definitionBody
+      .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${functionsDataset}`)
+      .replaceAll('$$SCAN_DATASET$$', `${project}.${scanDataset}`);
+
     return `
-      CREATE OR REPLACE TABLE FUNCTION ${dataset}.${this.name}(
+      CREATE OR REPLACE TABLE FUNCTION ${functionsDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
       RETURNS TABLE<
         ${this.returnTableType.map(col => col.toSql()).join(',\n        ')}
       >
       AS (
-      ${this.definitionBody}
+      ${body}
       );
     `;
   }
@@ -175,18 +218,14 @@ class BQTableFunction extends BQFunction {
 
 const iso_timestamp = new BQScalarFunction(
   'iso_timestamp',
-  [
-    new BQFunctionArgument('iso8601_string', STRING),
-  ],
+  [new BQFunctionArgument('iso8601_string', STRING)],
   new BQBasicType('TIMESTAMP'),
-  "PARSE_TIMESTAMP('%FT%TZ', iso8601_string)",
-)
+  "PARSE_TIMESTAMP('%FT%TZ', iso8601_string)"
+);
 
 const daml_prim_path = new BQScalarFunction(
   'daml_prim_path',
-  [
-    new BQFunctionArgument('selector', STRING),
-  ],
+  [new BQFunctionArgument('selector', STRING)],
   STRING,
   `
       CASE selector
@@ -199,7 +238,7 @@ const daml_prim_path = new BQScalarFunction(
         WHEN 'record' THEN ''
         ELSE ERROR('Unknown Daml primitive case: ' || selector)
       END
-    `,
+    `
 );
 
 const daml_record_path = new BQScalarFunction(
@@ -236,20 +275,17 @@ const daml_record_path = new BQScalarFunction(
                               '.record.fields[', CAST(field_indices[2] AS STRING), '].value')
             ELSE ERROR('Unsupported number of field indices: ' || ARRAY_LENGTH(field_indices))
           END,
-          \`da-cn-scratchnet.functions.daml_prim_path\`(prim_selector))
+          \`$$FUNCTIONS_DATASET$$.daml_prim_path\`(prim_selector))
 
   `
 );
 
 const daml_record_numeric = new BQScalarFunction(
   'daml_record_numeric',
-  [
-    new BQFunctionArgument('daml_record', json),
-    new BQFunctionArgument('path', new BQArray(INT64))
-  ],
+  [new BQFunctionArgument('daml_record', json), new BQFunctionArgument('path', new BQArray(INT64))],
   BIGNUMERIC,
   `PARSE_BIGNUMERIC(JSON_VALUE(daml_record,
-        \`da-cn-scratchnet.functions.daml_record_path\`(path, 'numeric')))`
+        \`$$FUNCTIONS_DATASET$$.daml_record_path\`(path, 'numeric')))`
 );
 
 const in_time_window = new BQScalarFunction(
@@ -283,15 +319,15 @@ const sum_bignumeric_acs = new BQScalarFunction(
     -- Find the ACS as of given time and sum bignumerics at path in the payload.
     (SELECT
       COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments,
-        \`da-cn-scratchnet.functions.daml_record_path\`(path, 'numeric')))), 0)
+        \`$$FUNCTIONS_DATASET$$.daml_record_path\`(path, 'numeric')))), 0)
     FROM
-      \`da-cn-scratchnet.devnet_da2_scan.scan_sv_1_update_history_creates\` c
+      \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
     WHERE
       NOT EXISTS (
       SELECT
         TRUE
       FROM
-        \`da-cn-scratchnet.devnet_da2_scan.scan_sv_1_update_history_exercises\` e
+        \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
       WHERE
         (e.migration_id < migration_id
           OR (e.migration_id = migration_id
@@ -302,7 +338,7 @@ const sum_bignumeric_acs = new BQScalarFunction(
         AND e.contract_id = c.contract_id)
       AND c.template_id_module_name = module_name
       AND c.template_id_entity_name = entity_name
-      AND \`da-cn-scratchnet.functions.in_time_window\`(as_of_record_time, migration_id,
+      AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(as_of_record_time, migration_id,
             c.record_time, c.migration_id))
   `
 );
@@ -315,7 +351,7 @@ const locked = new BQScalarFunction(
   ],
   BIGNUMERIC,
   `
-    \`da-cn-scratchnet.functions.sum_bignumeric_acs\`(
+    \`$$FUNCTIONS_DATASET$$.sum_bignumeric_acs\`(
       -- (LockedAmulet) .amulet.amount.initialAmount
       [0, 2, 0],
       'Splice.Amulet',
@@ -333,7 +369,7 @@ const unlocked = new BQScalarFunction(
   ],
   BIGNUMERIC,
   `
-    \`da-cn-scratchnet.functions.sum_bignumeric_acs\`(
+    \`$$FUNCTIONS_DATASET$$.sum_bignumeric_acs\`(
       -- (Amulet) .amount.initialAmount
       [2, 0],
       'Splice.Amulet',
@@ -351,7 +387,7 @@ const unminted = new BQScalarFunction(
   ],
   BIGNUMERIC,
   `
-    \`da-cn-scratchnet.functions.sum_bignumeric_acs\`(
+    \`$$FUNCTIONS_DATASET$$.sum_bignumeric_acs\`(
       -- (UnclaimedReward) .amount
       [1],
       'Splice.Amulet',
@@ -363,42 +399,37 @@ const unminted = new BQScalarFunction(
 
 const TransferSummary_minted = new BQScalarFunction(
   'TransferSummary_minted',
-  [
-    new BQFunctionArgument('tr_json', json),
-  ],
+  [new BQFunctionArgument('tr_json', json)],
   BIGNUMERIC,
   `
-    \`da-cn-scratchnet.functions.daml_record_numeric\`(tr_json, [0]) -- .inputAppRewardAmount
-    + \`da-cn-scratchnet.functions.daml_record_numeric\`(tr_json, [1]) -- .inputValidatorRewardAmount
-    + \`da-cn-scratchnet.functions.daml_record_numeric\`(tr_json, [2]) -- .inputSvRewardAmount
+    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) -- .inputAppRewardAmount
+    + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) -- .inputValidatorRewardAmount
+    + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) -- .inputSvRewardAmount
 
   `
 );
 
 const choice_result_TransferSummary = new BQScalarFunction(
   'choice_result_TransferSummary',
-  [
-    new BQFunctionArgument('choice', STRING),
-    new BQFunctionArgument('result', json),
-  ],
+  [new BQFunctionArgument('choice', STRING), new BQFunctionArgument('result', json)],
   json,
   `
     CASE choice
       WHEN 'AmuletRules_CreateExternalPartySetupProposal'
         -- .transferResult.summary
-        THEN JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([3, 1], 'record'))
+        THEN JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([3, 1], 'record'))
       WHEN 'AmuletRules_CreateTransferPreapproval'
         -- .transferResult.summary
-        THEN JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([1, 1], 'record'))
+        THEN JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 1], 'record'))
       WHEN 'AmuletRules_BuyMemberTraffic'
         -- .summary
-        THEN JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([1], 'record'))
+        THEN JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1], 'record'))
       WHEN 'AmuletRules_Transfer'
         -- .summary
-        THEN JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([1], 'record'))
+        THEN JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1], 'record'))
       WHEN 'TransferPreapproval_Renew'
         -- .transferResult.summary
-        THEN JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([1, 1], 'record'))
+        THEN JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 1], 'record'))
       ELSE ERROR('no TransferSummary for this choice: ' || choice)
     END
   `
@@ -413,11 +444,11 @@ const minted = new BQScalarFunction(
   BIGNUMERIC,
   `
     (SELECT
-        COALESCE(SUM(\`da-cn-scratchnet.functions.TransferSummary_minted\`(
-                  \`da-cn-scratchnet.functions.choice_result_TransferSummary\`(e.choice, e.result))),
+        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
+                  \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))),
                 0)
       FROM
-        \`da-cn-scratchnet.devnet_da2_scan.scan_sv_1_update_history_exercises\` e
+        \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
       WHERE
         -- all the choices that can take coupons as input, and thus mint amulets based on them.
         ((e.choice IN ('AmuletRules_BuyMemberTraffic',
@@ -428,56 +459,51 @@ const minted = new BQScalarFunction(
             OR (e.choice = 'TransferPreapproval_Renew'
                 AND e.template_id_entity_name = 'TransferPreapproval'))
         AND e.template_id_module_name = 'Splice.AmuletRules'
-        AND \`da-cn-scratchnet.functions.in_time_window\`(as_of_record_time, migration_id,
+        AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(as_of_record_time, migration_id,
               e.record_time, e.migration_id))
   `
 );
 
 const transferresult_fees = new BQScalarFunction(
   'transferresult_fees',
-  [
-    new BQFunctionArgument('tr_json', json),
-  ],
+  [new BQFunctionArgument('tr_json', json)],
   BIGNUMERIC,
   `
     -- .summary.holdingFees
-    PARSE_BIGNUMERIC(JSON_VALUE(tr_json, \`da-cn-scratchnet.functions.daml_record_path\`([1, 5], 'numeric')))
+    PARSE_BIGNUMERIC(JSON_VALUE(tr_json, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 5], 'numeric')))
     -- .summary.senderChangeFee
-    + PARSE_BIGNUMERIC(JSON_VALUE(tr_json, \`da-cn-scratchnet.functions.daml_record_path\`([1, 7], 'numeric')))
+    + PARSE_BIGNUMERIC(JSON_VALUE(tr_json, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 7], 'numeric')))
     + (SELECT COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)
       FROM
         UNNEST(JSON_QUERY_ARRAY(tr_json,
                   -- .summary.outputFees
-                  \`da-cn-scratchnet.functions.daml_record_path\`([1, 6], 'list'))) AS x)
+                  \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 6], 'list'))) AS x)
   `
 );
 
 const result_burn = new BQScalarFunction(
   'result_burn',
-  [
-    new BQFunctionArgument('choice', STRING),
-    new BQFunctionArgument('result', json),
-  ],
+  [new BQFunctionArgument('choice', STRING), new BQFunctionArgument('result', json)],
   BIGNUMERIC,
   `
     CASE choice
       WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer
         -- AmuletRules_BuyMemberTrafficResult
-        PARSE_BIGNUMERIC(JSON_VALUE(result, \`da-cn-scratchnet.functions.daml_record_path\`([2], 'numeric'))) -- .amuletPaid
-        + PARSE_BIGNUMERIC(JSON_VALUE(result, \`da-cn-scratchnet.functions.daml_record_path\`([1, 5], 'numeric'))) -- .summary.holdingFees
-        + PARSE_BIGNUMERIC(JSON_VALUE(result, \`da-cn-scratchnet.functions.daml_record_path\`([1, 7], 'numeric'))) -- .summary.senderChangeFee
+        PARSE_BIGNUMERIC(JSON_VALUE(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([2], 'numeric'))) -- .amuletPaid
+        + PARSE_BIGNUMERIC(JSON_VALUE(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 5], 'numeric'))) -- .summary.holdingFees
+        + PARSE_BIGNUMERIC(JSON_VALUE(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1, 7], 'numeric'))) -- .summary.senderChangeFee
       WHEN 'AmuletRules_Transfer' THEN -- Amulet Burnt in Amulet Transfers
         -- TransferResult
-        \`da-cn-scratchnet.functions.transferresult_fees\`(result)
+        \`$$FUNCTIONS_DATASET$$.transferresult_fees\`(result)
       WHEN 'AmuletRules_CreateTransferPreapproval' THEN
-        PARSE_BIGNUMERIC(JSON_VALUE(result, \`da-cn-scratchnet.functions.daml_record_path\`([2], 'numeric'))) -- .amuletPaid
-        + \`da-cn-scratchnet.functions.transferresult_fees\`(JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([1], 'record'))) -- .transferResult
+        PARSE_BIGNUMERIC(JSON_VALUE(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([2], 'numeric'))) -- .amuletPaid
+        + \`$$FUNCTIONS_DATASET$$.transferresult_fees\`(JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1], 'record'))) -- .transferResult
       WHEN 'AmuletRules_CreateExternalPartySetupProposal' THEN
-        PARSE_BIGNUMERIC(JSON_VALUE(result, \`da-cn-scratchnet.functions.daml_record_path\`([4], 'numeric'))) -- .amuletPaid
-        + \`da-cn-scratchnet.functions.transferresult_fees\`(JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([3], 'record'))) -- .transferResult
+        PARSE_BIGNUMERIC(JSON_VALUE(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([4], 'numeric'))) -- .amuletPaid
+        + \`$$FUNCTIONS_DATASET$$.transferresult_fees\`(JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([3], 'record'))) -- .transferResult
       WHEN 'TransferPreapproval_Renew' THEN
-        PARSE_BIGNUMERIC(JSON_VALUE(result, \`da-cn-scratchnet.functions.daml_record_path\`([4], 'numeric'))) -- .amuletPaid
-        + \`da-cn-scratchnet.functions.transferresult_fees\`(JSON_QUERY(result, \`da-cn-scratchnet.functions.daml_record_path\`([1], 'record'))) -- .transferResult
+        PARSE_BIGNUMERIC(JSON_VALUE(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([4], 'numeric'))) -- .amuletPaid
+        + \`$$FUNCTIONS_DATASET$$.transferresult_fees\`(JSON_QUERY(result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1], 'record'))) -- .transferResult
       ELSE ERROR('Unknown choice for result_burn: ' || choice)
     END
   `
@@ -494,10 +520,10 @@ const burned = new BQScalarFunction(
     (SELECT SUM(fees)
       FROM ((
                 SELECT
-                    SUM(\`da-cn-scratchnet.functions.result_burn\`(e.choice,
+                    SUM(\`$$FUNCTIONS_DATASET$$.result_burn\`(e.choice,
                                               e.result)) fees
                 FROM
-                    \`da-cn-scratchnet.devnet_da2_scan.scan_sv_1_update_history_exercises\` e
+                    \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
                 WHERE
                     ((e.choice IN ('AmuletRules_BuyMemberTraffic',
                                   'AmuletRules_Transfer',
@@ -507,29 +533,29 @@ const burned = new BQScalarFunction(
                         OR (e.choice = 'TransferPreapproval_Renew'
                             AND e.template_id_entity_name = 'TransferPreapproval'))
                   AND e.template_id_module_name = 'Splice.AmuletRules'
-                  AND \`da-cn-scratchnet.functions.in_time_window\`(as_of_record_time, migration_id_arg,
+                  AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(as_of_record_time, migration_id_arg,
                           e.record_time, e.migration_id))
             UNION ALL (-- Purchasing ANS Entries
                 SELECT
-                    SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, \`da-cn-scratchnet.functions.daml_record_path\`([2, 0], 'numeric')))) fees -- .amount.initialAmount
+                    SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([2, 0], 'numeric')))) fees -- .amount.initialAmount
                 FROM
-                    \`da-cn-scratchnet.devnet_da2_scan.scan_sv_1_update_history_exercises\` e,
-                    \`da-cn-scratchnet.devnet_da2_scan.scan_sv_1_update_history_creates\` c
+                    \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e,
+                    \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
                 WHERE
                     ((e.choice = 'SubscriptionInitialPayment_Collect'
                         AND e.template_id_entity_name = 'SubscriptionInitialPayment'
-                        AND c.contract_id = JSON_VALUE(e.result, \`da-cn-scratchnet.functions.daml_record_path\`([2], 'contractId'))) -- .amulet
+                        AND c.contract_id = JSON_VALUE(e.result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([2], 'contractId'))) -- .amulet
                         OR (e.choice = 'SubscriptionPayment_Collect'
                             AND e.template_id_entity_name = 'SubscriptionPayment'
-                            AND c.contract_id = JSON_VALUE(e.result, \`da-cn-scratchnet.functions.daml_record_path\`([1], 'contractId')))) -- .amulet
+                            AND c.contract_id = JSON_VALUE(e.result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1], 'contractId')))) -- .amulet
                   AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
                   AND c.template_id_module_name = 'Splice.Amulet'
                   AND c.template_id_entity_name = 'Amulet'
-                  AND \`da-cn-scratchnet.functions.in_time_window\`(as_of_record_time, migration_id_arg,
+                  AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(as_of_record_time, migration_id_arg,
                         e.record_time, e.migration_id)
                   AND c.record_time != -62135596800000000)))
   `
-)
+);
 
 const total_supply = new BQTableFunction(
   'total_supply',
@@ -548,15 +574,15 @@ const total_supply = new BQTableFunction(
   ],
   `
     SELECT
-      \`da-cn-scratchnet.functions.locked\`(as_of_record_time, migration_id) as locked,
-      \`da-cn-scratchnet.functions.unlocked\`(as_of_record_time, migration_id) as unlocked,
-      \`da-cn-scratchnet.functions.locked\`(as_of_record_time, migration_id) + \`da-cn-scratchnet.functions.unlocked\`(as_of_record_time, migration_id) as current_supply_total,
-      \`da-cn-scratchnet.functions.unminted\`(as_of_record_time, migration_id) as unminted,
-      \`da-cn-scratchnet.functions.minted\`(as_of_record_time, migration_id) as minted,
-      \`da-cn-scratchnet.functions.minted\`(as_of_record_time, migration_id) + \`da-cn-scratchnet.functions.unminted\`(as_of_record_time, migration_id) as allowed_mint,
-      \`da-cn-scratchnet.functions.burned\`(as_of_record_time, migration_id) as burned
+      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) as locked,
+      \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as unlocked,
+      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as current_supply_total,
+      \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) as minted,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
+      \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) as burned
   `
-)
+);
 
 export const allFunctions = [
   iso_timestamp,
@@ -575,4 +601,4 @@ export const allFunctions = [
   result_burn,
   burned,
   total_supply,
-]
+];

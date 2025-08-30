@@ -22,6 +22,7 @@ jobs:
       parallelism: 1
       test_name: bigquery
       with_gcp_creds: true
+      pre_sbt_cmd: 'make cluster/pulumi/build'
       commit_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha }}
       daml_base_version: ''
       oss_only: false
