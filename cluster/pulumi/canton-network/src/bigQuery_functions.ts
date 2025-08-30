@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
+import * as pulumi from '@pulumi/pulumi';
 
 abstract class BQType {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,7 +82,8 @@ abstract class BQFunction {
   public abstract toPulumi(
     project: string,
     functionsDataset: gcp.bigquery.Dataset,
-    scanDataset: gcp.bigquery.Dataset
+    scanDataset: gcp.bigquery.Dataset,
+    dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Routine;
   public abstract toSql(project: string, functionsDataset: string, scanDataset: string): string;
 }
@@ -102,23 +104,28 @@ class BQScalarFunction extends BQFunction {
   public toPulumi(
     project: string,
     functionsDataset: gcp.bigquery.Dataset,
-    scanDataset: gcp.bigquery.Dataset
+    scanDataset: gcp.bigquery.Dataset,
+    dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Routine {
-    return new gcp.bigquery.Routine(this.name, {
-      datasetId: functionsDataset.datasetId,
-      routineId: this.name,
-      routineType: 'SCALAR_FUNCTION',
-      language: 'SQL',
-      definitionBody: functionsDataset.datasetId.apply(fd =>
-        scanDataset.datasetId.apply(sd =>
-          this.definitionBody
-            .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
-            .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
-        )
-      ),
-      arguments: this.arguments.map(arg => arg.toPulumi()),
-      returnType: JSON.stringify(this.returnType.toPulumi()),
-    });
+    return new gcp.bigquery.Routine(
+      this.name,
+      {
+        datasetId: functionsDataset.datasetId,
+        routineId: this.name,
+        routineType: 'SCALAR_FUNCTION',
+        language: 'SQL',
+        definitionBody: functionsDataset.datasetId.apply(fd =>
+          scanDataset.datasetId.apply(sd =>
+            this.definitionBody
+              .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
+              .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
+          )
+        ),
+        arguments: this.arguments.map(arg => arg.toPulumi()),
+        returnType: JSON.stringify(this.returnType.toPulumi()),
+      },
+      { dependsOn }
+    );
   }
 
   public toSql(project: string, functionsDataset: string, scanDataset: string): string {
@@ -176,25 +183,30 @@ class BQTableFunction extends BQFunction {
   public toPulumi(
     project: string,
     functionsDataset: gcp.bigquery.Dataset,
-    scanDataset: gcp.bigquery.Dataset
+    scanDataset: gcp.bigquery.Dataset,
+    dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Routine {
-    return new gcp.bigquery.Routine(this.name, {
-      datasetId: functionsDataset.datasetId,
-      routineId: this.name,
-      routineType: 'TABLE_VALUED_FUNCTION',
-      language: 'SQL',
-      definitionBody: functionsDataset.datasetId.apply(fd =>
-        scanDataset.datasetId.apply(sd =>
-          this.definitionBody
-            .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
-            .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
-        )
-      ),
-      arguments: this.arguments.map(arg => arg.toPulumi()),
-      returnTableType: JSON.stringify({
-        columns: this.returnTableType.map(col => col.toPulumi()),
-      }),
-    });
+    return new gcp.bigquery.Routine(
+      this.name,
+      {
+        datasetId: functionsDataset.datasetId,
+        routineId: this.name,
+        routineType: 'TABLE_VALUED_FUNCTION',
+        language: 'SQL',
+        definitionBody: functionsDataset.datasetId.apply(fd =>
+          scanDataset.datasetId.apply(sd =>
+            this.definitionBody
+              .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
+              .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
+          )
+        ),
+        arguments: this.arguments.map(arg => arg.toPulumi()),
+        returnTableType: JSON.stringify({
+          columns: this.returnTableType.map(col => col.toPulumi()),
+        }),
+      },
+      { dependsOn }
+    );
   }
 
   public toSql(project: string, functionsDataset: string, scanDataset: string): string {
