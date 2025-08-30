@@ -23,6 +23,8 @@ import {
   commandScriptPath,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
+import { allFunctions } from './bigQuery_functions';
+
 interface ScanBigQueryConfig {
   dataset: string;
   prefix: string;
@@ -181,6 +183,28 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
       cluster: CLUSTER_BASENAME,
     },
   });
+}
+
+function installFunctions(
+  scanDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): gcp.bigquery.Dataset {
+  const datasetName = 'functions';
+  const dataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  scanDataset.project.apply(project =>
+    allFunctions.map(f => f.toPulumi(project, dataset, scanDataset, dependsOn))
+  );
+
+  return dataset;
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -401,6 +425,13 @@ export function configureScanBigQuery(
     passwordSecret
   );
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
-  installDatastream(postgres, sourceProfile, destinationProfile, dataset, pubRepSlots);
+  const stream = installDatastream(
+    postgres,
+    sourceProfile,
+    destinationProfile,
+    dataset,
+    pubRepSlots
+  );
+  installFunctions(dataset, [stream]);
   return;
 }
