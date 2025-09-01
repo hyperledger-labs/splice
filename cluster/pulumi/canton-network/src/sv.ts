@@ -46,7 +46,6 @@ import {
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   SvParticipant,
-  updateHistoryBackfillingValues,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import {
@@ -581,7 +580,6 @@ function installScan(
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
-    ...updateHistoryBackfillingValues,
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

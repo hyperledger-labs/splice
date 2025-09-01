@@ -50,7 +50,6 @@ import {
 import {
   configForSv,
   svsConfig,
-  updateHistoryBackfillingValues,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
@@ -389,7 +388,6 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
