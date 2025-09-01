@@ -8,6 +8,7 @@ import {
   SvCometBftKeys,
   svCometBftKeysFromSecret,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { configForSv } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
@@ -38,6 +39,37 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
       svCometBftKeysFromSecret('sv15-cometbft-keys'),
       svCometBftKeysFromSecret('sv16-cometbft-keys'),
     ];
+
+
+// TODO(#1892): we can probably get rid of StaticSvConfig and use SingleSvConfiguration directly
+const fromSingleSvConfig = (nodeName: string): StaticSvConfig => {
+  const config = configForSv(nodeName);
+
+  const svCometBftSecrets = svCometBftKeysFromSecret(config.cometbft!.keysGcpSecret!);
+
+  return {
+    nodeName,
+    ingressName: config.subdomain!,
+    onboardingName: config.publicName!,
+    auth0ValidatorAppName: config.validatorApp!.auth0Name!,
+    auth0SvAppName: config.svApp!.auth0Name!,
+    validatorWalletUser: config.validatorApp!.walletUser,
+    cometBft: {
+          nodeIndex: config.cometbft!.nodeIndex!,
+          id: config.cometbft!.nodeId!,
+          privateKey: svCometBftSecrets.nodePrivateKey,
+          retainBlocks: cometbftRetainBlocks,
+          validator: {
+            keyAddress: config.cometbft!.validatorKeyAddress!,
+            privateKey: svCometBftSecrets.validatorPrivateKey,
+            publicKey: svCometBftSecrets.validatorPublicKey,
+          },
+        },
+        ...(config.svApp?.sweep? { sweep: sweepConfigFromEnv(config.svApp.sweep.fromEnv) }: {}),
+        ...(config.scanApp?.bigQuery? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } } : {})
+  }
+}
+
 // to generate new keys: https://cimain.network.canton.global/sv_operator/sv_helm.html#generating-your-cometbft-node-keys
 // TODO(DACH-NY/canton-network-internal#435): rotate the non-mainNet keys as they have been exposed in github (once mechanism is in place)
 export const svConfigs: StaticSvConfig[] = isMainNet

@@ -46,8 +46,7 @@ export function installNode(
     migrationId,
     auth0Client,
     {
-      // TODO rm ! -- it's just to compile for now
-      ingressName: nodeConfig.ingressName!,
+      ingressName: nodeConfig.ingressName,
       onboardingName: nodeConfig.onboardingName,
       auth0SvAppName: nodeConfig.auth0SvAppName,
       isFirstSv: isFirstSv,

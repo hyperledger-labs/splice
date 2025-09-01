@@ -31,13 +31,11 @@ export function buildCrossStackCantonDependencies(
   return {
     decentralizedSynchronizer: decentralizedSynchronizerMigrationConfig.active.sequencer
       .enableBftSequencer
-      // TODO rm !
-      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svConfig.ingressName!)
+      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svConfig.ingressName)
       : new CrossStackCometBftDecentralizedSynchronizerNode(
           activeMigrationId,
           new CometBftNodeConfigs(activeMigrationId, cometbft.nodeConfigs).nodeIdentifier,
-          // TODO rm !
-          svConfig.ingressName!
+          svConfig.ingressName
         ),
     participant: {
       asDependencies: [],

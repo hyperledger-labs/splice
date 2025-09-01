@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 const SvCometbftConfigSchema = z.object({
   nodeId: z.string().optional(),
+  validatorKeyAddress: z.string().optional(),
   keysGcpSecret: z.string().optional(),
   nodeIndex: z.number().optional(),
   snapshotName: z.string().optional(),
@@ -51,7 +52,7 @@ const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 const SingleSvConfigSchema = z
   .object({
     publicName: z.string().optional(),
-    ingressName: z.string().optional(),
+    subdomain: z.string().optional(),
     cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
@@ -81,6 +82,8 @@ type SingleSvConfig = z.infer<typeof AllSvsConfigurationSchema>;
 export type SingleSvConfiguration = z.infer<typeof SingleSvConfigSchema>;
 
 const clusterSvsConfiguration: SingleSvConfig = SvsConfigurationSchema.parse(clusterYamlConfig).svs;
+
+// TODO function to get all keys...
 
 export const configForSv = (svName: string): SingleSvConfiguration => {
   return merge({}, clusterSvsConfiguration.default, clusterSvsConfiguration[svName]);

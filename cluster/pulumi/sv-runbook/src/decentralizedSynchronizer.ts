@@ -30,13 +30,11 @@ export function installCanton(
   return {
     decentralizedSynchronizer: decentralizedSynchronizerMigrationConfig.active.sequencer
       .enableBftSequencer
-      // TODO rm ! -- it's just to compile for now
-      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svRunbookConfig.ingressName!)
+      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svRunbookConfig.ingressName)
       : new CrossStackCometBftDecentralizedSynchronizerNode(
           activeMigrationId,
           new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier,
-          // TODO rm ! -- it's just to compile for now
-          svRunbookConfig.ingressName!
+          svRunbookConfig.ingressName
         ),
     participant: {
       asDependencies: [],
