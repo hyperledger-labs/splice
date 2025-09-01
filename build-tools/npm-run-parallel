@@ -10,7 +10,7 @@ SCRIPT=$1
 if [[ "$(uname)" == "Darwin"* ]]
 then
     # rust-parallel doesn't seem to be available for darwin in nix so we fallback to the sequential version
-    npm run --workspace --if-present "$SCRIPT"
+    npm run --workspaces --if-present "$SCRIPT"
 else
     npm query .workspace --json | jq -r '.[].location' | xargs -I {} sh -c "if jq -e .scripts.[\\\"$SCRIPT\\\"] {}/package.json > /dev/null; then echo {}; fi" | rust-parallel npm run "$SCRIPT" --workspace
 fi
