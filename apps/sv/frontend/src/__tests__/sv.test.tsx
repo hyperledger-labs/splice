@@ -92,10 +92,11 @@ describe('SV user can', () => {
     const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
     expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
 
+    const options: HTMLOptionElement[] = await screen.findAllByTestId('display-members-option');
+
     fireEvent.change(screen.getByTestId('display-members'), {
       target: {
-        value:
-          'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
+        value: options[0].value,
       },
     });
 
@@ -104,8 +105,6 @@ describe('SV user can', () => {
 
     const urlInput = screen.getByTestId('create-reason-url');
     await user.type(urlInput, 'https://vote-request.url');
-
-    // await waitFor(() => expect(screen.queryByTestId("voterequest-creation-alert")).toBeDefined());
 
     const submitButton = screen.getByTestId('create-voterequest-submit-button');
     await user.click(submitButton);
