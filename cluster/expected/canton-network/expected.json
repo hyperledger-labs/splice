@@ -45,11 +45,61 @@
   },
   {
     "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-1-bqdatastream-passwd",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-sv-1-bqdatastream-passwd",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "cn-apps-pg-bqdatastream-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
     "provider": "",
     "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "devnet_da2_scan",
+      "deleteContentsOnDestroy": true,
+      "friendlyName": "devnet_da2_scan Dataset",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6"
+    },
+    "name": "devnet_da2_scan",
+    "provider": "",
+    "type": "gcp:bigquery/dataset:Dataset"
   },
   {
     "custom": true,
@@ -578,6 +628,18 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "addPreviousOutputInEnv": true,
+      "create": "'SPLICE_ROOT/cluster/pulumi/canton-network/bigquery-cloudsql.sh' create-pub-rep-slot \\\n      --private-network-project=\"undefined\" \\\n      --compute-region=\"europe-west6\" \\\n      --service-account-email=\"undefined\" \\\n      --tables-to-replicate-length=\"2\" \\\n      --db-name=\"scan_sv_1\" \\\n      --schema-name=\"scan_sv_1\" \\\n      --tables-to-replicate-list=\"'update_history_creates', 'update_history_exercises'\" \\\n      --tables-to-replicate-joined=\"update_history_creates, update_history_exercises\" \\\n      --postgres-user-name=\"cnadmin\" \\\n      --publication-name=\"update_history_datastream_pub\" \\\n      --replication-slot-name=\"update_history_datastream_r_slot\" \\\n      --replicator-user-name=\"bqdatastream\" \\\n      --postgres-instance-name=\"undefined\" \\\n      --scan-app-database-name=\"scan_sv_1\"",
+      "delete": "'SPLICE_ROOT/cluster/pulumi/canton-network/bigquery-cloudsql.sh' delete-pub-rep-slot \\\n      --private-network-project=\"undefined\" \\\n      --compute-region=\"europe-west6\" \\\n      --service-account-email=\"undefined\" \\\n      --tables-to-replicate-length=\"2\" \\\n      --db-name=\"scan_sv_1\" \\\n      --schema-name=\"scan_sv_1\" \\\n      --tables-to-replicate-list=\"'update_history_creates', 'update_history_exercises'\" \\\n      --tables-to-replicate-joined=\"update_history_creates, update_history_exercises\" \\\n      --postgres-user-name=\"cnadmin\" \\\n      --publication-name=\"update_history_datastream_pub\" \\\n      --replication-slot-name=\"update_history_datastream_r_slot\" \\\n      --replicator-user-name=\"bqdatastream\" \\\n      --postgres-instance-name=\"undefined\" \\\n      --scan-app-database-name=\"scan_sv_1\""
+    },
+    "name": "sv-1-bqdatastream-pub-replicate-slots",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
@@ -611,6 +673,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "cloudsql.logical_decoding",
+            "value": "on"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -639,6 +705,33 @@
     "name": "sv-1-cn-apps-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allows": [
+        {
+          "ports": [
+            "5432"
+          ],
+          "protocol": "tcp"
+        }
+      ],
+      "destinationRanges": [
+        null
+      ],
+      "direction": "INGRESS",
+      "name": "sv-1-datastream-to-nat",
+      "network": "default",
+      "priority": 42,
+      "sourceRanges": [
+        "1.2.3.16/29"
+      ]
+    },
+    "name": "sv-1-datastream-to-nat",
+    "provider": "",
+    "type": "gcp:compute/firewall:Firewall"
   },
   {
     "custom": true,
@@ -847,6 +940,38 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "bootDisk": {
+        "initializeParams": {
+          "image": "debian-cloud/debian-12"
+        }
+      },
+      "labels": {
+        "cluster": "mock"
+      },
+      "machineType": "e2-micro",
+      "metadata": {
+        "enable-osconfig": "TRUE",
+        "enable-oslogin": "true",
+        "startup-script": "#! /bin/bash\n\nexport DB_ADDR=undefined\nexport DB_PORT=5432\n\n# Enable the VM to receive packets whose destinations do\n# not match any running process local to the VM\necho 1 > /proc/sys/net/ipv4/ip_forward\n\n# Ask the Metadata server for the IP address of the VM nic0\n# network interface:\nmd_url_prefix=\"http://169.254.169.254/computeMetadata/v1/instance\"\nvm_nic_ip=\"$(curl -H \"Metadata-Flavor: Google\" $md_url_prefix/network-interfaces/0/ip)\"\n\n# Clear any existing iptables NAT table entries (all chains):\niptables -t nat -F\n\n# Create a NAT table entry in the prerouting chain, matching\n# any packets with destination database port, changing the destination\n# IP address of the packet to the SQL instance IP address:\niptables -t nat -A PREROUTING \\\n     -p tcp --dport $DB_PORT \\\n     -j DNAT \\\n     --to-destination $DB_ADDR\n\n# Create a NAT table entry in the postrouting chain, matching\n# any packets with destination database port, changing the source IP\n# address of the packet to the NAT VM's primary internal IPv4 address:\niptables -t nat -A POSTROUTING \\\n     -p tcp --dport $DB_PORT \\\n     -j SNAT \\\n     --to-source $vm_nic_ip\n\n# Save iptables configuration:\niptables-save\n"
+      },
+      "networkInterfaces": [
+        {
+          "accessConfigs": [
+            {}
+          ],
+          "network": "default"
+        }
+      ],
+      "zone": "europe-west6-a"
+    },
+    "name": "sv-1-nat-vm",
+    "provider": "",
+    "type": "gcp:compute/instance:Instance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "EnvoyFilter",
       "metadata": {
@@ -995,6 +1120,107 @@
     "name": "sv-1-scan-app-rate-limit",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:EnvoyFilter"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "bigqueryProfile": {},
+      "connectionProfileId": "sv-1-scan-bq-cxn",
+      "displayName": "sv-1-scan-bq-cxn",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6"
+    },
+    "name": "sv-1-scan-bq-cxn",
+    "provider": "",
+    "type": "gcp:datastream/connectionProfile:ConnectionProfile"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "connectionProfileId": "sv-1-scan-update-history-cxn",
+      "displayName": "sv-1-scan-update-history-cxn",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6",
+      "postgresqlProfile": {
+        "database": "scan_sv_1",
+        "port": 5432,
+        "username": "bqdatastream"
+      },
+      "privateConnectivity": {}
+    },
+    "name": "sv-1-scan-update-history-cxn",
+    "provider": "",
+    "type": "gcp:datastream/connectionProfile:ConnectionProfile"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "displayName": "sv-1-scan-update-history-datastream-vpc",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6",
+      "privateConnectionId": "sv-1-scan-update-history-datastream-vpc",
+      "vpcPeeringConfig": {
+        "subnet": "1.2.3.16/29",
+        "vpc": "projects/test-project/global/networks/default"
+      }
+    },
+    "name": "sv-1-scan-update-history-datastream-vpc",
+    "provider": "",
+    "type": "gcp:datastream/privateConnection:PrivateConnection"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "backfillAll": {},
+      "desiredState": "RUNNING",
+      "destinationConfig": {
+        "bigqueryDestinationConfig": {
+          "singleTargetDataset": {
+            "datasetId": "projects/undefined/datasets/devnet_da2_scan"
+          }
+        }
+      },
+      "displayName": "sv-1-scan-update-history",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6",
+      "sourceConfig": {
+        "postgresqlSourceConfig": {
+          "includeObjects": {
+            "postgresqlSchemas": [
+              {
+                "postgresqlTables": [
+                  {
+                    "table": "update_history_creates"
+                  },
+                  {
+                    "table": "update_history_exercises"
+                  }
+                ],
+                "schema": "scan_sv_1"
+              }
+            ]
+          },
+          "publication": "update_history_datastream_pub",
+          "replicationSlot": "update_history_datastream_r_slot"
+        }
+      },
+      "streamId": "sv-1-scan-update-history"
+    },
+    "name": "sv-1-scan-update-history",
+    "provider": "",
+    "type": "gcp:datastream/stream:Stream"
   },
   {
     "custom": true,
@@ -1266,6 +1492,20 @@
     "name": "sv-1-sv-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "bqdatastream",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "sv-1-user-bqdatastream",
+    "provider": "",
+    "type": "gcp:sql/user:User"
   },
   {
     "custom": true,

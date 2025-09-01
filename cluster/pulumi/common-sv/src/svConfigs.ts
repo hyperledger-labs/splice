@@ -99,30 +99,7 @@ export const svConfigs: StaticSvConfig[] = isMainNet
       },
     ]
   : [
-      {
-        // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
-        nodeName: 'sv-1',
-        ingressName: 'sv-2', // fun, right?
-        onboardingName: 'Digital-Asset-2',
-        auth0ValidatorAppName: 'sv1_validator',
-        auth0SvAppName: 'sv-1',
-        validatorWalletUser: isDevNet
-          ? 'auth0|64afbc0956a97fe9577249d7'
-          : 'auth0|64529b128448ded6aa68048f',
-        cometBft: {
-          nodeIndex: 1,
-          id: '5af57aa83abcec085c949323ed8538108757be9c',
-          privateKey: svCometBftSecrets[0].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
-          validator: {
-            keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
-            privateKey: svCometBftSecrets[0].validatorPrivateKey,
-            publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
-          },
-        },
-        sweep: sweepConfigFromEnv('SV1'),
-        ...(sv1ScanBigQuery ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } } : {}),
-      },
+      fromSingleSvConfig('sv-1'),
       {
         // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
         nodeName: 'sv-2',
