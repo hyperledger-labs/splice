@@ -43,4 +43,5 @@ afterAll(() => {
 afterEach(() => {
   server.resetHandlers();
   cleanup();
+  vi.useRealTimers();
 });

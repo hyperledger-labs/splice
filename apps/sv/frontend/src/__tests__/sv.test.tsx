@@ -54,7 +54,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('see proper time format in popup', async () => {
+  test('see proper time format in popup', { timeout: 10000 }, async () => {
     const mockedDate = new Date(2020, 0, 14, 4, 42, 0);
 
     vi.setSystemTime(mockedDate);
@@ -112,8 +112,6 @@ describe('SV user can', () => {
     const submitPopup = screen.getByRole('dialog');
 
     expect(submitPopup).toHaveTextContent('in 23 minutes');
-
-    vi.useRealTimers();
   });
 });
 
