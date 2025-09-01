@@ -47,10 +47,7 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import {
-  configForSv,
-  svsConfig,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { configForSv, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
   CloudPostgres,
