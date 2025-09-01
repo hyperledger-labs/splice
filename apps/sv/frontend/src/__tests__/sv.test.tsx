@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
@@ -68,11 +68,11 @@ describe('SV user can', () => {
     const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
 
     // Calendar button is flaky, at first it has today date and then after a slight delay it sets it up for the next week
-    await waitFor(async () =>
-      expect(
-        screen.queryByRole('button', { name: 'Choose date, selected date is Jan 21, 2020' })
-      ).toBeTruthy()
-    );
+    // await waitFor(async () =>
+    //   expect(
+    //     screen.queryByRole('button', { name: 'Choose date, selected date is Jan 21, 2020' })
+    //   ).toBeTruthy()
+    // );
 
     const calendarButton = screen.getByRole('button', {
       name: 'Choose date, selected date is Jan 21, 2020',
