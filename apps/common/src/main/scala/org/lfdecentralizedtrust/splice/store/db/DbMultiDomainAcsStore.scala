@@ -1329,110 +1329,116 @@ final class DbMultiDomainAcsStore[TXE](
           .queryAndUpdate(
             ingestUpdateAtOffset(
               offset,
-              DBIO
-                .seq(
-                  reassignment.event match {
-                    case assign: ReassignmentEvent.Assign
-                        if !contractFilter.contains(assign.createdEvent) =>
-                      summary.numFilteredAssignEvents += 1
-                      DBIO.successful(())
-                    case assign: ReassignmentEvent.Assign =>
-                      contractFilter.ensureStakeholderOf(assign.createdEvent)
-                      for {
-                        case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
-                          Seq(
-                            hasIncompleteReassignments(assign.createdEvent.getContractId),
-                            hasAcsEntry(assign.createdEvent.getContractId),
-                          )
-                        )
-                        alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
-                        _ <-
-                          if (alreadyArchived) {
-                            doRegisterIncompleteReassignment(
-                              assign.createdEvent.getContractId,
-                              assign.source,
-                              assign.unassignId,
-                              true,
-                              summary,
-                            )
-                          } else if (_hasAcsEntry) {
-                            DBIO.seq(
-                              doSetContractStateActive(
-                                assign.createdEvent.getContractId,
-                                assign.target,
-                                assign.counter,
-                                summary,
-                              ),
-                              doRegisterIncompleteReassignment(
-                                assign.createdEvent.getContractId,
-                                assign.source,
-                                assign.unassignId,
-                                true,
-                                summary,
-                              ),
-                            )
-                          } else {
-                            DBIO.seq(
-                              doIngestAcsInsert(
-                                reassignment.offset,
-                                assign.createdEvent,
-                                stateRowDataFromAssign(assign),
-                                summary,
-                              ),
-                              doRegisterIncompleteReassignment(
-                                assign.createdEvent.getContractId,
-                                assign.source,
-                                assign.unassignId,
-                                true,
-                                summary,
-                              ),
-                            )
-                          }
-                      } yield ()
-                    case unassign: ReassignmentEvent.Unassign =>
-                      for {
-                        case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
-                          Seq(
-                            hasIncompleteReassignments(unassign.contractId.contractId),
-                            hasAcsEntry(unassign.contractId.contractId),
-                          )
-                        )
-                        filteredOut = !_hasAcsEntry & !_hasIncompleteReassignments
-                        alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
-                        _ <-
-                          if (filteredOut) {
-                            summary.numFilteredUnassignEvents += 1
-                            DBIO.successful(())
-                          } else if (alreadyArchived) {
-                            doRegisterIncompleteReassignment(
-                              unassign.contractId.contractId,
-                              unassign.source,
-                              unassign.unassignId,
-                              false,
-                              summary,
-                            )
-                          } else {
-                            DBIO.seq(
-                              doSetContractStateInFlight(
-                                unassign,
-                                summary,
-                              ),
-                              doRegisterIncompleteReassignment(
-                                unassign.contractId.contractId,
-                                unassign.source,
-                                unassign.unassignId,
-                                false,
-                                summary,
-                              ),
-                            )
-                          }
-                      } yield ()
-                  }
-                ),
+              DBIOAction.seq(
+                reassignment.events.map(ingestReassignmentEvent(reassignment, _, summary))*
+              ),
             ),
             "ingestReassignment",
           )
       } yield summary
+    }
+
+    private def ingestReassignmentEvent(
+        reassignment: Reassignment[ReassignmentEvent],
+        event: ReassignmentEvent,
+        summary: MutableIngestionSummary,
+    )(implicit tc: TraceContext): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+      event match {
+        case assign: ReassignmentEvent.Assign if !contractFilter.contains(assign.createdEvent) =>
+          summary.numFilteredAssignEvents += 1
+          DBIO.successful(())
+        case assign: ReassignmentEvent.Assign =>
+          contractFilter.ensureStakeholderOf(assign.createdEvent)
+          for {
+            case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
+              Seq(
+                hasIncompleteReassignments(assign.createdEvent.getContractId),
+                hasAcsEntry(assign.createdEvent.getContractId),
+              )
+            )
+            alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
+            _ <-
+              if (alreadyArchived) {
+                doRegisterIncompleteReassignment(
+                  assign.createdEvent.getContractId,
+                  assign.source,
+                  assign.unassignId,
+                  true,
+                  summary,
+                )
+              } else if (_hasAcsEntry) {
+                DBIO.seq(
+                  doSetContractStateActive(
+                    assign.createdEvent.getContractId,
+                    assign.target,
+                    assign.counter,
+                    summary,
+                  ),
+                  doRegisterIncompleteReassignment(
+                    assign.createdEvent.getContractId,
+                    assign.source,
+                    assign.unassignId,
+                    true,
+                    summary,
+                  ),
+                )
+              } else {
+                DBIO.seq(
+                  doIngestAcsInsert(
+                    reassignment.offset,
+                    assign.createdEvent,
+                    stateRowDataFromAssign(assign),
+                    summary,
+                  ),
+                  doRegisterIncompleteReassignment(
+                    assign.createdEvent.getContractId,
+                    assign.source,
+                    assign.unassignId,
+                    true,
+                    summary,
+                  ),
+                )
+              }
+          } yield ()
+        case unassign: ReassignmentEvent.Unassign =>
+          for {
+            case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
+              Seq(
+                hasIncompleteReassignments(unassign.contractId.contractId),
+                hasAcsEntry(unassign.contractId.contractId),
+              )
+            )
+            filteredOut = !_hasAcsEntry & !_hasIncompleteReassignments
+            alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
+            _ <-
+              if (filteredOut) {
+                summary.numFilteredUnassignEvents += 1
+                DBIO.successful(())
+              } else if (alreadyArchived) {
+                doRegisterIncompleteReassignment(
+                  unassign.contractId.contractId,
+                  unassign.source,
+                  unassign.unassignId,
+                  false,
+                  summary,
+                )
+              } else {
+                DBIO.seq(
+                  doSetContractStateInFlight(
+                    unassign,
+                    summary,
+                  ),
+                  doRegisterIncompleteReassignment(
+                    unassign.contractId.contractId,
+                    unassign.source,
+                    unassign.unassignId,
+                    false,
+                    summary,
+                  ),
+                )
+              }
+          } yield ()
+      }
     }
 
     private def ingestTransactionTree(

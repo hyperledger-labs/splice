@@ -124,13 +124,19 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     if (mustIncludeReassignments) {
       recordedUpdates.filter(_.update match {
-        case UpdateHistoryResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Assign)), _) =>
-          true
+        case UpdateHistoryResponse(ReassignmentUpdate(reassignment), _) =>
+          reassignment.events.filter {
+            case _ : Assign => true
+            case _ => false
+          }.nonEmpty
         case _ => false
       }) should not be empty
       recordedUpdates.filter(_.update match {
-        case UpdateHistoryResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Unassign)), _) =>
-          true
+        case UpdateHistoryResponse(ReassignmentUpdate(reassignment), _) =>
+          reassignment.events.filter {
+            case _ : Unassign => true
+            case _ => false
+          }.nonEmpty
         case _ => false
       }) should not be empty
     }
@@ -324,7 +330,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =
     r.copy(
-      event = dropTrailingNones(r.event)
+      events = r.events.map(dropTrailingNones(_))
     )
 
   def dropTrailingNones(e: ReassignmentEvent): ReassignmentEvent =

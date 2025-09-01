@@ -850,25 +850,13 @@ object LedgerClient {
           )
 
         case TU.Reassignment(x) =>
-          // TODO(DACH-NY/canton-network-internal#361) Support reassignment batching
-          val event: lapi.reassignment.ReassignmentEvent = x.events match {
-            case Seq(event) => event
-            case events =>
-              throw GrpcStatus.INTERNAL
-                .withDescription(s"Reassignment batching is not currently supported: $events")
-                .asRuntimeException
-          }
-          val synchronizerIdP = event.event match {
-            case lapi.reassignment.ReassignmentEvent.Event.Empty =>
-              sys.error("uninitialized update service result (event)")
-            case lapi.reassignment.ReassignmentEvent.Event.Unassigned(unassign) => unassign.source
-            case lapi.reassignment.ReassignmentEvent.Event.Assigned(assign) => assign.target
-          }
+          val reassignment = Reassignment.fromProto(x)
+
           Some(
             GetTreeUpdatesResponse(
               TreeUpdateOrOffsetCheckpoint.Update(
-                ReassignmentUpdate(Reassignment.fromProto(x)),
-                SynchronizerId.tryFromString(synchronizerIdP),
+                ReassignmentUpdate(reassignment),
+                reassignment.synchronizerId,
               )
             )
           )

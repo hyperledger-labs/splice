@@ -1304,13 +1304,15 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def mkReassignment[T <: ReassignmentEvent](
       offset: Long,
       event: T,
-      recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+    recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+    workflowId: String = "",
   ): Reassignment[T] =
     Reassignment(
       updateId = nextUpdateId(),
       offset = offset,
       recordTime = recordTime,
-      event = event,
+      workflowId = workflowId,
+      events = Seq(event),
     )
 
   protected def mkExercise[TCid <: ContractId[T], T](

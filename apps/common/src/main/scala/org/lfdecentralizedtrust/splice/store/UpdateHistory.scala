@@ -402,14 +402,44 @@ class UpdateHistory(
   private def ingestReassignment(
       reassignment: Reassignment[ReassignmentEvent],
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Write] = {
-    reassignment match {
-      case Reassignment(_, _, _, event: ReassignmentEvent.Assign) =>
-        ingestAssignment(reassignment, event, migrationId)
-      case Reassignment(_, _, _, event: ReassignmentEvent.Unassign) =>
-        ingestUnassignment(reassignment, event, migrationId)
+  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+    insertReassignmentUpdateRow(reassignment, migrationId).flatMap { _ =>
+    DBIOAction.seq(reassignment.events.map { event =>
+      event match {
+        case assign: ReassignmentEvent.Assign =>
+          ingestAssignment(reassignment, assign, migrationId)
+        case unassign: ReassignmentEvent.Unassign =>
+          ingestUnassignment(reassignment, unassign, migrationId)
+      }
+    }*)
     }
   }
+
+  private def insertReassignmentUpdateRow(
+    reassignment: Reassignment[?],
+    migrationId: Long,
+  ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
+
+    val safeUpdateId = lengthLimited(reassignment.updateId)
+    val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(reassignment.offset))
+    val safeSynchronizerId = lengthLimited(reassignment.synchronizerId.toProtoPrimitive)
+    val safeWorkflowId = lengthLimited(reassignment.workflowId)
+
+    (sql"""
+      insert into update_history_reassignments(
+        history_id, update_id, record_time,
+        participant_offset, domain_id, migration_id,
+        workflow_id,
+      )
+      values (
+        $historyId, $safeUpdateId, ${reassignment.recordTime},
+        $safeParticipantOffset, $safeSynchronizerId, $migrationId,
+        $safeWorkflowId,
+      )
+      return row_id
+    """.asUpdateReturning[Long].head)
+}
+
 
   private def ingestUnassignment(
       reassignment: Reassignment[?],
@@ -1471,39 +1501,47 @@ class UpdateHistory(
   private def decodeAssignment(
       row: SelectFromAssignments
   ): UpdateHistoryResponse = {
+    // FIXME
     UpdateHistoryResponse(
       ReassignmentUpdate(
         Reassignment[Assign](
           updateId = row.updateId,
           offset = row.participantOffset,
           recordTime = row.recordTime,
-          event = Assign(
-            submitter = row.submitter,
-            source = row.sourceDomain,
-            target = row.synchronizerId,
-            unassignId = row.reassignmentId,
-            createdEvent = new CreatedEvent(
-              /*witnessParties = */ java.util.Collections.emptyList(),
-              /*offset = */ 0, // not populated
-              /*nodeId = */ EventId.nodeIdFromEventId(row.eventId),
-              /*templateId = */ tid(
-                row.templatePackageId,
-                row.templateModuleName,
-                row.templateEntityName,
+          // FIXME
+          workflowId = "",
+          events = Seq(
+            Assign(
+              submitter = row.submitter,
+              source = row.sourceDomain,
+              target = row.synchronizerId,
+              unassignId = row.reassignmentId,
+              createdEvent = new CreatedEvent(
+                /*witnessParties = */ java.util.Collections.emptyList(),
+                /*offset = */ 0, // not populated
+                /*nodeId = */ EventId.nodeIdFromEventId(row.eventId),
+                /*templateId = */ tid(
+                  row.templatePackageId,
+                  row.templateModuleName,
+                  row.templateEntityName,
+                ),
+                /*packageName = */ row.packageName,
+                /*contractId = */ row.contractId,
+                /*arguments = */ ProtobufCodec
+                  .deserializeValue(row.createArguments)
+                  .asRecord()
+                  .get(),
+                /*createdEventBlob = */ ByteString.EMPTY,
+                /*interfaceViews = */ java.util.Collections.emptyMap(),
+                /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
+                /*contractKey = */ java.util.Optional.empty(),
+                /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
+                /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
+                /*createdAt = */ row.createdAt.toInstant,
+                /*acsDelta = */ false,
               ),
-              /*packageName = */ row.packageName,
-              /*contractId = */ row.contractId,
-              /*arguments = */ ProtobufCodec.deserializeValue(row.createArguments).asRecord().get(),
-              /*createdEventBlob = */ ByteString.EMPTY,
-              /*interfaceViews = */ java.util.Collections.emptyMap(),
-              /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-              /*contractKey = */ java.util.Optional.empty(),
-              /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
-              /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
-              /*createdAt = */ row.createdAt.toInstant,
-              /*acsDelta = */ false,
-            ),
-            counter = row.reassignmentCounter,
+              counter = row.reassignmentCounter,
+            )
           ),
         )
       ),
@@ -1514,19 +1552,24 @@ class UpdateHistory(
   private def decodeUnassignment(
       row: SelectFromUnassignments
   ): UpdateHistoryResponse = {
+    // FIXME
     UpdateHistoryResponse(
       ReassignmentUpdate(
         Reassignment[Unassign](
           updateId = row.updateId,
           offset = row.participantOffset,
           recordTime = row.recordTime,
-          event = Unassign(
-            submitter = row.submitter,
-            source = row.synchronizerId,
-            target = row.targetDomain,
-            unassignId = row.reassignmentId,
-            counter = row.reassignmentCounter,
-            contractId = new ContractId(row.contractId),
+          // FIXME
+          workflowId = "",
+          events = Seq(
+            Unassign(
+              submitter = row.submitter,
+              source = row.synchronizerId,
+              target = row.targetDomain,
+              unassignId = row.reassignmentId,
+              counter = row.reassignmentCounter,
+              contractId = new ContractId(row.contractId),
+            )
           ),
         )
       ),
@@ -2115,22 +2158,12 @@ class UpdateHistory(
               tree.getUpdateId,
             )
           case ReassignmentUpdate(update) =>
-            update.event match {
-              case _: ReassignmentEvent.Assign =>
-                (
-                  "update_history_assignments",
-                  update.recordTime,
-                  update.event.target,
-                  update.updateId,
-                )
-              case _: ReassignmentEvent.Unassign =>
-                (
-                  "update_history_unassignments",
-                  update.recordTime,
-                  update.event.source,
-                  update.updateId,
-                )
-            }
+            (
+              "update_history_reassignments",
+              update.recordTime,
+              update.synchronizerId,
+              update.updateId,
+            )
         }
 
       val action = for {

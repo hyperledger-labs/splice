@@ -45,6 +45,8 @@ sealed trait ReassignmentEvent extends Product with Serializable with PrettyPrin
 
   def target: SynchronizerId
 
+  def sequencedOn: SynchronizerId
+
   def counter: Long
 }
 
@@ -61,6 +63,9 @@ object ReassignmentEvent {
       contractId: ContractId[_],
       override val counter: Long,
   ) extends ReassignmentEvent {
+
+    override def sequencedOn = source
+
     def pretty: Pretty[this.type] =
       prettyOfClass(
         param("submitter", _.submitter),
@@ -92,6 +97,9 @@ object ReassignmentEvent {
       createdEvent: CreatedEvent,
       override val counter: Long,
   ) extends ReassignmentEvent {
+
+    override def sequencedOn = target
+
     def pretty: Pretty[this.type] =
       prettyOfClass(
         param("submitter", _.submitter),

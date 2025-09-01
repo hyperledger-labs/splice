@@ -184,11 +184,10 @@ abstract class UpdateHistoryTestBase
   protected val endOffset = "9".repeat(16)
 
   protected def singleRootEvent(tree: Transaction): Event = {
-    val rootEventIds = tree.getRootNodeIds.asScala
-    rootEventIds.length should be(1)
-    val rootEventId = rootEventIds.headOption.value
+    val rootEventId = tree.getRootNodeIds.asScala.loneElement
     tree.getEventsById.get(rootEventId)
   }
+
   protected def checkUpdates(
       actual: Seq[UpdateHistoryResponse],
       expected: Seq[ExpectedUpdate],
@@ -209,7 +208,7 @@ abstract class UpdateHistoryTestBase
             throw new RuntimeException(s"Unexpected event type. event: $event, expected: $expected")
         }
       case (UpdateHistoryResponse(ReassignmentUpdate(update), domain), expected) =>
-        (update.event, expected) match {
+        (update.events.loneElement, expected) match {
           case (unassign: ReassignmentEvent.Unassign, expected: ExpectedUnassign) =>
             unassign.contractId.contractId should be(expected.cid)
             domain should be(expected.synchronizerId)
@@ -451,23 +450,24 @@ object UpdateHistoryTestBase {
       transfer: Reassignment[ReassignmentEvent]
   ): Reassignment[ReassignmentEvent] = {
     transfer match {
-      case Reassignment(updateId, offset, recordTime, assign: Assign) =>
+      case Reassignment(updateId, offset, recordTime, workflowId, events) =>
         Reassignment(
           updateId,
           offset,
           recordTime,
-          assign.copy(
-            createdEvent = withoutLostData(assign.createdEvent)
-          ),
-        )
-      case Reassignment(updateId, offset, recordTime, unassign: Unassign) =>
-        Reassignment(
-          updateId,
-          offset,
-          recordTime,
-          unassign,
+          workflowId,
+          events.map(withoutLostData(_)),
         )
       case _ => throw new RuntimeException("Invalid transfer type")
     }
   }
+
+  private def withoutLostData(ev: ReassignmentEvent): ReassignmentEvent =
+    ev match {
+      case assign: Assign =>
+        assign.copy(
+          createdEvent = withoutLostData(assign.createdEvent),
+        )
+      case unassign: Unassign => unassign
+    }
 }
