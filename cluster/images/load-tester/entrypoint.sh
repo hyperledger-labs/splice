@@ -6,10 +6,10 @@ set -euo pipefail
 
 # --- Scenario configuration ---
 # Read configuration from the CONFIG environment variable, with sensible defaults.
-ADAPTIVE_SCENARIO_ENABLED=$(echo "$CONFIG" | jq '.adaptiveScenario.enabled // false')
-MAX_VUS=$(echo "$CONFIG" | jq '.adaptiveScenario.maxVUs // 50')
-MIN_VUS=$(echo "$CONFIG" | jq '.adaptiveScenario.minVUs // 0')
-SCALE_DOWN_STEP=$(echo "$CONFIG" | jq '.adaptiveScenario.scaleDownStep // 5')
+ADAPTIVE_SCENARIO_ENABLED=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.enabled // false')
+MAX_VUS=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.maxVUs // 50')
+MIN_VUS=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.minVUs // 0')
+SCALE_DOWN_STEP=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.scaleDownStep // 5')
 
 # --- Script State ---
 CURRENT_VUS=1
