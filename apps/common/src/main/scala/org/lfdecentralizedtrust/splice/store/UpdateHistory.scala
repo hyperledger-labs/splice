@@ -404,20 +404,20 @@ class UpdateHistory(
       migrationId: Long,
   ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
     insertReassignmentUpdateRow(reassignment, migrationId).flatMap { _ =>
-    DBIOAction.seq(reassignment.events.map { event =>
-      event match {
-        case assign: ReassignmentEvent.Assign =>
-          ingestAssignment(reassignment, assign, migrationId)
-        case unassign: ReassignmentEvent.Unassign =>
-          ingestUnassignment(reassignment, unassign, migrationId)
-      }
-    }*)
+      DBIOAction.seq(reassignment.events.map { event =>
+        event match {
+          case assign: ReassignmentEvent.Assign =>
+            ingestAssignment(reassignment, assign, migrationId)
+          case unassign: ReassignmentEvent.Unassign =>
+            ingestUnassignment(reassignment, unassign, migrationId)
+        }
+      }*)
     }
   }
 
   private def insertReassignmentUpdateRow(
-    reassignment: Reassignment[?],
-    migrationId: Long,
+      reassignment: Reassignment[?],
+      migrationId: Long,
   ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
 
     val safeUpdateId = lengthLimited(reassignment.updateId)
@@ -438,8 +438,7 @@ class UpdateHistory(
       )
       return row_id
     """.asUpdateReturning[Long].head)
-}
-
+  }
 
   private def ingestUnassignment(
       reassignment: Reassignment[?],

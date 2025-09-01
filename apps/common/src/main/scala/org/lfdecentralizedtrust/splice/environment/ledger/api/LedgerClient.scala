@@ -851,7 +851,6 @@ object LedgerClient {
 
         case TU.Reassignment(x) =>
           val reassignment = Reassignment.fromProto(x)
-
           Some(
             GetTreeUpdatesResponse(
               TreeUpdateOrOffsetCheckpoint.Update(

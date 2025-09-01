@@ -466,7 +466,7 @@ object UpdateHistoryTestBase {
     ev match {
       case assign: Assign =>
         assign.copy(
-          createdEvent = withoutLostData(assign.createdEvent),
+          createdEvent = withoutLostData(assign.createdEvent)
         )
       case unassign: Unassign => unassign
     }

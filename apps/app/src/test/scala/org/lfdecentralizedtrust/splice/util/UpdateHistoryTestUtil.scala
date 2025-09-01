@@ -126,7 +126,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       recordedUpdates.filter(_.update match {
         case UpdateHistoryResponse(ReassignmentUpdate(reassignment), _) =>
           reassignment.events.filter {
-            case _ : Assign => true
+            case _: Assign => true
             case _ => false
           }.nonEmpty
         case _ => false
@@ -134,7 +134,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       recordedUpdates.filter(_.update match {
         case UpdateHistoryResponse(ReassignmentUpdate(reassignment), _) =>
           reassignment.events.filter {
-            case _ : Unassign => true
+            case _: Unassign => true
             case _ => false
           }.nonEmpty
         case _ => false

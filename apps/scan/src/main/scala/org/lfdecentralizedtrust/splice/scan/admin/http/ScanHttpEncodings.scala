@@ -267,51 +267,51 @@ sealed trait ScanHttpEncodings {
     http.event match {
       case httpApi.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(assignment) =>
         throw new IllegalArgumentException("No reassignment support in scan encodings")
-        // TreeUpdateWithMigrationId(
-        //   UpdateHistoryResponse(
-        //     update = ledgerApi.ReassignmentUpdate(
-        //       transfer = ledgerApi.Reassignment(
-        //         updateId = http.updateId,
-        //         offset = LegacyOffset.Api.assertFromStringToLong(http.offset),
-        //         recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
-        //         event = ledgerApi.ReassignmentEvent.Assign(
-        //           submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
-        //           source = SynchronizerId.tryFromString(assignment.sourceSynchronizer),
-        //           target = SynchronizerId.tryFromString(assignment.targetSynchronizer),
-        //           unassignId = assignment.unassignId,
-        //           createdEvent = httpToJavaCreatedEvent(assignment.createdEvent),
-        //           counter = assignment.reassignmentCounter,
-        //         ),
-        //       )
-        //     ),
-        //     synchronizerId = SynchronizerId.tryFromString(assignment.targetSynchronizer),
-        //   ),
-        //   assignment.migrationId,
-        // )
+      // TreeUpdateWithMigrationId(
+      //   UpdateHistoryResponse(
+      //     update = ledgerApi.ReassignmentUpdate(
+      //       transfer = ledgerApi.Reassignment(
+      //         updateId = http.updateId,
+      //         offset = LegacyOffset.Api.assertFromStringToLong(http.offset),
+      //         recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
+      //         event = ledgerApi.ReassignmentEvent.Assign(
+      //           submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
+      //           source = SynchronizerId.tryFromString(assignment.sourceSynchronizer),
+      //           target = SynchronizerId.tryFromString(assignment.targetSynchronizer),
+      //           unassignId = assignment.unassignId,
+      //           createdEvent = httpToJavaCreatedEvent(assignment.createdEvent),
+      //           counter = assignment.reassignmentCounter,
+      //         ),
+      //       )
+      //     ),
+      //     synchronizerId = SynchronizerId.tryFromString(assignment.targetSynchronizer),
+      //   ),
+      //   assignment.migrationId,
+      // )
       case httpApi.UpdateHistoryReassignment.Event.members
-          .UpdateHistoryUnassignment(unassignment) =>
+            .UpdateHistoryUnassignment(unassignment) =>
         throw new IllegalArgumentException("No reassignment support in scan encodings")
-        // TreeUpdateWithMigrationId(
-        //   UpdateHistoryResponse(
-        //     update = ledgerApi.ReassignmentUpdate(
-        //       transfer = ledgerApi.Reassignment(
-        //         updateId = http.updateId,
-        //         offset = LegacyOffset.Api.assertFromStringToLong(http.offset),
-        //         recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
-        //         event = ledgerApi.ReassignmentEvent.Unassign(
-        //           submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),
-        //           source = SynchronizerId.tryFromString(unassignment.sourceSynchronizer),
-        //           target = SynchronizerId.tryFromString(unassignment.targetSynchronizer),
-        //           unassignId = unassignment.unassignId,
-        //           counter = unassignment.reassignmentCounter,
-        //           contractId = new javaApi.codegen.ContractId(unassignment.contractId),
-        //         ),
-        //       )
-        //     ),
-        //     synchronizerId = SynchronizerId.tryFromString(unassignment.sourceSynchronizer),
-        //   ),
-        //   unassignment.migrationId,
-        // )
+      // TreeUpdateWithMigrationId(
+      //   UpdateHistoryResponse(
+      //     update = ledgerApi.ReassignmentUpdate(
+      //       transfer = ledgerApi.Reassignment(
+      //         updateId = http.updateId,
+      //         offset = LegacyOffset.Api.assertFromStringToLong(http.offset),
+      //         recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
+      //         event = ledgerApi.ReassignmentEvent.Unassign(
+      //           submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),
+      //           source = SynchronizerId.tryFromString(unassignment.sourceSynchronizer),
+      //           target = SynchronizerId.tryFromString(unassignment.targetSynchronizer),
+      //           unassignId = unassignment.unassignId,
+      //           counter = unassignment.reassignmentCounter,
+      //           contractId = new javaApi.codegen.ContractId(unassignment.contractId),
+      //         ),
+      //       )
+      //     ),
+      //     synchronizerId = SynchronizerId.tryFromString(unassignment.sourceSynchronizer),
+      //   ),
+      //   unassignment.migrationId,
+      // )
     }
 
   private def httpToJavaEvent(
@@ -511,7 +511,9 @@ object ScanHttpEncodings {
     }
   }
 
-  def makeConsistentAcrossSvs(reassignment: ledgerApi.Reassignment[ledgerApi.ReassignmentEvent]): ledgerApi.Reassignment[ledgerApi.ReassignmentEvent] =
+  def makeConsistentAcrossSvs(
+      reassignment: ledgerApi.Reassignment[ledgerApi.ReassignmentEvent]
+  ): ledgerApi.Reassignment[ledgerApi.ReassignmentEvent] =
     reassignment.copy(offset = 1L)
 
   def makeConsistentAcrossSvs(
