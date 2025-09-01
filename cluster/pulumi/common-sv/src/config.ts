@@ -47,7 +47,8 @@ export interface ScanBigQueryConfig {
 
 export interface StaticSvConfig {
   nodeName: string;
-  ingressName: string;
+  // TODO the ? is just hack to compile for now
+  ingressName?: string;
   onboardingName: string;
   validatorWalletUser?: string;
   auth0ValidatorAppName: string;

@@ -7,36 +7,57 @@ import util from 'node:util';
 import { z } from 'zod';
 
 const SvCometbftConfigSchema = z.object({
-  snapshotName: z.string(),
-});
+  nodeId: z.string().optional(),
+  keysGcpSecret: z.string().optional(),
+  nodeIndex: z.number().optional(),
+  snapshotName: z.string().optional(),
+}).strict();
 const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
 });
-
 const SvSequencerConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
+}).strict();
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
   bftSequencerConnection: z.boolean().optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
+}).strict();
 const SvAppConfigSchema = z.object({
+  // TODO(tech-debt) inline env var into config.yaml
+  sweep: z.object({
+    fromEnv: z.string(),
+  }).optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
+  auth0Name: z.string().optional(),
+}).strict();
 const ScanAppConfigSchema = z.object({
+  bigQuery: z.object({
+    dataset: z.string(),
+    prefix: z.string(),
+  }).optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
+}).strict();
+const ValidatorAppConfigSchema = z.object({
+  walletUser: z.string().optional(),
+  // TODO use me
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  auth0Name: z.string().optional(),
+}).strict();
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
+// things here are declared optional even when they aren't, to allow partial overrides of defaults
 const SingleSvConfigSchema = z
   .object({
+    publicName: z.string().optional(),
+    ingressName: z.string().optional(),
     cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
+    validatorApp: ValidatorAppConfigSchema.optional(),
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,

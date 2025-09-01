@@ -15,6 +15,7 @@ import { StaticSvConfig } from './config';
 import { dsoSize } from './dsoConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
+// TODO we don't need this one anymore
 const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
 
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet

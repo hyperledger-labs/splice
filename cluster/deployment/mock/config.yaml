@@ -129,6 +129,11 @@ svs:
   sv:
     participant:
       bftSequencerConnection: false
+  sv-1:
+    scanApp:
+      bigQuery:
+        dataset: mock_da2_scan
+        prefix: da2
   # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
     logging:
