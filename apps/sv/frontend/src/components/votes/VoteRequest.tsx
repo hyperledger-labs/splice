@@ -310,6 +310,7 @@ export const CreateVoteRequest: React.FC = () => {
               <Typography variant="body2" mt={1}>
                 Expires{' '}
                 <DateWithDurationDisplay
+                  id="vote-request-expiration-duration"
                   datetime={expiration?.toDate()}
                   enableDuration
                   onlyDuration

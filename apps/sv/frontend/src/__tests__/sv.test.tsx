@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
 import { ListDsoRulesVoteRequestsResponse } from '@lfdecentralizedtrust/sv-openapi';
-import { test, expect, describe } from 'vitest';
+import { test, expect, describe, vi } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
@@ -52,6 +52,69 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     expect(await screen.findByText('Vote Requests')).toBeDefined();
+  });
+
+  test('see proper time format in popup', async () => {
+    const mockedDate = new Date(2020, 0, 14, 4, 42, 0);
+
+    vi.setSystemTime(mockedDate);
+
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
+
+    const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
+
+    // Calendar button is flaky, at first it has today date and then after a slight delay it sets it up for the next week
+    await waitFor(async () =>
+      expect(
+        screen.queryByRole('button', { name: 'Choose date, selected date is Jan 21, 2020' })
+      ).toBeTruthy()
+    );
+
+    const calendarButton = screen.getByRole('button', {
+      name: 'Choose date, selected date is Jan 21, 2020',
+    });
+
+    await user.click(calendarButton);
+
+    const dayButton = screen.getByRole('gridcell', { name: '14' });
+    const hourButton = screen.getByRole('option', { name: '5 hours' });
+    const minuteButton = screen.getByRole('option', { name: '5 minutes' });
+
+    await user.click(dayButton);
+    await user.click(hourButton);
+    await user.click(minuteButton);
+
+    expect(dateInput.getAttribute('value')).toBe('2020-01-14 05:05');
+    const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
+    expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
+
+    fireEvent.change(screen.getByTestId('display-members'), {
+      target: {
+        value:
+          'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
+      },
+    });
+
+    const summaryInput = screen.getByTestId('create-reason-summary');
+    await user.type(summaryInput, 'summaryABC');
+
+    const urlInput = screen.getByTestId('create-reason-url');
+    await user.type(urlInput, 'https://vote-request.url');
+
+    // await waitFor(() => expect(screen.queryByTestId("voterequest-creation-alert")).toBeDefined());
+
+    const submitButton = screen.getByTestId('create-voterequest-submit-button');
+    await user.click(submitButton);
+
+    const submitPopup = screen.getByRole('dialog');
+
+    expect(submitPopup).toHaveTextContent('in 23 minutes');
+
+    vi.useRealTimers();
   });
 });
 
