@@ -2093,7 +2093,6 @@ object DbMultiDomainAcsStore {
       // We update the metrics in here as it's the easiest way
       // to not miss any place that might need updating.
       metrics.acsSize.updateValue(newAcsSize.toLong)
-      metrics.lastIngestedOffset.updateValue(_ max offset)
       metrics.ingestedTxLogEntries.inc(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
       metrics.completedIngestions.inc()
       synchronizerId.foreach { synchronizer =>

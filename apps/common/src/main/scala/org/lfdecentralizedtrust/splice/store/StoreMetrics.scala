@@ -36,16 +36,6 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
       0L,
     )(metricsContext)
 
-  val lastIngestedOffset: Gauge[Long] = metricsFactory.gauge(
-    MetricInfo(
-      name = prefix :+ "last-ingested-offset",
-      summary = "The last offset ingested by this store",
-      Latency,
-      "The latest offset ingested by this store in numeric form.",
-    ),
-    0L,
-  )(metricsContext)
-
   val ingestedTxLogEntries: Counter = metricsFactory.counter(
     MetricInfo(
       name = prefix :+ "ingested-tx-log-entries",
@@ -83,7 +73,6 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
 
   override def close(): Unit = {
     acsSize.close()
-    lastIngestedOffset.close()
     perSynchronizerLastIngestedRecordTimeMs.values.foreach(_.close())
   }
 }
