@@ -499,7 +499,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
   /** Runs the total supply queries from the SQL file
     */
   private def runTotalSupplyQueries(): ExpectedMetrics = {
-    val project = $ { bigquery.getOptions.getProjectId }
+    val project = bigquery.getOptions.getProjectId
     val sql =
       s"SELECT * FROM `$project.$functionsDatasetName.total_supply`('1971-01-01T00:00:00Z', 0);"
 
