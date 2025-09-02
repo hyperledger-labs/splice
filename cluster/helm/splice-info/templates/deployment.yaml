@@ -89,7 +89,7 @@ spec:
         env:
           - name: SCAN_URL
             value: {{ .Values.runtimeDetails.scanUrl | quote }}
-          {{ - if .Values.runtimeDetails.logToStderrAfterFailures }}
+          {{- if .Values.runtimeDetails.logToStderrAfterFailures }}
           - name: LOG_TO_STDERR_AFTER_FAILURES
             value: {{ .Values.runtimeDetails.logToStderrAfterFailures | quote }}
           {{- end }}
