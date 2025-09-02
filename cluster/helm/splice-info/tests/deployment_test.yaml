@@ -28,11 +28,11 @@ tests:
     asserts:
       # Sanity check
       - equal:
-        path: spec.template.spec.containers[0].name
-        value: "nginx"
+          path: spec.template.spec.containers[0].name
+          value: "nginx"
       - equal:
-        path: spec
-        value: "https://scan.url"
+          path: spec.template.spec.containers[?(@.name=='content-runtime-updater')].env[?(@.name=='SCAN_URL')].value
+          value: "https://scan.url"
       - equal:
-        path: spec.template.spec.containers[?(@.name=='content-runtime-updater')].env[?(@.name=='LOG_TO_STDERR_AFTER_FAILURES')].value
-        value: "123"
+          path: spec.template.spec.containers[?(@.name=='content-runtime-updater')].env[?(@.name=='LOG_TO_STDERR_AFTER_FAILURES')].value
+          value: "123"
