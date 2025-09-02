@@ -1781,6 +1781,7 @@ lazy val `apps-app`: Project =
       ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
+      Test / parallelExecution := false,
       bundleTask,
       assembly / test := {}, // don't run tests during assembly
       // when building the fat jar, we need to properly merge our artefacts
