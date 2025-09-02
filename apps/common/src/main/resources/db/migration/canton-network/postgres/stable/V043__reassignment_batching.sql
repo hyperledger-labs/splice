@@ -22,3 +22,7 @@ create table update_history_reassignments
     migration_id                int not null,    -- The thing that increments with each hard domain migration
     workflow_id                 text null
 );
+alter table update_history_assignments alter column submitter drop not null;
+alter table update_history_unassignments alter column submitter drop not null;
+drop index updt_hist_assi_hi_mi_ui_u;
+drop index updt_hist_unas_hi_mi_ui_u;
