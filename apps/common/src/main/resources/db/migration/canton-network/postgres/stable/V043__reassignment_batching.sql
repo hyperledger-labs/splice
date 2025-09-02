@@ -17,12 +17,14 @@ create table update_history_reassignments
 
     -- Information useful for ordering or partitioning updates
     record_time                 bigint not null, -- When was this update sequenced
-    participant_offset          text not null,   -- TODO(#10605): local to the participant, drop this once we have the record time
+    participant_offset          text not null,
     domain_id                   text not null,   -- The domain of the reassignment batch
     migration_id                int not null,    -- The thing that increments with each hard domain migration
-    workflow_id                 text null
+    workflow_id                 text not null
 );
-alter table update_history_assignments alter column submitter drop not null;
-alter table update_history_unassignments alter column submitter drop not null;
 drop index updt_hist_assi_hi_mi_ui_u;
 drop index updt_hist_unas_hi_mi_ui_u;
+alter table update_history_assignments alter column submitter drop not null;
+alter table update_history_unassignments alter column submitter drop not null;
+alter table update_history_assignments add column update_row_id bigint not null references update_history_reassignments (row_id);
+alter table update_history_unassignments add column update_row_id bigint not null references update_history_reassignments (row_id);

@@ -403,13 +403,13 @@ class UpdateHistory(
       reassignment: Reassignment[ReassignmentEvent],
       migrationId: Long,
   ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-    insertReassignmentUpdateRow(reassignment, migrationId).flatMap { _ =>
+    insertReassignmentUpdateRow(reassignment, migrationId).flatMap { updateRowId =>
       DBIOAction.seq(reassignment.events.map { event =>
         event match {
           case assign: ReassignmentEvent.Assign =>
-            ingestAssignment(reassignment, assign, migrationId)
+            ingestAssignment(reassignment, assign, migrationId, updateRowId)
           case unassign: ReassignmentEvent.Unassign =>
-            ingestUnassignment(reassignment, unassign, migrationId)
+            ingestUnassignment(reassignment, unassign, migrationId, updateRowId)
         }
       }*)
     }
@@ -443,7 +443,8 @@ class UpdateHistory(
   private def ingestUnassignment(
       reassignment: Reassignment[?],
       event: ReassignmentEvent.Unassign,
-      migrationId: Long,
+    migrationId: Long,
+    updateRowId: Long,
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
@@ -453,14 +454,14 @@ class UpdateHistory(
     oMetrics.foreach(_.UpdateHistory.unassignments.mark())
     sqlu"""
       insert into update_history_unassignments(
-        history_id,update_id,record_time,
+        history_id,update_id,record_time,update_row_id,
         participant_offset,domain_id,migration_id,
         reassignment_counter,target_domain,
         reassignment_id,submitter,
         contract_id
       )
       values (
-        $historyId, $safeUpdateId, $safeRecordTime,
+        $historyId, $safeUpdateId, $safeRecordTime,$updateRowId,
         $safeParticipantOffset, ${event.source}, $migrationId,
         ${event.counter}, ${event.target},
         $safeUnassignId, ${event.submitter},
@@ -472,7 +473,8 @@ class UpdateHistory(
   private def ingestAssignment(
       reassignment: Reassignment[?],
       event: ReassignmentEvent.Assign,
-      migrationId: Long,
+    migrationId: Long,
+    updateRowId: Long,
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
@@ -499,7 +501,7 @@ class UpdateHistory(
     oMetrics.foreach(_.UpdateHistory.assignments.mark())
     sqlu"""
       insert into update_history_assignments(
-        history_id,update_id,record_time,
+        history_id,update_id,record_time,update_row_id,
         participant_offset,domain_id,migration_id,
         reassignment_counter,source_domain,
         reassignment_id,submitter,
@@ -509,7 +511,7 @@ class UpdateHistory(
         signatories, observers, contract_key
       )
       values (
-        $historyId, $safeUpdateId, $safeRecordTime,
+        $historyId, $safeUpdateId, $safeRecordTime,$updateRowId,
         $safeParticipantOffset, ${event.target}, $migrationId,
         ${event.counter}, ${event.source},
         $safeUnassignId, ${event.submitter},
@@ -1015,38 +1017,24 @@ class UpdateHistory(
     }
   }
 
-  private def getAssignmentUpdates(
+  private def getReassignmentUpdates(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
       sql"""
-    (select
-      update_id,
-      record_time,
-      participant_offset,
-      domain_id,
-      migration_id,
-      reassignment_counter,
-      source_domain,
-      reassignment_id,
-      submitter,
-      contract_id,
-      event_id,
-      created_at,
-      template_id_package_id,
-      template_id_module_name,
-      template_id_entity_name,
-      package_name,
-      create_arguments,
-      signatories,
-      observers,
-      contract_key
-    from update_history_assignments
-    where
-      history_id = $historyId and """ ++ afterFilter ++
+      (select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        workflow_id
+      from update_history_reassignments
+      where
+        history_id = $historyId and """ ++ afterFilter ++
         sql" order by " ++ orderBy ++ sql" limit ${limit.limit})"
     }
 
@@ -1054,48 +1042,92 @@ class UpdateHistory(
     for {
       rows <- storage
         .query(
-          finalQuery.toActionBuilder.as[SelectFromAssignments],
-          "getAssignmentUpdates",
+          finalQuery.toActionBuilder.as[SelectFromReassignments],
+          "getTxUpdates",
         )
+      assignments <- queryAssignmentEvents(rows.map(_.rowId))
+      unassignments <- queryUnassignmentEvents(rows.map(_.rowId))
     } yield {
-      rows.map { row => TreeUpdateWithMigrationId(decodeAssignment(row), row.migrationId) }
+      rows.map { row =>
+        TreeUpdateWithMigrationId(
+          decodeReassignment(
+            row,
+            assignments.getOrElse(row.rowId, Seq.empty),
+            unassignments.getOrElse(row.rowId, Seq.empty),
+          ),
+          row.migrationId,
+        )
+      }
     }
   }
 
-  private def getUnassignmentUpdates(
-      filters: NonEmptyList[SQLActionBuilder],
-      orderBy: SQLActionBuilder,
-      limit: PageLimit,
-  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-
-    def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
-      sql"""
-    (select
-      update_id,
-      record_time,
-      participant_offset,
-      domain_id,
-      migration_id,
-      reassignment_counter,
-      target_domain,
-      reassignment_id,
-      submitter,
-      contract_id
-    from update_history_unassignments
-    where
-      history_id = $historyId and """ ++ afterFilter ++
-        sql" order by " ++ orderBy ++ sql" limit ${limit.limit})"
-    }
-
-    val finalQuery = updatesQuery(filters, orderBy, limit, makeSubQuery)
-    for {
-      rows <- storage
+  private def queryAssignmentEvents(
+      transactionRowIds: Seq[Long]
+  )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromAssignments]]] = {
+    if (transactionRowIds.isEmpty) {
+      Future.successful(Map.empty)
+    } else {
+      storage
         .query(
-          finalQuery.toActionBuilder.as[SelectFromUnassignments],
-          "getUnassignmentUpdates",
+          (sql"""
+      select
+        update_row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        reassignment_counter,
+        source_domain,
+        reassignment_id,
+        submitter,
+        contract_id,
+        event_id,
+        created_at,
+        template_id_package_id,
+        template_id_module_name,
+        template_id_entity_name,
+        package_name,
+        create_arguments,
+        signatories,
+        observers,
+        contract_key
+      from update_history_assignments
+      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+            .as[SelectFromAssignments],
+          "queryAssignmentEvents",
         )
-    } yield {
-      rows.map { row => TreeUpdateWithMigrationId(decodeUnassignment(row), row.migrationId) }
+        .map(_.groupBy(_.updateRowId))
+    }
+  }
+
+  private def queryUnassignmentEvents(
+      transactionRowIds: Seq[Long]
+  )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromUnassignments]]] = {
+    if (transactionRowIds.isEmpty) {
+      Future.successful(Map.empty)
+    } else {
+      storage
+        .query(
+          (sql"""
+      select
+        update_row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        reassignment_counter,
+        target_domain,
+        reassignment_id,
+        submitter,
+        contract_id
+      from update_history_unassignments
+      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+            .as[SelectFromUnassignments],
+          "queryUnassignmentEvents",
+        )
+        .map(_.groupBy(_.updateRowId))
     }
   }
 
@@ -1107,10 +1139,9 @@ class UpdateHistory(
     val orderBy = sql"migration_id, record_time, domain_id"
     for {
       txs <- getTxUpdates(filters, orderBy, limit)
-      assignments <- getAssignmentUpdates(filters, orderBy, limit)
-      unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
+      reassignments <- getReassignmentUpdates(filters, orderBy, limit)
     } yield {
-      (txs ++ assignments ++ unassignments).sorted.take(limit.limit)
+      (txs ++ reassignments).sorted.take(limit.limit)
     }
   }
 
@@ -1124,10 +1155,9 @@ class UpdateHistory(
     val orderBy = sql"migration_id, record_time, domain_id, update_id"
     for {
       txs <- getTxUpdates(filters, orderBy, limit)
-      assignments <- getAssignmentUpdates(filters, orderBy, limit)
-      unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
+      reassignments <- getReassignmentUpdates(filters, orderBy, limit)
     } yield {
-      (txs ++ assignments ++ unassignments).sorted.take(limit.limit)
+      (txs ++ reassignments).sorted.take(limit.limit)
     }
   }
 
@@ -1142,10 +1172,9 @@ class UpdateHistory(
     val orderBy = sql"record_time desc"
     for {
       txs <- getTxUpdates(filters, orderBy, limit)
-      assignments <- getAssignmentUpdates(filters, orderBy, limit)
-      unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
+      reassignments <- getReassignmentUpdates(filters, orderBy, limit)
     } yield {
-      (txs ++ assignments ++ unassignments).sorted.reverse.take(limit.limit)
+      (txs ++ reassignments).sorted.reverse.take(limit.limit)
     }
   }
 
@@ -1497,19 +1526,30 @@ class UpdateHistory(
     )
   }
 
+  private def decodeReassignment(
+      updateRow: SelectFromReassignments,
+      assignments: Seq[SelectFromAssignments],
+      unassignments: Seq[SelectFromUnassignments],
+  ): UpdateHistoryResponse = {
+    val events = assignments.map(decodeAssignment(_)) ++ unassignments.map(decodeUnassignment(_))
+
+    UpdateHistoryResponse(
+      update = ReassignmentUpdate(
+        Reassignment(
+          updateRow.updateId,
+          updateRow.participantOffset,
+          updateRow.recordTime,
+          updateRow.workflowId,
+          events,
+        )
+      ),
+      synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
+    )
+  }
+
   private def decodeAssignment(
       row: SelectFromAssignments
-  ): UpdateHistoryResponse = {
-    // FIXME
-    UpdateHistoryResponse(
-      ReassignmentUpdate(
-        Reassignment[Assign](
-          updateId = row.updateId,
-          offset = row.participantOffset,
-          recordTime = row.recordTime,
-          // FIXME
-          workflowId = "",
-          events = Seq(
+  ): ReassignmentEvent =
             Assign(
               submitter = row.submitter,
               source = row.sourceDomain,
@@ -1541,26 +1581,10 @@ class UpdateHistory(
               ),
               counter = row.reassignmentCounter,
             )
-          ),
-        )
-      ),
-      row.synchronizerId,
-    )
-  }
 
   private def decodeUnassignment(
       row: SelectFromUnassignments
-  ): UpdateHistoryResponse = {
-    // FIXME
-    UpdateHistoryResponse(
-      ReassignmentUpdate(
-        Reassignment[Unassign](
-          updateId = row.updateId,
-          offset = row.participantOffset,
-          recordTime = row.recordTime,
-          // FIXME
-          workflowId = "",
-          events = Seq(
+  ): ReassignmentEvent =
             Unassign(
               submitter = row.submitter,
               source = row.synchronizerId,
@@ -1569,12 +1593,6 @@ class UpdateHistory(
               counter = row.reassignmentCounter,
               contractId = new ContractId(row.contractId),
             )
-          ),
-        )
-      ),
-      row.synchronizerId,
-    )
-  }
 
   private implicit lazy val GetResultSelectFromTransactions: GetResult[SelectFromTransactions] =
     GetResult { prs =>
@@ -1620,11 +1638,28 @@ class UpdateHistory(
       )
     }
 
+  private implicit lazy val GetResultSelectFromReassignments: GetResult[SelectFromReassignments] =
+    GetResult { prs =>
+      import prs.*
+      (SelectFromReassignments.apply _).tupled(
+        (
+          <<[Long],
+          <<[String],
+          <<[CantonTimestamp],
+          <<[Long],
+          <<[String],
+          <<[Long],
+          <<[String],
+        )
+      )
+    }
+
   private implicit lazy val GetResultSelectFromAssignments: GetResult[SelectFromAssignments] =
     GetResult { prs =>
       import prs.*
       (SelectFromAssignments.apply _).tupled(
         (
+          <<[Long],
           <<[String],
           <<[CantonTimestamp],
           LegacyOffset.Api.assertFromStringToLong(<<[String]),
@@ -1654,6 +1689,7 @@ class UpdateHistory(
       import prs.*
       (SelectFromUnassignments.apply _).tupled(
         (
+          <<[Long],
           <<[String],
           <<[CantonTimestamp],
           LegacyOffset.Api.assertFromStringToLong(<<[String]),
@@ -2388,7 +2424,18 @@ object UpdateHistory {
       interfaceEntityName: Option[String],
   )
 
+  private case class SelectFromReassignments(
+      rowId: Long,
+      updateId: String,
+      recordTime: CantonTimestamp,
+      participantOffset: Long,
+      synchronizerId: String,
+      migrationId: Long,
+      workflowId: String,
+  )
+
   private case class SelectFromAssignments(
+      updateRowId: Long,
       updateId: String,
       recordTime: CantonTimestamp,
       participantOffset: Long,
@@ -2412,6 +2459,7 @@ object UpdateHistory {
   )
 
   private case class SelectFromUnassignments(
+      updateRowId: Long,
       updateId: String,
       recordTime: CantonTimestamp,
       participantOffset: Long,

@@ -207,8 +207,20 @@ abstract class UpdateHistoryTestBase
           case (event, expected) =>
             throw new RuntimeException(s"Unexpected event type. event: $event, expected: $expected")
         }
-      case (UpdateHistoryResponse(ReassignmentUpdate(update), domain), expected) =>
-        (update.events.loneElement, expected) match {
+      case (UpdateHistoryResponse(ReassignmentUpdate(update), domain), expected : ExpectedReassignmentEvent) =>
+        checkReassignmentEvent(domain, update.events.loneElement, expected)
+      case (UpdateHistoryResponse(ReassignmentUpdate(update), domain), ExpectedReassignment(expectedEvents)) =>
+        update.events should have length(expectedEvents.length.toLong)
+        update.events.zip(expectedEvents).foreach {
+          case (actual, expected) => checkReassignmentEvent(domain, actual, expected)
+        }
+      case _ => throw new RuntimeException("Unexpected update type")
+    }
+    succeed
+  }
+
+  private def checkReassignmentEvent(domain: SynchronizerId, actual: ReassignmentEvent, expected: ExpectedReassignmentEvent) = {
+    (actual, expected) match {
           case (unassign: ReassignmentEvent.Unassign, expected: ExpectedUnassign) =>
             unassign.contractId.contractId should be(expected.cid)
             domain should be(expected.synchronizerId)
@@ -222,10 +234,7 @@ abstract class UpdateHistoryTestBase
             throw new RuntimeException(
               s"Unexpected reassignment type. event: $event, expected: $expected"
             )
-        }
-      case _ => throw new RuntimeException("Unexpected update type")
     }
-    succeed
   }
 
   protected def initStore(implicit store: UpdateHistory): Future[Unit] = {
@@ -274,6 +283,7 @@ abstract class UpdateHistoryTestBase
 
   protected val cid1 = validContractId(1)
   protected val cid2 = validContractId(2)
+  protected val cid3 = validContractId(3)
 
   protected val offset1 = validOffset(1)
   protected val offset2 = validOffset(2)
@@ -282,6 +292,8 @@ abstract class UpdateHistoryTestBase
   protected val participant2 = ParticipantId("participant2")
 
   protected val reassignmentId1 = "%08d".format(1)
+  protected val reassignmentId2 = "%08d".format(2)
+  protected val reassignmentId3 = "%08d".format(3)
 }
 
 object UpdateHistoryTestBase {
@@ -291,16 +303,22 @@ object UpdateHistoryTestBase {
   final case class ExpectedExercise(cid: String, synchronizerId: SynchronizerId, choice: String)
       extends ExpectedUpdate
 
+  sealed trait ExpectedReassignmentEvent extends ExpectedUpdate
+
   final case class ExpectedAssign(
       cid: String,
       sourceDomain: SynchronizerId,
       synchronizerId: SynchronizerId,
-  ) extends ExpectedUpdate
+  ) extends ExpectedReassignmentEvent
 
   final case class ExpectedUnassign(
       cid: String,
       synchronizerId: SynchronizerId,
       targetDomain: SynchronizerId,
+  ) extends ExpectedReassignmentEvent
+
+  final case class ExpectedReassignment(
+    events: Seq[ExpectedReassignmentEvent]
   ) extends ExpectedUpdate
 
   sealed trait LostDataMode

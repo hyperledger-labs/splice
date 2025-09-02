@@ -157,6 +157,8 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
       "handle reassignments" in {
         implicit val store = mkStore()
         val c = appRewardCoupon(1, party1, contractId = cid1)
+        val c1 = appRewardCoupon(2, party1, contractId = cid2)
+        val c2 = appRewardCoupon(3, party1, contractId = cid3)
         for {
           _ <- initStore(store)
           _ <- domain1.create(
@@ -180,6 +182,31 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             txEffectiveAt = CantonTimestamp.Epoch.plusMillis(4).toInstant,
             recordTime = CantonTimestamp.Epoch.plusMillis(4).toInstant,
           )
+          _ <- domain2.ingestReassignment(
+            offset =>
+            mkReassignments(
+              offset,
+              Seq(
+                toAssignEvent(
+                  c1,
+                  reassignmentId2,
+                  domain2,
+                  domain2,
+                  1L,
+                  Map.empty
+                ),
+                toAssignEvent(
+                  c2,
+                  reassignmentId3,
+                  domain2,
+                  domain2,
+                  1L,
+                  Map.empty
+                )
+              ),
+              recordTime = CantonTimestamp.Epoch.plusMillis(5),
+            )
+          )
           updates <- updates(store)
         } yield checkUpdates(
           updates,
@@ -188,6 +215,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             ExpectedUnassign(cid1, domain1, domain2),
             ExpectedAssign(cid1, domain1, domain2),
             ExpectedExercise(cid1, domain2, "Archive"),
+            ExpectedReassignment(Seq(ExpectedAssign(cid2, domain2, domain2), ExpectedAssign(cid3, domain2, domain2))),
           ),
         )
       }

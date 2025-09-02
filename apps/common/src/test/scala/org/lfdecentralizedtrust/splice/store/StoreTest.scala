@@ -1141,6 +1141,20 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .map(_ => tx)
     }
 
+    def ingestReassignment(
+        makeReassignment: Long => Reassignment[ReassignmentEvent]
+    )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent]] = {
+      val reassignment = makeReassignment(nextOffset())
+      store.testIngestionSink
+        .ingestUpdate(
+          domain,
+          ReassignmentUpdate(
+            reassignment
+          ),
+        )
+        .map(_ => reassignment)
+    }
+
     def ingestMulti(
         makeTx: Long => Transaction
     )(implicit stores: Seq[HasIngestionSink]): Future[Transaction] = {
@@ -1314,6 +1328,21 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId = workflowId,
       events = Seq(event),
     )
+
+  protected def mkReassignments[T <: ReassignmentEvent](
+      offset: Long,
+      events: Seq[T],
+      recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+      workflowId: String = "",
+  ): Reassignment[T] =
+    Reassignment(
+      updateId = nextUpdateId(),
+      offset = offset,
+      recordTime = recordTime,
+      workflowId = workflowId,
+      events = events,
+    )
+
 
   protected def mkExercise[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
