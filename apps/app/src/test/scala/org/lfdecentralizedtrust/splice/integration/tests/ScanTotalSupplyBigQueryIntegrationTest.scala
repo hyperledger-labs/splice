@@ -472,7 +472,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val sqlFile = sqlDir.resolve("functions.sql")
 
     val ret = Process(
-      s"npm run sql-codegen ${sys.env("CLOUDSDK_CORE_PROJECT")} ${functionsDatasetName} ${datasetName} ${sqlFile.toAbsolutePath}",
+      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${sqlFile.toAbsolutePath}",
       new File("cluster/pulumi/canton-network"),
     ).!
     if (ret != 0) {
