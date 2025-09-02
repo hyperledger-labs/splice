@@ -303,6 +303,9 @@ export const CreateVoteRequest: React.FC = () => {
                         'data-testid': 'datetime-picker-vote-request-expiration',
                       },
                     },
+                    openPickerButton: {
+                      'data-testid': 'datetime-picker-vote-request-expiration-button',
+                    } as Record<string, string>,
                   }}
                   closeOnSelect
                 />
