@@ -3,13 +3,13 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 
-export abstract class BQType {
+abstract class BQType {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract toPulumi(): any;
   abstract toSql(): string;
 }
 
-export class BQBasicType extends BQType {
+class BQBasicType extends BQType {
   private readonly type: string;
   public constructor(type: string) {
     super();
@@ -69,7 +69,7 @@ export class BQFunctionArgument {
   }
 }
 
-export abstract class BQFunction {
+abstract class BQFunction {
   protected readonly name: string;
   protected readonly arguments: BQFunctionArgument[];
   protected readonly definitionBody: string;

@@ -4,7 +4,6 @@ import {
   BIGNUMERIC,
   BOOL,
   BQArray,
-  BQBasicType,
   BQColumn,
   BQFunctionArgument,
   BQScalarFunction,
