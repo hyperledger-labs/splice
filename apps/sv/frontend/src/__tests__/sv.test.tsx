@@ -54,7 +54,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('see proper time format in popup', { timeout: 60_000 }, async () => {
+  test('see proper time format in popup', { timeout: 15000 }, async () => {
     const mockedDate = new Date(2020, 0, 14, 4, 42, 0);
 
     vi.setSystemTime(mockedDate);
