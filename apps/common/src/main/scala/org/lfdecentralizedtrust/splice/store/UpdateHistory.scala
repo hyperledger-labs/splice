@@ -1740,10 +1740,9 @@ class UpdateHistory(
 
     for {
       rangeTransactions <- range("update_history_transactions")
-      rangeAssignments <- range("update_history_assignments")
-      rangeUnassignments <- range("update_history_unassignments")
+      rangeReassignments <- range("update_history_reassignments")
     } yield {
-      rangeTransactions |+| rangeUnassignments |+| rangeAssignments
+      rangeTransactions |+| rangeReassignments
     }
   }
 

@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
-import cats.data.{NonEmptyList, OptionT}
+import cats.data.OptionT
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
@@ -600,15 +600,11 @@ final class DbMultiDomainAcsStore[TXE](
           )
           tree
         }
-        val nonEmpty = NonEmptyList
-          .fromFoldable(trees)
+        val nonEmptyItems = NonEmpty.from(items)
           .getOrElse(
-            throw new RuntimeException("insert() must not be called with an empty sequence")
+            throw new IllegalArgumentException("insert() must not be called with an empty sequence")
           )
-        val firstTree = nonEmpty.foldLeft(nonEmpty.head) { case (acc, tree) =>
-          if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
-        }
-        val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
+        val recordTimes: NonEmpty[Seq[CantonTimestamp]] = nonEmptyItems.map(_.update.recordTime)
         val treesWithEntries = trees.flatMap { tree =>
           val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
           entries.map(e => (tree, e))
@@ -622,7 +618,7 @@ final class DbMultiDomainAcsStore[TXE](
                 doUpdateFirstIngestedUpdate(
                   synchronizerId,
                   migrationId,
-                  firstRecordTime,
+                  recordTimes.min1,
                 ),
               )
               .transactionally,
@@ -632,7 +628,7 @@ final class DbMultiDomainAcsStore[TXE](
           backfilledUpdates = trees.size.toLong,
           backfilledEvents =
             trees.foldLeft(0L)((sum, tree) => sum + tree.getEventsById.size().toLong),
-          lastBackfilledRecordTime = CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
+          lastBackfilledRecordTime = recordTimes.max1,
         )
       }
 
