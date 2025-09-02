@@ -158,9 +158,10 @@ class UpdateHistory(
                 d4 <-
                   sqlu"delete from update_history_unassignments where history_id = $newHistoryId"
                 d5 <- sqlu"delete from update_history_transactions where history_id = $newHistoryId"
-                d6 <-
+                d6 <- sqlu"delete from update_history_reassignments where history_id = $newHistoryId"
+                d7 <-
                   sqlu"delete from update_history_last_ingested_offsets where history_id = $newHistoryId"
-                d7 <- sqlu"delete from update_history_descriptors where id = $newHistoryId"
+                d8 <- sqlu"delete from update_history_descriptors where id = $newHistoryId"
                 _ <-
                   sqlu"""
                   update update_history_descriptors
@@ -169,7 +170,7 @@ class UpdateHistory(
                 """
               } yield (
                 logger.info(
-                  s"Deleted ($d1 exercise, $d2 create, $d3 assignment, $d4 unassignment, $d5 transaction, $d6 offset, $d7 descriptor) rows."
+                  s"Deleted ($d1 exercise, $d2 create, $d3 assignment, $d4 unassignment, $d5 transaction, $d6 reassignment, $d7 offset, $d8 descriptor) rows."
                 )
               )
             case (Some(oldHistoryId), None) =>
@@ -796,6 +797,10 @@ class UpdateHistory(
             delete from update_history_unassignments
             where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
           """,
+          sqlu"""
+            delete from update_history_reassignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """,
         )
       )
       .map(rows =>
@@ -885,14 +890,14 @@ class UpdateHistory(
       numTransactions <- (
         sql"delete from update_history_transactions where " ++ filterCondition
       ).toActionBuilder.asUpdate
-      numReassignments <- (
-        sql"delete from update_history_reassignments where " ++ filterCondition
-      ).toActionBuilder.asUpdate
       numAssignments <- (
         sql"delete from update_history_assignments where " ++ filterCondition
       ).toActionBuilder.asUpdate
       numUnassignments <- (
         sql"delete from update_history_unassignments where " ++ filterCondition
+      ).toActionBuilder.asUpdate
+      numReassignments <- (
+        sql"delete from update_history_reassignments where " ++ filterCondition
       ).toActionBuilder.asUpdate
     } yield (numCreates, numExercises, numTransactions, numReassignments, numAssignments, numUnassignments)
 
