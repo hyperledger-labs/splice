@@ -67,13 +67,13 @@ spec:
               start_time=$(date +%s);
 
               # prevent curl from writing to stderr while still logging them ourselves
-              result=$(curl -m 10 -sS --fail-with-body "$SCAN_URL/api/scan/v0/dso" 2>&1)
-              exit_code=$?
-              if [ $exit_code -eq 0 ]; then
-                # ensure it's valid JSON by using jq
-                echo "$result" | jq . > "$dso_json_file.new"
-                mv "$dso_json_file.new" "$dso_json_file";
-                fail_count=0
+              if result=$(curl -m 10 -sS --fail-with-body "$SCAN_URL/api/scan/v0/dso" 2>&1); then
+                if echo "$result" | jq . > "$dso_json_file.new"; then
+                  mv "$dso_json_file.new" "$dso_json_file";
+                  fail_count=0
+                else
+                  echo "Failed to parse DSO JSON from $SCAN_URL (failure #$fail_count): $result" 1>&2
+                fi
               else
                 fail_count=$((fail_count + 1))
                 echo "Failed to fetch DSO from $SCAN_URL (failure #$fail_count): $result"
