@@ -836,7 +836,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ): ReassignmentEvent.Unassign =
     ReassignmentEvent.Unassign(
       unassignId = unassignId,
-      submitter = userParty(1),
+      submitter = Some(userParty(1)),
       contractId = contractId,
       source = source,
       target = target,
@@ -852,7 +852,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       implementedInterfaces: Map[Identifier, DamlRecord],
   ): ReassignmentEvent.Assign = ReassignmentEvent.Assign(
     unassignId = unassignId,
-    submitter = userParty(1),
+    submitter = Some(userParty(1)),
     source = source,
     target = target,
     createdEvent =

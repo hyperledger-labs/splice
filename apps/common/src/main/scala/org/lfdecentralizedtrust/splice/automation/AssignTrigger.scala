@@ -35,7 +35,7 @@ class AssignTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       outcome <-
-        if (partyId == unassign.submitter) {
+        if (Some(partyId) == unassign.submitter) {
           for {
             msg <- connection
               .submitReassignmentAndWaitNoDedup(

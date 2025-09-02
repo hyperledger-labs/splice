@@ -429,14 +429,14 @@ class UpdateHistory(
       insert into update_history_reassignments(
         history_id, update_id, record_time,
         participant_offset, domain_id, migration_id,
-        workflow_id,
+        workflow_id
       )
       values (
         $historyId, $safeUpdateId, ${reassignment.recordTime},
         $safeParticipantOffset, $safeSynchronizerId, $migrationId,
-        $safeWorkflowId,
+        $safeWorkflowId
       )
-      return row_id
+      returning row_id
     """.asUpdateReturning[Long].head)
   }
 
@@ -1633,7 +1633,7 @@ class UpdateHistory(
           <<[Long],
           <<[SynchronizerId],
           <<[String],
-          <<[PartyId],
+          <<[Option[PartyId]],
           <<[String],
           <<[String],
           <<[CantonTimestamp],
@@ -1662,7 +1662,7 @@ class UpdateHistory(
           <<[Long],
           <<[SynchronizerId],
           <<[String],
-          <<[PartyId],
+          <<[Option[PartyId]],
           <<[String],
         )
       )
@@ -2398,7 +2398,7 @@ object UpdateHistory {
       reassignmentCounter: Long,
       sourceDomain: SynchronizerId,
       reassignmentId: String,
-      submitter: PartyId,
+      submitter: Option[PartyId],
       contractId: String,
       eventId: String,
       createdAt: CantonTimestamp,
@@ -2421,7 +2421,7 @@ object UpdateHistory {
       reassignmentCounter: Long,
       targetDomain: SynchronizerId,
       reassignmentId: String,
-      submitter: PartyId,
+      submitter: Option[PartyId],
       contractId: String,
   )
 

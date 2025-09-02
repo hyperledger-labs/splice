@@ -20,5 +20,5 @@ create table update_history_reassignments
     participant_offset          text not null,   -- TODO(#10605): local to the participant, drop this once we have the record time
     domain_id                   text not null,   -- The domain of the reassignment batch
     migration_id                int not null,    -- The thing that increments with each hard domain migration
-    workflow_id                 text null,
+    workflow_id                 text null
 );

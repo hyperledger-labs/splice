@@ -1578,7 +1578,7 @@ final class DbMultiDomainAcsStore[TXE](
       reassignmentCounter = event.counter,
       reassignmentTargetDomain = Some(event.target),
       reassignmentSourceDomain = Some(event.source),
-      reassignmentSubmitter = Some(event.submitter),
+      reassignmentSubmitter = event.submitter,
       reassignmentUnassignId = Some(String255.tryCreate(event.unassignId)),
     )
 
@@ -1936,7 +1936,7 @@ final class DbMultiDomainAcsStore[TXE](
   ): ReassignmentEvent.Unassign = {
     assert(row.stateRow.assignedDomain.isEmpty)
     ReassignmentEvent.Unassign(
-      submitter = row.stateRow.reassignmentSubmitter.get,
+      submitter = row.stateRow.reassignmentSubmitter,
       source = row.stateRow.reassignmentSourceDomain.get,
       target = row.stateRow.reassignmentTargetDomain.get,
       unassignId = row.stateRow.reassignmentUnassignId.get,

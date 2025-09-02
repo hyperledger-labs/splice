@@ -96,7 +96,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       offset = 98,
       event = ReassignmentEvent.Assign(
         unassignId = "unassignId",
-        submitter = receiver,
+        submitter = Some(receiver),
         source = sourceDomain,
         target = targetDomain,
         createdEvent = toCreatedEvent(amuletContract, Seq(dsoParty)),
@@ -139,7 +139,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       event = ReassignmentEvent.Unassign(
         unassignId = "unassignId",
         contractId = amuletContract.contractId,
-        submitter = receiver,
+        submitter = Some(receiver),
         source = sourceDomain,
         target = targetDomain,
         counter = 71L,

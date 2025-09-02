@@ -39,7 +39,7 @@ object IncompleteReassignmentEvent {
 }
 
 sealed trait ReassignmentEvent extends Product with Serializable with PrettyPrinting {
-  def submitter: PartyId
+  def submitter: Option[PartyId]
 
   def source: SynchronizerId
 
@@ -56,7 +56,7 @@ object ReassignmentEvent {
   }
 
   final case class Unassign(
-      override val submitter: PartyId,
+      override val submitter: Option[PartyId],
       override val source: SynchronizerId,
       override val target: SynchronizerId,
       unassignId: String,
@@ -68,7 +68,7 @@ object ReassignmentEvent {
 
     def pretty: Pretty[this.type] =
       prettyOfClass(
-        param("submitter", _.submitter),
+        paramIfNonEmpty("submitter", _.submitter),
         param("source", _.source),
         param("target", _.target),
         param("unassignId", o => UnassignId(o.unassignId)),
@@ -79,7 +79,7 @@ object ReassignmentEvent {
   object Unassign {
     private[api] def fromProto(proto: multidomain.UnassignedEvent): Unassign = {
       Unassign(
-        submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
+        submitter = Some(proto.submitter).filter(_.nonEmpty).map(PartyId.tryFromProtoPrimitive(_)),
         source = SynchronizerId.tryFromString(proto.source),
         target = SynchronizerId.tryFromString(proto.target),
         unassignId = proto.reassignmentId,
@@ -90,7 +90,7 @@ object ReassignmentEvent {
   }
 
   final case class Assign(
-      override val submitter: PartyId,
+      override val submitter: Option[PartyId],
       override val source: SynchronizerId,
       override val target: SynchronizerId,
       unassignId: String,
@@ -102,7 +102,7 @@ object ReassignmentEvent {
 
     def pretty: Pretty[this.type] =
       prettyOfClass(
-        param("submitter", _.submitter),
+        paramIfNonEmpty("submitter", _.submitter),
         param("source", _.source),
         param("target", _.target),
         param("unassignId", i => UnassignId(i.unassignId)),
@@ -112,9 +112,8 @@ object ReassignmentEvent {
 
   object Assign {
     private[api] def fromProto(proto: multidomain.AssignedEvent): Assign = {
-      import com.daml.ledger.api.v2.event as scalaEvent
       Assign(
-        submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
+        submitter = Some(proto.submitter).filter(_.nonEmpty).map(PartyId.tryFromProtoPrimitive(_)),
         source = SynchronizerId.tryFromString(proto.source),
         target = SynchronizerId.tryFromString(proto.target),
         unassignId = proto.reassignmentId,
