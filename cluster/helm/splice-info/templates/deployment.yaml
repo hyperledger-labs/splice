@@ -64,7 +64,7 @@ spec:
               start_time=$(date +%s);
               exit_code=0;
 
-              if curl -m 10 -fsS "$SCAN_URL/api/scan/v0/dso" > "$dso_json_file.new"; then
+              if curl -m 10 -fs "$SCAN_URL/api/scan/v0/dso" > "$dso_json_file.new"; then
                 mv "$dso_json_file.new" "$dso_json_file";
               else
                 exit_code=$?;
