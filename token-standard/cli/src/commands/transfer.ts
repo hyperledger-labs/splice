@@ -84,7 +84,7 @@ export async function transfer(
         executeBefore: now.add(24, "hour").toISOString(),
         inputHoldingCids,
         meta: { values: {
-          "splice.lfdecentralizedtrust.com/reason": reason
+          "splice.lfdecentralizedtrust.org/reason": reason
         } },
       },
       extraArgs: {
