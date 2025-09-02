@@ -48,7 +48,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            set -u;
+            set -eu;
 
             period=60;
 
