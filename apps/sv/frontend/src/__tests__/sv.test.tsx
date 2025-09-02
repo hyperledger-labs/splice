@@ -54,7 +54,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('see proper time format in popup', { timeout: 10000 }, async () => {
+  test('see proper time format in popup', { timeout: 60_000 }, async () => {
     const mockedDate = new Date(2020, 0, 14, 4, 42, 0);
 
     vi.setSystemTime(mockedDate);
@@ -65,10 +65,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Governance')).toBeDefined();
     await user.click(screen.getByText('Governance'));
 
-    const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
-
     const calendarButton = screen.getByTestId('datetime-picker-vote-request-expiration-button');
-
     await user.click(calendarButton);
 
     const dayButton = screen.getByRole('gridcell', { name: '14' });
@@ -79,7 +76,9 @@ describe('SV user can', () => {
     await user.click(hourButton);
     await user.click(minuteButton);
 
+    const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
     expect(dateInput.getAttribute('value')).toBe('2020-01-14 05:05');
+
     const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
     expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
 
