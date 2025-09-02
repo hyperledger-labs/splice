@@ -22,6 +22,8 @@ jobs:
       parallelism: 1
       test_name: bigquery
       with_gcp_creds: true
+      # We run `npm build` in pulumi, as we run the sql-codegen from there in this test
+      pre_sbt_cmd: 'make cluster/pulumi/build'
       commit_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha }}
       daml_base_version: ''
       oss_only: false
