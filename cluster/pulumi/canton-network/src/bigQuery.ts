@@ -200,9 +200,19 @@ function installFunctions(
     },
   });
 
-  scanDataset.project.apply(project =>
-    allFunctions.map(f => f.toPulumi(project, dataset, scanDataset, dependsOn))
-  );
+  scanDataset.project.apply(project => {
+    // We don't just run allFunctions.map() because we want to sequence the creation, since every function
+    // might depend on those before it.
+    let lastResource: gcp.bigquery.Routine | undefined = undefined;
+    for (const f in allFunctions) {
+      lastResource = allFunctions[f].toPulumi(
+        project,
+        dataset,
+        scanDataset,
+        lastResource ? [lastResource] : dependsOn
+      );
+    }
+  });
 
   return dataset;
 }

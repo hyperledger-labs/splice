@@ -481,6 +481,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val sqlContent =
       java.nio.file.Files.readString(sqlFile, java.nio.charset.StandardCharsets.UTF_8)
 
+    logger.info(s"Creating BQ functions using the following SQL statement: $sqlContent")
+
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
       .newBuilder(sqlContent)
