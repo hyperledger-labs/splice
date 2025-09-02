@@ -102,8 +102,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
     logger.info(s"Cleaning up BigQuery dataset: $datasetName")
 
     // Delete the temporary BigQuery datasets after tests
-    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    // FIXME uncomment
+//    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+//    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     super.afterAll()
   }
 
