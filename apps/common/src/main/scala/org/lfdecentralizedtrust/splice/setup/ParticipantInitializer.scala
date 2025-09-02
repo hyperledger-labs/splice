@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.setup
 
+import com.digitalasset.canton.SynchronizerAlias
 import org.lfdecentralizedtrust.splice.config.ParticipantBootstrapDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
@@ -23,6 +24,7 @@ object ParticipantInitializer {
       dumpConfig: Option[ParticipantBootstrapDumpConfig],
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
+      synchronizerAlias: SynchronizerAlias,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -33,6 +35,7 @@ object ParticipantInitializer {
       loggerFactory,
       retryProvider,
       participantAdminConnection,
+      synchronizerAlias,
     )
     participantInitializer
       .ensureInitializedWithExpectedId()
@@ -62,6 +65,7 @@ class ParticipantInitializer(
     override protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     participantAdminConnection: ParticipantAdminConnection,
+    synchronizerAlias: SynchronizerAlias,
 )(implicit
     ec: ExecutionContextExecutor,
     tc: TraceContext,
@@ -84,9 +88,11 @@ class ParticipantInitializer(
       case None =>
         logger.info(s"Initializing participant $identifierName")
         for {
+          synchronizerId <- participantAdminConnection.getSynchronizerId(synchronizerAlias)
           _ <- nodeInitializer.initializeWithNewIdentityIfNeeded(
             identifierName,
             ParticipantId.apply,
+            synchronizerId,
           )
           _ <- nodeInitializer.waitForNodeInitialized()
         } yield {

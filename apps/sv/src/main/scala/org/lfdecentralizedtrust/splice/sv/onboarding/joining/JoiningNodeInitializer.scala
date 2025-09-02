@@ -312,6 +312,7 @@ class JoiningNodeInitializer(
               clock,
               loggerFactory,
               retryProvider,
+              decentralizedSynchronizerId,
             )
           )
         } else {
