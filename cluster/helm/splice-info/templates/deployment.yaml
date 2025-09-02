@@ -48,7 +48,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            set -eu;
+            set -u;
 
             period=60;
 
@@ -60,20 +60,32 @@ spec:
 
             echo "{\"dso\": \"/$dso_json_path\"}" > "$runtime_index_file";
 
+            fail_count=0
+            # prevent spamming alerts by logging only after the issues are persistent
+            LOG_TO_STDERR_AFTER_FAILURES=100
             while true; do
               start_time=$(date +%s);
-              exit_code=0;
 
-              if curl -m 10 -fs "$SCAN_URL/api/scan/v0/dso" > "$dso_json_file.new"; then
+              # prevent curl from writing to stderr while still logging them ourselves
+              result=$(curl -m 10 -sS --fail-with-body "$SCAN_URL/api/scan/v0/dso" 2>&1)
+              exit_code=$?
+              if [ $exit_code -eq 0 ]; then
+                # ensure it's valid JSON by using jq
+                echo "$result" | jq . > "$dso_json_file.new"
                 mv "$dso_json_file.new" "$dso_json_file";
+                fail_count=0
               else
-                exit_code=$?;
-                echo "ERROR: Failed to fetch DSO from $SCAN_URL";
+                fail_count=$((fail_count + 1))
+                echo "Failed to fetch DSO from $SCAN_URL (failure #$fail_count): $result"
+                if [ $((fail_count % LOG_TO_STDERR_AFTER_FAILURES)) -eq 0 ]; then
+                  echo "ERROR: $fail_count consecutive failures fetching DSO from $SCAN_URL" 1>&2
+                fi
               fi;
 
               end_time=$(date +%s);
               sleep "$((period - (end_time - start_time)))";
             done;
+
         env:
           - name: SCAN_URL
             value: {{ .Values.runtimeDetails.scanUrl | quote }}
