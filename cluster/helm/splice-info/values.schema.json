@@ -56,7 +56,8 @@
       "required": [ "scanUrl" ],
       "additionalProperties": false,
       "properties": {
-        "scanUrl": { "type": "string", "minLength": 1 }
+        "scanUrl": { "type": "string", "minLength": 1 },
+        "logToStderrAfterFailures": { "type": "integer", "minimum": 1 }
       }
     },
     "deploymentDetails": {

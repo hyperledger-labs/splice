@@ -19,7 +19,7 @@ const SvSequencerConfigSchema = z.object({
 });
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
-  bftSequencerConnection: z.boolean().default(true),
+  bftSequencerConnection: z.boolean().optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
 });
 const SvAppConfigSchema = z.object({

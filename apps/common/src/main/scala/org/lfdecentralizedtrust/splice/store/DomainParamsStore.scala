@@ -102,7 +102,7 @@ final class DomainParamsStore(
         SynchronizerParametersState
       ]
   )(implicit tc: TraceContext): Future[Unit] = Future {
-    val unpaused = SynchronizerMigrationUtil.synchronizerIsPaused(params)
+    val unpaused = SynchronizerMigrationUtil.synchronizerIsUnpaused(params)
     metrics.confirmationRequestsMaxRate.updateValue(
       params.mapping.parameters.confirmationRequestsMaxRate.value
     )
