@@ -27,6 +27,7 @@ Upcoming
   - Cometbft
 
      - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage. 
+     - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
 
 0.4.13
 ------
