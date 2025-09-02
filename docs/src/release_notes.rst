@@ -22,6 +22,12 @@ Upcoming
     including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
   - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
 
+- Deployment
+
+  - Cometbft
+
+     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage. 
+
 0.4.13
 ------
 
