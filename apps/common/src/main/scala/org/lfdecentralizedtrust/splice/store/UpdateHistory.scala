@@ -885,23 +885,26 @@ class UpdateHistory(
       numTransactions <- (
         sql"delete from update_history_transactions where " ++ filterCondition
       ).toActionBuilder.asUpdate
+      numReassignments <- (
+        sql"delete from update_history_reassignments where " ++ filterCondition
+      ).toActionBuilder.asUpdate
       numAssignments <- (
         sql"delete from update_history_assignments where " ++ filterCondition
       ).toActionBuilder.asUpdate
       numUnassignments <- (
         sql"delete from update_history_unassignments where " ++ filterCondition
       ).toActionBuilder.asUpdate
-    } yield (numCreates, numExercises, numTransactions, numAssignments, numUnassignments)
+    } yield (numCreates, numExercises, numTransactions, numReassignments, numAssignments, numUnassignments)
 
     for {
-      (numCreates, numExercises, numTransactions, numAssignments, numUnassignments) <- storage
+      (numCreates, numExercises, numTransactions, numReassignments, numAssignments, numUnassignments) <- storage
         .update(
           deleteAction.transactionally,
           "deleteUpdatesForTable",
         )
     } yield (
       logger.info(
-        s"Deleted $numCreates creates, $numExercises exercises, $numTransactions transactions, $numAssignments assignments, " +
+        s"Deleted $numCreates creates, $numExercises exercises, $numTransactions transactions, $numReassignments reassignments, $numAssignments assignments, " +
           s"and $numUnassignments unassignments from store $storeName with id $historyId"
       )
     )
@@ -1831,13 +1834,11 @@ class UpdateHistory(
 
     for {
       transactions <- previousId("update_history_transactions")
-      assignments <- previousId("update_history_assignments")
-      unassignments <- previousId("update_history_unassignments")
+      reassignments <- previousId("update_history_reassignments")
     } yield {
       List(
         transactions,
-        assignments,
-        unassignments,
+        reassignments,
       ).flatten.maxOption
     }
   }
@@ -1858,13 +1859,11 @@ class UpdateHistory(
 
     for {
       transactions <- previousId("update_history_transactions")
-      assignments <- previousId("update_history_assignments")
-      unassignments <- previousId("update_history_unassignments")
+      reassignments <- previousId("update_history_reassignments")
     } yield {
       List(
         transactions,
-        assignments,
-        unassignments,
+        reassignments
       ).flatten.minOption
     }
   }
