@@ -2093,8 +2093,8 @@ object DbMultiDomainAcsStore {
       // We update the metrics in here as it's the easiest way
       // to not miss any place that might need updating.
       metrics.acsSize.updateValue(newAcsSize.toLong)
-      metrics.ingestedTxLogEntries.inc(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
-      metrics.completedIngestions.inc()
+      metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
+      metrics.completedIngestions.mark()
       synchronizerId.foreach { synchronizer =>
         recordTime.foreach { recordTime =>
           metrics

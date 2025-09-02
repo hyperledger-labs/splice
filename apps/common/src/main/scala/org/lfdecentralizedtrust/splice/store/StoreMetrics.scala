@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Timer}
+import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Meter, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.SynchronizerId
@@ -36,7 +36,7 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
       0L,
     )(metricsContext)
 
-  val ingestedTxLogEntries: Counter = metricsFactory.counter(
+  val ingestedTxLogEntries: Meter = metricsFactory.meter(
     MetricInfo(
       name = prefix :+ "ingested-tx-log-entries",
       summary = "The number of transaction log entries ingested by this store",
@@ -45,7 +45,7 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
     )
   )(metricsContext)
 
-  val completedIngestions: Counter = metricsFactory.counter(
+  val completedIngestions: Meter = metricsFactory.meter(
     MetricInfo(
       name = prefix :+ "completed-ingestions",
       summary = "The number of completed ingestions by this store",
