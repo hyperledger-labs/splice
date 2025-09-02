@@ -67,7 +67,7 @@ spec:
 
               # prevent curl from writing to stderr while still logging them ourselves
               if result=$(curl -m 10 -sSL --fail-with-body "$SCAN_URL/api/scan/v0/dso" 2>&1); then
-                echo "$result" | jq . > "$dso_json_file.new"
+                echo "$result" > "$dso_json_file.new"
                 mv "$dso_json_file.new" "$dso_json_file";
                 fail_count=0
               else
