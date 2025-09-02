@@ -32,7 +32,7 @@ import {
 const iso_timestamp = new BQScalarFunction(
   'iso_timestamp',
   [new BQFunctionArgument('iso8601_string', STRING)],
-  new BQBasicType('TIMESTAMP'),
+  TIMESTAMP,
   "PARSE_TIMESTAMP('%FT%TZ', iso8601_string)"
 );
 
