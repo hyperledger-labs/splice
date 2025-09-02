@@ -1,17 +1,19 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
 import { ListDsoRulesVoteRequestsResponse } from '@lfdecentralizedtrust/sv-openapi';
-import { test, expect, describe, vi } from 'vitest';
+import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import dayjs from 'dayjs';
 
 const AppWithConfig = () => {
   return (
@@ -54,30 +56,21 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('see proper time format in popup', { timeout: 15000 }, async () => {
-    const mockedDate = new Date(2020, 0, 14, 4, 42, 0);
-
-    vi.setSystemTime(mockedDate);
-
+  test('see proper time format in popup', { timeout: 10000 }, async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
     expect(await screen.findByText('Governance')).toBeDefined();
     await user.click(screen.getByText('Governance'));
 
-    const calendarButton = screen.getByTestId('datetime-picker-vote-request-expiration-button');
-    await user.click(calendarButton);
-
-    const dayButton = screen.getByRole('gridcell', { name: '14' });
-    const hourButton = screen.getByRole('option', { name: '5 hours' });
-    const minuteButton = screen.getByRole('option', { name: '5 minutes' });
-
-    await user.click(dayButton);
-    await user.click(hourButton);
-    await user.click(minuteButton);
+    const inOneWeek = dayjs().add(1, 'week').format(dateTimeFormatISO);
+    const expirationDate = dayjs().add(23, 'minutes').format(dateTimeFormatISO);
 
     const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
-    expect(dateInput.getAttribute('value')).toBe('2020-01-14 05:05');
+
+    await waitFor(() => expect(dateInput.getAttribute('value')).toBe(inOneWeek));
+    await user.type(dateInput, expirationDate);
+    expect(dateInput.getAttribute('value')).toBe(expirationDate);
 
     const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
     expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
