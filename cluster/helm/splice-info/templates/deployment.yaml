@@ -62,7 +62,7 @@ spec:
 
             fail_count=0
             # prevent spamming alerts by logging only after the issues are persistent
-            LOG_TO_STDERR_AFTER_FAILURES=100
+            log_to_stderr_after_failures=${LOG_TO_STDERR_AFTER_FAILURES:-100}
             while true; do
               start_time=$(date +%s);
 
@@ -77,7 +77,7 @@ spec:
               else
                 fail_count=$((fail_count + 1))
                 echo "Failed to fetch DSO from $SCAN_URL (failure #$fail_count): $result"
-                if [ $((fail_count % LOG_TO_STDERR_AFTER_FAILURES)) -eq 0 ]; then
+                if [ $((fail_count % log_to_stderr_after_failures)) -eq 0 ]; then
                   echo "ERROR: $fail_count consecutive failures fetching DSO from $SCAN_URL" 1>&2
                 fi
               fi;
@@ -89,6 +89,10 @@ spec:
         env:
           - name: SCAN_URL
             value: {{ .Values.runtimeDetails.scanUrl | quote }}
+          {{ - if .Values.runtimeDetails.logToStderrAfterFailures }}
+          - name: LOG_TO_STDERR_AFTER_FAILURES
+            value: {{ .Values.runtimeDetails.logToStderrAfterFailures | quote }}
+          {{- end }}
         volumeMounts:
         - name: content-runtime
           mountPath: /usr/share/nginx/html/runtime
