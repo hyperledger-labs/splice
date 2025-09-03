@@ -556,10 +556,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
       if (field.isNull)
         fail(s"Column '$column' in all-stats results is null")
       else {
-        logger.info(s"Field $column: $field")
-        logger.info(s"Field $column string value: ${field.getStringValue}")
-        // Integer.getInteger(field.getStringValue)
-        logger.info(s"Field $column value: ${field.getLongValue}")
         field.getLongValue
       }
 
