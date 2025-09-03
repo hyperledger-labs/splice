@@ -40,11 +40,9 @@ object EnterpriseConfigValidations extends ConfigValidations {
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val CantonConfig(
-      _,
       sequencers,
       mediators,
       participants,
-      _,
       _,
       _,
       _,
@@ -207,14 +205,12 @@ object EnterpriseConfigValidations extends ConfigValidations {
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   private def atLeastOneNode(c: CantonConfig): Validated[NonEmpty[Seq[String]], Unit] = {
     val CantonConfig(
-      _,
       sequencers,
       mediators,
       participants,
       remoteSequencers,
       remoteMediators,
       remoteParticipants,
-      _,
       _,
       _,
       _,

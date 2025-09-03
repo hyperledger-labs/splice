@@ -470,7 +470,7 @@ class JcePureCrypto(
         SymmetricKey.create(CryptoKeyFormat.Raw, bytes.unwrap, scheme)
     }
 
-  override def signBytes(
+  override protected[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
@@ -737,50 +737,11 @@ class JcePureCrypto(
             publicKey,
           )
         case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc =>
-          val enabledEncryptionCheck =
-            Option(System.getProperty("canton.encryption-check")).exists(_.toLowerCase == "true")
-          // Check that two deterministic encryptions yield the same ciphertext and fail otherwise
-          // TODO remove this again once we figured out the encryption corruption problem
-          //  https://github.com/DACH-NY/cn-test-failures/issues/4655
-          if (enabledEncryptionCheck) {
-            implicit val traceContext: TraceContext = TraceContext.todo
-            // "def" on purpose, as the generator is stateful
-            def deterministicRng = DeterministicRandom.getDeterministicRandomGenerator(
-              message.toByteString,
-              publicKey.fingerprint,
-              loggerFactory,
-            )
-            for {
-              firstEncryption <- encryptWithEciesP256HmacSha256Aes128Cbc(
-                message,
-                publicKey,
-                deterministicRng,
-              )
-              secondEncryption <- encryptWithEciesP256HmacSha256Aes128Cbc(
-                message,
-                publicKey,
-                deterministicRng,
-              )
-              _ <- Either.cond(
-                firstEncryption == secondEncryption,
-                (),
-                EncryptionError.FailedToEncrypt(
-                  s"""Deterministic encryption check failed:
-                       |Expected two encryptions with the same input and deterministic RNG to yield identical ciphertexts.
-                       |However, they differed:
-                       |First ciphertext:  $firstEncryption
-                       |Second ciphertext: $secondEncryption
-                       |""".stripMargin
-                ),
-              )
-            } yield firstEncryption
-          } else {
-            encryptWithEciesP256HmacSha256Aes128Cbc(
-              message,
-              publicKey,
-              JceSecureRandom.random.get(),
-            )
-          }
+          encryptWithEciesP256HmacSha256Aes128Cbc(
+            message,
+            publicKey,
+            JceSecureRandom.random.get(),
+          )
         case EncryptionAlgorithmSpec.RsaOaepSha256 =>
           encryptWithRSAOaepSha256(
             message,

@@ -218,9 +218,8 @@ class ReassignmentCoordination(
         _.traverseSingleton((_, syncCrypto) => syncCrypto.snapshot(timestamp))
       )
 
-  private[reassignment] def awaitTimestampAndGetTaggedCryptoSnapshot[T[X] <: ReassignmentTag[
-    X
-  ]: SameReassignmentType: SingletonTraverse](
+  private[reassignment] def awaitTimestampAndGetTaggedCryptoSnapshot[T[X] <: ReassignmentTag[X]
+    : SameReassignmentType: SingletonTraverse](
       targetSynchronizerId: T[PhysicalSynchronizerId],
       staticSynchronizerParameters: T[StaticSynchronizerParameters],
       timestamp: CantonTimestamp,
