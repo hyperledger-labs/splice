@@ -11,6 +11,8 @@ import { Wrapper } from '../../helpers';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
 import { OffboardSvForm } from '../../../components/forms/OffboardSvForm';
+import { server, svUrl } from '../../setup/setup';
+import { rest } from 'msw';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -37,7 +39,7 @@ describe('Offboard SV Form', () => {
   test('should render all Offboard SV Form components', () => {
     render(
       <Wrapper>
-        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+        <OffboardSvForm />
       </Wrapper>
     );
 
@@ -68,7 +70,7 @@ describe('Offboard SV Form', () => {
 
     render(
       <Wrapper>
-        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+        <OffboardSvForm />
       </Wrapper>
     );
 
@@ -117,7 +119,7 @@ describe('Offboard SV Form', () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+        <OffboardSvForm />
       </Wrapper>
     );
 
@@ -147,7 +149,7 @@ describe('Offboard SV Form', () => {
 
     render(
       <Wrapper>
-        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+        <OffboardSvForm />
       </Wrapper>
     );
 
@@ -180,7 +182,7 @@ describe('Offboard SV Form', () => {
   test('sv dropdown contains all svs', async () => {
     render(
       <Wrapper>
-        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+        <OffboardSvForm />
       </Wrapper>
     );
 
@@ -202,7 +204,7 @@ describe('Offboard SV Form', () => {
 
     render(
       <Wrapper>
-        <OffboardSvForm onSubmit={() => Promise.resolve()} />
+        <OffboardSvForm />
       </Wrapper>
     );
 
@@ -233,5 +235,101 @@ describe('Offboard SV Form', () => {
     await user.click(submitButton);
 
     expect(screen.getByText('Proposal Summary')).toBeDefined();
+  });
+
+  test('should show error on form if submission fails', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <OffboardSvForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('offboard-sv-action');
+
+    const summaryInput = screen.getByTestId('offboard-sv-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('offboard-sv-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      await user.click(memberToSelect);
+    });
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
+    const submitButton = screen.getByTestId('submit-button');
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
+    expect(screen.getByText(/Submission failed/)).toBeDefined();
+    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+  });
+
+  test('should redirect to governance page after successful submission', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <OffboardSvForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('offboard-sv-action');
+
+    const summaryInput = screen.getByTestId('offboard-sv-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('offboard-sv-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      await user.click(memberToSelect);
+    });
+
+    const submitButton = screen.getByTestId('submit-button');
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    waitFor(() => {
+      expect(screen.getByText('Action Required')).toBeDefined();
+      expect(screen.getByText('Inflight Votes')).toBeDefined();
+      expect(screen.getByText('Vote History')).toBeDefined();
+      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    });
   });
 });

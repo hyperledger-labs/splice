@@ -25,7 +25,7 @@ import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { Box, Typography } from '@mui/material';
 import { ProposalSummary } from '../governance/ProposalSummary';
 
-type SetAmuletConfigCompleteFormData = {
+export type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
   config: ConfigFormData;
 };

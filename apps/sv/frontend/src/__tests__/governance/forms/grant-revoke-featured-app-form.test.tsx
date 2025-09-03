@@ -11,6 +11,8 @@ import { Wrapper } from '../../helpers';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
 import { GrantRevokeFeaturedAppForm } from '../../../components/forms/GrantRevokeFeaturedAppForm';
+import { server, svUrl } from '../../setup/setup';
+import { rest } from 'msw';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -37,10 +39,7 @@ describe('Grant Featured App Form', () => {
   test('should render all Form components', () => {
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_GrantFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -75,10 +74,7 @@ describe('Grant Featured App Form', () => {
 
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_GrantFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -118,10 +114,7 @@ describe('Grant Featured App Form', () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_GrantFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -151,10 +144,7 @@ describe('Grant Featured App Form', () => {
 
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_GrantFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -189,10 +179,7 @@ describe('Grant Featured App Form', () => {
 
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_GrantFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -225,10 +212,7 @@ describe('Revoke Featured App Form', () => {
   test('should render all Form components', () => {
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_RevokeFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -261,10 +245,7 @@ describe('Revoke Featured App Form', () => {
 
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_RevokeFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -304,10 +285,7 @@ describe('Revoke Featured App Form', () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_RevokeFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -335,10 +313,7 @@ describe('Revoke Featured App Form', () => {
 
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_RevokeFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -373,10 +348,7 @@ describe('Revoke Featured App Form', () => {
 
     render(
       <Wrapper>
-        <GrantRevokeFeaturedAppForm
-          onSubmit={() => Promise.resolve()}
-          selectedAction="SRARC_RevokeFeaturedAppRight"
-        />
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
       </Wrapper>
     );
 
@@ -402,5 +374,96 @@ describe('Revoke Featured App Form', () => {
     await user.click(submitButton);
 
     expect(screen.getByText('Proposal Summary')).toBeDefined();
+  });
+
+  test('should show error on form if submission fails', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('revoke-featured-app-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
+    expect(summaryInput).toBeDefined();
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('revoke-featured-app-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
+    expect(providerInput).toBeDefined();
+    await user.type(providerInput, 'abcde12345');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
+    expect(screen.getByText(/Submission failed/)).toBeDefined();
+    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+  });
+
+  test('should redirect to governance page after successful submission', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_RevokeFeaturedAppRight" />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('revoke-featured-app-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
+    expect(summaryInput).toBeDefined();
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('revoke-featured-app-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
+    expect(providerInput).toBeDefined();
+    await user.type(providerInput, 'abcde12345');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    waitFor(() => {
+      expect(screen.getByText('Action Required')).toBeDefined();
+      expect(screen.getByText('Inflight Votes')).toBeDefined();
+      expect(screen.getByText('Vote History')).toBeDefined();
+      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    });
   });
 });
