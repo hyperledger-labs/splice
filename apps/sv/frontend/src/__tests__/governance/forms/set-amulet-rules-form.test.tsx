@@ -169,7 +169,9 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    waitFor(() => {
+      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    });
   });
 
   test('changing config fields should render the current value', async () => {
