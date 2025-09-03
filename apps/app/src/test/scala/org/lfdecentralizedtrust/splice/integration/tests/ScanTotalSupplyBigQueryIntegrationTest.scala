@@ -542,7 +542,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
       minted: BigDecimal,
       allowedMint: BigDecimal,
       burned: BigDecimal,
-      monthlyBurn: BigDecimal,
       numAmuletHolders: Long,
       numActiveValidators: Long,
       avgTps: Double,
@@ -581,7 +580,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
       minted = bd("minted"),
       allowedMint = bd("allowed_mint"),
       burned = bd("burned"),
-      monthlyBurn = bd("monthly_burn"),
       numAmuletHolders = int("num_amulet_holders"),
       numActiveValidators = int("num_active_validators"),
       avgTps = float("average_tps"),
@@ -599,11 +597,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
-        (
-          "monthly_burn",
-          results.burned,
-          burnedAmount,
-        ), // Same as total burned as we don't simulate more than a month
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
         ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
         ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
