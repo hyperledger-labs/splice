@@ -379,7 +379,7 @@ describe('Revoke Featured App Form', () => {
   test('should show error on form if submission fails', async () => {
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
-        return res(ctx.status(503, 'Service Unavailable'));
+        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
       })
     );
 
@@ -417,6 +417,7 @@ describe('Revoke Featured App Form', () => {
 
     expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
     expect(screen.getByText(/Submission failed/)).toBeDefined();
+    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
   });
 
   test('should redirect to governance page after successful submission', async () => {
@@ -462,6 +463,7 @@ describe('Revoke Featured App Form', () => {
       expect(screen.getByText('Action Required')).toBeDefined();
       expect(screen.getByText('Inflight Votes')).toBeDefined();
       expect(screen.getByText('Vote History')).toBeDefined();
+      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
     });
   });
 });
