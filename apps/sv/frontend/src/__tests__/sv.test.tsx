@@ -68,6 +68,7 @@ describe('SV user can', () => {
 
     const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
 
+    // We wait for the date to be set to the default value from the ledger.
     await waitFor(() => expect(dateInput.getAttribute('value')).toBe(inOneWeek));
     await user.type(dateInput, expirationDate);
     expect(dateInput.getAttribute('value')).toBe(expirationDate);
