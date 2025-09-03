@@ -23,6 +23,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 import scala.sys.process.Process
+import java.time.temporal.ChronoUnit
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -69,6 +70,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private val unmintedAmount = BigDecimal("570776.255709163")
   private val amuletHolders = 5
   private val validators = 4 // one SV + 3 validators
+  // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
+  // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
+  private val avgTps = (0.0008, 0.00099)
+  // The peak is 17 transactions in a (simulated) minute, or 0.28333 tps over a minute,
+  // so we assert 15-20 transactions, or 0.25-0.34 tps
+  private val peakTps = (0.25, 0.34)
 
   override def beforeAll() = {
     super.beforeAll()
@@ -501,7 +508,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
     */
   private def runTotalSupplyQueries()(implicit env: FixtureParam): ExpectedMetrics = {
     val project = bigquery.getOptions.getProjectId
-    val timestamp = getLedgerTime.toInstant.plusSeconds(10).toString
+    // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
+    val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
     val sql =
       s"SELECT * FROM `$project.$functionsDatasetName.all_stats`('$timestamp', 0);"
 
@@ -536,6 +544,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       burned: BigDecimal,
       numAmuletHolders: Long,
       numActiveValidators: Long,
+      avgTps: Double,
+      peakTps: Double,
   )
 
   private def parseQueryResults(result: bq.TableResult) = {
@@ -543,22 +553,23 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val row = result.iterateAll().iterator().next()
     logger.debug(s"Query row: $row; schema ${result.getSchema}")
 
-    def bd(column: String) = {
+    def required(column: String) = {
       val field = row get column
       if (field.isNull)
         fail(s"Column '$column' in all-stats results is null")
-      else
-        BigDecimal(field.getStringValue)
+      field
+    }
+
+    def bd(column: String) = {
+      BigDecimal(required(column).getStringValue)
     }
 
     def int(column: String) = {
-      val field = row get column
-      if (field.isNull)
-        fail(s"Column '$column' in all-stats results is null")
-      else {
-        field.getLongValue
-      }
+      required(column).getLongValue
+    }
 
+    def float(column: String) = {
+      required(column).getDoubleValue
     }
 
     ExpectedMetrics(
@@ -571,6 +582,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       burned = bd("burned"),
       numAmuletHolders = int("num_amulet_holders"),
       numActiveValidators = int("num_active_validators"),
+      avgTps = float("average_tps"),
+      peakTps = float("peak_tps"),
     )
   }
 
@@ -592,6 +605,16 @@ class ScanTotalSupplyBigQueryIntegrationTest
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue
+    }
+
+    forEvery(
+      Seq(
+        ("average_tps", results.avgTps, avgTps),
+        ("peak_tps", results.peakTps, peakTps),
+      )
+    ) { case (clue, actual, expected) =>
+      actual shouldBe >=(expected._1) withClue clue
+      actual shouldBe <=(expected._2) withClue clue
     }
 
     // other derived metrics
