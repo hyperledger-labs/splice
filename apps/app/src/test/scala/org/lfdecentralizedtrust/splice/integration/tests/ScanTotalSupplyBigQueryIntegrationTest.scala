@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-/** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSK_CORE_PROJECT` * */
+/** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSDK_CORE_PROJECT` * */
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
@@ -67,6 +67,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private val burnedAmount = BigDecimal("60032.83108")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("570776.255709163")
+  private val amuletHolders = 5
+  private val validators = 4 // one SV + 3 validators
 
   override def beforeAll() = {
     super.beforeAll()
@@ -487,10 +489,13 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   /** Runs the total supply queries from the SQL file
     */
-  private def runTotalSupplyQueries(): ExpectedMetrics = {
+  private def runTotalSupplyQueries()(implicit env: FixtureParam): ExpectedMetrics = {
     val project = bigquery.getOptions.getProjectId
+    val timestamp = getLedgerTime.toInstant.plusSeconds(10).toString
     val sql =
-      s"SELECT * FROM `$project.$functionsDatasetName.total_supply`('1971-01-01T00:00:00Z', 0);"
+      s"SELECT * FROM `$project.$functionsDatasetName.all_stats`('$timestamp', 0);"
+
+    logger.info(s"Querying all stats as of $timestamp")
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
@@ -519,6 +524,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       minted: BigDecimal,
       allowedMint: BigDecimal,
       burned: BigDecimal,
+      numAmuletHolders: Long,
+      numActiveValidators: Long,
   )
 
   private def parseQueryResults(result: bq.TableResult) = {
@@ -529,9 +536,19 @@ class ScanTotalSupplyBigQueryIntegrationTest
     def bd(column: String) = {
       val field = row get column
       if (field.isNull)
-        fail(s"Column '$column' in total-supply results is null")
+        fail(s"Column '$column' in all-stats results is null")
       else
         BigDecimal(field.getStringValue)
+    }
+
+    def int(column: String) = {
+      val field = row get column
+      if (field.isNull)
+        fail(s"Column '$column' in all-stats results is null")
+      else {
+        field.getLongValue
+      }
+
     }
 
     ExpectedMetrics(
@@ -542,6 +559,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       minted = bd("minted"),
       allowedMint = bd("allowed_mint"),
       burned = bd("burned"),
+      numAmuletHolders = int("num_amulet_holders"),
+      numActiveValidators = int("num_active_validators"),
     )
   }
 
@@ -558,6 +577,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
         // internally-derived metrics
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
         ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
+        ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
+        ("num_active_validators", results.numActiveValidators, validators),
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue
