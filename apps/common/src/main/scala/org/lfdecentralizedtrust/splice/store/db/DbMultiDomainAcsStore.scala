@@ -234,18 +234,18 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Boolean] = waitUntilAcsIngested {
     if (ids.isEmpty) Future.successful(true)
     else {
+      val contractIds = inClause(ids)
+
       storage.query(
-        sql"""
+        (sql"""
         select not exists (
            select acs.contract_id
            from #$acsTableName acs
            where acs.store_id = $acsStoreId
            and acs.migration_id = $domainMigrationId
-           and acs.contract_id in (#${ids
-            .map(id => lengthLimited(s"'${id.contractId}'"))
-            .mkString(",")})
+           and acs.contract_id in """ ++ contractIds ++ sql"""
          )
-         """
+         """).toActionBuilder
           .as[Boolean]
           .head,
         "hasArchived",
