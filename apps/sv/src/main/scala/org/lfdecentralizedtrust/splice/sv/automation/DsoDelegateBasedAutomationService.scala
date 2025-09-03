@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -72,7 +73,13 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new GarbageCollectAmuletPriceVotesTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
-    registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
+    registerTrigger(
+      new ExpireRewardCouponsTrigger(
+        triggerContext,
+        svTaskContext,
+        config.automation.ignoredExpiredRewardsContractIds.map(new ContractId[Nothing](_)),
+      )
+    )
 
     registerTrigger(new AnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsEntryTrigger(triggerContext, svTaskContext))

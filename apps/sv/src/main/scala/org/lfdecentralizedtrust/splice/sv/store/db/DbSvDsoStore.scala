@@ -442,6 +442,7 @@ class DbSvDsoStore(
   override def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[AppRewardCoupon.ContractId]]] =
@@ -449,11 +450,13 @@ class DbSvDsoStore(
       AppRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredContracts,
     )
 
   override def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[ValidatorRewardCoupon.ContractId]]] =
@@ -461,11 +464,13 @@ class DbSvDsoStore(
       ValidatorRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredContracts,
     )
 
   override def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[ValidatorFaucetCoupon.ContractId]]] =
@@ -473,11 +478,13 @@ class DbSvDsoStore(
       ValidatorFaucetCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredContracts,
     )
 
   override def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[ValidatorLivenessActivityRecord.ContractId]]] =
@@ -485,22 +492,26 @@ class DbSvDsoStore(
       ValidatorLivenessActivityRecord.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredContracts,
     )
 
   override def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit tc: TraceContext): Future[Seq[RoundBatch[SvRewardCoupon.ContractId]]] =
     listCouponsGroupedByRound(
       SvRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredContracts,
     )
 
   private def listCouponsGroupedByRound[C, TCId <: ContractId[_]: ClassTag, T](
       companion: C,
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
@@ -526,15 +537,18 @@ class DbSvDsoStore(
                """.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
             opName,
           )
-      } yield applyLimit(opName, totalCouponsLimit, result).map { case (round, batch) =>
-        RoundBatch(
-          round,
-          batch
-            .take(totalCouponsLimit.limit)
-            .map(cid => companionClass.toContractId(companion, cid.contractId))
-            .toSeq,
-        )
-      }
+      } yield applyLimit(opName, totalCouponsLimit, result)
+        .map { case (round, batch) =>
+          RoundBatch(
+            round,
+            batch
+              .filterNot(ignoredContracts.contains)
+              .take(totalCouponsLimit.limit)
+              .map(cid => companionClass.toContractId(companion, cid.contractId))
+              .toSeq,
+          )
+        }
+        .filter(_.batch.nonEmpty)
     }
   }
 

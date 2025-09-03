@@ -484,6 +484,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           result <- store.listAppRewardCouponsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
+            ignoredContracts = Set.empty,
           )
         } yield {
           result should have size 2
@@ -528,6 +529,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           result <- store.listValidatorRewardCouponsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
+            ignoredContracts = Set.empty,
           )
         } yield {
           result should have size 2
@@ -574,6 +576,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           result <- store.listValidatorFaucetCouponsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
+            ignoredContracts = Set.empty,
           )
         } yield {
           result should have size 2
@@ -623,6 +626,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           result <- store.listValidatorLivenessActivityRecordsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
+            ignoredContracts = Set.empty,
           )
         } yield {
           result should have size 2
@@ -692,11 +696,20 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           domain = dummyDomain,
           enableExpireValidatorFaucet = true,
           totalCouponsLimit = PageLimit.tryCreate(1000),
+          ignoredExpiredRewardsContractIds = Set.empty,
+        )
+        resultWithIgnored <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
+          domain = dummyDomain,
+          enableExpireValidatorFaucet = true,
+          totalCouponsLimit = PageLimit.tryCreate(1000),
+          ignoredExpiredRewardsContractIds =
+            result.flatMap(_.validatorLivenessActivityRecords).toSet,
         )
         resultWithoutFaucet <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
           enableExpireValidatorFaucet = false,
           totalCouponsLimit = PageLimit.tryCreate(1000),
+          ignoredExpiredRewardsContractIds = Set.empty,
         )
       } yield {
         result should have size 4
@@ -725,6 +738,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           batch.svRewardCoupons should have size 0
           batch.validatorFaucets should have size 6
         }
+        resultWithIgnored should have size 3
+        forAll(resultWithIgnored)(_.validatorLivenessActivityRecords should have size 0)
         resultWithoutFaucet should have size 3
         forAll(resultWithoutFaucet)(_.validatorFaucets should have size 0)
       }

@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.store
 
 import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
@@ -227,6 +228,7 @@ trait SvDsoStore
   def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.AppRewardCoupon.ContractId]]]
@@ -249,6 +251,7 @@ trait SvDsoStore
   def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
@@ -288,6 +291,7 @@ trait SvDsoStore
   def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[
@@ -297,6 +301,7 @@ trait SvDsoStore
   def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[
@@ -335,6 +340,7 @@ trait SvDsoStore
   def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredContracts: Set[ContractId[?]],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.SvRewardCoupon.ContractId]]]
@@ -355,6 +361,7 @@ trait SvDsoStore
   final def getExpiredCouponsInBatchesPerRoundAndCouponType(
       domain: SynchronizerId,
       enableExpireValidatorFaucet: Boolean,
+      ignoredExpiredRewardsContractIds: Set[ContractId[?]],
       totalCouponsLimit: Limit = PageLimit.tryCreate(100),
   )(implicit
       tc: TraceContext
@@ -375,26 +382,31 @@ trait SvDsoStore
       appRewardGroups <- listAppRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
+        ignoredExpiredRewardsContractIds,
       )
       validatorRewardGroups <- listValidatorRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
+        ignoredExpiredRewardsContractIds,
       )
       validatorFaucetGroups <-
         if (enableExpireValidatorFaucet)
           listValidatorFaucetCouponsGroupedByRound(
             domain,
             totalCouponsLimit = totalCouponsLimit,
+            ignoredExpiredRewardsContractIds,
           )
         else Future.successful(Seq.empty)
       validatorLivenessActivityRecordGroups <-
         listValidatorLivenessActivityRecordsGroupedByRound(
           domain,
           totalCouponsLimit = totalCouponsLimit,
+          ignoredExpiredRewardsContractIds,
         )
       svRewardCouponGroups <- listSvRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
+        ignoredExpiredRewardsContractIds,
       )
       roundNumbers =
         (appRewardGroups ++ validatorRewardGroups ++ validatorFaucetGroups ++ validatorLivenessActivityRecordGroups ++ svRewardCouponGroups)
