@@ -21,6 +21,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import FeaturedAppActivityMarkerTrigger.Task
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 
@@ -74,7 +75,8 @@ class FeaturedAppActivityMarkerTrigger(
           Optional.of(controller),
         )
       )
-      _ <- svTaskContext.connection
+      _ <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.Medium)
         .submit(
           actAs = Seq(store.key.svParty),
           readAs = Seq(store.key.dsoParty),

@@ -18,6 +18,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import ExpireIssuingMiningRoundTrigger.*
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 
@@ -56,7 +57,8 @@ class ExpireIssuingMiningRoundTrigger(
           Optional.of(controller),
         )
       )
-      cid <- svTaskContext.connection
+      cid <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.Medium)
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
