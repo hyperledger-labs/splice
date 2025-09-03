@@ -454,18 +454,19 @@ const one_day_updates = new BQTableFunction(
   as_of_args,
   [new BQColumn('update_id', STRING), new BQColumn('record_time', INT64)],
   `
+    -- All update IDs over a period of 24 hours. Since the data might be up to 4 hours stale, we take a window of 4-28 hours ago.
     SELECT DISTINCT(update_id), record_time FROM (
         SELECT
           update_id,
           record_time
         FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
-        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 25 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 1 HOUR), migration_id, e.record_time, e.migration_id)
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, e.record_time, e.migration_id)
       UNION ALL
         SELECT
           update_id,
           record_time
         FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
-        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 25 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 1 HOUR), migration_id, c.record_time, c.migration_id)
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, c.record_time, c.migration_id)
     )
   `
 );

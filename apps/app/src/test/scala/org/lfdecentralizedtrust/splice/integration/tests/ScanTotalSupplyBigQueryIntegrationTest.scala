@@ -23,6 +23,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 import scala.sys.process.Process
+import java.time.temporal.ChronoUnit
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -501,7 +502,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
     */
   private def runTotalSupplyQueries()(implicit env: FixtureParam): ExpectedMetrics = {
     val project = bigquery.getOptions.getProjectId
-    val timestamp = getLedgerTime.toInstant.plusSeconds(10).toString
+    // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
+    val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
     val sql =
       s"SELECT * FROM `$project.$functionsDatasetName.all_stats`('$timestamp', 0);"
 
@@ -536,6 +538,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       burned: BigDecimal,
       numAmuletHolders: Long,
       numActiveValidators: Long,
+      avgTps: Float
   )
 
   private def parseQueryResults(result: bq.TableResult) = {
@@ -571,6 +574,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       burned = bd("burned"),
       numAmuletHolders = int("num_amulet_holders"),
       numActiveValidators = int("num_active_validators"),
+      avgTps = float("average_tps")
     )
   }
 
