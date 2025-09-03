@@ -110,8 +110,8 @@ const in_time_window = new BQScalarFunction(
   [
     new BQFunctionArgument('start_record_time', TIMESTAMP), // can be NULL for no lower bound
     new BQFunctionArgument('start_migration_id', INT64), // can be NULL for no lower bound
-    new BQFunctionArgument('as_of_record_time', TIMESTAMP),
-    new BQFunctionArgument('as_of_migration_id', INT64),
+    new BQFunctionArgument('up_to_record_time', TIMESTAMP),
+    new BQFunctionArgument('up_to_migration_id', INT64),
     new BQFunctionArgument('record_time', INT64),
     new BQFunctionArgument('migration_id', INT64),
   ],
@@ -119,34 +119,34 @@ const in_time_window = new BQScalarFunction(
   `
     CASE
       WHEN start_record_time IS NULL AND start_migration_id IS NULL THEN
-        (migration_id < as_of_migration_id
-            OR (migration_id = as_of_migration_id
-              AND record_time <= UNIX_MICROS(as_of_record_time)))
+        (migration_id < up_to_migration_id
+            OR (migration_id = up_to_migration_id
+              AND record_time <= UNIX_MICROS(up_to_record_time)))
           AND record_time != -62135596800000000
       WHEN start_record_time IS NOT NULL AND start_migration_id IS NOT NULL THEN
         (migration_id > start_migration_id
             OR (migration_id = start_migration_id
               AND record_time >= UNIX_MICROS(start_record_time)))
-          AND (migration_id < as_of_migration_id
-            OR (migration_id = as_of_migration_id
-              AND record_time <= UNIX_MICROS(as_of_record_time)))
+          AND (migration_id < up_to_migration_id
+            OR (migration_id = up_to_migration_id
+              AND record_time <= UNIX_MICROS(up_to_record_time)))
           AND record_time != -62135596800000000
       ELSE ERROR('in_time_window: start_record_time and start_migration_id must be both NULL or both NOT NULL')
     END
   `
 );
 
-const as_of_time = new BQScalarFunction(
-  'as_of_time',
+const up_to_time = new BQScalarFunction(
+  'up_to_time',
   [
-    new BQFunctionArgument('as_of_record_time', TIMESTAMP),
-    new BQFunctionArgument('as_of_migration_id', INT64),
+    new BQFunctionArgument('up_to_record_time', TIMESTAMP),
+    new BQFunctionArgument('up_to_migration_id', INT64),
     new BQFunctionArgument('record_time', INT64),
     new BQFunctionArgument('migration_id', INT64),
   ],
   BOOL,
   `
-    \`$$FUNCTIONS_DATASET$$.in_time_window\`(NULL, NULL, as_of_record_time, as_of_migration_id, record_time, migration_id)
+    \`$$FUNCTIONS_DATASET$$.in_time_window\`(NULL, NULL, up_to_record_time, up_to_migration_id, record_time, migration_id)
   `
 );
 
@@ -183,7 +183,7 @@ const sum_bignumeric_acs = new BQScalarFunction(
         AND e.contract_id = c.contract_id)
       AND c.template_id_module_name = module_name
       AND c.template_id_entity_name = entity_name
-      AND \`$$FUNCTIONS_DATASET$$.as_of_time\`(as_of_record_time, migration_id,
+      AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id,
             c.record_time, c.migration_id))
   `
 );
@@ -292,7 +292,7 @@ const minted = new BQScalarFunction(
             OR (e.choice = 'TransferPreapproval_Renew'
                 AND e.template_id_entity_name = 'TransferPreapproval'))
         AND e.template_id_module_name = 'Splice.AmuletRules'
-        AND \`$$FUNCTIONS_DATASET$$.as_of_time\`(as_of_record_time, migration_id,
+        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id,
               e.record_time, e.migration_id))
   `
 );
@@ -366,7 +366,7 @@ const burned = new BQScalarFunction(
                         OR (e.choice = 'TransferPreapproval_Renew'
                             AND e.template_id_entity_name = 'TransferPreapproval'))
                   AND e.template_id_module_name = 'Splice.AmuletRules'
-                  AND \`$$FUNCTIONS_DATASET$$.as_of_time\`(as_of_record_time, migration_id_arg,
+                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id_arg,
                           e.record_time, e.migration_id))
             UNION ALL (-- Purchasing ANS Entries
                 SELECT
@@ -384,7 +384,7 @@ const burned = new BQScalarFunction(
                   AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
                   AND c.template_id_module_name = 'Splice.Amulet'
                   AND c.template_id_entity_name = 'Amulet'
-                  AND \`$$FUNCTIONS_DATASET$$.as_of_time\`(as_of_record_time, migration_id_arg,
+                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id_arg,
                         e.record_time, e.migration_id)
                   AND c.record_time != -62135596800000000)))
   `
@@ -402,7 +402,7 @@ const amulet_holders = new BQTableFunction(
       WHERE c.package_name = "splice-amulet"
         AND c.template_id_module_name = "Splice.Amulet"
         AND c.template_id_entity_name = "Amulet"
-        AND \`$$FUNCTIONS_DATASET$$.as_of_time\`(as_of_record_time, migration_id, c.record_time, c.migration_id)
+        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id, c.record_time, c.migration_id)
       QUALIFY ROW_NUMBER() OVER (PARTITION BY owner ORDER BY created_at DESC) = 1
   `
 );
@@ -433,7 +433,7 @@ const all_validators = new BQTableFunction(
       WHERE c.package_name = "splice-amulet"
         AND c.template_id_module_name = "Splice.ValidatorLicense"
         AND c.template_id_entity_name = "ValidatorLicense"
-        AND \`$$FUNCTIONS_DATASET$$.as_of_time\`(as_of_record_time, migration_id, c.record_time, c.migration_id)
+        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id, c.record_time, c.migration_id)
   `
 );
 
@@ -486,7 +486,7 @@ export const allFunctions = [
   daml_record_path,
   daml_record_numeric,
   in_time_window,
-  as_of_time,
+  up_to_time,
   sum_bignumeric_acs,
   locked,
   unlocked,
