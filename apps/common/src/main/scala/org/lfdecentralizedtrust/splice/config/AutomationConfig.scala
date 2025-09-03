@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.config
 
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveFiniteDuration}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.reflect.ClassTag
 
@@ -85,7 +86,7 @@ case class AutomationConfig(
       * before we consider the trigger to be in an unhealthy state.
       */
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
-    ignoredExpiredRewardsContractIds: Set[String] = Set.empty,
+    ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName
