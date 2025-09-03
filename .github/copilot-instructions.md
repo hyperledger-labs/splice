@@ -25,7 +25,7 @@ When adding to enums, make sure to only add further nullary constructors to type
 ### Daml Numerics
 
 - To represent Daml `Numeric`s for any user facing APIs (console commands), use `scala.math.BigDecimal`.
-- To represent Daml Numerics in Protobuf, use `string`s. Conversions to and from `string`s should occur via `org.lfdecentralizedtrust.splice.util.Proto.encode/tryDecode`.
+- To represent Daml `Numeric`s in Protobuf, use `string`s. Conversions to and from `string`s should occur via `org.lfdecentralizedtrust.splice.util.Proto.encode/tryDecode`.
 - When interacting with the Ledger API, convert Scala `BigDecimal`s to Java `BigDecimal`s.
 - Refer to the `wallet.tap` command implementation for the canonical handling of Daml Numerics.
 
