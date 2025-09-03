@@ -241,7 +241,9 @@ final class DbMultiDomainAcsStore[TXE](
            from #$acsTableName acs
            where acs.store_id = $acsStoreId
            and acs.migration_id = $domainMigrationId
-           and acs.contract_id in (#${ids.map(id => lengthLimited(id.contractId))})
+           and acs.contract_id in (#${ids
+            .map(id => lengthLimited(s"'${id.contractId}'"))
+            .mkString(",")})
          )
          """
           .as[Boolean]

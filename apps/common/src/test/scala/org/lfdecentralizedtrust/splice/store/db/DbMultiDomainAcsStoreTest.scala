@@ -529,17 +529,19 @@ class DbMultiDomainAcsStoreTest
       val coupon2 = c(2)
       val coupon3 = c(3)
       for {
-        _ <- initWithAcs()(store) // store1 with different migration id
+        _ <- initWithAcs()(store)
         _ <- d1.create(coupon1)(store)
         _ <- d1.create(coupon2)(store)
         _ <- d1.create(coupon3)(store)
         _ <- d1.archive(coupon1)(store)
         _ <- d1.archive(coupon2)(store)
-        _ = store.hasArchived(Seq(coupon1.contractId)).value shouldBe true
-        _ = store.hasArchived(Seq(coupon1.contractId, coupon2.contractId)).value shouldBe true
-        _ = store.hasArchived(Seq(coupon2.contractId, coupon3.contractId)).value shouldBe false
-        _ = store.hasArchived(Seq(coupon3.contractId)).value shouldBe false
-        _ = store.hasArchived(Seq()).value shouldBe true
+        _ = store.hasArchived(Seq(coupon1.contractId)).futureValue shouldBe true
+        _ = store.hasArchived(Seq(coupon1.contractId, coupon2.contractId)).futureValue shouldBe true
+        _ = store
+          .hasArchived(Seq(coupon2.contractId, coupon3.contractId))
+          .futureValue shouldBe false
+        _ = store.hasArchived(Seq(coupon3.contractId)).futureValue shouldBe false
+        _ = store.hasArchived(Seq()).futureValue shouldBe true
       } yield succeed
     }
   }
