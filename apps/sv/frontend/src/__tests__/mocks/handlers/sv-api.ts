@@ -40,6 +40,10 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       })
     );
   }),
+  rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+    // return res(ctx.status(503, 'Service Unavailable'));
+    return res(ctx.json({}));
+  }),
   rest.post(`${svUrl}/v0/admin/sv/voterequest`, (_, res, ctx) => {
     return res(ctx.json<ListVoteRequestByTrackingCidResponse>(voteRequest));
   }),

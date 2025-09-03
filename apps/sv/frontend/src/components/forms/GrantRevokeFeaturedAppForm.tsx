@@ -23,6 +23,8 @@ import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -31,14 +33,10 @@ interface ExtraFormField {
   idValue: ProviderId | FeaturedAppRightId;
 }
 
-type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormField;
+export type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormField;
 
 export interface GrantRevokeFeaturedAppFormProps {
   selectedAction: GrantRevokeFeaturedAppActions;
-  onSubmit: (
-    data: GrantRevokeFeaturedAppFormData,
-    action: ActionRequiringConfirmation
-  ) => Promise<void>;
 }
 
 export type GrantRevokeFeaturedAppActions = Extract<
@@ -47,11 +45,12 @@ export type GrantRevokeFeaturedAppActions = Extract<
 >;
 
 export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProps> = props => {
-  const { onSubmit, selectedAction } = props;
+  const { selectedAction } = props;
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const mutation = useProposalMutation();
 
   // TODO(#1819): use either search params or props and not both.
   const formAction: GrantRevokeFeaturedAppActions =
@@ -87,7 +86,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const form = useAppForm({
     defaultValues,
 
-    onSubmit: ({ value }) => {
+    onSubmit: async ({ value }) => {
       const actionMap: Record<
         'SRARC_GrantFeaturedAppRight' | 'SRARC_RevokeFeaturedAppRight',
         (idValue: string) => ActionRequiringConfirmation
@@ -117,8 +116,9 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        console.log(`submit ${formAction} sv form data: `, value, 'with action:', action);
-        onSubmit(value, action);
+        await mutation.mutateAsync({ formData: value, action }).catch(e => {
+          console.error(`Failed to submit proposal`, e);
+        });
       }
     },
 
@@ -225,6 +225,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
         )}
 
         <form.AppForm>
+          <ProposalSubmissionError error={mutation.error} />
           <form.FormErrors />
           <form.FormControls
             showConfirmation={showConfirmation}
