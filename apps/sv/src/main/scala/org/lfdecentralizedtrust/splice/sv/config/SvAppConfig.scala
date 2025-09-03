@@ -320,7 +320,7 @@ case class SvAppBackendConfig(
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
-    delegatelessAutomationExpiredRewardCouponBatchSize: Int = 100,
+    delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
