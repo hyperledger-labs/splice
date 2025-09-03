@@ -8,6 +8,7 @@ import {
   BQFunctionArgument,
   BQScalarFunction,
   BQTableFunction,
+  FLOAT64,
   INT64,
   json,
   STRING,
@@ -448,6 +449,56 @@ const num_active_validators = new BQScalarFunction(
   `
 );
 
+const one_day_updates = new BQTableFunction(
+  'one_day_updates',
+  as_of_args,
+  [new BQColumn('update_id', STRING), new BQColumn('record_time', INT64)],
+  `
+    -- All update IDs over a period of 24 hours. Since the data might be up to 4 hours stale, we take a window of 4-28 hours ago.
+    SELECT DISTINCT(update_id), record_time FROM (
+        SELECT
+          update_id,
+          record_time
+        FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, e.record_time, e.migration_id)
+      UNION ALL
+        SELECT
+          update_id,
+          record_time
+        FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, c.record_time, c.migration_id)
+    )
+  `
+);
+
+const average_tps = new BQScalarFunction(
+  'average_tps',
+  as_of_args,
+  FLOAT64,
+  `
+    (SELECT COUNT(*) / 86400.0
+      FROM \`$$FUNCTIONS_DATASET$$.one_day_updates\`(as_of_record_time, migration_id)
+    )
+  `
+);
+
+const peak_tps = new BQScalarFunction(
+  'peak_tps',
+  as_of_args,
+  FLOAT64,
+  `
+    (SELECT
+      MAX(events_per_minute) / 60.0
+    FROM (
+      SELECT
+        COUNT(*) as events_per_minute
+      FROM \`$$FUNCTIONS_DATASET$$.one_day_updates\`(as_of_record_time, migration_id)
+      GROUP BY TIMESTAMP_TRUNC(TIMESTAMP_MICROS(record_time), MINUTE)
+    )
+  )
+  `
+);
+
 const all_stats = new BQTableFunction(
   'all_stats',
   as_of_args,
@@ -463,6 +514,8 @@ const all_stats = new BQTableFunction(
     new BQColumn('burned', BIGNUMERIC),
     new BQColumn('num_amulet_holders', INT64),
     new BQColumn('num_active_validators', INT64),
+    new BQColumn('average_tps', FLOAT64),
+    new BQColumn('peak_tps', FLOAT64),
   ],
   `
     SELECT
@@ -476,7 +529,9 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
       \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) as burned,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
-      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators
+      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
+      \`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id) as average_tps,
+      \`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id) as peak_tps
   `
 );
 
@@ -501,5 +556,8 @@ export const allFunctions = [
   num_amulet_holders,
   all_validators,
   num_active_validators,
+  one_day_updates,
+  average_tps,
+  peak_tps,
   all_stats,
 ];
