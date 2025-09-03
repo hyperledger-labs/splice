@@ -31,6 +31,7 @@ export const TIMESTAMP = new BQBasicType('TIMESTAMP');
 export const BIGNUMERIC = new BQBasicType('BIGNUMERIC');
 export const json = new BQBasicType('JSON'); // JSON is a reserved word in TypeScript
 export const BOOL = new BQBasicType('BOOL');
+export const FLOAT64 = new BQBasicType('FLOAT64');
 
 export class BQArray extends BQType {
   private readonly elementType: BQType;
