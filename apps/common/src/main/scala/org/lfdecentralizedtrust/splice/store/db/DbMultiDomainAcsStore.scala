@@ -231,9 +231,25 @@ final class DbMultiDomainAcsStore[TXE](
 
   def hasArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
-  ): Future[Boolean] =
-    // TODO(#838): implement this as a single DB query
-    Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
+  ): Future[Boolean] = waitUntilAcsIngested {
+    if (ids.isEmpty) Future.successful(true)
+    else {
+      storage.query(
+        sql"""
+        select not exists (
+           select acs.contract_id
+           from #$acsTableName acs
+           where acs.store_id = $acsStoreId
+           and acs.migration_id = $domainMigrationId
+           and acs.contract_id in (#${ids.map(id => lengthLimited(id.contractId))})
+         )
+         """
+          .as[Boolean]
+          .head,
+        "hasArchived",
+      )
+    }
+  }
 
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
