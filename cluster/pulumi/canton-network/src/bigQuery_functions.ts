@@ -444,7 +444,7 @@ const num_active_validators = new BQScalarFunction(
   `
     (SELECT COUNT(*) as num_active_validators
       FROM \`$$FUNCTIONS_DATASET$$.all_validators\`(as_of_record_time, migration_id) v
-      WHERE v.latest_validator_license > TIMESTAMP_SUB(CURRENT_TIMESTAMP(UTC), INTERVAL 24 HOUR))
+      WHERE v.latest_validator_license > TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR))
   `
 );
 
