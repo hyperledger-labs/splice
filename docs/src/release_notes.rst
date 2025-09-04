@@ -34,6 +34,11 @@ Upcoming
      - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
      - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
 
+  - Splice apps
+
+     - Removed the `ingest-from-participant-begin` and `ingest-update-history-from-participant-begin` from splice apps,
+       and the corresponding `disableIngestUpdateHistoryFromParticipantBegin` from helm charts.
+
 0.4.13
 ------
 
