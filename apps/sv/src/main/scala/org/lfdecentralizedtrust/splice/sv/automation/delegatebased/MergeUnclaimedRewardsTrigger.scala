@@ -54,7 +54,7 @@ class MergeUnclaimedRewardsTrigger(
 
   protected def isStaleTask(
       unclaimedRewardsTask: MergeUnclaimedRewardsTask
-  )(implicit tc: TraceContext): Future[Boolean] = store.multiDomainAcsStore.hasArchived(
+  )(implicit tc: TraceContext): Future[Boolean] = store.multiDomainAcsStore.containsArchived(
     unclaimedRewardsTask.contracts.map(_.contractId)
   )
 
