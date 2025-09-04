@@ -49,7 +49,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CantonBftSynchronizerNode,
-  CometbftSynchronizerNode,
   configForSv,
   svsConfig,
   updateHistoryBackfillingValues,
@@ -120,7 +119,7 @@ export async function installNode(
     ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', ''))!
     : undefined;
 
-  const { sv, validator } = await installSvAndValidator(
+  await installSvAndValidator(
     {
       xns,
       decentralizedSynchronizerMigrationConfig,
