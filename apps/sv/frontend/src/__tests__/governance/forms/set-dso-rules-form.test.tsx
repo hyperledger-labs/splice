@@ -117,17 +117,15 @@ describe('Set DSO Config Rules Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeNull();
     });
   });
@@ -147,22 +145,18 @@ describe('Set DSO Config Rules Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
     });
   });
