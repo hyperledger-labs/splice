@@ -6,6 +6,7 @@ infra:
 pulumiProjectConfig:
   default:
     cloudSql:
+      enabled: true
       protected: false
 validator1:
   participantPruningSchedule:
@@ -16,4 +17,22 @@ validator1:
 sv:
   scan:
     # TODO(#1164): Remove this once the import update backfilling is enabled by default
-    enableImportUpdatesBackfill : true
+    enableImportUpdatesBackfill: true
+svs:
+  default:
+    participant:
+      bftSequencerConnection: false
+synchronizerMigration:
+  active:
+    id: 0
+    version: 0.5.0 # Adjust as needed
+    enableBftSequencer: true
+    releaseReference:
+      gitReference: "refs/heads/bft-test-3.4"
+      repoUrl: https://github.com/hyperledger-labs/splice
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "splice/cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "splice"
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
