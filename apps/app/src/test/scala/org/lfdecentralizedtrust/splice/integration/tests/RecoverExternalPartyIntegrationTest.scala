@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
-
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -19,6 +18,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
+import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 
 import java.nio.file.Files
 import java.time.Duration
@@ -28,7 +28,8 @@ import scala.concurrent.duration.*
 class RecoverExternalPartyIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with ExternallySignedPartyTestUtil
-    with TokenStandardTest {
+    with TokenStandardTest
+    with WalletTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
@@ -179,7 +180,7 @@ class RecoverExternalPartyIntegrationTest
 
     // Tap so we have money for creating the preapproval
     bobValidatorWalletClient.tap(5000.0)
-    bobValidatorWalletClient.createTransferPreapproval()
+    createTransferPreapprovalIfNotExists(bobValidatorWalletClient)
 
     // Grant rights to bob's validator backend the rights to prepare transactions
     // and submit signed on behalf of the party.

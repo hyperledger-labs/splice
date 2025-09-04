@@ -62,6 +62,7 @@ import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescr
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
@@ -2092,6 +2093,8 @@ object DbMultiDomainAcsStore {
       // We update the metrics in here as it's the easiest way
       // to not miss any place that might need updating.
       metrics.acsSize.updateValue(newAcsSize.toLong)
+      metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
+      metrics.completedIngestions.mark()
       synchronizerId.foreach { synchronizer =>
         recordTime.foreach { recordTime =>
           metrics

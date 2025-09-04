@@ -198,13 +198,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       val aliceValidator = RichPartyId.local(aliceValidatorBackend.getValidatorPartyId())
 
       aliceValidatorWalletClient.tap(BigDecimal(1000))
-      aliceWalletClient.createTransferPreapproval()
-      aliceValidatorWalletClient.createTransferPreapproval()
+      createTransferPreapprovalIfNotExists(aliceWalletClient)
+      createTransferPreapprovalIfNotExists(aliceValidatorWalletClient)
+
+      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       logger.info(
         s"Generating CLI data for" +
           s" alice: ${alice.partyId.toProtoPrimitive}" +
           s" bob: ${bob.partyId.toProtoPrimitive}" +
+          s" charlie: ${charlieParty.toProtoPrimitive}" +
           s" validator: ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"
       )
 
@@ -542,6 +545,21 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               },
             )
 
+            // another one transferred from charlie to alice, but not via token standard
+            // TransferIn (derived by tx-kind), while making sure that charlie has no leftovers
+            val charlieAmount = 500.0
+            charlieWalletClient.tap(walletAmuletToUsd(charlieAmount))
+            createTransferPreapprovalIfNotExists(aliceWalletClient) // it was deleted before
+            charlieWalletClient.transferPreapprovalSend(
+              alice.partyId,
+              charlieAmount - 11,
+              UUID.randomUUID().toString,
+              Some("non-ts-transfer"),
+            )
+            eventually() {
+              charlieWalletClient.balance().unlockedQty should be(BigDecimal("0"))
+            }
+
             // DummyHolding holdings
             Seq("30.0", "40.0").foreach { amount =>
               aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -565,7 +583,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val activeHoldingsResponse =
               listContractsOfInterface(alice, holdingv1.Holding.TEMPLATE_ID)
 
-            activeHoldingsResponse should have size 5 // 2 unlocked amulets, 1 locked amulet, 2 sample holdings
+            activeHoldingsResponse should have size 6 // 3 unlocked amulets, 1 locked amulet, 2 sample holdings
 
             val activeTransferInstructionsResponse =
               listContractsOfInterface(bob, transferinstructionv1.TransferInstruction.TEMPLATE_ID)
@@ -628,6 +646,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           .getValidatorPartyId()
           .toProtoPrimitive -> "aliceValidator::normalized",
         bob.partyId.toProtoPrimitive -> "bob::normalized",
+        charlieParty.toProtoPrimitive -> "charlie::normalized",
       )
       val dateFields =
         Seq(

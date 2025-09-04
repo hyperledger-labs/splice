@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
@@ -12,6 +12,8 @@ import { SvConfigProvider } from '../utils';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import dayjs from 'dayjs';
 
 const AppWithConfig = () => {
   return (
@@ -52,6 +54,48 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     expect(await screen.findByText('Vote Requests')).toBeDefined();
+  });
+
+  test('see proper time format in popup', { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
+
+    const inOneWeek = dayjs().add(1, 'week').format(dateTimeFormatISO);
+    const expirationDate = dayjs().add(23, 'minutes').format(dateTimeFormatISO);
+
+    const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
+
+    // We wait for the date to be set to the default value from the ledger.
+    await waitFor(() => expect(dateInput.getAttribute('value')).toBe(inOneWeek));
+    await user.type(dateInput, expirationDate);
+    expect(dateInput.getAttribute('value')).toBe(expirationDate);
+
+    const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
+    expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
+
+    const options: HTMLOptionElement[] = await screen.findAllByTestId('display-members-option');
+
+    fireEvent.change(screen.getByTestId('display-members'), {
+      target: {
+        value: options[0].value,
+      },
+    });
+
+    const summaryInput = screen.getByTestId('create-reason-summary');
+    await user.type(summaryInput, 'summaryABC');
+
+    const urlInput = screen.getByTestId('create-reason-url');
+    await user.type(urlInput, 'https://vote-request.url');
+
+    const submitButton = screen.getByTestId('create-voterequest-submit-button');
+    await user.click(submitButton);
+
+    const submitPopup = screen.getByRole('dialog');
+
+    expect(submitPopup).toHaveTextContent('in 23 minutes');
   });
 });
 

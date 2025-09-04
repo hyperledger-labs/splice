@@ -23,5 +23,6 @@
     "**/.daml/unpacked-dars/**": true
   },
   "metals.inlayHints.implicitArguments.enable": true,
-  "metals.inlayHints.implicitConversions.enable": true
+  "metals.inlayHints.implicitConversions.enable": true,
+  "makefile.configureOnOpen": false
 }
