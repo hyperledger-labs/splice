@@ -63,6 +63,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Changed `metrics.filterByNodeAndAttribute` in `InstanceReference ` to filter by `node_name` instead of `node` to match the Splice metrics
 * Split `CommandFailure` into `InteractiveCommandFailure` and `CommandFailureWithDetails`.
 * `Cli.logLastErrors` default changed from `true` to `false`.
+* Added `rawStorage`, `setupStorage` and `DisableDbStorageIdempotency` to `DbTest` to allow better access to non-doubled writes.
 * Added better logging of setup and cleanup failures in `DbTest`
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
