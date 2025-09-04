@@ -33,8 +33,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     override val store: Store,
     ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -67,7 +65,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       backoffClock = triggerContext.pollingClock,
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
-      ingestFromParticipantBegin,
     )
   )
 
@@ -80,7 +77,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       backoffClock = triggerContext.pollingClock,
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
-      ingestUpdateHistoryFromParticipantBegin,
     )
   )
 

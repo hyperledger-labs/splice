@@ -30,8 +30,6 @@ class ExternalPartyWalletAutomationService(
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -45,8 +43,6 @@ class ExternalPartyWalletAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =

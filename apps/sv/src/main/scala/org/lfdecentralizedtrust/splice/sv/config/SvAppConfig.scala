@@ -293,8 +293,6 @@ case class SvAppBackendConfig(
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(2),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
-    ingestFromParticipantBegin: Boolean = true,
-    ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     extraBeneficiaries: Seq[BeneficiaryConfig] = Seq.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],

@@ -33,7 +33,6 @@ class UpdateIngestionService(
     backoffClock: Clock,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
-    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

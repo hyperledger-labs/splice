@@ -62,8 +62,6 @@ class SplitwellAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin = true,
-      ingestUpdateHistoryFromParticipantBegin = true,
     ) {
 
   override def companion
