@@ -11,10 +11,6 @@ Release Notes
 Upcoming
 --------
 
-- SV app
-
-   - Add the option to ignore certain parties when running expiry on reward contracts. This can added to the app configuration. Example: ``canton.sv-apps.sv.automation.ignored-expired-rewards-party-ids = [ "test-party::1220b3eeb21b02e14945e419c5d9e986ce8102171c50e1444010ab054e11eba262c9" ]`` 
-
 - Canton
 
     - SV
@@ -37,6 +33,14 @@ Upcoming
 
      - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
      - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
+
+0.4.14
+------
+
+- SV app
+
+   - Add the option to ignore certain parties when running expiry on reward contracts. This can added to the app configuration. Example: ``canton.sv-apps.sv.automation.ignored-expired-rewards-party-ids = [ "test-party::1220b3eeb21b02e14945e419c5d9e986ce8102171c50e1444010ab054e11eba262c9" ]``
+
 
 0.4.13
 ------
