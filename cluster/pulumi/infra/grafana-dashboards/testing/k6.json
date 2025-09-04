@@ -17,8 +17,8 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "id": 3423,
+  "graphTooltip": 2,
+  "id": 5097,
   "links": [
     {
       "asDropdown": false,
@@ -71,7 +71,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
+        "h": 7,
         "w": 6,
         "x": 0,
         "y": 1
@@ -143,7 +143,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
+        "h": 7,
         "w": 6,
         "x": 6,
         "y": 1
@@ -213,8 +213,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 12,
+        "h": 7,
+        "w": 8,
         "x": 12,
         "y": 1
       },
@@ -261,158 +261,6 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "The time it takes for a transaction to complete successfully (recipient accepts TransferOffer)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "blue",
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "log": 2,
-              "type": "log"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 1,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue"
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total time"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Total time"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "id": 29,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.0.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(k6_create_offer_latency_seconds[$__rate_interval])))",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "create",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(k6_offer_sync_latency_seconds[$__rate_interval])))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "sync",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(k6_accept_offer_latency_seconds[$__rate_interval])))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "accept",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "name": "Expression",
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "expression": "$A + $B + $C",
-          "hide": false,
-          "refId": "Total time",
-          "type": "math"
-        }
-      ],
-      "title": "Transaction Latency",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
       "description": "On non-devnet environments, end users get 1000 amulets from the validator for transfers.",
       "fieldConfig": {
         "defaults": {
@@ -443,10 +291,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 7,
         "w": 4,
-        "x": 12,
-        "y": 4
+        "x": 20,
+        "y": 1
       },
       "id": 30,
       "options": {
@@ -549,10 +397,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 4
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 8
       },
       "id": 28,
       "options": {
@@ -564,7 +412,7 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -581,7 +429,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "completed {{scenario}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -589,10 +437,162 @@
       ],
       "title": "Transaction Rate",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "The time it takes for a transaction to complete successfully (recipient accepts TransferOffer)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 2,
+              "type": "log"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total time"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total time"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.0.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_create_offer_latency_seconds[$__rate_interval])))",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "create",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_offer_sync_latency_seconds[$__rate_interval])))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "sync",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_accept_offer_latency_seconds[$__rate_interval])))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "accept",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "name": "Expression",
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "$A + $B + $C",
+          "hide": false,
+          "refId": "Total time",
+          "type": "math"
+        }
+      ],
+      "title": "Transaction Latency",
+      "type": "timeseries"
     }
   ],
   "preload": false,
-  "refresh": "5s",
+  "refresh": "1m",
   "schemaVersion": 41,
   "tags": [
     "prometheus",
@@ -685,5 +685,5 @@
   "timezone": "",
   "title": "k6 Load Tester (custom metrics)",
   "uid": "ccbb2351-2ae2-462f-ae0e-f2c893ad1028",
-  "version": 1
+  "version": 4
 }

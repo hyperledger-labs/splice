@@ -26,10 +26,13 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   rest.get(`${svUrl}/v0/admin/authorization`, (_, res, ctx) => {
     return res(ctx.status(200));
   }),
+
   dsoInfoHandler(svUrl),
+
   rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
     return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
   }),
+
   rest.get(`${svUrl}/v0/admin/sv/voterequests/:id`, (req, res, ctx) => {
     const { id } = req.params;
     return res(
@@ -40,9 +43,23 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       })
     );
   }),
+
+  rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+    return res(ctx.json({}));
+
+    // Use this to test a failed response
+    // return res(
+    //   ctx.status(503),
+    //   ctx.json({
+    //     error: 'Service Unavailable',
+    //   })
+    // );
+  }),
+
   rest.post(`${svUrl}/v0/admin/sv/voterequest`, (_, res, ctx) => {
     return res(ctx.json<ListVoteRequestByTrackingCidResponse>(voteRequest));
   }),
+
   rest.post(`${svUrl}/v0/admin/sv/voteresults`, (req, res, ctx) => {
     return req.json().then(data => {
       if (data.actionName === 'SRARC_SetConfig') {
@@ -118,9 +135,11 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       }
     });
   }),
+
   rest.post(`${svUrl}/v0/admin/sv/votes`, (_, res, ctx) => {
     return res(ctx.status(201));
   }),
+
   rest.get(`${svUrl}/v0/admin/domain/cometbft/debug`, (_, res, ctx) => {
     return res(
       ctx.status(404),
@@ -129,6 +148,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       })
     );
   }),
+
   rest.get(`${svUrl}/v0/admin/domain/sequencer/status`, (_, res, ctx) => {
     return res(
       ctx.json<SuccessStatusResponse>({
@@ -144,6 +164,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       })
     );
   }),
+
   rest.get(`${svUrl}/v0/admin/domain/mediator/status`, (_, res, ctx) => {
     return res(
       ctx.json<SuccessStatusResponse>({
@@ -159,8 +180,10 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       })
     );
   }),
+
   rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
     return res(ctx.json<FeatureSupportResponse>({ my_feature: false }));
   }),
+
   validatorLicensesHandler(svUrl),
 ];

@@ -450,3 +450,16 @@ To make sure your lock files match CI, run the following steps:
 1. `find . -name '.daml' | xargs rm -r`
 2. `sbt compile`
 3. Check-in the updated lock file which should now match CI.
+
+## Cpu.registerObservers exception
+
+If you are encountering an exception:
+```
+Exception in thread "main" java.lang.ExceptionInInitializerError
+        at io.opentelemetry.instrumentation.runtimemetrics.java8.Cpu.registerObservers(Cpu.java:51)
+        at com.digitalasset.canton.metrics.MetricsConfig$JvmMetrics$.setup(MetricsRegistry.scala:97)
+[...]
+Caused by: java.lang.NullPointerException: Cannot invoke "jdk.internal.platform.CgroupInfo.getMountPoint()" because "anyController" is null
+        at java.base/jdk.internal.platform.cgroupv2.CgroupV2Subsystem.getInstance(CgroupV2Subsystem.java:80)
+```
+in start-canton.sh, try adding: `export ADDITIONAL_JAVA_TOOLS_OPTIONS="-XX:-UseContainerSupport"` to .envrc.private

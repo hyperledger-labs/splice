@@ -1552,9 +1552,10 @@ class WalletTxLogIntegrationTest
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
-      val previousEventId = sv1WalletClient
-        .listTransactions(None, Limit.MaxPageSize)
-        .headOption
+      val previousEventId = withoutDevNetTopups(
+        sv1WalletClient
+          .listTransactions(None, Limit.MaxPageSize)
+      ).headOption
         .map(_.eventId)
 
       val amuletAmount = BigDecimal(42)
@@ -1619,6 +1620,27 @@ class WalletTxLogIntegrationTest
         ),
         entries => forAll(entries)(_.errorMessage should include("Failed to parse transaction")),
       )
+    }
+
+    "not blow up with failed CO_TransferPreapprovalSend" in { implicit env =>
+      // Note: using Alice and Charlie because manually creating subscriptions requires both
+      // the sender and the receiver to be hosted on the same participant.
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+
+      aliceValidatorWalletClient.tap(100) // funds to create preapproval
+      createTransferPreapprovalIfNotExists(charlieWalletClient)
+
+      assertCommandFailsDueToInsufficientFunds(
+        aliceWalletClient.transferPreapprovalSend(
+          charlieUserParty,
+          BigDecimal(10000000),
+          UUID.randomUUID().toString,
+          Some("this should not go through"),
+        )
+      )
+
+      aliceWalletClient.listTransactions(None, Limit.MaxPageSize) shouldBe empty
     }
 
   }

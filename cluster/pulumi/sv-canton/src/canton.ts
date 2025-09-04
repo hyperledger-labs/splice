@@ -116,6 +116,7 @@ export function installCantonComponents(
     );
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(
+          svConfig,
           migrationId,
           svConfig.ingressName,
           xns,

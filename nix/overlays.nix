@@ -62,7 +62,16 @@
   pre-commit = super.pre-commit.overrideAttrs (old: {
     doCheck = false;
   });
-  geckodriver = super.callPackage ./geckodriver.nix { inherit (super.darwin.apple_sdk.frameworks) Security; };
+  geckodriver = (
+    super.callPackage ./geckodriver.nix { inherit (super.darwin.apple_sdk.frameworks) Security; }
+  ).overrideAttrs (oldAttrs: {
+    cargoDeps = oldAttrs.cargoDeps.overrideAttrs (oldAttrs: {
+      buildPhase = builtins.replaceStrings
+        [ "/etc/ssl/certs/ca-bundle.crt\n" ]
+        [ "/etc/ssl/certs/ca-bundle.crt\nunset CARGO_HTTP_CAINFO NIX_SSL_CERT_FILE SSL_CERT_FILE\n" ]  # This is a workaround for Cargo to work behind MITM proxy, see https://github.com/NixOS/nixpkgs/issues/304483
+        (oldAttrs.buildPhase or "");
+    });
+  });
   git-search-replace = super.callPackage ./git-search-replace.nix {};
   sphinx-lint = super.callPackage ./sphinx-lint.nix {};
   jsonnet = super.callPackage ./jsonnet.nix {};

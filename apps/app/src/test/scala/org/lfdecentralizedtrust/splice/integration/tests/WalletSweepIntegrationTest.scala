@@ -222,7 +222,7 @@ abstract class WalletSweepIntegrationTest
           50.0
         ) // validator needs to have some funds to create preapproval
         walletClient.tap(50.0)
-        walletClient.createTransferPreapproval()
+        createTransferPreapprovalIfNotExists(walletClient)
       },
     )(
       "Transfer preapproval is visible in scan",
