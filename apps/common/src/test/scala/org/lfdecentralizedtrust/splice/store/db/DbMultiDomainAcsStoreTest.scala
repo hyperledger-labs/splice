@@ -523,7 +523,7 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
-    "hasArchived should return true for archived contracts" in {
+    "containsArchived should return true for archived contracts" in {
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = 1L)
       val coupon1 = c(1)
       val coupon2 = c(2)
@@ -535,13 +535,13 @@ class DbMultiDomainAcsStoreTest
         _ <- d1.create(coupon3)(store)
         _ <- d1.archive(coupon1)(store)
         _ <- d1.archive(coupon2)(store)
-        _ = store.hasArchived(Seq(coupon1.contractId)).futureValue shouldBe true
-        _ = store.hasArchived(Seq(coupon1.contractId, coupon2.contractId)).futureValue shouldBe true
+        _ = store.containsArchived(Seq(coupon1.contractId)).futureValue shouldBe true
+        _ = store.containsArchived(Seq(coupon1.contractId, coupon2.contractId)).futureValue shouldBe true
         _ = store
-          .hasArchived(Seq(coupon2.contractId, coupon3.contractId))
-          .futureValue shouldBe false
-        _ = store.hasArchived(Seq(coupon3.contractId)).futureValue shouldBe false
-        _ = store.hasArchived(Seq()).futureValue shouldBe true
+          .containsArchived(Seq(coupon2.contractId, coupon3.contractId))
+          .futureValue shouldBe true
+        _ = store.containsArchived(Seq(coupon3.contractId)).futureValue shouldBe false
+        _ = store.containsArchived(Seq()).futureValue shouldBe true
       } yield succeed
     }
   }

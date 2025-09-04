@@ -57,7 +57,7 @@ class ExpireRewardCouponsTrigger(
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
       tc: TraceContext
-  ): Future[Boolean] = store.multiDomainAcsStore.hasArchived(
+  ): Future[Boolean] = store.multiDomainAcsStore.containsArchived(
     expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons ++ expiredRewardsTask.validatorLivenessActivityRecords ++ expiredRewardsTask.svRewardCoupons
   )
 
