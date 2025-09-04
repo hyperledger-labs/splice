@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -32,6 +33,7 @@ import scala.util.Random
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
+    ignoredExpiredRewardsPartyIds: Set[PartyId],
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -48,6 +50,7 @@ class ExpireRewardCouponsTrigger(
       .getExpiredCouponsInBatchesPerRoundAndCouponType(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
+        ignoredExpiredRewardsPartyIds,
         PageLimit.tryCreate(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize),
       )
       // We select at most parallelism batches per round as  processing more than that would most likely just hit contention
