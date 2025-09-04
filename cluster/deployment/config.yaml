@@ -137,19 +137,3 @@ svs:
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true
-  # keys are the node names == k8s namespace
-  sv-1:
-    publicName: Digital-Asset-2
-    subdomain: sv-2
-    cometbft:
-      keysGcpSecret: sv1-cometbft-keys
-      nodeId: 5af57aa83abcec085c949323ed8538108757be9c
-      validatorKeyAddress: 8A931AB5F957B8331BDEF3A0A081BD9F017A777F
-      nodeIndex: 1
-    svApp:
-      auth0Name: sv-1
-      sweep:
-        fromEnv: SV1
-    validatorApp:
-      walletUser: auth0|64afbc0956a97fe9577249d7
-      auth0Name: sv1_validator

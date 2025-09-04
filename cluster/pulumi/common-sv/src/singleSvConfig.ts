@@ -10,7 +10,6 @@ const SvCometbftConfigSchema = z.object({
   nodeId: z.string().optional(),
   validatorKeyAddress: z.string().optional(),
   keysGcpSecret: z.string().optional(),
-  nodeIndex: z.number().optional(),
   snapshotName: z.string().optional(),
 }).strict();
 const EnvVarConfigSchema = z.object({
@@ -25,13 +24,17 @@ const SvParticipantConfigSchema = z.object({
   bftSequencerConnection: z.boolean().optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
 }).strict();
+const Auth0ConfigSchema = z.object({
+  name: z.string().optional(),
+  clientId: z.string().optional(),
+}).strict();
 const SvAppConfigSchema = z.object({
   // TODO(tech-debt) inline env var into config.yaml
   sweep: z.object({
     fromEnv: z.string(),
   }).optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-  auth0Name: z.string().optional(),
+  auth0: Auth0ConfigSchema.optional(),
 }).strict();
 const ScanAppConfigSchema = z.object({
   bigQuery: z.object({
@@ -42,9 +45,9 @@ const ScanAppConfigSchema = z.object({
 }).strict();
 const ValidatorAppConfigSchema = z.object({
   walletUser: z.string().optional(),
-  // TODO use me
+  // TODO use me (drive-by fix)
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-  auth0Name: z.string().optional(),
+  auth0: Auth0ConfigSchema.optional(),
 }).strict();
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
@@ -83,7 +86,7 @@ export type SingleSvConfiguration = z.infer<typeof SingleSvConfigSchema>;
 
 const clusterSvsConfiguration: SingleSvConfig = SvsConfigurationSchema.parse(clusterYamlConfig).svs;
 
-// TODO function to get all keys...
+export const allConfiguredSvs = Object.keys(clusterSvsConfiguration).filter((k) => k !== 'default');
 
 export const configForSv = (svName: string): SingleSvConfiguration => {
   return merge({}, clusterSvsConfiguration.default, clusterSvsConfiguration[svName]);
