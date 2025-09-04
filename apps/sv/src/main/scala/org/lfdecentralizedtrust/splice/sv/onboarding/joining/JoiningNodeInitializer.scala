@@ -58,7 +58,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -139,6 +139,8 @@ class JoiningNodeInitializer(
         SequencerConnections.tryMany(
           Seq(GrpcSequencerConnection.tryCreate(url)),
           PositiveInt.one,
+          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification,
         ),
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.

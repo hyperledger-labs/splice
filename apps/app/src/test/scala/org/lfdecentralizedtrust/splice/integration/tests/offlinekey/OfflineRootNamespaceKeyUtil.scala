@@ -124,8 +124,8 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
     val encryptionKey =
       node.keys.secret.generate_encryption_key("ecryption")
     node.topology.owner_to_key_mappings.propose(
-        node.id.member,
-        NonEmpty(Seq, signingKey, encryptionKey),
+      node.id.member,
+      NonEmpty(Seq, signingKey, encryptionKey),
       Some(PositiveInt.one),
       signedBy = Seq(delegatedNamespaceKey.fingerprint, signingKey.fingerprint),
     )

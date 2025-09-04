@@ -72,6 +72,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             readAs: Seq[PartyId] = Seq.empty,
             userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+            includeCreatedEventBlob: Boolean = false,
         ): JavaTransaction = {
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
@@ -95,6 +96,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 userId = userId,
                 packageIdSelectionPreference = Seq.empty,
                 transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                includeCreatedEventBlob = includeCreatedEventBlob,
               )
             )
           }

@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -93,6 +94,8 @@ class ReconcileSequencerConnectionsTrigger(
                     SequencerConnections.tryMany(
                       nonEmptyConnections.forgetNE,
                       Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                      // TODO(#2110) Rethink this when we enable sequencer connection pools.
+                      sequencerLivenessMargin = NonNegativeInt.zero,
                       submissionRequestAmplification = SubmissionRequestAmplification(
                         Thresholds.sequencerSubmissionRequestAmplification(
                           nonEmptyConnections.size

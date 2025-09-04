@@ -183,6 +183,8 @@ class SV1Initializer(
               )
             ),
             PositiveInt.one,
+            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
           ),
           manualConnect = false,
