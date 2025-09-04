@@ -553,6 +553,139 @@ const all_stats = new BQTableFunction(
   `
 );
 
+const all_stats_struct = new BQScalarFunction(
+  'all_stats_struct',
+  as_of_args,
+  new BQStruct([
+    // FIXME: can we auto-generate at least some of the places where we list all stats?
+    new BQStructField('as_of_record_time', TIMESTAMP),
+    new BQStructField('migration_id', INT64),
+    new BQStructField('locked', BIGNUMERIC),
+    new BQStructField('unlocked', BIGNUMERIC),
+    new BQStructField('current_supply_total', BIGNUMERIC),
+    new BQStructField('unminted', BIGNUMERIC),
+    new BQStructField('minted', BIGNUMERIC),
+    new BQStructField('allowed_mint', BIGNUMERIC),
+    new BQStructField('burned', BIGNUMERIC),
+    new BQStructField('monthly_burn', BIGNUMERIC),
+    new BQStructField('num_amulet_holders', INT64),
+    new BQStructField('num_active_validators', INT64),
+    new BQStructField('average_tps', FLOAT64),
+    new BQStructField('peak_tps', FLOAT64),
+  ]),
+  `
+    (SELECT
+      STRUCT(
+        as_of_record_time,
+        migration_id,
+        locked,
+        unlocked,
+        current_supply_total,
+        unminted,
+        minted,
+        allowed_mint,
+        burned,
+        monthly_burn,
+        num_amulet_holders,
+        num_active_validators,
+        average_tps,
+        peak_tps
+      )
+    FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(as_of_record_time, migration_id))
+  `
+);
+
+const all_days_since_genesis = new BQTableFunction(
+  'all_days_since_genesis',
+  [],
+  [new BQColumn('as_of_record_time', TIMESTAMP)],
+  `
+    -- Generate all days since genesis (first record time in the scan dataset) until today.
+    SELECT
+      TIMESTAMP(day) as as_of_record_time
+    FROM
+      UNNEST(GENERATE_DATE_ARRAY(DATE(TIMESTAMP_MICROS(
+        (SELECT record_time FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` ORDER BY record_time LIMIT 1)
+      )), DATE(CURRENT_TIMESTAMP))) as day
+  `
+);
+
+// FIXME: de-hardcode the project name below
+const days_with_missing_stats = new BQTableFunction(
+  'days_with_missing_stats',
+  [],
+  [new BQColumn('as_of_record_time', TIMESTAMP)],
+  `
+    -- Find all days since genesis for which we do not have a stats entry at all, or its lacking some fields.
+    SELECT as_of_record_time
+      FROM \`$$FUNCTIONS_DATASET$$.all_days_since_genesis\`()
+      EXCEPT DISTINCT
+        SELECT
+          as_of_record_time
+          FROM \`da-cn-scratchnet.dashboards.dashboards-data\`
+          WHERE
+            locked IS NOT NULL
+            AND unlocked IS NOT NULL
+            AND current_supply_total IS NOT NULL
+            AND unminted IS NOT NULL
+            AND minted IS NOT NULL
+            AND allowed_mint IS NOT NULL
+            AND burned IS NOT NULL
+            AND monthly_burn IS NOT NULL
+            AND num_amulet_holders IS NOT NULL
+            AND num_active_validators IS NOT NULL
+            AND average_tps IS NOT NULL
+            AND peak_tps IS NOT NULL
+    `
+);
+
+const fill_all_stats = new BQProcedure(
+  'fill_all_stats',
+  [],
+  `
+    CREATE TEMP TABLE temp_new_stats AS
+    SELECT
+      t.as_of_record_time,
+      0 as migration_id, -- FIXME: real migration_id
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).locked,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).unlocked,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).current_supply_total,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).unminted,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).minted,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).allowed_mint,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).burned,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).monthly_burn,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).num_amulet_holders,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).num_active_validators,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).average_tps,
+      \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).peak_tps
+    FROM
+      (SELECT * FROM \`$$FUNCTIONS_DATASET$$.days_with_missing_stats\`()) AS t;
+
+
+    MERGE \`da-cn-scratchnet.dashboards.dashboards-data\` T
+    USING temp_new_stats S
+    ON T.as_of_record_time = S.as_of_record_time
+    WHEN MATCHED THEN
+      UPDATE SET
+        T.locked = S.locked,
+        T.unlocked = S.unlocked,
+        T.current_supply_total = S.current_supply_total,
+        T.unminted = S.unminted,
+        T.minted = S.minted,
+        T.allowed_mint = S.allowed_mint,
+        T.burned = S.burned,
+        T.monthly_burn = S.monthly_burn,
+        T.num_amulet_holders = S.num_amulet_holders,
+        T.num_active_validators = S.num_active_validators,
+        T.average_tps = S.average_tps,
+        T.peak_tps = S.peak_tps
+      WHEN NOT MATCHED THEN
+        INSERT ROW;
+  `
+)
+
+
 export const allFunctions = [
   iso_timestamp,
   daml_prim_path,

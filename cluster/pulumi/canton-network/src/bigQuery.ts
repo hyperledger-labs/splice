@@ -188,6 +188,54 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
+<<<<<<< HEAD
+=======
+// FIXME: deletable on non-prod (currently fails a reset)
+function installDashboardDataset(
+  scanBigQuery: ScanBigQueryConfig,
+): gcp.bigquery.Dataset {
+  const datasetName = 'dashboards';
+  const dataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  const dataTableName = 'dashboards-data';
+  new gcp.bigquery.Table(
+    dataTableName, {
+    datasetId: dataset.datasetId,
+    tableId: dataTableName,
+    friendlyName: `${dataTableName} Table`,
+    schema: JSON.stringify([
+      // FIXME: auto-generate from all_stats?
+      { name: 'as_of_record_time', type: 'TIMESTAMP', mode: 'REQUIRED' },
+      { name: 'migration_id', type: 'INT64', mode: 'REQUIRED' },
+      { name: 'locked', type: 'BIGNUMERIC' },
+      { name: 'unlocked', type: 'BIGNUMERIC' },
+      { name: 'current_supply_total', type: 'BIGNUMERIC' },
+      { name: 'unminted', type: 'BIGNUMERIC' },
+      { name: 'minted', type: 'BIGNUMERIC' },
+      { name: 'allowed_mint', type: 'BIGNUMERIC' },
+      { name: 'burned', type: 'BIGNUMERIC' },
+      { name: 'monthly_burn', type: 'BIGNUMERIC' },
+      { name: 'num_amulet_holders', type: 'INT64' },
+      { name: 'num_active_validators', type: 'INT64' },
+      { name: 'average_tps', type: 'FLOAT64' },
+      { name: 'peak_tps', type: 'FLOAT64' },
+    ])
+  }, { dependsOn: [dataset] }
+  );
+
+  return dataset;
+};
+
+
+>>>>>>> 28d294f07 (wip)
 function installFunctions(
   scanDataset: gcp.bigquery.Dataset,
   dependsOn: pulumi.Resource[]
