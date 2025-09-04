@@ -597,7 +597,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
-        // internally-derived metrics
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
         ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
         ("num_amulet_holders", results.numAmuletHolders, amuletHolders),

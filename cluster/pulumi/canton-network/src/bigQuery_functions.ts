@@ -151,6 +151,22 @@ const up_to_time = new BQScalarFunction(
   `
 );
 
+const migration_id_at_time = new BQScalarFunction(
+  'migration_id_at_time',
+  [new BQFunctionArgument('as_of_record_time', TIMESTAMP)],
+  INT64,
+  `
+    -- Given a record time, find the latest migration ID that was active at that time. Takes the lowest ID that has updates
+    -- after the given time, therefore if the timestamp is during a migration, it will return the older migration ID.
+    (SELECT
+      MIN(migration_id)
+    FROM
+      ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
+      (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+    WHERE record_time > UNIX_MICROS(as_of_record_time))
+  `
+);
+
 const sum_bignumeric_acs = new BQScalarFunction(
   'sum_bignumeric_acs',
   [
@@ -512,6 +528,7 @@ const all_stats = new BQTableFunction(
     new BQColumn('minted', BIGNUMERIC),
     new BQColumn('allowed_mint', BIGNUMERIC),
     new BQColumn('burned', BIGNUMERIC),
+    new BQColumn('monthly_burn', BIGNUMERIC),
     new BQColumn('num_amulet_holders', INT64),
     new BQColumn('num_active_validators', INT64),
     new BQColumn('average_tps', FLOAT64),
@@ -528,6 +545,7 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) as minted,
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
       \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) as burned,
+      \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))) as monthly_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
       \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
       \`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id) as average_tps,
@@ -542,6 +560,7 @@ export const allFunctions = [
   daml_record_numeric,
   in_time_window,
   up_to_time,
+  migration_id_at_time,
   sum_bignumeric_acs,
   locked,
   unlocked,
