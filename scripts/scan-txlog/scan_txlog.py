@@ -3287,8 +3287,8 @@ class State:
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
             if (
-                isinstance(event, ExercisedEvent)
-                and event.choice_name == "AmuletRules_ClaimExpiredRewardCoupons"
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_ClaimExpiredRewards"
             ):
                 event = child_event
         rewards = []

@@ -93,21 +93,21 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
       /Unable to perform pointer interaction/
     );
 
-    screen.getByText('Summary is required');
-    screen.getByText('Invalid URL');
+    expect(screen.getByText('Summary is required')).toBeDefined();
+    expect(screen.getByText('Invalid URL')).toBeDefined();
 
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
     expect(summaryInput).toBeDefined();
-    user.type(summaryInput, 'Summary of the proposal');
+    await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('set-amulet-config-rules-url');
     expect(urlInput).toBeDefined();
-    user.type(urlInput, 'https://example.com');
+    await user.type(urlInput, 'https://example.com');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBeNull();
   });
 
   test('expiry date must be in the future', async () => {
@@ -169,7 +169,9 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    waitFor(() => {
+      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    });
   });
 
   test('changing config fields should render the current value', async () => {
@@ -195,5 +197,41 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     const changes = screen.getAllByTestId('config-current-value', { exact: false });
     expect(changes.length).toBe(2);
+  });
+
+  test('should show proposal review page after form completion', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('set-amulet-config-rules-action');
+
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
+    await user.type(c2Input, '9.99');
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton);
+
+    expect(screen.getByText('Proposal Summary')).toBeDefined();
   });
 });

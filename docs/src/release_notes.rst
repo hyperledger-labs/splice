@@ -11,9 +11,55 @@ Release Notes
 Upcoming
 --------
 
-- SV Deployment
+- Canton
 
-  - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
+    - SV
+        - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
+
+    - Ledger API
+
+        - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
+          a prepared transaction can be used.
+
+- Docs
+
+  - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
+    including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
+  - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
+
+- Deployment
+
+  - Cometbft
+
+     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
+     - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
+
+0.4.13
+------
+
+- Deployment
+
+  - SV
+    - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
+
+  - Cometbft
+
+    - State sync is disabled by default.
+      State sync introduces a dependency on the sponsoring node for fetching the state snapshot on
+      startup and therefore a single point of failure. It should only be enabled when joining a
+      new node to a chain that has already been running for a while. In all other cases, including
+      for a new node after it has completed initialization and after network resets, state sync
+      should be disabled.
+
+  - Observability
+
+    - Global Synchronizer Utilization dashboard now includes an average over an hour of the transaction rate.
+    - Canton/Sequencer Messages dashboard now includes hourly totals, and a pie chart of the
+      distribution of message types over the last 24 hours.
+
+- Validator Compose Deployment
+
+  - Expose Canton ledger API by default. Reference the  :ref:`docs <compose_canton_apis>` for details.
 
 - Daml
 
@@ -35,7 +81,6 @@ Upcoming
      wallet             0.1.13
      walletPayments     0.1.13
      ================== =======
-
 
 0.4.12
 ------

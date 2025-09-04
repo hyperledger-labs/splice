@@ -106,8 +106,14 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
   chartVersion: 1.2.3
+  adaptiveScenario:
+    enabled: true
 svs:
   default:
+    scanApp:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
     svApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME

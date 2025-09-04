@@ -529,7 +529,10 @@ class DbSvDsoStore(
       } yield applyLimit(opName, totalCouponsLimit, result).map { case (round, batch) =>
         RoundBatch(
           round,
-          batch.map(cid => companionClass.toContractId(companion, cid.contractId)).toSeq,
+          batch
+            .take(totalCouponsLimit.limit)
+            .map(cid => companionClass.toContractId(companion, cid.contractId))
+            .toSeq,
         )
       }
     }

@@ -19,21 +19,21 @@ object CantonDependencies {
     if (sys.props("os.name").contains("Mac")) "osx"
     else sys.props("os.name").toLowerCase
 
-  lazy val scala_version = "2.13.15"
+  lazy val scala_version = "2.13.16"
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val apispec_version = "0.11.7"
-  lazy val pekko_version = "1.1.2"
-  lazy val pekko_http_version = "1.1.0"
+  lazy val pekko_version = "1.2.0"
+  lazy val pekko_http_version = "1.2.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.67.1"
+  lazy val grpc_version = "1.75.0"
   lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "3.0.0"
+  lazy val ammonite_version = "3.0.1"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
@@ -48,7 +48,7 @@ object CantonDependencies {
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
 
-  lazy val netty_version = "4.1.110.Final"
+  lazy val netty_version = "4.1.124.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -137,7 +137,7 @@ object CantonDependencies {
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.65.Final"
+  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.72.Final"
   lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
   lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.41.0"
@@ -204,8 +204,8 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val opentelemetry_version = "1.36.0"
-  lazy val opentelemetry_java_instrumentation_version = "2.2.0"
+  lazy val opentelemetry_version = "1.43.0"
+  lazy val opentelemetry_java_instrumentation_version = "2.9.0"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
   lazy val opentelemetry_sdk_testing =
