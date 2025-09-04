@@ -16,6 +16,11 @@ Upcoming
     - SV
         - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
 
+    - Ledger API
+
+        - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
+          a prepared transaction can be used.
+
 - Docs
 
   - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
@@ -26,7 +31,7 @@ Upcoming
 
   - Cometbft
 
-     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage. 
+     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
      - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
 
 0.4.13
