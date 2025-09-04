@@ -43,8 +43,6 @@ class UserWalletAutomationService(
     scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
     packageVersionSupport: PackageVersionSupport,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     validatorTopupConfigO: Option[ValidatorTopupConfig],
     walletSweep: Option[WalletSweepConfig],
@@ -64,8 +62,6 @@ class UserWalletAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService.type =

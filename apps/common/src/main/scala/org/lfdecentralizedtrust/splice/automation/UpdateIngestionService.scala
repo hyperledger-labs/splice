@@ -33,7 +33,6 @@ class UpdateIngestionService(
     backoffClock: Clock,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
-    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -59,30 +58,26 @@ class UpdateIngestionService(
           for {
             _ <- ingestAcsAndInFlight(offset)
           } yield offset
+        case IngestionStart.InitializeAtParticipantBegin =>
+          for {
+            participantBegin <- connection.latestPrunedOffset()
+            _ = logger.debug(
+              s"Starting ingestion from participant begin at $participantBegin"
+            )
+            _ <- ingestionSink
+              .ingestAcs(
+                participantBegin,
+                Seq.empty,
+                Seq.empty,
+                Seq.empty,
+              )
+          } yield participantBegin
         case IngestionStart.InitializeAcsAtLatestOffset =>
           for {
-            offset <-
-              if (ingestFromParticipantBegin) {
-                for {
-                  participantBegin <- connection.latestPrunedOffset()
-                  _ = logger.debug(
-                    s"Starting ingestion from participant begin at $participantBegin"
-                  )
-                  _ <- ingestionSink
-                    .ingestAcs(
-                      participantBegin,
-                      Seq.empty,
-                      Seq.empty,
-                      Seq.empty,
-                    )
-                } yield participantBegin
-              } else
-                for {
-                  acsOffset <- connection.ledgerEnd()
-                  _ = logger.debug(s"Starting ingestion from ledger end at $acsOffset")
-                  _ <- ingestAcsAndInFlight(acsOffset)
-                } yield acsOffset
-          } yield offset
+            acsOffset <- connection.ledgerEnd()
+            _ = logger.debug(s"Starting ingestion from ledger end at $acsOffset")
+            _ <- ingestAcsAndInFlight(acsOffset)
+          } yield acsOffset
       }
     } yield new SpliceLedgerSubscription(
       source = connection.updates(subscribeFrom, filter),
