@@ -403,12 +403,11 @@ class DatabaseSequencer(
         }
     } yield report
 
-  override def locatePruningTimestamp(index: PositiveInt)(implicit
+  override def findPruningTimestamp(index: PositiveInt)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, PruningSupportError, Option[CantonTimestamp]] =
     EitherT.right[PruningSupportError](
-      sequencerStore
-        .locatePruningTimestamp(NonNegativeInt.tryCreate(index.value - 1))
+      sequencerStore.findPruningTimestamp(NonNegativeInt.tryCreate(index.value - 1))
     )
 
   override def reportMaxEventAgeMetric(
@@ -484,6 +483,7 @@ class DatabaseSequencer(
       reader,
       eventSignaller,
       sequencerStore,
+      cryptoApi,
     )(logger)
 
   override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit

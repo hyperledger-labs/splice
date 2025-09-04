@@ -6,7 +6,10 @@ package com.digitalasset.canton.integration.tests.traffic
 import cats.syntax.functor.*
 import com.daml.ledger.api.v2.commands.Command
 import com.digitalasset.canton.admin.api.client.data.ParticipantStatus.SubmissionReady
-import com.digitalasset.canton.admin.api.client.data.TrafficControlParameters
+import com.digitalasset.canton.admin.api.client.data.{
+  ComponentHealthState,
+  TrafficControlParameters,
+}
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeLong,
@@ -30,6 +33,7 @@ import com.digitalasset.canton.integration.plugins.{
   UseH2,
   UsePostgres,
 }
+import com.digitalasset.canton.integration.tests.TrafficBalanceSupport
 import com.digitalasset.canton.integration.util.OnboardsNewSequencerNode
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -56,6 +60,7 @@ import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSig
 import com.digitalasset.canton.topology.{Member, PartyId}
 import com.digitalasset.canton.{ProtocolVersionChecksFixtureAnyWordSpec, config}
 import monocle.macros.syntax.lens.*
+import org.scalatest.Assertion
 
 import java.time.Duration
 import scala.util.Random
@@ -64,9 +69,8 @@ trait TrafficControlTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with OnboardsNewSequencerNode
-    with ProtocolVersionChecksFixtureAnyWordSpec {
-
-  protected val enableSequencerRestart: Boolean = true
+    with ProtocolVersionChecksFixtureAnyWordSpec
+    with TrafficBalanceSupport {
 
   private val baseEventCost = 500L
   private val trafficControlParameters = TrafficControlParameters(
@@ -81,49 +85,18 @@ trait TrafficControlTest
 
   protected val pruningWindow = config.NonNegativeFiniteDuration.ofSeconds(5)
 
-  private def getTrafficForMember(
-      member: Member
-  )(implicit env: TestConsoleEnvironment): Option[TrafficState] = {
-    import env.*
-
-    sequencer1.traffic_control
-      .traffic_state_of_members_approximate(Seq(member))
-      .trafficStates
-      .get(member)
-  }
-
   private def updateBalanceForMember(
       instance: LocalInstanceReference,
       newBalance: PositiveLong,
-  )(implicit env: TestConsoleEnvironment) = {
-    val member = instance.id.member
-
-    sendTopUp(member, newBalance.toNonNegative)
-
-    eventually() {
-      // Advance the clock just slightly so we can observe the new balance be effective
-      env.environment.simClock.value.advance(Duration.ofMillis(1))
-      getTrafficForMember(member).value.extraTrafficPurchased.value shouldBe newBalance.value
-    }
-  }
-
-  private def sendTopUp(
-      member: Member,
-      newBalance: NonNegativeLong,
-      serialO: Option[PositiveInt] = None,
-  )(implicit
-      env: TestConsoleEnvironment
-  ): PositiveInt = {
-    import env.*
-
-    val serial = serialO
-      .orElse(getTrafficForMember(member).flatMap(_.serial).map(_.increment))
-      .getOrElse(PositiveInt.one)
-
-    sequencer1.traffic_control.set_traffic_balance(member, serial, newBalance)
-
-    serial
-  }
+  )(implicit env: TestConsoleEnvironment): Assertion =
+    updateBalanceForMember(
+      instance,
+      newBalance,
+      () => {
+        // Advance the clock just slightly so we can observe the new balance be effective
+        env.environment.simClock.value.advance(Duration.ofMillis(1))
+      },
+    )
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
@@ -349,50 +322,70 @@ trait TrafficControlTest
     (consumptionRound1 - consumptionRound2) should equal(0L +- 100L)
   }
 
-  "support restarting of sequencers" onlyRunWhen (enableSequencerRestart) in { implicit env =>
+  "support restarting of sequencers" in { implicit env =>
     import env.*
 
     // sanity check, and also makes the latest block only contain events from/to p1
     // When we restart we'll check that p2 recovered its state as well even though it is not in the latest block
-    participant1.health.ping(participant1.id)
+    clue("P1 self-ping sanity-check")(
+      participant1.health.ping(participant1.id)
+    )
 
-    val trafficStateBeforeRestart =
+    val trafficStateBeforeRestart = clue("traffic state before sequencer restart")(
       sequencer1.traffic_control.traffic_state_of_members(
         Seq(participant1.id, participant2.id, mediator1.id, sequencer1.id)
       )
+    )
 
     // Both P1 and P2 should have a status
     trafficStateBeforeRestart.trafficStates.keys should contain(participant1.id)
     trafficStateBeforeRestart.trafficStates.keys should contain(participant2.id)
 
-    loggerFactory.assertLoggedWarningsAndErrorsSeq(
-      {
-        sequencer1.stop()
-        sequencer1.start()
-        sequencer1.health.wait_for_running()
-      },
-      LogEntry.assertLogSeq(
-        Seq.empty,
-        Seq(
-          _.warningMessage should include(LostSequencerSubscription.id),
-          // We may get some failed gRPC calls to the sequencer while it's down (e.g auth token refresh)
-          _.warningMessage should include("Connection refused"),
+    clue("restart sequencer") {
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        {
+          sequencer1.stop()
+          sequencer1.start()
+          sequencer1.health.wait_for_running()
+        },
+        LogEntry.assertLogSeq(
+          mustContainWithClue = Seq.empty,
+          mayContain = Seq(
+            _.warningMessage should include(LostSequencerSubscription.id),
+            // We may get some failed gRPC calls to the sequencer while it's down (e.g auth token refresh)
+            _.warningMessage should include("Connection refused"),
+          ),
         ),
-      ),
-    )
+      )
+    }
 
-    val trafficStateAfterRestart = sequencer1.traffic_control.traffic_state_of_members(
-      Seq(participant1.id, participant2.id, mediator1.id, sequencer1.id)
+    val trafficStateAfterRestart = clue("traffic state after sequencer restart")(
+      sequencer1.traffic_control.traffic_state_of_members(
+        Seq(participant1.id, participant2.id, mediator1.id, sequencer1.id)
+      )
     )
 
     trafficStateBeforeRestart.trafficStates should
       contain theSameElementsAs trafficStateAfterRestart.trafficStates
 
-    eventually() {
-      participant1.health.status.trySuccess.connectedSynchronizers
-        .get(daId) should contain(SubmissionReady(true))
-      participant1.health.ping(participant1.id)
+    clue("advance clock for sequencer pool connection restart") {
+      eventually() {
+        val clock = env.environment.simClock.value
+        // The sequencer connection pool internal mechanisms to restart connections rely on the clock time advancing.
+        // 1 second is the default subscription pool retry delay.
+        clock.advance(Duration.ofSeconds(1))
+
+        participant1.health.status.trySuccess.connectedSynchronizers
+          .get(daId) should contain(SubmissionReady(true))
+
+        mediator1.health.status.trySuccess.components
+          .filter(_.name == "sequencer-client")
+          .loneElement
+          .state shouldBe ComponentHealthState.Ok(None)
+      }
     }
+
+    participant1.health.ping(participant1.id)
 
   }
 
@@ -859,7 +852,6 @@ class TrafficControlTestBftOrderingPostgres
 //  extends TrafficControlTest {
 //  registerPlugin(new UsePostgres(loggerFactory))
 //  registerPlugin(new UseBftOrderingBlockSequencer(loggerFactory))
-//  override protected val enableSequencerRestart: Boolean = false
 //}
 
 // TODO(#16789) Re-enable test once dynamic onboarding is supported for BFT Orderer
@@ -867,5 +859,4 @@ class TrafficControlTestBftOrderingH2
 //  extends TrafficControlTest {
 //  registerPlugin(new UseH2(loggerFactory))
 //  registerPlugin(new UseBftOrderingBlockSequencer(loggerFactory))
-//  override protected val enableSequencerRestart: Boolean = false
 //}

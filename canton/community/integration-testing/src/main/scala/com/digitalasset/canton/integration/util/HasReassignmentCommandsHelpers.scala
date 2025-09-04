@@ -66,7 +66,6 @@ trait HasReassignmentCommandsHelpers {
 
     val updates = participant.ledger_api.updates.reassignments(
       partyIds = Set(submittingParty),
-      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = ledgerEnd,
       verbose = true,
@@ -148,7 +147,6 @@ trait HasReassignmentCommandsHelpers {
 
     val updates = participant.ledger_api.updates.reassignments(
       partyIds = Set(submittingParty),
-      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = ledgerEnd,
       verbose = true,

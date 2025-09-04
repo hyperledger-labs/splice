@@ -252,12 +252,12 @@ class GrpcPartyManagementService(
   ): EitherT[FutureUnlessShutdown, PartyManagementServiceError, Unit] =
     for {
       service <- EitherT.fromOption[FutureUnlessShutdown](
-        sync.internalStateService,
+        sync.internalIndexService,
         PartyManagementServiceError.InternalError.Error("Unavailable internal state service"),
       )
       _ <- EitherT
         .apply[Future, PartyManagementServiceError, Unit](
-          ResourceUtil.withResourceFuture(out)(out =>
+          ResourceUtil.withResourceM(out)(out =>
             service
               .activeContracts(request.parties, Some(request.offset))
               .map(response => response.getActiveContract)

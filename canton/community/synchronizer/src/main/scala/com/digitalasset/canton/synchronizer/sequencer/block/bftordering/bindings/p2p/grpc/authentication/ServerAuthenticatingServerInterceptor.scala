@@ -13,6 +13,7 @@ import com.digitalasset.canton.lifecycle.{
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder.createChannelBuilder
 import com.digitalasset.canton.networking.grpc.GrpcManagedChannel
 import com.digitalasset.canton.sequencing.authentication.grpc.SequencerClientTokenAuthentication
@@ -21,6 +22,7 @@ import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationTokenProvider,
 }
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth.ChannelTokenFetcher
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.authentication.ServerAuthenticatingServerInterceptor.ServerAuthenticatingSimpleForwardingServerCall
 import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -64,18 +66,30 @@ private[bftordering] class ServerAuthenticatingServerInterceptor(
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     Option(requestHeaders.get(AddEndpointHeaderClientInterceptor.ENDPOINT_METADATA_KEY)) match {
       case Some(endpoint) =>
-        logger.debug(s"Found endpoint header: $endpoint")
+        logger.debug(s"Found endpoint header and adding it to the gRPC server context: $endpoint")
         implicit val executor: Executor = (command: Runnable) => ec.execute(command)
         val authenticationServiceChannel = GrpcManagedChannel(
-          s"server-authenticationServiceChannel-${endpoint.address}:${endpoint.port}",
+          s"server-authenticationServiceChannel-$endpoint",
           createChannelBuilder(endpoint.endpointConfig).build(),
           this,
           loggerFactory.getTracedLogger(getClass),
         )
-        next.startCall(
+        // Add the endpoint info sent by the client (`externalAddress`) to the context, so we could use it to find
+        //  a potentially existing outgoing connection rather than accepting the incoming one.
+        val contextWithEndpoint =
+          Context
+            .current()
+            .withValue(
+              ServerAuthenticatingServerInterceptor.peerEndpointContextKey,
+              Some(endpoint),
+            )
+        logger.debug("Intercepting incoming P2P call: performing P2P server authentication")
+        Contexts.interceptCall(
+          contextWithEndpoint,
           new ServerAuthenticatingSimpleForwardingServerCall(
             call,
             tokenProvider,
+            endpoint,
             authenticationServiceChannel,
             synchronizerId,
             member,
@@ -83,6 +97,7 @@ private[bftordering] class ServerAuthenticatingServerInterceptor(
             loggerFactory,
           ),
           requestHeaders,
+          next,
         )
       case _ =>
         logger.error("No authenticated endpoint header found")
@@ -97,15 +112,20 @@ private[bftordering] class ServerAuthenticatingServerInterceptor(
 
 object ServerAuthenticatingServerInterceptor {
 
+  val peerEndpointContextKey: Context.Key[Option[P2PEndpoint]] =
+    Context
+      .keyWithDefault[Option[P2PEndpoint]]("bft-orderer-p2p-peer-endpoint", None)
+
   private class ServerAuthenticatingSimpleForwardingServerCall[ReqT, RespT](
       call: ServerCall[ReqT, RespT],
       tokenProvider: AuthenticationTokenProvider,
+      p2pEndpoint: P2PEndpoint,
       authenticationServiceChannel: GrpcManagedChannel,
       synchronizerId: PhysicalSynchronizerId,
       member: Member,
       timeouts: ProcessingTimeout,
       override val loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext)
+  )(implicit executionContext: ExecutionContext)
       extends SimpleForwardingServerCall[ReqT, RespT](call)
       with NamedLogging {
 
@@ -113,7 +133,11 @@ object ServerAuthenticatingServerInterceptor {
       implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
       val tokenFetcher =
-        new ChannelTokenFetcher(tokenProvider, authenticationServiceChannel)
+        new ChannelTokenFetcher(
+          tokenProvider,
+          Endpoint(p2pEndpoint.address, p2pEndpoint.port),
+          authenticationServiceChannel,
+        )
 
       logger.debug("Retrieving token to authenticate P2P server")
 

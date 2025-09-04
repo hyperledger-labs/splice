@@ -9,7 +9,12 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.{Port, PositiveDouble, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
+  Port,
+  PositiveDouble,
+  PositiveInt,
+}
 import com.digitalasset.canton.config.{
   DefaultProcessingTimeouts,
   LoggingConfig,
@@ -53,7 +58,6 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencer.api.v30.SequencerAuthenticationServiceGrpc.SequencerAuthenticationService
 import com.digitalasset.canton.sequencing.*
-import com.digitalasset.canton.sequencing.ConnectionX.ConnectionXConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionXPool.SequencerConnectionXPoolConfig
 import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationToken,
@@ -76,13 +80,14 @@ import com.digitalasset.canton.topology.store.TopologyStateForInitializationServ
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.{EitherTUtil, PekkoUtil}
 import com.digitalasset.canton.version.{
+  IgnoreInSerializationTestExhaustivenessCheck,
   ProtocolVersion,
   ProtocolVersionCompatibility,
   ReleaseVersion,
   RepresentativeProtocolVersion,
 }
 import com.digitalasset.canton.{config, *}
-import io.grpc.netty.NettyServerBuilder
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import io.grpc.{Server, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -133,7 +138,7 @@ class Env(override val loggerFactory: SuppressingLogger)(implicit
     override protected[this] def logger: TracedLogger = self.logger
   })
 
-  // TODO(i25218): adjust when the new connection pool is stable
+  // TODO(i26481): adjust when the new connection pool is stable
   val useNewConnectionPool: Boolean = BaseTest.testedProtocolVersion >= ProtocolVersion.dev
 
   when(topologyClient.currentSnapshotApproximation(any[TraceContext]))
@@ -293,19 +298,6 @@ class Env(override val loggerFactory: SuppressingLogger)(implicit
   private val expectedSequencers: NonEmpty[Map[SequencerAlias, SequencerId]] =
     NonEmpty.mk(Set, SequencerAlias.Default -> sequencerId).toMap
 
-  private val poolConfig = SequencerConnectionXPoolConfig(
-    connections = NonEmpty(
-      Seq,
-      ConnectionXConfig(
-        name = SequencerAlias.Default.toString,
-        endpoint = Endpoint("localhost", serverPort),
-        transportSecurity = false,
-        customTrustCertificates = None,
-        tracePropagation = TracingConfig.Propagation.Disabled,
-      ),
-    ),
-    trustThreshold = PositiveInt.one,
-  )
   val connectionPoolFactory = new GrpcSequencerConnectionXPoolFactory(
     clientProtocolVersions = NonEmpty(Seq, BaseTest.testedProtocolVersion),
     minimumProtocolVersion = None,
@@ -353,6 +345,12 @@ class Env(override val loggerFactory: SuppressingLogger)(implicit
       ),
     )
 
+    val poolConfig = SequencerConnectionXPoolConfig.fromSequencerConnections(
+      connections,
+      TracingConfig(TracingConfig.Propagation.Disabled),
+      expectedPSIdO = None,
+    )
+
     for {
       connectionPool <- EitherT.fromEither[FutureUnlessShutdown](
         connectionPoolFactory.create(poolConfig).leftMap(error => error.toString)
@@ -386,7 +384,7 @@ class Env(override val loggerFactory: SuppressingLogger)(implicit
           },
           connections,
           synchronizerPredecessor = None,
-          expectedSequencers,
+          Option.when(!useNewConnectionPool)(expectedSequencers),
           connectionPool = connectionPool,
         )
     } yield {
@@ -495,7 +493,7 @@ class GrpcSequencerIntegrationTest
       val client = env.makeDefaultClient.futureValueUS.value
       val result = for {
         response <- client
-          .sendAsync(
+          .send(
             Batch
               .of(
                 testedProtocolVersion,
@@ -569,19 +567,21 @@ class GrpcSequencerIntegrationTest
       )
       sequencedEventStore.store(Seq(dummyEvent))(traceContext, closeContext).futureValueUS
 
-      env.loggerFactory.assertLogs(SuppressionRule.Level(Level.INFO))(
+      env.loggerFactory.assertLogs(
+        SuppressionRule.Level(Level.INFO) && SuppressionRule.forLogger[SequencerClientFactory]
+      )(
         makeClient(
           SequencerConnections
             .many(
               NonEmpty.mk(Seq, connection, makeConnection(port2, sequencerAlias2)),
               sequencerTrustThreshold = PositiveInt.two,
+              sequencerLivenessMargin = NonNegativeInt.zero,
               submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
             )
             .value,
           expectedSequencers = NonEmpty
             .mk(Set, SequencerAlias.Default -> sequencerId, sequencerAlias2 -> sequencerId2)
             .toMap,
-          useNewConnectionPool = false, // Assertions become more complicated otherwise
         ).futureValueUS,
         assertions = _.infoMessage should include(
           "Cannot reach threshold for Retrieving traffic state from synchronizer"
@@ -595,7 +595,9 @@ class GrpcSequencerIntegrationTest
     }
   }
 
-  private case object MockProtocolMessage extends UnsignedProtocolMessage {
+  private case object MockProtocolMessage
+      extends UnsignedProtocolMessage
+      with IgnoreInSerializationTestExhaustivenessCheck {
     override def representativeProtocolVersion: RepresentativeProtocolVersion[companionObj.type] =
       ???
 

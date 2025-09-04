@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.util.ResourceUtil
 import com.google.protobuf.ByteString
 import io.grpc.stub.StreamObserver
 
@@ -22,7 +21,7 @@ class GrpcByteChunksToByteArrayObserver[
   override def onNext(value: T): Unit = {
     Try(bs.write(value.chunk.toByteArray)) match {
       case Failure(exception) =>
-        ResourceUtil.closeAndAddSuppressed(Some(exception), bs)
+        closeAndAddSuppressed(Some(exception), bs)
         throw exception
       case Success(_) =>
     }
@@ -30,13 +29,24 @@ class GrpcByteChunksToByteArrayObserver[
 
   override def onError(t: Throwable): Unit = {
     requestComplete.tryFailure(t).discard
-    ResourceUtil.closeAndAddSuppressed(None, bs)
+    closeAndAddSuppressed(None, bs)
   }
 
   override def onCompleted(): Unit = {
     requestComplete.trySuccess(ByteString.copyFrom(bs.toByteArray)).discard
-    ResourceUtil.closeAndAddSuppressed(None, bs)
+    closeAndAddSuppressed(None, bs)
   }
+
+  private def closeAndAddSuppressed(e: Option[Throwable], resource: AutoCloseable): Unit =
+    e.fold(resource.close()) { exception =>
+      try {
+        resource.close()
+      } catch {
+        case scala.util.control.NonFatal(suppressed) =>
+          // Avoid an IllegalArgumentException if it's the same exception,
+          if (!(suppressed eq exception)) exception.addSuppressed(suppressed)
+      }
+    }
 }
 
 object GrpcByteChunksToByteArrayObserver {

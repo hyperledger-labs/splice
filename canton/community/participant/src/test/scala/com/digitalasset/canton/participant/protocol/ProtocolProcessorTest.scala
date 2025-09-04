@@ -14,8 +14,8 @@ import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSu
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
-  CachingConfigs,
   ProcessingTimeout,
+  SessionEncryptionKeyCacheConfig,
   StorageConfig,
   TestingConfigInternal,
 }
@@ -150,7 +150,7 @@ class ProtocolProcessorTest
   when(mockSequencerClient.psid).thenAnswer(psid)
   when(mockSequencerClient.protocolVersion).thenAnswer(psid.protocolVersion)
   when(
-    mockSequencerClient.sendAsync(
+    mockSequencerClient.send(
       any[Batch[DefaultOpenEnvelope]],
       any[Option[CantonTimestamp]],
       any[CantonTimestamp],
@@ -309,6 +309,8 @@ class ProtocolProcessorTest
     when(ledgerApiIndexer.onlyForTestingTransactionInMemoryStore).thenAnswer(None)
 
     val timeTracker = mock[SynchronizerTimeTracker]
+    when(timeTracker.requestTick(any[CantonTimestamp], any[Boolean])(any[TraceContext]))
+      .thenReturn(SynchronizerTimeTracker.DummyTickRequest)
     val recordOrderPublisher = RecordOrderPublisher(
       psid = psid,
       synchronizerSuccessor = None,
@@ -357,7 +359,9 @@ class ProtocolProcessorTest
         startingPoints,
         ParticipantTestMetrics.synchronizer,
         exitOnFatalFailures = true,
-        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+        // Disable the session encryption key cache: it starts a scheduler that must be closed properly,
+        // otherwise we see RejectedExecutionException warnings during shutdown.
+        SessionEncryptionKeyCacheConfig(enabled = false),
         timeouts,
         loggerFactory,
         FutureSupervisor.Noop,
@@ -481,7 +485,7 @@ class ProtocolProcessorTest
       val failingSequencerClient = mock[SequencerClientSend]
       val sendError = SendAsyncClientError.RequestFailed("no thank you")
       when(
-        failingSequencerClient.sendAsync(
+        failingSequencerClient.send(
           any[Batch[DefaultOpenEnvelope]],
           any[Option[CantonTimestamp]],
           any[CantonTimestamp],

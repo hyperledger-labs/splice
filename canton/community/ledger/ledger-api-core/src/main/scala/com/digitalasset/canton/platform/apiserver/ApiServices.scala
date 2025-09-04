@@ -26,7 +26,7 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.*
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.AuthenticateFatContractInstance
+import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.platform.apiserver.services.*
 import com.digitalasset.canton.platform.apiserver.services.admin.*
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionServiceImpl
@@ -46,7 +46,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.*
 import io.grpc.BindableService
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -114,7 +114,7 @@ object ApiServices {
       userManagementServiceConfig: UserManagementServiceConfig,
       partyManagementServiceConfig: PartyManagementServiceConfig,
       engineLoggingConfig: EngineLoggingConfig,
-      authenticateFatContractInstance: AuthenticateFatContractInstance,
+      contractAuthenticator: ContractAuthenticatorFn,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
       dynParamGetter: DynamicSynchronizerParameterGetter,
@@ -207,7 +207,7 @@ object ApiServices {
         services -> apiUpdateService
       }
 
-      val apiReflectionService = ProtoReflectionService.newInstance()
+      val apiReflectionService = ProtoReflectionServiceV1.newInstance()
 
       val apiHealthService = new GrpcHealthService(healthChecks, telemetry, loggerFactory)
 
@@ -259,7 +259,7 @@ object ApiServices {
           participant = participantId,
           packageSyncService = syncService,
           contractStore = contractStore,
-          authenticateFatContractInstance = authenticateFatContractInstance,
+          contractAuthenticator = contractAuthenticator,
           metrics = metrics,
           config = engineLoggingConfig,
           prefetchingRecursionLevel = commandConfig.contractPrefetchingDepth,
@@ -290,8 +290,7 @@ object ApiServices {
           getPackageMetadataSnapshot = syncService.getPackageMetadataSnapshot(_)
         )
       val commandsValidator = new CommandsValidator(
-        validateDisclosedContracts =
-          new ValidateDisclosedContracts(authenticateFatContractInstance),
+        validateDisclosedContracts = new ValidateDisclosedContracts(contractAuthenticator),
         validateUpgradingPackageResolutions = validateUpgradingPackageResolutions,
         topologyAwarePackageSelectionEnabled = ledgerFeatures.topologyAwarePackageSelection,
       )
@@ -350,6 +349,10 @@ object ApiServices {
         telemetry = telemetry,
         loggerFactory = loggerFactory,
       )
+      val updateServices = new CommandServiceImpl.UpdateServices(
+        getTransactionTreeById = ledgerApiUpdateService.getTransactionTreeById,
+        getUpdateById = ledgerApiUpdateService.getUpdateById,
+      )
       val apiCommandService = CommandServiceImpl.createApiService(
         commandsValidator = commandsValidator,
         transactionSubmissionTracker = transactionSubmissionTracker,
@@ -358,10 +361,7 @@ object ApiServices {
         submit = apiSubmissionService.submitWithTraceContext,
         submitReassignment = apiSubmissionService.submitReassignmentWithTraceContext,
         defaultTrackingTimeout = commandConfig.defaultTrackingTimeout,
-        updateServices = new CommandServiceImpl.UpdateServices(
-          getTransactionTreeById = ledgerApiUpdateService.getTransactionTreeById,
-          getUpdateById = ledgerApiUpdateService.getUpdateById,
-        ),
+        updateServices = updateServices,
         timeProvider = timeProvider,
         maxDeduplicationDuration = maxDeduplicationDuration,
         telemetry = telemetry,
@@ -371,6 +371,7 @@ object ApiServices {
       val apiInteractiveSubmissionService = {
         val interactiveSubmissionService =
           InteractiveSubmissionServiceImpl.createApiService(
+            updateServices,
             syncService,
             seedService,
             commandExecutor,

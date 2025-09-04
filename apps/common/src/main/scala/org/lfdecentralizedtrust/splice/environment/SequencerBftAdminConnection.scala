@@ -46,7 +46,7 @@ trait SequencerBftAdminConnection {
       SequencerBftAdminCommands.GetPeerNetworkStatus(None)
     ).map(_.endpointStatuses.map {
       case PeerConnectionStatus.PeerIncomingConnection(sequencerId) => (Some(sequencerId), None)
-      case PeerConnectionStatus.PeerEndpointIdStatus(id, health) =>
+      case PeerConnectionStatus.PeerEndpointStatus(id, isOutgoing @ _, health) =>
         health.status match {
           case PeerEndpointHealthStatus.UnknownEndpoint =>
             None -> Some(id)

@@ -111,11 +111,10 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   override def prune(
       pruneUpToInclusive: Offset,
       submissionId: Ref.SubmissionId,
-      pruneAllDivulgedContracts: Boolean,
   ): CompletionStage[PruningResult] =
     Timed.completionStage(
       metrics.services.write.prune,
-      delegate.prune(pruneUpToInclusive, submissionId, pruneAllDivulgedContracts),
+      delegate.prune(pruneUpToInclusive, submissionId),
     )
 
   override def currentHealth(): HealthStatus =
@@ -137,14 +136,14 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       delegate.incompleteReassignmentOffsets(validAt, stakeholders),
     )
 
-  override def registerInternalStateService(internalStateService: InternalStateService): Unit =
-    delegate.registerInternalStateService(internalStateService)
+  override def registerInternalIndexService(internalIndexService: InternalIndexService): Unit =
+    delegate.registerInternalIndexService(internalIndexService)
 
-  override def internalStateService: Option[InternalStateService] =
-    delegate.internalStateService
+  override def internalIndexService: Option[InternalIndexService] =
+    delegate.internalIndexService
 
-  override def unregisterInternalStateService(): Unit =
-    delegate.unregisterInternalStateService()
+  override def unregisterInternalIndexService(): Unit =
+    delegate.unregisterInternalIndexService()
 
   override def getPackageMetadataSnapshot(implicit
       errorLoggingContext: ErrorLoggingContext

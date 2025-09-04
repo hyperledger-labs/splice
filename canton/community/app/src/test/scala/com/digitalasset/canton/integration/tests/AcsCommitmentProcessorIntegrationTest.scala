@@ -6,8 +6,8 @@ package com.digitalasset.canton.integration.tests
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.{DbConfig, SynchronizerTimeTrackerConfig}
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
@@ -30,8 +30,13 @@ import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.Errors
   CommitmentsMismatch,
   NoSharedContracts,
 }
-import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceSynchronizerDisabledUs
+import com.digitalasset.canton.participant.sync.SyncServiceError.{
+  SyncServiceSynchronizerDisabledUs,
+  SyncServiceSynchronizerDisconnect,
+}
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
+import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.MemberAccessDisabled
 import com.digitalasset.canton.sequencing.protocol.{MemberRecipient, SubmissionRequest}
 import com.digitalasset.canton.synchronizer.sequencer.{
@@ -98,14 +103,16 @@ sealed trait AcsCommitmentProcessorIntegrationTest
             participant: ParticipantReference,
             minObservationDuration: NonNegativeFiniteDuration,
         ): Unit = {
-          // Connect and disconnect so that we can modify the synchronizer connection config afterwards
-          participant.synchronizers.connect_local(sequencer1, alias = daName)
-          participant.synchronizers.disconnect_local(daName)
-          val daConfig = participant.synchronizers.config(daName).value
+          val daSequencerConnection =
+            SequencerConnections.single(sequencer1.sequencerConnection.withAlias(daName.toString))
           participant.synchronizers.connect_by_config(
-            daConfig
-              .focus(_.timeTracker.minObservationDuration)
-              .replace(minObservationDuration.toConfig)
+            SynchronizerConnectionConfig(
+              synchronizerAlias = daName,
+              sequencerConnections = daSequencerConnection,
+              timeTracker = SynchronizerTimeTrackerConfig(minObservationDuration =
+                minObservationDuration.toConfig
+              ),
+            )
           )
         }
 
@@ -386,7 +393,7 @@ sealed trait AcsCommitmentProcessorIntegrationTest
           participant1.commitments
             .received(
               daName,
-              lastCommTick.toInstant,
+              lastCommTick.toInstant.minusMillis(1),
               lastCommTick.toInstant,
               Some(participant2),
             )
@@ -397,7 +404,7 @@ sealed trait AcsCommitmentProcessorIntegrationTest
           participant2.commitments
             .received(
               daName,
-              lastCommTick.toInstant,
+              lastCommTick.toInstant.minusMillis(1),
               lastCommTick.toInstant,
               Some(participant1),
             )
@@ -488,7 +495,12 @@ sealed trait AcsCommitmentProcessorIntegrationTest
     logger.info(
       s"After the min observation duration, participant1 should request a time proof and compute a new round of commitments"
     )
-    simClock.advance(minObservationDuration1.duration)
+    simClock.advance(
+      minObservationDuration1.duration
+        // Allow some margin as the sim clock advancement doesn't take into account the unique timestamps
+        // that have already been issued after sim clock "now".
+        .plusMillis(1)
+    )
     val end = simClock.now.toInstant
     eventually() {
       participant2.commitments.received(
@@ -572,7 +584,12 @@ sealed trait AcsCommitmentProcessorIntegrationTest
                 Some(c),
               )
             val received =
-              p.commitments.received(daName, periodBegin.toInstant, periodBegin.toInstant, Some(c))
+              p.commitments.received(
+                daName,
+                periodBegin.toInstant.minusMillis(1),
+                periodBegin.toInstant,
+                Some(c),
+              )
             (c, computed.size, received.size)
           }
         )
@@ -634,6 +651,19 @@ sealed trait AcsCommitmentProcessorIntegrationTest
           fromP2ToP3Only.get() shouldBe 1
           fromP3ToP2Only.get() shouldBe 1
         }
+
+        // When sequencer1 processes the removal of participant1's trust certificate, it will close participant1's
+        // subscription. participant1 will try to reconnect, but as sequencer1 answers with `CLIENT_AUTHENTICATION_REJECTED`,
+        // participant1 will eventually disconnect from this synchronizer.
+        // Wait for this disconnection to happen.
+        eventually() {
+          // The sequencer connection pool internal mechanisms to restart connections rely on the clock time advancing.
+          simClock.advance(JDuration.ofSeconds(1))
+
+          participant1.synchronizers.is_connected(
+            initializedSynchronizers(daName).synchronizerId
+          ) shouldBe false
+        }
       },
       forEvery(_) { entry =>
         entry.message should (include(
@@ -649,7 +679,8 @@ sealed trait AcsCommitmentProcessorIntegrationTest
           // because the sequencer may cut the participant's connection before delivering the topology broadcast
           or include regex ("Waiting for transaction .* to be observed")
           or include("Unknown recipients: PAR::participant1")
-          or include("(Eligible) Senders are unknown: PAR::participant1"))
+          or include("(Eligible) Senders are unknown: PAR::participant1")
+          or include("UNAVAILABLE/Channel shutdownNow invoked"))
       },
     )
   }
@@ -690,6 +721,9 @@ sealed trait AcsCommitmentProcessorIntegrationTest
           change = TopologyChangeOp.Remove,
         )
         eventually() {
+          // The sequencer connection pool internal mechanisms to restart connections rely on the clock time advancing.
+          simClock.advance(JDuration.ofSeconds(1))
+
           participant2.synchronizers.is_connected(
             initializedSynchronizers(acmeName).synchronizerId
           ) shouldBe false
@@ -746,7 +780,9 @@ sealed trait AcsCommitmentProcessorIntegrationTest
           // is processed by the sequencer after the participant is disabled
           include(
             "Health-check service responded NOT_SERVING for"
-          ))
+          )
+          // Added due to pool not propagating the "disabled us" error
+          or include(SyncServiceSynchronizerDisconnect.id))
       },
     )
   }

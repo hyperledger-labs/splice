@@ -350,7 +350,7 @@ object TopologyAdminCommands {
       override protected def createRequest()
           : Either[String, v30.ListSynchronizerParametersStateRequest] =
         Right(
-          new v30.ListSynchronizerParametersStateRequest(
+          v30.ListSynchronizerParametersStateRequest(
             baseQuery = Some(query.toProtoV1),
             filterSynchronizerId = filterSynchronizerId,
           )
@@ -431,38 +431,6 @@ object TopologyAdminCommands {
       ): Either[String, Seq[ListSequencerSynchronizerStateResult]] =
         response.results
           .traverse(ListSequencerSynchronizerStateResult.fromProtoV30)
-          .leftMap(_.toString)
-    }
-
-    final case class ListPurgeTopologyTransaction(
-        query: BaseQuery,
-        filterSynchronizerId: String,
-    ) extends BaseCommand[
-          v30.ListPurgeTopologyTransactionRequest,
-          v30.ListPurgeTopologyTransactionResponse,
-          Seq[ListPurgeTopologyTransactionResult],
-        ] {
-
-      override protected def createRequest()
-          : Either[String, v30.ListPurgeTopologyTransactionRequest] =
-        Right(
-          new v30.ListPurgeTopologyTransactionRequest(
-            baseQuery = Some(query.toProtoV1),
-            filterSynchronizerId = filterSynchronizerId,
-          )
-        )
-
-      override protected def submitRequest(
-          service: TopologyManagerReadServiceStub,
-          request: v30.ListPurgeTopologyTransactionRequest,
-      ): Future[v30.ListPurgeTopologyTransactionResponse] =
-        service.listPurgeTopologyTransaction(request)
-
-      override protected def handleResponse(
-          response: v30.ListPurgeTopologyTransactionResponse
-      ): Either[String, Seq[ListPurgeTopologyTransactionResult]] =
-        response.results
-          .traverse(ListPurgeTopologyTransactionResult.fromProtoV30)
           .leftMap(_.toString)
     }
 

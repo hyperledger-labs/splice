@@ -27,6 +27,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawReassignmentEvent,
   RawTreeEvent,
   RawUnassignEvent,
+  SequentialIdBatch,
   SynchronizerOffset,
   UnassignProperties,
 }
@@ -935,8 +936,6 @@ abstract class EventStorageBackendTemplate(
     queryStrategy: QueryStrategy,
     ledgerEndCache: LedgerEndCache,
     stringInterning: StringInterning,
-    // This method is needed in pruneEvents, but belongs to [[ParameterStorageBackend]].
-    participantAllDivulgedContractsPrunedUpToInclusive: Connection => Option[Offset],
     val loggerFactory: NamedLoggerFactory,
 ) extends EventStorageBackend
     with NamedLogging {
@@ -960,23 +959,22 @@ abstract class EventStorageBackendTemplate(
   // Improvement idea: Implement pruning queries in terms of event sequential id in order to be able to drop offset based indices.
   /** Deletes a subset of the indexed data (up to the pruning offset) in the following order and in
     * the manner specified:
-    *   1. entries from filter for create stakeholders for there is an archive for the corresponding
-    *      create event,
-    *   1. entries from filter for create non-stakeholder informees for there is an archive for the
-    *      corresponding create event,
+    *   1. entries from filter for create stakeholders for which there is an archive for the
+    *      corresponding create event or the corresponding create event is immediatly divulged,
+    *   1. entries from filter for create non-stakeholder informees for which there is an archive
+    *      for the corresponding create event or the corresponding create event is immediatly
+    *      divulged,
     *   1. all entries from filter for consuming stakeholders,
     *   1. all entries from filter for consuming non-stakeholders informees,
     *   1. all entries from filter for non-consuming informees,
-    *   1. create events table for which there is an archive event,
-    *   1. if pruning-all-divulged-contracts is enabled: create contracts which did not have a
-    *      locally hosted party before their creation offset (immediate divulgence),
+    *   1. create events table for which there is an archive event or create events which did not
+    *      have a locally hosted party before their creation offset (immediate divulgence),
     *   1. all consuming events,
     *   1. all non-consuming events,
     *   1. transaction meta entries for which there exists at least one create event.
     */
   override def pruneEvents(
       pruneUpToInclusive: Offset,
-      pruneAllDivulgedContracts: Boolean,
       incompleteReassignmentOffsets: Vector[Offset],
   )(implicit connection: Connection, traceContext: TraceContext): Unit = {
     val _ =
@@ -1014,11 +1012,11 @@ abstract class EventStorageBackendTemplate(
 
     pruneWithLogging(queryDescription = "Create events pruning") {
       SQL"""
-          -- Create events (only for contracts archived before the specified offset)
+          -- Create events (for contracts deactivated or immediately divulged before the specified offset)
           delete from lapi_events_create delete_events
           where
             delete_events.event_offset <= $pruneUpToInclusive and
-            ${createIsArchivedOrUnassigned("delete_events", pruneUpToInclusive)}"""
+            ${createIsPrunable("delete_events", pruneUpToInclusive)}"""
     }
 
     pruneWithLogging(queryDescription = "Assign events pruning") {
@@ -1029,34 +1027,8 @@ abstract class EventStorageBackendTemplate(
             -- do not prune incomplete
             ${reassignmentIsNotIncomplete("delete_events")}
             -- only prune if it is archived in same synchronizer, or unassigned later in the same synchronizer
-            and ${assignIsArchivedOrUnassigned("delete_events", pruneUpToInclusive)}
+            and ${assignIsPrunable("delete_events", pruneUpToInclusive)}
             and delete_events.event_offset <= $pruneUpToInclusive"""
-    }
-
-    if (pruneAllDivulgedContracts) {
-      val pruneAfterClause =
-        participantAllDivulgedContractsPrunedUpToInclusive(connection) match {
-          case Some(pruneAfter) => cSQL"and event_offset > $pruneAfter"
-          case None => cSQL""
-        }
-
-      pruneWithLogging(queryDescription = "Immediate divulgence events pruning") {
-        SQL"""
-            -- Immediate divulgence pruning
-            delete from lapi_events_create c
-            where event_offset <= $pruneUpToInclusive
-            -- Only prune create events which did not have a locally hosted party before their creation offset
-            and not exists (
-              select 1
-              from lapi_party_entries p
-              where p.typ = 'accept'
-              and p.ledger_offset <= c.event_offset
-              and p.is_local
-              and #${queryStrategy.arrayContains("c.flat_event_witnesses", "p.party_id")}
-            )
-            $pruneAfterClause
-         """
-      }
     }
 
     pruneWithLogging(queryDescription = "Exercise (consuming) events pruning") {
@@ -1123,7 +1095,7 @@ abstract class EventStorageBackendTemplate(
               SELECT * from lapi_events_create c
               WHERE
               c.event_offset <= $pruneUpToInclusive
-              AND ${createIsArchivedOrUnassigned("c", pruneUpToInclusive)}
+              AND ${createIsPrunable("c", pruneUpToInclusive)}
               AND c.event_sequential_id = id_filter.event_sequential_id
             )"""
 
@@ -1190,7 +1162,7 @@ abstract class EventStorageBackendTemplate(
             SELECT * from lapi_events_assign assign
             WHERE
               assign.event_offset <= $pruneUpToInclusive
-              AND ${assignIsArchivedOrUnassigned("assign", pruneUpToInclusive)}
+              AND ${assignIsPrunable("assign", pruneUpToInclusive)}
               AND ${reassignmentIsNotIncomplete("assign")}
               AND assign.event_sequential_id = id_filter.event_sequential_id
           )"""
@@ -1212,12 +1184,12 @@ abstract class EventStorageBackendTemplate(
     }
   }
 
-  private def createIsArchivedOrUnassigned(
+  private def createIsPrunable(
       createEventTableName: String,
       pruneUpToInclusive: Offset,
   ): CompositeSql =
     cSQL"""
-          ${eventIsArchivedOrUnassigned(
+          ((${eventIsArchivedOrUnassigned(
         createEventTableName,
         pruneUpToInclusive,
         "synchronizer_id",
@@ -1226,10 +1198,10 @@ abstract class EventStorageBackendTemplate(
         createEventTableName,
         "synchronizer_id",
         pruneUpToInclusive,
-      )}
+      )}) or cardinality(#$createEventTableName.flat_event_witnesses) = 0)
           """
 
-  private def assignIsArchivedOrUnassigned(
+  private def assignIsPrunable(
       assignEventTableName: String,
       pruneUpToInclusive: Offset,
   ): CompositeSql =
@@ -1369,7 +1341,7 @@ abstract class EventStorageBackendTemplate(
   }
 
   override def assignEventBatch(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       allFilterParties: Option[Set[Party]],
   )(connection: Connection): Vector[Entry[RawAssignEvent]] = {
     val allInternedFilterParties =
@@ -1383,15 +1355,15 @@ abstract class EventStorageBackendTemplate(
     SQL"""
         SELECT *
         FROM lapi_events_assign assign_evs
-        WHERE assign_evs.event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+        WHERE ${queryStrategy.inBatch("assign_evs.event_sequential_id", eventSequentialIds)}
         ORDER BY assign_evs.event_sequential_id -- deliver in index order
         """
-      .withFetchSize(Some(eventSequentialIds.size))
+      .withFetchSize(Some(fetchSize(eventSequentialIds)))
       .asVectorOf(assignEventParser(allInternedFilterParties, stringInterning))(connection)
   }
 
   override def unassignEventBatch(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       allFilterParties: Option[Set[Party]],
   )(connection: Connection): Vector[Entry[RawUnassignEvent]] = {
     val allInternedFilterParties = allFilterParties
@@ -1404,10 +1376,10 @@ abstract class EventStorageBackendTemplate(
     SQL"""
           SELECT *
           FROM lapi_events_unassign unassign_evs
-          WHERE unassign_evs.event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+          WHERE ${queryStrategy.inBatch("unassign_evs.event_sequential_id", eventSequentialIds)}
           ORDER BY unassign_evs.event_sequential_id -- deliver in index order
           """
-      .withFetchSize(Some(eventSequentialIds.size))
+      .withFetchSize(Some(fetchSize(eventSequentialIds)))
       .asVectorOf(unassignEventParser(allInternedFilterParties, stringInterning))(connection)
   }
 
@@ -1812,15 +1784,15 @@ abstract class EventStorageBackendTemplate(
     )(connection)
 
   override def topologyPartyEventBatch(
-      eventSequentialIds: Iterable[Long]
+      eventSequentialIds: SequentialIdBatch
   )(connection: Connection): Vector[EventStorageBackend.RawParticipantAuthorization] =
     SQL"""
           SELECT *
           FROM lapi_events_party_to_participant e
-          WHERE e.event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+          WHERE ${queryStrategy.inBatch("e.event_sequential_id", eventSequentialIds)}
           ORDER BY e.event_sequential_id -- deliver in index order
           """
-      .withFetchSize(Some(eventSequentialIds.size))
+      .withFetchSize(Some(fetchSize(eventSequentialIds)))
       .asVectorOf(partyToParticipantEventParser(stringInterning))(connection)
 
   override def topologyEventOffsetPublishedOnRecordTime(
@@ -1846,7 +1818,7 @@ abstract class EventStorageBackendTemplate(
   private def fetchAcsDeltaEvents(
       tableName: String,
       selectColumns: String,
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       allFilterParties: Option[Set[Ref.Party]],
   )(connection: Connection): Vector[Entry[RawFlatEvent]] = {
     val internedAllParties: Option[Set[Int]] = allFilterParties
@@ -1864,16 +1836,16 @@ abstract class EventStorageBackendTemplate(
         FROM
           #$tableName
         WHERE
-          event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+          ${queryStrategy.inBatch("event_sequential_id", eventSequentialIds)}
         ORDER BY
           event_sequential_id
       """
-      .withFetchSize(Some(eventSequentialIds.size))
+      .withFetchSize(Some(fetchSize(eventSequentialIds)))
       .asVectorOf(rawAcsDeltaEventParser(internedAllParties, stringInterning))(connection)
   }
 
   override def fetchEventPayloadsAcsDelta(target: EventPayloadSourceForUpdatesAcsDelta)(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       requestingParties: Option[Set[Ref.Party]],
   )(connection: Connection): Vector[Entry[RawFlatEvent]] =
     target match {
@@ -1896,7 +1868,7 @@ abstract class EventStorageBackendTemplate(
   private def fetchLedgerEffectsEvents(
       tableName: String,
       selectColumns: String,
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       allFilterParties: Option[Set[Ref.Party]],
   )(connection: Connection): Vector[Entry[RawTreeEvent]] = {
     val internedAllParties: Option[Set[Int]] = allFilterParties
@@ -1914,16 +1886,16 @@ abstract class EventStorageBackendTemplate(
         FROM
           #$tableName
         WHERE
-          event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+          ${queryStrategy.inBatch("event_sequential_id", eventSequentialIds)}
         ORDER BY
           event_sequential_id
       """
-      .withFetchSize(Some(eventSequentialIds.size))
+      .withFetchSize(Some(fetchSize(eventSequentialIds)))
       .asVectorOf(rawTreeEventParser(internedAllParties, stringInterning))(connection)
   }
 
   override def fetchEventPayloadsLedgerEffects(target: EventPayloadSourceForUpdatesLedgerEffects)(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       requestingParties: Option[Set[Ref.Party]],
   )(connection: Connection): Vector[Entry[RawTreeEvent]] =
     target match {
@@ -1953,6 +1925,13 @@ abstract class EventStorageBackendTemplate(
           eventSequentialIds = eventSequentialIds,
           allFilterParties = requestingParties,
         )(connection)
+    }
+
+  private def fetchSize(eventSequentialIds: SequentialIdBatch): Int =
+    eventSequentialIds match {
+      case SequentialIdBatch.IdRange(fromInclusive, toInclusive) =>
+        Math.min(toInclusive - fromInclusive + 1, Int.MaxValue).toInt
+      case SequentialIdBatch.Ids(ids) => ids.size
     }
 
 }

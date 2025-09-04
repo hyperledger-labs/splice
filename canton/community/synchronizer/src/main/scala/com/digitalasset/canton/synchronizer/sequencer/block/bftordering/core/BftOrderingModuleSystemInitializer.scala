@@ -18,6 +18,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.AvailabilityModule
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.AvailabilityStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
   EpochStore,
   EpochStoreReader,
@@ -69,10 +70,11 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   BlockSubscription,
   Env,
+  ModuleRef,
   ModuleSystem,
   OrderingModuleSystemInitializer,
   P2PConnectionEventListener,
-  P2PNetworkRefFactory,
+  P2PNetworkManager,
 }
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingMessage
 import com.digitalasset.canton.time.Clock
@@ -85,7 +87,7 @@ import scala.util.Random
   */
 private[bftordering] class BftOrderingModuleSystemInitializer[
     E <: Env[E],
-    P2PNetworkRefFactoryT <: P2PNetworkRefFactory[E, BftOrderingMessage],
+    P2PNetworkManagerT <: P2PNetworkManager[E, BftOrderingMessage],
 ](
     node: BftNodeId,
     config: BftBlockOrdererConfig,
@@ -95,6 +97,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
     orderingTopologyProvider: OrderingTopologyProvider[E],
     blockSubscription: BlockSubscription,
     sequencerSnapshotAdditionalInfo: Option[SequencerSnapshotAdditionalInfo],
+    p2pNetworkOutModuleState: P2PNetworkOutModule.State,
     clock: Clock,
     random: Random,
     metrics: BftOrderingMetrics,
@@ -106,7 +109,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
 )(implicit synchronizerProtocolVersion: ProtocolVersion, mc: MetricsContext)
     extends SystemInitializer[
       E,
-      P2PNetworkRefFactoryT,
+      P2PNetworkManagerT,
       BftOrderingMessage,
       Mempool.Message,
     ]
@@ -114,10 +117,13 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
 
   override def initialize(
       moduleSystem: ModuleSystem[E],
-      createP2PNetworkRefFactory: P2PConnectionEventListener => P2PNetworkRefFactoryT,
+      createP2PNetworkManager: (
+          P2PConnectionEventListener,
+          ModuleRef[BftOrderingMessage],
+      ) => P2PNetworkManagerT,
   ): SystemInitializationResult[
     E,
-    P2PNetworkRefFactoryT,
+    P2PNetworkManagerT,
     BftOrderingMessage,
     Mempool.Message,
   ] = {
@@ -168,7 +174,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
           bootstrapTopologyInfo.currentTopology,
         ),
       )
-    new OrderingModuleSystemInitializer[E, P2PNetworkRefFactoryT](
+    new OrderingModuleSystemInitializer[E, P2PNetworkManagerT](
       ModuleFactories(
         mempool = { availabilityRef =>
           val cfg = MempoolModuleConfig(
@@ -203,7 +209,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
             pruningRef,
         ) => {
           val dependencies = P2PNetworkOutModuleDependencies(
-            createP2PNetworkRefFactory,
+            createP2PNetworkManager,
             p2pNetworkInRef,
             mempoolRef,
             availabilityRef,
@@ -213,13 +219,16 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
           )
           val p2PNetworkOutModule = new P2PNetworkOutModule(
             bootstrapTopologyInfo.thisNode,
+            isGenesis = initialEpoch == GenesisEpoch.info.number,
+            bootstrapTopologySize = bootstrapTopologyInfo.currentMembership.orderingTopology.size,
+            p2pNetworkOutModuleState,
             stores.p2pEndpointsStore,
             metrics,
             dependencies,
             loggerFactory,
             timeouts,
           )
-          (p2PNetworkOutModule, p2PNetworkOutModule.p2pNetworkRefFactory)
+          (p2PNetworkOutModule, p2PNetworkOutModule.p2pNetworkManager)
         },
         availability = (mempoolRef, networkOutRef, consensusRef, outputRef) => {
           val dependencies = AvailabilityModuleDependencies[E](
@@ -294,7 +303,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
             timeouts,
           ),
       )
-    ).initialize(moduleSystem, createP2PNetworkRefFactory)
+    ).initialize(moduleSystem, createP2PNetworkManager)
   }
 
   private def fetchBootstrapTopologyInfo(

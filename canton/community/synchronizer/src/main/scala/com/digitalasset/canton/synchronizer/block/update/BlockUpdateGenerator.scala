@@ -15,11 +15,7 @@ import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent.*
 import com.digitalasset.canton.synchronizer.block.data.{BlockEphemeralState, BlockInfo}
 import com.digitalasset.canton.synchronizer.block.{BlockEvents, LedgerBlockEvent, RawLedgerBlock}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregations
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
-  SignedOrderingRequest,
-  SignedOrderingRequestOps,
-}
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
   InvalidLedgerEvent,
@@ -27,6 +23,7 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
+import com.digitalasset.canton.synchronizer.sequencer.{InFlightAggregations, SubmissionOutcome}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.collection.IterableUtil
@@ -133,7 +130,7 @@ class BlockUpdateGeneratorImpl(
     val ledgerBlockEvents = block.events.mapFilter { tracedEvent =>
       implicit val traceContext: TraceContext = tracedEvent.traceContext
       logger.trace("Extracting event from raw block")
-      // TODO(i10428) Prevent zip bombing when decompressing the request
+      // TODO(i26169) Prevent zip bombing when decompressing the request
       LedgerBlockEvent.fromRawBlockEvent(protocolVersion, MaxRequestSizeToDeserialize.NoLimit)(
         tracedEvent.value
       ) match {
@@ -194,9 +191,9 @@ class BlockUpdateGeneratorImpl(
 
   private def isAddressingSequencers(event: LedgerBlockEvent): Boolean =
     event match {
-      case Send(_, signedOrderingRequest, _) =>
+      case Send(_, signedOrderingRequest, _, _) =>
         val allRecipients =
-          signedOrderingRequest.signedSubmissionRequest.content.batch.allRecipients
+          signedOrderingRequest.content.batch.allRecipients
         allRecipients.contains(AllMembersOfSynchronizer) ||
         allRecipients.contains(SequencersOfSynchronizer)
       case _ => false
@@ -230,10 +227,13 @@ object BlockUpdateGeneratorImpl {
       inFlightAggregations: InFlightAggregations,
   )
 
-  private[update] final case class SequencedSubmission(
+  private[update] final case class SequencedValidatedSubmission(
       sequencingTimestamp: CantonTimestamp,
-      submissionRequest: SignedOrderingRequest,
+      submissionRequest: SignedSubmissionRequest,
+      orderingSequencerId: SequencerId,
       topologyOrSequencingSnapshot: SyncCryptoApi,
       topologyTimestampError: Option[SequencerDeliverError],
+      consumeTraffic: SubmissionRequestValidator.TrafficConsumption,
+      errorOrResolvedGroups: Either[SubmissionOutcome, Map[GroupRecipient, Set[Member]]],
   )(val traceContext: TraceContext)
 }

@@ -25,7 +25,7 @@ import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.ResourceUtil.withResourceEitherT
+import com.digitalasset.canton.util.ResourceUtil
 import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -58,7 +58,7 @@ abstract class UseKms
   )(implicit ec: ExecutionContext): EitherT[Future, KmsError, V] =
     for {
       kmsClient <- createKms().toEitherT[Future]
-      res <- withResourceEitherT(kmsClient)(f)
+      res <- ResourceUtil.withResourceM(kmsClient)(f)
     } yield res
 
   private lazy val kmsKeyDeletionExecutionContext: ExecutionContextIdlenessExecutorService =

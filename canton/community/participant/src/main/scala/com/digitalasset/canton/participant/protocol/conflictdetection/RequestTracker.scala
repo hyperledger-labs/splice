@@ -8,7 +8,11 @@ import com.digitalasset.canton.data.{CantonTimestamp, TaskScheduler}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetector.LockedStates
+import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
+import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetector.{
+  LockedStates,
+  ReplicatedContract,
+}
 import com.digitalasset.canton.participant.protocol.conflictdetection.NaiveRequestTracker.TimedTask
 import com.digitalasset.canton.participant.store.ActiveContractStore.ContractState
 import com.digitalasset.canton.participant.store.{ActiveContractStore, ReassignmentStore}
@@ -287,8 +291,27 @@ trait RequestTracker extends RequestTrackerLookup with AutoCloseable with NamedL
     RequestTrackerStoreError
   ], Unit]]
 
-  /** Returns a future that completes after the request has progressed to the given timestamp. If
-    * the request tracker has already progressed to the timestamp, [[scala.None]] is returned.
+  /** Informs the request tracker of contracts to add on behalf of an "add party" replication
+    * request. Must not be called concurrently on behalf of the same request id.
+    *
+    * @param addPartyRequestId
+    *   request id unique to "add party" replication request
+    * @param addPartyEffectiveTime
+    *   timestamp after which the contracts are to be added
+    * @param contracts
+    *   information about contracts needed for persisting
+    */
+  def addReplicatedContracts(
+      addPartyRequestId: AddPartyRequestId,
+      addPartyEffectiveTime: CantonTimestamp,
+      contracts: Seq[ReplicatedContract],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, NonEmptyChain[AcsError], Unit]
+
+  /** Returns a future that completes after the request tracker has progressed to the given
+    * timestamp. If the request tracker has already progressed to the timestamp, [[scala.None]] is
+    * returned.
     */
   def awaitTimestampUS(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext

@@ -30,7 +30,7 @@ import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.time.{Minutes, Span}
+import org.scalatest.time.{Minutes, Seconds, Span}
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
@@ -40,8 +40,12 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
 
   // Those test cases may interfere with each other by sending submissions in the background.
   // Some of the submissions, which started as part of one test case, may time out as part of the next one.
-  private val submissionTimedOut: LogEntry => Assertion =
+  private val optionalManySubmissionTimedOut: LogEntry => Assertion =
     _.warningMessage should include("Submission timed out at")
+
+  // Due to sequencer restart time proof requests get retried, and may get logged as warning after reaching a threshold.
+  private val optionalManyRequestCurrentTime: LogEntry => Assertion =
+    _.warningMessage should include("Now retrying operation 'request current time'")
 
   protected def name: String
 
@@ -166,12 +170,17 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
 
       def sendAndWait(participant: LocalParticipantReference): Unit = {
         implicit val metricsContext: MetricsContext = MetricsContext.Empty
+        utils.retry_until_true(
+          participant.underlying.value.sync
+            .readyConnectedSynchronizerById(daId)
+            .nonEmpty
+        )
         val client = participant.underlying.value.sync
           .readyConnectedSynchronizerById(daId)
           .value
           .sequencerClient
         val callback = SendCallback.future
-        val sendAsync = client.sendAsync(
+        val sendAsync = client.send(
           batch,
           topologyTimestamp = Some(ts.minusSeconds(5)),
           maxSequencingTime = maxTs,
@@ -179,7 +188,9 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
           callback = callback,
         )
         sendAsync.valueOrFailShutdown("Participant send").futureValue
-        callback.future.onShutdown(fail("shutdown")).futureValue should matchPattern {
+        callback.future
+          .onShutdown(fail("shutdown"))
+          .futureValue(Timeout(Span(45, Seconds))) should matchPattern {
           case SendResult.Success(_) =>
         }
       }
@@ -199,25 +210,27 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         sendAndWait(participant2),
         logs => {
-          val assertion1: LogEntry => Assertion = _.shouldBeCantonError(
+          val assertSyncServiceAlarm: LogEntry => Assertion = _.shouldBeCantonError(
             SyncServiceAlarm,
             _ should include("Received no encrypted view message of type"),
           )
-          val assertion2: LogEntry => Assertion = _.shouldBeCantonError(
+          val assertBadRootHashMessages: LogEntry => Assertion = _.shouldBeCantonError(
             LocalRejectError.MalformedRejects.BadRootHashMessages,
             _ should include("Received no encrypted view message of type TransactionViewType"),
           )
-          val assertion3: LogEntry => Assertion = _.shouldBeCantonError(
+          val assertInvalidMessage: LogEntry => Assertion = _.shouldBeCantonError(
             InvalidMessage,
             _ should (include("Received a confirmation response") and include(
               "with an unknown request id"
             )),
           )
-          if (logs.sizeIs > 3)
-            forAtLeast(logs.size - 3, logs)(submissionTimedOut)
-          forAtLeast(1, logs)(assertion1)
-          forAtLeast(1, logs)(assertion2)
-          forAtLeast(1, logs)(assertion3)
+          if (logs.sizeIs > 3) {
+            forAtMost(logs.size - 3, logs)(optionalManySubmissionTimedOut)
+            forAtMost(logs.size - 3, logs)(optionalManyRequestCurrentTime)
+          }
+          forAtLeast(1, logs)(assertSyncServiceAlarm)
+          forAtLeast(1, logs)(assertBadRootHashMessages)
+          forAtLeast(1, logs)(assertInvalidMessage)
         },
       )
     }

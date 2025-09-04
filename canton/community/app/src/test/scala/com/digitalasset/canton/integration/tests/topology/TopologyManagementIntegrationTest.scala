@@ -707,7 +707,7 @@ trait TopologyManagementIntegrationTest
           TopologyTransaction(
             TopologyChangeOp.Replace,
             PositiveInt.tryCreate(2),
-            OwnerToKeyMapping(sequencer1.id, NonEmpty(Seq, key)),
+            OwnerToKeyMapping.tryCreate(sequencer1.id, NonEmpty(Seq, key)),
             testedProtocolVersion,
           ),
           key,
@@ -838,9 +838,9 @@ trait TopologyManagementIntegrationTest
       val tx2 = create(2)
 
       // steal the sig of tx2 and use it for tx1
-      val fakeTx = SignedTopologyTransaction.tryCreate(
+      val fakeTx = SignedTopologyTransaction.withTopologySignatures(
         transaction = tx1.transaction,
-        signatures = tx2.signatures,
+        signatures = tx2.signatures.toSeq,
         isProposal = tx1.isProposal,
         testedProtocolVersion,
       )

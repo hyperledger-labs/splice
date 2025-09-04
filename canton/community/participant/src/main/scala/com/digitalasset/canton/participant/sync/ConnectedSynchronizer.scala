@@ -707,9 +707,7 @@ class ConnectedSynchronizer(
           case Right(()) => ()
         }
 
-        pendingReassignments.lastOption.map(t =>
-          t.unassignmentTs -> t.sourceSynchronizer.map(_.logical)
-        )
+        pendingReassignments.lastOption.map(t => t.unassignmentTs -> t.sourcePSId.map(_.logical))
       }
 
       resF.map {
@@ -726,10 +724,7 @@ class ConnectedSynchronizer(
       // has "caught up" on messages from the synchronizer (and so should have seen all the assignments)
       // TODO(i9009): This assumes the participant and synchronizer clocks are synchronized, which may not be the case
       _waitForReplay <- FutureUnlessShutdown.outcomeF(
-        timeTracker
-          .awaitTick(clock.now)
-          .map(_.void)
-          .getOrElse(Future.unit)
+        timeTracker.awaitTick(clock.now).getOrElse(Future.unit)
       )
 
       _params <- synchronizeWithClosing(functionFullName)(

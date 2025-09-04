@@ -64,6 +64,7 @@ abstract class BlockSequencerFactory(
       protocolVersion,
       sequencerId,
       blockSequencerMode = true,
+      metrics,
     )
     with NamedLogging {
 
@@ -73,6 +74,7 @@ abstract class BlockSequencerFactory(
     sequencerStore,
     nodeParameters.processingTimeouts,
     loggerFactory,
+    nodeParameters.batchingConfig,
   )
 
   private val trafficPurchasedStore = TrafficPurchasedStore(

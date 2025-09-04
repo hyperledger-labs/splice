@@ -585,8 +585,9 @@ class MediatorNodeBootstrap(
           )
           .leftMap(error => error.toString)
       )
-
     } yield connectionPool
+
+    val useNewConnectionPool = parameters.sequencerClient.useNewConnectionPool
 
     val mediatorRuntimeET = for {
       physicalSynchronizerIdx <- EitherT
@@ -598,7 +599,7 @@ class MediatorNodeBootstrap(
         timeouts,
         synchronizerLoggerFactory,
       )
-      sendTrackerStore = SendTrackerStore(storage)
+      sendTrackerStore = SendTrackerStore()
       sequencerCounterTrackerStore = SequencerCounterTrackerStore(
         storage,
         physicalSynchronizerIdx,
@@ -610,7 +611,7 @@ class MediatorNodeBootstrap(
           .right(
             TopologyTransactionProcessor.createProcessorAndClientForSynchronizer(
               synchronizerTopologyStore,
-              synchronizerId,
+              synchronizerPredecessor = None,
               crypto.pureCrypto,
               arguments.parameterConfig,
               arguments.clock,
@@ -674,7 +675,7 @@ class MediatorNodeBootstrap(
 
       connectionPool <- connectionPoolET
       _ <-
-        if (parameters.sequencerClient.useNewConnectionPool) {
+        if (useNewConnectionPool) {
           connectionPool.start().leftMap(error => error.toString)
         } else EitherTUtil.unitUS
 
@@ -690,30 +691,31 @@ class MediatorNodeBootstrap(
           ),
           info.sequencerConnections,
           synchronizerPredecessor = None,
-          info.expectedSequencers,
+          Option.when(!useNewConnectionPool)(info.expectedSequencers),
           connectionPool,
         )
 
       sequencerClientRef =
-        GrpcSequencerConnectionService.setup[MediatorSynchronizerConfiguration](mediatorId)(
-          adminServerRegistry,
-          () => synchronizerConfigurationStore.fetchConfiguration(),
-          config => synchronizerConfigurationStore.saveConfiguration(config),
-          Lens[MediatorSynchronizerConfiguration, SequencerConnections](_.sequencerConnections)(
-            connection => conf => conf.copy(sequencerConnections = connection)
-          ),
-          RequestSigner(
-            syncCryptoWithOptionalSessionKeys,
-            staticSynchronizerParameters.protocolVersion,
+        GrpcSequencerConnectionService
+          .setup[MediatorSynchronizerConfiguration](mediatorId, useNewConnectionPool)(
+            adminServerRegistry,
+            () => synchronizerConfigurationStore.fetchConfiguration(),
+            config => synchronizerConfigurationStore.saveConfiguration(config),
+            Lens[MediatorSynchronizerConfiguration, SequencerConnections](_.sequencerConnections)(
+              connection => conf => conf.copy(sequencerConnections = connection)
+            ),
+            RequestSigner(
+              syncCryptoWithOptionalSessionKeys,
+              staticSynchronizerParameters.protocolVersion,
+              loggerFactory,
+            ),
+            sequencerClientFactory,
+            sequencerInfoLoader,
+            synchronizerAlias,
+            synchronizerId,
+            sequencerClient,
             loggerFactory,
-          ),
-          sequencerClientFactory,
-          sequencerInfoLoader,
-          synchronizerAlias,
-          synchronizerId,
-          sequencerClient,
-          loggerFactory,
-        )
+          )
 
       _ = sequencerClientRef.set(sequencerClient)
       _ = deferredSequencerClientHealth.set(sequencerClient.healthComponent)
@@ -730,12 +732,11 @@ class MediatorNodeBootstrap(
       // TODO(i12076): Request topology information from all sequencers and reconcile
       _ <- MonadUtil.unlessM(
         EitherT.right[String](synchronizerConfigurationStore.isTopologyInitialized())
-      ) {
+      )(
         new StoreBasedSynchronizerTopologyInitializationCallback(
           mediatorId
         ).callback(
           new InitialTopologySnapshotValidator(
-            staticSynchronizerParameters.protocolVersion,
             crypto.pureCrypto,
             synchronizerTopologyStore,
             arguments.parameterConfig.processingTimeouts,
@@ -745,7 +746,7 @@ class MediatorNodeBootstrap(
           sequencerClient,
           staticSynchronizerParameters.protocolVersion,
         ).semiflatMap(_ => synchronizerConfigurationStore.setTopologyInitialized())
-      }
+      )
 
       mediatorRuntime <- MediatorRuntimeFactory.create(
         mediatorId,

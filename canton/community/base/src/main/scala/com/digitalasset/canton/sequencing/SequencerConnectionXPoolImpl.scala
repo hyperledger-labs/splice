@@ -87,7 +87,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
   private val initializedP = {
     import TraceContext.Implicits.Empty.*
     PromiseUnlessShutdown
-      .supervised[Either[SequencerConnectionXPoolError.TimeoutError, Unit]](
+      .supervised[Either[SequencerConnectionXPoolError, Unit]](
         "connection-pool-initialization",
         futureSupervisor,
       )
@@ -113,7 +113,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
   override def start()(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXPoolError.TimeoutError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, SequencerConnectionXPoolError, Unit] = {
     if (startedRef.getAndSet(true)) {
       logger.debug("Connection pool already started -- ignoring")
     } else {
@@ -142,6 +142,43 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       clock.scheduleAfter(_ => signalTimeout(), initializationTimeout.asJavaApproximation),
       s"connection-pool-initialization-timeout",
     )
+  }
+
+  override def isThresholdStillReachable(
+      threshold: PositiveInt,
+      ignored: Set[ConnectionXConfig],
+      extraUndecided: NonNegativeInt,
+  )(implicit traceContext: TraceContext): Boolean = blocking {
+    lock.synchronized {
+      // Grab all attributes only once to prevent a race condition if a connection is validated between the next calls
+      val nonFatalAttributes = trackedConnections.toSeq.collect {
+        case (connection, _validated)
+            if connection.health.getState != SequencerConnectionXState.Fatal && !ignored.contains(
+              connection.config
+            ) =>
+          connection.attributes
+      }
+
+      // Number of unique sequencer IDs that have been validated at some point, differentiated by bootstrap
+      val validatedSequencerIds = nonFatalAttributes.flatten.toSet
+        .groupMap(BootstrapInfo.fromAttributes)(_.sequencerId)
+        .values
+        .map(_.size)
+      // Maximum of these
+      val maxValidatedSequencerIds = validatedSequencerIds.maxOption.getOrElse(0)
+      // Number of connection that have not yet been validated (and therefore have not yet determined their sequencer ID)
+      val undecided = nonFatalAttributes.count(_.isEmpty)
+
+      val isReachable =
+        maxValidatedSequencerIds + undecided + extraUndecided.unwrap >= threshold.unwrap
+
+      logger.debug(
+        s"isThresholdStillReachable = $isReachable: threshold = $threshold; ignored = ${ignored.size} -> "
+          + s"validatedSequencerIds = $validatedSequencerIds; undecided = $undecided + $extraUndecided"
+      )
+
+      isReachable
+    }
   }
 
   private def updateTrackedConnections(
@@ -186,9 +223,12 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       if (restartScheduledRef.getAndSet(true))
         logger.debug("Restart already scheduled -- ignoring")
       else {
-        logger.debug("Scheduling restart")
+        val delay = config.restartConnectionDelay
+        logger.debug(
+          s"Scheduling restart after ${LoggerUtil.roundDurationForHumans(delay.duration)}"
+        )
         FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-          clock.scheduleAfter(_ => restart(), config.restartConnectionDelay),
+          clock.scheduleAfter(_ => restart(), delay.asJava),
           s"restart-connection-${connection.name}",
         )
       }
@@ -232,6 +272,8 @@ class SequencerConnectionXPoolImpl private[sequencing] (
               case SequencerConnectionXState.Fatal |
                   SequencerConnectionXState.Initial | SequencerConnectionXState.Starting |
                   SequencerConnectionXState.Started | SequencerConnectionXState.Stopping =>
+                if (state == SequencerConnectionXState.Fatal)
+                  checkIfThresholdIsStillReachable(config.trustThreshold)
                 removeConnectionFromPool(connection)
             }
           }
@@ -264,6 +306,22 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
           changedConnections = currentConfig.changedConnections(newConfig)
 
+          // Check whether the trust threshold is reachable with the new configuration
+          _ <-
+            Either.cond(
+              isThresholdStillReachable(
+                newThreshold,
+                // The removed connections don't count
+                ignored = changedConnections.removed,
+                // The added connections are so far undecided
+                extraUndecided = NonNegativeInt.tryCreate(changedConnections.added.size),
+              ),
+              (),
+              SequencerConnectionXPoolError.InvalidConfigurationError(
+                s"Trust threshold $newThreshold cannot be reached"
+              ),
+            )
+
           // Check whether the new threshold is now reached, which can only happen if it was lowered
           bootstrapIfThresholdReachedO <-
             if (poolNotInitialized && newThreshold < currentConfig.trustThreshold) {
@@ -292,11 +350,34 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       }
     }
 
-  private def markValidated(connection: InternalSequencerConnectionX): Unit =
+  private def markValidated(
+      connection: InternalSequencerConnectionX
+  )(implicit traceContext: TraceContext): Unit = {
     blocking {
       lock.synchronized {
         require(trackedConnections.contains(connection))
         trackedConnections.update(connection, true)
+      }
+    }
+    checkIfThresholdIsStillReachable(config.trustThreshold)
+  }
+
+  private def checkIfThresholdIsStillReachable(
+      threshold: PositiveInt
+  )(implicit traceContext: TraceContext): Unit =
+    if (!isClosing && !isThresholdStillReachable(threshold)) {
+      val message =
+        s"Trust threshold of ${config.trustThreshold} is no longer reachable"
+      logger.info(message)
+      if (
+        initializedP
+          .outcome(
+            Left(SequencerConnectionXPoolError.ThresholdUnreachableError(message))
+          )
+      ) {
+        // Close if we have not yet initialized
+        logger.info("Connection pool failed to initialize -- closing")
+        close()
       }
     }
 
@@ -323,8 +404,6 @@ class SequencerConnectionXPoolImpl private[sequencing] (
     // If this becomes a concern, we can optimize it in the future.
     val bootstrapToSequencerIds = attributesOfValidatedConnections
       .groupMap(BootstrapInfo.fromAttributes)(_.sequencerId)
-
-    // TODO(i24790): Add alert when trust threshold cannot be reached with remaining connections
 
     bootstrapToSequencerIds.toSeq.mapFilter {
       case (bootstrapInfo, sequencerIds) if sequencerIds.sizeIs >= threshold.unwrap =>
@@ -521,6 +600,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
   }
 
   override def getConnections(
+      requester: String,
       requestedNumber: PositiveInt,
       exclusions: Set[SequencerId],
   )(implicit traceContext: TraceContext): Set[SequencerConnectionX] =
@@ -528,7 +608,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
     blocking {
       lock.synchronized {
         logger.debug(
-          s"Requesting $requestedNumber connections excluding ${exclusions.map(_.uid.identifier)}"
+          s"[$requester] requesting $requestedNumber connections excluding ${exclusions.map(_.uid.identifier)}"
         )
 
         // Pick up to `requestedNumber` non-excluded sequencer IDs from the pool
@@ -552,18 +632,20 @@ class SequencerConnectionXPoolImpl private[sequencing] (
           head
         }.toSet
 
-        logger.debug(s"Returning ${pickedConnections.map(_.name)}")
+        logger.debug(s"[$requester] returning ${pickedConnections.map(_.name)}")
         pickedConnections
       }
     }
 
-  override def getOneConnectionPerSequencer()(implicit
+  override def getOneConnectionPerSequencer(requester: String)(implicit
       traceContext: TraceContext
   ): Map[SequencerId, SequencerConnectionX] = {
-    logger.debug(s"Requesting one connection per sequencer")
+    logger.debug(s"[$requester] requesting one connection per sequencer")
     // Upper bound on number of connections. Note: `checked` because `connections` is `NonEmpty`.
     val nb = checked(PositiveInt.tryCreate(config.connections.size))
-    getConnections(nb, exclusions = Set.empty).map(c => c.attributes.sequencerId -> c).toMap
+    getConnections(requester, nb, exclusions = Set.empty)
+      .map(c => c.attributes.sequencerId -> c)
+      .toMap
   }
 
   override def getAllConnections()(implicit traceContext: TraceContext): Seq[SequencerConnectionX] =

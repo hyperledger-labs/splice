@@ -41,8 +41,8 @@ class SymbolicPureCrypto extends CryptoPureApi {
     CryptoScheme(SigningAlgorithmSpec.Ed25519, NonEmpty.mk(Set, SigningAlgorithmSpec.Ed25519))
   override val encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec] =
     CryptoScheme(
-      EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm,
-      NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm),
+      EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc,
+      NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc),
     )
   override val defaultPbkdfScheme: PbkdfScheme = PbkdfScheme.Argon2idMode1
 
@@ -296,6 +296,21 @@ class SymbolicPureCrypto extends CryptoPureApi {
       random.concat(new Array[Byte](length - random.length))
     else
       random
+  }
+
+  private[crypto] def computeHmacWithSecretInternal(
+      secret: ByteString,
+      message: ByteString,
+      algorithm: HmacAlgorithm = defaultHmacAlgorithm,
+  ): Either[HmacError, Hmac] = {
+    // We just hash the secret and message, then truncate/pad to desired length
+    val combined = secret.concat(message)
+    val hash = TestHash.build.addWithoutLengthPrefix(combined).finish()
+    val hmacBytes = ByteStringUtil.padOrTruncate(
+      hash.unwrap,
+      NonNegativeInt.tryCreate(algorithm.hashAlgorithm.length.toInt),
+    )
+    Hmac.create(hmacBytes, algorithm)
   }
 
   override def deriveSymmetricKey(

@@ -666,7 +666,7 @@ messages:
           If enabled, values served over the API will contain more information than strictly necessary to interpret the data.
           In particular, setting the verbose flag to true triggers the ledger to include labels for record fields.
           Optional
-  ExecuteSubmissionAndWaitRequest:
+  ExecuteSubmissionAndWaitForTransactionRequest:
     message:
       comments: null
       fieldComments:
@@ -675,16 +675,26 @@ messages:
           Each party can provide one or more signatures..
           and one or more parties can sign.
           Note that currently, only single party submissions are supported.
-        hashing_scheme_version: The hashing scheme version used when building the
-          hash
+          Required
+        hashing_scheme_version: |-
+          The hashing scheme version used when building the hash
+          Required
         deduplication_duration: |-
           Specifies the length of the deduplication period.
           It is interpreted relative to the local clock at some point during the submission's processing.
           Must be non-negative. Must not exceed the maximum deduplication time.
+        transaction_format: |-
+          If no ``transaction_format`` is provided, a default will be used where ``transaction_shape`` is set to
+          TRANSACTION_SHAPE_ACS_DELTA, ``event_format`` is defined with ``filters_by_party`` containing wildcard-template
+          filter for all original ``act_as`` and ``read_as`` parties and the ``verbose`` flag is set.
+          When the ``transaction_shape`` TRANSACTION_SHAPE_ACS_DELTA shape is used (explicitly or is defaulted to as explained above),
+          events will only be returned if the submitting party is hosted on this node.
+          Optional
         prepared_transaction: |-
           the prepared transaction
           Typically this is the value of the `prepared_transaction` field in `PrepareSubmissionResponse`
           obtained from calling `prepareSubmission`.
+          Required
         deduplication_offset: |-
           Specifies the start of the deduplication period by a completion stream offset (exclusive).
           Must be a valid absolute offset (positive integer).
@@ -699,7 +709,56 @@ messages:
           If set will influence the chosen ledger effective time but will not result in a submission delay so any override
           should be scheduled to executed within the window allowed by synchronizer.
           Optional
-        user_id: See [PrepareSubmissionRequest.user_id]
+        user_id: |-
+          See [PrepareSubmissionRequest.user_id]
+          Optional
+  ExecuteSubmissionAndWaitForTransactionResponse:
+    message:
+      comments: null
+      fieldComments:
+        transaction: |-
+          The transaction that resulted from the submitted command.
+          The transaction might contain no events (request conditions result in filtering out all of them).
+          Required
+  ExecuteSubmissionAndWaitRequest:
+    message:
+      comments: null
+      fieldComments:
+        party_signatures: |-
+          The party(ies) signatures that authorize the prepared submission to be executed by this node.
+          Each party can provide one or more signatures..
+          and one or more parties can sign.
+          Note that currently, only single party submissions are supported.
+          Required
+        hashing_scheme_version: |-
+          The hashing scheme version used when building the hash
+          Required
+        deduplication_duration: |-
+          Specifies the length of the deduplication period.
+          It is interpreted relative to the local clock at some point during the submission's processing.
+          Must be non-negative. Must not exceed the maximum deduplication time.
+        prepared_transaction: |-
+          the prepared transaction
+          Typically this is the value of the `prepared_transaction` field in `PrepareSubmissionResponse`
+          obtained from calling `prepareSubmission`.
+          Required
+        deduplication_offset: |-
+          Specifies the start of the deduplication period by a completion stream offset (exclusive).
+          Must be a valid absolute offset (positive integer).
+        submission_id: |-
+          A unique identifier to distinguish completions for different submissions with the same change ID.
+          Typically a random UUID. Applications are expected to use a different UUID for each retry of a submission
+          with the same change ID.
+          Must be a valid LedgerString (as described in ``value.proto``).
+
+          Required
+        min_ledger_time: |-
+          If set will influence the chosen ledger effective time but will not result in a submission delay so any override
+          should be scheduled to executed within the window allowed by synchronizer.
+          Optional
+        user_id: |-
+          See [PrepareSubmissionRequest.user_id]
+          Optional
   ExecuteSubmissionAndWaitResponse:
     message:
       comments: null
@@ -720,8 +779,10 @@ messages:
           Each party can provide one or more signatures..
           and one or more parties can sign.
           Note that currently, only single party submissions are supported.
-        hashing_scheme_version: The hashing scheme version used when building the
-          hash
+          Required
+        hashing_scheme_version: |-
+          The hashing scheme version used when building the hash
+          Required
         deduplication_duration: |-
           Specifies the length of the deduplication period.
           It is interpreted relative to the local clock at some point during the submission's processing.
@@ -730,6 +791,7 @@ messages:
           the prepared transaction
           Typically this is the value of the `prepared_transaction` field in `PrepareSubmissionResponse`
           obtained from calling `prepareSubmission`.
+          Required
         deduplication_offset: |-
           Specifies the start of the deduplication period by a completion stream offset (exclusive).
           Must be a valid absolute offset (positive integer).
@@ -744,7 +806,9 @@ messages:
           If set will influence the chosen ledger effective time but will not result in a submission delay so any override
           should be scheduled to executed within the window allowed by synchronizer.
           Optional
-        user_id: See [PrepareSubmissionRequest.user_id]
+        user_id: |-
+          See [PrepareSubmissionRequest.user_id]
+          Optional
   ExecuteSubmissionResponse:
     message:
       comments: null
@@ -1876,7 +1940,9 @@ messages:
     message:
       comments: Additional signatures provided by the submitting parties
       fieldComments:
-        signatures: Additional signatures provided by all individual parties
+        signatures: |-
+          Additional signatures provided by all individual parties
+          Required
   PrefetchContractKey:
     message:
       comments: Preload contracts
@@ -1907,12 +1973,14 @@ messages:
         package_id_selection_preference: |-
           The package-id selection preference of the client for resolving
           package names and interface instances in command submission and interpretation
+          Optional
         disclosed_contracts: |-
           Additional contracts used to resolve contract & contract key lookups.
           Optional
         verbose_hashing: |-
           When true, the response will contain additional details on how the transaction was encoded and hashed
           This can be useful for troubleshooting of hash mismatches. Should only be used for debugging.
+          Optional, default to false
         prefetch_contract_keys: |-
           Fetches the contract keys into the caches to speed up the command processing.
           Should only contain contract keys that are expected to be resolved during interpretation of the commands.
@@ -1921,6 +1989,8 @@ messages:
           Optional
         commands: |-
           Individual elements of this atomic command. Must be non-empty.
+          Limitation: Only single command transaction are currently supported by the API.
+          The field is marked as repeated in preparation for future support of multiple commands.
           Required
         read_as: |-
           Set of parties on whose behalf (in addition to all parties listed in ``act_as``) contracts can be retrieved.
@@ -1945,6 +2015,7 @@ messages:
           Must be a valid UserIdString (as described in ``value.proto``).
           Required unless authentication is used with a user token.
           In that case, the token's user-id will be used for the request's user_id.
+          Optional
   PrepareSubmissionResponse:
     message:
       comments: '[docs-entry-end: HashingSchemeVersion]'
@@ -1980,23 +2051,14 @@ messages:
           1. All normal and divulged contracts that have been archived before
              `prune_up_to`.
           2. All transaction events and completions before `prune_up_to`
+          3. All immediately divulged contracts created before `prune_up_to` independent of whether
+             they were archived before `prune_up_to`.
         submission_id: |-
           Unique submission identifier.
           Optional, defaults to a random identifier, used for logging.
         prune_all_divulged_contracts: |-
-          Prune all immediately and retroactively divulged contracts created before `prune_up_to`
-          independent of whether they were archived before `prune_up_to`. Useful to avoid leaking
-          storage on participant nodes that can see a divulged contract but not its archival.
-
-          Application developers SHOULD write their Daml applications
-          such that they do not rely on divulged contracts; i.e., no warnings from
-          using divulged contracts as inputs to transactions are emitted.
-
-          Participant node operators SHOULD set the `prune_all_divulged_contracts` flag to avoid leaking
-          storage due to accumulating unarchived divulged contracts PROVIDED that:
-
-          1. no application using this participant node relies on divulgence OR
-          2. divulged contracts on which applications rely have been re-divulged after the `prune_up_to` offset.
+          Deprecated flag used to prune all immediately and retroactively divulged contracts.
+          It is a no-op since the divulged contracts are pruned along with the deactivated contracts.
   PruneResponse:
     message:
       comments: null
@@ -2147,8 +2209,12 @@ messages:
     message:
       comments: Signatures provided by a single party
       fieldComments:
-        party: Submitting party
-        signatures: Signatures
+        party: |-
+          Submitting party
+          Required
+        signatures: |-
+          Signatures
+          Required
   SubmitAndWaitForReassignmentRequest:
     message:
       comments: This reassignment is executed as a single atomic update.
@@ -2866,12 +2932,29 @@ oneOfs:
           archived: ''
           exercised: ''
   EventFormat: {}
+  ExecuteSubmissionAndWaitForTransactionRequest:
+    deduplication_period:
+      message:
+        comments: |-
+          Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
+          If omitted, the participant will assume the configured maximum deduplication time.
+          Optional
+        fieldComments:
+          deduplication_duration: |-
+            Specifies the length of the deduplication period.
+            It is interpreted relative to the local clock at some point during the submission's processing.
+            Must be non-negative. Must not exceed the maximum deduplication time.
+          deduplication_offset: |-
+            Specifies the start of the deduplication period by a completion stream offset (exclusive).
+            Must be a valid absolute offset (positive integer).
+  ExecuteSubmissionAndWaitForTransactionResponse: {}
   ExecuteSubmissionAndWaitRequest:
     deduplication_period:
       message:
         comments: |-
           Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
           If omitted, the participant will assume the configured maximum deduplication time.
+          Optional
         fieldComments:
           deduplication_duration: |-
             Specifies the length of the deduplication period.
@@ -2887,6 +2970,7 @@ oneOfs:
         comments: |-
           Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
           If omitted, the participant will assume the configured maximum deduplication time.
+          Optional
         fieldComments:
           deduplication_duration: |-
             Specifies the length of the deduplication period.

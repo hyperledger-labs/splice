@@ -129,7 +129,7 @@ import com.digitalasset.canton.util.{
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 import com.digitalasset.canton.watchdog.WatchdogService
 import io.grpc.ServerServiceDefinition
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 
@@ -568,7 +568,7 @@ abstract class CantonNodeBootstrapImpl[
           )
         )
         adminServerRegistry
-          .addServiceU(ProtoReflectionService.newInstance().bindService(), withLogging = false)
+          .addServiceU(ProtoReflectionServiceV1.newInstance().bindService(), withLogging = false)
         adminServerRegistry.addServiceU(
           ApiInfoServiceGrpc.bindService(
             new GrpcApiInfoService(CantonGrpcUtil.ApiName.AdminApi),
@@ -723,7 +723,6 @@ abstract class CantonNodeBootstrapImpl[
         )
 
       val snapshotValidator = new InitialTopologySnapshotValidator(
-        ProtocolVersion.latest,
         crypto.pureCrypto,
         temporaryTopologyStore,
         this.timeouts,
@@ -1025,7 +1024,7 @@ abstract class CantonNodeBootstrapImpl[
           asOfInclusive = false,
           isProposal = false,
           types = Seq(OwnerToKeyMapping.code),
-          filterUid = Some(Seq(nodeId)),
+          filterUid = Some(NonEmpty(Seq, nodeId)),
           filterNamespace = None,
         )
         .map { res =>
@@ -1081,7 +1080,7 @@ abstract class CantonNodeBootstrapImpl[
               isProposal = false,
               types = Seq(NamespaceDelegation.code),
               filterUid = None,
-              filterNamespace = Some(Seq(nodeId.namespace)),
+              filterNamespace = Some(NonEmpty(Seq, nodeId.namespace)),
             )
         )
         .flatMap { existing =>
@@ -1189,6 +1188,7 @@ abstract class CantonNodeBootstrapImpl[
               NonEmpty.mk(Seq, sequencerAuthKey, signingKey)
             )
           }
+        otk <- EitherT.fromEither[FutureUnlessShutdown](OwnerToKeyMapping.create(ownerId, keys))
         // register the keys
         _ <- authorizeStateUpdate(
           Seq(
@@ -1196,7 +1196,7 @@ abstract class CantonNodeBootstrapImpl[
             sequencerAuthKey.fingerprint,
             signingKey.fingerprint,
           ),
-          OwnerToKeyMapping(ownerId, keys),
+          otk,
           ProtocolVersion.latest,
         )
       } yield Some(())
