@@ -1959,7 +1959,9 @@ class UpdateHistory(
     storage.query(readOffsetAction(), "readOffset")
   }
 
-  lazy val sourceHistory: HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
+  def sourceHistory(
+      excludeAcsImportUpdates: Boolean
+  ): HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
     new HistoryBackfilling.SourceHistory[UpdateHistoryResponse] {
       override def isReady: Boolean = state
         .get()
@@ -2019,7 +2021,8 @@ class UpdateHistory(
           migrationId = migrationId,
           synchronizerId = synchronizerId,
           beforeRecordTime = before,
-          atOrAfterRecordTime = None,
+          atOrAfterRecordTime =
+            Option.when(excludeAcsImportUpdates)(CantonTimestamp.MinValue.plusSeconds(1L)),
           limit = PageLimit.tryCreate(count),
         ).map(_.map(_.update))
       }

@@ -1816,7 +1816,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetMigrationInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getMigrationInfo") { _ => _ =>
-      val sourceHistory = store.updateHistory.sourceHistory
+      val sourceHistory = store.updateHistory.sourceHistory(excludeAcsImportUpdates = false)
       for {
         infoO <- sourceHistory.migrationInfo(body.migrationId)
       } yield infoO match {

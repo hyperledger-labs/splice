@@ -1091,7 +1091,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             withClueAndLog("Backfilled history includes ACS import") {
               eventually() {
-                sv1ScanLocalBackend.appState.store.updateHistory.sourceHistory
+                sv1ScanLocalBackend.appState.store.updateHistory
+                  .sourceHistory(excludeAcsImportUpdates = false)
                   .migrationInfo(1L)
                   .futureValue
                   .exists(_.complete) should be(true)

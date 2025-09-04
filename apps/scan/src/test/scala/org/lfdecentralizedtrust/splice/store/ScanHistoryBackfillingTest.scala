@@ -30,7 +30,8 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           testData.destinationHistory,
           Map(domain1 -> time(0), domain2 -> time(0)),
         )
-        backfillingComplete <- testData.destinationHistory.sourceHistory
+        backfillingComplete <- testData.destinationHistory
+          .sourceHistory(excludeAcsImportUpdates = false)
           .migrationInfo(0)
           .map(_.value.complete)
         // Check that the updates are the same
@@ -101,7 +102,8 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           testData.destinationHistory,
           Map(domain1 -> time(5), domain2 -> time(5)),
         )
-        migrationInfo0 <- testData.destinationHistory.sourceHistory
+        migrationInfo0 <- testData.destinationHistory
+          .sourceHistory(excludeAcsImportUpdates = false)
           .migrationInfo(0)
         updatesB1 <- testData.destinationHistory.getAllUpdates(
           None,
@@ -114,7 +116,8 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           testData.destinationHistory,
           Map(domain1 -> time(0), domain2 -> time(0)),
         )
-        backfillingComplete2 <- testData.destinationHistory.sourceHistory
+        backfillingComplete2 <- testData.destinationHistory
+          .sourceHistory(excludeAcsImportUpdates = false)
           .migrationInfo(0)
           .map(_.value.complete)
 
@@ -306,7 +309,9 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
         migrationId: Long
     )(implicit tc: TraceContext): Future[Option[SourceMigrationInfo]] =
       for {
-        original <- history.sourceHistory.migrationInfo(migrationId)(tc)
+        original <- history
+          .sourceHistory(excludeAcsImportUpdates = false)
+          .migrationInfo(migrationId)(tc)
         filteredRange = original.map(
           _.recordTimeRange.toList
             .flatMap { case (k, v) =>
