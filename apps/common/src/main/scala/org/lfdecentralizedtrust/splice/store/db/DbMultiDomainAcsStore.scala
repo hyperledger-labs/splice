@@ -232,7 +232,7 @@ final class DbMultiDomainAcsStore[TXE](
   def containsArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
   ): Future[Boolean] = waitUntilAcsIngested {
-    if (ids.isEmpty) Future.successful(true)
+    if (ids.isEmpty) Future.successful(false)
     else {
       val contractIds = inClause(ids)
       val expectedCount = ids.size

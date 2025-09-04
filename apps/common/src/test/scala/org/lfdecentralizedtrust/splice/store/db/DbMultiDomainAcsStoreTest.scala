@@ -543,7 +543,7 @@ class DbMultiDomainAcsStoreTest
           .containsArchived(Seq(coupon2.contractId, coupon3.contractId))
           .futureValue shouldBe true
         _ = store.containsArchived(Seq(coupon3.contractId)).futureValue shouldBe false
-        _ = store.containsArchived(Seq()).futureValue shouldBe true
+        _ = store.containsArchived(Seq()).futureValue shouldBe false
       } yield succeed
     }
   }
