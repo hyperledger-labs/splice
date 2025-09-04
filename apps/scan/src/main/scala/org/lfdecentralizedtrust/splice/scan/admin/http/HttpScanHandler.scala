@@ -39,10 +39,17 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   MaybeCachedContractWithState,
   UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
+  EventHistoryRequest,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanEventStore,
+  ScanStore,
+  TxLogEntry,
+}
+
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -64,6 +71,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Try, Using}
+import scala.annotation.unused
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
@@ -100,6 +108,7 @@ class HttpScanHandler(
     sequencerAdminConnection: SequencerAdminConnection,
     protected val store: ScanStore,
     snapshotStore: AcsSnapshotStore,
+    eventStore: ScanEventStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
@@ -830,6 +839,110 @@ class HttpScanHandler(
         extracted,
       )
         .map(items => definitions.UpdateHistoryResponseV2(items.map(toUpdateV2)))
+    }
+  }
+
+  def getEventById(
+      updateId: String,
+      encoding: definitions.DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Either[definitions.ErrorResponse, definitions.EventHistoryItem]] = {
+    implicit val tc = extracted
+    for {
+      eventO <- eventStore.getEventByUpdateId(updateId)
+    } yield {
+      eventO match {
+        case None => Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
+        case Some((verdictWithViewsO, updateO)) =>
+          val encodedUpdateV2 = updateO
+            .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+            .map(toUpdateV2)
+          val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+            ScanHttpEncodings.encodeVerdict(v, views)
+          }
+          Right(definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded))
+      }
+    }
+  }
+
+  override def getEventById(respond: ScanResource.GetEventByIdResponse.type)(
+      updateId: String,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetEventByIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getEventById") { _ => _ =>
+      val encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson)
+      getEventById(
+        updateId = updateId,
+        encoding = encoding,
+        extracted,
+      ).map {
+        case Left(error) => ScanResource.GetEventByIdResponse.NotFound(error)
+        case Right(update) => ScanResource.GetEventByIdResponse.OK(update)
+      }
+    }
+  }
+
+  def getEventHistory(
+      after: Option[definitions.UpdateHistoryRequestAfter] = None,
+      pageSize: Int,
+      encoding: definitions.DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Vector[definitions.EventHistoryItem]] = {
+    implicit val tc: TraceContext = extracted
+    val updateHistory = store.updateHistory
+    val afterO = after.map { a =>
+      val afterRecordTime = parseTimestamp(a.afterRecordTime)
+      (a.afterMigrationId, afterRecordTime)
+    }
+
+    updateHistory
+      .getBackfillingState()
+      .flatMap {
+        case BackfillingState.NotInitialized =>
+          throw Status.UNAVAILABLE
+            .withDescription(
+              "This scan instance has not yet loaded its updates history. Wait a short time and retry."
+            )
+            .asRuntimeException()
+        case BackfillingState.InProgress(_, _) =>
+          throw Status.UNAVAILABLE
+            .withDescription(
+              "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
+                "Wait until replication is complete, or connect to a different scan instance."
+            )
+            .asRuntimeException()
+        case BackfillingState.Complete =>
+          for {
+            events <- eventStore.getEventsReference(
+              afterO = afterO,
+              currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
+              limit = PageLimit.tryCreate(pageSize),
+            )
+          } yield events.map { case (verdictWithViewsO, updateO) =>
+            val encodedUpdateV2 = updateO
+              .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+              .map(toUpdateV2)
+            val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+              ScanHttpEncodings.encodeVerdict(v, views)
+            }
+            definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded)
+          }.toVector
+      }
+  }
+
+  override def getEventHistory(respond: ScanResource.GetEventHistoryResponse.type)(
+      request: EventHistoryRequest
+  )(extracted: TraceContext): Future[ScanResource.GetEventHistoryResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getEventHistory") { _ => _ =>
+      getEventHistory(
+        after = request.after,
+        pageSize = request.pageSize,
+        encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+        extracted,
+      )
+        .map(items => definitions.EventHistoryResponse(items))
     }
   }
 

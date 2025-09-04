@@ -21,6 +21,13 @@ final case class ScanSynchronizerConfig(
     mediator: FullClientConfig,
 )
 
+final case class MediatorVerdictIngestionConfig(
+    /** Max verdicts items for DB insert batch. */
+    batchSize: Int = 50,
+    /** Delay before restart on stream failure. */
+    restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -30,7 +37,9 @@ case class ScanAppBackendConfig(
     svUser: String,
     override val participantClient: ParticipantClientConfig,
     sequencerAdminClient: FullClientConfig,
+    mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     isFirstSv: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,

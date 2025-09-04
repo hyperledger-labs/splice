@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{TransactionViewT, VerdictT}
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
@@ -33,12 +34,6 @@ import scala.jdk.OptionConverters.*
   * http: org.lfdecentralizedtrust.splice.http.v0.httpApi.*
   */
 sealed trait ScanHttpEncodings {
-  private val recordTimeDateFormatter =
-    new DateTimeFormatterBuilder()
-      .appendInstant(6) // 6 digits of precision for microseconds, right padded with zeros
-      .toFormatter()
-  private def formatRecordTime(instant: Instant) =
-    recordTimeDateFormatter.format(instant)
 
   def lapiToHttpUpdate(
       updateWithMigrationId: TreeUpdateWithMigrationId,
@@ -53,7 +48,7 @@ sealed trait ScanHttpEncodings {
               tree.getUpdateId,
               updateWithMigrationId.migrationId,
               tree.getWorkflowId,
-              formatRecordTime(tree.getRecordTime),
+              ScanHttpEncodings.formatRecordTime(tree.getRecordTime),
               updateWithMigrationId.update.synchronizerId.toProtoPrimitive,
               tree.getEffectiveAt.toString,
               LegacyOffset.Api.fromLong(tree.getOffset),
@@ -85,7 +80,7 @@ sealed trait ScanHttpEncodings {
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 LegacyOffset.Api.fromLong(update.offset),
-                formatRecordTime(update.recordTime.toInstant),
+                ScanHttpEncodings.formatRecordTime(update.recordTime.toInstant),
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
@@ -112,7 +107,7 @@ sealed trait ScanHttpEncodings {
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 LegacyOffset.Api.fromLong(update.offset),
-                formatRecordTime(update.recordTime.toInstant),
+                ScanHttpEncodings.formatRecordTime(update.recordTime.toInstant),
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
@@ -439,6 +434,61 @@ object ScanHttpEncodings {
   sealed trait ApiVersion
   case object V0 extends ApiVersion
   case object V1 extends ApiVersion
+
+  private val recordTimeDateFormatter =
+    new DateTimeFormatterBuilder().appendInstant(6).toFormatter()
+  def formatRecordTime(instant: Instant): String =
+    recordTimeDateFormatter.format(instant)
+
+  // TODO: is it better to inline this?
+  def encodeVerdict(
+      verdict: VerdictT,
+      views: Seq[TransactionViewT],
+  ): definitions.EventHistoryVerdict = {
+    val verdictResultEnum: definitions.VerdictResult = verdict.verdictResult match {
+      case org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue.Accepted =>
+        definitions.VerdictResult.VerdictResultAccepted
+      case org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue.Rejected =>
+        definitions.VerdictResult.VerdictResultRejected
+      case _ => definitions.VerdictResult.VerdictResultUnspecified
+    }
+
+    val txViewsList: Vector[definitions.TransactionView] =
+      views.sortBy(_.viewId).toVector.map { v =>
+        val quorums: Vector[definitions.Quorum] = v.confirmingParties.asArray
+          .getOrElse(Vector.empty)
+          .toVector
+          .flatMap { j =>
+            val parties = j.hcursor.downField("parties").as[Vector[String]].getOrElse(Vector.empty)
+            val threshold = j.hcursor.downField("threshold").as[Int].getOrElse(0)
+            Some(definitions.Quorum(parties, threshold))
+          }
+        definitions.TransactionView(
+          viewId = v.viewId,
+          informees = v.informees.toVector,
+          confirmingParties = quorums,
+          subViews = v.subViews.toVector,
+        )
+      }
+
+    val txViews = definitions.TransactionViews(
+      views = txViewsList,
+      rootViews = verdict.transactionRootViews.toVector,
+    )
+
+    httpApi.EventHistoryVerdict(
+      updateId = verdict.updateId,
+      migrationId = verdict.migrationId,
+      domainId = verdict.domainId.toString(),
+      recordTime = formatRecordTime(verdict.recordTime.toInstant),
+      finalizationTime = formatRecordTime(verdict.finalizationTime.toInstant),
+      submittingParties = verdict.submittingParties.toVector,
+      submittingParticipantUid = verdict.submittingParticipantUid,
+      verdictResult = verdictResultEnum,
+      mediatorGroup = verdict.mediatorGroup,
+      transactionViews = txViews,
+    )
+  }
 
   def encodeUpdate(
       update: TreeUpdateWithMigrationId,
