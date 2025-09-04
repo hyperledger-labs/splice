@@ -603,40 +603,49 @@ final class DbMultiDomainAcsStore[TXE](
             )
             tree
         }
-        val nonEmpty = NonEmptyList
-          .fromFoldable(trees)
-          .getOrElse(
-            throw new RuntimeException("insert() must not be called with an empty sequence")
-          )
-        val firstTree = nonEmpty.foldLeft(nonEmpty.head) { case (acc, tree) =>
-          if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
-        }
-        val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
-        val treesWithEntries = trees.flatMap { tree =>
-          val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
-          entries.map(e => (tree, e))
-        }
 
-        for {
-          _ <- storage.queryAndUpdate(
-            DBIOAction
-              .seq(
-                doInsertEntries(migrationId, synchronizerId, treesWithEntries),
-                doUpdateFirstIngestedUpdate(
-                  synchronizerId,
-                  migrationId,
-                  firstRecordTime,
-                ),
+        NonEmptyList.fromFoldable(trees) match {
+          case None =>
+            Future.successful(
+              DestinationHistory.InsertResult(
+                backfilledUpdates = 0L,
+                backfilledEvents = 0L,
+                lastBackfilledRecordTime =
+                  items.headOption.map(_.update.recordTime).getOrElse(CantonTimestamp.MinValue),
               )
-              .transactionally,
-            "destinationHistory.insert",
-          )
-        } yield DestinationHistory.InsertResult(
-          backfilledUpdates = trees.size.toLong,
-          backfilledEvents =
-            trees.foldLeft(0L)((sum, tree) => sum + tree.getEventsById.size().toLong),
-          lastBackfilledRecordTime = CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
-        )
+            )
+          case Some(nonEmpty) =>
+            val firstTree = nonEmpty.foldLeft(nonEmpty.head) { case (acc, tree) =>
+              if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
+            }
+            val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
+            val treesWithEntries = trees.flatMap { tree =>
+              val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
+              entries.map(e => (tree, e))
+            }
+
+            for {
+              _ <- storage.queryAndUpdate(
+                DBIOAction
+                  .seq(
+                    doInsertEntries(migrationId, synchronizerId, treesWithEntries),
+                    doUpdateFirstIngestedUpdate(
+                      synchronizerId,
+                      migrationId,
+                      firstRecordTime,
+                    ),
+                  )
+                  .transactionally,
+                "destinationHistory.insert",
+              )
+            } yield DestinationHistory.InsertResult(
+              backfilledUpdates = trees.size.toLong,
+              backfilledEvents =
+                trees.foldLeft(0L)((sum, tree) => sum + tree.getEventsById.size().toLong),
+              lastBackfilledRecordTime =
+                CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
+            )
+        }
       }
 
       override def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit] = {
