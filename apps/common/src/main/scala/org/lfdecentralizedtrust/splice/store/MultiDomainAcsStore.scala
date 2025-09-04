@@ -740,7 +740,7 @@ object MultiDomainAcsStore {
         traceContext: TraceContext
     ): Future[Unit]
 
-    def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
+    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit] =
       ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))

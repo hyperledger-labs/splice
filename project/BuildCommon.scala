@@ -80,8 +80,10 @@ object BuildCommon {
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
         scalacOptions ++= Seq(
           "-Wconf:src=src_managed/.*:silent",
+          // Silencing deprecation warnings for now for javaapi, remove when on canton-3.4
+          "-Wconf:msg=.*package command_service.*|.*CommandService.*|.*package update_service.*|.*UpdateService.*|.*transaction_filter.*|.*package data.*|.*package transaction.*&cat=deprecation:silent",
           // renable once scala is > 2.13.15 https://github.com/scala/bug/issues/13041
-//          "-Wunused:patvars",
+          // "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
           // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning

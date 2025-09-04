@@ -12,7 +12,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferOutput}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferOutput,
+  TransferPreapproval,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.console.{ValidatorAppBackendReference, *}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
@@ -28,7 +32,8 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport}
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import org.scalatest.Assertion
 
 import java.time.Duration
@@ -1301,6 +1306,19 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       .supportsExpectedDsoParty(partiesOfInterest, now)
       .futureValue
       .supported
+  }
+
+  def createTransferPreapprovalIfNotExists(
+      partyWalletClient: WalletAppClientReference
+  ): TransferPreapproval.ContractId = {
+    // creating the transfer preapproval can fail because there are no funds (which this won't recover),
+    // but also by the validator being slow to approve the preapproval, which we can recover here
+    eventuallySucceeds() {
+      partyWalletClient.createTransferPreapproval() match {
+        case CreateTransferPreapprovalResponse.Created(contractId) => contractId
+        case CreateTransferPreapprovalResponse.AlreadyExists(contractId) => contractId
+      }
+    }
   }
 
 }

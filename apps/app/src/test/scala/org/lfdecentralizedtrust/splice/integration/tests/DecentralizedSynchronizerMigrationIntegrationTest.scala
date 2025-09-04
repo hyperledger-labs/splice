@@ -421,7 +421,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val onboarding @ OnboardingResult(externalParty, _, _) =
         onboardExternalParty(validatorBackend)
       walletClient.tap(50.0)
-      walletClient.createTransferPreapproval()
+      createTransferPreapprovalIfNotExists(walletClient)
       createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
       eventually() {
         validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty

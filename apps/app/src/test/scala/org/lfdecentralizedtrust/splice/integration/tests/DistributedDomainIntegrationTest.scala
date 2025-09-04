@@ -140,9 +140,10 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     val decentralizedSynchronizerId =
       sv1Backend.participantClient.synchronizers.id_of(decentralizedSynchronizer)
     eventuallySucceeds() {
-      sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
+      val parameters = sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
         .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-        .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+      parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
+      parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
     }
 
     bracket(
@@ -169,9 +170,10 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         "decentralizedSynchronizer is paused",
         _ =>
           forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            sv.participantClientWithAdminToken.topology.synchronizer_parameters
+            val parameters = sv.participantClientWithAdminToken.topology.synchronizer_parameters
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-              .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+            parameters.confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+            parameters.mediatorReactionTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
           },
       )
 
@@ -186,9 +188,10 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         "decentralizedSynchronizer is un-paused",
         _ =>
           forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            sv.participantClientWithAdminToken.topology.synchronizer_parameters
+            val parameters = sv.participantClientWithAdminToken.topology.synchronizer_parameters
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-              .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+            parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
+            parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
           },
       )
     }

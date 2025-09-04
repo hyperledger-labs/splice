@@ -188,7 +188,7 @@ tmux new-session -d -s "${tmux_session}"
 
 # Numbers chosen such that we don't run out of memory and CI runs are not measurably slower.
 # Feel free to bump if you encounter issues but make sure the nodes don't run out of memory.
-JAVA_TOOL_OPTIONS="-Xms6g -Xmx8g -Dlogback.configurationFile=./scripts/canton-logback.xml"
+JAVA_TOOL_OPTIONS="-Xms6g -Xmx8g -Dlogback.configurationFile=./scripts/canton-logback.xml ${ADDITIONAL_JAVA_TOOLS_OPTIONS:-}"
 
 config_overrides=""
 config_overrides_simtime=""

@@ -377,7 +377,7 @@ export class TransactionParser {
     const children = await this.getChildren(exercisedEvent);
     const receiverAmounts = new Map<string, BigNumber>();
     children.creates
-      .filter((h) => h.owner !== this.partyId)
+      .filter((h) => h.owner !== sender)
       .forEach((holding) =>
         receiverAmounts.set(
           holding.owner,

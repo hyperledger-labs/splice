@@ -5,6 +5,7 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{ApiLoggingConfig, FullClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
@@ -83,9 +84,10 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
       "domain is unpaused on the new nodes"
     )(
       _.newParticipantConnection.getSynchronizerParametersState(synchronizerId)
-    )(
-      _.mapping.parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
-    )
+    ) { params =>
+      params.mapping.parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
+      params.mapping.parameters.mediatorReactionTimeout should be > NonNegativeFiniteDuration.Zero
+    }
   }
 
   def forAllNodesAssert[T](

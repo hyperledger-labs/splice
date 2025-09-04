@@ -754,6 +754,22 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 monitoringConfig.alerting.alerts.svNames
                   .map(p => `,member!~"PAR::${p}::.*"`)
                   .join('')
+              )
+              .replaceAll(
+                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
+                monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
+              )
+              .replaceAll(
+                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD',
+                monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
+              )
+              .replaceAll(
+                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
+                monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
+              )
+              .replaceAll(
+                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD',
+                monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

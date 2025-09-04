@@ -64,6 +64,8 @@ Configuring a docker compose deployment to enable metrics
 
 When using docker compose for the deployment, the metrics are enabled by default. These can be accessed at `http://validator.localhost/metrics` for the validator app and at `http://participant.localhost/metrics` for the participant.
 
+.. _metrics_grafana_dashboards:
+
 Grafana Dashboards
 ++++++++++++++++++
 
