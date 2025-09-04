@@ -20,6 +20,9 @@ sv:
     enableImportUpdatesBackfill: true
 svs:
   default:
+    logging:
+      appsLogLevel: INFO
+      cantonLogLevel: INFO
     participant:
       bftSequencerConnection: false
 synchronizerMigration:
