@@ -230,28 +230,28 @@ final class DbMultiDomainAcsStore[TXE](
   }
 
   def containsArchived(ids: Seq[ContractId[?]])(implicit
-                                                traceContext: TraceContext
+      traceContext: TraceContext
   ): Future[Boolean] = waitUntilAcsIngested {
     if (ids.isEmpty) Future.successful(true)
     else {
       val contractIds = inClause(ids)
       val expectedCount = ids.size
-      storage.query(
-        (sql"""
-        select count(1) from (
-           select acs.contract_id
-           from #$acsTableName acs
-           where acs.store_id = $acsStoreId
-           and acs.migration_id = $domainMigrationId
-           and acs.contract_id in """ ++ contractIds ++ sql"""
-         ) as contract_ids
+      storage
+        .query(
+          (sql"""
+         select count(1)
+         from #$acsTableName acs
+         where acs.store_id = $acsStoreId
+         and acs.migration_id = $domainMigrationId
+         and acs.contract_id in """ ++ contractIds ++ sql"""
          """).toActionBuilder
-          .as[Int]
-          .head,
-        "containsArchived",
-      ).map { count =>
-        count != expectedCount
-      }
+            .as[Int]
+            .head,
+          "containsArchived",
+        )
+        .map { count =>
+          count != expectedCount
+        }
     }
   }
 

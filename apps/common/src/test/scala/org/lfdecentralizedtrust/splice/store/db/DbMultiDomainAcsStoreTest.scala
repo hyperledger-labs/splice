@@ -536,7 +536,9 @@ class DbMultiDomainAcsStoreTest
         _ <- d1.archive(coupon1)(store)
         _ <- d1.archive(coupon2)(store)
         _ = store.containsArchived(Seq(coupon1.contractId)).futureValue shouldBe true
-        _ = store.containsArchived(Seq(coupon1.contractId, coupon2.contractId)).futureValue shouldBe true
+        _ = store
+          .containsArchived(Seq(coupon1.contractId, coupon2.contractId))
+          .futureValue shouldBe true
         _ = store
           .containsArchived(Seq(coupon2.contractId, coupon3.contractId))
           .futureValue shouldBe true

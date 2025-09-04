@@ -105,7 +105,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   /** True if the ids contains an id that has been archived. */
   def containsArchived(ids: Seq[ContractId[?]])(implicit
-                                                traceContext: TraceContext
+      traceContext: TraceContext
   ): Future[Boolean]
 
   /** Like `lookupContractById` but
