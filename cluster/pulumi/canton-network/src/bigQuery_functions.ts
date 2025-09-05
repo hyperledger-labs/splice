@@ -477,13 +477,13 @@ const one_day_updates = new BQTableFunction(
           update_id,
           record_time
         FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
-        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, e.record_time, e.migration_id)
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), migration_id, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, e.record_time, e.migration_id)
       UNION ALL
         SELECT
           update_id,
           record_time
         FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
-        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), 0, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, c.record_time, c.migration_id)
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), migration_id, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, c.record_time, c.migration_id)
     )
   `
 );
@@ -615,7 +615,7 @@ const fill_all_stats = new BQProcedure(
       DELETE FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\` WHERE as_of_record_time = t.as_of_record_time;
 
       INSERT INTO \`$$DASHBOARDS_DATASET$$.dashboards-data\`
-        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, 0);
+        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(t.as_of_record_time));
 
     END FOR;
   `
