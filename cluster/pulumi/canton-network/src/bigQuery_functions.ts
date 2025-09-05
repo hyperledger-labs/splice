@@ -6,6 +6,7 @@ import {
   BQArray,
   BQColumn,
   BQFunctionArgument,
+  BQProcedure,
   BQScalarFunction,
   BQTableFunction,
   FLOAT64,
@@ -21,7 +22,7 @@ import {
  * We also support codegen of sql statements that create these functions in BigQuery, which is currently used for
  * the integration test in ScanTotalSupplyBigQueryIntegrationTest.
  *
- * Note that the functions are parameterized with $$FUNCTIONS_DATASET$$ and $$SCAN_DATASET$$ placeholders that are replaced
+ * Note that the functions are parameterized with $$FUNCTIONS_DATASET$$, $$SCAN_DATASET$$ and $$DASHBOARDS_DATASET$$ placeholders that are replaced
  * by Pulumi and codegen, to point to the correct datasets. Any reference to a table in the scan dataset must use the
  * $$SCAN_DATASET$$ placeholder, e.g. `$$SCAN_DATASET$$.scan_sv_1_update_history_creates`. Similarly, all references to
  * another function must use the $$FUNCTIONS_DATASET$$ placeholder, e.g. `$$FUNCTIONS_DATASET$$.daml_record_path`.
@@ -544,16 +545,83 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) as minted,
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
-      \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) as burned,
-      \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))) as monthly_burn,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id), 0) as burned,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))), 0) as monthly_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
       \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
-      \`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id) as average_tps,
-      \`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id) as peak_tps
+      IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id), 0.0) as average_tps,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id), 0.0) as peak_tps
   `
 );
 
-export const allFunctions = [
+const all_days_since_genesis = new BQTableFunction(
+  'all_days_since_genesis',
+  [],
+  [new BQColumn('as_of_record_time', TIMESTAMP)],
+  `
+    -- Generate all days since genesis (first record time in the scan dataset) until today.
+    SELECT
+      TIMESTAMP(day) as as_of_record_time
+    FROM
+      UNNEST(
+        GENERATE_DATE_ARRAY(
+          -- DATE(
+          --   TIMESTAMP_MICROS((SELECT MIN(record_time) FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+          --),
+          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 30 days until we confirm costs, and will
+          -- backfill to genesis later.
+          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)),
+          CURRENT_DATE
+        )
+      ) as day
+  `
+);
+
+const days_with_missing_stats = new BQTableFunction(
+  'days_with_missing_stats',
+  [],
+  [new BQColumn('as_of_record_time', TIMESTAMP)],
+  `
+    -- Find all days since genesis for which we do not have a stats entry at all, or its lacking some fields.
+    SELECT as_of_record_time
+      FROM \`$$DASHBOARDS_DATASET$$.all_days_since_genesis\`()
+      EXCEPT DISTINCT
+        SELECT
+          as_of_record_time
+          FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\`
+          WHERE
+            locked IS NOT NULL
+            AND unlocked IS NOT NULL
+            AND current_supply_total IS NOT NULL
+            AND unminted IS NOT NULL
+            AND minted IS NOT NULL
+            AND allowed_mint IS NOT NULL
+            AND burned IS NOT NULL
+            AND monthly_burn IS NOT NULL
+            AND num_amulet_holders IS NOT NULL
+            AND num_active_validators IS NOT NULL
+            AND average_tps IS NOT NULL
+            AND peak_tps IS NOT NULL
+    `
+);
+
+const fill_all_stats = new BQProcedure(
+  'fill_all_stats',
+  [],
+  `
+    FOR t IN
+      (SELECT * FROM \`$$DASHBOARDS_DATASET$$.days_with_missing_stats\`())
+    DO
+      DELETE FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\` WHERE as_of_record_time = t.as_of_record_time;
+
+      INSERT INTO \`da-cn-scratchnet.dashboards.dashboards-data\`
+        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, 0);
+
+    END FOR;
+  `
+);
+
+export const allScanFunctions = [
   iso_timestamp,
   daml_prim_path,
   daml_record_path,
@@ -579,4 +647,10 @@ export const allFunctions = [
   average_tps,
   peak_tps,
   all_stats,
+];
+
+export const allDashboardFunctions = [
+  all_days_since_genesis,
+  days_with_missing_stats,
+  fill_all_stats,
 ];
