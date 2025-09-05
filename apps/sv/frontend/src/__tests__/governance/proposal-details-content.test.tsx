@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import {
   ProposalDetailsContent,
@@ -858,7 +858,14 @@ describe('Proposal Details > Votes & Voting', () => {
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
     expect(submitButton).toBeDefined();
 
-    await user.click(submitButton);
+    // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
+    // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
+    user.click(submitButton);
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      expect(submitButton.textContent).toMatch(/Submitting/);
+    });
 
     const submissionMessage = await screen.findByTestId('submission-message');
     expect(submissionMessage).toBeDefined();
@@ -919,14 +926,21 @@ describe('Proposal Details > Votes & Voting', () => {
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
     expect(submitButton).toBeDefined();
 
-    await user.click(submitButton);
+    // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
+    // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
+    user.click(submitButton);
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      expect(submitButton.textContent).toMatch(/Submitting/);
+    });
 
     const submissionMessage = await screen.findByTestId('submission-message');
     expect(submissionMessage).toBeDefined();
 
-    const successMessage = await screen.findByTestId('vote-submission-error');
+    const errorMessage = await screen.findByTestId('vote-submission-error');
 
-    expect(successMessage.textContent).toMatch(/Something went wrong, unable to cast vote/);
+    expect(errorMessage.textContent).toMatch(/Something went wrong, unable to cast vote/);
   });
 
   test('prevent submission if provided url is invalid', async () => {
