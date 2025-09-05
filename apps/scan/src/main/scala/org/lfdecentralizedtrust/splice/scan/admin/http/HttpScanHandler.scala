@@ -71,7 +71,6 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Try, Using}
-import scala.annotation.unused
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
