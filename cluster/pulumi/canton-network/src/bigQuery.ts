@@ -188,8 +188,6 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
-<<<<<<< HEAD
-=======
 // FIXME: deletable on non-prod (currently fails a reset)
 function installDashboardDataset(
   scanBigQuery: ScanBigQueryConfig,
@@ -235,7 +233,6 @@ function installDashboardDataset(
 };
 
 
->>>>>>> 28d294f07 (wip)
 function installFunctions(
   scanDataset: gcp.bigquery.Dataset,
   dependsOn: pulumi.Resource[]
@@ -493,6 +490,7 @@ export function configureScanBigQuery(
     dataset,
     pubRepSlots
   );
-  installFunctions(dataset, [stream]);
+  const dashboardDataset = installDashboardDataset(scanBigQuery);
+  installFunctions(dataset, [stream, dashboardDataset]);
   return;
 }

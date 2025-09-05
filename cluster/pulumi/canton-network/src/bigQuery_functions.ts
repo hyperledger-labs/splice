@@ -595,6 +595,7 @@ const all_stats = new BQTableFunction(
 //   `
 // );
 
+// FIXME: should actually not include the day of genesis, as we're rounding down to midnight UTC
 const all_days_since_genesis = new BQTableFunction(
   'all_days_since_genesis',
   [],
@@ -606,7 +607,8 @@ const all_days_since_genesis = new BQTableFunction(
     FROM
       UNNEST(GENERATE_DATE_ARRAY(DATE(TIMESTAMP_MICROS(
         (SELECT record_time FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` ORDER BY record_time LIMIT 1)
-      )), DATE(CURRENT_TIMESTAMP))) as day
+      -- FIXME: don't add +24 hours (we added that for testing to include end of today)
+      )), DATE(TIMESTAMP_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)))) as day
   `
 );
 
