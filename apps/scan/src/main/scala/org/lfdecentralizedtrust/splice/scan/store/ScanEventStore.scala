@@ -72,11 +72,11 @@ class ScanEventStore(
       def keyVerdict(v: VerdictT) = (v.migrationId, v.recordTime)
       def keyUpdate(u: TreeUpdateWithMigrationId) = (u.migrationId, u.update.update.recordTime)
 
+      // For the currentMigrationId we expect data to be present in both tables
+      // In case data in either table is missing for currentMigrationId, no events would be returned
       val capO: Option[CantonTimestamp] = (maxVerdictO, maxUpdateO) match {
         case (Some(v), Some(u)) => Some(if (v < u) v else u)
-        case (Some(v), None) => Some(v)
-        case (None, Some(u)) => Some(u)
-        case _ => None
+        case _ => Some(CantonTimestamp.MinValue)
       }
 
       def allow(mig: Long, rt: CantonTimestamp): Boolean = {
