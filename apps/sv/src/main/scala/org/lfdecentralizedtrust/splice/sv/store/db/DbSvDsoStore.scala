@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.sv.store.db
 import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
-import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -87,7 +86,7 @@ class DbSvDsoStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbSvDsoStore",
         party = key.dsoParty,
         participant = participantId,
@@ -143,6 +142,7 @@ class DbSvDsoStore(
                        idle.contract_id,
                        idle.template_id_package_id,
                        idle.template_id_qualified_name,
+                       idle.package_name,
                        idle.create_arguments,
                        idle.created_event_blob,
                        idle.created_at,
@@ -153,6 +153,7 @@ class DbSvDsoStore(
                        ctx.contract_id,
                        ctx.template_id_package_id,
                        ctx.template_id_qualified_name,
+                       ctx.package_name,
                        ctx.create_arguments,
                        ctx.created_event_blob,
                        ctx.created_at,
@@ -195,9 +196,7 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}""",
+              SvOnboardingConfirmed.COMPANION,
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
             "listSvOnboardingConfirmed",
@@ -217,9 +216,8 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
-                )} and sv_candidate_party = $svParty""",
+              SvOnboardingConfirmed.COMPANION,
+              where = sql"""sv_candidate_party = $svParty""",
               orderLimit = sql"limit 1",
             ).headOption,
             "lookupSvOnboardingConfirmedByParty",
@@ -238,10 +236,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                   and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(
+            Confirmation.COMPANION,
+            where = sql"""action_requiring_confirmation = ${payloadJsonFromDefinedDataType(
                 action
               )}""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
@@ -266,10 +262,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                and confirmer = $confirmer
+            Confirmation.COMPANION,
+            where = sql"""
+                confirmer = $confirmer
                 and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
@@ -295,7 +290,7 @@ class DbSvDsoStore(
       sql"""select
               sum(case app_reward_is_featured when true then reward_amount else 0 end),
               sum(case app_reward_is_featured when true then 0 else reward_amount end)""",
-      AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+      PackageQualifiedName.fromJavaCodegenCompanion(AppRewardCoupon.COMPANION),
       round,
       synchronizerId,
     )
@@ -319,7 +314,7 @@ class DbSvDsoStore(
   ): Future[BigDecimal] =
     selectFromRewardCouponsOnDomain[Option[BigDecimal]](
       sql"select sum(reward_amount)",
-      ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+      PackageQualifiedName.fromJavaCodegenCompanion(ValidatorRewardCoupon.COMPANION),
       round,
       synchronizerId,
     ).map(_.headOption.flatten.getOrElse(BigDecimal(0)))
@@ -362,7 +357,7 @@ class DbSvDsoStore(
       implicit tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
-    ValidatorFaucetCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    PackageQualifiedName.fromJavaCodegenCompanion(ValidatorFaucetCoupon.COMPANION),
     round,
     synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
@@ -374,7 +369,7 @@ class DbSvDsoStore(
       tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
-    ValidatorLivenessActivityRecord.COMPANION.TEMPLATE_ID,
+    PackageQualifiedName.fromJavaCodegenCompanion(ValidatorLivenessActivityRecord.COMPANION),
     round,
     synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
@@ -383,7 +378,7 @@ class DbSvDsoStore(
       implicit tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select sum(reward_weight)",
-    SvRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    PackageQualifiedName.fromJavaCodegenCompanion(SvRewardCoupon.COMPANION),
     round,
     synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
@@ -397,10 +392,9 @@ class DbSvDsoStore(
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
   ): Future[Seq[Contract[TCId, T]]] = {
-    val templateId = companionClass.typeId(companion)
     selectFromRewardCouponsOnDomain[SelectFromAcsTableResult](
       sql"select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}",
-      templateId,
+      companionClass.packageQualifiedName(companion),
       round,
       synchronizerId,
       limit = limit,
@@ -409,14 +403,14 @@ class DbSvDsoStore(
 
   private def selectFromRewardCouponsOnDomain[R: GetResult](
       selectClause: SQLActionBuilder,
-      templateId: Identifier,
+      packageQualifiedName: PackageQualifiedName,
       round: Long,
       synchronizerId: SynchronizerId,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[R]] = {
-    val opName = s"selectFrom${templateId.getEntityName}OnDomain"
+    val opName = s"selectFrom${packageQualifiedName.qualifiedName.entityName}OnDomain"
     waitUntilAcsIngested {
       for {
         result <- storage
@@ -426,7 +420,8 @@ class DbSvDsoStore(
                    from #${DsoTables.acsTableName}
                    where store_id = $acsStoreId
                      and migration_id = $domainMigrationId
-                     and template_id_qualified_name = ${QualifiedName(templateId)}
+                     and package_name = ${packageQualifiedName.packageName}
+                     and template_id_qualified_name = ${packageQualifiedName.qualifiedName}
                      and assigned_domain = $synchronizerId
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
@@ -516,6 +511,7 @@ class DbSvDsoStore(
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
   ): Future[Seq[SvDsoStore.RoundBatch[TCId]]] = {
+    val packageQualifiedName = companionClass.packageQualifiedName(companion)
     val templateId = companionClass.typeId(companion)
     val opName = s"list${templateId.getEntityName}GroupedByRound"
     val partyFilter =
@@ -531,7 +527,8 @@ class DbSvDsoStore(
                 from dso_acs_store
                 where store_id = $acsStoreId
                   and migration_id = $domainMigrationId
-                  and template_id_qualified_name = ${QualifiedName(templateId)}
+                  and package_name = ${packageQualifiedName.packageName}
+                  and template_id_qualified_name = ${packageQualifiedName.qualifiedName}
                   and assigned_domain = $domain
                   and reward_party is not null -- otherwise index is not used
                   and reward_round is not null -- otherwise index is not used
@@ -569,11 +566,10 @@ class DbSvDsoStore(
                   DsoTables.acsTableName,
                   acsStoreId,
                   domainMigrationId,
-                  where = sql"""template_id_qualified_name = ${QualifiedName(
-                      ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
-                    )}
-              and assigned_domain = ${dsoRules.domain}
-              and mining_round is not null""",
+                  ClosedMiningRound.COMPANION,
+                  additionalWhere = sql"""
+                    and assigned_domain = ${dsoRules.domain}
+                    and mining_round is not null""",
                   orderLimit = sql"""order by mining_round limit 1""",
                 ).headOption,
                 "lookupOldestClosedMiningRound",
@@ -594,9 +590,7 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                SummarizingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}""",
+            SummarizingMiningRound.COMPANION,
             orderLimit = sql"""order by mining_round limit ${sqlLimit(limit)}""",
           ),
           "listOldestSummarizingMiningRounds",
@@ -617,11 +611,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
+            Confirmation.COMPANION,
             where = sql"""
-                    template_id_qualified_name = ${QualifiedName(
-                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                and confirmer = $confirmer
+                    confirmer = $confirmer
                 and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                   """,
             orderLimit = sql" limit 1",
@@ -651,11 +643,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
+            Confirmation.COMPANION,
             where = sql"""
-                        template_id_qualified_name = ${QualifiedName(
-                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                    and confirmer = $confirmer
+                        confirmer = $confirmer
                     and action_ans_entry_context_payment_id = $paymentId
                     and action_ans_entry_context_arc_type = ${lengthLimited(
                 DsoTables.AnsActionTypeCollectInitialEntryPayment
@@ -688,11 +678,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
+            Confirmation.COMPANION,
             where = sql"""
-                        template_id_qualified_name = ${QualifiedName(
-                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                    and confirmer = $confirmer
+                        confirmer = $confirmer
                     and action_ans_entry_context_payment_id = $paymentId
                     and action_ans_entry_context_arc_type = ${lengthLimited(
                 DsoTables.AnsActionTypeRejectEntryInitialPayment
@@ -725,11 +713,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
+            Confirmation.COMPANION,
             where = sql"""
-                        template_id_qualified_name = ${QualifiedName(
-                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                    and confirmer = $confirmer
+                        confirmer = $confirmer
                     and action_ans_entry_context_payment_id = $paymentId
                       """,
             orderLimit = sql"limit 1",
@@ -755,10 +741,9 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-                       and confirmer = $confirmer
+              Confirmation.COMPANION,
+              where = sql"""
+                           confirmer = $confirmer
                        and action_ans_entry_context_cid IN (
                          select contract_id
                          from #${DsoTables.acsTableName}
@@ -788,12 +773,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                      template_id_qualified_name = ${QualifiedName(
-                SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                  and sv_onboarding_token = ${lengthLimited(token)}
-                    """,
+            SvOnboardingRequest.COMPANION,
+            where = sql"""sv_onboarding_token = ${lengthLimited(token)}""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupSvOnboardingRequestByTokenWithOffset",
@@ -829,9 +810,9 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = (sql"""template_id_qualified_name = ${QualifiedName(
-                  SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-                )} and (sv_candidate_party, sv_candidate_name) in (""" ++ svCandidates ++ sql")").toActionBuilder,
+              SvOnboardingRequest.COMPANION,
+              where =
+                (sql"""(sv_candidate_party, sv_candidate_name) in (""" ++ svCandidates ++ sql")").toActionBuilder,
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
             "listSvOnboardingRequestsBySvs",
@@ -852,14 +833,15 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-                template_id_qualified_name = ${QualifiedName(companion.getTemplateIdWithPackageId)}
+              companion,
+              additionalWhere = sql"""
                 and assigned_domain = $synchronizerId
                 and acs.amulet_round_of_expiry <= (
                   select mining_round - 2
                   from dso_acs_store
                   where store_id = $acsStoreId
                     and migration_id = $domainMigrationId
+                    and package_name = ${splice.round.OpenMiningRound.PACKAGE_NAME}
                     and template_id_qualified_name = ${QualifiedName(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
@@ -887,11 +869,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                        and member_traffic_member = $memberId
-                        and member_traffic_domain = $synchronizerId""",
+            MemberTraffic.COMPANION,
+            where = sql"""member_traffic_member = $memberId
+                      and member_traffic_domain = $synchronizerId""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listMemberTrafficContracts",
@@ -919,10 +899,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = (sql"""template_id_qualified_name = ${QualifiedName(
-                AmuletPriceVote.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                 and voter in """ ++ voterParties).toActionBuilder,
+            AmuletPriceVote.COMPANION,
+            where = (sql"""voter in """ ++ voterParties).toActionBuilder,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listSvAmuletPriceVotes",
@@ -943,12 +921,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                        template_id_qualified_name = ${QualifiedName(
-                SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                    and sv_candidate_party = $candidateParty
-                      """,
+            SvOnboardingRequest.COMPANION,
+            where = sql"""sv_candidate_party = $candidateParty""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupSvOnboardingRequestByCandidatePartyWithOffset",
@@ -971,12 +945,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                          template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                      and validator = $validator
-                        """,
+            ValidatorLicense.COMPANION,
+            where = sql"""validator = $validator""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupValidatorLicenseWithOffset",
@@ -997,11 +967,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              AND validator = ${lengthLimited(validator)}
-            """,
+            ValidatorLicense.COMPANION,
+            where = sql"""validator = ${lengthLimited(validator)}""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listValidatorLicensePerValidator",
@@ -1019,6 +986,7 @@ class DbSvDsoStore(
                from #${DsoTables.acsTableName}
                where store_id = $acsStoreId
                 and migration_id = $domainMigrationId
+                and package_name = ${MemberTraffic.PACKAGE_NAME}
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
@@ -1087,12 +1055,8 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-                              template_id_qualified_name = ${QualifiedName(
-                  VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-                          and vote_request_tracking_cid = $voteRequestCid
-                            """,
+              VoteRequest.COMPANION,
+              where = sql"""vote_request_tracking_cid = $voteRequestCid""",
               orderLimit = sql"limit 1",
             ).headOption,
             "lookupVoteByThisSvAndVoteRequestWithOffset",
@@ -1117,11 +1081,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                           template_id_qualified_name = ${QualifiedName(
-                VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                       and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
+            VoteRequest.COMPANION,
+            where = sql"""action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                        and requester_name = ${key.svParty}
                          """,
             orderLimit = sql"limit 1",
@@ -1144,10 +1105,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                AmuletPriceVote.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                          and voter = ${key.svParty}""",
+            AmuletPriceVote.COMPANION,
+            where = sql"""voter = ${key.svParty}""",
             orderLimit = sql"""limit 1""",
           ).headOption,
           "lookupAmuletPriceVoteByThisSv",
@@ -1168,12 +1127,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                            template_id_qualified_name = ${QualifiedName(
-                SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                        and sv_candidate_name = ${lengthLimited(candidateName)}
-                          """,
+            SvOnboardingRequest.COMPANION,
+            where = sql"""sv_candidate_name = ${lengthLimited(candidateName)}""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupSvOnboardingRequestByCandidateNameWithOffset",
@@ -1196,12 +1151,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                              template_id_qualified_name = ${QualifiedName(
-                SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                          and sv_candidate_name = ${lengthLimited(svName)}
-                            """,
+            SvOnboardingConfirmed.COMPANION,
+            where = sql"""sv_candidate_name = ${lengthLimited(svName)}""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupSvOnboardingConfirmedByNameWithOffset",
@@ -1225,12 +1176,10 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                    and ans_entry_name = ${lengthLimited(name)}
-                    and assigned_domain is not null
-                    and acs.contract_expires_at >= $now""",
+            AnsEntry.COMPANION,
+            where = sql"""ans_entry_name = ${lengthLimited(name)}
+                      and assigned_domain is not null
+                      and acs.contract_expires_at >= $now""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupAnsEntryByNameWithOffset",
@@ -1257,11 +1206,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                SubscriptionInitialPayment.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                        and contract_id = $paymentCid
-                        and assigned_domain is not null""",
+            SubscriptionInitialPayment.COMPANION,
+            where = sql"""contract_id = $paymentCid
+                      and assigned_domain is not null""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupSubscriptionInitialPaymentWithOffset",
@@ -1288,10 +1235,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                      and featured_app_right_provider = $providerPartyId
+            FeaturedAppRight.COMPANION,
+            where = sql"""featured_app_right_provider = $providerPartyId
                       and assigned_domain is not null""",
             orderLimit = sql"limit 1",
           ).headOption,
@@ -1318,11 +1263,8 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-               template_id_qualified_name = ${QualifiedName(
-                  AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-           and subscription_reference_contract_id = $reference""",
+              AnsEntryContext.COMPANION,
+              additionalWhere = sql"""and subscription_reference_contract_id = $reference""",
               orderLimit = sql"""limit 1""",
             ).headOption,
             "lookupAnsEntryContext",
@@ -1350,9 +1292,9 @@ class DbSvDsoStore(
                 DsoTables.acsTableName,
                 acsStoreId,
                 domainMigrationId,
-                where = (sql"""template_id_qualified_name = ${QualifiedName(
-                    ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
-                  )} AND assigned_domain = $synchronizerId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
+                ClosedMiningRound.COMPANION,
+                where =
+                  (sql"""assigned_domain = $synchronizerId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
                 orderLimit = sql"""limit ${sqlLimit(limit)}""",
               ),
               "listClosedRounds",
@@ -1397,11 +1339,8 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              AND sv_name = ${lengthLimited(svName)}
-            """,
+            SvRewardState.COMPANION,
+            where = sql"""sv_name = ${lengthLimited(svName)}""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listSvRewardStates",
@@ -1424,9 +1363,8 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-         template_id_qualified_name = ${QualifiedName(templateId)}
-     and sv_party = $svPartyId""",
+              companion,
+              additionalWhere = sql"""and sv_party = $svPartyId""",
               orderLimit = sql"""limit 1""",
             ).headOption,
             s"lookupContractBySvParty[$templateId]",
@@ -1452,9 +1390,8 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-         template_id_qualified_name = ${QualifiedName(templateId)}
-     and sv_name = ${lengthLimited(svName)}""",
+              companion,
+              additionalWhere = sql"""and sv_name = ${lengthLimited(svName)}""",
               orderLimit = sql"""limit 1""",
             ).headOption,
             s"lookupContractBySvName[$templateId]",
@@ -1478,12 +1415,8 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-                    template_id_qualified_name = ${QualifiedName(
-                  splice.externalpartyamuletrules.TransferCommandCounter.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-                and wallet_party = $partyId
-                  """,
+              splice.externalpartyamuletrules.TransferCommandCounter.COMPANION,
+              where = sql"""wallet_party = $partyId""",
               orderLimit = sql" limit 1",
             ).headOption,
             "lookupTransferCommandCounterBySender",
