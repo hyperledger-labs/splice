@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.mediator
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.QueueOfferResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.networking.grpc.{ClientChannelBuilder, ForwardingStreamObserver}
@@ -42,13 +43,13 @@ final class MediatorVerdictsClient(
     val srcWithFutureMat = Source.fromMaterializer { (mat, _) =>
       implicit val ec: ExecutionContext = mat.executionContext
 
-      val (queue, src) = org.apache.pekko.stream.scaladsl.Source
+      val (queue, src) = Source
         .queue[v30.Verdict](bufferSize = 128)
         .preMaterialize()(mat)
 
       val verdictObserver = new StreamObserver[v30.Verdict] {
         override def onNext(value: v30.Verdict): Unit = {
-          queue.offer(value).discard[org.apache.pekko.stream.QueueOfferResult]
+          queue.offer(value).discard[QueueOfferResult]
         }
         override def onError(t: Throwable): Unit = queue.fail(t)
         override def onCompleted(): Unit = queue.complete()

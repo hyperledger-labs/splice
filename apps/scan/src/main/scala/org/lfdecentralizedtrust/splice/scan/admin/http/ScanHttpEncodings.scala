@@ -17,7 +17,11 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{TransactionViewT, VerdictT}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
+  TransactionViewT,
+  VerdictResultDbValue,
+  VerdictT,
+}
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
@@ -446,9 +450,9 @@ object ScanHttpEncodings {
       views: Seq[TransactionViewT],
   ): definitions.EventHistoryVerdict = {
     val verdictResultEnum: definitions.VerdictResult = verdict.verdictResult match {
-      case org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue.Accepted =>
+      case VerdictResultDbValue.Accepted =>
         definitions.VerdictResult.VerdictResultAccepted
-      case org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue.Rejected =>
+      case VerdictResultDbValue.Rejected =>
         definitions.VerdictResult.VerdictResultRejected
       case _ => definitions.VerdictResult.VerdictResultUnspecified
     }

@@ -39,8 +39,9 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
 }
@@ -215,14 +216,14 @@ class ScanApp(
       )
       scanVerdictStore = storage match {
         case db: DbStorage =>
-          new org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore(
+          new DbScanVerdictStore(
             db,
             loggerFactory,
           )(ec)
         case other =>
           throw new RuntimeException(s"Unsupported storage type $other for DbScanVerdictStore")
       }
-      scanEventStore = new org.lfdecentralizedtrust.splice.scan.store.ScanEventStore(
+      scanEventStore = new ScanEventStore(
         scanVerdictStore,
         store.updateHistory,
         loggerFactory,
@@ -413,7 +414,7 @@ object ScanApp {
       store: ScanStore,
       automation: ScanAutomationService,
       verdictAutomation: ScanVerdictAutomationService,
-      eventStore: org.lfdecentralizedtrust.splice.scan.store.ScanEventStore,
+      eventStore: ScanEventStore,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       bftSequencersAdminConnections: Seq[SequencerAdminConnection],
