@@ -273,11 +273,19 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           domainMigrationId,
           pageLimit,
         )
+        histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
 
         // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
         // byId <- ctx.eventStore.getEventByUpdateId(reassignment.updateId)
       } yield {
         hasUpdate(events, reassignment.updateId) shouldBe true
+
+        // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdatesWithoutImportUpdates
+        val eventUpdateOpt =
+          events.flatMap(_._2).find(_.update.update.updateId == reassignment.updateId)
+        val histUpdateOpt =
+          histUpdates.find(_.update.update.updateId == reassignment.updateId)
+        eventUpdateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
 
         // val (verdictO, updateO) = byId.value
         // verdictO shouldBe None
@@ -301,11 +309,19 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           domainMigrationId,
           pageLimit,
         )
+        histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
 
         // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
         // byId <- ctx.eventStore.getEventByUpdateId(reassignment.updateId)
       } yield {
         hasUpdate(events, reassignment.updateId) shouldBe true
+
+        // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdatesWithoutImportUpdates
+        val eventUpdateOpt =
+          events.flatMap(_._2).find(_.update.update.updateId == reassignment.updateId)
+        val histUpdateOpt =
+          histUpdates.find(_.update.update.updateId == reassignment.updateId)
+        eventUpdateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
 
         // val (verdictO, updateO) = byId.value
         // verdictO shouldBe None
