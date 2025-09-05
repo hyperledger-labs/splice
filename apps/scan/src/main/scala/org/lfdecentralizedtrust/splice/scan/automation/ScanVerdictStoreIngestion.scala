@@ -11,8 +11,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.topology.SynchronizerId
+import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 
-import scala.concurrent.{ExecutionContextExecutor}
+import scala.concurrent.ExecutionContextExecutor
 
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -22,6 +23,8 @@ import io.circe.Json
 import java.util.concurrent.atomic.AtomicReference
 import com.digitalasset.canton.discard.Implicits.*
 import scala.concurrent.Future
+import org.apache.pekko.Done
+import org.apache.pekko.stream.{Materializer, UniqueKillSwitch}
 import scala.concurrent.duration.*
 import org.lfdecentralizedtrust.splice.environment.RetryFor
 
@@ -36,7 +39,7 @@ class ScanVerdictStoreIngestion(
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
-    mat: org.apache.pekko.stream.Materializer,
+    mat: Materializer,
 ) extends HasHealth
     with AutoCloseable
     with NamedLogging {
@@ -44,13 +47,13 @@ class ScanVerdictStoreIngestion(
   override def isHealthy: Boolean = true
 
   private val mediatorClient =
-    new org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient(
+    new MediatorVerdictsClient(
       config.mediatorAdminClient,
       loggerFactory,
     )(ec)
 
   private val killSwitchRef =
-    new AtomicReference[Option[org.apache.pekko.stream.UniqueKillSwitch]](None)
+    new AtomicReference[Option[UniqueKillSwitch]](None)
 
   override def close(): Unit = {
     killSwitchRef.getAndSet(None).foreach(_.shutdown())
@@ -69,8 +72,8 @@ class ScanVerdictStoreIngestion(
 
     resumeF.foreach { resumeTs =>
       val materialized: (
-          org.apache.pekko.stream.UniqueKillSwitch,
-          scala.concurrent.Future[org.apache.pekko.Done],
+          UniqueKillSwitch,
+          Future[Done],
       ) = mediatorClient
         .streamVerdicts(Some(resumeTs))
         .viaMat(KillSwitches.single)(Keep.right)
@@ -90,7 +93,7 @@ class ScanVerdictStoreIngestion(
         ingestionMetrics.errors.mark()
         retryProvider
           .scheduleAfterUnlessShutdown(
-            action = scala.concurrent.Future {
+            action = Future {
               startStream()(TraceContext.createNew())
               ()
             },
@@ -128,7 +131,7 @@ class ScanVerdictStoreIngestion(
 
     val mkViews: Long => Seq[store.TransactionViewT] = { rowId =>
       verdict.getTransactionViews.views.map { case (viewId, txView) =>
-        val confirmingPartiesJson: Json = io.circe.Json.fromValues(
+        val confirmingPartiesJson: Json = Json.fromValues(
           txView.confirmingParties.map { q =>
             Json.obj(
               "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
