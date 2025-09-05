@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { existsSync, unlinkSync, writeFileSync } from 'fs';
 
-import { allFunctions } from './src/bigQuery_functions';
+import { allScanFunctions } from './src/bigQuery_functions';
 
 if (process.argv.length != 6) {
   console.error(
@@ -19,6 +19,8 @@ const out = process.argv[5];
 if (existsSync(out)) {
   unlinkSync(out);
 }
-allFunctions.forEach(f =>
-  writeFileSync(out, f.toSql(project, functionsDatasetName, scanDatasetName), { flag: 'a' })
+// Note that we're currently code-generating only the scan functions, not the dashboards ones, as the latter are not
+// tested in integration tests.
+allScanFunctions.forEach(f =>
+  writeFileSync(out, f.toSql(project, functionsDatasetName, scanDatasetName, ''), { flag: 'a' })
 );
