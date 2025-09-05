@@ -271,7 +271,7 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     expect(await screen.findByText('CRARC_AddFutureAmuletConfigSchedule')).toBeDefined();
   });
 
-  test('validator licenses are displayed and paginable', async () => {
+  test('validator licenses and secrets are displayed and paginable', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
@@ -285,5 +285,9 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
 
     mockAllIsIntersecting(true);
     expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
+
+    // secrets
+    expect(await screen.queryByText('encoded_secret')).toBeDefined();
+    expect(await screen.queryByText('candidate_secret')).toBeNull();
   });
 });
