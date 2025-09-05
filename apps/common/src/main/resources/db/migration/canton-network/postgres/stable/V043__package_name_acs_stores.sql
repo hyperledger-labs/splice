@@ -1,15 +1,5 @@
 -- truncates are not strictly necessary, but lets us define the constraint as mandatory afterwards,
 -- and also makes index creation faster since there's no data to index
-delete
-from store_last_ingested_offsets
-where store_id in (select id
-                   from store_descriptors
-                   where descriptor ->> 'name' IN
-                         -- these are ACS only, so we can delete everything
-                         ('DbSplitwellStore', 'DbSvSvStore', 'DbValidatorStore', 'DbExternalPartyWalletStore')
-                      -- these have txlog, preserve it. Version matches that of the txlog descriptor
-                      OR (descriptor ->> 'name' = 'DbUserWalletStore' AND descriptor ->> 'version' != 2)
-                      OR (descriptor ->> 'name' = 'DbScanStore' AND descriptor ->> 'version' != 1));
 truncate table acs_store_template cascade;
 truncate table user_wallet_acs_store cascade;
 truncate table external_party_wallet_acs_store cascade;
@@ -30,6 +20,8 @@ alter table sv_acs_store add column package_name text not null;
 alter table dso_acs_store add column package_name text not null;
 alter table scan_acs_store add column package_name text not null;
 alter table splitwell_acs_store add column package_name text not null;
+
+-- index creation should be fast since all ACS stores have been truncated
 
 -- obtained with (unfortunately not all indexes are named consistently, so some require manual intervention) and IJ formatting:
 -- select
