@@ -1,10 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+/** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSDK_CORE_PROJECT` * */
+
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import com.digitalasset.canton.BaseTest.getResourcePath
-import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
@@ -12,15 +13,17 @@ import com.google.cloud.bigquery as bq
 import bq.{Field, JobInfo, Schema, TableId}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
-
 import slick.jdbc.GetResult
 
-import java.nio.file.Paths
+import java.io.File
+import java.nio.file.{Path, Paths}
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
+import scala.sys.process.Process
+import java.time.temporal.ChronoUnit
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -32,7 +35,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
     with FlagCloseable
     with HasCloseContext
     with UpdateHistoryTestUtil {
-  private val totalSupplySqlPath = getResourcePath("total-supply-bigquery.sql")
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -47,8 +49,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
+  private val uuid = UUID.randomUUID().toString.replace("-", "_")
   private val datasetName =
-    s"scantotalsupply_test_dataset_${UUID.randomUUID().toString.replace("-", "_")}"
+    s"scantotalsupply_test_dataset_$uuid"
   private val (createsBqTableName, exercisesBqTableName) = {
     val prefix = "scan_sv_1_"
     (
@@ -56,6 +59,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       s"${prefix}update_history_exercises",
     )
   }
+  private val functionsDatasetName = s"functions_$uuid"
 
   // Test data parameters
   private val mintedAmount = BigDecimal("2587519.0258740704")
@@ -64,6 +68,14 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private val burnedAmount = BigDecimal("60032.83108")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("570776.255709163")
+  private val amuletHolders = 5
+  private val validators = 4 // one SV + 3 validators
+  // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
+  // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
+  private val avgTps = (0.0008, 0.00099)
+  // The peak is 17 transactions in a (simulated) minute, or 0.28333 tps over a minute,
+  // so we assert 15-20 transactions, or 0.25-0.34 tps
+  private val peakTps = (0.25, 0.34)
 
   override def beforeAll() = {
     super.beforeAll()
@@ -76,13 +88,21 @@ class ScanTotalSupplyBigQueryIntegrationTest
     bigquery.create(datasetInfo)
 
     createEmptyTables()
+
+    val functionsDatasetInfo =
+      bq.DatasetInfo
+        .newBuilder(functionsDatasetName)
+        .setDefaultTableLifetime(1.hour.toMillis)
+        .build()
+    bigquery.create(functionsDatasetInfo)
   }
 
   override def afterAll() = {
     logger.info(s"Cleaning up BigQuery dataset: $datasetName")
 
-    // Delete the temporary BigQuery dataset after tests
+    // Delete the temporary BigQuery datasets after tests
     bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     super.afterAll()
   }
 
@@ -97,6 +117,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
     withClue("exporting PostgreSQL tables to BigQuery") {
       exportPostgresToBigQuery()
+    }
+
+    withClue("Creating BigQuery functions") {
+      createBigQueryFunctions()
     }
 
     val results = withClue("running total supply queries in BigQuery") {
@@ -436,29 +460,54 @@ class ScanTotalSupplyBigQueryIntegrationTest
       )
   }
 
-  /** Runs the total supply queries from the SQL file
+  /** Creates all auxiliary functions in BigQuery. First codegen's from the Pulumi definitions
+    * the query that creates them, then runs that query in BQ.
     */
-  private def runTotalSupplyQueries(): ExpectedMetrics = {
-    // slurp BigQuery SQL file
-    val sqlContent = java.nio.file.Files
-      .readString(Paths get totalSupplySqlPath, java.nio.charset.StandardCharsets.UTF_8)
+  private def createBigQueryFunctions() = {
+    val sqlDir: Path = Paths.get("apps/app/src/test/resources/dumps/sql")
+    if (!sqlDir.toFile.exists())
+      sqlDir.toFile.mkdirs()
+    val sqlFile = sqlDir.resolve("functions.sql")
 
-    val modifiedSql = Seq(
-      ("mainnet_da2_scan".r, datasetName), // Replace prod dataset name with test dataset name
-      (raw"SET migration_id = \d+".r, "SET migration_id = 0"), // migration ID with 0
-      (
-        raw"SET as_of_record_time = iso_timestamp\('\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'\)".r,
-        "SET as_of_record_time = iso_timestamp('1971-01-01T00:00:00Z')",
-      ), // as-of time with later canton timestamp
-    ).foldLeft(sqlContent) { case (sqlContent, (origin, replacement)) =>
-      val modifiedSql = origin.replaceAllIn(sqlContent, replacement)
-      modifiedSql should not be sqlContent withClue s"inserting $replacement"
-      modifiedSql
+    val ret = Process(
+      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${sqlFile.toAbsolutePath}",
+      new File("cluster/pulumi/canton-network"),
+    ).!
+    if (ret != 0) {
+      fail("Failed to codegen the sql query for creating functions in BigQuery")
     }
+
+    val sqlContent =
+      java.nio.file.Files.readString(sqlFile, java.nio.charset.StandardCharsets.UTF_8)
+
+    logger.info(s"Creating BQ functions using the following SQL statement: $sqlContent")
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
-      .newBuilder(modifiedSql)
+      .newBuilder(sqlContent)
+      .setUseLegacySql(false)
+      .build()
+
+    val jobId = bq.JobId.of(UUID.randomUUID().toString)
+    val job = bigquery.create(JobInfo.newBuilder(queryConfig).setJobId(jobId).build())
+
+    job.waitFor()
+  }
+
+  /** Runs the total supply queries from the SQL file
+    */
+  private def runTotalSupplyQueries()(implicit env: FixtureParam): ExpectedMetrics = {
+    val project = bigquery.getOptions.getProjectId
+    // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
+    val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
+    val sql =
+      s"SELECT * FROM `$project.$functionsDatasetName.all_stats`('$timestamp', 0);"
+
+    logger.info(s"Querying all stats as of $timestamp")
+
+    // Execute the query
+    val queryConfig = bq.QueryJobConfiguration
+      .newBuilder(sql)
       .setUseLegacySql(false)
       .build()
 
@@ -483,6 +532,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
       minted: BigDecimal,
       allowedMint: BigDecimal,
       burned: BigDecimal,
+      numAmuletHolders: Long,
+      numActiveValidators: Long,
+      avgTps: Double,
+      peakTps: Double,
   )
 
   private def parseQueryResults(result: bq.TableResult) = {
@@ -490,12 +543,23 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val row = result.iterateAll().iterator().next()
     logger.debug(s"Query row: $row; schema ${result.getSchema}")
 
-    def bd(column: String) = {
+    def required(column: String) = {
       val field = row get column
       if (field.isNull)
-        fail(s"Column '$column' in total-supply results is null")
-      else
-        BigDecimal(field.getStringValue)
+        fail(s"Column '$column' in all-stats results is null")
+      field
+    }
+
+    def bd(column: String) = {
+      BigDecimal(required(column).getStringValue)
+    }
+
+    def int(column: String) = {
+      required(column).getLongValue
+    }
+
+    def float(column: String) = {
+      required(column).getDoubleValue
     }
 
     ExpectedMetrics(
@@ -506,6 +570,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
       minted = bd("minted"),
       allowedMint = bd("allowed_mint"),
       burned = bd("burned"),
+      numAmuletHolders = int("num_amulet_holders"),
+      numActiveValidators = int("num_active_validators"),
+      avgTps = float("average_tps"),
+      peakTps = float("peak_tps"),
     )
   }
 
@@ -519,12 +587,23 @@ class ScanTotalSupplyBigQueryIntegrationTest
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
-        // internally-derived metrics
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
         ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
+        ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
+        ("num_active_validators", results.numActiveValidators, validators),
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue
+    }
+
+    forEvery(
+      Seq(
+        ("average_tps", results.avgTps, avgTps),
+        ("peak_tps", results.peakTps, peakTps),
+      )
+    ) { case (clue, actual, expected) =>
+      actual shouldBe >=(expected._1) withClue clue
+      actual shouldBe <=(expected._2) withClue clue
     }
 
     // other derived metrics

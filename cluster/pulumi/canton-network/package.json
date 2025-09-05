@@ -20,7 +20,8 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
+    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
+    "sql-codegen": "ts-node ./bigquery-sql-codegen.ts"
   },
   "devDependencies": {
     "@types/ip": "^1.1.3",
