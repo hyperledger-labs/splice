@@ -62,6 +62,16 @@ object DbScanVerdictStore {
       case _ => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
     }
   }
+
+  def apply(
+      storage: com.digitalasset.canton.resource.Storage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit ec: ExecutionContext): DbScanVerdictStore =
+    storage match {
+      case db: DbStorage => new DbScanVerdictStore(db, loggerFactory)
+      case other =>
+        throw new RuntimeException(s"Unsupported storage type $other for DbScanVerdictStore")
+    }
 }
 
 class DbScanVerdictStore(
