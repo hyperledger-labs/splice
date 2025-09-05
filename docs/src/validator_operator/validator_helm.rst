@@ -119,7 +119,7 @@ OIDC Provider Requirements
 ++++++++++++++++++++++++++
 
 This section provides pointers for setting up an OIDC provider for use with your Validator node.
-Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.
+Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.  You can also refer to `Okta and Keycloak community authored examples` </community/oidc-config-okta-keycloak.html>`.
 
 Your OIDC provider must be reachable [#reach]_ at a well known (HTTPS) URL.
 In the following, we will refer to this URL as ``OIDC_AUTHORITY_URL``.
