@@ -565,9 +565,12 @@ const all_days_since_genesis = new BQTableFunction(
     FROM
       UNNEST(
         GENERATE_DATE_ARRAY(
-          DATE(
-            TIMESTAMP_MICROS((SELECT MIN(record_time) FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
-          ),
+          -- DATE(
+          --   TIMESTAMP_MICROS((SELECT MIN(record_time) FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+          --),
+          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 30 days until we confirm costs, and will
+          -- backfill to genesis later.
+          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)),
           CURRENT_DATE
         )
       ) as day
