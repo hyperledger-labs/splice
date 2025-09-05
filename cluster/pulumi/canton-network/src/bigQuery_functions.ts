@@ -6,6 +6,7 @@ import {
   BQArray,
   BQColumn,
   BQFunctionArgument,
+  BQProcedure,
   BQScalarFunction,
   BQTableFunction,
   FLOAT64,
@@ -21,7 +22,7 @@ import {
  * We also support codegen of sql statements that create these functions in BigQuery, which is currently used for
  * the integration test in ScanTotalSupplyBigQueryIntegrationTest.
  *
- * Note that the functions are parameterized with $$FUNCTIONS_DATASET$$ and $$SCAN_DATASET$$ placeholders that are replaced
+ * Note that the functions are parameterized with $$FUNCTIONS_DATASET$$, $$SCAN_DATASET$$ and $$DASHBOARDS_DATASET$$ placeholders that are replaced
  * by Pulumi and codegen, to point to the correct datasets. Any reference to a table in the scan dataset must use the
  * $$SCAN_DATASET$$ placeholder, e.g. `$$SCAN_DATASET$$.scan_sv_1_update_history_creates`. Similarly, all references to
  * another function must use the $$FUNCTIONS_DATASET$$ placeholder, e.g. `$$FUNCTIONS_DATASET$$.daml_record_path`.
@@ -544,58 +545,15 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) as minted,
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
-      \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) as burned,
-      \`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))) as monthly_burn,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id), 0) as burned,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))), 0) as monthly_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
       \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
-      \`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id) as average_tps,
-      \`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id) as peak_tps
+      IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id), 0.0) as average_tps,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id), 0.0) as peak_tps
   `
 );
 
-// const all_stats_struct = new BQScalarFunction(
-//   'all_stats_struct',
-//   as_of_args,
-//   new BQStruct([
-//     // FIXME: can we auto-generate at least some of the places where we list all stats?
-//     new BQStructField('as_of_record_time', TIMESTAMP),
-//     new BQStructField('migration_id', INT64),
-//     new BQStructField('locked', BIGNUMERIC),
-//     new BQStructField('unlocked', BIGNUMERIC),
-//     new BQStructField('current_supply_total', BIGNUMERIC),
-//     new BQStructField('unminted', BIGNUMERIC),
-//     new BQStructField('minted', BIGNUMERIC),
-//     new BQStructField('allowed_mint', BIGNUMERIC),
-//     new BQStructField('burned', BIGNUMERIC),
-//     new BQStructField('monthly_burn', BIGNUMERIC),
-//     new BQStructField('num_amulet_holders', INT64),
-//     new BQStructField('num_active_validators', INT64),
-//     new BQStructField('average_tps', FLOAT64),
-//     new BQStructField('peak_tps', FLOAT64),
-//   ]),
-//   `
-//     (SELECT
-//       STRUCT(
-//         as_of_record_time,
-//         migration_id,
-//         locked,
-//         unlocked,
-//         current_supply_total,
-//         unminted,
-//         minted,
-//         allowed_mint,
-//         burned,
-//         monthly_burn,
-//         num_amulet_holders,
-//         num_active_validators,
-//         average_tps,
-//         peak_tps
-//       )
-//     FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(as_of_record_time, migration_id))
-//   `
-// );
-
-// FIXME: should actually not include the day of genesis, as we're rounding down to midnight UTC
 const all_days_since_genesis = new BQTableFunction(
   'all_days_since_genesis',
   [],
@@ -605,14 +563,17 @@ const all_days_since_genesis = new BQTableFunction(
     SELECT
       TIMESTAMP(day) as as_of_record_time
     FROM
-      UNNEST(GENERATE_DATE_ARRAY(DATE(TIMESTAMP_MICROS(
-        (SELECT record_time FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` ORDER BY record_time LIMIT 1)
-      -- FIXME: don't add +24 hours (we added that for testing to include end of today)
-      )), DATE(TIMESTAMP_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)))) as day
+      UNNEST(
+        GENERATE_DATE_ARRAY(
+          DATE(
+            TIMESTAMP_MICROS((SELECT MIN(record_time) FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+          ),
+          CURRENT_DATE
+        )
+      ) as day
   `
 );
 
-// FIXME: de-hardcode the project name below
 const days_with_missing_stats = new BQTableFunction(
   'days_with_missing_stats',
   [],
@@ -620,11 +581,11 @@ const days_with_missing_stats = new BQTableFunction(
   `
     -- Find all days since genesis for which we do not have a stats entry at all, or its lacking some fields.
     SELECT as_of_record_time
-      FROM \`$$FUNCTIONS_DATASET$$.all_days_since_genesis\`()
+      FROM \`$$DASHBOARDS_DATASET$$.all_days_since_genesis\`()
       EXCEPT DISTINCT
         SELECT
           as_of_record_time
-          FROM \`da-cn-scratchnet.dashboards.dashboards-data\`
+          FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\`
           WHERE
             locked IS NOT NULL
             AND unlocked IS NOT NULL
@@ -641,54 +602,23 @@ const days_with_missing_stats = new BQTableFunction(
     `
 );
 
-// const fill_all_stats = new BQProcedure(
-//   'fill_all_stats',
-//   [],
-//   `
-//     CREATE TEMP TABLE temp_new_stats AS
-//     SELECT
-//       t.as_of_record_time,
-//       0 as migration_id, -- FIXME: real migration_id
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).locked,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).unlocked,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).current_supply_total,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).unminted,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).minted,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).allowed_mint,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).burned,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).monthly_burn,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).num_amulet_holders,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).num_active_validators,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).average_tps,
-//       \`$$FUNCTIONS_DATASET$$.all_stats_struct\`(t.as_of_record_time, 0).peak_tps
-//     FROM
-//       (SELECT * FROM \`$$FUNCTIONS_DATASET$$.days_with_missing_stats\`()) AS t;
+const fill_all_stats = new BQProcedure(
+  'fill_all_stats',
+  [],
+  `
+    FOR t IN
+      (SELECT * FROM \`$$DASHBOARDS_DATASET$$.days_with_missing_stats\`())
+    DO
+      DELETE FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\` WHERE as_of_record_time = t.as_of_record_time;
 
+      INSERT INTO \`da-cn-scratchnet.dashboards.dashboards-data\`
+        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, 0);
 
-//     MERGE \`da-cn-scratchnet.dashboards.dashboards-data\` T
-//     USING temp_new_stats S
-//     ON T.as_of_record_time = S.as_of_record_time
-//     WHEN MATCHED THEN
-//       UPDATE SET
-//         T.locked = S.locked,
-//         T.unlocked = S.unlocked,
-//         T.current_supply_total = S.current_supply_total,
-//         T.unminted = S.unminted,
-//         T.minted = S.minted,
-//         T.allowed_mint = S.allowed_mint,
-//         T.burned = S.burned,
-//         T.monthly_burn = S.monthly_burn,
-//         T.num_amulet_holders = S.num_amulet_holders,
-//         T.num_active_validators = S.num_active_validators,
-//         T.average_tps = S.average_tps,
-//         T.peak_tps = S.peak_tps
-//       WHEN NOT MATCHED THEN
-//         INSERT ROW;
-//   `
-// )
+    END FOR;
+  `
+);
 
-
-export const allFunctions = [
+export const allScanFunctions = [
   iso_timestamp,
   daml_prim_path,
   daml_record_path,
@@ -714,6 +644,10 @@ export const allFunctions = [
   average_tps,
   peak_tps,
   all_stats,
+];
+
+export const allDashboardFunctions = [
   all_days_since_genesis,
   days_with_missing_stats,
+  fill_all_stats,
 ];
