@@ -20,9 +20,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
 
 object DbScanVerdictStore {
-  import io.circe.Json
-  import com.digitalasset.canton.data.CantonTimestamp
-  import com.digitalasset.canton.topology.SynchronizerId
   import com.digitalasset.canton.mediator.admin.{v30}
 
   final case class TransactionViewT(
