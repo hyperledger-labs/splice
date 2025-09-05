@@ -45,10 +45,13 @@ Onboarding Process Overview
 
 Onboarding a Validator involves the following steps (for each network you want to join).
 
-1. Provide your sponsoring SV with the egress IP for your Validator node. Note that at this point
-   this can also be accomplished by connecting your validator through a VPN run by an SV. This
-   can be useful when trying to run a validator from a local laptop.
-   This option may be removed in the future.
+1. Provide your sponsoring SV with the egress IP for your Validator node.
+   Only one IP may be provided per network, and this IP must be distinct from the IP you use for any other of the three networks.
+
+   .. note::
+      At this point this can also be accomplished by connecting your validator through a VPN run by an SV
+      This can be useful when trying to run a validator from a local laptop.
+      This option may be removed in the future.
 2. Wait for super validators to adopt the new IP allowlist. This usually takes between 2-7 days.
 3. If you want to access the Canton Coin Scan Web UI from your laptop, you also need to ensure that
    you can connect to a VPN operated by one of the SVs. This is required as laptops usually
