@@ -5,6 +5,7 @@ import {
   ActionRequiringConfirmation,
   AmuletRules_ActionRequiringConfirmation,
   DsoRules_ActionRequiringConfirmation,
+  SvInfo,
   Vote,
   VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
@@ -86,7 +87,7 @@ export function computeYourVote(votes: Vote[], svPartyId: string | undefined): Y
   return vote ? (vote.accept ? 'accepted' : 'rejected') : 'no-vote';
 }
 
-export function buildProposal(action: ActionRequiringConfirmation): Proposal {
+export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: DsoInfo): Proposal {
   if (action.tag === 'ARC_DsoRules') {
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
@@ -94,11 +95,17 @@ export function buildProposal(action: ActionRequiringConfirmation): Proposal {
         return {
           memberToOffboard: dsoAction.value.sv,
         } as OffBoardMemberProposal;
-      case 'SRARC_UpdateSvRewardWeight':
+      case 'SRARC_UpdateSvRewardWeight': {
+        const allSvInfos = dsoInfo?.dsoRules.payload.svs.entriesArray() || [];
+        const svPartyId = dsoInfo?.svPartyId || '';
+        const currentWeight = getSvRewardWeight(allSvInfos, svPartyId);
+
         return {
           svToUpdate: dsoAction.value.svParty,
+          currentWeight: currentWeight,
           weightChange: dsoAction.value.newRewardWeight,
         } as UpdateSvRewardWeightProposal;
+      }
       case 'SRARC_GrantFeaturedAppRight':
         return {
           provider: dsoAction.value.provider,
@@ -171,4 +178,9 @@ export function configFormDataToConfigChanges(
       } as ConfigChange;
     })
     .filter(change => change.currentValue !== change.newValue);
+}
+
+export function getSvRewardWeight(svs: [string, SvInfo][], svPartyId: string): string {
+  const svInfo = svs.find(sv => sv[0] === svPartyId);
+  return svInfo ? svInfo[1].svRewardWeight : '';
 }
