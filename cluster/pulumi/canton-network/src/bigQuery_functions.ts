@@ -614,7 +614,7 @@ const fill_all_stats = new BQProcedure(
     DO
       DELETE FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\` WHERE as_of_record_time = t.as_of_record_time;
 
-      INSERT INTO \`da-cn-scratchnet.dashboards.dashboards-data\`
+      INSERT INTO \`$$DASHBOARDS_DATASET$$.dashboards-data\`
         SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, 0);
 
     END FOR;
