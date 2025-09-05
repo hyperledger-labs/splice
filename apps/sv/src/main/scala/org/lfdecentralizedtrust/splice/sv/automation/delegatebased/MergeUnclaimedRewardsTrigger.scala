@@ -18,6 +18,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -72,7 +73,8 @@ class MergeUnclaimedRewardsTrigger(
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeUnclaimedRewards(arg))
       res <- for {
-        outcome <- svTaskContext.connection
+        outcome <- svTaskContext
+          .connection(SpliceLedgerConnectionPriority.Low)
           .submit(
             Seq(store.key.svParty),
             Seq(store.key.dsoParty),

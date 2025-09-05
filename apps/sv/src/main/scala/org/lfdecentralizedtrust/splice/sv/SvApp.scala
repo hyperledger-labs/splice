@@ -88,6 +88,7 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.time.Instant
 import java.util.Optional
@@ -416,7 +417,7 @@ class SvApp(
       }
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
-        svAutomation.connection,
+        svAutomation.connection(SpliceLedgerConnectionPriority.Low),
         loggerFactory,
       )
 
@@ -507,7 +508,8 @@ class SvApp(
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
 
-      initialRound <- svAutomation.connection
+      initialRound <- svAutomation
+        .connection(SpliceLedgerConnectionPriority.Low)
         .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
         .flatMap {
           case Some(round) => Future.successful(round)
@@ -603,7 +605,7 @@ class SvApp(
                         AdminAuthExtractor(
                           verifier,
                           svStore.key.svParty,
-                          svAutomation.connection,
+                          svAutomation.connection(SpliceLedgerConnectionPriority.Low),
                           loggerFactory,
                           "splice sv admin realm",
                         )(traceContext)(operation)
@@ -835,7 +837,8 @@ object SvApp {
                 _ <- retryProvider.retryForClientCalls(
                   "prepare_validator_onboarding",
                   "Create a validator onboarding contract with a secret",
-                  svStoreWithIngestion.connection
+                  svStoreWithIngestion
+                    .connection(SpliceLedgerConnectionPriority.Low)
                     .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
                     .withDedup(
                       commandId = SpliceLedgerConnection
@@ -879,7 +882,8 @@ object SvApp {
               desiredAmuletPrice.bigDecimal,
             )
           )
-          _ <- dsoStoreWithIngestion.connection
+          _ <- dsoStoreWithIngestion
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               actAs = Seq(dsoStore.key.svParty),
               readAs = Seq(dsoStore.key.dsoParty),
@@ -941,7 +945,8 @@ object SvApp {
               effectiveTime,
             )
             cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
-            _ <- dsoStoreWithIngestion.connection
+            _ <- dsoStoreWithIngestion
+              .connection(SpliceLedgerConnectionPriority.Low)
               .submit(
                 actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
                 readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
@@ -998,7 +1003,8 @@ object SvApp {
                   ),
                 )
               )
-              res <- dsoStoreWithIngestion.connection
+              res <- dsoStoreWithIngestion
+                .connection(SpliceLedgerConnectionPriority.Low)
                 .submit(
                   actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
                   readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
@@ -1166,7 +1172,8 @@ object SvApp {
               )
 
               for {
-                _ <- dsoStoreWithIngestion.connection
+                _ <- dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
                   .submit(
                     actAs = Seq(svParty),
                     readAs = Seq(dsoParty),
@@ -1195,11 +1202,13 @@ object SvApp {
       // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
       // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
       // and then checks if it has a primary party already.
-      _ <- dsoStoreWithIngestion.connection.createUserWithPrimaryParty(
-        config.validatorLedgerApiUser,
-        svParty,
-        Seq(User.Right.ParticipantAdmin.INSTANCE),
-      )
+      _ <- dsoStoreWithIngestion
+        .connection(SpliceLedgerConnectionPriority.Low)
+        .createUserWithPrimaryParty(
+          config.validatorLedgerApiUser,
+          svParty,
+          Seq(User.Right.ParticipantAdmin.INSTANCE),
+        )
     } yield ()
   }
 }

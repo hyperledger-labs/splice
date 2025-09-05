@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -70,7 +71,8 @@ class GarbageCollectAmuletPriceVotesTrigger(
               Optional.of(controller),
             )
           )
-          svTaskContext.connection
+          svTaskContext
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(store.key.svParty),
               Seq(store.key.dsoParty),

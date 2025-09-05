@@ -33,6 +33,7 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import org.scalatest.Assertion
 
@@ -1295,7 +1296,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     )
     val packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
       synchronizerId,
-      userValidator.validatorAutomation.connection,
+      userValidator.validatorAutomation.connection(SpliceLedgerConnectionPriority.Low),
       loggerFactory,
     )
     val partiesOfInterest = Seq(

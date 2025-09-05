@@ -140,7 +140,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        validatorConfig.parameters.commandCircuitBreakerConfig,
+        validatorConfig.parameters.circuitBreakers,
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -178,7 +178,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        svConfig.parameters.commandCircuitBreakerConfig,
+        svConfig.parameters.circuitBreakers,
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -215,7 +215,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        scanConfig.parameters.commandCircuitBreakerConfig,
+        scanConfig.parameters.circuitBreakers,
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -252,7 +252,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        splitwellConfig.parameters.commandCircuitBreakerConfig,
+        splitwellConfig.parameters.circuitBreakers,
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -402,6 +402,8 @@ object SpliceConfig {
 
     implicit val circuitBreakerConfig: ConfigReader[CircuitBreakerConfig] =
       deriveReader[CircuitBreakerConfig]
+    implicit val circuitBreakersConfig: ConfigReader[CircuitBreakersConfig] =
+      deriveReader[CircuitBreakersConfig]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
@@ -794,6 +796,8 @@ object SpliceConfig {
 
     implicit val circuitBreakerConfig: ConfigWriter[CircuitBreakerConfig] =
       deriveWriter[CircuitBreakerConfig]
+    implicit val circuitBreakersConfig: ConfigWriter[CircuitBreakersConfig] =
+      deriveWriter[CircuitBreakersConfig]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 

@@ -61,6 +61,7 @@ class ScanAutomationService(
       retryProvider,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      config.parameters,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService.type =

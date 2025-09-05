@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.wallet
 
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{
@@ -38,6 +38,7 @@ class ExternalPartyWalletService(
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    params: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -69,10 +70,9 @@ class ExternalPartyWalletService(
     retryProvider,
     ingestFromParticipantBegin,
     ingestUpdateHistoryFromParticipantBegin,
+    params,
     loggerFactory,
   )
-
-  val connection: SpliceLedgerConnection = automation.connection
 
   override def isHealthy: Boolean =
     automation.isHealthy

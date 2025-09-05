@@ -36,13 +36,14 @@ import com.digitalasset.canton.lifecycle.SyncCloseable
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 class RestartDsoDelegateBasedAutomationTrigger(
     override protected val context: TriggerContext,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     store: SvDsoStore,
-    connection: SpliceLedgerConnection,
+    connection: SpliceLedgerConnectionPriority => SpliceLedgerConnection,
     clock: Clock,
     config: SvAppBackendConfig,
     appLevelRetryProvider: RetryProvider,
