@@ -953,7 +953,7 @@ object SpliceConfig {
     implicit val periodicBackupDumpConfigWriter: ConfigWriter[PeriodicBackupDumpConfig] =
       deriveWriter[PeriodicBackupDumpConfig]
     implicit val partyIdConfigWriter: ConfigWriter[PartyId] =
-      implicitly[ConfigWriter[String]].contramap(_.toString)
+      implicitly[ConfigWriter[String]].contramap(_.toProtoPrimitive)
     implicit val packageVersionConfigWriter: ConfigWriter[PackageVersion] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
