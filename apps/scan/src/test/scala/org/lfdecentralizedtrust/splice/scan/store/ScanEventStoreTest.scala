@@ -1,0 +1,840 @@
+package org.lfdecentralizedtrust.splice.scan.store
+
+import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.store.PageLimit
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.StoreTest
+import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import io.circe.Json
+
+import scala.concurrent.Future
+
+class ScanEventStoreTest extends StoreTest with HasExecutionContext with SplicePostgresTest {
+
+  "ScanEventStore" should {
+    "combine verdict and update events by update_id" in {
+      for {
+        ctx <- newEventStore()
+        recordTs = CantonTimestamp.now()
+        tx <- insertUpdate(ctx.updateHistory, recordTs, "update1")
+        updateId = tx.getUpdateId
+
+        _ <- insertVerdict(ctx.verdictStore, updateId, recordTs)
+
+        eventOpt <- ctx.eventStore.getEventByUpdateId(updateId)
+        histUpdateOpt <- ctx.updateHistory.getUpdate(updateId)
+      } yield {
+        val (verdictOpt, updateOpt) = eventOpt.value
+        verdictOpt.value._2.size shouldBe 1
+        val view = verdictOpt.value._2.head
+        view.verdictRowId shouldBe verdictOpt.value._1.rowId
+        verdictOpt.value._1.recordTime shouldBe updateOpt.value.update.update.recordTime
+        // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdate
+        updateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
+      }
+    }
+
+    "Cap the updates till the latest verdict" in {
+      for {
+        ctx <- newEventStore()
+        // First update
+        recordTs1 = CantonTimestamp.now()
+        tx1 <- insertUpdate(ctx.updateHistory, recordTs1, "update1")
+        updateId1 = tx1.getUpdateId
+        _ <- insertVerdict(ctx.verdictStore, updateId1, recordTs1)
+
+        // Second update (with no verdict).
+        recordTs2 = recordTs1.plusSeconds(1)
+        tx2 <- insertUpdate(ctx.updateHistory, recordTs2, "update2")
+        updateId2 = tx2.getUpdateId
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after recordTs1
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1)),
+          domainMigrationId,
+          pageLimit,
+        )
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+      } yield {
+        // Expect only the first update (with a verdict) to appear for the current migration
+        hasVerdict(events1, updateId1) shouldBe true
+
+        // Ensure the second, later update without a verdict is filtered out
+        hasUpdate(events1, updateId2) shouldBe false
+
+        events1 shouldBe events2
+
+        events3.isEmpty shouldBe true
+
+        // But fetching by the specific update_id still returns the update
+        val (verdictO, updateO) = updateEventOpt.value
+        verdictO shouldBe None
+        updateO.map(_.update.update.updateId) shouldBe Some(updateId2)
+      }
+    }
+
+    "Cap the verdict till the latest update" in {
+      for {
+        ctx <- newEventStore()
+        // First update
+        recordTs1 = CantonTimestamp.now()
+        tx1 <- insertUpdate(ctx.updateHistory, recordTs1, "update1")
+        updateId1 = tx1.getUpdateId
+        _ <- insertVerdict(ctx.verdictStore, updateId1, recordTs1)
+
+        // Second verdict (with no update).
+        recordTs2 = recordTs1.plusSeconds(1)
+        updateId2 = "verdict-later-update-id"
+        _ <- insertVerdict(ctx.verdictStore, updateId2, recordTs2)
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after recordTs1
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1)),
+          domainMigrationId,
+          pageLimit,
+        )
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+      } yield {
+        // Expect only the first update (with a verdict) to appear for the current migration
+        hasVerdict(events1, updateId1) shouldBe true
+
+        // Ensure the second, later verdict without an update is filtered out
+        hasUpdate(events1, updateId2) shouldBe false
+
+        events1 shouldBe events2
+
+        events3.isEmpty shouldBe true
+
+        // But fetching by the specific update_id still returns the event with verdict
+        val (verdictO, updateO) = updateEventOpt.value
+        updateO shouldBe None
+        verdictO.map(_._1.updateId) shouldBe Some(updateId2)
+      }
+    }
+
+    "does not filter out the update matching the last verdict" in {
+      for {
+        ctx <- newEventStore()
+        recordTs1 = CantonTimestamp.now()
+        recordTs2 = recordTs1.plusSeconds(1)
+        recordTs3 = recordTs2.plusSeconds(1)
+
+        // Insert two verdicts at earlier times (no matching update ids)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-update-1", recordTs1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-update-2", recordTs2)
+
+        // Ingest an update and verdict at the latest time
+        tx <- insertUpdate(ctx.updateHistory, recordTs3, "update3")
+        updateId = tx.getUpdateId
+        _ <- insertVerdict(ctx.verdictStore, updateId, recordTs3)
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after recordTs1
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1)),
+          domainMigrationId,
+          pageLimit,
+        )
+      } yield {
+        events1.size shouldBe 3
+        // All returned events should contain verdicts
+        events1.forall(_._1.isDefined) shouldBe true
+        // Ensure both verdict updateIds are present
+
+        events1 shouldBe events2
+
+        events3.size shouldBe 2
+        events3.forall(_._1.isDefined) shouldBe true
+        events3.exists(_._1.exists(_._1.updateId == "verdict-update-1")) shouldBe false
+      }
+    }
+
+    "provide events for two migrationIds" in {
+      val mig0 = domainMigrationId
+      val mig1 = nextDomainMigrationId
+      for {
+        // Create two stores using the same underlying storage
+        ctx0 <- newEventStore(mig0)
+        ctx1 <- newEventStore(mig1)
+
+        // Insert an update+verdict in migration 0
+        recordTs1 = CantonTimestamp.now()
+        tx1 <- insertUpdate(ctx0.updateHistory, recordTs1, "update-mig0")
+        updateId1 = tx1.getUpdateId
+        _ <- insertVerdict(ctx0.verdictStore, updateId1, recordTs1, migrationId = mig0)
+
+        // Insert an update+verdict in migration 1
+        recordTs2 = recordTs1.plusSeconds(1)
+        tx2 <- insertUpdate(ctx1.updateHistory, recordTs2, "update-mig1")
+        updateId2 = tx2.getUpdateId
+        _ <- insertVerdict(ctx1.verdictStore, updateId2, recordTs2, migrationId = mig1)
+
+        // Query combined events at current migration = mig1
+        events <- ctx1.eventStore.getEventsReference(
+          None,
+          mig1,
+          pageLimit,
+        )
+        events2 <- ctx1.eventStore.getEventsReference(
+          Some((mig0, recordTs1.minusSeconds(1))),
+          mig1,
+          pageLimit,
+        )
+        // after recordTs1
+        events3 <- ctx1.eventStore.getEventsReference(
+          Some((mig0, recordTs1)),
+          mig1,
+          pageLimit,
+        )
+        // Fetch by id works across migrationIds
+        e1 <- ctx1.eventStore.getEventByUpdateId(updateId1)
+        e2 <- ctx1.eventStore.getEventByUpdateId(updateId2)
+      } yield {
+        // Cursor before ts1 should match no-cursor results
+        events shouldBe events2
+
+        // Should contain both updateIds
+        hasUpdate(events, updateId1) shouldBe true
+        hasUpdate(events, updateId2) shouldBe true
+
+        // Cursor at ts1 for mig0 should exclude mig0 event and include only mig1
+        events3.size shouldBe 1
+        hasUpdate(events3, updateId1) shouldBe false
+        hasUpdate(events3, updateId2) shouldBe true
+
+        // Fetch by id should yield both verdict and update
+        val (v1, u1) = e1.value
+        val (v2, u2) = e2.value
+
+        v1.value._1.migrationId shouldBe mig0
+        v2.value._1.migrationId shouldBe mig1
+
+        u1.value.migrationId shouldBe mig0
+        u2.value.migrationId shouldBe mig1
+      }
+    }
+
+    "provide assignment updates" in {
+      for {
+        ctx <- newEventStore()
+        recordTs = CantonTimestamp.now()
+
+        // Create an assignment (source -> target)
+        reassignment <- insertAssign(ctx.updateHistory, recordTs, "assign-cid")
+
+        recordTs2 = recordTs.plusSeconds(1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
+
+        events <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
+
+        // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
+        // byId <- ctx.eventStore.getEventByUpdateId(reassignment.updateId)
+      } yield {
+        hasUpdate(events, reassignment.updateId) shouldBe true
+
+        // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdatesWithoutImportUpdates
+        val eventUpdateOpt =
+          events.flatMap(_._2).find(_.update.update.updateId == reassignment.updateId)
+        val histUpdateOpt =
+          histUpdates.find(_.update.update.updateId == reassignment.updateId)
+        eventUpdateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
+
+        // val (verdictO, updateO) = byId.value
+        // verdictO shouldBe None
+        // updateO.map(_.update.update.updateId) shouldBe Some(reassignment.updateId)
+      }
+    }
+
+    "provide unassignment updates" in {
+      for {
+        ctx <- newEventStore()
+        recordTs = CantonTimestamp.now()
+
+        // Create an unassignment (source -> target)
+        reassignment <- insertUnassign(ctx.updateHistory, recordTs, "unassign-cid")
+
+        recordTs2 = recordTs.plusSeconds(1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
+
+        events <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
+
+        // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
+        // byId <- ctx.eventStore.getEventByUpdateId(reassignment.updateId)
+      } yield {
+        hasUpdate(events, reassignment.updateId) shouldBe true
+
+        // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdatesWithoutImportUpdates
+        val eventUpdateOpt =
+          events.flatMap(_._2).find(_.update.update.updateId == reassignment.updateId)
+        val histUpdateOpt =
+          histUpdates.find(_.update.update.updateId == reassignment.updateId)
+        eventUpdateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
+
+        // val (verdictO, updateO) = byId.value
+        // verdictO shouldBe None
+        // updateO.map(_.update.update.updateId) shouldBe Some(reassignment.updateId)
+      }
+    }
+
+    "Cap the assignments till the latest verdict" in {
+      for {
+        ctx <- newEventStore()
+        // First assignment
+        recordTs1 = CantonTimestamp.now()
+        assignment1 <- insertAssign(ctx.updateHistory, recordTs1, "assign-cap-1")
+
+        recordTs2 = recordTs1.plusSeconds(1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
+
+        // Second assignment, after last verdict
+        recordTs3 = recordTs2.plusSeconds(1)
+        assignment2 <- insertAssign(ctx.updateHistory, recordTs3, "assign-cap-2")
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after latest verdict
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs2)),
+          domainMigrationId,
+          pageLimit,
+        )
+      } yield {
+        // Only first assignment appears
+        hasVerdict(events1, "verdict-1") shouldBe true
+
+        // Later assignment is filtered
+        hasUpdate(events1, assignment2.updateId) shouldBe false
+
+        events1 shouldBe events2
+
+        events3.isEmpty shouldBe true
+      }
+    }
+
+    "Cap the verdict till the latest assignment" in {
+      for {
+        ctx <- newEventStore()
+        // First verdict
+        recordTs1 = CantonTimestamp.now()
+        updateId1 = "verdict-before-assignment-id"
+        _ <- insertVerdict(ctx.verdictStore, updateId1, recordTs1)
+
+        recordTs2 = recordTs1.plusSeconds(1)
+        assignment1 <- insertAssign(ctx.updateHistory, recordTs2, "assign-cap-3")
+
+        // Second verdict
+        recordTs3 = recordTs2.plusSeconds(1)
+        updateId2 = "verdict-later-assignment-id"
+        _ <- insertVerdict(ctx.verdictStore, updateId2, recordTs3)
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after latest assignment
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs2)),
+          domainMigrationId,
+          pageLimit,
+        )
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+      } yield {
+        hasUpdate(events1, assignment1.updateId) shouldBe true
+        hasVerdict(events1, updateId2) shouldBe false
+
+        events1 shouldBe events2
+
+        events3.isEmpty shouldBe true
+
+        // Fetching by id does returns verdict
+        val (verdictO, updateO) = updateEventOpt.value
+        updateO shouldBe None
+        verdictO.map(_._1.updateId) shouldBe Some(updateId2)
+      }
+    }
+
+    "Cap the unassignments till the latest verdict" in {
+      for {
+        ctx <- newEventStore()
+        // First unassignment
+        recordTs1 = CantonTimestamp.now()
+        unassignment1 <- insertUnassign(ctx.updateHistory, recordTs1, "unassign-cap-1")
+
+        recordTs2 = recordTs1.plusSeconds(1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
+
+        // Second unassignment, after last verdict
+        recordTs3 = recordTs2.plusSeconds(1)
+        unassignment2 <- insertUnassign(ctx.updateHistory, recordTs3, "unassign-cap-2")
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after latest verdict
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs2)),
+          domainMigrationId,
+          pageLimit,
+        )
+      } yield {
+        // Only first unassignment appears
+        hasVerdict(events1, "verdict-1") shouldBe true
+
+        // Later unassignment is filtered
+        hasUpdate(events1, unassignment2.updateId) shouldBe false
+
+        events1 shouldBe events2
+
+        events3.isEmpty shouldBe true
+
+      }
+    }
+
+    "Cap the verdict till the latest unassignment" in {
+      for {
+        ctx <- newEventStore()
+        // First verdict
+        recordTs1 = CantonTimestamp.now()
+        updateId1 = "verdict-before-unassignment-id"
+        _ <- insertVerdict(ctx.verdictStore, updateId1, recordTs1)
+
+        recordTs2 = recordTs1.plusSeconds(1)
+        unassignment1 <- insertUnassign(ctx.updateHistory, recordTs2, "unassign-cap-3")
+
+        // Second verdict
+        recordTs3 = recordTs2.plusSeconds(1)
+        updateId2 = "verdict-later-unassignment-id"
+        _ <- insertVerdict(ctx.verdictStore, updateId2, recordTs3)
+
+        // Fetch without cursor
+        events1 <- ctx.eventStore.getEventsReference(
+          None,
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch with cursor
+        events2 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs1.minusSeconds(1))),
+          domainMigrationId,
+          pageLimit,
+        )
+        // Fetch after latest unassignment
+        events3 <- ctx.eventStore.getEventsReference(
+          Some((domainMigrationId, recordTs2)),
+          domainMigrationId,
+          pageLimit,
+        )
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+      } yield {
+        hasUpdate(events1, unassignment1.updateId) shouldBe true
+        hasVerdict(events1, updateId2) shouldBe false
+
+        events1 shouldBe events2
+
+        events3.isEmpty shouldBe true
+
+        // Fetching by id does return verdict
+        val (verdictO, updateO) = updateEventOpt.value
+        updateO shouldBe None
+        verdictO.map(_._1.updateId) shouldBe Some(updateId2)
+      }
+    }
+
+    "does not cap the updates for migrationId < currentMigrationId" in {
+      val mig0 = domainMigrationId
+      val mig1 = mig0 + 1
+      val mig2 = mig1 + 1
+      for {
+        ctx0 <- newEventStore(mig0)
+        ctx1 <- newEventStore(mig1)
+        ctx2 <- newEventStore(mig2)
+
+        // mig0: has only one update (T1)
+        recordTs1 = CantonTimestamp.now()
+        tx0 <- insertUpdate(ctx0.updateHistory, recordTs1, "update-mig0")
+        updateId0 = tx0.getUpdateId
+
+        // mig1: has 1 verdict (T2), then one update (T3)
+        recordTs2 = recordTs1.plusSeconds(1)
+        _ <- insertVerdict(ctx1.verdictStore, "verdict-mig1", recordTs2, migrationId = mig1)
+        recordTs3 = recordTs2.plusSeconds(1)
+        tx1 <- insertUpdate(ctx1.updateHistory, recordTs3, "update-mig1")
+        updateId1 = tx1.getUpdateId
+
+        // mig2 (current): has 1 verdict (T4), then one update (T5)
+        recordTs4 = recordTs3.plusSeconds(1)
+        _ <- insertVerdict(ctx2.verdictStore, "verdict-mig2", recordTs4, migrationId = mig2)
+        recordTs5 = recordTs4.plusSeconds(1)
+        tx2 <- insertUpdate(ctx2.updateHistory, recordTs5, "update-mig2")
+        updateId2 = tx2.getUpdateId
+
+        // Query combined events at current migration = mig2
+        events <- ctx2.eventStore.getEventsReference(
+          None,
+          mig2,
+          pageLimit,
+        )
+      } yield {
+        // mig0 + mig1 updates should be present; mig2 update should be filtered (after cap)
+        hasUpdate(events, updateId0) shouldBe true
+        hasUpdate(events, updateId1) shouldBe true
+        hasUpdate(events, updateId2) shouldBe false
+        hasVerdict(events, "verdict-mig1") shouldBe true
+      }
+    }
+
+    "does not cap the verdicts for migrationId < currentMigrationId" in {
+      val mig0 = domainMigrationId
+      val mig1 = mig0 + 1
+      val mig2 = mig1 + 1
+      for {
+        ctx0 <- newEventStore(mig0)
+        ctx1 <- newEventStore(mig1)
+        ctx2 <- newEventStore(mig2)
+
+        // mig0: has only one verdict (T1)
+        recordTs1 = CantonTimestamp.now()
+        _ <- insertVerdict(ctx0.verdictStore, "verdict-mig0", recordTs1, migrationId = mig0)
+
+        // mig1: has 1 update (T2), then one verdict (T3)
+        recordTs2 = recordTs1.plusSeconds(1)
+        tx1 <- insertUpdate(ctx1.updateHistory, recordTs2, "update-mig1")
+        updateId1 = tx1.getUpdateId
+        recordTs3 = recordTs2.plusSeconds(1)
+        _ <- insertVerdict(ctx1.verdictStore, "verdict-mig1", recordTs3, migrationId = mig1)
+
+        // mig2 (current): has 1 update (T4), then one verdict (T5)
+        recordTs4 = recordTs3.plusSeconds(1)
+        tx2 <- insertUpdate(ctx2.updateHistory, recordTs4, "update-mig2")
+        updateId2 = tx2.getUpdateId
+        recordTs5 = recordTs4.plusSeconds(1)
+        _ <- insertVerdict(ctx2.verdictStore, "verdict-mig2", recordTs5, migrationId = mig2)
+
+        // Query combined events at current migration = mig2
+        events <- ctx2.eventStore.getEventsReference(
+          None,
+          mig2,
+          pageLimit,
+        )
+      } yield {
+        // mig0 + mig1 verdicts should be present; mig2 verdict should be filtered (after cap)
+        hasVerdict(events, "verdict-mig0") shouldBe true
+        hasVerdict(events, "verdict-mig1") shouldBe true
+        hasVerdict(events, "verdict-mig2") shouldBe false
+        // Ensure updates from mig1/mig2 are visible where applicable
+        hasUpdate(events, updateId1) shouldBe true
+        hasUpdate(events, updateId2) shouldBe true
+      }
+    }
+
+    "does not cap the assignments for migrationId < currentMigrationId" in {
+      val mig0 = domainMigrationId
+      val mig1 = mig0 + 1
+      val mig2 = mig1 + 1
+      for {
+        ctx0 <- newEventStore(mig0)
+        ctx1 <- newEventStore(mig1)
+        ctx2 <- newEventStore(mig2)
+
+        // mig0: has only one assignment (T1)
+        recordTs1 = CantonTimestamp.now()
+        assignment0 <- insertAssign(ctx0.updateHistory, recordTs1, "assign-old-mig")
+
+        // mig1: has 1 verdict (T2), then one assignment (T3)
+        recordTs2 = recordTs1.plusSeconds(1)
+        _ <- insertVerdict(ctx1.verdictStore, "verdict-mig1", recordTs2, migrationId = mig1)
+        recordTs3 = recordTs2.plusSeconds(1)
+        assignment1 <- insertAssign(ctx1.updateHistory, recordTs3, "assign-mig1")
+
+        // mig2 (current): has 1 verdict (T4), then one assignment (T5)
+        recordTs4 = recordTs3.plusSeconds(1)
+        _ <- insertVerdict(ctx2.verdictStore, "verdict-mig2", recordTs4, migrationId = mig2)
+        recordTs5 = recordTs4.plusSeconds(1)
+        assignment2 <- insertAssign(ctx2.updateHistory, recordTs5, "assign-mig2")
+
+        // Query combined events at current migration = mig2
+        events <- ctx2.eventStore.getEventsReference(
+          None,
+          mig2,
+          pageLimit,
+        )
+      } yield {
+        // mig0 + mig1 assignments should be present; mig2 assignment should be filtered (after cap)
+        hasUpdate(events, assignment0.updateId) shouldBe true
+        hasUpdate(events, assignment1.updateId) shouldBe true
+        hasUpdate(events, assignment2.updateId) shouldBe false
+        hasVerdict(events, "verdict-mig1") shouldBe true
+      }
+    }
+
+    "does not cap the unassignments for migrationId < currentMigrationId" in {
+      val mig0 = domainMigrationId
+      val mig1 = mig0 + 1
+      val mig2 = mig1 + 1
+      for {
+        ctx0 <- newEventStore(mig0)
+        ctx1 <- newEventStore(mig1)
+        ctx2 <- newEventStore(mig2)
+
+        // mig0: has only one unassignment (T1)
+        recordTs1 = CantonTimestamp.now()
+        unassignment0 <- insertUnassign(ctx0.updateHistory, recordTs1, "unassign-old-mig")
+
+        // mig1: has 1 verdict (T2), then one unassignment (T3)
+        recordTs2 = recordTs1.plusSeconds(1)
+        _ <- insertVerdict(ctx1.verdictStore, "verdict-mig1", recordTs2, migrationId = mig1)
+        recordTs3 = recordTs2.plusSeconds(1)
+        unassignment1 <- insertUnassign(ctx1.updateHistory, recordTs3, "unassign-mig1")
+
+        // mig2 (current): has 1 verdict (T4), then one unassignment (T5)
+        recordTs4 = recordTs3.plusSeconds(1)
+        _ <- insertVerdict(ctx2.verdictStore, "verdict-mig2", recordTs4, migrationId = mig2)
+        recordTs5 = recordTs4.plusSeconds(1)
+        unassignment2 <- insertUnassign(ctx2.updateHistory, recordTs5, "unassign-mig2")
+
+        // Query combined events at current migration = mig2
+        events <- ctx2.eventStore.getEventsReference(
+          None,
+          mig2,
+          pageLimit,
+        )
+      } yield {
+        // mig0 + mig1 unassignments should be present; mig2 unassignment should be filtered (after cap)
+        hasUpdate(events, unassignment0.updateId) shouldBe true
+        hasUpdate(events, unassignment1.updateId) shouldBe true
+        hasUpdate(events, unassignment2.updateId) shouldBe false
+        hasVerdict(events, "verdict-mig1") shouldBe true
+      }
+    }
+
+  }
+
+  private def newUpdateHistory(
+      migrationId: Long
+  ): Future[UpdateHistory] = {
+    val participantId = mkParticipantId("ScanEventStoreTest")
+    val uh = new UpdateHistory(
+      storage.underlying,
+      new DomainMigrationInfo(migrationId, None),
+      "scan_event_store_test",
+      participantId,
+      dsoParty,
+      BackfillingRequirement.BackfillingNotRequired,
+      loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = true,
+    )
+    uh.ingestionSink.initialize().map(_ => uh)
+  }
+
+  private def newVerdictStore() =
+    new DbScanVerdictStore(storage.underlying, loggerFactory)
+
+  private def insertUpdate(
+      updateHistory: UpdateHistory,
+      recordTs: CantonTimestamp,
+      workflowId: String,
+  ) = {
+    implicit val store = updateHistory
+    val _ = store
+    dummyDomain.ingest { off =>
+      mkTx(
+        off,
+        Seq.empty,
+        dummyDomain,
+        workflowId = workflowId,
+        recordTime = recordTs.toInstant,
+      )
+    }
+  }
+
+  private var ridCounter: Long = 0
+  private def nextRid(prefix: String) = { ridCounter += 1; s"$prefix-$ridCounter" }
+
+  private def insertAssign(
+      updateHistory: UpdateHistory,
+      recordTs: CantonTimestamp,
+      contractId: String,
+  ) = {
+    implicit val store = updateHistory
+    val _ = store
+    val sourceDomain = SynchronizerId.tryFromString("source::domain")
+    val targetDomain = dummyDomain
+    targetDomain.assign(
+      (
+        appRewardCoupon(round = 0, provider = dsoParty, contractId = contractId),
+        sourceDomain,
+      ),
+      nextRid("assign"),
+      0,
+      recordTime = recordTs,
+    )
+  }
+
+  private def insertUnassign(
+      updateHistory: UpdateHistory,
+      recordTs: CantonTimestamp,
+      contractId: String,
+  ) = {
+    implicit val store = updateHistory
+    val _ = store
+    val sourceDomain = dummyDomain
+    val targetDomain = SynchronizerId.tryFromString("target::domain")
+    sourceDomain.unassign(
+      (
+        appRewardCoupon(round = 0, provider = dsoParty, contractId = contractId),
+        targetDomain,
+      ),
+      nextRid("unassign"),
+      0,
+      recordTime = recordTs,
+    )
+  }
+
+  private def insertVerdict(
+      verdictStore: DbScanVerdictStore,
+      updateId: String,
+      recordTs: CantonTimestamp,
+      participantId: ParticipantId = mkParticipantId(
+        "ScanEventStoreTest"
+      ),
+      informees: Seq[PartyId] = Seq(dsoParty),
+      viewId: Int = 0,
+      migrationId: Long = domainMigrationId,
+  ): Future[Unit] = {
+    val verdict = new verdictStore.VerdictT(
+      0L,
+      migrationId,
+      dummyDomain,
+      recordTs,
+      recordTs,
+      participantId.toProtoPrimitive,
+      DbScanVerdictStore.VerdictResultDbValue.Accepted,
+      0,
+      updateId,
+      informees.map(_.toProtoPrimitive),
+      Seq(viewId),
+    )
+    val mkViews: Long => Seq[verdictStore.TransactionViewT] = { rowId =>
+      Seq(
+        new verdictStore.TransactionViewT(
+          verdictRowId = rowId,
+          viewId = viewId,
+          informees = informees.map(_.toProtoPrimitive),
+          confirmingParties = Json.arr(),
+          subViews = Seq.empty,
+        )
+      )
+    }
+    verdictStore.insertVerdictAndTransactionViews(verdict, mkViews)
+  }
+
+  private val pageLimit = PageLimit.tryCreate(1000)
+
+  private def hasUpdate(events: Seq[ScanEventStore#Event], updateId: String): Boolean =
+    events.exists(_._2.exists(_.update.update.updateId == updateId))
+
+  private def hasVerdict(events: Seq[ScanEventStore#Event], updateId: String): Boolean =
+    events.exists(_._1.exists(_._1.updateId == updateId))
+
+  private case class EventStoreCtx(
+      verdictStore: DbScanVerdictStore,
+      updateHistory: UpdateHistory,
+      eventStore: ScanEventStore,
+  )
+
+  private def newEventStore(migrationId: Long = domainMigrationId): Future[EventStoreCtx] =
+    for {
+      uh <- newUpdateHistory(migrationId)
+      vs = newVerdictStore()
+      es = new ScanEventStore(vs, uh, loggerFactory)
+    } yield EventStoreCtx(vs, uh, es)
+
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[_] =
+    for {
+      _ <- resetAllAppTables(storage)
+    } yield ()
+
+}
