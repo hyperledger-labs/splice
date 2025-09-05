@@ -356,7 +356,7 @@ object AcsQueries {
         companionClass: ContractCompanion[C, TCId, T],
         decoder: TemplateJsonDecoder,
     ): Contract[TCId, T] = {
-      // safety check: if the templates don't match,
+      // safety check: if the PackageQualifiedNames don't match,
       // it means that we would be returning a contract of a different template
       // note that the packageId not matching is expected due to upgrades, but the name will be stable
       val expectedPackageQualifiedName = companionClass.packageQualifiedName(companion)
