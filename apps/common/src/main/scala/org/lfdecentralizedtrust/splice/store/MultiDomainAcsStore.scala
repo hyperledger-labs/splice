@@ -107,8 +107,8 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext
   ): Future[Option[ContractState]]
 
-  /** True if all contract ids point to known and non-archived contracts. They might be in-flight though. */
-  def hasArchived(ids: Seq[ContractId[?]])(implicit
+  /** True if the ids contains an id that has been archived. */
+  def containsArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
   ): Future[Boolean]
 
@@ -746,7 +746,7 @@ object MultiDomainAcsStore {
         traceContext: TraceContext
     ): Future[Unit]
 
-    def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
+    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit] =
       ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))

@@ -20,6 +20,8 @@ import {
   UpdateSvRewardWeightProposal,
   ProposalListingStatus,
   YourVoteStatus,
+  ConfigFormData,
+  ConfigChange,
 } from '../utils/types';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
@@ -149,4 +151,24 @@ export function getInitialExpiration(dsoInfo: DsoInfo | undefined): Dayjs {
     Math.floor(parseInt(dsoInfo.dsoRules.payload.config.voteRequestTimeout.microseconds!) / 1000),
     'milliseconds'
   );
+}
+
+/**
+ * Builds a list of config changes from the form data and filters out the ones that have not changed
+ **/
+export function configFormDataToConfigChanges(
+  formData: ConfigFormData,
+  configChanges: ConfigChange[]
+): ConfigChange[] {
+  return configChanges
+    .map(change => {
+      const fieldState = formData[change.fieldName];
+      return {
+        fieldName: change.fieldName,
+        label: change.label,
+        currentValue: change.currentValue,
+        newValue: fieldState?.value || '',
+      } as ConfigChange;
+    })
+    .filter(change => change.currentValue !== change.newValue);
 }

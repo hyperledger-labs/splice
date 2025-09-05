@@ -208,6 +208,7 @@
           "editorMode": "builder",
           "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[$__rate_interval]))",
           "fullMetaSearch": false,
+          "hide": false,
           "includeNullMetadata": true,
           "instant": false,
           "legendFormat": "__auto",
@@ -247,6 +248,23 @@
           "legendFormat": "hourly total",
           "range": true,
           "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[1h] offset 30d))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "hourly total 30 days ago",
+          "range": true,
+          "refId": "B",
           "useBackend": false
         }
       ],
@@ -756,7 +774,7 @@
     }
   ],
   "preload": false,
-  "refresh": "30s",
+  "refresh": "",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
@@ -815,5 +833,5 @@
   "timezone": "",
   "title": "Sequencer Messages",
   "uid": "fdjrxql2alblsd",
-  "version": 4
+  "version": 5
 }

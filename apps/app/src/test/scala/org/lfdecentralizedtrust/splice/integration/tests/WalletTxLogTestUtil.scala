@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   TransferTxLogEntry,
   TxLogEntry,
-  TxLogEntry as walletLogEntry,
 }
 import org.scalatest.Assertion
 
@@ -91,9 +90,14 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
     }
   }
 
-  def withoutDevNetTopups(txs: Seq[walletLogEntry]): Seq[walletLogEntry] = {
+  def withoutDevNetTopups(
+      txs: Seq[TxLogEntry.TransactionHistoryTxLogEntry]
+  ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] = {
     @tailrec
-    def go(txs: List[walletLogEntry], acc: Seq[walletLogEntry]): Seq[walletLogEntry] =
+    def go(
+        txs: List[TxLogEntry.TransactionHistoryTxLogEntry],
+        acc: Seq[TxLogEntry.TransactionHistoryTxLogEntry],
+    ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] =
       txs match {
         case Nil => acc
         case (first: TransferTxLogEntry) :: (second: BalanceChangeTxLogEntry) :: tail =>
@@ -113,7 +117,10 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
     go(txs.toList, Seq.empty)
   }
 
-  def withoutNonDevNetTopups(txs: Seq[walletLogEntry]): Seq[walletLogEntry] = {
+  // prevents flakes from traffic purchases - possible to happen in Validator wallets
+  def withoutNonDevNetTopups(
+      txs: Seq[TxLogEntry.TransactionHistoryTxLogEntry]
+  ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] = {
     // On non-DevNet like clusters, traffic topups take input amulets that must have been created beforehand.
     txs.filterNot {
       case transfer: TransferTxLogEntry =>

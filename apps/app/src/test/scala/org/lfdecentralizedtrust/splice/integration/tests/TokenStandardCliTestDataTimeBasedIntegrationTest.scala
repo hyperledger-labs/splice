@@ -199,8 +199,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       val aliceValidator = RichPartyId.local(aliceValidatorBackend.getValidatorPartyId())
 
       aliceValidatorWalletClient.tap(BigDecimal(1000))
-      aliceWalletClient.createTransferPreapproval()
-      aliceValidatorWalletClient.createTransferPreapproval()
+      createTransferPreapprovalIfNotExists(aliceWalletClient)
+      createTransferPreapprovalIfNotExists(aliceValidatorWalletClient)
 
       val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
@@ -550,7 +550,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             // TransferIn (derived by tx-kind), while making sure that charlie has no leftovers
             val charlieAmount = 500.0
             charlieWalletClient.tap(walletAmuletToUsd(charlieAmount))
-            aliceWalletClient.createTransferPreapproval() // it was deleted before
+            createTransferPreapprovalIfNotExists(aliceWalletClient) // it was deleted before
             charlieWalletClient.transferPreapprovalSend(
               alice.partyId,
               charlieAmount - 11,

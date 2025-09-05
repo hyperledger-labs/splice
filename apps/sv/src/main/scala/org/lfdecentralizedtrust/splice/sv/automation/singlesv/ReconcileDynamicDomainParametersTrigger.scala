@@ -71,7 +71,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       decentralizedSynchronizerConfig =
         dsoRules.payload.config.decentralizedSynchronizer.synchronizers.asScala
           .get(decentralizedSynchronizerId.toProtoPrimitive)
-      stateHistory <- participantAdminConnection.listSynchronizerParametersState(
+      stateHistory <- participantAdminConnection.listSynchronizerParametersStateHistory(
         decentralizedSynchronizerId
       )
       state <- participantAdminConnection.getSynchronizerParametersState(

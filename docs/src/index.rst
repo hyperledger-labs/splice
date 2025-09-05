@@ -50,13 +50,13 @@ Global Synchronizer for the Canton Network
    :caption: Background
 
    background/architecture
+   background/tokenomics/index.rst
    background/preapprovals
 
 .. todo:: Add Background sections containing
 
           - security (starting from key usage doc and risk of key compromise)
           - comparison to other chains
-          - tokenomics
 
 .. toctree::
    :maxdepth: 2

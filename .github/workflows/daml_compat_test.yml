@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   get_mainnet_version:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.get_mainnet_version.outputs.version }}
     steps:

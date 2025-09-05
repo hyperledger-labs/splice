@@ -27,7 +27,7 @@ describe('SV user can', () => {
     await user.type(input, 'sv1');
 
     const button = screen.getByRole('button', { name: 'Log In' });
-    user.click(button);
+    await user.click(button);
 
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
@@ -86,21 +86,21 @@ describe('Set DSO Config Rules Form', () => {
       /Unable to perform pointer interaction/
     );
 
-    screen.getByText('Summary is required');
-    screen.getByText('Invalid URL');
+    expect(screen.getByText('Summary is required')).toBeDefined();
+    expect(screen.getByText('Invalid URL')).toBeDefined();
 
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
     expect(summaryInput).toBeDefined();
-    user.type(summaryInput, 'Summary of the proposal');
+    await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('set-dso-config-rules-url');
     expect(urlInput).toBeDefined();
-    user.type(urlInput, 'https://example.com');
+    await user.type(urlInput, 'https://example.com');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBeNull();
   });
 
   test('expiry date must be in the future', async () => {
@@ -117,17 +117,17 @@ describe('Set DSO Config Rules Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
-    expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    });
   });
 
   test('effective date must be after expiry date', async () => {
@@ -145,22 +145,20 @@ describe('Set DSO Config Rules Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    });
   });
 
   test('changing config fields should render the current value', async () => {
@@ -186,5 +184,41 @@ describe('Set DSO Config Rules Form', () => {
 
     const changes = screen.getAllByTestId('config-current-value', { exact: false });
     expect(changes.length).toBe(2);
+  });
+
+  test('should show proposal review page after form completion', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('set-dso-config-rules-action');
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-voteCooldownTime');
+    await user.type(c2Input, '9999');
+
+    expect(screen.getByText('Review Proposal')).toBeDefined();
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton);
+
+    expect(screen.getByText('Proposal Summary')).toBeDefined();
   });
 });

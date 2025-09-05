@@ -62,6 +62,7 @@ import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescr
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
@@ -229,11 +230,31 @@ final class DbMultiDomainAcsStore[TXE](
       .value
   }
 
-  def hasArchived(ids: Seq[ContractId[?]])(implicit
+  def containsArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
-  ): Future[Boolean] =
-    // TODO(#838): implement this as a single DB query
-    Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
+  ): Future[Boolean] = waitUntilAcsIngested {
+    if (ids.isEmpty) Future.successful(false)
+    else {
+      val contractIds = inClause(ids)
+      val expectedCount = ids.size
+      storage
+        .query(
+          (sql"""
+         select count(1)
+         from #$acsTableName acs
+         where acs.store_id = $acsStoreId
+         and acs.migration_id = $domainMigrationId
+         and acs.contract_id in """ ++ contractIds ++ sql"""
+         """).toActionBuilder
+            .as[Int]
+            .head,
+          "containsArchived",
+        )
+        .map { count =>
+          count != expectedCount
+        }
+    }
+  }
 
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
@@ -2058,6 +2079,8 @@ object DbMultiDomainAcsStore {
       // We update the metrics in here as it's the easiest way
       // to not miss any place that might need updating.
       metrics.acsSize.updateValue(newAcsSize.toLong)
+      metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
+      metrics.completedIngestions.mark()
       synchronizerId.foreach { synchronizer =>
         recordTime.foreach { recordTime =>
           metrics
