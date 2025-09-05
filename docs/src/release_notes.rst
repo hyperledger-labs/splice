@@ -20,6 +20,10 @@ Upcoming
 
         - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
           a prepared transaction can be used.
+        - Add an alpha version of ``com.daml.ledger.api.v2.admin.PartyManagementService/GenerateExternalPartyTopology`` and
+          ``com.daml.ledger.api.v2.admin.PartyManagementService/AllocateExternalParty``. These endpoints can be used instead of
+          the validator endpoints ``/v0/admin/external-party/topology/generate`` and ``/v0/admin/external-party/topology/submit``
+          and will eventually supersede them.
 
 - Docs
 
