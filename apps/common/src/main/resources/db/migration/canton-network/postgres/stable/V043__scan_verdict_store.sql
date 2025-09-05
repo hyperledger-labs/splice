@@ -27,7 +27,7 @@ create table scan_verdict_store
 );
 
 -- Index for efficient querying by migration, and record time
-create index scan_verdict_mi_rt_di on scan_verdict_store (migration_id, record_time, domain_id);
+create index scan_verdict_mi_rt on scan_verdict_store (migration_id, record_time);
 
 -- Index for querying by update_id
 create index scan_verdict_update_id on scan_verdict_store (update_id);
