@@ -265,6 +265,9 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         // Create an assignment (source -> target)
         reassignment <- insertAssign(ctx.updateHistory, recordTs, "assign-cid")
 
+        recordTs2 = recordTs.plusSeconds(1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
+
         events <- ctx.eventStore.getEventsReference(
           None,
           domainMigrationId,
@@ -289,6 +292,9 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         // Create an unassignment (source -> target)
         reassignment <- insertUnassign(ctx.updateHistory, recordTs, "unassign-cid")
+
+        recordTs2 = recordTs.plusSeconds(1)
+        _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
 
         events <- ctx.eventStore.getEventsReference(
           None,
