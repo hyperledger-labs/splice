@@ -142,6 +142,7 @@ lazy val root: Project = (project in file("."))
     docs,
     `canton-json-api-v2-openapi-ts-client`,
     `token-standard-cli`,
+    `party-allocator`,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -481,6 +482,67 @@ lazy val `canton-json-api-v2-openapi-ts-client` = project
 lazy val `token-standard-cli` =
   project
     .in(file("token-standard/cli"))
+    .dependsOn(
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `canton-json-api-v2-openapi-ts-client`,
+    )
+    .settings(
+      Headers.TsHeaderSettings,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
+          false,
+        ),
+        (
+          (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
+          (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
+          false,
+        ),
+      ),
+      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value,
+      npmTest := {
+        val log = streams.value.log
+        (Test / compile).value
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "test:sbt"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmFix := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "fix"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmLint := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "check"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      Compile / compile := {
+        npmInstall.value
+        (Compile / compile).value
+      },
+    )
+
+lazy val `party-allocator` =
+  project
+    .in(file("party-allocator"))
     .dependsOn(
       `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
