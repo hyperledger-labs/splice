@@ -541,7 +541,7 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as unminted,
       \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(as_of_record_time, TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)) as daily_mint,
       \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) as minted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as allowed_mint,
+      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as allowed_mint,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time), 0) as burned,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY)), 0) as monthly_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time) as num_amulet_holders,
