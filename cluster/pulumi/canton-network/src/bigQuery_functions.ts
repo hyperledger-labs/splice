@@ -553,9 +553,12 @@ const all_stats = new BQTableFunction(
     new BQColumn('unlocked', BIGNUMERIC),
     new BQColumn('current_supply_total', BIGNUMERIC),
     new BQColumn('unminted', BIGNUMERIC),
-    new BQColumn('daily_mint', BIGNUMERIC),
-    new BQColumn('minted', BIGNUMERIC),
-    new BQColumn('allowed_mint', BIGNUMERIC),
+    new BQColumn('daily_app_rewards', BIGNUMERIC),
+    new BQColumn('daily_validator_rewards', BIGNUMERIC),
+    new BQColumn('daily_validator_liveness_rewards', BIGNUMERIC),
+    new BQColumn('daily_sv_rewards', BIGNUMERIC),
+    // new BQColumn('minted', BIGNUMERIC),
+    // new BQColumn('allowed_mint', BIGNUMERIC),
     new BQColumn('burned', BIGNUMERIC),
     new BQColumn('monthly_burn', BIGNUMERIC),
     new BQColumn('num_amulet_holders', INT64),
@@ -571,15 +574,20 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time) as unlocked,
       \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time) as current_supply_total,
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as unminted,
-      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(as_of_record_time, TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)) as daily_mint,
-      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) as minted,
-      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as allowed_mint,
+      daily_mints.appRewards as daily_app_rewards,
+      daily_mints.validatorRewards as daily_validator_rewards,
+      daily_mints.validatorLivenessRewards as daily_validator_liveness_rewards,
+      daily_mints.svRewards as daily_sv_rewards,
+      -- \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) as minted,
+      -- \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as allowed_mint,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time), 0) as burned,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY)), 0) as monthly_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time) as num_amulet_holders,
       \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time) as num_active_validators,
       IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time), 0.0) as average_tps,
       IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time), 0.0) as peak_tps
+    FROM
+      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR), as_of_record_time) as daily_mints
   `
 );
 
