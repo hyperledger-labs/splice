@@ -113,16 +113,20 @@ const migration_id_at_time = new BQScalarFunction(
     -- after the given time, therefore if the timestamp is during a migration, it will return the older migration ID.
     -- If no updates exist after the given time, returns the migration id of the last update.
     IFNULL
-    ((SELECT
-      MIN(migration_id)
-    FROM
-      ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
-      (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
-    WHERE record_time > UNIX_MICROS(as_of_record_time)),
-      (SELECT migration_id FROM
+    (
+      -- Try to find the lowest migration ID that has updates after the given time.
+      (SELECT
+        MIN(migration_id)
+      FROM
         ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
-        (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
-        ORDER BY record_time DESC LIMIT 1)
+         (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+      WHERE record_time > UNIX_MICROS(as_of_record_time)),
+      -- If none exists, return the migration ID of the last update.
+      (SELECT migration_id FROM
+        (
+          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
+          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`)
+        ) ORDER BY record_time DESC LIMIT 1)
     )
   `
 );
