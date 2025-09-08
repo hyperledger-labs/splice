@@ -41,7 +41,6 @@ class PackageVetting(
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResources
         .lookupAllPackageVersions(pkg.packageName)
-//        .filter(r => r.metadata.version == packageVersion || !latestPackagesOnly && r.metadata.version < packageVersion)
         .filter(_.metadata.version <= packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
