@@ -118,13 +118,13 @@ const migration_id_at_time = new BQScalarFunction(
       (SELECT
         MIN(migration_id)
       FROM
-        ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION
+        ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION ALL
          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
       WHERE record_time > UNIX_MICROS(as_of_record_time)),
       -- If none exists, return the migration ID of the last update.
       (SELECT migration_id FROM
         (
-          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION
+          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION ALL
           (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`)
         ) ORDER BY record_time DESC LIMIT 1)
     )
@@ -248,15 +248,41 @@ const unminted = new BQScalarFunction(
   `
 );
 
-const TransferSummary_minted = new BQScalarFunction(
-  'TransferSummary_minted',
+// TODO(XXX): add unclaimedActivityReward
+
+const TransferSummary_appRewards = new BQScalarFunction(
+  'TransferSummary_appRewards',
   [new BQFunctionArgument('tr_json', json)],
   BIGNUMERIC,
   `
-    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) -- .inputAppRewardAmount
-    + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) -- .inputValidatorRewardAmount
-    + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) -- .inputSvRewardAmount
+    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0])
+  `
+);
 
+const TransferSummary_validatorRewards = new BQScalarFunction(
+  'TransferSummary_validatorRewards',
+  [new BQFunctionArgument('tr_json', json)],
+  BIGNUMERIC,
+  `
+    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) - \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [10]) -- inputValidatorRewardAmount include liveness, so we subtract it as we want to count liveness separately
+  `
+);
+
+const TransferSummary_validatorLivenessRewards = new BQScalarFunction(
+  'TransferSummary_validatorLivenessRewards',
+  [new BQFunctionArgument('tr_json', json)],
+  BIGNUMERIC,
+  `
+    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [10])
+  `
+);
+
+const TransferSummary_svRewards = new BQScalarFunction(
+  'TransferSummary_svRewards',
+  [new BQFunctionArgument('tr_json', json)],
+  BIGNUMERIC,
+  `
+    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2])
   `
 );
 
@@ -286,19 +312,25 @@ const choice_result_TransferSummary = new BQScalarFunction(
   `
 );
 
-const minted_in_time_window = new BQScalarFunction(
+const minted_in_time_window = new BQTableFunction(
   'minted_in_time_window',
   [
     new BQFunctionArgument('start_record_time', TIMESTAMP),
     new BQFunctionArgument('as_of_record_time', TIMESTAMP),
   ],
-  BIGNUMERIC,
+  [
+    new BQColumn('appRewards', BIGNUMERIC),
+    new BQColumn('validatorRewards', BIGNUMERIC),
+    new BQColumn('validatorLivenessRewards', BIGNUMERIC),
+    new BQColumn('svRewards', BIGNUMERIC),
+  ],
   `
-    (SELECT
-        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
-                  \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))),
-                0)
-      FROM
+    SELECT
+        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_appRewards\`(\`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))), 0) as appRewards,
+        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_validatorRewards\`(\`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))), 0) as validatorRewards,
+        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_validatorLivenessRewards\`(\`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))), 0) as validatorLivenessRewards,
+        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_svRewards\`(\`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))), 0) as svRewards
+    FROM
         \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
       WHERE
         -- all the choices that can take coupons as input, and thus mint amulets based on them.
@@ -310,7 +342,7 @@ const minted_in_time_window = new BQScalarFunction(
             OR (e.choice = 'TransferPreapproval_Renew'
                 AND e.template_id_entity_name = 'TransferPreapproval'))
         AND e.template_id_module_name = 'Splice.AmuletRules'
-        AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(start_record_time, as_of_record_time, e.record_time, e.migration_id))
+        AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(start_record_time, as_of_record_time, e.record_time, e.migration_id)
   `
 );
 
@@ -629,7 +661,10 @@ export const allScanFunctions = [
   locked,
   unlocked,
   unminted,
-  TransferSummary_minted,
+  TransferSummary_appRewards,
+  TransferSummary_validatorRewards,
+  TransferSummary_validatorLivenessRewards,
+  TransferSummary_svRewards,
   choice_result_TransferSummary,
   minted_in_time_window,
   transferresult_fees,
