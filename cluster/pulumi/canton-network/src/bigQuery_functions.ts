@@ -388,9 +388,10 @@ const burned = new BQScalarFunction(
                             AND e.template_id_entity_name = 'SubscriptionPayment'
                             AND c.contract_id = JSON_VALUE(e.result, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1], 'contractId')))) -- .amulet
                   AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
+                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id)
                   AND c.template_id_module_name = 'Splice.Amulet'
                   AND c.template_id_entity_name = 'Amulet'
-                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id)
+                  AND c.record_time != -62135596800000000
                 )))
   `
 );
