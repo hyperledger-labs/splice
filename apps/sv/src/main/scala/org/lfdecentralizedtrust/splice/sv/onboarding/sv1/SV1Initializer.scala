@@ -214,9 +214,9 @@ class SV1Initializer(
             .map(_.nonEmpty), {
             val packages = requiredDars(sv1Config.initialPackageConfig)
             if (config.latestPackagesOnly)
-                logger.warn(
-                    "latestPackagesOnly is enabled, only the latest versions of the initial packages will be uploaded and vetted"
-                )
+              logger.warn(
+                "latestPackagesOnly is enabled, only the latest versions of the initial packages will be uploaded and vetted"
+              )
             logger.info(
               s"Starting with initial package ${sv1Config.initialPackageConfig} and vetting ${packages
                   .map(_.resourcePath)}"

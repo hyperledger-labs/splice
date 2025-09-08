@@ -330,7 +330,7 @@ class SvDsoAutomationService(
         dsoStore,
         triggerContext,
         config.maxVettingDelay,
-        config.latestPackagesOnly
+        config.latestPackagesOnly,
       )
     )
 

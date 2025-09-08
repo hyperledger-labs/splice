@@ -118,7 +118,8 @@ class PackageVetting(
   )(implicit tc: TraceContext): Future[Unit] = {
     logger.debug(s"Vetting packages: ${packages.mkString(", ")} on $domainId valid from $validFrom")
     val packagesToProcess = if (latestPackagesOnly) {
-        val res = packages.foldLeft(Map.empty[IdString.PackageName, (PackageIdResolver.Package, PackageVersion)]) {
+      val res = packages
+        .foldLeft(Map.empty[IdString.PackageName, (PackageIdResolver.Package, PackageVersion)]) {
           case (acc, (pkg, version)) =>
             acc.get(pkg.packageName) match {
               case Some((_, existingVersion)) =>
@@ -127,8 +128,12 @@ class PackageVetting(
               case None => acc.updated(pkg.packageName, (pkg, version))
             }
 
-          }.values.toSeq
-      logger.debug(s"Vetting only the latest packages: ${res.mkString(", ")} on $domainId valid from $validFrom")
+        }
+        .values
+        .toSeq
+      logger.debug(
+        s"Vetting only the latest packages: ${res.mkString(", ")} on $domainId valid from $validFrom"
+      )
       res
     } else packages
     val resources = packagesToProcess.flatMap { case (pkg, packageVersion) =>

@@ -48,7 +48,7 @@ case class ScanAppBackendConfig(
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
-    override val latestPackagesOnly: Boolean
+    override val latestPackagesOnly: Boolean,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {

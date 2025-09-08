@@ -15,7 +15,7 @@ import scala.concurrent.Future
 abstract class PackageVettingTrigger(
     packages: Set[PackageIdResolver.Package],
     maxVettingDelay: NonNegativeFiniteDuration,
-    latestPackagesOnly: Boolean
+    latestPackagesOnly: Boolean,
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
