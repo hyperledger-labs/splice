@@ -1,28 +1,29 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
-
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest}
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
-  AdvanceOpenMiningRoundTrigger,
-  ExpireIssuingMiningRoundTrigger,
-}
 import org.lfdecentralizedtrust.splice.util.*
 
-import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.http.v0.definitions
+import definitions.DamlValueEncoding.members.{CompactJson, ProtobufJson}
+import definitions.EventHistoryItem
+import definitions.UpdateHistoryItemV2.members.{
+  UpdateHistoryReassignment,
+  UpdateHistoryTransactionV2,
+}
+import definitions.UpdateHistoryReassignment.Event.members.{
+  UpdateHistoryAssignment,
+  UpdateHistoryUnassignment,
+}
 
 import scala.concurrent.duration.*
 import scala.util.Try
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.Port
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTest
@@ -33,130 +34,163 @@ class ScanEventHistoryIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
-        (updateAutomationConfig(ConfigurableApp.Validator)(
-          _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
-        ) andThen
-          updateAutomationConfig(ConfigurableApp.Sv)(
-            _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
-              .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
-          ))(config)
-      )
-      // Removed configurable groupWithin; using constant in ingestion
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.updateAllScanAppConfigs_(config =>
-          config.copy(
-            bftSequencers = Seq(
-              BftSequencerConfig(
-                config.domainMigrationId,
-                config.sequencerAdminClient,
-                "http://testUrl:8081",
-              )
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(
+            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
+              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
             ),
-            parameters =
-              config.parameters.copy(customTimeouts = config.parameters.customTimeouts.map {
-                // guaranteeing a timeout for first test below
-                case (key @ "getAcsSnapshot", _) =>
-                  key -> NonNegativeFiniteDuration.ofMillis(1L)
-                case other => other
-              }),
+            // Route mediator admin client via toxiproxy
+            mediatorAdminClient = scanConfig.mediatorAdminClient.copy(
+              port = Port.tryCreate(scanConfig.mediatorAdminClient.port.unwrap + 20000)
+            ),
           )
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
-      )
-      .withTrafficTopupsEnabled
 
-  "getEventHistory can provide new events with verdicts" in { implicit env =>
+  private val toxiproxy = UseToxiproxy(createMediatorProxies = true)
+  registerPlugin(toxiproxy)
+
+  private val pageLimit = 1000
+
+  "should provide new events with verdicts" in { implicit env =>
     initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val (aliceParty, _) = onboardAliceAndBob()
 
-    def cursorOf(item: definitions.EventHistoryItem): Option[(Long, String)] = {
-      val updateCursor: Option[(Long, String)] = item.update.flatMap {
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx) =>
-          Some((tx.migrationId, tx.recordTime))
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryReassignment(r) =>
-          r.event match {
-            case definitions.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(ev) =>
-              Some((ev.migrationId, r.recordTime))
-            case definitions.UpdateHistoryReassignment.Event.members
-                  .UpdateHistoryUnassignment(ev) =>
-              Some((ev.migrationId, r.recordTime))
-          }
-      }
-      updateCursor.orElse(item.verdict.map(v => (v.migrationId, v.recordTime)))
-    }
+    val cursorBeforeTap = eventuallySucceeds() { lastCursor() }
 
-    // Read and paginate all current events to obtain the last cursor
-    val lastCursorBeforeTap = eventuallySucceeds() {
-      @annotation.tailrec
-      def go(
-          after: Option[(Long, String)],
-          acc: Option[(Long, String)],
-      ): Option[(Long, String)] = {
-        val page = sv1ScanBackend.getEventHistory(
-          count = 100,
-          after = after,
-          encoding = definitions.DamlValueEncoding.CompactJson,
-        )
-        if (page.isEmpty) acc
-        else {
-          val next = page.lastOption.flatMap(cursorOf)
-          val newAcc = next.orElse(acc)
-          next match {
-            case Some(c) => go(Some(c), newAcc)
-            case None => newAcc
-          }
-        }
-      }
-      go(None, None).getOrElse((0L, ""))
-    }
-
-    // Before doing tap, using the lastCursorBeforeTap should be empty
-    val preTapTailEvents = sv1ScanBackend.getEventHistory(
-      count = 50,
-      after = Some(lastCursorBeforeTap),
-      encoding = definitions.DamlValueEncoding.CompactJson,
+    // Before doing tap, using the cursor should be empty
+    val eventHistoryAfterLastCursor = sv1ScanBackend.getEventHistory(
+      count = pageLimit,
+      after = Some(cursorBeforeTap),
+      encoding = CompactJson,
     )
-    preTapTailEvents shouldBe empty
+    eventHistoryAfterLastCursor shouldBe empty
 
     aliceWalletClient.tap(1)
 
     // Verify that new events are visible after the cursor
     eventually() {
-      val newEvents = sv1ScanBackend.getEventHistory(
-        count = 100,
-        after = Some(lastCursorBeforeTap),
-        encoding = definitions.DamlValueEncoding.CompactJson,
+      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTap))
+      eventHistory.nonEmpty shouldBe true
+
+      // Basic checks for page limit and encoding
+      val smallerLimit = eventHistory.size - 1
+      val withCompactEncoding = sv1ScanBackend.getEventHistory(
+        count = smallerLimit,
+        after = Some(cursorBeforeTap),
+        encoding = CompactJson,
       )
 
-      newEvents.nonEmpty shouldBe true
+      withCompactEncoding.size shouldBe smallerLimit
 
-      val txItems = newEvents.collect {
-        case item if item.update.exists {
-              case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(_) => true
-              case _ => false
-            } =>
-          item
-      }
+      val withProtobufEncoding = sv1ScanBackend.getEventHistory(
+        count = smallerLimit,
+        after = Some(cursorBeforeTap),
+        encoding = ProtobufJson,
+      )
 
-      val allTxHaveVerdicts = txItems.forall { item =>
-        item.update match {
-          case Some(definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx)) =>
-            item.verdict.exists(v => v.updateId == tx.updateId && v.recordTime == tx.recordTime)
-          case _ => false
+      withProtobufEncoding.size shouldBe smallerLimit
+
+      val txIdsCompact = withCompactEncoding
+        .collect {
+          case item if item.update.exists {
+                case UpdateHistoryTransactionV2(_) => true; case _ => false
+              } =>
+            item
         }
+        .flatMap(_.update)
+        .collect {
+          case UpdateHistoryTransactionV2(tx) => tx.updateId
+          case UpdateHistoryReassignment(r) => r.updateId
+        }
+        .toSet
+
+      val txIdsProtobuf = withProtobufEncoding
+        .collect {
+          case item if item.update.exists {
+                case UpdateHistoryTransactionV2(_) => true; case _ => false
+              } =>
+            item
+        }
+        .flatMap(_.update)
+        .collect {
+          case UpdateHistoryTransactionV2(tx) => tx.updateId
+          case UpdateHistoryReassignment(r) => r.updateId
+        }
+        .toSet
+
+      withClue("Mismatch between CompactJson and ProtobufJson update ids") {
+        txIdsProtobuf shouldBe txIdsCompact
       }
 
-      allTxHaveVerdicts shouldBe true
     }
   }
 
-  "getEventById returns valid event; 404 for invalid event" in { implicit env =>
+  "should resume verdict ingestion when mediator recovers" in { implicit env =>
+    initDsoWithSv1Only()
+
+    // Disable mediator admin connectivity via proxy before starting scan
+    toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
+
+    startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
+
+    val (aliceParty, _) = onboardAliceAndBob()
+
+    val cursorBefore = eventuallySucceeds() { lastCursor() }
+
+    // Also record wallet top event to derive updateIds for taps
+    val topBeforeO = aliceWalletClient
+      .listTransactions(beginAfterId = None, pageSize = 1)
+      .headOption
+      .map(_.eventId)
+
+    // Generate new updates while mediator ingestion is unavailable
+    aliceWalletClient.tap(5)
+    aliceWalletClient.tap(6)
+
+    // While mediator ingestion is down, history after cursor should be empty due to capping
+    eventually() {
+      val eventHistory = sv1ScanBackend.getEventHistory(
+        count = pageLimit,
+        after = Some(cursorBefore),
+        encoding = CompactJson,
+      )
+      eventHistory shouldBe empty
+    }
+
+    // Fetch the updateIds for the taps from wallet history
+    val expectedUpdateIds = eventuallySucceeds() {
+      val latest = aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10)
+      val newSinceTop = topBeforeO match {
+        case Some(prev) => latest.takeWhile(_.eventId != prev)
+        case None => latest
+      }
+      newSinceTop.size should be >= 2
+      newSinceTop.take(2).map(e => EventId.updateIdFromEventId(e.eventId)).toVector
+    }
+
+    // getEventById should return the update, but no verdicts while mediator is unavailable
+    expectedUpdateIds.foreach { id =>
+      val ev = sv1ScanBackend.getEventById(
+        id,
+        Some(CompactJson),
+      )
+      ev.update shouldBe defined
+      ev.verdict shouldBe empty
+    }
+
+    // Re-enable mediator connectivity and expect ingestion to resume
+    toxiproxy.enableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
+
+    eventually() {
+      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBefore))
+      eventHistory.nonEmpty shouldBe true
+    }
+  }
+
+  "should return event for valid updateId and 404 for missing updateId" in { implicit env =>
     initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
@@ -170,7 +204,7 @@ class ScanEventHistoryIntegrationTest
     // Create a new event (tap) and capture its update id from wallet transaction history
     aliceWalletClient.tap(4)
 
-    val tapTxId = eventuallySucceeds() {
+    val updateIdFromTap = eventuallySucceeds() {
       val latest = aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10)
       // Prefer the first new entry different from the previous top if available
       val candidateEventId = topBeforeO match {
@@ -186,8 +220,8 @@ class ScanEventHistoryIntegrationTest
     // Both update, and verdict should be returned
     eventually() {
       val eventById = sv1ScanBackend.getEventById(
-        tapTxId,
-        Some(definitions.DamlValueEncoding.CompactJson),
+        updateIdFromTap,
+        Some(CompactJson),
       )
       eventById.update shouldBe defined
       eventById.verdict shouldBe defined
@@ -198,58 +232,19 @@ class ScanEventHistoryIntegrationTest
     val failure = Try {
       sv1ScanBackend.getEventById(
         missingId,
-        Some(definitions.DamlValueEncoding.CompactJson),
+        Some(CompactJson),
       )
     }
     failure.isSuccess shouldBe false
   }
 
-  "resume verdict ingestion after scan restart without duplicates" in { implicit env =>
+  "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>
     initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val (aliceParty, _) = onboardAliceAndBob()
 
-    // Helper to compute the last cursor before generating new events
-    def cursorOf(item: definitions.EventHistoryItem): Option[(Long, String)] = {
-      val updateCursor: Option[(Long, String)] = item.update.flatMap {
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx) =>
-          Some((tx.migrationId, tx.recordTime))
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryReassignment(r) =>
-          r.event match {
-            case definitions.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(ev) =>
-              Some((ev.migrationId, r.recordTime))
-            case definitions.UpdateHistoryReassignment.Event.members
-                  .UpdateHistoryUnassignment(ev) =>
-              Some((ev.migrationId, r.recordTime))
-          }
-      }
-      updateCursor.orElse(item.verdict.map(v => (v.migrationId, v.recordTime)))
-    }
-
-    val lastCursorBefore = eventuallySucceeds() {
-      @annotation.tailrec
-      def go(
-          after: Option[(Long, String)],
-          acc: Option[(Long, String)],
-      ): Option[(Long, String)] = {
-        val page = sv1ScanBackend.getEventHistory(
-          count = 100,
-          after = after,
-          encoding = definitions.DamlValueEncoding.CompactJson,
-        )
-        if (page.isEmpty) acc
-        else {
-          val next = page.lastOption.flatMap(cursorOf)
-          val newAcc = next.orElse(acc)
-          next match {
-            case Some(c) => go(Some(c), newAcc)
-            case None => newAcc
-          }
-        }
-      }
-      go(None, None).getOrElse((0L, ""))
-    }
+    val cursorBeforeRestart = eventuallySucceeds() { lastCursor() }
 
     // Also record wallet top eventId to derive updateIds for taps deterministically
     val topBeforeAll = aliceWalletClient
@@ -263,28 +258,14 @@ class ScanEventHistoryIntegrationTest
 
     // Ensure those initial taps have verdicts attached after the baseline cursor
     eventually() {
-      val events = sv1ScanBackend.getEventHistory(
-        count = 100,
-        after = Some(lastCursorBefore),
-        encoding = definitions.DamlValueEncoding.CompactJson,
-      )
-      val txItems = events.collect {
+      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
+      val txItems = eventHistory.collect {
         case item if item.update.exists {
-              case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(_) => true
-              case _ => false
+              case UpdateHistoryTransactionV2(_) => true; case _ => false
             } =>
           item
       }
       txItems.size should be >= 2
-      // Each tx should have a matching verdict
-      val allTxHaveVerdicts = txItems.forall { item =>
-        item.update match {
-          case Some(definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx)) =>
-            item.verdict.exists(v => v.updateId == tx.updateId && v.recordTime == tx.recordTime)
-          case _ => false
-        }
-      }
-      allTxHaveVerdicts shouldBe true
     }
 
     // Stop scan to pause ingestion, wait until fully stopped
@@ -314,32 +295,93 @@ class ScanEventHistoryIntegrationTest
 
     // Verify: contains all expected updateIds, no duplicates, and verdicts attached
     eventually() {
-      val events = sv1ScanBackend.getEventHistory(
-        count = 200,
-        after = Some(lastCursorBefore),
-        encoding = definitions.DamlValueEncoding.CompactJson,
-      )
-      val txItems = events.collect {
+      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
+      val txItems = eventHistory.collect {
         case item if item.update.exists {
-              case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(_) => true
-              case _ => false
+              case UpdateHistoryTransactionV2(_) => true; case _ => false
             } =>
           item
       }
       val ids = txItems.flatMap(_.update).collect {
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx) => tx.updateId
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryReassignment(r) => r.updateId
+        case UpdateHistoryTransactionV2(tx) => tx.updateId
+        case UpdateHistoryReassignment(r) => r.updateId
       }
       expectedUpdateIds.toSet.subsetOf(ids.toSet) shouldBe true
       ids.distinct.size shouldBe ids.size // no duplicates
-      val allTxHaveVerdicts = txItems.forall { item =>
-        item.update match {
-          case Some(definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx)) =>
-            item.verdict.exists(v => v.updateId == tx.updateId && v.recordTime == tx.recordTime)
-          case _ => false
+    }
+  }
+
+  // Fetch events and assert every tx update has a matching verdict
+  private def getEventHistoryAndCheckTxVerdicts(after: Option[(Long, String)])(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val eventHistory = sv1ScanBackend.getEventHistory(
+      count = pageLimit,
+      after = after,
+      encoding = CompactJson,
+    )
+
+    val txItems = eventHistory.collect {
+      case item if item.update.exists {
+            case UpdateHistoryTransactionV2(_) => true; case _ => false
+          } =>
+        item
+    }
+
+    val missing = txItems.flatMap { item =>
+      item.update match {
+        case Some(UpdateHistoryTransactionV2(tx))
+            if !item.verdict
+              .exists(v => v.updateId == tx.updateId && v.recordTime == tx.recordTime) =>
+          Some(tx.updateId)
+        case _ => None
+      }
+    }
+
+    withClue("Update events with missing verdict: " + missing.mkString(",")) {
+      missing shouldBe empty
+    }
+
+    eventHistory
+  }
+
+  // Obtain last (migrationId, recordTime) provided by the event stream
+  private def lastCursor(startAfter: Option[(Long, String)] = None)(implicit
+      env: SpliceTestConsoleEnvironment
+  ): (Long, String) = {
+    @annotation.tailrec
+    def go(after: Option[(Long, String)], acc: Option[(Long, String)]): Option[(Long, String)] = {
+      val page = sv1ScanBackend.getEventHistory(
+        count = pageLimit,
+        after = after,
+        encoding = CompactJson,
+      )
+      if (page.isEmpty) acc
+      else {
+        val next = page.lastOption.flatMap(cursorOf)
+        val newAcc = next.orElse(acc)
+        next match {
+          case Some(c) => go(Some(c), newAcc)
+          case None => newAcc
         }
       }
-      allTxHaveVerdicts shouldBe true
     }
+    go(startAfter, None).getOrElse((0L, ""))
+  }
+
+  // (migrationId, recordTime) for an event item
+  private def cursorOf(item: EventHistoryItem): Option[(Long, String)] = {
+    val updateCursor: Option[(Long, String)] = item.update.flatMap {
+      case UpdateHistoryTransactionV2(tx) =>
+        Some((tx.migrationId, tx.recordTime))
+      case UpdateHistoryReassignment(r) =>
+        r.event match {
+          case UpdateHistoryAssignment(ev) =>
+            Some((ev.migrationId, r.recordTime))
+          case UpdateHistoryUnassignment(ev) =>
+            Some((ev.migrationId, r.recordTime))
+        }
+    }
+    updateCursor.orElse(item.verdict.map(v => (v.migrationId, v.recordTime)))
   }
 }
