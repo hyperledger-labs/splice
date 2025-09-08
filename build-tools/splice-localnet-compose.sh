@@ -16,8 +16,7 @@ SCRIPTNAME=${0##*/}
 LOCALNET_DIR="${SPLICE_ROOT}/cluster/compose/localnet"
 export LOCALNET_DIR
 
-IMAGE_TAG=0.4.16-peterkvokacka-dirty
-#$("${SPLICE_ROOT}/build-tools/get-snapshot-version")
+IMAGE_TAG=$("${SPLICE_ROOT}/build-tools/get-snapshot-version")
 export IMAGE_TAG
 IMAGE_REPO=""
 export IMAGE_REPO
