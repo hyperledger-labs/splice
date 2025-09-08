@@ -293,6 +293,7 @@ class ValidatorApp(
                   clock,
                   participantAdminConnection,
                   loggerFactory,
+                  config.latestPackagesOnly,
                 )
                 _ <- packageVetting.vetCurrentPackages(domainId, amuletRules)
               } yield ()
@@ -850,6 +851,7 @@ class ValidatorApp(
         initialSynchronizerTime,
         config.maxVettingDelay,
         config.parameters,
+        config.latestPackagesOnly,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

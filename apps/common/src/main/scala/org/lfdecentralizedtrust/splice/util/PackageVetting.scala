@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.{IdString, PackageVersion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -25,6 +25,7 @@ class PackageVetting(
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
     override val loggerFactory: NamedLoggerFactory,
+    latestPackagesOnly: Boolean,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with Spanning {
@@ -40,6 +41,7 @@ class PackageVetting(
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResources
         .lookupAllPackageVersions(pkg.packageName)
+//        .filter(r => r.metadata.version == packageVersion || !latestPackagesOnly && r.metadata.version < packageVersion)
         .filter(_.metadata.version <= packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
@@ -116,7 +118,21 @@ class PackageVetting(
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
   )(implicit tc: TraceContext): Future[Unit] = {
     logger.debug(s"Vetting packages: ${packages.mkString(", ")} on $domainId valid from $validFrom")
-    val resources = packages.flatMap { case (pkg, packageVersion) =>
+    val packagesToProcess = if (latestPackagesOnly) {
+        val res = packages.foldLeft(Map.empty[IdString.PackageName, (PackageIdResolver.Package, PackageVersion)]) {
+          case (acc, (pkg, version)) =>
+            acc.get(pkg.packageName) match {
+              case Some((_, existingVersion)) =>
+                if (version > existingVersion) acc.updated(pkg.packageName, (pkg, version))
+                else acc
+              case None => acc.updated(pkg.packageName, (pkg, version))
+            }
+
+          }.values.toSeq
+      logger.debug(s"Vetting only the latest packages: ${res.mkString(", ")} on $domainId valid from $validFrom")
+      res
+    } else packages
+    val resources = packagesToProcess.flatMap { case (pkg, packageVersion) =>
       // Upload the version required by current config, and log an error if it is not part of the deployed release
       DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {
         case None =>
