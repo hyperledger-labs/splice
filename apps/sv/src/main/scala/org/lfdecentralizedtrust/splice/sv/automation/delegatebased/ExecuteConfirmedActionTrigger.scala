@@ -140,7 +140,7 @@ class ExecuteConfirmedActionTrigger(
                       )
                       res <- for {
                         outcome <- svTaskContext
-                          .connection(SpliceLedgerConnectionPriority.Medium)
+                          .connection(SpliceLedgerConnectionPriority.High)
                           .submit(
                             Seq(store.key.svParty),
                             Seq(store.key.dsoParty),

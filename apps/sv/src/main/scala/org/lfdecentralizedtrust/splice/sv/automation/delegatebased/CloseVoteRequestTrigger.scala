@@ -47,7 +47,7 @@ class CloseVoteRequestTrigger(
       amuletRulesId = amuletRules.contractId
       res <- for {
         outcome <- svTaskContext
-          .connection(SpliceLedgerConnectionPriority.Low)
+          .connection(SpliceLedgerConnectionPriority.High)
           .submit(
             Seq(store.key.svParty),
             Seq(store.key.dsoParty),

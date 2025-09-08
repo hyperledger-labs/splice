@@ -48,11 +48,11 @@ final case class CircuitBreakersConfig(
     ),
     mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
       maxFailures = 10,
-      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(5),
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
     ),
     lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
       maxFailures = 5,
-      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(10),
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),
 )
 
