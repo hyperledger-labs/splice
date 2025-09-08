@@ -8,7 +8,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
 }
-import org.lfdecentralizedtrust.splice.config.{AutomationConfig, PeriodicBackupDumpConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  AutomationConfig,
+  PeriodicBackupDumpConfig,
+  SpliceParametersConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -37,6 +41,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
@@ -70,6 +75,7 @@ class ValidatorAutomationService(
     contactPoint: String,
     initialSynchronizerTime: Option[CantonTimestamp],
     maxVettingDelay: NonNegativeFiniteDuration,
+    params: SpliceParametersConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -85,23 +91,38 @@ class ValidatorAutomationService(
       retryProvider,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
 
   walletManagerOpt.foreach { walletManager =>
-    registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
+    registerTrigger(
+      new WalletAppInstallTrigger(
+        triggerContext,
+        walletManager,
+        connection(
+          SpliceLedgerConnectionPriority.Low
+        ),
+      )
+    )
     registerTrigger(
       new ValidatorRightTrigger(
         triggerContext,
         walletManager.externalPartyWalletManager,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Medium),
         participantAdminConnection,
       )
     )
 
-    registerTrigger(new OffboardUserPartyTrigger(triggerContext, walletManager, connection))
+    registerTrigger(
+      new OffboardUserPartyTrigger(
+        triggerContext,
+        walletManager,
+        connection(SpliceLedgerConnectionPriority.Medium),
+      )
+    )
 
     registerTrigger(
       new AcceptTransferPreapprovalProposalTrigger(
@@ -130,7 +151,7 @@ class ValidatorAutomationService(
           store,
           walletManager,
           validatorTopupConfig,
-          connection,
+          connection(SpliceLedgerConnectionPriority.Medium),
           clock,
         )
       )
@@ -151,7 +172,7 @@ class ValidatorAutomationService(
             .focus(_.config.pollingInterval)
             .replace(triggerContext.config.topupTriggerPollingInterval_),
           store,
-          connection,
+          connection(SpliceLedgerConnectionPriority.High),
           participantAdminConnection,
           validatorTopupConfig,
           grpcDeadline,
@@ -168,7 +189,7 @@ class ValidatorAutomationService(
         scanConnection,
         store,
         walletManager.externalPartyWalletManager,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Medium),
       )
     )
   }
@@ -207,7 +228,7 @@ class ValidatorAutomationService(
   registerTrigger(
     new ValidatorLicenseMetadataTrigger(
       triggerContext,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
       store,
       contactPoint,
     )
@@ -216,7 +237,7 @@ class ValidatorAutomationService(
   registerTrigger(
     new ValidatorLicenseActivityTrigger(
       triggerContext,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
       store,
     )
   )
@@ -231,7 +252,7 @@ class ValidatorAutomationService(
         new DecentralizedSynchronizerMigrationTrigger(
           domainMigrationId,
           triggerContext,
-          connection,
+          connection(SpliceLedgerConnectionPriority.Medium),
           participantAdminConnection,
           path,
           scanConnection,

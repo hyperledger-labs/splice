@@ -22,6 +22,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.PageLimit
 
 import java.util.Optional
@@ -180,7 +181,8 @@ class ExpireRewardCouponsTrigger(
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>
-          svTaskContext.connection
+          svTaskContext
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(store.key.svParty),
               Seq(store.key.dsoParty),

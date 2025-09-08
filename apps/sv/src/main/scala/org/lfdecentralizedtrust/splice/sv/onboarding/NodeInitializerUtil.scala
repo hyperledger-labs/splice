@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
 }
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -215,7 +216,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                     rulesAndState,
                     newSvNodeConfig,
                     dsoStore,
-                    dsoAutomation.connection,
+                    dsoAutomation.connection(SpliceLedgerConnectionPriority.High),
                   )
                 } yield ()
               }

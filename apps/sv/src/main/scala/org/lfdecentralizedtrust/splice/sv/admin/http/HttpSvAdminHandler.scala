@@ -65,6 +65,7 @@ import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesC
 import org.lfdecentralizedtrust.splice.migration.ParticipantUsersDataExporter
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
 import java.time.Instant
@@ -499,7 +500,7 @@ class HttpSvAdminHandler(
                 DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
-                    svStoreWithIngestion.connection,
+                    svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
                     participantAdminConnection,
                     synchronizerNode,
                     loggerFactory,
@@ -539,7 +540,9 @@ class HttpSvAdminHandler(
     val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
       for {
-        participantUsersData <- new ParticipantUsersDataExporter(svStoreWithIngestion.connection)
+        participantUsersData <- new ParticipantUsersDataExporter(
+          svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Medium)
+        )
           .exportParticipantUsersData()
       } yield domainDataSnapshotGenerator
         .getDomainDataSnapshot(
@@ -632,7 +635,7 @@ class HttpSvAdminHandler(
                 dump <- DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
-                    svStoreWithIngestion.connection,
+                    svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
                     participantAdminConnection,
                     synchronizerNode,
                     loggerFactory,
