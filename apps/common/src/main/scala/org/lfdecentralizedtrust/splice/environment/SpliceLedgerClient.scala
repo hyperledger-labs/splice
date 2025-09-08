@@ -11,7 +11,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.CircuitBreaker
 import org.lfdecentralizedtrust.splice.admin.api.client.{
   ApiClientRequestLogger,
   GrpcClientMetrics,
@@ -19,6 +18,7 @@ import org.lfdecentralizedtrust.splice.admin.api.client.{
 }
 import org.lfdecentralizedtrust.splice.auth.AuthToken
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
+import org.lfdecentralizedtrust.splice.util.SpliceCircuitBreaker
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -104,7 +104,7 @@ class SpliceLedgerClient(
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
-      circuitBreaker: CircuitBreaker,
+      circuitBreaker: SpliceCircuitBreaker,
       completionOffsetCallback: Long => Future[Unit] = _ => Future.unit,
   ): SpliceLedgerConnection =
     new SpliceLedgerConnection(
