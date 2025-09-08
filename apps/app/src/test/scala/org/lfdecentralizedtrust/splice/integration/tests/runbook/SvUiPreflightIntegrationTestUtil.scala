@@ -112,7 +112,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
               val firstSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
               firstSecret should not be oldFirstSecret
               inside(firstSecret) { case Some(s) =>
-                s should have size 44
+                s should have size 216
               }
             },
           )
