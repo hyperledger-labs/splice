@@ -30,10 +30,7 @@ import {
  * Note also that the functions are ordered, and each function may refer only to functions defined earlier.
  */
 
-const as_of_args = [
-  new BQFunctionArgument('as_of_record_time', TIMESTAMP),
-  new BQFunctionArgument('migration_id', INT64),
-];
+const as_of_args = [new BQFunctionArgument('as_of_record_time', TIMESTAMP)];
 
 const iso_timestamp = new BQScalarFunction(
   'iso_timestamp',
@@ -107,33 +104,53 @@ const daml_record_numeric = new BQScalarFunction(
         \`$$FUNCTIONS_DATASET$$.daml_record_path\`(path, 'numeric')))`
 );
 
+const migration_id_at_time = new BQScalarFunction(
+  'migration_id_at_time',
+  [new BQFunctionArgument('as_of_record_time', TIMESTAMP)],
+  INT64,
+  `
+    -- Given a record time, find the latest migration ID that was active at that time. Takes the lowest ID that has updates
+    -- after the given time, therefore if the timestamp is during a migration, it will return the older migration ID.
+    -- If no updates exist after the given time, returns the migration id of the last update.
+    IFNULL
+    ((SELECT
+      MIN(migration_id)
+    FROM
+      ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
+      (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+    WHERE record_time > UNIX_MICROS(as_of_record_time)),
+      (SELECT migration_id FROM
+        ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
+        (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
+        ORDER BY record_time DESC LIMIT 1)
+    )
+  `
+);
+
 const in_time_window = new BQScalarFunction(
   'in_time_window',
   [
     new BQFunctionArgument('start_record_time', TIMESTAMP), // can be NULL for no lower bound
-    new BQFunctionArgument('start_migration_id', INT64), // can be NULL for no lower bound
     new BQFunctionArgument('up_to_record_time', TIMESTAMP),
-    new BQFunctionArgument('up_to_migration_id', INT64),
     new BQFunctionArgument('record_time', INT64),
     new BQFunctionArgument('migration_id', INT64),
   ],
   BOOL,
   `
     CASE
-      WHEN start_record_time IS NULL AND start_migration_id IS NULL THEN
-        (migration_id < up_to_migration_id
-            OR (migration_id = up_to_migration_id
+      WHEN start_record_time IS NULL THEN
+        (migration_id < \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(up_to_record_time)
+            OR (migration_id = \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(up_to_record_time)
               AND record_time <= UNIX_MICROS(up_to_record_time)))
           AND record_time != -62135596800000000
-      WHEN start_record_time IS NOT NULL AND start_migration_id IS NOT NULL THEN
-        (migration_id > start_migration_id
-            OR (migration_id = start_migration_id
+      ELSE
+        (migration_id > \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(start_record_time)
+            OR (migration_id = \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(start_record_time)
               AND record_time >= UNIX_MICROS(start_record_time)))
-          AND (migration_id < up_to_migration_id
-            OR (migration_id = up_to_migration_id
+          AND (migration_id < \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(up_to_record_time)
+            OR (migration_id = \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(up_to_record_time)
               AND record_time <= UNIX_MICROS(up_to_record_time)))
           AND record_time != -62135596800000000
-      ELSE ERROR('in_time_window: start_record_time and start_migration_id must be both NULL or both NOT NULL')
     END
   `
 );
@@ -142,29 +159,12 @@ const up_to_time = new BQScalarFunction(
   'up_to_time',
   [
     new BQFunctionArgument('up_to_record_time', TIMESTAMP),
-    new BQFunctionArgument('up_to_migration_id', INT64),
     new BQFunctionArgument('record_time', INT64),
     new BQFunctionArgument('migration_id', INT64),
   ],
   BOOL,
   `
-    \`$$FUNCTIONS_DATASET$$.in_time_window\`(NULL, NULL, up_to_record_time, up_to_migration_id, record_time, migration_id)
-  `
-);
-
-const migration_id_at_time = new BQScalarFunction(
-  'migration_id_at_time',
-  [new BQFunctionArgument('as_of_record_time', TIMESTAMP)],
-  INT64,
-  `
-    -- Given a record time, find the latest migration ID that was active at that time. Takes the lowest ID that has updates
-    -- after the given time, therefore if the timestamp is during a migration, it will return the older migration ID.
-    (SELECT
-      MIN(migration_id)
-    FROM
-      ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION DISTINCT
-      (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
-    WHERE record_time > UNIX_MICROS(as_of_record_time))
+    \`$$FUNCTIONS_DATASET$$.in_time_window\`(NULL, up_to_record_time, record_time, migration_id)
   `
 );
 
@@ -175,7 +175,6 @@ const sum_bignumeric_acs = new BQScalarFunction(
     new BQFunctionArgument('module_name', STRING),
     new BQFunctionArgument('entity_name', STRING),
     new BQFunctionArgument('as_of_record_time', TIMESTAMP),
-    new BQFunctionArgument('migration_id', INT64),
   ],
   BIGNUMERIC,
   `
@@ -192,17 +191,14 @@ const sum_bignumeric_acs = new BQScalarFunction(
       FROM
         \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
       WHERE
-        (e.migration_id < migration_id
-          OR (e.migration_id = migration_id
-            AND e.record_time <= UNIX_MICROS(as_of_record_time)))
+        \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id)
         AND e.consuming
         AND e.template_id_module_name = module_name
         AND e.template_id_entity_name = entity_name
         AND e.contract_id = c.contract_id)
       AND c.template_id_module_name = module_name
       AND c.template_id_entity_name = entity_name
-      AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id,
-            c.record_time, c.migration_id))
+      AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, c.record_time, c.migration_id))
   `
 );
 
@@ -216,8 +212,7 @@ const locked = new BQScalarFunction(
       [0, 2, 0],
       'Splice.Amulet',
       'LockedAmulet',
-      as_of_record_time,
-      migration_id)
+      as_of_record_time)
   `
 );
 
@@ -231,8 +226,7 @@ const unlocked = new BQScalarFunction(
       [2, 0],
       'Splice.Amulet',
       'Amulet',
-      as_of_record_time,
-      migration_id)
+      as_of_record_time)
   `
 );
 
@@ -246,8 +240,7 @@ const unminted = new BQScalarFunction(
       [1],
       'Splice.Amulet',
       'UnclaimedReward',
-      as_of_record_time,
-      migration_id)
+      as_of_record_time)
   `
 );
 
@@ -310,8 +303,7 @@ const minted = new BQScalarFunction(
             OR (e.choice = 'TransferPreapproval_Renew'
                 AND e.template_id_entity_name = 'TransferPreapproval'))
         AND e.template_id_module_name = 'Splice.AmuletRules'
-        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id,
-              e.record_time, e.migration_id))
+        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id))
   `
 );
 
@@ -362,10 +354,7 @@ const result_burn = new BQScalarFunction(
 
 const burned = new BQScalarFunction(
   'burned',
-  [
-    new BQFunctionArgument('as_of_record_time', TIMESTAMP),
-    new BQFunctionArgument('migration_id_arg', INT64),
-  ],
+  [new BQFunctionArgument('as_of_record_time', TIMESTAMP)],
   BIGNUMERIC,
   `
     (SELECT SUM(fees)
@@ -384,8 +373,7 @@ const burned = new BQScalarFunction(
                         OR (e.choice = 'TransferPreapproval_Renew'
                             AND e.template_id_entity_name = 'TransferPreapproval'))
                   AND e.template_id_module_name = 'Splice.AmuletRules'
-                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id_arg,
-                          e.record_time, e.migration_id))
+                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id))
             UNION ALL (-- Purchasing ANS Entries
                 SELECT
                     SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([2, 0], 'numeric')))) fees -- .amount.initialAmount
@@ -402,9 +390,8 @@ const burned = new BQScalarFunction(
                   AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
                   AND c.template_id_module_name = 'Splice.Amulet'
                   AND c.template_id_entity_name = 'Amulet'
-                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id_arg,
-                        e.record_time, e.migration_id)
-                  AND c.record_time != -62135596800000000)))
+                  AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id)
+                )))
   `
 );
 
@@ -420,7 +407,7 @@ const amulet_holders = new BQTableFunction(
       WHERE c.package_name = "splice-amulet"
         AND c.template_id_module_name = "Splice.Amulet"
         AND c.template_id_entity_name = "Amulet"
-        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id, c.record_time, c.migration_id)
+        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, c.record_time, c.migration_id)
       QUALIFY ROW_NUMBER() OVER (PARTITION BY owner ORDER BY created_at DESC) = 1
   `
 );
@@ -430,7 +417,7 @@ const num_amulet_holders = new BQScalarFunction(
   as_of_args,
   INT64,
   `
-    (SELECT COUNT(*) as num_amulet_holders FROM \`$$FUNCTIONS_DATASET$$.amulet_holders\`(as_of_record_time, migration_id))
+    (SELECT COUNT(*) as num_amulet_holders FROM \`$$FUNCTIONS_DATASET$$.amulet_holders\`(as_of_record_time))
   `
 );
 
@@ -451,7 +438,7 @@ const all_validators = new BQTableFunction(
       WHERE c.package_name = "splice-amulet"
         AND c.template_id_module_name = "Splice.ValidatorLicense"
         AND c.template_id_entity_name = "ValidatorLicense"
-        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id, c.record_time, c.migration_id)
+        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, c.record_time, c.migration_id)
   `
 );
 
@@ -461,7 +448,7 @@ const num_active_validators = new BQScalarFunction(
   INT64,
   `
     (SELECT COUNT(*) as num_active_validators
-      FROM \`$$FUNCTIONS_DATASET$$.all_validators\`(as_of_record_time, migration_id) v
+      FROM \`$$FUNCTIONS_DATASET$$.all_validators\`(as_of_record_time) v
       WHERE v.latest_validator_license > TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR))
   `
 );
@@ -477,13 +464,13 @@ const one_day_updates = new BQTableFunction(
           update_id,
           record_time
         FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
-        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), migration_id, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, e.record_time, e.migration_id)
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), e.record_time, e.migration_id)
       UNION ALL
         SELECT
           update_id,
           record_time
         FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
-        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), migration_id, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, c.record_time, c.migration_id)
+        WHERE \`$$FUNCTIONS_DATASET$$.in_time_window\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), c.record_time, c.migration_id)
     )
   `
 );
@@ -494,7 +481,7 @@ const average_tps = new BQScalarFunction(
   FLOAT64,
   `
     (SELECT COUNT(*) / 86400.0
-      FROM \`$$FUNCTIONS_DATASET$$.one_day_updates\`(as_of_record_time, migration_id)
+      FROM \`$$FUNCTIONS_DATASET$$.one_day_updates\`(as_of_record_time)
     )
   `
 );
@@ -509,7 +496,7 @@ const peak_tps = new BQScalarFunction(
     FROM (
       SELECT
         COUNT(*) as events_per_minute
-      FROM \`$$FUNCTIONS_DATASET$$.one_day_updates\`(as_of_record_time, migration_id)
+      FROM \`$$FUNCTIONS_DATASET$$.one_day_updates\`(as_of_record_time)
       GROUP BY TIMESTAMP_TRUNC(TIMESTAMP_MICROS(record_time), MINUTE)
     )
   )
@@ -538,19 +525,19 @@ const all_stats = new BQTableFunction(
   `
     SELECT
       as_of_record_time,
-      migration_id,
-      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) as locked,
-      \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as unlocked,
-      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as current_supply_total,
-      \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) as minted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id), 0) as burned,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))), 0) as monthly_burn,
-      \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
-      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id), 0.0) as average_tps,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id), 0.0) as peak_tps
+      \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(as_of_record_time) as migration_id,
+      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time) as locked,
+      \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time) as unlocked,
+      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time) as current_supply_total,
+      \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as unminted,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time) as minted,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as allowed_mint,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time), 0) as burned,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY)), 0) as monthly_burn,
+      \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time) as num_amulet_holders,
+      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time) as num_active_validators,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time), 0.0) as average_tps,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time), 0.0) as peak_tps
   `
 );
 
@@ -615,8 +602,7 @@ const fill_all_stats = new BQProcedure(
       DELETE FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\` WHERE as_of_record_time = t.as_of_record_time;
 
       INSERT INTO \`$$DASHBOARDS_DATASET$$.dashboards-data\`
-        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(t.as_of_record_time));
-
+        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time);
     END FOR;
   `
 );
@@ -626,9 +612,9 @@ export const allScanFunctions = [
   daml_prim_path,
   daml_record_path,
   daml_record_numeric,
+  migration_id_at_time,
   in_time_window,
   up_to_time,
-  migration_id_at_time,
   sum_bignumeric_acs,
   locked,
   unlocked,
