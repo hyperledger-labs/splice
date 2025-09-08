@@ -286,9 +286,12 @@ const choice_result_TransferSummary = new BQScalarFunction(
   `
 );
 
-const minted = new BQScalarFunction(
-  'minted',
-  as_of_args,
+const minted_in_time_window = new BQScalarFunction(
+  'minted_in_time_window',
+  [
+    new BQFunctionArgument('start_record_time', TIMESTAMP),
+    new BQFunctionArgument('as_of_record_time', TIMESTAMP),
+  ],
   BIGNUMERIC,
   `
     (SELECT
@@ -307,7 +310,7 @@ const minted = new BQScalarFunction(
             OR (e.choice = 'TransferPreapproval_Renew'
                 AND e.template_id_entity_name = 'TransferPreapproval'))
         AND e.template_id_module_name = 'Splice.AmuletRules'
-        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, e.record_time, e.migration_id))
+        AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(start_record_time, as_of_record_time, e.record_time, e.migration_id))
   `
 );
 
@@ -518,6 +521,7 @@ const all_stats = new BQTableFunction(
     new BQColumn('unlocked', BIGNUMERIC),
     new BQColumn('current_supply_total', BIGNUMERIC),
     new BQColumn('unminted', BIGNUMERIC),
+    new BQColumn('daily_mint', BIGNUMERIC),
     new BQColumn('minted', BIGNUMERIC),
     new BQColumn('allowed_mint', BIGNUMERIC),
     new BQColumn('burned', BIGNUMERIC),
@@ -535,7 +539,8 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time) as unlocked,
       \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time) as current_supply_total,
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as unminted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time) as minted,
+      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(as_of_record_time, TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)) as daily_mint,
+      \`$$FUNCTIONS_DATASET$$.minted_in_time_window\`(NULL, as_of_record_time) as minted,
       \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time) as allowed_mint,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time), 0) as burned,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY)), 0) as monthly_burn,
@@ -626,7 +631,7 @@ export const allScanFunctions = [
   unminted,
   TransferSummary_minted,
   choice_result_TransferSummary,
-  minted,
+  minted_in_time_window,
   transferresult_fees,
   result_burn,
   burned,

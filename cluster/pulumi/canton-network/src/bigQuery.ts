@@ -215,6 +215,7 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
         { name: 'unlocked', type: 'BIGNUMERIC' },
         { name: 'current_supply_total', type: 'BIGNUMERIC' },
         { name: 'unminted', type: 'BIGNUMERIC' },
+        { name: 'daily_minted', type: 'BIGNUMERIC' },
         { name: 'minted', type: 'BIGNUMERIC' },
         { name: 'allowed_mint', type: 'BIGNUMERIC' },
         { name: 'burned', type: 'BIGNUMERIC' },
