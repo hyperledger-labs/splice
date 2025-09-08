@@ -11,8 +11,7 @@ Alternative Docker Compose Deployment
 .. warning::
 
    This section features solutions shared by community members. 
-   While they haven’t been formally tested by the Splice maintainers, 
-   users are encouraged to verify the information independently. 
+   While they haven’t been formally tested by the Splice maintainers, users are encouraged to verify the information independently. 
    Contributions to enhance accuracy and completeness are always welcome.
 
 This guide introduces a community-contributed Docker Compose solution for deploying Canton validator nodes and supporting infrastructure, following the ``x-docker`` standard used by Mario Delgado’s team for onboarding blockchains.
