@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { LedgerApiClient } from "./ledger-api-client.js";
 import * as crypto from "node:crypto";
 import { Command, DisclosedContract } from "canton-json-api-v2-openapi";
