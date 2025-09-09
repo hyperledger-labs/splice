@@ -138,15 +138,15 @@ const in_time_window = new BQScalarFunction(
       WHEN start_record_time IS NULL AND start_migration_id IS NULL THEN
         (migration_id < up_to_migration_id
             OR (migration_id = up_to_migration_id
-              AND record_time < UNIX_MICROS(up_to_record_time)))
+              AND record_time <= UNIX_MICROS(up_to_record_time)))
           AND record_time != -62135596800000000
       WHEN start_record_time IS NOT NULL AND start_migration_id IS NOT NULL THEN
         (migration_id > start_migration_id
             OR (migration_id = start_migration_id
-              AND record_time >= UNIX_MICROS(start_record_time)))
+              AND record_time > UNIX_MICROS(start_record_time)))
           AND (migration_id < up_to_migration_id
             OR (migration_id = up_to_migration_id
-              AND record_time < UNIX_MICROS(up_to_record_time)))
+              AND record_time <= UNIX_MICROS(up_to_record_time)))
           AND record_time != -62135596800000000
       ELSE ERROR('in_time_window: start_record_time and start_migration_id must be both NULL or both NOT NULL')
     END
