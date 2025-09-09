@@ -49,6 +49,30 @@ export class BQArray extends BQType {
   }
 }
 
+export class BQStruct extends BQType {
+  private readonly structTypes: { name: string; type: BQType }[];
+  public constructor(structTypes: { name: string; type: BQType }[]) {
+    super();
+    this.structTypes = structTypes;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public toPulumi(): any {
+    return {
+      typeKind: 'STRUCT',
+      structType: {
+        fields: this.structTypes.map(st => ({
+          name: st.name,
+          type: st.type.toPulumi(),
+        })),
+      },
+    };
+  }
+
+  public toSql(): string {
+    return `STRUCT<${this.structTypes.map(st => `${st.name} ${st.type.toSql()}`).join(', ')}>`;
+  }
+}
+
 export class BQFunctionArgument {
   private readonly name: string;
   private readonly type: BQType;

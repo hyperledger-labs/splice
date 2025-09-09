@@ -62,7 +62,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private val functionsDatasetName = s"functions_$uuid"
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("2587519.0258740704")
+  private val mintedAppRewardsAmount = BigDecimal(0)
+  private val mintedValidatorRewardsAmount = BigDecimal("152207.0015220704")
+  private val mintedSvRewardsAmount = BigDecimal("2435312.024352")
+  private val mintedUnclaimedsAmount = BigDecimal(0)
+  private val mintedAmount =
+    mintedAppRewardsAmount + mintedValidatorRewardsAmount + mintedSvRewardsAmount + mintedUnclaimedsAmount
   private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
   private val lockedAmount = BigDecimal("5000")
   private val burnedAmount = BigDecimal("60032.83108")
@@ -539,8 +544,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
       unlocked: BigDecimal,
       currentSupplyTotal: BigDecimal,
       unminted: BigDecimal,
-      minted: BigDecimal,
-      allowedMint: BigDecimal,
+      mintedAppRewards: BigDecimal,
+      mintedValidatorRewards: BigDecimal,
+      mintedSvRewards: BigDecimal,
+      mintedUnclaimed: BigDecimal,
       burned: BigDecimal,
       numAmuletHolders: Long,
       numActiveValidators: Long,
@@ -577,9 +584,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
       unlocked = bd("unlocked"),
       currentSupplyTotal = bd("current_supply_total"),
       unminted = bd("unminted"),
-      minted = bd("minted"),
-      allowedMint = bd("allowed_mint"),
-      burned = bd("burned"),
+      mintedAppRewards = bd("daily_mint_app_rewards"),
+      mintedValidatorRewards = bd("daily_mint_validator_rewards"),
+      mintedSvRewards = bd("daily_mint_sv_rewards"),
+      mintedUnclaimed = bd("daily_mint_unclaimed_activity_records"),
+      burned = bd("daily_burn"),
       numAmuletHolders = int("num_amulet_holders"),
       numActiveValidators = int("num_active_validators"),
       avgTps = float("average_tps"),
@@ -592,13 +601,15 @@ class ScanTotalSupplyBigQueryIntegrationTest
     forEvery(
       Seq(
         // base metrics
-        ("minted", results.minted, mintedAmount),
+        ("minted_appRewards", results.mintedAppRewards, mintedAppRewardsAmount),
+        ("minted_validatorRewards", results.mintedValidatorRewards, mintedValidatorRewardsAmount),
+        ("minted_svRewards", results.mintedSvRewards, mintedSvRewardsAmount),
+        ("minted_unclaimed", results.mintedUnclaimed, mintedUnclaimedsAmount),
         ("locked", results.locked, lockedAmount),
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
-        ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
         ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
         ("num_active_validators", results.numActiveValidators, validators),
       )
