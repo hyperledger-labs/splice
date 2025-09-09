@@ -24,6 +24,9 @@ import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { useMemo, useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
+import { dsoFormConfigEncoder } from '../../utils/dsoFormConfigEncoder';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 
 export type SetDsoConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -32,17 +35,11 @@ export type SetDsoConfigCompleteFormData = {
 
 const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_SetConfig');
 
-export interface SetDsoConfigRulesFormProps {
-  onSubmit: (
-    data: SetDsoConfigCompleteFormData,
-    action: ActionRequiringConfirmation
-  ) => Promise<void>;
-}
-
-export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => {
+export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
+  const mutation = useProposalMutation();
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   const defaultValues = useMemo((): SetDsoConfigCompleteFormData => {
@@ -85,11 +82,29 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
 
   const form = useAppForm({
     defaultValues,
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value: formData }) => {
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        console.log('submit dso config form data: ', value);
+        const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges, false);
+        const baseConfig = dsoConfig;
+        const newConfig = dsoFormConfigEncoder(changes);
+        const action: ActionRequiringConfirmation = {
+          tag: 'ARC_DsoRules',
+          value: {
+            dsoAction: {
+              tag: 'SRARC_SetConfig',
+              value: {
+                baseConfig: baseConfig,
+                newConfig: newConfig,
+              },
+            },
+          },
+        };
+
+        await mutation.mutateAsync({ formData, action }).catch(e => {
+          console.error(`Failed to submit proposal`, e);
+        });
       }
     },
 
@@ -193,6 +208,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
       )}
 
       <form.AppForm>
+        <ProposalSubmissionError error={mutation.error} />
         <form.FormErrors />
         <form.FormControls
           showConfirmation={showConfirmation}
