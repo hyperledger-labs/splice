@@ -373,8 +373,9 @@ async function installValidator(
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
-    additionalEnvVars: bftSequencerConnection
-      ? undefined
+    additionalEnvVars: [
+      ...bftSequencerConnection
+      ? []
       : [
           {
             name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
@@ -382,6 +383,8 @@ async function installValidator(
               'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
           },
         ],
+    ...svConfig.validatorApp?.additionalEnvVars || []
+    ]
   });
 
   return validator;

@@ -3952,62 +3952,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "authenticationMethod": "none",
-      "clientId": "SVDA1 UI (Pulumi managed, test-stack)_id"
-    },
-    "name": "svda1UiAppCredentials",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
-    "type": "auth0:index/clientCredentials:ClientCredentials"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "allowedLogoutUrls": [
-        "https://wallet.sv-1.mock.network.canton.global",
-        "https://wallet.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://cns.sv-1.mock.network.canton.global",
-        "https://cns.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://sv.sv-1.mock.network.canton.global",
-        "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
-      ],
-      "allowedOrigins": [
-        "https://wallet.sv-1.mock.network.canton.global",
-        "https://wallet.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://cns.sv-1.mock.network.canton.global",
-        "https://cns.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://sv.sv-1.mock.network.canton.global",
-        "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
-      ],
-      "appType": "spa",
-      "callbacks": [
-        "https://wallet.sv-1.mock.network.canton.global",
-        "https://wallet.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://cns.sv-1.mock.network.canton.global",
-        "https://cns.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://sv.sv-1.mock.network.canton.global",
-        "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
-      ],
-      "crossOriginAuth": false,
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for Digital-Asset-1",
-      "name": "SVDA1 UI (Pulumi managed, test-stack)",
-      "webOrigins": [
-        "https://wallet.sv-1.mock.network.canton.global",
-        "https://wallet.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://cns.sv-1.mock.network.canton.global",
-        "https://cns.sv-1.mock.global.canton.network.digitalasset.com",
-        "https://sv.sv-1.mock.network.canton.global",
-        "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
-      ]
-    },
-    "name": "svda1UiApp",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
-    "type": "auth0:index/client:Client"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "clientId": "mgmt",
       "clientSecret": "s3cr3t",
       "domain": "canton-network-sv-test.us.auth0.com"

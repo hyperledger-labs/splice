@@ -134,20 +134,21 @@ svs:
       bigQuery:
         dataset: mock_da2_scan
         prefix: da2
+  # TODO(DACH-NY/canton-network-internal#1484) make this work beyond "mock"
   sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     # the values here are actually working on scratch and CI
     publicName: Digital-Asset-1
     subdomain: sv-1
     cometbft:
       keysGcpSecret: sv-da-1-cometbft-keys
-      nodeId: 5af57aa83abcec085c949323ed8538108757be9c #TODO
-      validatorKeyAddress: 8A931AB5F957B8331BDEF3A0A081BD9F017A777F #TODO
+      nodeId: 5af57aa83abcec085c949323ed8538108757be9c #TODO(DACH-NY/canton-network-internal#1484)
+      validatorKeyAddress: 8A931AB5F957B8331BDEF3A0A081BD9F017A777F #TODO(DACH-NY/canton-network-internal#1484)
     svApp:
       auth0:
         name: sv-da-1
         clientId: bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7
     validatorApp:
-      walletUser: auth0|mock #TODO
+      walletUser: auth0|mock #TODO(DACH-NY/canton-network-internal#1484)
       auth0:
         name: sv-da-1_validator
         clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY
