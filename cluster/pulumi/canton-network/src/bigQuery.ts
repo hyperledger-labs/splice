@@ -161,8 +161,7 @@ function installDatastream(
           },
           // editing dataFreshness does not alter existing BQ tables, see its
           // docstring or https://github.com/hyperledger-labs/splice/issues/2011
-          // dataFreshness: '14400s',
-          // FIXME: uncomment (or better yet, make it configurable easily)
+          dataFreshness: '14400s',
         },
         destinationConnectionProfile: destination.name,
       },
