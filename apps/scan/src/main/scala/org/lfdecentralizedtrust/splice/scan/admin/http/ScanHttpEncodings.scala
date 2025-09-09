@@ -444,7 +444,6 @@ object ScanHttpEncodings {
   def formatRecordTime(instant: Instant): String =
     recordTimeDateFormatter.format(instant)
 
-  // TODO: is it better to inline this?
   def encodeVerdict(
       verdict: VerdictT,
       views: Seq[TransactionViewT],
