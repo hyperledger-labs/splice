@@ -92,8 +92,8 @@ function svsOnlyAuth0(
 ): pulumi.Output<Auth0Config> {
 
   const svUis = svs.map(sv => newUiApp(
-    `${sv.namespace.replace('-', '').toUpperCase()}UiApp`,
-    `${sv.namespace} UI`,
+    `${sv.namespace.replace('-', '')}UiApp`,
+    `${sv.namespace.replace('-', '').toUpperCase()} UI`,
     `Used for the Wallet, ANS and SV UIs for ${sv.description}`,
     ['wallet', ansDomainPrefix, 'sv'],
     sv.ingressName,
