@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.daml.ledger.api.v2.event.CreatedEvent
+import com.daml.ledger.javaapi
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -18,6 +20,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   ExpireRewardCouponsTrigger,
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
+import org.lfdecentralizedtrust.splice.util.JavaDecodeUtil
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
@@ -87,18 +90,6 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
         )
         .loneElement
     }
-    actAndCheck("Advance by one tick", advanceRoundsByOneTickViaAutomation())(
-      "Round 0 is closed",
-      _ =>
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(ClosedMiningRound.COMPANION)(
-            dsoParty
-          )
-          .loneElement
-          .data
-          .round
-          .number shouldBe 0,
-    )
     actAndCheck(
       "SV1 uploads the latest dso governance",
       sv1Backend.participantClient.dars.upload(
@@ -116,6 +107,17 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
           .item
           .packages
           .map(_.packageId) should contain(DarResources.dsoGovernance.bootstrap.packageId),
+    )
+    actAndCheck("Advance by one tick", advanceRoundsByOneTickViaAutomation())(
+      "Round 0 is closed",
+      _ => {
+        val closedRound = sv1Backend.participantClient.ledger_api_extensions.acs
+          .of_party(ClosedMiningRound.COMPANION)(
+            dsoParty
+          ).loneElement
+        JavaDecodeUtil.decodeCreated(ClosedMiningRound.COMPANION)(javaapi.data.CreatedEvent.fromProto(CreatedEvent.toJavaProto(closedRound))).value.data.round.number shouldBe 0
+        closedRound.getTemplateId.packageId shouldBe DarResources.amulet.bootstrap.packageId
+      }
     )
     // Recreate AmuletRules in new package id.
     actAndCheck(
