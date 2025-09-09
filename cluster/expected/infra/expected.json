@@ -3953,9 +3953,9 @@
     "id": "",
     "inputs": {
       "authenticationMethod": "none",
-      "clientId": "SVDA-1 UI (Pulumi managed, test-stack)_id"
+      "clientId": "SVDA1 UI (Pulumi managed, test-stack)_id"
     },
-    "name": "svda-1UiAppCredentials",
+    "name": "svda1UiAppCredentials",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientCredentials:ClientCredentials"
   },
@@ -3990,7 +3990,7 @@
       ],
       "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for Digital-Asset-1",
-      "name": "SVDA-1 UI (Pulumi managed, test-stack)",
+      "name": "SVDA1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-1.mock.network.canton.global",
         "https://wallet.sv-1.mock.global.canton.network.digitalasset.com",
@@ -4000,7 +4000,7 @@
         "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
       ]
     },
-    "name": "svda-1UiApp",
+    "name": "svda1UiApp",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/client:Client"
   },

@@ -92,8 +92,8 @@ function svsOnlyAuth0(
 ): pulumi.Output<Auth0Config> {
 
   const svUis = svs.map(sv => newUiApp(
-    `${sv.namespace.replace('-', '')}UiApp`,
-    `${sv.namespace.replace('-', '').toUpperCase()} UI`,
+    `${sv.namespace.replace(/-/g, '')}UiApp`,
+    `${sv.namespace.replace(/-/g, '').toUpperCase()} UI`,
     `Used for the Wallet, ANS and SV UIs for ${sv.description}`,
     ['wallet', ansDomainPrefix, 'sv'],
     sv.ingressName,
@@ -176,7 +176,7 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
   const standardSvs: svAuth0Params[] = standardSvConfigs.map(sv => (
     {
       namespace: sv.nodeName,
-      description: sv.nodeName.replace('-', '').toUpperCase(),
+      description: sv.nodeName.replace(/-/g, '').toUpperCase(),
       ingressName: sv.ingressName,
       svBackend: sv.auth0SvAppClientId ? {
         name: sv.auth0SvAppName,
