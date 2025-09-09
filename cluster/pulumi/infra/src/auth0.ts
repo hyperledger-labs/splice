@@ -12,7 +12,7 @@ import {
   isMainNet,
   NamespaceToClientIdMapMap,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { coreSvsToDeploy } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { coreSvsToDeploy, standardSvConfigs, extraSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 function newUiApp(
   resourceName: string,
@@ -145,6 +145,23 @@ function svsOnlyAuth0(
   })
 }
 
+// function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
+//   const svs: svAuth0Params[] = coreSvsToDeploy.map(sv => {
+//     return {
+//       namespace: sv.nodeName,
+//       description: sv.onboardingName,
+//       ingressName: sv.ingressName,
+//       svBackend: sv.auth0SvAppClientId ? {
+//         name: sv.auth0SvAppName,
+//         clientId: sv.auth0SvAppClientId,
+//       } : undefined,
+//       validatorBackend: sv.auth0ValidatorAppClientId ? {
+//         name: sv.auth0ValidatorAppName,
+//         clientId: sv.auth0ValidatorAppClientId,
+//       } : undefined,
+//     }
+//   });
+
 function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
   const auth0Domain = 'canton-network-dev.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
@@ -156,10 +173,10 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     clientSecret: auth0MgtClientSecret,
   });
 
-  const svs: svAuth0Params[] = coreSvsToDeploy.map(sv => {
-    return {
+  const standardSvs: svAuth0Params[] = standardSvConfigs.map(sv => (
+    {
       namespace: sv.nodeName,
-      description: sv.onboardingName,
+      description: sv.nodeName.replace('-', '').toUpperCase(),
       ingressName: sv.ingressName,
       svBackend: sv.auth0SvAppClientId ? {
         name: sv.auth0SvAppName,
@@ -170,13 +187,28 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
         clientId: sv.auth0ValidatorAppClientId,
       } : undefined,
     }
-  });
+  ));
+  const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => (
+    {
+      namespace: sv.nodeName,
+      description: sv.onboardingName,
+      ingressName: sv.ingressName,
+      svBackend: {
+        name: sv.auth0SvAppName,
+        clientId: sv.auth0SvAppClientId!,
+      },
+      validatorBackend: {
+        name: sv.auth0ValidatorAppName,
+        clientId: sv.auth0ValidatorAppClientId!,
+      },
+    }
+  ));
 
   const baseAuth0 = svsOnlyAuth0(
     clusterBasename,
     dnsNames,
     provider,
-    svs,
+    [...standardSvs, ...extraSvs],
     auth0Domain,
     auth0MgtClientId,
     'auth0-fixed-token-cache',

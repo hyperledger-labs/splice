@@ -2,8 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ContractId } from '@daml/types';
-import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import {
+  ActionRequiringConfirmation,
+  VoteRequest,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ConfigFieldState } from '../components/form-components/ConfigField';
+import { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
+import { OffboardSvFormData } from '../components/forms/OffboardSvForm';
+import { GrantRevokeFeaturedAppFormData } from '../components/forms/GrantRevokeFeaturedAppForm';
+import { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
+import { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
 
 export interface OffBoardMemberProposal {
   memberToOffboard: string;
@@ -40,6 +48,7 @@ export interface ConfigChange {
 
 export interface UpdateSvRewardWeightProposal {
   svToUpdate: string;
+  currentWeight: string;
   weightChange: string;
 }
 
@@ -157,3 +166,17 @@ export interface Effectivity {
   type: EffectivityType;
   effectiveDate: string | undefined;
 }
+
+export interface ProposalMutationArgs {
+  formData: ProposalFormData;
+  action: ActionRequiringConfirmation;
+}
+
+export type NonConfigProposalFormData =
+  | UpdateSvRewardWeightFormData
+  | OffboardSvFormData
+  | GrantRevokeFeaturedAppFormData;
+
+export type ConfigProposalFormData = SetDsoConfigCompleteFormData | SetAmuletConfigCompleteFormData;
+
+export type ProposalFormData = NonConfigProposalFormData | ConfigProposalFormData;

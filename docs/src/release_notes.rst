@@ -8,19 +8,43 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.15
+------
 
 - Canton
 
     - SV
         - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
 
+    - Ledger API
+
+        - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
+          a prepared transaction can be used.
+        - Add an alpha version of ``com.daml.ledger.api.v2.admin.PartyManagementService/GenerateExternalPartyTopology`` and
+          ``com.daml.ledger.api.v2.admin.PartyManagementService/AllocateExternalParty``. These endpoints can be used instead of
+          the validator endpoints ``/v0/admin/external-party/topology/generate`` and ``/v0/admin/external-party/topology/submit``
+          and will eventually supersede them.
+
 - Docs
 
   - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
     including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
   - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
+
+- Deployment
+
+  - Cometbft
+
+     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
+     - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
+
+0.4.14
+------
+
+- SV app
+
+   - Add the option to ignore certain parties when running expiry on reward contracts. This can added to the app configuration. Example: ``canton.sv-apps.sv.automation.ignored-expired-rewards-party-ids = [ "test-party::1220b3eeb21b02e14945e419c5d9e986ce8102171c50e1444010ab054e11eba262c9" ]``
+
 
 0.4.13
 ------

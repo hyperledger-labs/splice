@@ -20,24 +20,21 @@ import { useMemo, useState } from 'react';
 import { CommonProposalFormData } from '../../utils/types';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { ProposalSummary } from '../governance/ProposalSummary';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
 
 interface ExtraFormFields {
   sv: string;
 }
 
-type OffboardSvFormData = CommonProposalFormData & ExtraFormFields;
+export type OffboardSvFormData = CommonProposalFormData & ExtraFormFields;
 
-export interface OffboardSvFormProps {
-  onSubmit: (data: OffboardSvFormData, action: ActionRequiringConfirmation) => Promise<void>;
-}
-
-export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
-  const { onSubmit } = props;
-
+export const OffboardSvForm: React.FC = _ => {
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const mutation = useProposalMutation();
 
   const svs = useMemo(
     () => dsoInfosQuery.data?.dsoRules.payload.svs.entriesArray() || [],
@@ -65,7 +62,7 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
 
   const form = useAppForm({
     defaultValues,
-    onSubmit: ({ value }) => {
+    onSubmit: async ({ value }) => {
       const action: ActionRequiringConfirmation = {
         tag: 'ARC_DsoRules',
         value: {
@@ -81,8 +78,9 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        console.log('submit offboard sv form data: ', value, 'with action:', action);
-        onSubmit(value, action);
+        await mutation.mutateAsync({ formData: value, action }).catch(e => {
+          console.error(`Failed to submit proposal`, e);
+        });
       }
     },
 
@@ -188,7 +186,9 @@ export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
             </form.AppField>
           </>
         )}
+
         <form.AppForm>
+          <ProposalSubmissionError error={mutation.error} />
           <form.FormErrors />
           <form.FormControls
             showConfirmation={showConfirmation}

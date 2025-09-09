@@ -25,7 +25,7 @@ import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { useMemo, useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
 
-type SetDsoConfigCompleteFormData = {
+export type SetDsoConfigCompleteFormData = {
   common: CommonProposalFormData;
   config: ConfigFormData;
 };

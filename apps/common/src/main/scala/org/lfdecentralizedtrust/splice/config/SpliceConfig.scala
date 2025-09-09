@@ -42,6 +42,20 @@ final case class CircuitBreakerConfig(
     randomFactor: Double = 0.2,
 )
 
+final case class CircuitBreakersConfig(
+    highPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
+    ),
+    mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 10,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
+    ),
+    lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 5,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
+)
+
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
   * For example, the [[TracingConfig]] is configured once for all Splice apps that are started by a Splice binary as part of the
   * [[com.digitalasset.canton.config.MonitoringConfig]].
@@ -59,7 +73,7 @@ case class SharedSpliceAppParameters(
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
-    commandCircuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
+    circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
     // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,

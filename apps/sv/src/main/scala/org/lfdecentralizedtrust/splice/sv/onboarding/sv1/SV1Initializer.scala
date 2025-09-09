@@ -90,6 +90,7 @@ import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.jdk.OptionConverters.*
 import java.util.concurrent.TimeUnit
@@ -257,28 +258,29 @@ class SV1Initializer(
         participantAdminConnection,
         Some(localSynchronizerNode),
       )
+      connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       (_, decentralizedSynchronizer) <- (
-        SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
+        SetupUtil.ensureDsoPartyMetadataAnnotation(connection, config, dsoParty),
         svStore.domains.waitForDomainConnection(config.domains.global.alias),
       ).tupled
       _ <- SetupUtil.ensureSvNameMetadataAnnotation(
-        svAutomation.connection,
+        connection,
         config,
         sv1Config.name,
       )
       _ <- DomainMigrationInfo.saveToUserMetadata(
-        svAutomation.connection,
+        connection,
         config.ledgerApiUser,
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
-        svAutomation.connection,
+        connection,
         loggerFactory,
       )
       initialRound <- establishInitialRound(
-        svAutomation.connection,
+        connection,
         upgradesConfig,
         packageVersionSupport,
         svParty,
@@ -577,7 +579,7 @@ class SV1Initializer(
     private val svParty = dsoStore.key.svParty
     private val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
-      dsoStoreWithIngestion.connection,
+      dsoStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
       config.legacyMigrationId,
       clock = clock,
       retryProvider = retryProvider,
@@ -666,7 +668,8 @@ class SV1Initializer(
                       Seq(svParty),
                       clock.now,
                     )
-                  _ <- dsoStoreWithIngestion.connection
+                  _ <- dsoStoreWithIngestion
+                    .connection(SpliceLedgerConnectionPriority.Low)
                     .submit(
                       actAs = Seq(dsoParty),
                       readAs = Seq.empty,
