@@ -3,36 +3,40 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.automation.{
+  SourceBasedTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.Clock
-import org.lfdecentralizedtrust.splice.util.HasHealth
-import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
-
-import scala.concurrent.ExecutionContextExecutor
-
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Json
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
+import org.apache.pekko.stream.scaladsl.{Keep, Source}
+import com.digitalasset.canton.util.PekkoUtil
+import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
+import monocle.Monocle.toAppliedFocusOps
+
+import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.Failure
 
 import com.digitalasset.canton.mediator.admin.v30
-import com.digitalasset.canton.data.CantonTimestamp
-import io.circe.Json
-import java.util.concurrent.atomic.AtomicReference
-import com.digitalasset.canton.discard.Implicits.*
-import scala.concurrent.Future
-import org.apache.pekko.Done
-import org.apache.pekko.stream.{Materializer, UniqueKillSwitch}
-import scala.concurrent.duration.*
-import org.lfdecentralizedtrust.splice.environment.RetryFor
 
 class ScanVerdictStoreIngestion(
+    originalContext: TriggerContext,
     config: ScanAppBackendConfig,
-    clock: Clock,
-    retryProvider: RetryProvider,
-    protected val loggerFactory: NamedLoggerFactory,
     store: DbScanVerdictStore,
     migrationId: Long,
     synchronizerId: SynchronizerId,
@@ -40,71 +44,89 @@ class ScanVerdictStoreIngestion(
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
-) extends HasHealth
-    with AutoCloseable
+    tracer: Tracer,
+    prettyVerdictBatch: Pretty[Seq[v30.Verdict]],
+) extends SourceBasedTrigger[Seq[v30.Verdict]]
     with NamedLogging {
 
-  override def isHealthy: Boolean = true
+  // enforce sequential DB ingestion
+  override protected lazy val context: TriggerContext =
+    originalContext.focus(_.config.parallelism).replace(1)
 
   private val mediatorClient =
     new MediatorVerdictsClient(
       config.mediatorAdminClient,
-      loggerFactory,
+      this,
+      context.loggerFactory,
     )(ec)
 
-  private val killSwitchRef =
-    new AtomicReference[Option[UniqueKillSwitch]](None)
+  override protected def source(implicit tc: TraceContext): Source[Seq[v30.Verdict], NotUsed] = {
+    val batchSize = math.max(1, config.mediatorVerdictIngestion.batchSize)
 
-  override def close(): Unit = {
-    killSwitchRef.getAndSet(None).foreach(_.shutdown())
-    com.digitalasset.canton.lifecycle.LifeCycle.close(mediatorClient)(logger)
+    def mediatorClientSource
+        : Source[Seq[v30.Verdict], (KillSwitch, scala.concurrent.Future[Done])] = {
+      val base: Source[Seq[v30.Verdict], NotUsed] =
+        Source
+          .future(
+            store
+              .maxVerdictRecordTime(migrationId)
+              .map(_.getOrElse(CantonTimestamp.MinValue))
+          )
+          .flatMapConcat { resumeTs =>
+            mediatorClient
+              .streamVerdicts(Some(resumeTs))
+              .groupedWithin(batchSize, 1.second)
+          }
+
+      val withKs = base.viaMat(KillSwitches.single)(Keep.right)
+      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
+    }
+
+    val delay = config.mediatorVerdictIngestion.restartDelay.asFiniteApproximation
+    val policy = new RetrySourcePolicy[Unit, Seq[v30.Verdict]] {
+      override def shouldRetry(
+          lastState: Unit,
+          lastEmittedElement: Option[Seq[v30.Verdict]],
+          lastFailure: Option[Throwable],
+      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] =
+        lastFailure.map(_ => delay -> ())
+    }
+
+    PekkoUtil
+      .restartSource(
+        name = "mediator-verdict-ingestion",
+        initial = (),
+        mkSource = (_: Unit) => mediatorClientSource,
+        policy = policy,
+      )
+      .map(_.value)
+      .mapMaterializedValue(_ => NotUsed)
   }
 
-  private def startStream()(implicit tc: TraceContext): Unit = {
-    import org.apache.pekko.stream.scaladsl.{Keep, Sink}
-    import org.apache.pekko.stream.KillSwitches
-
-    // Determine ingestion resume point: if there are no rows for current
-    // migration, start from MinValue
-    val resumeF = store
-      .maxVerdictRecordTime(migrationId)
-      .map(_.getOrElse(CantonTimestamp.MinValue))
-
-    resumeF.foreach { resumeTs =>
-      val materialized: (
-          UniqueKillSwitch,
-          Future[Done],
-      ) = mediatorClient
-        .streamVerdicts(Some(resumeTs))
-        .viaMat(KillSwitches.single)(Keep.right)
-        .groupedWithin(
-          math.max(1, config.mediatorVerdictIngestion.batchSize),
-          1.second, // Perform ingestion after this delay
-        )
-        .mapAsync(1) { batch =>
-          ingestBatchWithRetry(batch)(tc)
+  override protected def completeTask(batch: Seq[v30.Verdict])(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] = {
+    if (batch.isEmpty) Future.successful(TaskSuccess("empty batch"))
+    else {
+      val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
+        batch.map(toDbRowAndViews)
+      store
+        .insertVerdictAndTransactionViews(items)
+        .map { _ =>
+          val lastRecordTime = batch.lastOption
+            .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
+            .getOrElse(CantonTimestamp.MinValue)
+          ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
+          batch.foreach(_ => ingestionMetrics.verdictCount.mark())
+          TaskSuccess(s"inserted ${batch.size} verdicts")
         }
-        .toMat(Sink.ignore)(Keep.both)
-        .run()
-      val (killSwitch, done) = materialized
-      killSwitchRef.set(Some(killSwitch))
-      done.failed.foreach { t =>
-        logger.warn("Mediator verdict stream failed; scheduling restart", t)
-        ingestionMetrics.errors.mark()
-        retryProvider
-          .scheduleAfterUnlessShutdown(
-            action = Future {
-              startStream()(TraceContext.createNew())
-              ()
-            },
-            clock = clock,
-            delay = config.mediatorVerdictIngestion.restartDelay,
-            jitter = 0.2,
-          )(ec)
-          .discard
-      }(ec)
+        .andThen { case Failure(_) => ingestionMetrics.errors.mark() }
     }
   }
+
+  override protected def isStaleTask(batch: Seq[v30.Verdict])(implicit
+      tc: TraceContext
+  ): Future[Boolean] = Future.successful(false)
 
   private def toDbRowAndViews(
       verdict: v30.Verdict
@@ -151,34 +173,14 @@ class ScanVerdictStoreIngestion(
     (row, mkViews)
   }
 
-  private def ingestBatchWithRetry(
-      batch: Seq[v30.Verdict]
-  )(implicit tc: TraceContext): Future[Unit] = {
-    if (batch.isEmpty) Future.unit
-    else {
-      val firstUpdateId = batch.headOption.map(_.updateId).getOrElse("")
-      val opId = s"scan_verdict_batch_ingest"
-      val desc = s"insert ${batch.size} mediator verdict(s) starting at update_id=$firstUpdateId"
-      retryProvider.retry(
-        RetryFor.LongRunningAutomation,
-        operationId = opId,
-        operationDescription = desc,
-        task = {
-          val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
-            batch.map(toDbRowAndViews)
-          store.insertVerdictAndTransactionViews(items).map { _ =>
-            // Update metrics: last record time and count
-            val lastRecordTime = batch.lastOption
-              .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
-              .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
-            batch.foreach(_ => ingestionMetrics.verdictCount.mark())
-          }
-        },
-        logger = logger,
-      )
-    }
-  }
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    super.closeAsync() :+ SyncCloseable(
+      "MediatorVerdictsClient",
+      LifeCycle.close(mediatorClient)(logger),
+    )
+}
 
-  startStream()(TraceContext.createNew())
+object ScanVerdictStoreIngestion {
+  implicit val prettyVerdictBatch: Pretty[Seq[v30.Verdict]] =
+    Pretty.prettyOfString(batch => s"verdict_store_ingestion_batch(size=${batch.size})")
 }
