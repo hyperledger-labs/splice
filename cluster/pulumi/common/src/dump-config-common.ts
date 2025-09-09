@@ -39,6 +39,8 @@ export const cantonNetworkAuth0Config = {
     sv4_validator: 'sv4-validator-client-id',
     sv: 'sv-client-id',
     validator: 'sv-client-id',
+    'sv-da-1': 'sv-da-1-client-id',
+    'sv-da-1_validator': 'sv-da-1-validator-client-id',
   },
   namespaceToUiToClientId: {
     validator1: {

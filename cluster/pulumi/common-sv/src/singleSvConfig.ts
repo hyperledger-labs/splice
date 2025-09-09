@@ -6,37 +6,79 @@ import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
 
-const SvCometbftConfigSchema = z.object({
-  snapshotName: z.string(),
-});
+const SvCometbftConfigSchema = z
+  .object({
+    nodeId: z.string().optional(),
+    validatorKeyAddress: z.string().optional(),
+    keysGcpSecret: z.string().optional(),
+    snapshotName: z.string().optional(),
+  })
+  .strict();
 const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
 });
-
-const SvSequencerConfigSchema = z.object({
-  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
-const SvParticipantConfigSchema = z.object({
-  kms: KmsConfigSchema.optional(),
-  bftSequencerConnection: z.boolean().optional(),
-  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
-const SvAppConfigSchema = z.object({
-  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
-const ScanAppConfigSchema = z.object({
-  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-});
+const SvSequencerConfigSchema = z
+  .object({
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  })
+  .strict();
+const SvParticipantConfigSchema = z
+  .object({
+    kms: KmsConfigSchema.optional(),
+    bftSequencerConnection: z.boolean().optional(),
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  })
+  .strict();
+const Auth0ConfigSchema = z
+  .object({
+    name: z.string().optional(),
+    clientId: z.string().optional(),
+  })
+  .strict();
+const SvAppConfigSchema = z
+  .object({
+    // TODO(tech-debt) inline env var into config.yaml
+    sweep: z
+      .object({
+        fromEnv: z.string(),
+      })
+      .optional(),
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    auth0: Auth0ConfigSchema.optional(),
+  })
+  .strict();
+const ScanAppConfigSchema = z
+  .object({
+    bigQuery: z
+      .object({
+        dataset: z.string(),
+        prefix: z.string(),
+      })
+      .optional(),
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  })
+  .strict();
+const ValidatorAppConfigSchema = z
+  .object({
+    walletUser: z.string().optional(),
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    auth0: Auth0ConfigSchema.optional(),
+  })
+  .strict();
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
+// things here are declared optional even when they aren't, to allow partial overrides of defaults
 const SingleSvConfigSchema = z
   .object({
+    publicName: z.string().optional(),
+    subdomain: z.string().optional(),
     cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
+    validatorApp: ValidatorAppConfigSchema.optional(),
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,
@@ -60,6 +102,8 @@ type SingleSvConfig = z.infer<typeof AllSvsConfigurationSchema>;
 export type SingleSvConfiguration = z.infer<typeof SingleSvConfigSchema>;
 
 const clusterSvsConfiguration: SingleSvConfig = SvsConfigurationSchema.parse(clusterYamlConfig).svs;
+
+export const allConfiguredSvs = Object.keys(clusterSvsConfiguration).filter(k => k !== 'default');
 
 export const configForSv = (svName: string): SingleSvConfiguration => {
   return merge({}, clusterSvsConfiguration.default, clusterSvsConfiguration[svName]);
