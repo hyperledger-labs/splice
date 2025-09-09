@@ -679,12 +679,11 @@ const days_with_missing_stats = new BQTableFunction(
             AND unlocked IS NOT NULL
             AND current_supply_total IS NOT NULL
             AND unminted IS NOT NULL
-            AND minted_app_rewards IS NOT NULL
-            AND minted_validator_rewards IS NOT NULL
-            AND minted_sv_rewards IS NOT NULL
-            AND minted_unclaimed_activity_records IS NOT NULL
-            AND burned IS NOT NULL
-            AND monthly_burn IS NOT NULL
+            AND daily_mint_app_rewards IS NOT NULL
+            AND daily_mint_validator_rewards IS NOT NULL
+            AND daily_mint_sv_rewards IS NOT NULL
+            AND daily_mint_unclaimed_activity_records IS NOT NULL
+            AND daily_burn IS NOT NULL
             AND num_amulet_holders IS NOT NULL
             AND num_active_validators IS NOT NULL
             AND average_tps IS NOT NULL
