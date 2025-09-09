@@ -588,7 +588,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       mintedValidatorRewards = bd("minted_validator_rewards"),
       mintedSvRewards = bd("minted_sv_rewards"),
       mintedUnclaimed = bd("minted_unclaimed_activity_records"),
-      burned = bd("burned"),
+      burned = bd("daily_burn"),
       numAmuletHolders = int("num_amulet_holders"),
       numActiveValidators = int("num_active_validators"),
       avgTps = float("average_tps"),
