@@ -12,7 +12,7 @@ import {
   isMainNet,
   NamespaceToClientIdMapMap,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { coreSvsToDeploy, standardSvConfigs, extraSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { standardSvConfigs, extraSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 function newUiApp(
   resourceName: string,
@@ -145,22 +145,63 @@ function svsOnlyAuth0(
   })
 }
 
-// function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
-//   const svs: svAuth0Params[] = coreSvsToDeploy.map(sv => {
-//     return {
-//       namespace: sv.nodeName,
-//       description: sv.onboardingName,
-//       ingressName: sv.ingressName,
-//       svBackend: sv.auth0SvAppClientId ? {
-//         name: sv.auth0SvAppName,
-//         clientId: sv.auth0SvAppClientId,
-//       } : undefined,
-//       validatorBackend: sv.auth0ValidatorAppClientId ? {
-//         name: sv.auth0ValidatorAppName,
-//         clientId: sv.auth0ValidatorAppClientId,
-//       } : undefined,
-//     }
-//   });
+function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
+  const auth0Domain = 'canton-network-mainnet.us.auth0.com';
+  const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
+
+  const provider = new auth0.Provider('main', {
+    domain: auth0Domain,
+    clientId: auth0MgtClientId,
+    clientSecret: auth0MgtClientSecret,
+  });
+
+  // hardcoded sv1 will be removed once we switch DA-2 to KMS (and, likely, the sv-da-1 namespace)
+  const sv1 = {
+    namespace: 'sv-1',
+    description: 'sv-1 (Digital-Asset 2)',
+    ingressName: 'sv-2', // Ingress name of sv-1 is sv-2!
+    svBackend: {
+      name: 'sv',
+      clientId: 'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
+    },
+    validatorBackend: {
+      name: 'validator',
+      clientId: 'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
+    },
+  };
+
+  const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => (
+    {
+      namespace: sv.nodeName,
+      description: sv.onboardingName,
+      ingressName: sv.ingressName,
+      svBackend: {
+        name: sv.auth0SvAppName,
+        clientId: sv.auth0SvAppClientId!,
+      },
+      validatorBackend: {
+        name: sv.auth0ValidatorAppName,
+        clientId: sv.auth0ValidatorAppClientId!,
+      },
+    }
+  ));
+
+  return svsOnlyAuth0(
+    clusterBasename,
+    dnsNames,
+    provider,
+    [sv1, ...extraSvs],
+    auth0Domain,
+    auth0MgtClientId,
+    'DO_NOT_USE',
+    {
+      ledger: 'https://ledger_api.main.digitalasset.com',
+      sv: 'https://sv.main.digitalasset.com',
+      validator: 'https://validator.main.digitalasset.com',
+    }
+  )
+}
 
 function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
   const auth0Domain = 'canton-network-dev.us.auth0.com';
@@ -462,23 +503,7 @@ export function configureAuth0(
   dnsNames: string[]
 ): pulumi.Output<Auth0ClusterConfig> {
   if (isMainNet) {
-    const auth0Cfg = svRunbookAuth0(
-      clusterBasename,
-      dnsNames,
-      'main',
-      'canton-network-mainnet.us.auth0.com',
-      config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID'),
-      config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET'),
-      'sv-1 (Digital-Asset 2)',
-      'sv-1',
-      'sv-2', // Ingress name of sv-1 is sv-2!
-      'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
-      'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
-      'https://ledger_api.main.digitalasset.com',
-      'https://sv.main.digitalasset.com',
-      'https://validator.main.digitalasset.com',
-      'DO_NOT_USE'
-    );
+    const auth0Cfg = mainNetAuth0(clusterBasename, dnsNames);
     return auth0Cfg.apply(mainnetCfg => {
       const r: Auth0ClusterConfig = {
         mainnet: mainnetCfg,
