@@ -474,7 +474,7 @@ async function installSvAndValidator(
                 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
             },
           ]),
-      ...(svConfig.validatorApp?.additionalEnvVars || [])
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
   };
 
