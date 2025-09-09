@@ -131,7 +131,7 @@ export class Dso extends pulumi.ComponentResource {
     const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
       return {
         ...acc,
-        [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replace('-', '')),
+        [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replaceAll('-', '')),
       };
     }, {});
 
@@ -140,7 +140,7 @@ export class Dso extends pulumi.ComponentResource {
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
         return {
           ...acc,
-          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(conf.nodeName.replace('-', '')),
+          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(conf.nodeName.replaceAll('-', '')),
         };
       }, {});
 
