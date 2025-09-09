@@ -3,18 +3,65 @@
 
 package org.lfdecentralizedtrust.splice.util
 
+import com.digitalasset.base.error.ErrorCategory
+import com.digitalasset.base.error.ErrorCategory.{
+  InvalidGivenCurrentSystemStateOther,
+  InvalidGivenCurrentSystemStateResourceExists,
+  InvalidGivenCurrentSystemStateResourceMissing,
+  InvalidGivenCurrentSystemStateSeekAfterEnd,
+  InvalidIndependentOfSystemState,
+}
+import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.StatusRuntimeException
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.pattern.CircuitBreaker
 import org.lfdecentralizedtrust.splice.config.CircuitBreakerConfig
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 class SpliceCircuitBreaker(underlying: CircuitBreaker) {
 
+  private val errorCategoriesToIgnore: Set[ErrorCategory] = Set(
+    InvalidIndependentOfSystemState,
+    InvalidGivenCurrentSystemStateOther,
+    InvalidGivenCurrentSystemStateResourceExists,
+    InvalidGivenCurrentSystemStateResourceMissing,
+    InvalidGivenCurrentSystemStateSeekAfterEnd,
+  )
+
   def withCircuitBreaker[T](body: => Future[T]): Future[T] =
-    underlying.withCircuitBreaker(body)
+    underlying.withCircuitBreaker[T](
+      body,
+      isResultIgnored,
+    )
+
+  private def isResultIgnored[T](result: Try[T]): Boolean = {
+    result match {
+      case Failure(ex: StatusRuntimeException) =>
+        val isIgnoredCategory = ErrorDetails
+          .from(ex)
+          .collect {
+            case ErrorDetails.ErrorInfoDetail(_, metadata) if metadata.contains("category") =>
+              metadata
+                .get("category")
+                .flatMap(_.toIntOption)
+                .flatMap(ErrorCategory.fromInt)
+          }
+          .flatten
+          .exists(failureCategory => errorCategoriesToIgnore.contains(failureCategory))
+        !isIgnoredCategory
+      case Failure(_) =>
+        true
+      case Success(_) => false
+    }
+  }
+
+  def isOpen: Boolean = underlying.isOpen
+  def isClosed: Boolean = underlying.isClosed
+  def isHalfOpen: Boolean = underlying.isHalfOpen
 
 }
 
