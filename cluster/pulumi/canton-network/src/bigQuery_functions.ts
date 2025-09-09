@@ -41,7 +41,7 @@ const time_window_args = [
   new BQFunctionArgument('start_migration_id', INT64),
   new BQFunctionArgument('up_to_record_time', TIMESTAMP),
   new BQFunctionArgument('up_to_migration_id', INT64),
-]
+];
 
 const rewardsStruct = new BQStruct([
   { name: 'appRewardAmount', type: BIGNUMERIC },
@@ -166,7 +166,6 @@ const up_to_time = new BQScalarFunction(
     \`$$FUNCTIONS_DATASET$$.in_time_window\`(NULL, NULL, up_to_record_time, up_to_migration_id, record_time, migration_id)
   `
 );
-
 
 const migration_id_at_time = new BQScalarFunction(
   'migration_id_at_time',
@@ -585,11 +584,10 @@ const all_stats = new BQTableFunction(
     new BQColumn('unlocked', BIGNUMERIC),
     new BQColumn('current_supply_total', BIGNUMERIC),
     new BQColumn('unminted', BIGNUMERIC),
-    new BQColumn('minted_app_rewards', BIGNUMERIC),
-    new BQColumn('minted_validator_rewards', BIGNUMERIC),
-    new BQColumn('minted_sv_rewards', BIGNUMERIC),
-    new BQColumn('minted_unclaimed_activity_records', BIGNUMERIC),
-    new BQColumn('total_burned', BIGNUMERIC),
+    new BQColumn('daily_mint_app_rewards', BIGNUMERIC),
+    new BQColumn('daily_mint_validator_rewards', BIGNUMERIC),
+    new BQColumn('daily_mint_sv_rewards', BIGNUMERIC),
+    new BQColumn('daily_mint_unclaimed_activity_records', BIGNUMERIC),
     new BQColumn('daily_burn', BIGNUMERIC),
     new BQColumn('num_amulet_holders', INT64),
     new BQColumn('num_active_validators', INT64),
@@ -604,12 +602,36 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as unlocked,
       \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as current_supply_total,
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).appRewardAmount as minted_app_rewards,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).validatorRewardAmount as minted_validator_rewards,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).svRewardAmount as minted_sv_rewards,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).unclaimedActivityRecordAmount as minted_unclaimed_activity_records,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(NULL, NULL, as_of_record_time, migration_id), 0) as total_burned,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)), as_of_record_time, migration_id), 0) as daily_burn,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id).appRewardAmount
+          AS daily_mint_app_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id).validatorRewardAmount
+          AS daily_mint_validator_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time, migration_id).svRewardAmount
+          AS daily_mint_sv_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id).unclaimedActivityRecordAmount
+          AS daily_mint_unclaimed_activity_records,
+      IFNULL(
+        \`$$FUNCTIONS_DATASET$$.burned\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id),
+        0) AS daily_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
       \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
       IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id), 0.0) as average_tps,
