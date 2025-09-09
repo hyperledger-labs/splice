@@ -11,6 +11,7 @@ awaitAllOrThrowAllExceptions(
       const preview = await stack.preview({
         parallel: 128,
         diff: true,
+        color: 'always',
       });
       console.log(`[migration=${migration.id}]Previewing stack for ${sv}`);
       console.error(preview.stderr);
