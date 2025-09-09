@@ -9,7 +9,14 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.pattern.CircuitBreaker
 import org.lfdecentralizedtrust.splice.config.CircuitBreakerConfig
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+
+class SpliceCircuitBreaker(underlying: CircuitBreaker) {
+
+  def withCircuitBreaker[T](body: => Future[T]): Future[T] =
+    underlying.withCircuitBreaker(body)
+
+}
 
 object SpliceCircuitBreaker {
 
@@ -17,23 +24,24 @@ object SpliceCircuitBreaker {
       name: String,
       config: CircuitBreakerConfig,
       logger: TracedLogger,
-  )(implicit scheduler: Scheduler, ec: ExecutionContext): CircuitBreaker = {
-    new CircuitBreaker(
-      scheduler,
-      maxFailures = config.maxFailures,
-      callTimeout = config.callTimeout.underlying,
-      resetTimeout = config.resetTimeout.underlying,
-      maxResetTimeout = config.maxResetTimeout.underlying,
-      exponentialBackoffFactor = config.exponentialBackoffFactor,
-      randomFactor = config.randomFactor,
-    ).onOpen {
-      logger.warn(
-        s"Circuit breaker $name tripped after ${config.maxFailures} failures"
-      )(TraceContext.empty)
-    }.onHalfOpen {
-      logger.info(s"Circuit breaker $name moving to half-open state")(TraceContext.empty)
-    }.onClose {
-      logger.info(s"Circuit breaker $name moving to closed state")(TraceContext.empty)
-    }
-  }
+  )(implicit scheduler: Scheduler, ec: ExecutionContext): SpliceCircuitBreaker =
+    new SpliceCircuitBreaker(
+      new CircuitBreaker(
+        scheduler,
+        maxFailures = config.maxFailures,
+        callTimeout = config.callTimeout.underlying,
+        resetTimeout = config.resetTimeout.underlying,
+        maxResetTimeout = config.maxResetTimeout.underlying,
+        exponentialBackoffFactor = config.exponentialBackoffFactor,
+        randomFactor = config.randomFactor,
+      ).onOpen {
+        logger.warn(
+          s"Circuit breaker $name tripped after ${config.maxFailures} failures"
+        )(TraceContext.empty)
+      }.onHalfOpen {
+        logger.info(s"Circuit breaker $name moving to half-open state")(TraceContext.empty)
+      }.onClose {
+        logger.info(s"Circuit breaker $name moving to closed state")(TraceContext.empty)
+      }
+    )
 }
