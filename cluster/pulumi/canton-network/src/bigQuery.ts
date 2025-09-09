@@ -161,8 +161,7 @@ function installDatastream(
           },
           // editing dataFreshness does not alter existing BQ tables, see its
           // docstring or https://github.com/hyperledger-labs/splice/issues/2011
-          // dataFreshness: '14400s',
-          // FIXME: uncomment (or better yet, make it configurable easily)
+          dataFreshness: '14400s',
         },
         destinationConnectionProfile: destination.name,
       },
@@ -216,11 +215,12 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
         { name: 'unlocked', type: 'BIGNUMERIC' },
         { name: 'current_supply_total', type: 'BIGNUMERIC' },
         { name: 'unminted', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_app_rewards', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_validator_rewards', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_sv_rewards', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_unclaimed_activity_records', type: 'BIGNUMERIC' },
-        { name: 'daily_burn', type: 'BIGNUMERIC' },
+        { name: 'minted_app_rewards', type: 'BIGNUMERIC' },
+        { name: 'minted_validator_rewards', type: 'BIGNUMERIC' },
+        { name: 'minted_sv_rewards', type: 'BIGNUMERIC' },
+        { name: 'minted_unclaimed_activity_records', type: 'BIGNUMERIC' },
+        { name: 'burned', type: 'BIGNUMERIC' },
+        { name: 'monthly_burn', type: 'BIGNUMERIC' },
         { name: 'num_amulet_holders', type: 'INT64' },
         { name: 'num_active_validators', type: 'INT64' },
         { name: 'average_tps', type: 'FLOAT64' },
