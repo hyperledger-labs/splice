@@ -319,7 +319,7 @@ const choice_result_TransferSummary = new BQScalarFunction(
 
 const minted = new BQScalarFunction(
   'minted',
-  as_of_args,
+  time_window_args,
   rewardsStruct,
   `
     (SELECT
@@ -349,26 +349,10 @@ const minted = new BQScalarFunction(
             OR (e.choice = 'TransferPreapproval_Renew'
                 AND e.template_id_entity_name = 'TransferPreapproval'))
         AND e.template_id_module_name = 'Splice.AmuletRules'
-        AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id,
+        AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(
+              start_record_time, start_migration_id,
+              up_to_record_time, up_to_migration_id,
               e.record_time, e.migration_id))
-  `
-);
-
-const total_minted = new BQScalarFunction(
-  'total_minted',
-  as_of_args,
-  BIGNUMERIC,
-  `
-    (SELECT
-      SUM(mint_amount)
-    FROM
-      UNNEST(ARRAY[
-        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).appRewardAmount,
-        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).validatorRewardAmount,
-        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).svRewardAmount,
-        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).unclaimedActivityRecordAmount
-      ]) AS mint_amount
-    )
   `
 );
 
@@ -722,7 +706,6 @@ export const allScanFunctions = [
   TransferSummary_minted,
   choice_result_TransferSummary,
   minted,
-  total_minted,
   transferresult_fees,
   result_burn,
   burned,
