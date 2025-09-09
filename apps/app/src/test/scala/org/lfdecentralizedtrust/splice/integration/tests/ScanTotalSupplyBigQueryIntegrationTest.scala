@@ -63,8 +63,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   // Test data parameters
   private val mintedAppRewardsAmount = BigDecimal(0)
-  private val mintedValidatorRewardsAmount = BigDecimal(0)
-  private val mintedSvRewardsAmount = BigDecimal(0)
+  private val mintedValidatorRewardsAmount = BigDecimal("152207.0015220704")
+  private val mintedSvRewardsAmount = BigDecimal("2435312.024352")
   private val mintedUnclaimedsAmount = BigDecimal(0)
   private val mintedAmount =
     mintedAppRewardsAmount + mintedValidatorRewardsAmount + mintedSvRewardsAmount + mintedUnclaimedsAmount
