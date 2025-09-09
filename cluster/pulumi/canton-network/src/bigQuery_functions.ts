@@ -8,6 +8,7 @@ import {
   BQFunctionArgument,
   BQProcedure,
   BQScalarFunction,
+  BQStruct,
   BQTableFunction,
   FLOAT64,
   INT64,
@@ -34,6 +35,13 @@ const as_of_args = [
   new BQFunctionArgument('as_of_record_time', TIMESTAMP),
   new BQFunctionArgument('migration_id', INT64),
 ];
+
+const rewardsStruct = new BQStruct([
+  { name: 'appRewardAmount', type: BIGNUMERIC },
+  { name: 'validatorRewardAmount', type: BIGNUMERIC },
+  { name: 'svRewardAmount', type: BIGNUMERIC },
+  { name: 'unclaimedActivityRecordAmount', type: BIGNUMERIC },
+]);
 
 const iso_timestamp = new BQScalarFunction(
   'iso_timestamp',
@@ -254,13 +262,14 @@ const unminted = new BQScalarFunction(
 const TransferSummary_minted = new BQScalarFunction(
   'TransferSummary_minted',
   [new BQFunctionArgument('tr_json', json)],
-  BIGNUMERIC,
+  rewardsStruct,
   `
-    \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) -- .inputAppRewardAmount
-    + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) -- .inputValidatorRewardAmount
-    + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) -- .inputSvRewardAmount
-    + IFNULL(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [11]), 0) -- .inputUnclaimedActivityRecordAmount (was added only in Splice 0.4.4)
-
+    STRUCT(
+      \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) AS appRewardAmount,
+      \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) AS validatorRewardAmount,
+      \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) AS svRewardAmount,
+      IFNULL(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [11]), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
+    )
   `
 );
 
@@ -293,12 +302,23 @@ const choice_result_TransferSummary = new BQScalarFunction(
 const minted = new BQScalarFunction(
   'minted',
   as_of_args,
-  BIGNUMERIC,
+  rewardsStruct,
   `
     (SELECT
-        COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
-                  \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result))),
-                0)
+        STRUCT(
+          COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
+                    \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result)).appRewardAmount),
+                  0) AS appRewardAmount,
+          COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
+                    \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result)).validatorRewardAmount),
+                  0) AS validatorRewardAmount,
+          COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
+                    \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result)).svRewardAmount),
+                  0) AS svRewardAmount,
+          COALESCE(SUM(\`$$FUNCTIONS_DATASET$$.TransferSummary_minted\`(
+                    \`$$FUNCTIONS_DATASET$$.choice_result_TransferSummary\`(e.choice, e.result)).unclaimedActivityRecordAmount),
+                  0) AS unclaimedActivityRecordAmount
+        )
       FROM
         \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\` e
       WHERE
@@ -313,6 +333,24 @@ const minted = new BQScalarFunction(
         AND e.template_id_module_name = 'Splice.AmuletRules'
         AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(as_of_record_time, migration_id,
               e.record_time, e.migration_id))
+  `
+);
+
+const total_minted = new BQScalarFunction(
+  'total_minted',
+  as_of_args,
+  BIGNUMERIC,
+  `
+    (SELECT
+      SUM(mint_amount)
+    FROM
+      UNNEST(ARRAY[
+        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).appRewardAmount,
+        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).validatorRewardAmount,
+        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).svRewardAmount,
+        \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).unclaimedActivityRecordAmount
+      ]) AS mint_amount
+    )
   `
 );
 
@@ -527,8 +565,10 @@ const all_stats = new BQTableFunction(
     new BQColumn('unlocked', BIGNUMERIC),
     new BQColumn('current_supply_total', BIGNUMERIC),
     new BQColumn('unminted', BIGNUMERIC),
-    new BQColumn('minted', BIGNUMERIC),
-    new BQColumn('allowed_mint', BIGNUMERIC),
+    new BQColumn('minted_app_rewards', BIGNUMERIC),
+    new BQColumn('minted_validator_rewards', BIGNUMERIC),
+    new BQColumn('minted_sv_rewards', BIGNUMERIC),
+    new BQColumn('minted_unclaimed_activity_records', BIGNUMERIC),
     new BQColumn('burned', BIGNUMERIC),
     new BQColumn('monthly_burn', BIGNUMERIC),
     new BQColumn('num_amulet_holders', INT64),
@@ -544,8 +584,10 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as unlocked,
       \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as current_supply_total,
       \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) as minted,
-      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as allowed_mint,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).appRewardAmount as minted_app_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).validatorRewardAmount as minted_validator_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).svRewardAmount as minted_sv_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(as_of_record_time, migration_id).unclaimedActivityRecordAmount as minted_unclaimed_activity_records,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id), 0) as burned,
       IFNULL(\`$$FUNCTIONS_DATASET$$.burned\`(as_of_record_time, migration_id) - \`$$FUNCTIONS_DATASET$$.burned\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY), \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 30 DAY))), 0) as monthly_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
@@ -595,8 +637,10 @@ const days_with_missing_stats = new BQTableFunction(
             AND unlocked IS NOT NULL
             AND current_supply_total IS NOT NULL
             AND unminted IS NOT NULL
-            AND minted IS NOT NULL
-            AND allowed_mint IS NOT NULL
+            AND minted_app_rewards IS NOT NULL
+            AND minted_validator_rewards IS NOT NULL
+            AND minted_sv_rewards IS NOT NULL
+            AND minted_unclaimed_activity_records IS NOT NULL
             AND burned IS NOT NULL
             AND monthly_burn IS NOT NULL
             AND num_amulet_holders IS NOT NULL
@@ -637,6 +681,7 @@ export const allScanFunctions = [
   TransferSummary_minted,
   choice_result_TransferSummary,
   minted,
+  total_minted,
   transferresult_fees,
   result_burn,
   burned,
