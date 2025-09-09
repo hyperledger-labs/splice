@@ -113,7 +113,7 @@ ________
 
   How can I fetch more than 200 entries for ACS through the JSON API?
 
-    There is a server limit which is by default 200.  The configuration file can be updated as shown below:
+    There is a server limit which is by default 200.  The configuration file can be updated as shown below where it increases the ``http-list-max-elements-limit`` to have a value of 1,000.
 
     .. code-block:: text
 
@@ -154,7 +154,7 @@ ________
 
     The recommended approach is to wrap the two calls in a little helper contract. Here is `an example <https://github.com/hyperledger-labs/splice/pull/1907/files#diff-90d0ed0955b3e59b9edec55e5191d155335bae39a258dbd029b53a4e53e15db3>`__.
 
-  .. TODO(XX)::  use a permalink to point to the example once the PR is merged
+  .. TODO(2178)::  use a permalink to point to the example once the PR is merged
 
   How can our application match registered public keys with their corresponding parties to identify the party associated with an onboarded user?
 
@@ -168,8 +168,6 @@ ________
       * You can also filter by signed key through the ``filter_signed_key`` field in the ``base_query`` . If you use the fingerprint of the party’s it should give you a decent filter.
         This can be used by any of the ``List***Request`` `APIs <https://github.com/digital-asset/canton/blob/eeb56bc5d9779a7f918893b7a6b15e0b312a044e/community/base/src/main/protobuf/com/digitalasset/canton/topology/admin/v30/topology_manager_read_service.proto#L14>`__,
         like ``ListPartyToKeyMapping``.
-
-  .. TODO(XX)::  Need response from Thibault
 
   How do I know I find the specifications for the latest API version for a Dev/Test/MainNet release?
 
