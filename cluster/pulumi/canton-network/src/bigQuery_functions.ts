@@ -259,6 +259,7 @@ const TransferSummary_minted = new BQScalarFunction(
     \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) -- .inputAppRewardAmount
     + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) -- .inputValidatorRewardAmount
     + \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) -- .inputSvRewardAmount
+    + IFNULL(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [11]), 0) -- .inputUnclaimedActivityRecordAmount (was added only in Splice 0.4.4)
 
   `
 );
