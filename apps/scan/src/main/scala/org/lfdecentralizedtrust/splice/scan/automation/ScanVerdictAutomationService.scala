@@ -5,6 +5,10 @@ package org.lfdecentralizedtrust.splice.scan.automation
 
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{AutomationService, AutomationServiceCompanion}
+import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
+  TriggerClass,
+  aTrigger,
+}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
@@ -18,6 +22,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.ExecutionContextExecutor
+import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion.prettyVerdictBatch
 
 class ScanVerdictAutomationService(
     config: ScanAppBackendConfig,
@@ -31,6 +36,7 @@ class ScanVerdictAutomationService(
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
+    tracer: io.opentelemetry.api.trace.Tracer,
 ) extends AutomationService(
       config.automation,
       clock,
@@ -41,12 +47,10 @@ class ScanVerdictAutomationService(
 
   override def companion: AutomationServiceCompanion = ScanVerdictAutomationService
 
-  registerService(
+  registerTrigger(
     new ScanVerdictStoreIngestion(
+      triggerContext,
       config,
-      clock,
-      retryProvider,
-      loggerFactory,
       store,
       migrationId,
       synchronizerId,
@@ -56,5 +60,6 @@ class ScanVerdictAutomationService(
 }
 
 object ScanVerdictAutomationService extends AutomationServiceCompanion {
-  override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
+  override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
+    Seq(aTrigger[ScanVerdictStoreIngestion])
 }
