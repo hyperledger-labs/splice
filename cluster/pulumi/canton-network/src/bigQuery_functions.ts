@@ -118,13 +118,13 @@ const migration_id_at_time = new BQScalarFunction(
       (SELECT
         MIN(migration_id)
       FROM
-        ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION ALL
+        ((SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION
          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
       WHERE record_time > UNIX_MICROS(as_of_record_time)),
       -- If none exists, return the migration ID of the last update.
       (SELECT migration_id FROM
         (
-          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION ALL
+          (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\`) UNION
           (SELECT record_time, migration_id FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`)
         ) ORDER BY record_time DESC LIMIT 1)
     )
