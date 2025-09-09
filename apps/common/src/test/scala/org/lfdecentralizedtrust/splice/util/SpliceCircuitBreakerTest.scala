@@ -76,7 +76,6 @@ class SpliceCircuitBreakerTest
           cb.isClosed shouldBe true
         }
       }
-
     }
 
     "open after mixed ignored and non-ignored error categories" in {
@@ -112,6 +111,44 @@ class SpliceCircuitBreakerTest
         ex shouldBe a[CircuitBreakerOpenException]
         cb.isOpen shouldBe true
       }
+    }
+
+    "handle ignored exceptions correctly in half-open state" in {
+      val cb = createCircuitBreaker()
+
+      val nonIgnoredError =
+        SubmissionErrors.SequencerBackpressure.Rejection("Sequencer is overloaded")
+      val nonIgnoredException = ErrorCode.asGrpcError(nonIgnoredError)
+
+      for (_ <- 1 to 2) {
+        val future = cb.withCircuitBreaker(Future.failed(nonIgnoredException))
+        whenReady(future.failed) { ex =>
+          ex shouldBe a[StatusRuntimeException]
+        }
+      }
+
+      cb.isOpen shouldBe true
+
+      Thread.sleep(200)
+
+      cb.isHalfOpen shouldBe true
+
+      val ignoredError = SubmissionErrors.PackageNotVettedByRecipients.Error(Seq.empty)
+      val ignoredException = ErrorCode.asGrpcError(ignoredError)
+
+      val ignoredFuture = cb.withCircuitBreaker(Future.failed(ignoredException))
+      whenReady(ignoredFuture.failed) { ex =>
+        ex shouldBe a[StatusRuntimeException]
+      }
+
+      cb.isHalfOpen shouldBe true
+
+      val successFuture = cb.withCircuitBreaker(Future.successful("success"))
+      whenReady(successFuture) { result =>
+        result shouldBe "success"
+      }
+
+      cb.isClosed shouldBe true
     }
   }
 }

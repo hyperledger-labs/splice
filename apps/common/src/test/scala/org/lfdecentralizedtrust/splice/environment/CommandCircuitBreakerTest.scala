@@ -32,6 +32,7 @@ class CommandCircuitBreakerTest
   val ledgerClient = mock[LedgerClient]
 
   val circuitBreaker = new SpliceCircuitBreaker(
+    "test",
     new CircuitBreaker(
       actorSystem.scheduler,
       maxFailures = 5,

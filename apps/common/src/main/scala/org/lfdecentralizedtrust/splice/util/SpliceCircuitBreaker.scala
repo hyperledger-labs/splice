@@ -16,13 +16,15 @@ import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.actor.Scheduler
-import org.apache.pekko.pattern.CircuitBreaker
+import org.apache.pekko.pattern.{CircuitBreaker, CircuitBreakerOpenException}
 import org.lfdecentralizedtrust.splice.config.CircuitBreakerConfig
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
-class SpliceCircuitBreaker(underlying: CircuitBreaker) {
+class SpliceCircuitBreaker(name: String, underlying: CircuitBreaker)(implicit
+    ec: ExecutionContext
+) {
 
   private val errorCategoriesToIgnore: Set[ErrorCategory] = Set(
     InvalidIndependentOfSystemState,
@@ -32,15 +34,32 @@ class SpliceCircuitBreaker(underlying: CircuitBreaker) {
     InvalidGivenCurrentSystemStateSeekAfterEnd,
   )
 
-  def withCircuitBreaker[T](body: => Future[T]): Future[T] =
-    underlying.withCircuitBreaker[T](
-      body,
-      isResultIgnored,
-    )
+  def withCircuitBreaker[T](body: => Future[T]): Future[T] = {
+    if (underlying.isClosed || underlying.isHalfOpen) {
+      callAndMark(body)
+    } else {
+      Future.failed(
+        new CircuitBreakerOpenException(
+          underlying.resetTimeout,
+          s"Circuit breaker $name is open, calls are failing fast",
+        )
+      )
+    }
+  }
 
-  private def isResultIgnored[T](result: Try[T]): Boolean = {
+  private def callAndMark[T](body: => Future[T]) = {
+    body.andThen {
+      case Failure(exception) =>
+        if (!isFailureIgnored(exception)) {
+          underlying.fail()
+        }
+      case Success(_) => underlying.succeed()
+    }
+  }
+
+  private def isFailureIgnored[T](result: Throwable): Boolean = {
     result match {
-      case Failure(ex: StatusRuntimeException) =>
+      case ex: StatusRuntimeException =>
         val isIgnoredCategory = ErrorDetails
           .from(ex)
           .collect {
@@ -53,9 +72,7 @@ class SpliceCircuitBreaker(underlying: CircuitBreaker) {
           .flatten
           .exists(failureCategory => errorCategoriesToIgnore.contains(failureCategory))
         !isIgnoredCategory
-      case Failure(_) =>
-        true
-      case Success(_) => false
+      case _ => false
     }
   }
 
@@ -73,6 +90,7 @@ object SpliceCircuitBreaker {
       logger: TracedLogger,
   )(implicit scheduler: Scheduler, ec: ExecutionContext): SpliceCircuitBreaker =
     new SpliceCircuitBreaker(
+      name,
       new CircuitBreaker(
         scheduler,
         maxFailures = config.maxFailures,
@@ -89,6 +107,6 @@ object SpliceCircuitBreaker {
         logger.info(s"Circuit breaker $name moving to half-open state")(TraceContext.empty)
       }.onClose {
         logger.info(s"Circuit breaker $name moving to closed state")(TraceContext.empty)
-      }
+      },
     )
 }
