@@ -47,12 +47,13 @@ class SpliceCircuitBreakerTest
         ex shouldBe a[RuntimeException]
         cb.isClosed shouldBe true
       }
-
-      val future2 = cb.withCircuitBreaker(Future.failed(new RuntimeException("test failure 2")))
-      whenReady(future2.failed) { ex =>
-        ex shouldBe a[RuntimeException]
-        ex.getMessage shouldBe "test failure 2"
-        cb.isOpen shouldBe true
+      loggerFactory.suppressWarnings {
+        val future2 = cb.withCircuitBreaker(Future.failed(new RuntimeException("test failure 2")))
+        whenReady(future2.failed) { ex =>
+          ex shouldBe a[RuntimeException]
+          ex.getMessage shouldBe "test failure 2"
+          cb.isOpen shouldBe true
+        }
       }
 
       val future3 = cb.withCircuitBreaker(Future.successful("should not reach here"))
@@ -101,9 +102,11 @@ class SpliceCircuitBreakerTest
 
       val exception2 = ErrorCode.asGrpcError(nonIgnoredError)
       val future3 = cb.withCircuitBreaker(Future.failed(exception2))
-      whenReady(future3.failed) { ex =>
-        ex shouldBe a[StatusRuntimeException]
-        cb.isOpen shouldBe true
+      loggerFactory.suppressWarnings {
+        whenReady(future3.failed) { ex =>
+          ex shouldBe a[StatusRuntimeException]
+          cb.isOpen shouldBe true
+        }
       }
 
       val future4 = cb.withCircuitBreaker(Future.successful("should not reach here"))
@@ -113,25 +116,27 @@ class SpliceCircuitBreakerTest
       }
     }
 
-    "handle ignored exceptions correctly in half-open state" in {
+    "do not close circuit breaker when ignored failures occur" in {
       val cb = createCircuitBreaker()
 
       val nonIgnoredError =
         SubmissionErrors.SequencerBackpressure.Rejection("Sequencer is overloaded")
       val nonIgnoredException = ErrorCode.asGrpcError(nonIgnoredError)
 
-      for (_ <- 1 to 2) {
-        val future = cb.withCircuitBreaker(Future.failed(nonIgnoredException))
-        whenReady(future.failed) { ex =>
-          ex shouldBe a[StatusRuntimeException]
+      loggerFactory.suppressWarnings {
+        for (_ <- 1 to 2) {
+          val future = cb.withCircuitBreaker(Future.failed(nonIgnoredException))
+          whenReady(future.failed) { ex =>
+            ex shouldBe a[StatusRuntimeException]
+          }
         }
       }
 
       cb.isOpen shouldBe true
 
-      Thread.sleep(200)
-
-      cb.isHalfOpen shouldBe true
+      eventually() {
+        cb.isHalfOpen shouldBe true
+      }
 
       val ignoredError = SubmissionErrors.PackageNotVettedByRecipients.Error(Seq.empty)
       val ignoredException = ErrorCode.asGrpcError(ignoredError)

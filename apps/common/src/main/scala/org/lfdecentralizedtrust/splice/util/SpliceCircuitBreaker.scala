@@ -60,7 +60,7 @@ class SpliceCircuitBreaker(name: String, underlying: CircuitBreaker)(implicit
   private def isFailureIgnored[T](result: Throwable): Boolean = {
     result match {
       case ex: StatusRuntimeException =>
-        val isIgnoredCategory = ErrorDetails
+        ErrorDetails
           .from(ex)
           .collect {
             case ErrorDetails.ErrorInfoDetail(_, metadata) if metadata.contains("category") =>
@@ -71,7 +71,6 @@ class SpliceCircuitBreaker(name: String, underlying: CircuitBreaker)(implicit
           }
           .flatten
           .exists(failureCategory => errorCategoriesToIgnore.contains(failureCategory))
-        !isIgnoredCategory
       case _ => false
     }
   }
