@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.store.PageLimit
+import scala.collection.immutable.SortedMap
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -109,6 +110,88 @@ class ScanEventStore(
         .map(k => (verdictByKey.get(k), updateByKey.get(k)))
         .take(limit.limit)
         .toSeq
+    }
+  }
+
+  /** Like getEventsReference, but uses in-memory lastIngested record_time instead of DB max queries. */
+  def getEvents(
+      afterO: Option[(Long, CantonTimestamp)],
+      currentMigrationId: Long,
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[Event]] = {
+    val capO: Option[CantonTimestamp] =
+      (verdictStore.lastIngestedRecordTime, updateHistory.lastIngestedRecordTime) match {
+        case (Some(v), Some(u)) => Some(if (v < u) v else u)
+        case _ => None
+      }
+
+    afterO match {
+      case Some((afterMig, _)) if afterMig == currentMigrationId && capO.isEmpty =>
+        // fall back to reading max recordTime from DB, if the in-memory refs
+        // are not initialized, which may happen if there has been no ingestion
+        getEventsReference(afterO, currentMigrationId, limit)
+      case _ =>
+        def allow(mig: Long, rt: CantonTimestamp): Boolean = {
+          afterO match {
+            case Some((afterMig, afterRt)) if mig == afterMig =>
+              if (mig < currentMigrationId) rt > afterRt
+              else rt > afterRt && capO.forall(rt <= _)
+            case _ if mig < currentMigrationId =>
+              // For prior migrations, stream everything in order
+              rt > CantonTimestamp.MinValue
+            case _ =>
+              rt > CantonTimestamp.MinValue && capO.forall(rt <= _)
+          }
+        }
+
+        val verdictsF = verdictStore.listVerdicts(
+          afterO = afterO,
+          includeImportUpdates = false,
+          limit = limit.limit,
+        )
+        val updatesF = updateHistory.getUpdatesWithoutImportUpdates(afterO, limit)
+
+        for {
+          verdicts <- verdictsF
+          cappedVerdicts = verdicts.filter(v => allow(v.migrationId, v.recordTime))
+          // Fetch views only for filtered verdicts
+          verdictsWithViews <- Future.traverse(cappedVerdicts)(v =>
+            verdictStore.listTransactionViews(v.rowId).map(views => v -> views)
+          )
+          updatesAll <- updatesF
+        } yield {
+          val verdictEntries: Iterator[((Long, CantonTimestamp), Verdict)] =
+            verdictsWithViews.iterator.map { case (v, views) =>
+              val k = (v.migrationId, v.recordTime)
+              k -> (v -> views)
+            }
+
+          val filteredUpdates =
+            updatesAll.filter(u => allow(u.migrationId, u.update.update.recordTime))
+
+          val mergedSorted = {
+            val fromUpdates = filteredUpdates.iterator.foldLeft(
+              SortedMap.empty[
+                (Long, CantonTimestamp),
+                (Option[Verdict], Option[TreeUpdateWithMigrationId]),
+              ]
+            ) { case (acc, u) =>
+              val k = (u.migrationId, u.update.update.recordTime)
+              acc.updated(k, (None, Some(u)))
+            }
+            verdictEntries.foldLeft(fromUpdates) { case (acc, (k, v)) =>
+              acc.get(k) match {
+                case Some((_, uOpt)) => acc.updated(k, (Some(v), uOpt))
+                case None => acc.updated(k, (Some(v), None))
+              }
+            }
+          }
+
+          mergedSorted.iterator
+            .take(limit.limit)
+            .map(_._2)
+            .toSeq
+        }
     }
   }
 }
