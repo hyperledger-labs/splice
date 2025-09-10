@@ -24,9 +24,9 @@ import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { useMemo, useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
-import { dsoFormConfigEncoder } from '../../utils/dsoFormConfigEncoder';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigFromChanges';
 
 export type SetDsoConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -88,7 +88,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       } else {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges, false);
         const baseConfig = dsoConfig;
-        const newConfig = dsoFormConfigEncoder(changes);
+        const newConfig = buildDsoRulesConfigFromChanges(changes);
         const action: ActionRequiringConfirmation = {
           tag: 'ARC_DsoRules',
           value: {

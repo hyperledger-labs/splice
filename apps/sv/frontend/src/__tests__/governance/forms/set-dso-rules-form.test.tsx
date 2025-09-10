@@ -39,7 +39,7 @@ describe('Set DSO Config Rules Form', () => {
   test('should render all Set DSO Config Rules Form components', () => {
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -74,7 +74,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -109,7 +109,7 @@ describe('Set DSO Config Rules Form', () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -137,7 +137,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -168,7 +168,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -193,7 +193,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 

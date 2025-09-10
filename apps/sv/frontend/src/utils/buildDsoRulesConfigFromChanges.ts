@@ -13,7 +13,7 @@ import {
  * Given a list of config changes, build and return a DsoRulesConfig.
  * The config changes should have all fields, whether they have been changed or not.
  */
-export function dsoFormConfigEncoder(dsoConfigChanges: ConfigChange[]): DsoRulesConfig {
+export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[]): DsoRulesConfig {
   // map of field names -> new values for quick lookup
   const changeMap = new Map<string, string>();
 
