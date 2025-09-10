@@ -15,6 +15,7 @@ import io.circe.Json
 import slick.jdbc.{GetResult, PositionedParameters, PositionedResult, SetParameter}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
+import java.util.concurrent.atomic.AtomicReference
 
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
@@ -88,6 +89,20 @@ class DbScanVerdictStore(
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
   override protected def timeouts = new ProcessingTimeout
+
+  private val lastIngestedRecordTimeRef =
+    new AtomicReference[Option[CantonTimestamp]](None)
+
+  def lastIngestedRecordTime: Option[CantonTimestamp] = lastIngestedRecordTimeRef.get()
+
+  private def advanceLastIngestedRecordTime(ts: CantonTimestamp): Unit = {
+    val _ = lastIngestedRecordTimeRef.updateAndGet { curr =>
+      curr match {
+        case Some(c) if ts < c => curr
+        case _ => Some(ts)
+      }
+    }
+  }
 
   object Tables {
     val verdicts = "scan_verdict_store"
@@ -245,11 +260,15 @@ class DbScanVerdictStore(
       } yield ()
 
       futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          action.transactionally,
-          "scanVerdict.insertVerdictAndTransactionViews.batch",
-        )
-      )
+        storage
+          .queryAndUpdate(
+            action.transactionally,
+            "scanVerdict.insertVerdictAndTransactionViews.batch",
+          )
+      ).map { _ =>
+        val maxRt = items.map(_._1.recordTime).reduceOption((a, b) => if (a >= b) a else b)
+        maxRt.foreach(advanceLastIngestedRecordTime)
+      }
     }
   }
 
