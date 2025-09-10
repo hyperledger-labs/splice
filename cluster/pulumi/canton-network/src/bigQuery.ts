@@ -203,7 +203,8 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
     {
       datasetId: dataset.datasetId,
       tableId: dataTableName,
-      deletionProtection: protectCloudSql,
+      // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
+      deletionProtection: false,
       friendlyName: `${dataTableName} Table`,
       schema: JSON.stringify([
         { name: 'as_of_record_time', type: 'TIMESTAMP', mode: 'REQUIRED' },
