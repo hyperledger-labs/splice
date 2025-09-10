@@ -882,7 +882,7 @@ class HttpScanHandler(
 
     confirmBackfillingIsCompleteThen(updateHistory) {
       for {
-        events <- eventStore.getEventsReference(
+        events <- eventStore.getEvents(
           afterO = afterO,
           currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
           limit = PageLimit.tryCreate(pageSize),
