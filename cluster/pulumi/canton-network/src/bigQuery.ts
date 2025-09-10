@@ -206,7 +206,8 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
     {
       datasetId: dataset.datasetId,
       tableId: dataTableName,
-      deletionProtection: protectCloudSql,
+      // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
+      deletionProtection: false,
       friendlyName: `${dataTableName} Table`,
       schema: JSON.stringify([
         { name: 'as_of_record_time', type: 'TIMESTAMP', mode: 'REQUIRED' },
@@ -215,10 +216,10 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
         { name: 'unlocked', type: 'BIGNUMERIC' },
         { name: 'current_supply_total', type: 'BIGNUMERIC' },
         { name: 'unminted', type: 'BIGNUMERIC' },
-        { name: 'minted_app_rewards', type: 'BIGNUMERIC' },
-        { name: 'minted_validator_rewards', type: 'BIGNUMERIC' },
-        { name: 'minted_sv_rewards', type: 'BIGNUMERIC' },
-        { name: 'minted_unclaimed_activity_records', type: 'BIGNUMERIC' },
+        { name: 'daily_mint_app_rewards', type: 'BIGNUMERIC' },
+        { name: 'daily_mint_validator_rewards', type: 'BIGNUMERIC' },
+        { name: 'daily_mint_sv_rewards', type: 'BIGNUMERIC' },
+        { name: 'daily_mint_unclaimed_activity_records', type: 'BIGNUMERIC' },
         { name: 'burned', type: 'BIGNUMERIC' },
         { name: 'monthly_burn', type: 'BIGNUMERIC' },
         { name: 'num_amulet_holders', type: 'INT64' },
