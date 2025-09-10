@@ -677,7 +677,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       val sv1Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(4), userParty(1), 1000))
       val sv2Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(4), userParty(2), 1000))
       val sv3Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(4), 1000))
-      val sv4Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(1), 1000))
+      val sv4Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(2), 1000))
       for {
         store <- mkStore()
         _ <- dummyDomain.create(closedRound)(store.multiDomainAcsStore)
