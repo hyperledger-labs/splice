@@ -672,9 +672,12 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(4), userParty(2), 1000))
       val sv3NotClosed =
         (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(1), userParty(4), 1000))
+      val sv4NotClosed =
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(1), userParty(1), 1000))
       val sv1Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(4), userParty(1), 1000))
       val sv2Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(4), userParty(2), 1000))
       val sv3Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(4), 1000))
+      val sv4Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(1), 1000))
       for {
         store <- mkStore()
         _ <- dummyDomain.create(closedRound)(store.multiDomainAcsStore)
@@ -694,7 +697,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
         _ <- MonadUtil.sequentialTraverse(
-          sv1NotClosed ++ sv2NotClosed ++ sv3NotClosed ++ sv1Closed ++ sv2Closed ++ sv3Closed
+          sv1NotClosed ++ sv2NotClosed ++ sv3NotClosed ++ sv4NotClosed ++ sv1Closed ++ sv2Closed ++ sv3Closed ++ sv4Closed
         )(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
@@ -734,7 +737,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         forExactly(1, result) { batch =>
           batch.validatorCoupons should have size 0
           batch.appCoupons should have size 0
-          batch.svRewardCoupons should have size 9
+          batch.svRewardCoupons should have size 12
           batch.validatorFaucets should have size 0
         }
         forExactly(1, result) { batch =>
