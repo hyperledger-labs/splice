@@ -343,6 +343,8 @@ Based on that:
 
       select distinct(reward_party) from dso_acs_store where reward_round < UPGRADE_ROUND;
 
+  Note however that this query overapproximates the set of parties to ignore, so you might need to remove some parties again later.
+
 - If one of the parties you want to ignore is an SV, you most likely want to ignore the beneficiary of that SV instead
   (or even better - talk to the SV's operator to make sure their beneficiary upgrades to a more recent version).
 - Once you are confident in the set of parties to ignore, remove the ``delegatelessAutomationExpiredRewardCouponBatchSize`` override and confirm that the
