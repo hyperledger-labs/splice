@@ -267,6 +267,7 @@ class ScanApp(
         clock,
         retryProvider,
         loggerFactory,
+        nodeMetrics.grpcClientMetrics,
         scanVerdictStore,
         migrationInfo.currentMigrationId,
         synchronizerId,

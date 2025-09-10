@@ -20,6 +20,11 @@ import com.digitalasset.canton.admin.api.client.commands.MediatorInspectionComma
 import io.grpc.Context
 import io.grpc.stub.StreamObserver
 import com.digitalasset.canton.lifecycle.HasRunOnClosing
+import org.lfdecentralizedtrust.splice.admin.api.client.{
+  GrpcClientMetrics,
+  GrpcMetricsClientInterceptor,
+}
+import com.digitalasset.canton.tracing.TraceContextGrpc
 
 import scala.concurrent.ExecutionContext
 import java.util.concurrent.Executor
@@ -27,6 +32,7 @@ import java.util.concurrent.Executor
 final class MediatorVerdictsClient(
     mediatorAdminClientConfig: com.digitalasset.canton.config.FullClientConfig,
     hasRunOnClosing: HasRunOnClosing,
+    grpcClientMetrics: GrpcClientMetrics,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends AutoCloseable
@@ -66,10 +72,20 @@ final class MediatorVerdictsClient(
           mediatorVerdicts.extractResults,
         )
 
-        val svc = mediatorVerdicts.createService(managedChannel.channel)
+        val svc = mediatorVerdicts
+          .createService(managedChannel.channel)
+          .withInterceptors(
+            TraceContextGrpc.clientInterceptor,
+            new GrpcMetricsClientInterceptor(grpcClientMetrics),
+          )
         val ctx = Context.current().withCancellation()
         mediatorVerdicts.createRequestInternal() match {
-          case Right(req) => ctx.run(() => mediatorVerdicts.doRequest(svc, req, rawObserver))
+          case Right(req) =>
+            ctx.run(() =>
+              TraceContextGrpc.withGrpcContext(tc) {
+                mediatorVerdicts.doRequest(svc, req, rawObserver)
+              }
+            )
           case Left(err) => queue.fail(new IllegalArgumentException(err))
         }
         ctx

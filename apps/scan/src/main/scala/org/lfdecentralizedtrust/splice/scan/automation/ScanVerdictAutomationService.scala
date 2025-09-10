@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   TriggerClass,
   aTrigger,
 }
+import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
@@ -29,6 +30,7 @@ class ScanVerdictAutomationService(
     clock: Clock,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
+    grpcClientMetrics: GrpcClientMetrics,
     store: DbScanVerdictStore,
     migrationId: Long,
     synchronizerId: SynchronizerId,
@@ -51,6 +53,7 @@ class ScanVerdictAutomationService(
     new ScanVerdictStoreIngestion(
       triggerContext,
       config,
+      grpcClientMetrics,
       store,
       migrationId,
       synchronizerId,

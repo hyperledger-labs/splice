@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
@@ -37,6 +38,7 @@ import com.digitalasset.canton.mediator.admin.v30
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
     config: ScanAppBackendConfig,
+    grpcClientMetrics: GrpcClientMetrics,
     store: DbScanVerdictStore,
     migrationId: Long,
     synchronizerId: SynchronizerId,
@@ -57,6 +59,7 @@ class ScanVerdictStoreIngestion(
     new MediatorVerdictsClient(
       config.mediatorAdminClient,
       this,
+      grpcClientMetrics,
       context.loggerFactory,
     )(ec)
 
