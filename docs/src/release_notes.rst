@@ -21,6 +21,15 @@ Upcoming
     `earn app rewards on deposits and withdrawals <https://docs.digitalasset.com/integrate/devnet/exchange-integration/extensions.html>`__
     of CN token standard tokens.
 
+- Docs
+
+  - SV
+
+    - Document process for :ref:`ignoring party IDs for reward expiry automation <sv_ops_ignored_rewards_party_ids>`
+      that is currently recommended after each Daml upgrade,
+      to reduce the impact of validators that are unable to complete
+      the Daml upgrade due to being on an outdated version of Splice.
+
 0.4.15
 ------
 
