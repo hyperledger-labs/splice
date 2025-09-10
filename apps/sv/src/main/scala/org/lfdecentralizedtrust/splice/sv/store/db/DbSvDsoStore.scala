@@ -520,7 +520,16 @@ class DbSvDsoStore(
     val opName = s"list${templateId.getEntityName}GroupedByRound"
     val partyFilter =
       if (ignoredParties.nonEmpty)
-        (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+        companion match {
+          case SvRewardCoupon.COMPANION =>
+            // only SV reward coupons have a beneficiary field
+            (sql"and reward_party not in " ++ inClause(ignoredParties) ++
+              sql" and create_arguments ->> 'beneficiary' not in " ++ inClause(
+                ignoredParties
+              )).toActionBuilder
+          case _ =>
+            (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+        }
       else sql""
     waitUntilAcsIngested {
       for {
