@@ -57,19 +57,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         updateId2 = tx2.getUpdateId
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after recordTs1
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1)),
           domainMigrationId,
           pageLimit,
@@ -108,19 +106,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         _ <- insertVerdict(ctx.verdictStore, updateId2, recordTs2)
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after recordTs1
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1)),
           domainMigrationId,
           pageLimit,
@@ -161,19 +157,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         _ <- insertVerdict(ctx.verdictStore, updateId, recordTs3)
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after recordTs1
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1)),
           domainMigrationId,
           pageLimit,
@@ -213,22 +207,15 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         _ <- insertVerdict(ctx1.verdictStore, updateId2, recordTs2, migrationId = mig1)
 
         // Query combined events at current migration = mig1
-        events <- ctx1.eventStore.getEventsReference(
-          None,
-          mig1,
-          pageLimit,
-        )
-        events2 <- ctx1.eventStore.getEventsReference(
+        events <- fetchEvents(ctx1.eventStore, None, mig1, pageLimit)
+        events2 <- fetchEvents(
+          ctx1.eventStore,
           Some((mig0, recordTs1.minusSeconds(1))),
           mig1,
           pageLimit,
         )
         // after recordTs1
-        events3 <- ctx1.eventStore.getEventsReference(
-          Some((mig0, recordTs1)),
-          mig1,
-          pageLimit,
-        )
+        events3 <- fetchEvents(ctx1.eventStore, Some((mig0, recordTs1)), mig1, pageLimit)
         // Fetch by id works across migrationIds
         e1 <- ctx1.eventStore.getEventByUpdateId(updateId1)
         e2 <- ctx1.eventStore.getEventByUpdateId(updateId2)
@@ -268,11 +255,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         recordTs2 = recordTs.plusSeconds(1)
         _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
 
-        events <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
 
         // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
@@ -304,11 +287,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         recordTs2 = recordTs.plusSeconds(1)
         _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
 
-        events <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
 
         // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
@@ -344,19 +323,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         assignment2 <- insertAssign(ctx.updateHistory, recordTs3, "assign-cap-2")
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after latest verdict
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs2)),
           domainMigrationId,
           pageLimit,
@@ -391,19 +368,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         _ <- insertVerdict(ctx.verdictStore, updateId2, recordTs3)
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after latest assignment
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs2)),
           domainMigrationId,
           pageLimit,
@@ -439,19 +414,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         unassignment2 <- insertUnassign(ctx.updateHistory, recordTs3, "unassign-cap-2")
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after latest verdict
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs2)),
           domainMigrationId,
           pageLimit,
@@ -487,19 +460,17 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         _ <- insertVerdict(ctx.verdictStore, updateId2, recordTs3)
 
         // Fetch without cursor
-        events1 <- ctx.eventStore.getEventsReference(
-          None,
-          domainMigrationId,
-          pageLimit,
-        )
+        events1 <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         // Fetch with cursor
-        events2 <- ctx.eventStore.getEventsReference(
+        events2 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs1.minusSeconds(1))),
           domainMigrationId,
           pageLimit,
         )
         // Fetch after latest unassignment
-        events3 <- ctx.eventStore.getEventsReference(
+        events3 <- fetchEvents(
+          ctx.eventStore,
           Some((domainMigrationId, recordTs2)),
           domainMigrationId,
           pageLimit,
@@ -549,11 +520,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         updateId2 = tx2.getUpdateId
 
         // Query combined events at current migration = mig2
-        events <- ctx2.eventStore.getEventsReference(
-          None,
-          mig2,
-          pageLimit,
-        )
+        events <- fetchEvents(ctx2.eventStore, None, mig2, pageLimit)
       } yield {
         // mig0 + mig1 updates should be present; mig2 update should be filtered (after cap)
         hasUpdate(events, updateId0) shouldBe true
@@ -591,11 +558,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         _ <- insertVerdict(ctx2.verdictStore, "verdict-mig2", recordTs5, migrationId = mig2)
 
         // Query combined events at current migration = mig2
-        events <- ctx2.eventStore.getEventsReference(
-          None,
-          mig2,
-          pageLimit,
-        )
+        events <- fetchEvents(ctx2.eventStore, None, mig2, pageLimit)
       } yield {
         // mig0 + mig1 verdicts should be present; mig2 verdict should be filtered (after cap)
         hasVerdict(events, "verdict-mig0") shouldBe true
@@ -633,11 +596,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         assignment2 <- insertAssign(ctx2.updateHistory, recordTs5, "assign-mig2")
 
         // Query combined events at current migration = mig2
-        events <- ctx2.eventStore.getEventsReference(
-          None,
-          mig2,
-          pageLimit,
-        )
+        events <- fetchEvents(ctx2.eventStore, None, mig2, pageLimit)
       } yield {
         // mig0 + mig1 assignments should be present; mig2 assignment should be filtered (after cap)
         hasUpdate(events, assignment0.updateId) shouldBe true
@@ -673,11 +632,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         unassignment2 <- insertUnassign(ctx2.updateHistory, recordTs5, "unassign-mig2")
 
         // Query combined events at current migration = mig2
-        events <- ctx2.eventStore.getEventsReference(
-          None,
-          mig2,
-          pageLimit,
-        )
+        events <- fetchEvents(ctx2.eventStore, None, mig2, pageLimit)
       } yield {
         // mig0 + mig1 unassignments should be present; mig2 unassignment should be filtered (after cap)
         hasUpdate(events, unassignment0.updateId) shouldBe true
@@ -816,6 +771,22 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
   private def hasVerdict(events: Seq[ScanEventStore#Event], updateId: String): Boolean =
     events.exists(_._1.exists(_._1.updateId == updateId))
+
+  // Wrapper that calls both reference and more optimized API and asserts equality
+  private def fetchEvents(
+      es: ScanEventStore,
+      afterO: Option[(Long, CantonTimestamp)],
+      currentMigrationId: Long,
+      limit: PageLimit,
+  ): Future[Seq[ScanEventStore#Event]] = {
+    for {
+      ref <- es.getEventsReference(afterO, currentMigrationId, limit)(traceContext)
+      alt <- es.getEvents(afterO, currentMigrationId, limit)(traceContext)
+    } yield {
+      ref shouldBe alt
+      ref
+    }
+  }
 
   private case class EventStoreCtx(
       verdictStore: DbScanVerdictStore,
