@@ -198,56 +198,6 @@ class DbScanVerdictStore(
       """.asUpdate
   }
 
-  def insertVerdict(row: VerdictT)(implicit tc: TraceContext): Future[Int] = {
-    storage
-      .querySingle(
-        sqlInsertVerdictReturningId(row),
-        "scanVerdict.insertVerdictReturningId",
-      )
-      .value
-      .map {
-        case Some(id) => id.toInt
-        case None => throw new RuntimeException("insertVerdict did not return row_id")
-      }
-  }
-
-  def insertTransactionViews(
-      rows: Seq[TransactionViewT]
-  )(implicit tc: TraceContext): Future[Int] = {
-    if (rows.isEmpty) Future.successful(0)
-    else {
-      import slick.dbio.DBIO
-      futureUnlessShutdownToFuture(
-        storage.update(
-          DBIO.sequence(rows.map(sqlInsertView)).map(_.sum: Int),
-          "scanVerdict.insertTransactionViews",
-        )
-      )
-    }
-  }
-
-  def insertVerdictAndTransactionViews(
-      verdict: VerdictT,
-      mkViews: Long => Seq[TransactionViewT],
-  )(implicit tc: TraceContext): Future[Unit] = {
-    import slick.dbio.DBIO
-    import profile.api.jdbcActionExtensionMethods
-
-    val action: DBIO[Unit] = for {
-      idOpt <- sqlInsertVerdictReturningId(verdict)
-      rowId <- idOpt match {
-        case Some(id) => DBIO.successful(id)
-        case None => DBIO.failed(new RuntimeException("insertVerdict did not return row_id"))
-      }
-      views = mkViews(rowId)
-      _ <- DBIO.sequence(views.map(sqlInsertView)).map(_ => ())
-    } yield ()
-
-    futureUnlessShutdownToFuture(
-      storage.queryAndUpdate(action.transactionally, "scanVerdict.insertVerdictAndTransactionViews")
-    )
-  }
-
   /** Insert multiple verdicts and their transaction views in a single transaction.
     *
     * Similar to insertItems of UpdateHistory, we check whether the first verdict's

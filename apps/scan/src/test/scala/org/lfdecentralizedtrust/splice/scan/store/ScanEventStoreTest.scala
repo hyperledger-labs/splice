@@ -806,7 +806,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         )
       )
     }
-    verdictStore.insertVerdictAndTransactionViews(verdict, mkViews)
+    verdictStore.insertVerdictAndTransactionViews(Seq(verdict -> mkViews))
   }
 
   private val pageLimit = PageLimit.tryCreate(1000)
