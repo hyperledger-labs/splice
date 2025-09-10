@@ -1559,10 +1559,12 @@ paths:
       x-jvm-package: scan
       operationId: "getEventHistory"
       description: |
-        Returns the event history in ascending order, paged. Ordering is by `(migration_id ASC, record_time ASC)`.
-        When `after` is provided, the cursor is exclusive and uniquely identified by `(migration_id, record_time)`.
-        Items may be transactions, mediator verdicts, or both for the same `update_id` when available.
-        Error semantics mirror `POST /v2/updates`.
+        Returns the event history in ascending order, paged, from ledger begin or optionally starting after a record time.
+        Updates are ordered lexicographically by `(migration id, record time)`.
+        For a given migration id, each event has a unique record time.
+        The record time ranges of different migrations may overlap, i.e.,
+        it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
+        and there may be two updates with the same record time but different migration ids.
       requestBody:
         required: true
         content:
@@ -1586,7 +1588,7 @@ paths:
       x-jvm-package: scan
       operationId: "getEventById"
       description: |
-        Returns the event with the given `update_id` for the current domain (synchronizer); spans all migrations.
+        Returns the event with the given update_id.
       parameters:
         - name: "update_id"
           in: "path"
@@ -3690,7 +3692,7 @@ components:
             specified.
         page_size:
           description: |
-            The maximum number of events returned for this request (1–1000).
+            The maximum number of events returned for this request.
           type: integer
           format: int32
           minimum: 1
@@ -3709,8 +3711,8 @@ components:
     EventHistoryItem:
       type: object
       description: |
-        An item in the event history. May contain a transaction, a mediator verdict, or both for the same `update_id`.
-        When both are present, they refer to the same `update_id` and `record_time`.
+        An event history item may contain a transaction update, a verdict from mediator, or both.
+        When both are present, they have the same `update_id` and `record_time`.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
@@ -3734,24 +3736,24 @@ components:
       properties:
         update_id:
           description: |
-            The ID of the update associated with this verdict.
+            The ID of the transaction update associated with this verdict.
           type: string
         migration_id:
           description: |
-            The migration id of the synchronizer which processed this verdict.
+            The migration id of the domain through which this event was sequenced.
           type: integer
           format: int64
         domain_id:
           description: |
-            The domain_id of the synchronizer which processed this verdict.
+            The id of the domain through which this event was sequenced.
           type: string
         record_time:
           description: |
-            The record_time of the event the verdict corresponds to.
+            The record_time of the transaction the verdict corresponds to.
           type: string
         finalization_time:
           description: |
-            The finalization_time of the event the verdict corresponds to.
+            The finalization_time of the transaction the verdict corresponds to.
           type: string
         submitting_parties:
           description: |
@@ -3765,11 +3767,11 @@ components:
           type: string
         verdict_result:
           description: |
-            Result of the mediator verdict.
+            Result of the verdict.
           $ref: '#/components/schemas/VerdictResult'
         mediator_group:
           description: |
-            The mediator group that finalized the verdict.
+            The mediator group which finalized this verdict.
           type: integer
           format: int32
         transaction_views:
