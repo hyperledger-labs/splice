@@ -8,6 +8,19 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Daml
+
+  - Add the ``splice-util-featured-app-proxies``
+    :ref:`package <featured_app_activity_markers_api>` to simplify
+    the creation of featured app activity markers for token standard actions.
+    This is a utility package that is not uploaded by default to a validator node.
+    An example use-case for this package is an exchange that wants to
+    `earn app rewards on deposits and withdrawals <https://docs.digitalasset.com/integrate/devnet/exchange-integration/extensions.html>`__
+    of CN token standard tokens.
+
 0.4.15
 ------
 
