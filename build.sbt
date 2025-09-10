@@ -338,7 +338,7 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
           val transferInstructionOpenApiFile =
             baseDirectory.value / "openapi/transfer-instruction-v1.yaml"
 
-          val npmName = "transfer-instruction-openapi"
+          val npmName = "@lfdecentralizedtrust/transfer-instruction-openapi"
 
           BuildCommon.TS.generateOpenApiClient(
             npmName = npmName,
@@ -461,7 +461,7 @@ lazy val `canton-json-api-v2-openapi-ts-client` = project
       Def.taskDyn {
         val openApiFile = baseDirectory.value / "openapi.yaml"
 
-        val npmName = "canton-json-api-v2"
+        val npmName = "@lfdecentralizedtrust/canton-json-api-v2"
 
         BuildCommon.TS.generateOpenApiClient(
           npmName = npmName,
