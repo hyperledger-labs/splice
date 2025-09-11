@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
+import { coreSvsToDeploy } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigs';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 
 import { isDevNet, isMainNet } from '../../common';
@@ -13,7 +13,8 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numCoreSvsToDeploy = coreSvsToDeploy.length;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
   const port = (migration: number, node: number) => ({
     number: cometBFTExternalPort(migration, node),

@@ -452,6 +452,7 @@ export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
   return asJson && JSON.parse(asJson);
 }
 
+// "core SVs" are deployed as part of the `canton-network` stack;
 // if config.yaml contains any SVs that don't match the standard sv-X pattern, we deploy them independently of DSO_SIZE
 export const coreSvsToDeploy: StaticSvConfig[] = standardSvConfigs
   .slice(0, dsoSize)

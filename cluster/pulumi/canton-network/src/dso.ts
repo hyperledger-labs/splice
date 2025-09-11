@@ -20,9 +20,9 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
+  coreSvsToDeploy,
   initialRound,
   StaticCometBftConfigWithNodeName,
-  svConfigs,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   SequencerPruningConfig,
@@ -34,7 +34,6 @@ import _ from 'lodash';
 import { InstalledSv, installSvNode } from './sv';
 
 interface DsoArgs {
-  dsoSize: number;
   auth0Client: Auth0Client;
   approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
@@ -125,7 +124,7 @@ export class Dso extends pulumi.ComponentResource {
   }
 
   private async installDso() {
-    const relevantSvConfs = svConfigs.slice(0, this.args.dsoSize);
+    const relevantSvConfs = coreSvsToDeploy;
     const [sv1Conf, ...restSvConfs] = relevantSvConfs;
 
     const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
