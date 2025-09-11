@@ -22,7 +22,6 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
 
-  val latestPackagesOnly: Boolean = false
   def participantClient: BaseParticipantClientConfig
   def automation: AutomationConfig
 

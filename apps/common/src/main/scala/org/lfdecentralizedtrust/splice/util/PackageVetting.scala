@@ -116,9 +116,8 @@ class PackageVetting(
       validFrom: Option[Instant],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
   )(implicit tc: TraceContext): Future[Unit] = {
-    logger.debug(s"Vetting packages: ${packages.mkString(", ")} on $domainId valid from $validFrom")
     val packagesToProcess = if (latestPackagesOnly) {
-      val res = packages
+      packages
         .foldLeft(Map.empty[IdString.PackageName, (PackageIdResolver.Package, PackageVersion)]) {
           case (acc, (pkg, version)) =>
             acc.get(pkg.packageName) match {
@@ -131,11 +130,16 @@ class PackageVetting(
         }
         .values
         .toSeq
-      logger.debug(
-        s"Vetting only the latest packages: ${res.mkString(", ")} on $domainId valid from $validFrom"
-      )
-      res
     } else packages
+    if (latestPackagesOnly) {
+      logger.debug(
+        s"Vetting only the latest packages: ${packagesToProcess.mkString(", ")} on $domainId valid from $validFrom"
+      )
+    } else {
+      logger.debug(
+        s"Vetting packages: ${packages.mkString(", ")} on $domainId valid from $validFrom"
+      )
+    }
     val resources = packagesToProcess.flatMap { case (pkg, packageVersion) =>
       // Upload the version required by current config, and log an error if it is not part of the deployed release
       DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {

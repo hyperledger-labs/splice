@@ -43,7 +43,6 @@ case class SplitwellAppBackendConfig(
     domains: SplitwellSynchronizerConfig,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     requiredDarVersion: PackageVersion = DarResources.splitwell.bootstrap.metadata.version,
-    override val latestPackagesOnly: Boolean,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"
