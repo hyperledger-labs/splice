@@ -604,7 +604,10 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
                         // We could also have done `info.sv*.whatever` here but enumerating what we expect seems slightly more secure
                         ...new Set(
                           [
-                            ...Array.from({ length: numCoreSvsToDeploy }, (_, index) => `sv-${index + 1}`),
+                            ...Array.from(
+                              { length: numCoreSvsToDeploy },
+                              (_, index) => `sv-${index + 1}`
+                            ),
                             ...(DeploySvRunbook ? ['sv'] : []),
                           ]
                             .map(sv => [

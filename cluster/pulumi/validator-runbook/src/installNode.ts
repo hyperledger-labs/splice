@@ -20,7 +20,6 @@ import {
   fixedTokens,
   imagePullSecret,
   imagePullSecretByNamespaceName,
-  installLoopback,
   installSpliceRunbookHelmChart,
   installSpliceRunbookHelmChartByNamespaceName,
   installValidatorOnboardingSecret,
@@ -40,6 +39,7 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   installParticipant,
   ValidatorNodeConfig,

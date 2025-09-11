@@ -18,8 +18,8 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
-  installLoopback,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   installParticipant,
   splitwellDarPaths,

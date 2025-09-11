@@ -27,7 +27,6 @@ import {
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
-  installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   networkWideConfig,
@@ -45,6 +44,7 @@ import {
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installLoopback,
   SvParticipant,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';

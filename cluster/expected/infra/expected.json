@@ -302,6 +302,8 @@
                   "hosts": [
                     "info.sv-1.mock.network.canton.global",
                     "info.sv-1.mock.global.canton.network.digitalasset.com",
+                    "info.sv-2.mock.network.canton.global",
+                    "info.sv-2.mock.global.canton.network.digitalasset.com",
                     "info.sv.mock.network.canton.global",
                     "info.sv.mock.global.canton.network.digitalasset.com"
                   ]
@@ -632,6 +634,16 @@
               "*"
             ],
             "port": {
+              "name": "cometbft-0-2-gw",
+              "number": 26026,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
               "name": "cometbft-1-0-gw",
               "number": 26106,
               "protocol": "TCP"
@@ -644,6 +656,16 @@
             "port": {
               "name": "cometbft-1-1-gw",
               "number": 26116,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
+              "name": "cometbft-1-2-gw",
+              "number": 26126,
               "protocol": "TCP"
             }
           },
@@ -672,6 +694,16 @@
               "*"
             ],
             "port": {
+              "name": "cometbft-2-2-gw",
+              "number": 26226,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
               "name": "cometbft-3-0-gw",
               "number": 26306,
               "protocol": "TCP"
@@ -692,6 +724,16 @@
               "*"
             ],
             "port": {
+              "name": "cometbft-3-2-gw",
+              "number": 26326,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
               "name": "cometbft-4-0-gw",
               "number": 26406,
               "protocol": "TCP"
@@ -704,6 +746,16 @@
             "port": {
               "name": "cometbft-4-1-gw",
               "number": 26416,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
+              "name": "cometbft-4-2-gw",
+              "number": 26426,
               "protocol": "TCP"
             }
           }
@@ -1558,6 +1610,12 @@
               "targetPort": 26016
             },
             {
+              "name": "cometbft-0-2-gw",
+              "port": 26026,
+              "protocol": "TCP",
+              "targetPort": 26026
+            },
+            {
               "name": "cometbft-1-0-gw",
               "port": 26106,
               "protocol": "TCP",
@@ -1568,6 +1626,12 @@
               "port": 26116,
               "protocol": "TCP",
               "targetPort": 26116
+            },
+            {
+              "name": "cometbft-1-2-gw",
+              "port": 26126,
+              "protocol": "TCP",
+              "targetPort": 26126
             },
             {
               "name": "cometbft-2-0-gw",
@@ -1582,6 +1646,12 @@
               "targetPort": 26216
             },
             {
+              "name": "cometbft-2-2-gw",
+              "port": 26226,
+              "protocol": "TCP",
+              "targetPort": 26226
+            },
+            {
               "name": "cometbft-3-0-gw",
               "port": 26306,
               "protocol": "TCP",
@@ -1594,6 +1664,12 @@
               "targetPort": 26316
             },
             {
+              "name": "cometbft-3-2-gw",
+              "port": 26326,
+              "protocol": "TCP",
+              "targetPort": 26326
+            },
+            {
               "name": "cometbft-4-0-gw",
               "port": 26406,
               "protocol": "TCP",
@@ -1604,6 +1680,12 @@
               "port": 26416,
               "protocol": "TCP",
               "targetPort": 26416
+            },
+            {
+              "name": "cometbft-4-2-gw",
+              "port": 26426,
+              "protocol": "TCP",
+              "targetPort": 26426
             }
           ]
         },
