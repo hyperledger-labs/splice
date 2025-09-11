@@ -565,6 +565,7 @@ function installScan(
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
+    mediatorAddress: decentralizedSynchronizerNode.namespaceInternalMediatorAddress,
     participantAddress: participant.internalClusterAddress,
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
