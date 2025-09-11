@@ -51,6 +51,24 @@ object HttpScanProxyAppClient {
     }
   }
 
+  case object GetDsoInfo
+      extends ScanProxyBaseCommand[scanProxy.GetDsoInfoResponse, definitions.GetDsoInfoResponse] {
+    override def submitRequest(
+        client: ScanproxyClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], scanProxy.GetDsoInfoResponse] =
+      client.getDsoInfo(headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[scanProxy.GetDsoInfoResponse, Either[
+      String,
+      definitions.GetDsoInfoResponse,
+    ]] = { case scanProxy.GetDsoInfoResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
   case object GetAnsRules
       extends ScanProxyBaseCommand[
         scanProxy.GetAnsRulesResponse,
