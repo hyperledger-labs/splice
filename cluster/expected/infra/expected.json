@@ -300,10 +300,10 @@
               {
                 "operation": {
                   "hosts": [
-                    "info.sv-1.mock.network.canton.global",
-                    "info.sv-1.mock.global.canton.network.digitalasset.com",
                     "info.sv-2.mock.network.canton.global",
                     "info.sv-2.mock.global.canton.network.digitalasset.com",
+                    "info.sv-1.mock.network.canton.global",
+                    "info.sv-1.mock.global.canton.network.digitalasset.com",
                     "info.sv.mock.network.canton.global",
                     "info.sv.mock.global.canton.network.digitalasset.com"
                   ]

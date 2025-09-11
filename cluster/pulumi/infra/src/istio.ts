@@ -3,9 +3,11 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { coreSvsToDeploy } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigs';
+import {
+  allSvsToDeploy,
+  coreSvsToDeploy,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigs';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
-import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
 
@@ -603,16 +605,10 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
                       hosts: [
                         // We could also have done `info.sv*.whatever` here but enumerating what we expect seems slightly more secure
                         ...new Set(
-                          [
-                            ...Array.from(
-                              { length: numCoreSvsToDeploy },
-                              (_, index) => `sv-${index + 1}`
-                            ),
-                            ...(DeploySvRunbook ? ['sv'] : []),
-                          ]
+                          allSvsToDeploy
                             .map(sv => [
-                              `info.${sv}.${getDnsNames().cantonDnsName}`,
-                              `info.${sv}.${getDnsNames().daDnsName}`,
+                              `info.${sv.ingressName}.${getDnsNames().cantonDnsName}`,
+                              `info.${sv.ingressName}.${getDnsNames().daDnsName}`,
                             ])
                             .flat()
                         ),

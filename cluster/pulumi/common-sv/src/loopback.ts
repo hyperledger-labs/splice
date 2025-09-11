@@ -73,11 +73,9 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     { dependsOn: [namespace.ns] }
   );
 
-  const svHosts = Array.from({ length: numSVs }, (_, i) =>
-    i == 0
-      ? [`sv-2.${clusterHostname}`, `*.sv-2.${clusterHostname}`]
-      : [`sv-${i + 1}-eng.${clusterHostname}`, `*.sv-${i + 1}-eng.${clusterHostname}`]
-  ).flat();
+  const svHosts = coreSvsToDeploy
+    .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
+    .flat();
   const allHosts = [
     clusterHostname,
     `sv.${clusterHostname}`,
