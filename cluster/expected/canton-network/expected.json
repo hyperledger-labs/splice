@@ -1041,6 +1041,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
         "logLevel": "DEBUG",
+        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
