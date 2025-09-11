@@ -127,7 +127,7 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
     logging:
-      appsLogLevel: INFO
+      appsLogLevel: WARN
       cantonLogLevel: INFO
       cantonStdoutLogLevel: DEBUG
   sv:

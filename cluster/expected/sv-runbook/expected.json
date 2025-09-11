@@ -785,7 +785,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
-        "logLevel": "INFO",
+        "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
