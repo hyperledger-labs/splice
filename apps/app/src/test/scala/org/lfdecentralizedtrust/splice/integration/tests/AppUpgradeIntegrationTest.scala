@@ -29,7 +29,6 @@ import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
-import org.scalatest.Ignore
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -38,8 +37,6 @@ import scala.util.Using
 import scala.util.Using.Releasable
 import scala.concurrent.duration.*
 
-// remove after update of LATEST VERSION
-@Ignore
 class AppUpgradeIntegrationTest
     extends IntegrationTest
     with PostgresAroundEach
