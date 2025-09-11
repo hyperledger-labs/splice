@@ -154,16 +154,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           val aliceRefs = setupUser(aliceStaticRefs)
 
           requestAndPayForEntry(aliceRefs, testEntryName)
-          eventually(timeUntilSuccess = 2.minutes) {
-            val entry =
-              try
-                loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
-                  sv1ScanBackend.lookupEntryByName(testEntryName),
-                  forAll(_)(_.errorMessage should include("Entry with name")),
-                )
-              catch {
-                case e: CommandFailure if e.getMessage contains "Entry with name" => fail(e)
-              }
+          eventuallySucceeds(timeUntilSuccess = 2.minutes) {
+            val entry = sv1ScanBackend.lookupEntryByName(testEntryName)
             entry.name shouldBe testEntryName
             entry.user shouldBe aliceRefs.userParty.toProtoPrimitive
           }
