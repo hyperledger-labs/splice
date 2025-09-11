@@ -13,7 +13,7 @@ Release Notes
 
 - LocalNet
 
-  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — now only the latest packages are used unless explicitly overridden.
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
 
 
 0.4.16
