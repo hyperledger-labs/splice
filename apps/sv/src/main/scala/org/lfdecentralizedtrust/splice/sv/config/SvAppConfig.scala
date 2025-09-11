@@ -309,6 +309,10 @@ case class SvAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
+    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // it will never send a time proof.
+    timeTrackerObservationLatency: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(5),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,

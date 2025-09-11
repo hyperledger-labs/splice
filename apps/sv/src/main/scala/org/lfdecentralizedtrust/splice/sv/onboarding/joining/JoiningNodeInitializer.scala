@@ -148,7 +148,8 @@ class JoiningNodeInitializer(
         // This is changed to false after SV onboarding completes.
         manualConnect = true,
         timeTracker = SynchronizerTimeTrackerConfig(
-          minObservationDuration = config.timeTrackerMinObservationDuration
+          minObservationDuration = config.timeTrackerMinObservationDuration,
+          observationLatency = config.timeTrackerObservationLatency,
         ),
       )
     )
