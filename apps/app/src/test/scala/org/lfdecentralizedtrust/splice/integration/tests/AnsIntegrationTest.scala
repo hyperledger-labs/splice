@@ -24,7 +24,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
