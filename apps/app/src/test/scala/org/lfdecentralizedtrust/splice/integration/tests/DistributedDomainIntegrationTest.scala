@@ -26,6 +26,7 @@ import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
 
+  // Changed to a non-default value (the default is 250ms) to see that we correctly modify it.
   val observationLatency = NonNegativeFiniteDuration.ofMillis(500)
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
