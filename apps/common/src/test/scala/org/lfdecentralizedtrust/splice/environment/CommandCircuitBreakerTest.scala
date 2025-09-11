@@ -41,7 +41,7 @@ class CommandCircuitBreakerTest
       maxResetTimeout = 5.seconds,
       exponentialBackoffFactor = 2.0,
       randomFactor = 0.0,
-    )
+    ),
   )
 
   val retryProvider = new RetryProvider(
