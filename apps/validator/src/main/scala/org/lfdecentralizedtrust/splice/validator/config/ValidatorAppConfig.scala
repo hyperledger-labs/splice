@@ -203,6 +203,8 @@ case class ValidatorAppBackendConfig(
     // all validators submit the transaction at the same time
     // overloading the network.
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
+    // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
+    latestPackagesOnly: Boolean = false,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

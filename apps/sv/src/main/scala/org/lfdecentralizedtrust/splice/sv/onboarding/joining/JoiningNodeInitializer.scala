@@ -824,6 +824,7 @@ class JoiningNodeInitializer(
           clock,
           participantAdminConnection,
           loggerFactory,
+          config.latestPackagesOnly,
         )
         _ <- vetting.vetCurrentPackages(
           synchronizerId,
