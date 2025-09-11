@@ -101,9 +101,11 @@ class DamlCIUpgradeVotePreflightTest
         val svsF = Seq(2, 3, 4).map(withWebUiSv[Unit]) :+ withWebUiSvRunbook[Unit]
         svsF.par.foreach { svF =>
           svF { implicit webDriver =>
-            click on "navlink-votes"
-            click on "tab-panel-action-needed"
-            click on className("vote-row-action")
+            eventuallySucceeds() {
+              click on "navlink-votes"
+              click on "tab-panel-action-needed"
+              click on className("vote-row-action")
+            }
             click on "cast-vote-button"
             click on "accept-vote-button"
             click on "save-vote-button"
