@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+0.4.17
+------
+
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — now only the latest packages are used unless explicitly overridden.
+
+
 0.4.16
 ------
 

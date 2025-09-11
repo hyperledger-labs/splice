@@ -333,6 +333,7 @@ case class SvAppBackendConfig(
     // all validators submit the transaction at the same time
     // overloading the network.
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
+    // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
