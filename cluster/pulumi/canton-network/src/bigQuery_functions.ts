@@ -558,6 +558,32 @@ const peak_tps = new BQScalarFunction(
   `
 );
 
+const coin_price = new BQScalarFunction(
+  'coin_price',
+  time_window_args,
+  new BQStruct([
+    { name: 'minPrice', type: BIGNUMERIC },
+    { name: 'maxPrice', type: BIGNUMERIC },
+    { name: 'avgPrice', type: BIGNUMERIC },
+  ]),
+  `
+    (SELECT AS
+      STRUCT
+        MIN(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(c.create_arguments, [2])),
+        MAX(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(c.create_arguments, [2])),
+        AVG(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(c.create_arguments, [2]))
+    FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
+      WHERE template_id_entity_name = 'SummarizingMiningRound'
+      AND c.template_id_module_name = 'Splice.Round'
+      AND package_name = 'splice-amulet'
+      AND \`$$FUNCTIONS_DATASET$$.in_time_window\`(
+        start_record_time, start_migration_id,
+        up_to_record_time, up_to_migration_id,
+        c.record_time, c.migration_id
+    ))
+  `
+);
+
 const all_stats = new BQTableFunction(
   'all_stats',
   as_of_args,
@@ -577,6 +603,9 @@ const all_stats = new BQTableFunction(
     new BQColumn('num_active_validators', INT64),
     new BQColumn('average_tps', FLOAT64),
     new BQColumn('peak_tps', FLOAT64),
+    new BQColumn('daily_min_coin_price', BIGNUMERIC),
+    new BQColumn('daily_max_coin_price', BIGNUMERIC),
+    new BQColumn('daily_avg_coin_price', BIGNUMERIC),
   ],
   `
     SELECT
@@ -619,7 +648,25 @@ const all_stats = new BQTableFunction(
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
       \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
       IFNULL(\`$$FUNCTIONS_DATASET$$.average_tps\`(as_of_record_time, migration_id), 0.0) as average_tps,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id), 0.0) as peak_tps
+      IFNULL(\`$$FUNCTIONS_DATASET$$.peak_tps\`(as_of_record_time, migration_id), 0.0) as peak_tps,
+      \`$$FUNCTIONS_DATASET$$.coin_price\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id).minPrice
+          AS daily_min_coin_price,
+      \`$$FUNCTIONS_DATASET$$.coin_price\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id).maxPrice
+          AS daily_max_coin_price,
+      \`$$FUNCTIONS_DATASET$$.coin_price\`(
+            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),
+            \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),
+            as_of_record_time,
+            migration_id).avgPrice
+          AS daily_avg_coin_price
   `
 );
 
@@ -672,6 +719,9 @@ const days_with_missing_stats = new BQTableFunction(
             AND num_active_validators IS NOT NULL
             AND average_tps IS NOT NULL
             AND peak_tps IS NOT NULL
+            AND daily_min_coin_price IS NOT NULL
+            AND daily_max_coin_price IS NOT NULL
+            AND daily_avg_coin_price IS NOT NULL
     `
 );
 
@@ -716,6 +766,7 @@ export const allScanFunctions = [
   one_day_updates,
   average_tps,
   peak_tps,
+  coin_price,
   all_stats,
 ];
 
