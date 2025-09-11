@@ -126,6 +126,10 @@ svs:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+    logging:
+      appsLogLevel: INFO
+      cantonLogLevel: INFO
+      cantonStdoutLogLevel: DEBUG
   sv:
     participant:
       bftSequencerConnection: false
@@ -157,7 +161,6 @@ svs:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
-  sv-3:
     participant:
       kms:
         keyRingId: sv-3_participant_mock
