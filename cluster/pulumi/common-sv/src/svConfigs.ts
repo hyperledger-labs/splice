@@ -43,7 +43,8 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
 const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): StaticSvConfig => {
   const config = configForSv(nodeName);
 
-  const svCometBftSecrets = svCometBftKeysFromSecret(config.cometbft!.keysGcpSecret!);
+  const svCometBftSecretName = config.cometbft?.keysGcpSecret ? config.cometbft.keysGcpSecret : `${nodeName.replaceAll('-', '')}-cometbft-keys`;
+  const svCometBftSecrets = svCometBftKeysFromSecret(svCometBftSecretName);
 
   return {
     nodeName,
