@@ -187,7 +187,8 @@ class SV1Initializer(
           manualConnect = false,
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
-            minObservationDuration = config.timeTrackerMinObservationDuration
+            minObservationDuration = config.timeTrackerMinObservationDuration,
+            observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
         overwriteExistingConnection =
@@ -213,6 +214,10 @@ class SV1Initializer(
             )
             .map(_.nonEmpty), {
             val packages = requiredDars(sv1Config.initialPackageConfig)
+            if (config.latestPackagesOnly)
+              logger.warn(
+                "latestPackagesOnly is enabled, only the latest versions of the initial packages will be uploaded and vetted"
+              )
             logger.info(
               s"Starting with initial package ${sv1Config.initialPackageConfig} and vetting ${packages
                   .map(_.resourcePath)}"
@@ -552,7 +557,7 @@ class SV1Initializer(
       packageResource.all
         .filter { darResource =>
           val required = PackageVersion.assertFromString(requiredVersion)
-          darResource.metadata.version <= required
+          darResource.metadata.version == required || !config.latestPackagesOnly && darResource.metadata.version < required
         }
         .map(UploadablePackage.fromResource)
     }

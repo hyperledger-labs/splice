@@ -8,8 +8,16 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.17
+------
+
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+
+
+0.4.16
+------
 
 - Daml
 
@@ -20,6 +28,18 @@ Upcoming
     An example use-case for this package is an exchange that wants to
     `earn app rewards on deposits and withdrawals <https://docs.digitalasset.com/integrate/devnet/exchange-integration/extensions.html>`__
     of CN token standard tokens.
+
+- Docs
+
+  - SV
+
+    - Document process for :ref:`ignoring party IDs for reward expiry automation <sv_ops_ignored_rewards_party_ids>`
+      that is currently recommended after each Daml upgrade,
+      to reduce the impact of validators that are unable to complete
+      the Daml upgrade due to being on an outdated version of Splice.
+
+    - Make the filter for ignoring party ids for reward expiry automation also ignore beneficiaries for SV reward coupons so
+      that it is not required to ignore the SV if only one beneficiary has problems.
 
 0.4.15
 ------

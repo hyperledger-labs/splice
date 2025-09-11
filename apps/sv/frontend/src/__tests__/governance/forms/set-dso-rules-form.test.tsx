@@ -11,6 +11,8 @@ import { Wrapper } from '../../helpers';
 import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
 import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { server, svUrl } from '../../setup/setup';
+import { rest } from 'msw';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -37,7 +39,7 @@ describe('Set DSO Config Rules Form', () => {
   test('should render all Set DSO Config Rules Form components', () => {
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -72,7 +74,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -107,7 +109,7 @@ describe('Set DSO Config Rules Form', () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -135,7 +137,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -166,7 +168,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -191,7 +193,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetDsoConfigRulesForm />
       </Wrapper>
     );
 
@@ -220,5 +222,98 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(submitButton);
 
     expect(screen.getByText('Proposal Summary')).toBeDefined();
+  });
+
+  test('should show error on form if submission fails', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('set-dso-config-rules-action');
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-voteCooldownTime');
+    await user.type(c2Input, '9999');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    const submitButton = screen.getByTestId('submit-button');
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); // review proposal
+    await user.click(submitButton); // submit proposal
+
+    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
+    expect(screen.getByText(/Submission failed/)).toBeDefined();
+    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+  });
+
+  test('should redirect to governance page after successful submission', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('set-dso-config-rules-action');
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-voteCooldownTime');
+    await user.type(c2Input, '9999');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    const submitButton = screen.getByTestId('submit-button');
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); // review proposal
+    await user.click(submitButton); // submit proposal
+
+    waitFor(() => {
+      expect(screen.getByText('Action Required')).toBeDefined();
+      expect(screen.getByText('Inflight Votes')).toBeDefined();
+      expect(screen.getByText('Vote History')).toBeDefined();
+      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    });
   });
 });
