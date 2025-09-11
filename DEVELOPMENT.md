@@ -316,7 +316,7 @@ Note that the entire command must be quoted in this case, especially if it has s
 - `damlBuild`: create `.dar` files for all Daml projects
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `amulet` to call it.
 - `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors.
-
+- `updateTestConfigForParallelRuns`: Updates the test configuration files that drive how tests are executed in parallel in CI. You need to run this when you add a new unit or integration test, and commit the changes to the test-*.log files that it saves, otherwise the static checks will fail in CI.
 Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
