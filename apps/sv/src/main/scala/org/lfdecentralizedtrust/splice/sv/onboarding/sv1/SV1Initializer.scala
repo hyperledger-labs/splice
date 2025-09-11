@@ -187,7 +187,8 @@ class SV1Initializer(
           manualConnect = false,
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
-            minObservationDuration = config.timeTrackerMinObservationDuration
+            minObservationDuration = config.timeTrackerMinObservationDuration,
+            observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
         overwriteExistingConnection =

@@ -239,6 +239,7 @@ class ValidatorApp(
                     val decentralizedSynchronizerInitializer = new DomainDataRestorer(
                       participantAdminConnection,
                       config.timeTrackerMinObservationDuration,
+                      config.timeTrackerObservationLatency,
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
