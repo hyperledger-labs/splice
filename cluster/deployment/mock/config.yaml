@@ -134,6 +134,10 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    logging:
+      appsLogLevel: WARN
+      cantonLogLevel: INFO
+      cantonStdoutLogLevel: DEBUG
     scanApp:
       bigQuery:
         dataset: mock_da2_scan
