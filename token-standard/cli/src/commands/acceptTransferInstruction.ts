@@ -6,12 +6,12 @@ import {
 } from "../apis/ledger-api-utils";
 import { TransferInstructionInterface } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
-import { ExerciseCommand } from "canton-json-api-v2-openapi";
+import { ExerciseCommand } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import {
   createConfiguration,
   DefaultApi as TransferFactoryAPI,
   ServerConfiguration,
-} from "transfer-instruction-openapi";
+} from "@lfdecentralizedtrust/transfer-instruction-openapi";
 
 interface AcceptTransferInstructionCommandOptions {
   // paths to keys
