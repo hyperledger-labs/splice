@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.16
+------
 
 - Daml
 
@@ -29,6 +29,9 @@ Upcoming
       that is currently recommended after each Daml upgrade,
       to reduce the impact of validators that are unable to complete
       the Daml upgrade due to being on an outdated version of Splice.
+
+    - Make the filter for ignoring party ids for reward expiry automation also ignore beneficiaries for SV reward coupons so
+      that it is not required to ignore the SV if only one beneficiary has problems.
 
 0.4.15
 ------
