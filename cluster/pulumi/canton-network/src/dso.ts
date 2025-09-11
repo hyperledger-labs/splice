@@ -140,7 +140,9 @@ export class Dso extends pulumi.ComponentResource {
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
         return {
           ...acc,
-          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(conf.nodeName.replaceAll('-', '')),
+          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(
+            conf.nodeName.replaceAll('-', '')
+          ),
         };
       }, {});
 

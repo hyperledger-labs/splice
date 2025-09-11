@@ -43,16 +43,20 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
 const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): StaticSvConfig => {
   const config = configForSv(nodeName);
 
-  const svCometBftSecretName = config.cometbft?.keysGcpSecret ? config.cometbft.keysGcpSecret : `${nodeName.replaceAll('-', '')}-cometbft-keys`;
+  const svCometBftSecretName = config.cometbft?.keysGcpSecret
+    ? config.cometbft.keysGcpSecret
+    : `${nodeName.replaceAll('-', '')}-cometbft-keys`;
   const svCometBftSecrets = svCometBftKeysFromSecret(svCometBftSecretName);
 
   return {
     nodeName,
     ingressName: config.subdomain!,
     onboardingName: config.publicName!,
-    auth0ValidatorAppName: config.validatorApp!.auth0!.name!,
+    auth0ValidatorAppName: config.validatorApp!.auth0!.name
+      ? config.validatorApp!.auth0!.name!
+      : `${nodeName}_validator`,
     auth0ValidatorAppClientId: config.validatorApp?.auth0?.clientId,
-    auth0SvAppName: config.svApp!.auth0!.name!,
+    auth0SvAppName: config.svApp!.auth0!.name ? config.svApp!.auth0!.name! : nodeName,
     auth0SvAppClientId: config.svApp?.auth0?.clientId,
     validatorWalletUser: config.validatorApp?.walletUser,
     cometBft: {
