@@ -1040,7 +1040,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
-        "logLevel": "DEBUG",
+        "logLevel": "WARN",
         "metrics": {
           "enable": true
         },
@@ -1218,7 +1218,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
-        "logLevel": "DEBUG",
+        "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
@@ -1313,7 +1313,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
           "enable": true

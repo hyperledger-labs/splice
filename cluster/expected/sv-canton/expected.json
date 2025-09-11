@@ -1579,7 +1579,8 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_3_mediator",
@@ -1672,7 +1673,8 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_4_mediator",
@@ -2237,7 +2239,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -2395,7 +2397,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -3677,7 +3679,8 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_3_mediator",
@@ -3770,7 +3773,8 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_4_mediator",
@@ -4335,7 +4339,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -4493,7 +4497,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -5205,7 +5209,8 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_3",
@@ -5298,7 +5303,8 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_4",
@@ -5863,7 +5869,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -6021,7 +6027,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
