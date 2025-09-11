@@ -1885,10 +1885,10 @@ lazy val `apps-app`: Project =
 
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
-lazy val printTests = taskKey[Unit](
+lazy val updateTestConfigForParallelRuns = taskKey[Unit](
   "write full class names of `apps-app` tests to separated files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
 )
-printTests := {
+updateTestConfigForParallelRuns := {
   import java.io._
   println("Appending full class names of tests.")
 
