@@ -78,7 +78,7 @@ class ScanVerdictStoreIngestion(
           .flatMapConcat { resumeTs =>
             mediatorClient
               .streamVerdicts(Some(resumeTs))
-              .groupedWithin(batchSize, 1.second)
+              .groupedWithin(batchSize, config.mediatorVerdictIngestion.batchMaxWait.underlying)
           }
 
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)

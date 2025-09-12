@@ -24,6 +24,8 @@ final case class ScanSynchronizerConfig(
 final case class MediatorVerdictIngestionConfig(
     /** Max verdicts items for DB insert batch. */
     batchSize: Int = 50,
+    /** Max time window to wait for DB insert batch. */
+    batchMaxWait: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(1),
     /** Delay before restart on stream failure. */
     restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
 )
