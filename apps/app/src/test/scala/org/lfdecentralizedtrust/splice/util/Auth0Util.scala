@@ -39,6 +39,8 @@ class Auth0Util(
   val api = new ManagementAPI(domain, requestManagementAPIToken())
 
   def createUser()(implicit tc: TraceContext): Auth0User = {
+    // Note that a "user already exists" error may be caused by our retries if we retry only the create-user call,
+    // so in a retry we also choose a new username, email address, etc.
     retry.retryAuth0CallsForTests {
       val user = new User()
       val rand = new scala.util.Random
@@ -61,19 +63,6 @@ class Auth0Util(
       new Auth0User(id, email, password, this)
     }
   }
-
-  private[this] def inferNewUserByEmail(email: String, e: Throwable)(implicit
-      tc: TraceContext
-  ): Option[User] =
-    // A "user already exists" error may be caused by our retries, try finding the user by email
-    executeManagementApiRequest(api.users().listByEmail(email, null)).asScala match {
-      case user +: _ =>
-        logger.debug("Error caught, but found the user by email, so trying to use it", e)
-        Some(user)
-      case _ =>
-        logger.debug(s"Failed to create user with email $email, but no user found by that email")
-        None
-    }
 
   def deleteUser(id: String): Unit = {
     // Called from AutoCloseable.close, which doesn't propagate the trace context
