@@ -44,6 +44,7 @@ import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-v
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import _ from 'lodash';
 
+import { installPartyAllocator } from './partyAllocator';
 import { validatorConfig } from './validatorConfig';
 
 type BootstrapCliConfig = {
@@ -307,7 +308,7 @@ async function installValidator(
     activeVersion,
     { dependsOn: dependsOn }
   );
-  if (validatorRunbookConfig?.partyAllocator.enable) {
+  if (validatorConfig?.partyAllocator.enable) {
     installPartyAllocator(xns, [validatorChart]);
   }
   return validatorChart;
