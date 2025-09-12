@@ -34,7 +34,7 @@ async function main() {
   };
   const secrets = new SecretsFixtureMap();
 
-  installNode.installNode({
+  await installNode.installNode({
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
     getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
