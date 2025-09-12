@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation
@@ -49,7 +48,6 @@ class HttpTokenStandardAllocationHandler(
         choiceContext <- getAllocationChoiceContext(
           allocationId,
           requireLockedAmulet = true,
-          canBeFeatured = true,
         )
       } yield v1.Resource.GetAllocationTransferContextResponseOK(choiceContext)
     }
@@ -66,7 +64,6 @@ class HttpTokenStandardAllocationHandler(
         choiceContext <- getAllocationChoiceContext(
           allocationId,
           requireLockedAmulet = false,
-          canBeFeatured = false,
         )
       } yield v1.Resource.GetAllocationCancelContextResponseOK(choiceContext)
     }
@@ -83,7 +80,6 @@ class HttpTokenStandardAllocationHandler(
         choiceContext <- getAllocationChoiceContext(
           allocationId,
           requireLockedAmulet = false,
-          canBeFeatured = false,
         )
       } yield v1.Resource.GetAllocationWithdrawContextResponseOK(choiceContext)
     }
@@ -93,7 +89,6 @@ class HttpTokenStandardAllocationHandler(
   private def getAllocationChoiceContext(
       allocationId: String,
       requireLockedAmulet: Boolean,
-      canBeFeatured: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[definitions.ChoiceContext] = {
@@ -120,9 +115,6 @@ class HttpTokenStandardAllocationHandler(
         amuletAlloc.contract.payload.lockedAmulet,
         amuletAlloc.contract.payload.allocation.settlement.settleBefore,
         requireLockedAmulet,
-        Option.when(canBeFeatured)(
-          PartyId.tryFromProtoPrimitive(amuletAlloc.payload.allocation.settlement.executor)
-        ),
         store,
         clock,
         new ChoiceContextBuilder(_),

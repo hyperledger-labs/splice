@@ -16,7 +16,6 @@ module Splice.Testing.Registries.AmuletRegistry
   , tapFaucet
   , featureApp
   , createTransferPreapproval
-  , beneficiariesToMetadata
 
   -- ** Locking
   , TimeLock(..)
@@ -32,7 +31,6 @@ import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
 import DA.Time
-import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
@@ -199,18 +197,6 @@ featureApp registry provider = do
   result <- submitMulti [provider] [registry.dso] $ exerciseCmd amuletRulesCid AmuletRules_DevNet_FeatureApp with
     provider
   return result.featuredAppRightCid
-
--- | Encode a list of beneficiaries as metadata to pass in via token standard choices.
--- Currently only supported for allocation execution.
-beneficiariesToMetadata : [(Party, Decimal)] -> Metadata
-beneficiariesToMetadata [] = emptyMetadata
-beneficiariesToMetadata bs = Metadata with
-    values = TextMap.fromList
-      [ (appRewardBeneficiariesMetaKey, commaSeparated [ partyToText b._1 | b <- bs])
-      , (appRewardBeneficiaryWeightsMetaKey, commaSeparated [ show b._2 | b <- bs])
-      ]
-  where
-    commaSeparated = T.intercalate ","
 
 
 -- Token standard registry implementation

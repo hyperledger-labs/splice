@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -213,7 +212,6 @@ class HttpTokenStandardTransferInstructionHandler(
         amuletInstr.contract.payload.lockedAmulet,
         amuletInstr.contract.payload.transfer.executeBefore,
         requireLockedAmulet,
-        None,
         store,
         clock,
         new ChoiceContextBuilder(_),

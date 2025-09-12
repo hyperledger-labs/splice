@@ -13,7 +13,6 @@ import DA.TextMap qualified as TextMap
 import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 
 
@@ -43,7 +42,7 @@ nonZeroMetadata k n m
 
 -- | Add an metadata entry for an optional value if it is non-zero number.
 optionalNonZeroMetadata : (Eq a, Additive a, Show a) => Text -> Optional a -> TextMap Text -> TextMap Text
-optionalNonZeroMetadata k optN m = 
+optionalNonZeroMetadata k optN m =
   case optN of
     None -> m
     Some n -> nonZeroMetadata k n m
@@ -184,20 +183,6 @@ copyOnlyBurnMeta optOrigMeta = fromOptional emptyMetadata $ do
   pure $ Metadata with
     values =
       TextMap.singleton burnedMetaKey origValue
-
-beneficiariesFromMetadata : Metadata -> Either Text (Optional [AppRewardBeneficiary])
-beneficiariesFromMetadata meta = do
-  let optBs = TextMap.lookup appRewardBeneficiariesMetaKey meta.values
-  let optWeights = TextMap.lookup appRewardBeneficiaryWeightsMetaKey meta.values
-  case (optBs, optWeights) of
-    (None, None) -> pure None
-    (Some bsText, Some weightsText) -> do
-      bs <- parseCommaSeparated "beneficiaries" partyFromText bsText
-      weights <- parseCommaSeparated "weights" T.parseDecimal weightsText
-      if length bs /= length weights
-        then fail $ "Number of beneficiaries (" <> show (length bs) <> ") does not match number of weights (" <> show (length weights) <> ")"
-        else pure $ Some (zipWith AppRewardBeneficiary bs weights)
-    _ -> fail $ "Expected both beneficiaries and weights to be present, but got: " <> show (optBs, optWeights)
 
 parseCommaSeparated : Text -> (Text -> Optional a) -> Text -> Either Text [a]
 parseCommaSeparated desc parser txt = do
