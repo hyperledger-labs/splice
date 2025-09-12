@@ -165,19 +165,22 @@ export function getInitialExpiration(dsoInfo: DsoInfo | undefined): Dayjs {
  **/
 export function configFormDataToConfigChanges(
   formData: ConfigFormData,
-  configChanges: ConfigChange[]
+  configChanges: ConfigChange[],
+  onlyChangedFields = true
 ): ConfigChange[] {
-  return configChanges
-    .map(change => {
-      const fieldState = formData[change.fieldName];
-      return {
-        fieldName: change.fieldName,
-        label: change.label,
-        currentValue: change.currentValue,
-        newValue: fieldState?.value || '',
-      } as ConfigChange;
-    })
-    .filter(change => change.currentValue !== change.newValue);
+  const changes = configChanges.map(change => {
+    const fieldState = formData[change.fieldName];
+    return {
+      fieldName: change.fieldName,
+      label: change.label,
+      currentValue: change.currentValue,
+      newValue: fieldState?.value || '',
+    } as ConfigChange;
+  });
+
+  return onlyChangedFields
+    ? changes.filter(change => change.currentValue !== change.newValue)
+    : changes;
 }
 
 export function getSvRewardWeight(svs: [string, SvInfo][], svPartyId: string): string {

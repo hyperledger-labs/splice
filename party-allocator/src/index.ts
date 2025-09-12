@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { LedgerApiClient } from "./ledger-api-client.js";
 import * as crypto from "node:crypto";
-import { Command, DisclosedContract } from "canton-json-api-v2-openapi";
+import {
+  Command,
+  DisclosedContract,
+} from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import { readdir, writeFile } from "node:fs/promises";
 import { config } from "./config.js";
 import fs from "fs";
@@ -92,6 +95,7 @@ async function setupTopology(
     keyPair.privateKey,
   );
   const allocatePartyResponse = await client.allocateExternalParty(
+    partyHint,
     synchronizerId,
     generateTopologyResponse.topologyTransactions!.map((t) => ({
       transaction: t,

@@ -15,7 +15,7 @@ import {
   Signature,
   SignedTransaction,
   SigningPublicKey,
-} from "canton-json-api-v2-openapi";
+} from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as crypto from "node:crypto";
 
@@ -76,11 +76,12 @@ export class LedgerApiClient {
   }
 
   async allocateExternalParty(
+    hint: string,
     synchronizer: string,
     onboardingTransactions: SignedTransaction[],
     multiHashSignatures: Signature[],
   ): Promise<AllocateExternalPartyResponse> {
-    return this.retry(`allocate external party`, () =>
+    return this.retry(`allocate external party ${hint}`, () =>
       this.als.run({ url: undefined }, () =>
         this.api.postV2PartiesExternalAllocate({
           synchronizer,

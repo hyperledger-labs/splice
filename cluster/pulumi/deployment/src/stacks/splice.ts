@@ -80,7 +80,10 @@ export function installSpliceStacks(
       config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'),
       reference,
       envRefs,
-      gcpSecret
+      gcpSecret,
+      {
+        SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME: 'validator-runbook',
+      }
     );
   }
   if (mustInstallValidator1) {

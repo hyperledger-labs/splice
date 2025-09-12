@@ -1,6 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DeploySvRunbook, DeployValidatorRunbook } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  DeploySvRunbook,
+  DeployValidatorRunbook,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
@@ -25,7 +28,9 @@ async function runAllStacksUp() {
     operations.push(upOperation(svRunbook, abortController));
   }
   if (DeployValidatorRunbook) {
-    const validatorRunbook = await stack('validator-runbook', 'validator-runbook', true, {});
+    const validatorRunbook = await stack('validator-runbook', 'validator-runbook', true, {
+      SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME: 'validator-runbook',
+    });
     operations.push(upOperation(validatorRunbook, abortController));
   }
 

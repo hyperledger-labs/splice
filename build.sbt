@@ -101,6 +101,8 @@ lazy val root: Project = (project in file("."))
     `splice-wallet-payments-daml`,
     `splice-wallet-daml`,
     `splice-wallet-test-daml`,
+    `splice-util-featured-app-proxies-daml`,
+    `splice-util-featured-app-proxies-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -225,6 +227,7 @@ lazy val docs = project
           (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
+          (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -335,12 +338,8 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
           val transferInstructionOpenApiFile =
             baseDirectory.value / "openapi/transfer-instruction-v1.yaml"
 
-          val npmName = "transfer-instruction-openapi"
-
           BuildCommon.TS.generateOpenApiClient(
-            npmName = npmName,
-            npmModuleName = npmName,
-            npmProjectName = npmName,
+            unscopedNpmName = "transfer-instruction-openapi",
             openApiSpec = "transfer-instruction-v1.yaml",
             cacheFileDependencies = Set(transferInstructionOpenApiFile),
             directory = "openapi-ts-client",
@@ -458,12 +457,8 @@ lazy val `canton-json-api-v2-openapi-ts-client` = project
       Def.taskDyn {
         val openApiFile = baseDirectory.value / "openapi.yaml"
 
-        val npmName = "canton-json-api-v2"
-
         BuildCommon.TS.generateOpenApiClient(
-          npmName = npmName,
-          npmModuleName = npmName,
-          npmProjectName = npmName,
+          unscopedNpmName = "canton-json-api-v2",
           openApiSpec = "openapi.yaml",
           cacheFileDependencies = Set(openApiFile),
           directory = "openapi-ts-client",
@@ -561,7 +556,9 @@ lazy val `party-allocator` =
           false,
         ),
       ),
-      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`token-standard-cli` / Compile / npmInstall).value,
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {
@@ -595,9 +592,15 @@ lazy val `party-allocator` =
           Some(npmRootDir.value),
         )
       },
-      Compile / compile := {
+      npmBuild := {
+        val log = streams.value.log
         npmInstall.value
-        (Compile / compile).value
+        runCommand(
+          Seq("npm", "run", "build"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
       },
     )
 
@@ -737,6 +740,33 @@ lazy val `splice-wallet-daml` =
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-featured-app-proxies-daml` =
+  project
+    .in(file("daml/splice-util-featured-app-proxies"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-featured-app-proxies-test-daml` =
+  project
+    .in(file("daml/splice-util-featured-app-proxies-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -910,16 +940,16 @@ lazy val `apps-validator` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/validator-openapi",
+        unscopedNpmName = "validator-openapi",
         openApiSpec = "validator-internal.yaml",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/ans-external-openapi",
+        unscopedNpmName = "ans-external-openapi",
         openApiSpec = "ans-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/scan-proxy-openapi",
+        unscopedNpmName = "scan-proxy-openapi",
         openApiSpec = "scan-proxy.yaml",
         directory = "scan-proxy-openapi-ts-client",
       ),
@@ -961,7 +991,7 @@ lazy val `apps-sv` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/sv-openapi",
+        unscopedNpmName = "sv-openapi",
         openApiSpec = "sv-internal.yaml",
       ),
       Compile / guardrailTasks :=
@@ -987,7 +1017,7 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/scan-openapi",
+        unscopedNpmName = "scan-openapi",
         openApiSpec = "scan.yaml",
       ),
       Compile / guardrailTasks :=
@@ -1366,12 +1396,12 @@ lazy val `apps-wallet` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/wallet-external-openapi",
+        unscopedNpmName = "wallet-external-openapi",
         openApiSpec = "wallet-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/wallet-openapi",
+        unscopedNpmName = "wallet-openapi",
         openApiSpec = "wallet-internal.yaml",
       ),
       Compile / guardrailTasks :=
@@ -1404,7 +1434,7 @@ lazy val `apps-splitwell` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/splitwell-openapi",
+        unscopedNpmName = "splitwell-openapi",
         openApiSpec = "splitwell-internal.yaml",
       ),
       BuildCommon.sharedAppSettings,
@@ -1855,10 +1885,10 @@ lazy val `apps-app`: Project =
 
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
-lazy val printTests = taskKey[Unit](
+lazy val updateTestConfigForParallelRuns = taskKey[Unit](
   "write full class names of `apps-app` tests to separated files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
 )
-printTests := {
+updateTestConfigForParallelRuns := {
   import java.io._
   println("Appending full class names of tests.")
 
