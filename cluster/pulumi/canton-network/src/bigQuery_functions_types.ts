@@ -308,12 +308,12 @@ export class BQLogicalView extends BQFunction {
     dashboardsDataset: gcp.bigquery.Dataset,
     dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Table {
-
     return new gcp.bigquery.Table(
       this.name,
       {
         datasetId: installInDataset.datasetId,
         tableId: this.name,
+        deletionProtection: false, // no point in deletion protection for a view, it doesn't hold data
         view: {
           query: this.replaceDatasetsPulumi(
             project,
