@@ -44,6 +44,12 @@ function _resolve_pulumi_stack() {
         pulumi_stack="$CLOUDSDK_CORE_PROJECT"
     elif [[ $pulumi_project == "sv-canton" ]]; then
         pulumi_stack="$pulumi_project.${SPLICE_SV}-migration-${SPLICE_MIGRATION_ID}.$GCP_CLUSTER_BASENAME"
+    elif [[ $pulumi_project == "validator-runbook" ]]; then
+      if [[ $SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME == "validator-runbook" ]]; then
+        pulumi_stack="validator-runbook.$GCP_CLUSTER_BASENAME"
+      else
+        pulumi_stack="validators.${SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME}.$GCP_CLUSTER_BASENAME"
+      fi
     else
         pulumi_stack="$pulumi_project.$GCP_CLUSTER_BASENAME"
     fi
