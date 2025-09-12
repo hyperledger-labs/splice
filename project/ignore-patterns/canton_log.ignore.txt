@@ -138,9 +138,6 @@ Timeout .*expired, but readers are still active
 # test significantly so for now we don't bother.
 ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 
-# TODO(#1932) fix our requests to not trigger that
-Received an identifier with package ID .* but expected a package name
-
 # TODO(#1450) - investigate this on the canton side
 FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
 Rejected transaction due to a participant determined timeout
