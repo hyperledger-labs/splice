@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.util
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
@@ -134,7 +133,6 @@ object ChoiceContextBuilder {
       lockedAmuletId: amulet.LockedAmulet.ContractId,
       expiry: Instant,
       requireLockedAmulet: Boolean,
-      featuredProvider: Option[PartyId],
       store: ScanStore,
       clock: Clock,
       newBuilder: String => Builder,
@@ -151,15 +149,6 @@ object ChoiceContextBuilder {
         ChoiceContext,
         Builder,
       ](store, clock, newBuilder)
-      featuredAppRightO <- featuredProvider.fold(
-        Future.successful[Option[
-          ContractWithState[amulet.FeaturedAppRight.ContractId, amulet.FeaturedAppRight]
-        ]](None)
-      )(provider =>
-        store.lookupFeaturedAppRight(
-          provider
-        )
-      )
     } yield {
       if (optLockedAmulet.isEmpty) {
         // the locked amulet did expire and was unlocked
@@ -182,7 +171,6 @@ object ChoiceContextBuilder {
         choiceContextBuilder
           // the choice implementation should only attempt to expire the lock if it exists
           .addBool("expire-lock", optLockedAmulet.isDefined)
-          .addOptionalContract("featured-app-right", featuredAppRightO.map(_.contract))
           .build()
       }
     }

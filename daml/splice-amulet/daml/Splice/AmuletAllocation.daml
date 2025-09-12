@@ -64,7 +64,6 @@ allocationToTwoStepTransfer allocation =
     provider = allocation.settlement.executor
     transferBefore = allocation.settlement.settleBefore
     transferBeforeDeadline = "allocation.settlement.settleBefore"
-    allowFeaturing = True
     lockContext = Text.implode
       -- We don't show more context to avoid bloating the response here.
       ["allocation for transfer leg ", show allocation.transferLegId, " to ", show allocation.transferLeg.receiver]

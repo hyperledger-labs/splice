@@ -42,8 +42,6 @@ data TwoStepTransfer = TwoStepTransfer with
     transferBeforeDeadline : Text -- ^ Name of the deadline for the transfer
     provider : Party
       -- ^ Provider that should be marked as the app provider on the second step.
-    allowFeaturing : Bool
-      -- ^ Whether the second step can be featured.
 
 -- | The extra amount locked to guard against the transfer fees changing between
 -- the time of locking the amulet and the time of executing the actual transfer.
@@ -111,16 +109,7 @@ executeTwoStepTransfer
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
-  (paymentContext, beneficiaries) <-
-    if allowFeaturing
-      then do
-        beneficiaries <- either fail pure $ beneficiariesFromMetadata extraArgs.meta
-        context <- paymentFromChoiceContext dso extraArgs.context
-        pure (context, beneficiaries)
-      else do
-        -- ignore beneficiaries in case we are not allowing featuring
-        context <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-        pure (context, None)
+  paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
   let openRoundCid = paymentContext.context.openMiningRound
   -- unlock amulet
   unlockResult <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
@@ -136,7 +125,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         provider
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
-        beneficiaries
+        beneficiaries = None
   result <- exercisePaymentTransfer dso paymentContext amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)

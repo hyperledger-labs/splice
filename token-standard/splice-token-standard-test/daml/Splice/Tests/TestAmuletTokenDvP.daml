@@ -15,7 +15,7 @@ module Splice.Tests.TestAmuletTokenDvP where
 
 import Daml.Script
 
-import DA.Action (unless)
+import DA.Action (when)
 import DA.Assert
 import DA.Foldable (forA_, foldMap)
 import DA.Optional (isSome)
@@ -54,7 +54,8 @@ data AllocatedOTCTrade = AllocatedOTCTrade
 
 setupOtcTrade : Script AllocatedOTCTrade
 setupOtcTrade  = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
   let amuletId = registry.instrumentId
 
   alice <- allocatePartyExact "alice"
@@ -142,7 +143,7 @@ setupOtcTrade  = do
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- check metadata
-  expectBurn result.meta
+  expectNoBurn result.meta
 
   -- check lock context
   [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
@@ -199,12 +200,11 @@ testDvP = script do
   allocations <- appBackendListAllocations provider otcTradeRef
   TextMap.size allocations === 2
 
-  let beneficiaryMetadata = AmuletRegistry.beneficiariesToMetadata providerBeneficiaries
   richAllocationsWithContext <- Traversable.forA allocations $ \(allocCid, _) -> do
-    context <- RegistryApi.getAllocation_TransferContext registry allocCid beneficiaryMetadata
+    context <- RegistryApi.getAllocation_TransferContext registry allocCid emptyMetadata
     let extraArgs = ExtraArgs with
           context = context.choiceContext
-          meta = beneficiaryMetadata
+          meta = emptyMetadata
     pure (context.disclosures, (allocCid, extraArgs))
   let disclosures = foldMap fst richAllocationsWithContext
 
@@ -212,7 +212,7 @@ testDvP = script do
     allocationsWithContext = fmap snd richAllocationsWithContext
 
   -- check metadata
-  forA_ results $ \result -> expectBurn result.meta
+  forA_ results $ \result -> expectNoBurn result.meta
 
   -- check that the expected transfers happened
   WalletClient.checkHoldingWithAmountExists alice amuletId 20.0
@@ -221,31 +221,10 @@ testDvP = script do
   WalletClient.checkBalanceApprox alice amuletId 919.0 -- around 1 $ of fees paid
   WalletClient.checkBalanceApprox bob amuletId 1079.8  -- around 0.2 $ of fees paid
 
-  -- check that the provider got their featured app reward coupons
-  coupons <- map snd <$> query @AppRewardCoupon provider
-  let couponWithAmount : Decimal -> AppRewardCoupon -> Bool
-      couponWithAmount amount coupon =
-        coupon.featured && coupon.beneficiary == Some provider && coupon.amount == amount
-      checkCouponExists amount =
-        unless (any (couponWithAmount amount) coupons) $
-          fail $ "Expected coupon with amount " <> show amount <> " not found: " <> show coupons
-
-      extraAppReward = 2.0 -- 1 $ (at 0.5 Amulet per $)
-      providerWeight = 0.8
-      aliceAmount = providerWeight * (extraAppReward + 1.06) -- 1% fees plus the 0.06 Amulet create fee  (at 0.5 Amulet per $)
-      bobAmount = providerWeight * (extraAppReward + 0.26) -- 0.5% fees (at 0.5 Amulet per $)
-
-      checkNumCouponsFor b expectedNumCoupons = do
-        let numCoupons = length $ filter (\c -> c.beneficiary == Some b) coupons
-        unless (numCoupons == expectedNumCoupons ) $
-          fail $ "Expected " <> show expectedNumCoupons <> " coupons for " <> show b <> ", but got " <> show numCoupons
-
-
-  checkCouponExists aliceAmount
-  checkCouponExists bobAmount
-
-  checkNumCouponsFor providerBeneficiary1 2
-  checkNumCouponsFor providerBeneficiary2 2
+  -- check that there are no reward coupons
+  -- FIXME: make it such that the TradingApp creates a featured app marker
+  coupons <- query @AppRewardCoupon provider
+  coupons === []
 
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()
@@ -321,7 +300,7 @@ appBackendListAllocations p ref = do
         pure (fundedAllocation.allocation.transferLegId, (cid, fundedAllocation))
   pure $ TextMap.fromList matchingAllocs
 
-expectBurn : Metadata -> Script ()
-expectBurn meta =
-  unless (isSome $ TextMap.lookup burnedMetaKey meta.values) $
-    fail $ "Expected burned meta key to be present in " <> show meta
+expectNoBurn : Metadata -> Script ()
+expectNoBurn meta =
+  when (isSome $ TextMap.lookup burnedMetaKey meta.values) $
+    fail $ "Expected no burned meta key to be present in " <> show meta
