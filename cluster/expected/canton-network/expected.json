@@ -1040,7 +1040,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
-        "logLevel": "DEBUG",
+        "logLevel": "WARN",
         "metrics": {
           "enable": true
         },
@@ -1218,7 +1218,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
-        "logLevel": "DEBUG",
+        "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
@@ -1278,6 +1278,7 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "affinity": {
@@ -1312,7 +1313,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "DEBUG",
+        "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
           "enable": true

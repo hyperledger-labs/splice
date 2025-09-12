@@ -40,6 +40,7 @@ export function pulumiOptsWithPrefix(
   parallel: 128;
   onOutput: (output: string) => void;
   signal: AbortSignal;
+  color: 'always';
 } {
   return {
     parallel: 128,
@@ -50,6 +51,7 @@ export function pulumiOptsWithPrefix(
       }
     },
     signal: abortSignal,
+    color: 'always',
   };
 }
 

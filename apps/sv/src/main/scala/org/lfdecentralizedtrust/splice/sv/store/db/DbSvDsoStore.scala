@@ -518,11 +518,24 @@ class DbSvDsoStore(
   ): Future[Seq[SvDsoStore.RoundBatch[TCId]]] = {
     val templateId = companionClass.typeId(companion)
     val opName = s"list${templateId.getEntityName}GroupedByRound"
+    val partyFilter =
+      if (ignoredParties.nonEmpty)
+        companion match {
+          case SvRewardCoupon.COMPANION =>
+            // only SV reward coupons have a beneficiary field
+            (sql"and reward_party not in " ++ inClause(ignoredParties) ++
+              sql" and create_arguments ->> 'beneficiary' not in " ++ inClause(
+                ignoredParties
+              )).toActionBuilder
+          case _ =>
+            (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+        }
+      else sql""
     waitUntilAcsIngested {
       for {
         result <- storage
           .query(
-            sql"""
+            (sql"""
                 select reward_round, array_agg(contract_id)
                 from dso_acs_store
                 where store_id = $acsStoreId
@@ -531,13 +544,11 @@ class DbSvDsoStore(
                   and assigned_domain = $domain
                   and reward_party is not null -- otherwise index is not used
                   and reward_round is not null -- otherwise index is not used
-                  and reward_party NOT IN (${ignoredParties
-                .map(_.filterString)
-                .mkString(",")})
+                  """ ++ partyFilter ++ sql"""
                 group by reward_round
                 order by reward_round asc
                 limit ${sqlLimit(totalCouponsLimit)}
-               """.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
+               """).toActionBuilder.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
             opName,
           )
       } yield applyLimit(opName, totalCouponsLimit, result)

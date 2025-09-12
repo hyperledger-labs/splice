@@ -47,11 +47,7 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import {
-  configForSv,
-  svsConfig,
-  updateHistoryBackfillingValues,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { configForSv, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
   CloudPostgres,
@@ -389,7 +385,6 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
@@ -479,6 +474,7 @@ async function installSvAndValidator(
                 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
             },
           ]),
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
   };
 

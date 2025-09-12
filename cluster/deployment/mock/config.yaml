@@ -126,15 +126,45 @@ svs:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+    logging:
+      appsLogLevel: WARN
+      cantonLogLevel: INFO
+      cantonStdoutLogLevel: DEBUG
   sv:
     participant:
       bftSequencerConnection: false
+  sv-1:
+    logging:
+      appsLogLevel: WARN
+      cantonLogLevel: INFO
+      cantonStdoutLogLevel: DEBUG
+    scanApp:
+      bigQuery:
+        dataset: mock_da2_scan
+        prefix: da2
+  # TODO(DACH-NY/canton-network-internal#1484) make this work beyond "mock"
+  sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
+    # the values here are actually working on scratch and CI
+    publicName: Digital-Asset-1
+    subdomain: sv-1
+    cometbft:
+      keysGcpSecret: sv-da-1-cometbft-keys
+      nodeId: 5af57aa83abcec085c949323ed8538108757be9c #TODO(DACH-NY/canton-network-internal#1484)
+      validatorKeyAddress: 8A931AB5F957B8331BDEF3A0A081BD9F017A777F #TODO(DACH-NY/canton-network-internal#1484)
+    svApp:
+      auth0:
+        name: sv-da-1
+        clientId: bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7
+    validatorApp:
+      walletUser: auth0|mock #TODO(DACH-NY/canton-network-internal#1484)
+      auth0:
+        name: sv-da-1_validator
+        clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY
   # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
-  sv-3:
     participant:
       kms:
         keyRingId: sv-3_participant_mock

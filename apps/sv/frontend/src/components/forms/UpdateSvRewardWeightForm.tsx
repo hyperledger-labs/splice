@@ -17,7 +17,11 @@ import {
   validateUrl,
   validateWeight,
 } from './formValidators';
-import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import {
+  createProposalActions,
+  getInitialExpiration,
+  getSvRewardWeight,
+} from '../../utils/governance';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { CommonProposalFormData } from '../../utils/types';
 import { ProposalSummary } from '../governance/ProposalSummary';
@@ -42,6 +46,9 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
     () => dsoInfosQuery.data?.dsoRules.payload.svs.entriesArray() || [],
     [dsoInfosQuery]
   );
+
+  const svPartyId = dsoInfosQuery.data?.svPartyId || '';
+  const currentWeight = getSvRewardWeight(svs, svPartyId);
 
   const svOptions: { key: string; value: string }[] = useMemo(
     () => svs.map(([partyId, svInfo]) => ({ key: svInfo.name, value: partyId })),
@@ -112,6 +119,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
             expiryDate={form.state.values.expiryDate}
             effectiveDate={form.state.values.effectiveDate.effectiveDate}
             formType="sv-reward-weight"
+            currentWeight={currentWeight}
             svRewardWeightMember={form.state.values.sv}
             svRewardWeight={form.state.values.weight}
             onEdit={() => setShowConfirmation(false)}

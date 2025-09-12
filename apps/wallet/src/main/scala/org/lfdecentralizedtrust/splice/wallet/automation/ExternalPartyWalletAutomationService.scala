@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
 }
 import AutomationServiceCompanion.TriggerClass
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -32,6 +32,7 @@ class ExternalPartyWalletAutomationService(
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    params: SpliceParametersConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -47,6 +48,7 @@ class ExternalPartyWalletAutomationService(
       retryProvider,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =

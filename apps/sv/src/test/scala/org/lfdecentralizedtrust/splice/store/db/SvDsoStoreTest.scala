@@ -654,6 +654,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 3))
       val validatorFaucet1Closed = (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 2))
       val validatorFaucet2Closed = (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 2))
+      val validatorFaucet3Closed = (1 to 3).map(_ => validatorFaucetCoupon(userParty(3), round = 2))
 
       val validator1NotClosed = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
       val validator2NotClosed = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
@@ -666,16 +667,22 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       val app2Closed = (1 to 3).map(_ => appRewardCoupon(round = 2, userParty(2)))
 
       val sv1NotClosed =
-        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(1), userParty(1), 1000))
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(4), userParty(1), 1000))
       val sv2NotClosed =
-        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(2), userParty(2), 1000))
-      val sv1Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(1), 1000))
-      val sv2Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(2), userParty(2), 1000))
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(4), userParty(2), 1000))
+      val sv3NotClosed =
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(1), userParty(4), 1000))
+      val sv4NotClosed =
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(1), userParty(1), 1000))
+      val sv1Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(4), userParty(1), 1000))
+      val sv2Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(4), userParty(2), 1000))
+      val sv3Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(4), 1000))
+      val sv4Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(2), 1000))
       for {
         store <- mkStore()
         _ <- dummyDomain.create(closedRound)(store.multiDomainAcsStore)
         _ <- MonadUtil.sequentialTraverse(
-          validatorFaucet1NotClosed ++ validatorFaucet2NotClosed ++ validatorFaucet1Closed ++ validatorFaucet2Closed
+          validatorFaucet1NotClosed ++ validatorFaucet2NotClosed ++ validatorFaucet1Closed ++ validatorFaucet2Closed ++ validatorFaucet3Closed
         )(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
@@ -689,7 +696,9 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         )(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
-        _ <- MonadUtil.sequentialTraverse(sv1NotClosed ++ sv2NotClosed ++ sv1Closed ++ sv2Closed)(
+        _ <- MonadUtil.sequentialTraverse(
+          sv1NotClosed ++ sv2NotClosed ++ sv3NotClosed ++ sv4NotClosed ++ sv1Closed ++ sv2Closed ++ sv3Closed ++ sv4Closed
+        )(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
         result <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
@@ -702,7 +711,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           domain = dummyDomain,
           enableExpireValidatorFaucet = true,
           totalCouponsLimit = PageLimit.tryCreate(1000),
-          ignoredExpiredRewardsPartyIds = Set(userParty(1)),
+          ignoredExpiredRewardsPartyIds = Set(userParty(1), userParty(3)),
         )
         resultWithoutFaucet <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
@@ -728,14 +737,14 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         forExactly(1, result) { batch =>
           batch.validatorCoupons should have size 0
           batch.appCoupons should have size 0
-          batch.svRewardCoupons should have size 6
+          batch.svRewardCoupons should have size 12
           batch.validatorFaucets should have size 0
         }
         forExactly(1, result) { batch =>
           batch.validatorCoupons should have size 0
           batch.appCoupons should have size 0
           batch.svRewardCoupons should have size 0
-          batch.validatorFaucets should have size 6
+          batch.validatorFaucets should have size 9
         }
         resultWithIgnoredUserParty should have size 4
         forAll(resultWithIgnoredUserParty)(_.closedRoundNumber shouldBe 2)

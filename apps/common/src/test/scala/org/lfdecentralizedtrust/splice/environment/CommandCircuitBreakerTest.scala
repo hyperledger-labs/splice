@@ -16,7 +16,7 @@ import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{DedupConfig, LedgerClient}
 import LedgerClient.SubmitAndWaitFor
-import org.lfdecentralizedtrust.splice.util.DisclosedContracts
+import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, SpliceCircuitBreaker}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import io.grpc.{Status, StatusRuntimeException}
@@ -31,14 +31,17 @@ class CommandCircuitBreakerTest
     with HasExecutionContext {
   val ledgerClient = mock[LedgerClient]
 
-  val circuitBreaker = new CircuitBreaker(
-    actorSystem.scheduler,
-    maxFailures = 5,
-    callTimeout = 0.seconds,
-    resetTimeout = 5.seconds,
-    maxResetTimeout = 5.seconds,
-    exponentialBackoffFactor = 2.0,
-    randomFactor = 0.0,
+  val circuitBreaker = new SpliceCircuitBreaker(
+    "test",
+    new CircuitBreaker(
+      actorSystem.scheduler,
+      maxFailures = 5,
+      callTimeout = 0.seconds,
+      resetTimeout = 5.seconds,
+      maxResetTimeout = 5.seconds,
+      exponentialBackoffFactor = 2.0,
+      randomFactor = 0.0,
+    ),
   )
 
   val retryProvider = new RetryProvider(

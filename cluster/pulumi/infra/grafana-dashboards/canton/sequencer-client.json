@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5079,
+  "id": 5124,
   "links": [],
   "panels": [
     {
@@ -78,7 +78,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -110,23 +111,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": " histogram_quantile(0.9, sum by (namespace, job, node) (rate(daml_sequencer_client_submissions_sequencing_duration_seconds{namespace=~\"$namespace\",job=~\"$job\",node=~\"$node\"}[$__rate_interval])))",
-          "legendFormat": "0.9 quantile for ({{namespace}}, {{job}}) {{node}}",
+          "expr": " histogram_quantile($quantile, sum by (namespace, job, node) (rate(daml_sequencer_client_submissions_sequencing_duration_seconds{namespace=~\"$namespace\",job=~\"$job\",node=~\"$node\"}[$__rate_interval])))",
+          "legendFormat": " ({{namespace}}, {{job}}) {{node}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": " histogram_quantile(0.99, sum by (namespace, job, node) (rate(daml_sequencer_client_submissions_sequencing_duration_seconds{namespace=~\"$namespace\",job=~\"$job\",node=~\"$node\"}[$__rate_interval])))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "0.99 quantile for ({{namespace}}, {{job}}) {{node}}",
-          "range": true,
-          "refId": "B"
         }
       ],
       "title": "Sequencer Submission Latency",
@@ -636,9 +624,7 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -660,9 +646,7 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -680,16 +664,42 @@
         "refresh": 1,
         "regex": "",
         "type": "query"
+      },
+      {
+        "current": {
+          "text": "0.9",
+          "value": "0.9"
+        },
+        "name": "quantile",
+        "options": [
+          {
+            "selected": true,
+            "text": "0.9",
+            "value": "0.9"
+          },
+          {
+            "selected": false,
+            "text": "0.95",
+            "value": "0.95"
+          },
+          {
+            "selected": false,
+            "text": "0.99",
+            "value": "0.99"
+          }
+        ],
+        "query": "0.9,0.95,0.99",
+        "type": "custom"
       }
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "UTC",
   "title": "Sequencer Client",
   "uid": "eecxhade03n5se",
-  "version": 3
+  "version": 2
 }

@@ -135,14 +135,12 @@ describe('Update SV Reward Weight Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
     waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
     waitFor(() => {
@@ -165,22 +163,18 @@ describe('Update SV Reward Weight Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
     });
   });
@@ -217,7 +211,7 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput).toBeDefined();
     await user.type(weightInput, '123abc');
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.getByText('Weight must be a valid number')).toBeDefined();
     });
 
@@ -225,7 +219,9 @@ describe('Update SV Reward Weight Form', () => {
     await user.type(weightInput, '1001');
     await user.click(screen.getByTestId('update-sv-reward-weight-action'));
 
-    expect(screen.queryByText('Weight must be a valid number')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText('Weight must be a valid number')).toBeNull();
+    });
   });
 
   test('should show error on form if submission fails', async () => {

@@ -769,8 +769,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
       val results = SpliceRateLimiterTest
         .runRateLimited(
-          40,
-          200,
+          10,
+          50,
         ) {
           Future {
             blocking {
@@ -779,13 +779,13 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           }
         } futureValue
 
-      // 20 is the limit from where the rate limiter starts to kick in
-      // then 20 every second
-      // first second is 20 (full capacity) + 20 (capacity added after consumption)
-      // then 20 every second
-      val maxAccepted = 120
+      // 2 is the limit from where the rate limiter starts to kick in
+      // then 2 every second
+      // first second is 2 (full capacity) + 2 (capacity added after consumption)
+      // then 2 every second
+      val maxAccepted = 12
       // account for bursts in the stream used to rate limit the calls in `runRateLimited`
-      val minAccepted = 60
+      val minAccepted = 4
       results.count(identity) should (be >= minAccepted and be <= maxAccepted)
 
     }
