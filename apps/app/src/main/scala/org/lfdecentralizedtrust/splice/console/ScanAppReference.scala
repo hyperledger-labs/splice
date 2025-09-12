@@ -502,6 +502,29 @@ abstract class ScanAppReference(
     }
   }
 
+  def getEventHistory(
+      count: Int,
+      after: Option[(Long, String)],
+      encoding: definitions.DamlValueEncoding,
+  ): Seq[definitions.EventHistoryItem] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetEventHistory(count, after, encoding)
+      )
+    }
+  }
+
+  def getEventById(
+      updateId: String,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
+  ): definitions.EventHistoryItem = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetEventById(updateId, damlValueEncoding)
+      )
+    }
+  }
+
   def getSpliceInstanceNames() = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetSpliceInstanceNames())

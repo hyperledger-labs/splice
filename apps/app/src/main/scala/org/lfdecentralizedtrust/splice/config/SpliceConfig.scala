@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
+  MediatorVerdictIngestionConfig,
   ScanSynchronizerConfig,
   CacheConfig as SpliceCacheConfig,
 }
@@ -443,6 +444,9 @@ object SpliceConfig {
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
+    implicit val mediatorVerdictIngestionConfigReader
+        : ConfigReader[MediatorVerdictIngestionConfig] =
+      deriveReader[MediatorVerdictIngestionConfig]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
@@ -856,6 +860,9 @@ object SpliceConfig {
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
       deriveWriter[ScanCacheConfig]
+    implicit val mediatorVerdictIngestionConfigWriter
+        : ConfigWriter[MediatorVerdictIngestionConfig] =
+      deriveWriter[MediatorVerdictIngestionConfig]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 
