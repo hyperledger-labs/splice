@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { existsSync, unlinkSync, writeFileSync } from 'fs';
 
-import { allScanFunctions } from './src/bigQuery_functions';
+import {
+  allDashboardFunctions,
+  allScanFunctions,
+  computedDataTable,
+} from './src/bigQuery_functions';
 
-if (process.argv.length != 6) {
+if (process.argv.length != 7) {
   console.error(
     'Usage: npm run bigquery-sql-codegen <project> <functions-dataset-name> <scan-dataset-name> <output-file>'
   );
@@ -14,13 +18,38 @@ if (process.argv.length != 6) {
 const project = process.argv[2];
 const functionsDatasetName = process.argv[3];
 const scanDatasetName = process.argv[4];
-const out = process.argv[5];
+const dashboardsDatasetName = process.argv[5];
+const out = process.argv[6];
 
 if (existsSync(out)) {
   unlinkSync(out);
 }
-// Note that we're currently code-generating only the scan functions, not the dashboards ones, as the latter are not
-// tested in integration tests.
 allScanFunctions.forEach(f =>
-  writeFileSync(out, f.toSql(project, functionsDatasetName, scanDatasetName, ''), { flag: 'a' })
+  writeFileSync(
+    out,
+    f.toSql(
+      project,
+      functionsDatasetName,
+      functionsDatasetName,
+      scanDatasetName,
+      dashboardsDatasetName
+    ),
+    { flag: 'a' }
+  )
+);
+
+writeFileSync(out, computedDataTable.toSql(dashboardsDatasetName), { flag: 'a' });
+
+allDashboardFunctions.forEach(f =>
+  writeFileSync(
+    out,
+    f.toSql(
+      project,
+      dashboardsDatasetName,
+      functionsDatasetName,
+      scanDatasetName,
+      dashboardsDatasetName
+    ),
+    { flag: 'a' }
+  )
 );

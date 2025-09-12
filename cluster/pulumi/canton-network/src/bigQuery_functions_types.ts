@@ -114,6 +114,7 @@ abstract class BQFunction {
   ): gcp.bigquery.Routine;
   public abstract toSql(
     project: string,
+    installInDataset: string,
     functionsDataset: string,
     scanDataset: string,
     dashboardsDataset: string
@@ -186,6 +187,7 @@ export class BQScalarFunction extends BQFunction {
 
   public toSql(
     project: string,
+    installInDataset: string,
     functionsDataset: string,
     scanDataset: string,
     dashboardsDataset: string
@@ -193,7 +195,7 @@ export class BQScalarFunction extends BQFunction {
     const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
 
     return `
-      CREATE OR REPLACE FUNCTION ${functionsDataset}.${this.name}(
+      CREATE OR REPLACE FUNCTION ${installInDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
       RETURNS ${this.returnType.toSql()}
@@ -271,6 +273,7 @@ export class BQTableFunction extends BQFunction {
 
   public toSql(
     project: string,
+    installInDataset: string,
     functionsDataset: string,
     scanDataset: string,
     dashboardsDataset: string
@@ -278,7 +281,7 @@ export class BQTableFunction extends BQFunction {
     const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
 
     return `
-      CREATE OR REPLACE TABLE FUNCTION ${functionsDataset}.${this.name}(
+      CREATE OR REPLACE TABLE FUNCTION ${installInDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
       RETURNS TABLE<
@@ -325,21 +328,51 @@ export class BQProcedure extends BQFunction {
 
   public toSql(
     project: string,
+    installInDataset: string,
     functionsDataset: string,
     scanDataset: string,
     dashboardsDataset: string
   ): string {
-    const body = this.definitionBody
-      .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${functionsDataset}`)
-      .replaceAll('$$SCAN_DATASET$$', `${project}.${scanDataset}`)
-      .replaceAll('$$DASHBOARDS_DATASET$$', `${project}.${dashboardsDataset}`);
+    const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
 
     return `
-      CREATE OR REPLACE FUNCTION ${functionsDataset}.${this.name}(
+      CREATE OR REPLACE PROCEDURE ${installInDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
-      AS (
+      BEGIN
       ${body}
+      END;
+    `;
+  }
+}
+
+export class BQTable {
+  protected readonly name: string;
+  protected readonly columns: BQColumn[];
+
+  public constructor(name: string, columns: BQColumn[]) {
+    this.name = name;
+    this.columns = columns;
+  }
+
+  public toPulumi(
+    installInDataset: gcp.bigquery.Dataset,
+    deletionProtection: boolean
+  ): gcp.bigquery.Table {
+    return new gcp.bigquery.Table(this.name, {
+      datasetId: installInDataset.datasetId,
+      tableId: this.name,
+      deletionProtection,
+      schema: JSON.stringify({
+        fields: this.columns.map(col => col.toPulumi()),
+      }),
+    });
+  }
+
+  public toSql(dataset: string): string {
+    return `
+      CREATE OR REPLACE TABLE \`${dataset}.${this.name}\` (
+        ${this.columns.map(col => col.toSql()).join(',\n        ')}
       );
     `;
   }
