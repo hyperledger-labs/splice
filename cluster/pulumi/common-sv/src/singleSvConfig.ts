@@ -104,7 +104,12 @@ export type SingleSvConfiguration = z.infer<typeof SingleSvConfigSchema>;
 
 const clusterSvsConfiguration: SingleSvConfig = SvsConfigurationSchema.parse(clusterYamlConfig).svs;
 
-export const allConfiguredSvs = Object.keys(clusterSvsConfiguration).filter(k => k !== 'default');
+export const allConfiguredSvs: string[] = Object.keys(clusterSvsConfiguration).filter(
+  k => k !== 'default'
+);
+
+// SVs that don't match the standard sv-X pattern; we deploy those always, independently of DSO_SIZE
+export const configuredExtraSvs: string[] = allConfiguredSvs.filter(k => !k.match(/^sv(-\d+)?$/));
 
 export const configForSv = (svName: string): SingleSvConfiguration => {
   return merge({}, clusterSvsConfiguration.default, clusterSvsConfiguration[svName]);

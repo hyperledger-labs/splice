@@ -8,12 +8,12 @@ import {
   SvCometBftKeys,
   svCometBftKeysFromSecret,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { allConfiguredSvs, configForSv } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 import { StaticSvConfig } from './config';
 import { dsoSize } from './dsoConfig';
+import { configForSv, configuredExtraSvs } from './singleSvConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
@@ -43,15 +43,20 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
 const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): StaticSvConfig => {
   const config = configForSv(nodeName);
 
-  const svCometBftSecrets = svCometBftKeysFromSecret(config.cometbft!.keysGcpSecret!);
+  const svCometBftSecretName = config.cometbft?.keysGcpSecret
+    ? config.cometbft.keysGcpSecret
+    : `${nodeName.replaceAll('-', '')}-cometbft-keys`;
+  const svCometBftSecrets = svCometBftKeysFromSecret(svCometBftSecretName);
 
   return {
     nodeName,
     ingressName: config.subdomain!,
     onboardingName: config.publicName!,
-    auth0ValidatorAppName: config.validatorApp!.auth0!.name!,
+    auth0ValidatorAppName: config.validatorApp?.auth0?.name
+      ? config.validatorApp.auth0.name
+      : `${nodeName}_validator`,
     auth0ValidatorAppClientId: config.validatorApp?.auth0?.clientId,
-    auth0SvAppName: config.svApp!.auth0!.name!,
+    auth0SvAppName: config.svApp?.auth0?.name ? config.svApp.auth0.name : nodeName,
     auth0SvAppClientId: config.svApp?.auth0?.clientId,
     validatorWalletUser: config.validatorApp?.walletUser,
     cometBft: {
@@ -414,9 +419,10 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
     ];
 
 // TODO(#1892): consider supporting overrides of hardcoded svs (in case we're keeping hardcoded svs at all)
-export const extraSvConfigs: StaticSvConfig[] = allConfiguredSvs
-  .filter(k => !k.match(/^sv(-\d+)?$/))
-  .map((k, index) => fromSingleSvConfig(k, dsoSize + index + 1));
+export const extraSvConfigs: StaticSvConfig[] = configuredExtraSvs.map((k, index) =>
+  // Note how we give the first extra SV the CometBFT node index of the first standard SV that we don't deploy.
+  fromSingleSvConfig(k, dsoSize + index + 1)
+);
 
 export const svConfigs = standardSvConfigs.concat(extraSvConfigs);
 
@@ -447,6 +453,7 @@ export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
   return asJson && JSON.parse(asJson);
 }
 
+// "core SVs" are deployed as part of the `canton-network` stack;
 // if config.yaml contains any SVs that don't match the standard sv-X pattern, we deploy them independently of DSO_SIZE
 export const coreSvsToDeploy: StaticSvConfig[] = standardSvConfigs
   .slice(0, dsoSize)

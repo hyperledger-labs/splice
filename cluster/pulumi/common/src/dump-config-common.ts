@@ -73,6 +73,11 @@ export const cantonNetworkAuth0Config = {
       cns: 'sv-4-cns-ui-client-id',
       sv: 'sv-4-sv-ui-client-id',
     },
+    'sv-da-1': {
+      wallet: 'sv-da-1-wallet-ui-client-id',
+      cns: 'sv-da-1-cns-ui-client-id',
+      sv: 'sv-da-1-sv-ui-client-id',
+    },
   },
   appToApiAudience: {},
   appToClientAudience: {},

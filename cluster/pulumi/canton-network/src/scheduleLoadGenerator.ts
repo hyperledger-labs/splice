@@ -13,9 +13,9 @@ import {
   numInstances,
   numNodesPerInstance,
   loadTesterConfig,
-  installLoopback,
   parsedVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { Resource } from '@pulumi/pulumi';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {

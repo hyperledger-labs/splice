@@ -17,10 +17,10 @@ import {
   failOnAppVersionMismatch,
   imagePullSecret,
   installAuth0Secret,
-  installLoopback,
   installSpliceHelmChart,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   installParticipant,
   splitwellDarPaths,
