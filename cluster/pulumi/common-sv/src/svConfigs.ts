@@ -8,12 +8,12 @@ import {
   SvCometBftKeys,
   svCometBftKeysFromSecret,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { allConfiguredSvs, configForSv } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 import { StaticSvConfig } from './config';
 import { dsoSize } from './dsoConfig';
+import { allConfiguredSvs, configForSv } from './singleSvConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);

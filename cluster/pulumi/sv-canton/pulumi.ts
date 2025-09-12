@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
 
-import { allSvsToDeploy } from '../common-sv/src/svConfigs';
+import { allSvNamesToDeploy } from '../common-sv/src/dsoConfig';
 import { DeploySvRunbook, isDevNet } from '../common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
 // as we have no pulumi runtime
@@ -43,7 +43,7 @@ export async function stackForMigration(
 }
 
 const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
-export const svsToDeploy = allSvsToDeploy.map(sv => sv.nodeName);
+export const svsToDeploy = allSvNamesToDeploy;
 
 export function runSvCantonForAllMigrations<T>(
   operation: string,
