@@ -420,6 +420,7 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
 
 // TODO(#1892): consider supporting overrides of hardcoded svs (in case we're keeping hardcoded svs at all)
 export const extraSvConfigs: StaticSvConfig[] = configuredExtraSvs.map((k, index) =>
+  // Note how we give the first extra SV the CometBFT node index of the first standard SV that we don't deploy.
   fromSingleSvConfig(k, dsoSize + index + 1)
 );
 
