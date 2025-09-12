@@ -3,9 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbParameterUtils, DbStorage}
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.lifecycle.*
@@ -108,8 +110,6 @@ class DbScanVerdictStore(
     val verdicts = "scan_verdict_store"
     val views = "scan_verdict_transaction_view_store"
   }
-  import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
-  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   // Expose stable, top-level case classes via the instance for convenience
   type TransactionViewT = DbScanVerdictStore.TransactionViewT
@@ -394,12 +394,13 @@ class DbScanVerdictStore(
   def maxUpdateRecordTime(historyId: Long, migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[CantonTimestamp]] = {
-    val q =
-      sql"select max(record_time) from (" ++
-        sql"select record_time from update_history_transactions where history_id = $historyId and migration_id = $migrationId" ++
-        sql" union all select record_time from update_history_assignments where history_id = $historyId and migration_id = $migrationId" ++
-        sql" union all select record_time from update_history_unassignments where history_id = $historyId and migration_id = $migrationId" ++
-        sql") t"
+    val q = sql"""
+      select max(record_time) from (
+        select record_time from update_history_transactions where history_id = $historyId and migration_id = $migrationId
+         union all select record_time from update_history_assignments where history_id = $historyId and migration_id = $migrationId
+         union all select record_time from update_history_unassignments where history_id = $historyId and migration_id = $migrationId
+      ) t
+    """
 
     storage
       .query(
