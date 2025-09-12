@@ -558,7 +558,7 @@ lazy val `party-allocator` =
       ),
       npmInstallDeps := Seq(
         baseDirectory.value / "package.json"
-      ) ++ (`token-standard-cli` / Compile / npmInstall).value,
+      ),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {
