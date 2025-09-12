@@ -377,8 +377,6 @@
         ],
         "hosts": [
           "mock.global.canton.network.digitalasset.com",
-          "sv.mock.global.canton.network.digitalasset.com",
-          "*.sv.mock.global.canton.network.digitalasset.com",
           "validator.mock.global.canton.network.digitalasset.com",
           "*.validator.mock.global.canton.network.digitalasset.com",
           "validator1.mock.global.canton.network.digitalasset.com",
@@ -388,7 +386,9 @@
           "sv-2.mock.global.canton.network.digitalasset.com",
           "*.sv-2.mock.global.canton.network.digitalasset.com",
           "sv-1.mock.global.canton.network.digitalasset.com",
-          "*.sv-1.mock.global.canton.network.digitalasset.com"
+          "*.sv-1.mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com"
         ],
         "http": [
           {
@@ -417,8 +417,6 @@
                 ],
                 "sniHosts": [
                   "mock.global.canton.network.digitalasset.com",
-                  "sv.mock.global.canton.network.digitalasset.com",
-                  "*.sv.mock.global.canton.network.digitalasset.com",
                   "validator.mock.global.canton.network.digitalasset.com",
                   "*.validator.mock.global.canton.network.digitalasset.com",
                   "validator1.mock.global.canton.network.digitalasset.com",
@@ -428,7 +426,9 @@
                   "sv-2.mock.global.canton.network.digitalasset.com",
                   "*.sv-2.mock.global.canton.network.digitalasset.com",
                   "sv-1.mock.global.canton.network.digitalasset.com",
-                  "*.sv-1.mock.global.canton.network.digitalasset.com"
+                  "*.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com"
                 ]
               }
             ],

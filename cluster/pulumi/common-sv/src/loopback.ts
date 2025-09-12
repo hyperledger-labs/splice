@@ -11,7 +11,7 @@ import {
   ExactNamespace,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
-import { coreSvsToDeploy } from './svConfigs';
+import { allSvsToDeploy, coreSvsToDeploy } from './svConfigs';
 import { cometBFTExternalPort } from './synchronizer/cometbftConfig';
 
 export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
@@ -73,13 +73,11 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     { dependsOn: [namespace.ns] }
   );
 
-  const svHosts = coreSvsToDeploy
+  const svHosts = allSvsToDeploy
     .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
     .flat();
   const allHosts = [
     clusterHostname,
-    `sv.${clusterHostname}`,
-    `*.sv.${clusterHostname}`,
     `validator.${clusterHostname}`,
     `*.validator.${clusterHostname}`,
     `validator1.${clusterHostname}`,
