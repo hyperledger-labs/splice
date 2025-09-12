@@ -9,6 +9,7 @@ import {
   BQProcedure,
   BQScalarFunction,
   BQStruct,
+  BQTable,
   BQTableFunction,
   FLOAT64,
   INT64,
@@ -769,6 +770,27 @@ export const allScanFunctions = [
   coin_price,
   all_stats,
 ];
+
+export const computedDataTable = new BQTable('dashboards-data', [
+  new BQColumn('as_of_record_time', TIMESTAMP),
+  new BQColumn('migration_id', INT64),
+  new BQColumn('locked', BIGNUMERIC),
+  new BQColumn('unlocked', BIGNUMERIC),
+  new BQColumn('current_supply_total', BIGNUMERIC),
+  new BQColumn('unminted', BIGNUMERIC),
+  new BQColumn('daily_mint_app_rewards', BIGNUMERIC),
+  new BQColumn('daily_mint_validator_rewards', BIGNUMERIC),
+  new BQColumn('daily_mint_sv_rewards', BIGNUMERIC),
+  new BQColumn('daily_mint_unclaimed_activity_records', BIGNUMERIC),
+  new BQColumn('daily_burn', BIGNUMERIC),
+  new BQColumn('num_amulet_holders', INT64),
+  new BQColumn('num_active_validators', INT64),
+  new BQColumn('average_tps', FLOAT64),
+  new BQColumn('peak_tps', FLOAT64),
+  new BQColumn('daily_min_coin_price', BIGNUMERIC),
+  new BQColumn('daily_max_coin_price', BIGNUMERIC),
+  new BQColumn('daily_avg_coin_price', BIGNUMERIC),
+]);
 
 export const allDashboardFunctions = [
   all_days_since_genesis,

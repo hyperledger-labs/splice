@@ -23,7 +23,7 @@ import {
   commandScriptPath,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
-import { allDashboardFunctions, allScanFunctions } from './bigQuery_functions';
+import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -200,37 +200,10 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
     },
   });
 
-  const dataTableName = 'dashboards-data';
-  new gcp.bigquery.Table(
-    dataTableName,
-    {
-      datasetId: dataset.datasetId,
-      tableId: dataTableName,
-      // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
-      deletionProtection: false,
-      friendlyName: `${dataTableName} Table`,
-      schema: JSON.stringify([
-        { name: 'as_of_record_time', type: 'TIMESTAMP', mode: 'REQUIRED' },
-        { name: 'migration_id', type: 'INT64', mode: 'REQUIRED' },
-        { name: 'locked', type: 'BIGNUMERIC' },
-        { name: 'unlocked', type: 'BIGNUMERIC' },
-        { name: 'current_supply_total', type: 'BIGNUMERIC' },
-        { name: 'unminted', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_app_rewards', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_validator_rewards', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_sv_rewards', type: 'BIGNUMERIC' },
-        { name: 'daily_mint_unclaimed_activity_records', type: 'BIGNUMERIC' },
-        { name: 'daily_burn', type: 'BIGNUMERIC' },
-        { name: 'num_amulet_holders', type: 'INT64' },
-        { name: 'num_active_validators', type: 'INT64' },
-        { name: 'average_tps', type: 'FLOAT64' },
-        { name: 'peak_tps', type: 'FLOAT64' },
-        { name: 'daily_min_coin_price', type: 'BIGNUMERIC' },
-        { name: 'daily_max_coin_price', type: 'BIGNUMERIC' },
-        { name: 'daily_avg_coin_price', type: 'BIGNUMERIC' },
-      ]),
-    },
-    { dependsOn: [dataset] }
+  computedDataTable.toPulumi(
+    dataset,
+    // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
+    false
   );
 
   return dataset;
