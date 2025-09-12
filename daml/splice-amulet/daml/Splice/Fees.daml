@@ -45,7 +45,7 @@ scaleRatePerRound : Decimal -> RatePerRound -> RatePerRound
 scaleRatePerRound s r = RatePerRound with rate = s * r.rate
 
 positiveRatePerRound : RatePerRound -> Bool
-positiveRatePerRound r = r.rate > 0.0
+positiveRatePerRound r = r.rate >= 0.0
 
 -- Fixed and variable rates
 ---------------------------
@@ -59,7 +59,7 @@ scaleFixedFee : Decimal -> FixedFee -> FixedFee
 scaleFixedFee s f = FixedFee with fee = s * f.fee
 
 positiveFixedFee : FixedFee -> Bool
-positiveFixedFee f = f.fee > 0.0
+positiveFixedFee f = f.fee >= 0.0
 
 -- | A rate defined as a piecewise linear function, e.g.,
 -- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
