@@ -101,7 +101,7 @@ export async function installNode(
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE: svNamespaceStr,
+      namespace: svNamespaceStr,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,

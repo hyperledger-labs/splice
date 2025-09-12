@@ -61,6 +61,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     )
   }
   private val functionsDatasetName = s"functions_$uuid"
+  private val dashboardsDatasetName = s"dasboards_$uuid"
 
   // Test data parameters
   private val mintedAppRewardsAmount = BigDecimal(0)
@@ -101,6 +102,17 @@ class ScanTotalSupplyBigQueryIntegrationTest
         .setDefaultTableLifetime(1.hour.toMillis)
         .build()
     bigquery.create(functionsDatasetInfo)
+
+    // Note that the dashboard tables are never actually populated in this test,
+    // but we do test creating them from the codegen'ed schemas, and creating the
+    // functions and procedures for populating them, so we get some sanity check
+    // on the queries for syntax and type errors.
+    val dashboardsDatasetInfo =
+      bq.DatasetInfo
+        .newBuilder(dashboardsDatasetName)
+        .setDefaultTableLifetime(1.hour.toMillis)
+        .build()
+    bigquery.create(dashboardsDatasetInfo)
   }
 
   private[this] def inferBQUser(): String = {
@@ -119,6 +131,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     // Delete the temporary BigQuery datasets after tests
     bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     super.afterAll()
   }
 
@@ -486,7 +499,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val sqlFile = sqlDir.resolve("functions.sql")
 
     val ret = Process(
-      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${sqlFile.toAbsolutePath}",
+      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${dashboardsDatasetName} ${sqlFile.toAbsolutePath}",
       new File("cluster/pulumi/canton-network"),
     ).!
     if (ret != 0) {
