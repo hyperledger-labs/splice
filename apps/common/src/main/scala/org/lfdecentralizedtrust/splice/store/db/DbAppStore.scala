@@ -58,7 +58,6 @@ abstract class DbTxLogAppStore[TXE](
       acsContractFilter,
       txLogConfig,
       domainMigrationInfo,
-      participantId,
       retryProvider,
       handleIngestionSummary,
     )
@@ -98,7 +97,6 @@ abstract class DbAppStore(
       acsContractFilter,
       TxLogStore.Config.empty,
       domainMigrationInfo,
-      participantId,
       retryProvider,
       handleIngestionSummary,
     )
