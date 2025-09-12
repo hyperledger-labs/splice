@@ -103,6 +103,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
         .build()
     bigquery.create(functionsDatasetInfo)
 
+    // Note that the dashboard tables are never actually populated in this test,
+    // but we do test creating them from the codegen'ed schemas, and creating the
+    // functions and procedures for populating them, so we get some sanity check
+    // on the queries for syntax and type errors.
     val dashboardsDatasetInfo =
       bq.DatasetInfo
         .newBuilder(dashboardsDatasetName)
@@ -125,9 +129,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
     logger.info(s"Cleaning up BigQuery dataset: $datasetName")
 
     // Delete the temporary BigQuery datasets after tests
-//    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-//    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-//    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     super.afterAll()
   }
 
