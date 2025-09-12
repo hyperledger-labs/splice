@@ -17,6 +17,8 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
+    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
+    "down": "PULUMI_CONFIG_PASSPHRASE= ts-node ./runPulumiDown.ts",
+    "up": "PULUMI_CONFIG_PASSPHRASE= ts-node ./runPulumiUp.ts"
   }
 }
