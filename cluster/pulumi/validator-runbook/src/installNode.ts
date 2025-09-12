@@ -49,8 +49,6 @@ import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/p
 import _ from 'lodash';
 
 import { clusterSubConfig } from '../../common/src/config/configLoader';
-import { validatorRunbookConfig } from './config';
-import { installPartyAllocator } from './partyAllocator';
 import {
   VALIDATOR_MIGRATE_PARTY,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
@@ -318,7 +316,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     )
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  const validatorChart = installSpliceRunbookHelmChart(
+  return installSpliceRunbookHelmChart(
     xns,
     'validator',
     'splice-validator',
@@ -326,8 +324,4 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     activeVersion,
     { dependsOn: dependsOn }
   );
-  if (validatorRunbookConfig?.partyAllocator.enable) {
-    installPartyAllocator(xns, [validatorChart]);
-  }
-  return validatorChart;
 }

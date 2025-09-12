@@ -76,12 +76,11 @@ export class LedgerApiClient {
   }
 
   async allocateExternalParty(
-    hint: string,
     synchronizer: string,
     onboardingTransactions: SignedTransaction[],
     multiHashSignatures: Signature[],
   ): Promise<AllocateExternalPartyResponse> {
-    return this.retry(`allocate external party ${hint}`, () =>
+    return this.retry(`allocate external party`, () =>
       this.als.run({ url: undefined }, () =>
         this.api.postV2PartiesExternalAllocate({
           synchronizer,
