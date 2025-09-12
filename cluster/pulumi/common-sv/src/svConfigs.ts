@@ -13,7 +13,7 @@ import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/
 
 import { StaticSvConfig } from './config';
 import { dsoSize } from './dsoConfig';
-import { allConfiguredSvs, configForSv } from './singleSvConfig';
+import { configForSv, configuredExtraSvs } from './singleSvConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
@@ -419,9 +419,9 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
     ];
 
 // TODO(#1892): consider supporting overrides of hardcoded svs (in case we're keeping hardcoded svs at all)
-export const extraSvConfigs: StaticSvConfig[] = allConfiguredSvs
-  .filter(k => !k.match(/^sv(-\d+)?$/))
-  .map((k, index) => fromSingleSvConfig(k, dsoSize + index + 1));
+export const extraSvConfigs: StaticSvConfig[] = configuredExtraSvs.map((k, index) =>
+  fromSingleSvConfig(k, dsoSize + index + 1)
+);
 
 export const svConfigs = standardSvConfigs.concat(extraSvConfigs);
 

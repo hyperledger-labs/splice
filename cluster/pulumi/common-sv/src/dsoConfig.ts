@@ -1,8 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { config, isDevNet, DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+import {
+  config,
+  isDevNet,
+  DeploySvRunbook,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 
-import { allConfiguredSvs } from './singleSvConfig';
+import { configuredExtraSvs } from './singleSvConfig';
 
 function getDsoSize(): number {
   // If not devnet, enforce 1 sv
@@ -33,9 +37,9 @@ export const dsoSize = getDsoSize();
 
 function getAllSvNamesToDeploy(): string[] {
   const coreSvs = Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
-  const extraSvs = allConfiguredSvs;
-  const svRunbook = DeploySvRunbook ? [ 'sv' ] : [];
-  return [ coreSvs, extraSvs, svRunbook ].flat();
+  const extraSvs = configuredExtraSvs;
+  const svRunbook = DeploySvRunbook ? ['sv'] : [];
+  return [coreSvs, extraSvs, svRunbook].flat();
 }
 
 // use this is if imporing `svConfigs` for `allSvsToDeploy` doesn't work for you because you don't have a pulumi runtime
