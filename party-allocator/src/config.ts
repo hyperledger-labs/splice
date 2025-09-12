@@ -14,10 +14,6 @@ const partyAllocationsSchema = z.object({
 
 type PartyAllocationsConf = z.infer<typeof partyAllocationsSchema>;
 
-if (!process.env.EXTERNAL_CONFIG) {
-  throw new Error("EXTERNAL_CONFIG envrionment variable must be set");
-}
-
 export const config: PartyAllocationsConf = partyAllocationsSchema.parse(
   JSON.parse(process.env.EXTERNAL_CONFIG!),
 );
