@@ -396,9 +396,9 @@ class DbScanVerdictStore(
   ): Future[Option[CantonTimestamp]] = {
     val q = sql"""
       select max(record_time) from (
-        select record_time from update_history_transactions where history_id = $historyId and migration_id = $migrationId
-         union all select record_time from update_history_assignments where history_id = $historyId and migration_id = $migrationId
-         union all select record_time from update_history_unassignments where history_id = $historyId and migration_id = $migrationId
+        select max(record_time) as record_time from update_history_transactions where history_id = $historyId and migration_id = $migrationId
+         union all select max(record_time) as record_time from update_history_assignments where history_id = $historyId and migration_id = $migrationId
+         union all select max(record_time) as record_time from update_history_unassignments where history_id = $historyId and migration_id = $migrationId
       ) t
     """
 
