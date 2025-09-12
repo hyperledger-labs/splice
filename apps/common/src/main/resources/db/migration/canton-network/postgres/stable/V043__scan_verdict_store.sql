@@ -26,7 +26,7 @@ create table scan_verdict_store
     transaction_root_views      integer[] not null
 );
 
--- Index for efficient querying by migration, and record time
+-- Index for efficient querying by migration and record time
 create index scan_verdict_mi_rt on scan_verdict_store (migration_id, record_time);
 
 -- Index for querying by update_id
