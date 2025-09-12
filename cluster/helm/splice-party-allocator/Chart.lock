@@ -1,0 +1,6 @@
+dependencies:
+- name: splice-util-lib
+  repository: file://../splice-util-lib
+  version: 0.3.0
+digest: sha256:c5a259142f837278690980ec0668f22124aa519df736e3ef8005be613a808ca2
+generated: "2024-09-06T20:02:38.240661Z"

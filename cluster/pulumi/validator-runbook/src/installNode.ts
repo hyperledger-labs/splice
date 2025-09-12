@@ -299,7 +299,7 @@ async function installValidator(
     )
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  return installSpliceRunbookHelmChart(
+  const validatorChart = installSpliceRunbookHelmChart(
     xns,
     'validator',
     'splice-validator',
@@ -307,4 +307,8 @@ async function installValidator(
     activeVersion,
     { dependsOn: dependsOn }
   );
+  if (validatorRunbookConfig?.partyAllocator.enable) {
+    installPartyAllocator(xns, [validatorChart]);
+  }
+  return validatorChart;
 }
