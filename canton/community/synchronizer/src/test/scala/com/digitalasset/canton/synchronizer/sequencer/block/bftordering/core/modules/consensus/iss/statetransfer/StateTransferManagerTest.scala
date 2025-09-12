@@ -224,7 +224,7 @@ class StateTransferManagerTest extends AnyWordSpec with BftSequencerBaseTest {
                   .create(commitCertificate = None, from = myId)
                   .fakeSign
               ),
-              to = otherId,
+              destinationBftNodeId = otherId,
             )
           )
         )(any[TraceContext], any[MetricsContext])
@@ -283,7 +283,7 @@ class StateTransferManagerTest extends AnyWordSpec with BftSequencerBaseTest {
                   .create(Some(commitCert), from = myId)
                   .fakeSign
               ),
-              to = otherId,
+              destinationBftNodeId = otherId,
             )
           )
         )(any[TraceContext], any[MetricsContext])
@@ -373,7 +373,7 @@ class StateTransferManagerTest extends AnyWordSpec with BftSequencerBaseTest {
               prePrepare.canonicalCommitSet,
             ),
             prePrepare.viewNumber,
-            from = commitCert.prePrepare.from,
+            originalLeader = commitCert.prePrepare.from,
             isLastInEpoch = true,
             mode = OrderedBlockForOutput.Mode.FromStateTransfer,
           )

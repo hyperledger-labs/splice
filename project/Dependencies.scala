@@ -36,7 +36,7 @@ object Dependencies {
     "com.daml" %% "daml-lf-validation" % CantonDependencies.daml_libraries_version
 
   lazy val pekko_http_cors =
-    "org.apache.pekko" %% "pekko-http-cors" % "1.0.0"
+    "org.apache.pekko" %% "pekko-http-cors" % CantonDependencies.pekko_http_version
 
   lazy val spray_json =
     "io.spray" %% "spray-json" % "1.3.6"

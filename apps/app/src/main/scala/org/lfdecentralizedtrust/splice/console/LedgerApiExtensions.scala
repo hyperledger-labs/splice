@@ -72,6 +72,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             readAs: Seq[PartyId] = Seq.empty,
             userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+            includeCreatedEventBlob: Boolean = false,
         ): JavaTransaction = {
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
@@ -95,6 +96,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 userId = userId,
                 packageIdSelectionPreference = Seq.empty,
                 transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                includeCreatedEventBlob = includeCreatedEventBlob,
               )
             )
           }
@@ -400,7 +402,8 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             partyId: PartyId,
             predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
-          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val filterIdentifier =
+            PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,
@@ -439,7 +442,8 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
         ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
             partyId: PartyId
         ): Seq[CreatedEvent] = {
-          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val filterIdentifier =
+            PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,

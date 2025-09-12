@@ -1,10 +1,16 @@
 # Reference configuration options
-svs:
-  default:
-    logging:
-      appsLogLevel: DEBUG
-      cantonLogLevel: DEBUG
-      cometbftLogLevel: debug
+cluster:
+  nodePools:
+    apps:
+      minNodes: 0
+      # A high max-nodes by default to support large deployments and hard migrations
+      # Should be set to a lower number (currently 8) on CI clusters that do neither of those.
+      maxNodes: 20
+      nodeType: e2-standard-16
+    infra:
+      minNodes: 1
+      maxNodes: 3
+      nodeType: e2-standard-8
 infra:
   prometheus:
     retentionDuration: "1y"
@@ -36,6 +42,11 @@ pulumiProjectConfig:
   sv-runbook:
     cloudSql:
       enabled: false
+pulumiStacks:
+  default:
+    parallelism: 64
+  multi-validator:
+    parallelism: 10
 validator1:
   logging:
     level: DEBUG
@@ -56,6 +67,15 @@ monitoring:
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
+      # confirmation requests correspond to new ledger submissions;
+      # we alert if the rate is higher than expected to spot potential overload situations
+      confirmationRequests:
+        total:
+          rate: 10
+          overMinutes: 5
+        perMember:
+          rate: 2
+          overMinutes: 5
       cloudSql:
         maintenance: false
       cometbft:
@@ -93,3 +113,27 @@ sv:
         memory: '12Gi'
       limits:
         memory: '18Gi'
+  scan:
+    externalRateLimits:
+      globalLimits:
+        maxTokens: 2147483647
+        tokensPerFill: 2147483647
+        fillInterval: 60s
+      rateLimits:
+        - actions:
+            - name: acs
+              pathPrefix: /api/scan/v0/acs
+            - name: client_ip
+              clientIp: true
+          limits:
+            maxTokens: 10
+            tokensPerFill: 5
+            fillInterval: 60s
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      cantonLogLevel: DEBUG
+      cometbftLogLevel: debug
+    participant:
+      bftSequencerConnection: true

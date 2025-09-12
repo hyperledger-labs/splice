@@ -9,7 +9,7 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.catsinstances.`cats nonempty traverse`
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.admin.participant.v30
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.{
@@ -97,6 +97,7 @@ final case class SynchronizerConnectionConfig(
             SequencerConnections(
               otherAliasToConnection,
               `sequencerConnections`.sequencerTrustThreshold,
+              `sequencerConnections`.`sequencerLivenessMargin`,
               `sequencerConnections`.submissionRequestAmplification,
             ),
             `manualConnect`,
@@ -153,6 +154,7 @@ final case class SynchronizerConnectionConfig(
           updatedSequencerConnections <- SequencerConnections.many(
             updatedConnections,
             sequencerConnections.sequencerTrustThreshold,
+            sequencerConnections.sequencerLivenessMargin,
             sequencerConnections.submissionRequestAmplification,
           )
         } yield this.copy(
@@ -274,6 +276,7 @@ object SynchronizerConnectionConfig
 
   def tryGrpcSingleConnection(
       synchronizerAlias: SynchronizerAlias,
+      sequencerAlias: SequencerAlias,
       connection: String,
       manualConnect: Boolean = false,
       psid: Option[PhysicalSynchronizerId] = None,
@@ -286,7 +289,7 @@ object SynchronizerConnectionConfig
   ): SynchronizerConnectionConfig = {
     val sequencerConnection =
       SequencerConnections.single(
-        GrpcSequencerConnection.tryCreate(connection, certificates, SequencerAlias.Default)
+        GrpcSequencerConnection.tryCreate(connection, certificates, sequencerAlias)
       )
 
     SynchronizerConnectionConfig(
@@ -313,6 +316,7 @@ object SynchronizerConnectionConfig
       timeTracker: SynchronizerTimeTrackerConfig = SynchronizerTimeTrackerConfig(),
       initializeFromTrustedSynchronizer: Boolean = false,
       sequencerTrustThreshold: PositiveInt = PositiveInt.one,
+      sequencerLivenessMargin: NonNegativeInt = NonNegativeInt.zero,
       submissionRequestAmplification: SubmissionRequestAmplification =
         SubmissionRequestAmplification.NoAmplification,
   ): SynchronizerConnectionConfig = {
@@ -320,6 +324,7 @@ object SynchronizerConnectionConfig
       SequencerConnections.tryMany(
         connections,
         sequencerTrustThreshold = sequencerTrustThreshold,
+        sequencerLivenessMargin = sequencerLivenessMargin,
         submissionRequestAmplification = submissionRequestAmplification,
       )
 

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.store.db
 
+import cats.syntax.apply.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf
 import com.daml.nameof.NameOf.functionFullName
@@ -16,7 +17,10 @@ import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, Can
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.event.RecordTime
-import com.digitalasset.canton.participant.store.AcsCommitmentStore.ParticipantCommitmentData
+import com.digitalasset.canton.participant.store.AcsCommitmentStore.{
+  ParticipantCommitmentData,
+  ReinitializationStatus,
+}
 import com.digitalasset.canton.participant.store.{
   AcsCommitmentStore,
   AcsCounterParticipantConfigStore,
@@ -30,10 +34,7 @@ import com.digitalasset.canton.protocol.messages.{
   CommitmentPeriodState,
   SignedProtocolMessage,
 }
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.{
-  mergeBuildersIntoChain,
-  toSQLActionBuilderChain,
-}
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.{DbAction, SQLActionBuilderChain}
 import com.digitalasset.canton.resource.{DbParameterUtils, DbStorage, DbStore}
 import com.digitalasset.canton.serialization.DeterministicEncoding
@@ -46,6 +47,7 @@ import com.digitalasset.canton.util.collection.IterableUtil.Ops
 import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.google.protobuf.ByteString
 import slick.jdbc.TransactionIsolation.Serializable
+import slick.jdbc.canton.SQLActionBuilder
 import slick.jdbc.{
   GetResult,
   GetTupleResult,
@@ -215,6 +217,17 @@ class DbAcsCommitmentStore(
     storage.update_(upsertQuery, operationName = "commitments: markComputedAndSent")
   }
 
+  private def buildParticipantFilter(
+      column: String,
+      participants: Option[NonEmpty[Seq[ParticipantId]]],
+      in: Boolean = true,
+  ): SQLActionBuilderChain = participants match {
+    case None => sql""
+    case Some(filter) =>
+      val not = if (in) sql"" else sql"NOT "
+      sql" AND " ++ not ++ DbStorage.toInClause(column, filter)
+  }
+
   override def outstanding(
       start: CantonTimestamp,
       end: CantonTimestamp,
@@ -223,18 +236,12 @@ class DbAcsCommitmentStore(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)]] = {
-    val participantFilter: SQLActionBuilderChain = counterParticipantsFilter match {
-      case None => sql""
-      case Some(list) =>
-        sql" AND counter_participant IN (" ++ list.forgetNE
-          .map(part => sql"$part")
-          .intercalate(sql", ") ++ sql")"
-    }
+    val participantFilter = buildParticipantFilter("counter_participant", counterParticipantsFilter)
 
     import DbStorage.Implicits.BuilderChain.*
     val query =
       sql"""select from_exclusive, to_inclusive, counter_participant, matching_state
-                    from par_outstanding_acs_commitments where synchronizer_idx = $indexedSynchronizer and to_inclusive >= $start and from_exclusive < $end
+                    from par_outstanding_acs_commitments where synchronizer_idx = $indexedSynchronizer and to_inclusive > $start and from_exclusive < $end
                     and ($includeMatchedPeriods or matching_state != ${CommitmentPeriodState.Matched})
                 """ ++ participantFilter
 
@@ -378,32 +385,26 @@ class DbAcsCommitmentStore(
           Seq(indexedSynchronizer.synchronizerId),
           Seq.empty,
         )
+      participantFilter = buildParticipantFilter(
+        "counter_participant",
+        NonEmpty.from(ignores.map(_.participantId)),
+        in = false,
+      )
       outstandingOpt <- adjustedTsOpt.traverse { ts =>
-        storage.query(
-          sql"""select from_exclusive, to_inclusive, counter_participant, multi_hosted_cleared from par_outstanding_acs_commitments
+        val query: SQLActionBuilder =
+          (sql"""select from_exclusive, to_inclusive from par_outstanding_acs_commitments
                where synchronizer_idx=$indexedSynchronizer
                and from_exclusive < $ts
                and matching_state != ${CommitmentPeriodState.Matched}
-               and multi_hosted_cleared = false"""
-            .as[(CantonTimestamp, CantonTimestamp, ParticipantId, Boolean)]
+               and multi_hosted_cleared = false""" ++ participantFilter).toActionBuilder
+        storage.query(
+          query
+            .as[(CantonTimestamp, CantonTimestamp)]
             .withTransactionIsolation(Serializable),
           operationName = "commitments: compute no outstanding",
         )
       }
-    } yield {
-      for {
-        ts <- adjustedTsOpt
-        outstanding <- outstandingOpt.map { vector =>
-          vector
-            .filter { case (_, _, participantId, _) =>
-              !ignores.exists(config => config.participantId == participantId)
-            }
-            .map { case (start, end, _, _) =>
-              (start, end)
-            }
-        }
-      } yield AcsCommitmentStore.latestCleanPeriod(ts, outstanding)
-    }
+    } yield (adjustedTsOpt, outstandingOpt).mapN(AcsCommitmentStore.latestCleanPeriod)
 
   override def searchComputedBetween(
       start: CantonTimestamp,
@@ -415,13 +416,7 @@ class DbAcsCommitmentStore(
     Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)]
   ] = {
 
-    val participantFilter: SQLActionBuilderChain = counterParticipantsFilter match {
-      case None => sql""
-      case Some(list) =>
-        sql" AND counter_participant IN (" ++ list.forgetNE
-          .map(part => sql"$part")
-          .intercalate(sql", ") ++ sql")"
-    }
+    val participantFilter = buildParticipantFilter("counter_participant", counterParticipantsFilter)
 
     import DbStorage.Implicits.BuilderChain.*
     val query =
@@ -443,19 +438,13 @@ class DbAcsCommitmentStore(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[SignedProtocolMessage[AcsCommitment]]] = {
 
-    val participantFilter: SQLActionBuilderChain = counterParticipantsFilter match {
-      case None => sql""
-      case Some(list) =>
-        sql" AND sender IN (" ++ list.forgetNE
-          .map(part => sql"$part")
-          .intercalate(sql", ") ++ sql")"
-    }
+    val participantFilter = buildParticipantFilter("sender", counterParticipantsFilter)
 
     import DbStorage.Implicits.BuilderChain.*
     val query =
       sql"""select signed_commitment
             from par_received_acs_commitments
-            where synchronizer_idx = $indexedSynchronizer and to_inclusive >= $start and from_exclusive < $end""" ++ participantFilter
+            where synchronizer_idx = $indexedSynchronizer and to_inclusive > $start and from_exclusive < $end""" ++ participantFilter
 
     storage.query(query.as[SignedProtocolMessage[AcsCommitment]], functionFullName)
 
@@ -566,6 +555,7 @@ class DbIncrementalCommitmentStore(
           HashAlgorithm.Sha256,
         )
         .toLengthLimitedHexString
+
     def deleteCommitments(stakeholders: List[SortedSet[LfPartyId]]): DbAction.All[Unit] = {
       val deleteStatement =
         "delete from par_commitment_snapshot where synchronizer_idx = ? and stakeholders_hash = ?"
@@ -622,6 +612,62 @@ class DbIncrementalCommitmentStore(
       DBIO.seq(operations*).transactionally.withTransactionIsolation(Serializable),
       operationName = "commitments: incremental commitments snapshot update",
     )
+  }
+
+  override def readReinitilizationStatus()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[ReinitializationStatus] = {
+    val query =
+      sql"""select ts_reinit_ongoing, ts_reinit_completed from par_commitment_reinitialization where synchronizer_idx=$indexedSynchronizer"""
+        .as[(Option[CantonTimestamp], Option[CantonTimestamp])]
+        .headOption
+    storage
+      .query(query, operationName = "commitments: read reinitilization status")
+      .map(_.getOrElse((None, None)))
+      .map { case (lastStarted, lastCompleted) =>
+        ReinitializationStatus(lastStarted, lastCompleted)
+      }
+  }
+
+  override def markReinitializationStarted(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    val query = storage.profile match {
+      case _: DbStorage.Profile.Postgres =>
+        sqlu"""insert into par_commitment_reinitialization (synchronizer_idx, ts_reinit_ongoing)
+                    VALUES ($indexedSynchronizer, $timestamp)
+                 on conflict (synchronizer_idx) do update
+                  set
+                    ts_reinit_ongoing = $timestamp
+                 """
+      case _: DbStorage.Profile.H2 =>
+        sqlu"""merge into par_commitment_reinitialization
+                  using dual
+                  on (synchronizer_idx = $indexedSynchronizer)
+                  when matched then
+                    update set
+                       ts_reinit_ongoing = $timestamp
+                  when not matched then
+                    insert (synchronizer_idx, ts_reinit_ongoing)
+                    values ($indexedSynchronizer, $timestamp)
+                 """
+    }
+    storage.update_(query, functionFullName)
+  }
+
+  override def markReinitializationCompleted(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] = {
+    val query = storage.profile match {
+      case _ =>
+        sqlu"""
+          UPDATE par_commitment_reinitialization
+          SET ts_reinit_completed = $timestamp
+          WHERE synchronizer_idx = $indexedSynchronizer
+            AND ts_reinit_ongoing = $timestamp
+        """
+    }
+    storage.update(query, functionFullName).map(nrRows => if (nrRows > 0) true else false)
   }
 }
 

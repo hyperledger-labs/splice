@@ -361,6 +361,19 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
           case None => Nil
         }
 
+      val signingAlgoSpecRelationCheck: Seq[String] =
+        supportedSigningKeySpecs match {
+          case Some(specs) =>
+            supportedSigningAlgoSpecs.toList.flatten.foldLeft(List.empty[String]) {
+              case (state, algoSpec) =>
+                if (algoSpec.supportedSigningKeySpecs.intersect(specs).isEmpty)
+                  state :+ s"The signing algorithm specification $algoSpec does not include any key " +
+                    s"specification supported by this node. Supported key specifications: $specs."
+                else state
+            }
+          case None => Nil
+        }
+
       val encryptionAlgoCheck: Seq[String] =
         cryptoConfig.encryption.algorithms.default.zip(supportedEncryptionAlgoSpecs) match {
           case Some((default, allowed)) if !allowed.contains(default) =>
@@ -397,11 +410,24 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
           case None => Nil
         }
 
+      val encryptionAlgoSpecRelationCheck: Seq[String] =
+        supportedEncryptionKeySpecs match {
+          case Some(specs) =>
+            supportedEncryptionAlgoSpecs.toList.flatten.foldLeft(List.empty[String]) {
+              case (state, algoSpec) =>
+                if (algoSpec.supportedEncryptionKeySpecs.intersect(specs).isEmpty)
+                  state :+ s"The encryption algorithm specification $algoSpec does not include any key " +
+                    s"specification supported by this node. Supported key specifications: $specs."
+                else state
+            }
+          case None => Nil
+        }
+
       // only one supported scheme for symmetric, hash, and pbkdf; no need to check them.
 
       val allChecksForNode =
-        signingAlgoCheck ++ signingKeyCheck ++ signingKeySpecRelationCheck ++
-          encryptionAlgoCheck ++ encryptionKeyCheck ++ encryptionKeySpecRelationCheck
+        signingAlgoCheck ++ signingKeyCheck ++ signingKeySpecRelationCheck ++ signingAlgoSpecRelationCheck ++
+          encryptionAlgoCheck ++ encryptionKeyCheck ++ encryptionKeySpecRelationCheck ++ encryptionAlgoSpecRelationCheck
 
       prefixErrors(allChecksForNode)
     }

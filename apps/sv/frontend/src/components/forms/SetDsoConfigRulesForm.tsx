@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import dayjs from 'dayjs';
-import { ConfigFieldState } from '../form-components/ConfigField';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { ConfigChange } from '../../utils/types';
-import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import { CommonProposalFormData, ConfigFormData } from '../../utils/types';
+import {
+  configFormDataToConfigChanges,
+  createProposalActions,
+  getInitialExpiration,
+} from '../../utils/governance';
 import { useDsoInfos } from '../../contexts/SvContext';
-import { useMemo, useState } from 'react';
 import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
 import { useAppForm } from '../../hooks/form';
 import {
@@ -17,39 +19,17 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { useMemo, useState } from 'react';
+import { ProposalSummary } from '../governance/ProposalSummary';
 
-type ConfigFormData = Record<string, ConfigFieldState>;
-
-interface CommonFormData {
-  action: string;
-  expiryDate: string;
-  effectiveDate: string;
-  url: string;
-  summary: string;
-}
-
-type SetDsoConfigCompleteFormData = {
-  common: CommonFormData;
+export type SetDsoConfigCompleteFormData = {
+  common: CommonProposalFormData;
   config: ConfigFormData;
 };
 
-export function configFormDataToConfigChanges(
-  formData: ConfigFormData,
-  dsoConfigChanges: ConfigChange[]
-): ConfigChange[] {
-  const configChanges: ConfigChange[] = dsoConfigChanges.map(change => {
-    const fieldState = formData[change.fieldName];
-    return {
-      fieldName: change.fieldName,
-      label: change.label,
-      currentValue: change.currentValue,
-      newValue: fieldState?.value || '',
-    };
-  });
-  return configChanges;
-}
 const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_SetConfig');
 
 export interface SetDsoConfigRulesFormProps {
@@ -60,10 +40,10 @@ export interface SetDsoConfigRulesFormProps {
 }
 
 export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => {
-  const [effectivityType, setEffectivityType] = useState('custom');
   const dsoInfoQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const defaultValues = useMemo((): SetDsoConfigCompleteFormData => {
     if (!dsoInfoQuery.data) {
@@ -71,7 +51,10 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
         common: {
           action: createProposalAction?.name || '',
           expiryDate: initialExpiration.format(dateTimeFormatISO),
-          effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+          effectiveDate: {
+            type: 'custom',
+            effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+          },
           url: '',
           summary: '',
         },
@@ -86,7 +69,10 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
       common: {
         action: createProposalAction?.name || '',
         expiryDate: initialExpiration.format(dateTimeFormatISO),
-        effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+        effectiveDate: {
+          type: 'custom',
+          effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+        },
         url: '',
         summary: '',
       },
@@ -100,13 +86,18 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
   const form = useAppForm({
     defaultValues,
     onSubmit: async ({ value }) => {
-      console.log('form submit', value);
+      if (!showConfirmation) {
+        setShowConfirmation(true);
+      } else {
+        console.log('submit dso config form data: ', value);
+      }
     },
+
     validators: {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
           expiration: value.common.expiryDate,
-          effectiveDate: value.common.effectiveDate,
+          effectiveDate: value.common.effectiveDate.effectiveDate,
         });
       },
     },
@@ -119,125 +110,94 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
 
   return (
     <FormLayout form={form} id="set-dso-config-rules-form">
-      <form.AppField name="common.action">
-        {field => (
-          <field.TextField
-            title="Action"
-            id="set-dso-config-rules-action"
-            muiTextFieldProps={{ disabled: true }}
-          />
-        )}
-      </form.AppField>
-
-      <form.AppField name="common.expiryDate">
-        {field => (
-          <field.DateField
-            title="Vote Proposal Expiration"
-            description="This is the last day voters can vote on this proposal"
-            id="set-dso-config-rules-expiry-date"
-          />
-        )}
-      </form.AppField>
-
-      <form.Field
-        name="common.effectiveDate"
-        validators={{
-          onChange: ({ value }) => validateEffectiveDate(value),
-          onBlur: ({ value }) => validateEffectiveDate(value),
-        }}
-        children={_ => {
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="h5" gutterBottom>
-                Vote Proposal Effectivity
-              </Typography>
-
-              <RadioGroup
-                value={effectivityType}
-                onChange={e => setEffectivityType(e.target.value)}
-              >
-                <FormControlLabel
-                  value="custom"
-                  control={<Radio />}
-                  label={<Typography>Custom</Typography>}
-                />
-
-                {effectivityType === 'custom' && (
-                  <form.AppField name="common.effectiveDate">
-                    {field => (
-                      <field.DateField
-                        description="Select the date and time the proposal will take effect"
-                        minDate={dayjs(form.getFieldValue('common.expiryDate'))}
-                        id="set-dso-config-rules-effective-date"
-                      />
-                    )}
-                  </form.AppField>
-                )}
-
-                <FormControlLabel
-                  value="threshold"
-                  control={<Radio />}
-                  label={
-                    <Box>
-                      <Typography>Make effective at threshold</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        This will allow the vote proposal to take effect immediately when 2/3 vote
-                        in favor
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mt: 2 }}
-                />
-              </RadioGroup>
-            </Box>
-          );
-        }}
-      />
-
-      <form.AppField
-        name="common.summary"
-        validators={{
-          onBlur: ({ value }) => validateSummary(value),
-          onChange: ({ value }) => validateSummary(value),
-        }}
-      >
-        {field => <field.TextArea title="Proposal Summary" id="set-dso-config-rules-summary" />}
-      </form.AppField>
-
-      <form.AppField
-        name="common.url"
-        validators={{
-          onBlur: ({ value }) => validateUrl(value),
-          onChange: ({ value }) => validateUrl(value),
-        }}
-      >
-        {field => <field.TextField title="URL" id="set-dso-config-rules-url" />}
-      </form.AppField>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Configuration
-        </Typography>
-
-        {dsoConfigChanges.map((change, index) => (
-          <form.AppField name={`config.${change.fieldName}`} key={index}>
-            {field => <field.ConfigField configChange={change} key={index} />}
+      {showConfirmation ? (
+        <ProposalSummary
+          actionName={form.state.values.common.action}
+          url={form.state.values.common.url}
+          summary={form.state.values.common.summary}
+          expiryDate={form.state.values.common.expiryDate}
+          effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
+          formType="config-change"
+          configFormData={configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges)}
+          onEdit={() => setShowConfirmation(false)}
+          onSubmit={() => {}}
+        />
+      ) : (
+        <>
+          <form.AppField name="common.action">
+            {field => (
+              <field.TextField
+                title="Action"
+                id="set-dso-config-rules-action"
+                muiTextFieldProps={{ disabled: true }}
+              />
+            )}
           </form.AppField>
-        ))}
-      </Box>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {form.state.errors.map((error, index) => (
-          <Alert severity="error" key={index}>
-            <Typography key={index} variant="h6" color="error">
-              {error}
+          <form.AppField name="common.expiryDate">
+            {field => (
+              <field.DateField
+                title="Vote Proposal Expiration"
+                description="This is the last day voters can vote on this proposal"
+                id="set-dso-config-rules-expiry-date"
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField
+            name="common.effectiveDate"
+            validators={{
+              onChange: ({ value }) => validateEffectiveDate(value),
+              onBlur: ({ value }) => validateEffectiveDate(value),
+            }}
+            children={_ => (
+              <EffectiveDateField
+                initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+                id="set-dso-config-rules-effective-date"
+              />
+            )}
+          />
+
+          <form.AppField
+            name="common.summary"
+            validators={{
+              onBlur: ({ value }) => validateSummary(value),
+              onChange: ({ value }) => validateSummary(value),
+            }}
+          >
+            {field => <field.TextArea title="Proposal Summary" id="set-dso-config-rules-summary" />}
+          </form.AppField>
+
+          <form.AppField
+            name="common.url"
+            validators={{
+              onBlur: ({ value }) => validateUrl(value),
+              onChange: ({ value }) => validateUrl(value),
+            }}
+          >
+            {field => <field.TextField title="URL" id="set-dso-config-rules-url" />}
+          </form.AppField>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Configuration
             </Typography>
-          </Alert>
-        ))}
-      </Box>
+
+            {dsoConfigChanges.map((change, index) => (
+              <form.AppField name={`config.${change.fieldName}`} key={index}>
+                {field => <field.ConfigField configChange={change} key={index} />}
+              </form.AppField>
+            ))}
+          </Box>
+        </>
+      )}
 
       <form.AppForm>
-        <form.FormControls />
+        <form.FormErrors />
+        <form.FormControls
+          showConfirmation={showConfirmation}
+          onEdit={() => setShowConfirmation(false)}
+        />
       </form.AppForm>
     </FormLayout>
   );

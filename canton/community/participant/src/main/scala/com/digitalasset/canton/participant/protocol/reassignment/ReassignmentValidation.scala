@@ -124,7 +124,7 @@ object ReassignmentValidation {
       )
       _ <- MonadUtil.sequentialTraverse(reassignmentRequest.contracts.contracts) { reassign =>
         contractAuthenticator
-          .authenticate(reassign.contract.inst)
+          .legacyAuthenticate(reassign.contract.inst)
           .leftMap(error =>
             ReassignmentValidationError.ContractIdAuthenticationFailure(
               reassignmentRequest.reassignmentRef,

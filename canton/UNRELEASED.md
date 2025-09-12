@@ -9,11 +9,56 @@ schedule, i.e. if you add an entry effective at or after the first
 header, prepend the new date header that corresponds to the
 Wednesday after your change.
 
+## until 2025-09-04 (Exclusive)
+- Replace an unbounded timeout with a configurable timeout when waiting to observe the submitted topology tranactions.
+  Additionally, the delay between retries of the topology dispatching loop has been made configurable.
+  ```
+  participants.participant1.topology.topology-transaction-observation-timeout = 30s // default value
+  participants.participant1.topology.broadcast-retry-delay = 10s // default value
+
+  mediators.mediator1.topology.topology-transaction-observation-timeout = 30s // default value
+  mediators.mediator1.topology.broadcast-retry-delay = 10s // default value
+
+  sequencers.sequencer1.topology.topology-transaction-observation-timeout = 30s // default value
+  sequencers.sequencer1.topology.broadcast-retry-delay = 10s // default value
+  ```
+
+## until 2025-08-28 (Exclusive)
+
+- **Breaking** we have removed support for `ecies-hkdf-hmac-sha-256-aes-128-gcm` encryption algorithm specification.
+- **Breaking** `OwnerToKeyMapping` (OTK) and `PartyToKeyMapping` (PTK) are now restricted to a maximum of 20 keys.
+  These bounds are enforced in the factory methods `create` and `tryCreate`. Additionally, the constructor of `OwnerToKeyMapping`
+  has been made private and OTK values must be created via the factory methods.
+- **Breaking** Alongside the aforementioned change to OTK and PTK, the console commands have been changed to accept the factory
+  method parameters instead of OTK and PTK values directly. This is in line with the `propose` methods for other mappings as well.
+- **Breaking** The `SequencerConnections` protobuf structure takes a new parameter `sequencer_liveness_margin` that
+  determines the number of extra subscriptions to maintain beyond `sequencer_trust_threshold` in order to ensure
+  liveness. This parameter is only used when the new sequencer connection pool is enabled, and is ignored otherwise.
+- **Breaking** The `SequencerConnections` class' public constructor `many(...)` takes accordingly a new parameter
+  `sequencerLivenessMargin`.
+- **Breaking** In non-verbose mode event rendering of Ledger API queries, trailing Optional record field that are not populated
+  are no longer included in the Record representation. The reason for this is so that the same structural representation
+  is produced independently of the package version that was used to enrich it.
+
+## until 2025-08-21 (Exclusive)
+
+- **Breaking** In verbose mode reporting, record values will no longer contain trailing Optional fields that
+  have a value of [None](https://docs.daml.com/daml/stdlib/Prelude.html#type-da-internal-prelude-optional-37153).
+  The reason for this is so that the same structural representation is produced independently of the
+  package version that was used to enrich it.
+- Synchronizer owners are implicitly authorized to REMOVE any topology transaction on the synchronizer, even if they
+  are not the "normal" authorizers. As a consequence, the unused topology mapping `PurgeTopologyTransaction` has been removed
+  from the code base.
+- The HTTP connection timeout is configurable in the Ledger JSON API via
+  `canton.participants.<participant-id>.http-ledger-api.server.request-timeout=<duration>`. Configure this value to allow
+  more complex Ledger API requests to complete (e.g. `/state/active-contracts`). The default value is 20 seconds.
+
 ## until 2025-08-13 (Exclusive)
 
 - **Breaking** In `com/digitalasset/canton/admin/participant/v30/party_management_service.proto` used by Online Party Replication,
   the `GetAddPartyStatusResponse.Status` enum has been extended with a new value, `FullyReplicatedAcs` shifting the
   Protobuf ordinals for some existing status enum values.
+- Endpoints and console commands LocatePruningTimestamp are renamed to FindPruningTimestamp.
 
 - **Breaking** Transactions with transient events for which there was an intersection between submitters
   and querying parties were previously exposed as transactions with empty events in AcsDelta shape. Those transactions
@@ -22,6 +67,10 @@ Wednesday after your change.
 
 - **Breaking** Participant divulgence (i.e. if there is a party divulgence, and none of the stakeholders of the divulged contracts
   are hosted on the participant) is no longer performed in Active Contracts Service and AcsDelta transaction shapes.
+
+- The pruning of divulged contracts has changed. Previously, the flag `prune_all_divulged_contracts` of the `PruneRequest`
+  was used to prune all the immediately divulged contracts. The divulged contracts will be pruned along with the
+  deactivated contracts during the regular pruning process. Thus, the flag `prune_all_divulged_contracts` is a no-op.
 
 ## until 2025-08-06 (Exclusive)
 

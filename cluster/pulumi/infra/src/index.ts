@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
-import { config } from 'splice-pulumi-common';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
@@ -31,10 +31,12 @@ const observabilityDependsOn = istio.concat([network]);
 configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
-  installGcpLoggingAlerts(notificationChannel);
-  installClusterMaintenanceUpdateAlerts(notificationChannel);
-  if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
-    installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+  if (notificationChannel) {
+    installGcpLoggingAlerts(notificationChannel);
+    installClusterMaintenanceUpdateAlerts(notificationChannel);
+    if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
+      installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+    }
   }
 }
 istioMonitoring(network.ingressNs, []);

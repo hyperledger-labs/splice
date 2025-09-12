@@ -99,6 +99,7 @@ class TransactionProcessor(
           ContractAuthenticator(crypto.pureCrypto),
           participantId,
           packageResolver,
+          crypto.pureCrypto,
           loggerFactory,
         ),
         staticSynchronizerParameters,
@@ -500,5 +501,4 @@ object TransactionProcessor {
   type TransactionSubmissionFailure = TransactionSubmissionFailure.type
   final case class TransactionSubmissionUnknown(maxSequencingTime: CantonTimestamp)
       extends TransactionSubmissionResult
-  type TransactonSubmissionUnknown = TransactionSubmissionUnknown.type
 }

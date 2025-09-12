@@ -40,13 +40,10 @@ import com.digitalasset.canton.participant.store.{
   SyncPersistentState,
   SynchronizerConnectionConfigStore,
 }
-import com.digitalasset.canton.participant.sync.{
-  SyncEphemeralStateFactory,
-  SyncPersistentStateManager,
-}
+import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants
-import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{
@@ -81,7 +78,6 @@ import scala.math.Ordering.Implicits.*
 class PruningProcessor(
     participantNodePersistentState: Eval[ParticipantNodePersistentState],
     syncPersistentStateManager: SyncPersistentStateManager,
-    sortedReconciliationIntervalsProviderFactory: SortedReconciliationIntervalsProviderFactory,
     maxPruningBatchSize: PositiveInt,
     metrics: PruningMetrics,
     exitOnFatalFailures: Boolean,
@@ -107,8 +103,8 @@ class PruningProcessor(
 
   private val firstUnsafeOffsetComputation = new FirstUnsafeOffsetComputation(
     participantNodePersistentState,
-    sortedReconciliationIntervalsProviderFactory,
     synchronizerConnectionConfigStore,
+    syncPersistentStateManager,
     timeouts,
     loggerFactory,
   )
@@ -197,8 +193,7 @@ class PruningProcessor(
             if (beforeOrAtOffset >= boundInclusive) boundInclusive else beforeOrAtOffset
           firstUnsafeOffsetComputation
             .perform(
-              syncPersistentStateManager.getAll.values.toSeq,
-              rewoundBoundInclusive,
+              rewoundBoundInclusive
             )
             .map(
               _.map(_.offset)
@@ -326,12 +321,10 @@ class PruningProcessor(
       offset: Offset
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, LedgerPruningError, Unit] = {
-
-    val synchronizers = syncPersistentStateManager.getAll.values.toSeq
+  ): EitherT[FutureUnlessShutdown, LedgerPruningError, Unit] =
     for {
       firstUnsafeOffsetO <- firstUnsafeOffsetComputation
-        .perform(synchronizers, offset)
+        .perform(offset)
         // if nothing to prune we go on with this iteration regardless to ensure that iterative and scheduled pruning is not stuck in a window where nothing to prune
         .recover { case LedgerPruningNothingToPrune => None }
       _ <- firstUnsafeOffsetO match {
@@ -352,7 +345,6 @@ class PruningProcessor(
             )
       }
     } yield ()
-  }
 
   private[pruning] def performPruning(
       fromExclusive: Option[Offset],
@@ -478,7 +470,7 @@ class PruningProcessor(
   /** Providing the next Offset for iterative pruning: computed by the current pruning Offset
     * increased by the max pruning batch size.
     */
-  def locatePruningOffsetForOneIteration(implicit
+  def findPruningOffsetForOneIteration(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, LedgerPruningError, Offset] =
     EitherT
@@ -589,15 +581,14 @@ private[pruning] object PruningProcessor extends HasLoggerName {
       sortedReconciliationIntervalsProvider: SortedReconciliationIntervalsProvider,
       acsCommitmentStore: AcsCommitmentStore,
       inFlightSubmissionStore: InFlightSubmissionStore,
-      synchronizerId: PhysicalSynchronizerId,
+      synchronizerId: SynchronizerId,
       checkForOutstandingCommitments: Boolean,
   )(implicit
       ec: ExecutionContext,
       loggingContext: NamedLoggingContext,
   ): FutureUnlessShutdown[Option[CantonTimestampSecond]] = {
     implicit val traceContext: TraceContext = loggingContext.traceContext
-    val cleanReplayF = SyncEphemeralStateFactory
-      .crashRecoveryPruningBoundInclusive(requestJournalStore, synchronizerIndexO)
+    val cleanReplayF = requestJournalStore.crashRecoveryPruningBoundInclusive(synchronizerIndexO)
 
     val commitmentsPruningBound =
       if (checkForOutstandingCommitments)
@@ -607,14 +598,14 @@ private[pruning] object PruningProcessor extends HasLoggerName {
           acsCommitmentStore.lastComputedAndSent.map(_.map(_.forgetRefinement))
         )
 
-    val earliestInFlightF = inFlightSubmissionStore.lookupEarliest(synchronizerId.logical)
+    val earliestInFlightF = inFlightSubmissionStore.lookupEarliest(synchronizerId)
 
     safeToPrune_(
       cleanReplayF,
       commitmentsPruningBound = commitmentsPruningBound,
       earliestInFlightF,
       sortedReconciliationIntervalsProvider,
-      synchronizerId.logical,
+      synchronizerId,
     )
   }
 

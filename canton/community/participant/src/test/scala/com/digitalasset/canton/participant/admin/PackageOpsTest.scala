@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.admin
 
 import cats.Eval
 import cats.data.EitherT
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
@@ -311,7 +312,7 @@ class PackageOpsTest extends PackageOpsTestBase {
           eqTo(true),
           eqTo(false),
           eqTo(Seq(VettedPackages.code)),
-          eqTo(Some(Seq(nodeId))),
+          eqTo(Some(NonEmpty(Seq, nodeId))),
           eqTo(None),
         )(anyTraceContext)
       ).thenReturn(FutureUnlessShutdown.pure(packagesVettedStoredTx(currentlyVettedPackages)))
@@ -351,7 +352,7 @@ class PackageOpsTest extends PackageOpsTestBase {
       )
 
     private def signedTopologyTransaction(vettedPackages: List[LfPackageId]) =
-      SignedTopologyTransaction.tryCreate(
+      SignedTopologyTransaction.withSignatures(
         transaction = TopologyTransaction(
           op = TopologyChangeOp.Replace,
           serial = txSerial,
@@ -361,10 +362,7 @@ class PackageOpsTest extends PackageOpsTestBase {
         ),
         signatures = Signature.noSignatures,
         isProposal = false,
-      )(
-        SignedTopologyTransaction.versioningTable.protocolVersionRepresentativeFor(
-          testedProtocolVersion
-        )
+        testedProtocolVersion,
       )
   }
 }

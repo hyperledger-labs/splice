@@ -10,22 +10,18 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   RetryProvider,
 }
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.DurationInt
-import scala.jdk.DurationConverters.ScalaDurationOps
 
 class AcsExporter(
     participantAdminConnection: ParticipantAdminConnection,
@@ -76,45 +72,37 @@ class AcsExporter(
       ec: ExecutionContext,
   ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
     for {
-      domainParamsStateTopology <- domainStateTopology
+      paramsState <- domainStateTopology
         .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
         .toRight(AcsExporter.DomainStateNotFound)
-      domainParamsState = domainParamsStateTopology.mapping.parameters
       _ <- EitherT.cond[Future](
-        domainParamsState.confirmationRequestsMaxRate == NonNegativeInt.zero,
+        SynchronizerMigrationUtil.synchronizerIsPaused(paramsState.currentState),
         (),
         AcsExporter.DomainNotPaused,
       )
       _ <- EitherT.liftF[Future, AcsExportFailure, Unit](
-        waitForMediatorAndParticipantResponseTime(domain, domainParamsStateTopology)
+        waitUntilSynchronizerTime(domain, paramsState.acsExportWaitTimestamp)
       )
-      acsSnapshotTimestamp = domainParamsStateTopology.base.validFrom
       snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties.toSet,
           filterSynchronizerId = Some(domain),
-          timestamp = Some(acsSnapshotTimestamp),
+          timestamp = Some(paramsState.exportTimestamp),
           force = true,
         )
       )
     } yield {
-      snapshot -> acsSnapshotTimestamp
+      snapshot -> paramsState.exportTimestamp
     }
   }
 
-  private def waitForMediatorAndParticipantResponseTime(
+  private def waitUntilSynchronizerTime(
       synchronizerId: SynchronizerId,
-      domainParamsTopology: TopologyResult[SynchronizerParametersState],
+      timestamp: Instant,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ) = {
-    val domainParams = domainParamsTopology.mapping.parameters
-    val duration = domainParams.mediatorReactionTimeout.duration
-      .plus(domainParams.confirmationResponseTimeout.duration)
-      .plus(5.seconds.toJava) // a small buffer to account for network latency
-
-    val readyForDumpAfter = domainParamsTopology.base.validFrom.plus(duration)
     for {
       _ <- retryProvider
         .waitUntil(
@@ -129,10 +117,10 @@ class AcsExporter(
             )
             .map(domainTimeResponse => {
               val domainTimeLowerBound = domainTimeResponse.timestamp.toInstant
-              if (domainTimeLowerBound.isBefore(readyForDumpAfter)) {
+              if (domainTimeLowerBound.isBefore(timestamp)) {
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
-                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state. Current domain time is $domainTimeLowerBound"
+                    s"we should wait until $timestamp to let all participants catch up with the paused domain state. Current domain time is $domainTimeLowerBound"
                   )
                   .asRuntimeException()
               }

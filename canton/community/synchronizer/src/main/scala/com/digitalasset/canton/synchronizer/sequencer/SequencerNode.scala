@@ -235,6 +235,7 @@ class SequencerNodeBootstrap(
         // are not closed properly
         arguments.metrics.trafficControl.purchaseCache.closeAcquired()
         arguments.metrics.trafficControl.consumedCache.closeAcquired()
+        arguments.metrics.eventBuffer.closeAcquired()
       }
     })
 
@@ -510,7 +511,6 @@ class SequencerNodeBootstrap(
                 EitherT.rightT[FutureUnlessShutdown, String](Set.empty[Member])
               case Some((initialTopologyTransactions, sequencerSnapshot)) =>
                 val topologySnapshotValidator = new InitialTopologySnapshotValidator(
-                  staticSynchronizerParameters.protocolVersion,
                   crypto.pureCrypto,
                   synchronizerTopologyStore,
                   parameters.processingTimeouts,
@@ -594,7 +594,7 @@ class SequencerNodeBootstrap(
             .right(
               TopologyTransactionProcessor.createProcessorAndClientForSynchronizer(
                 synchronizerTopologyStore,
-                psid,
+                synchronizerPredecessor = None,
                 crypto.pureCrypto,
                 parameters,
                 clock,
@@ -809,7 +809,7 @@ class SequencerNodeBootstrap(
             sequencedEventStore,
             new SendTracker(
               Map(),
-              SendTrackerStore(storage),
+              SendTrackerStore(),
               arguments.metrics.sequencerClient,
               loggerFactory,
               timeouts,

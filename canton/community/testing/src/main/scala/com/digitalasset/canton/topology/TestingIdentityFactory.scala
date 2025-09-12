@@ -594,15 +594,12 @@ class TestingIdentityFactory(
         throw new IllegalStateException(s"Multiple synchronizer parameters are valid at $ts")
     }
 
-  private val signedTxProtocolRepresentative =
-    SignedTopologyTransaction.protocolVersionRepresentativeFor(defaultProtocolVersion)
-
   private def mkAdd(
       mapping: TopologyMapping,
       serial: PositiveInt = PositiveInt.one,
       isProposal: Boolean = false,
   ): SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping] =
-    SignedTopologyTransaction.tryCreate(
+    SignedTopologyTransaction.withSignatures(
       TopologyTransaction(
         TopologyChangeOp.Replace,
         serial,
@@ -611,7 +608,8 @@ class TestingIdentityFactory(
       ),
       Signature.noSignatures,
       isProposal,
-    )(signedTxProtocolRepresentative)
+      defaultProtocolVersion,
+    )
 
   private def genKeyCollection(
       owner: Member
@@ -720,7 +718,7 @@ class TestingIdentityFactory(
     NonEmpty
       .from(sigKeys ++ encKey)
       .map { keys =>
-        mkAdd(OwnerToKeyMapping(owner, keys))
+        mkAdd(OwnerToKeyMapping.tryCreate(owner, keys))
       }
       .toList
   }
@@ -830,11 +828,11 @@ class TestingOwnerWithKeys(
       )
     )
     val seq_okm_k2 = mkAddMultiKey(
-      OwnerToKeyMapping(sequencerId, NonEmpty(Seq, key2)),
+      OwnerToKeyMapping.tryCreate(sequencerId, NonEmpty(Seq, key2)),
       NonEmpty(Set, namespaceKey, key2),
     )
     val med_okm_k3 = mkAddMultiKey(
-      OwnerToKeyMapping(mediatorId, NonEmpty(Seq, key3)),
+      OwnerToKeyMapping.tryCreate(mediatorId, NonEmpty(Seq, key3)),
       NonEmpty(Set, namespaceKey, key3),
     )
 
@@ -868,15 +866,18 @@ class TestingOwnerWithKeys(
     val p2_dtc = mkAdd(SynchronizerTrustCertificate(participant2, synchronizerId))
     val p3_dtc = mkAdd(SynchronizerTrustCertificate(participant3, synchronizerId))
     val p1_otk = mkAddMultiKey(
-      OwnerToKeyMapping(participant1, NonEmpty(Seq, EncryptionKeys.key1, SigningKeys.key1)),
+      OwnerToKeyMapping
+        .tryCreate(participant1, NonEmpty(Seq, EncryptionKeys.key1, SigningKeys.key1)),
       NonEmpty(Set, key1),
     )
     val p2_otk = mkAddMultiKey(
-      OwnerToKeyMapping(participant2, NonEmpty(Seq, EncryptionKeys.key2, SigningKeys.key2)),
+      OwnerToKeyMapping
+        .tryCreate(participant2, NonEmpty(Seq, EncryptionKeys.key2, SigningKeys.key2)),
       NonEmpty(Set, key2),
     )
     val p3_otk = mkAddMultiKey(
-      OwnerToKeyMapping(participant3, NonEmpty(Seq, EncryptionKeys.key3, SigningKeys.key3)),
+      OwnerToKeyMapping
+        .tryCreate(participant3, NonEmpty(Seq, EncryptionKeys.key3, SigningKeys.key3)),
       NonEmpty(Set, key3),
     )
 

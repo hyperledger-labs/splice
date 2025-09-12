@@ -10,6 +10,10 @@ import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Inspection.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Package.DarData
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Pruning.*
+import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.ReinitCommitments.{
+  CommitmentReinitializationInfo,
+  ReinitializeCommitments,
+}
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Resources.{
   GetResourceLimits,
   SetResourceLimits,
@@ -177,6 +181,7 @@ private[console] object ParticipantCommands {
         maxRetryDelay: Option[NonNegativeFiniteDuration] = None,
         priority: Int = 0,
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
+        sequencerLivenessMargin: NonNegativeInt = NonNegativeInt.zero,
         submissionRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
     ): SynchronizerConnectionConfig =
@@ -187,6 +192,7 @@ private[console] object ParticipantCommands {
             sequencer.sequencerConnection.withAlias(SequencerAlias.tryCreate(sequencer.name))
           },
           sequencerTrustThreshold,
+          sequencerLivenessMargin,
           submissionRequestAmplification,
         ),
         manualConnect = manualConnect,
@@ -207,6 +213,7 @@ private[console] object ParticipantCommands {
         initialRetryDelay: Option[NonNegativeFiniteDuration] = None,
         maxRetryDelay: Option[NonNegativeFiniteDuration] = None,
         timeTrackerConfig: SynchronizerTimeTrackerConfig = SynchronizerTimeTrackerConfig(),
+        sequencerAlias: SequencerAlias = SequencerAlias.Default,
     ): SynchronizerConnectionConfig = {
       // architecture-handbook-entry-begin: OnboardParticipantToConfig
       val certificates = OptionUtil.emptyStringAsNone(certificatesPath).map { path =>
@@ -217,6 +224,7 @@ private[console] object ParticipantCommands {
       }
       SynchronizerConnectionConfig.tryGrpcSingleConnection(
         synchronizerAlias,
+        sequencerAlias,
         connection,
         manualConnect,
         physicalSynchronizerId,
@@ -298,7 +306,7 @@ class ParticipantTestingGroup(
     val loggerFactory: NamedLoggerFactory,
 ) extends FeatureFlagFilter
     with Helpful {
-  import participantRef.*
+  import participantRef.{config as _, *}
 
   @Help.Summary(
     "Send a bong to a set of target parties over the ledger. Levels > 0 leads to an exploding ping with exponential number of contracts. " +
@@ -318,24 +326,25 @@ class ParticipantTestingGroup(
   def bong(
       targets: Set[ParticipantId],
       validators: Set[ParticipantId] = Set(),
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.testingBong,
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.testingBong,
       levels: Int = 0,
       synchronizerId: Option[SynchronizerId] = None,
       workflowId: String = "",
       id: String = "",
-  ): Duration =
+  ): Duration = check(FeatureFlag.Testing)(
     consoleEnvironment.runE(
       maybe_bong(targets, validators, timeout, levels, synchronizerId, workflowId, id)
         .toRight(
           s"Unable to bong $targets with $levels levels within ${LoggerUtil.roundDurationForHumans(timeout.duration)}"
         )
     )
+  )
 
   @Help.Summary("Like bong, but returns None in case of failure.", FeatureFlag.Testing)
   def maybe_bong(
       targets: Set[ParticipantId],
       validators: Set[ParticipantId] = Set(),
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.testingBong,
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.testingBong,
       levels: Int = 0,
       synchronizerId: Option[SynchronizerId] = None,
       workflowId: String = "",
@@ -359,7 +368,7 @@ class ParticipantTestingGroup(
   @Help.Summary("Fetch the current time from the given synchronizer", FeatureFlag.Testing)
   def fetch_synchronizer_time(
       synchronizerAlias: SynchronizerAlias,
-      timeout: NonNegativeDuration,
+      timeout: config.NonNegativeDuration,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       val id = participantRef.synchronizers.physical_id_of(synchronizerAlias)
@@ -369,7 +378,7 @@ class ParticipantTestingGroup(
   @Help.Summary("Fetch the current time from the given synchronizer", FeatureFlag.Testing)
   def fetch_synchronizer_time(
       synchronizer: Synchronizer,
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
@@ -385,7 +394,7 @@ class ParticipantTestingGroup(
 
   @Help.Summary("Fetch the current time from all connected synchronizers", FeatureFlag.Testing)
   def fetch_synchronizer_times(
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand
   ): Unit =
     check(FeatureFlag.Testing) {
       participantRef.synchronizers.list_connected().foreach { item =>
@@ -400,7 +409,7 @@ class ParticipantTestingGroup(
   def await_synchronizer_time(
       synchronizerAlias: SynchronizerAlias,
       time: CantonTimestamp,
-      timeout: NonNegativeDuration,
+      timeout: config.NonNegativeDuration,
   ): Unit =
     check(FeatureFlag.Testing) {
       val id = participantRef.synchronizers.physical_id_of(synchronizerAlias)
@@ -414,7 +423,7 @@ class ParticipantTestingGroup(
   def await_synchronizer_time(
       synchronizer: Synchronizer,
       time: CantonTimestamp,
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
   ): Unit =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
@@ -430,7 +439,7 @@ class ParticipantTestingGroup(
 }
 
 class LocalParticipantTestingGroup(
-    participantRef: ParticipantReference with BaseInspection[ParticipantNode],
+    participantRef: ParticipantReference & BaseInspection[ParticipantNode],
     consoleEnvironment: ConsoleEnvironment,
     loggerFactory: NamedLoggerFactory,
 ) extends ParticipantTestingGroup(participantRef, consoleEnvironment, loggerFactory)
@@ -440,7 +449,8 @@ class LocalParticipantTestingGroup(
   protected def defaultLimit: PositiveInt =
     consoleEnvironment.environment.config.parameters.console.defaultLimit
 
-  import participantRef.*
+  import participantRef.{config as _, *}
+
   @Help.Summary("Lookup contracts in the Private Contract Store", FeatureFlag.Testing)
   @Help.Description("""Get raw access to the PCS of the given synchronizer sync controller.
   The filter commands will check if the target value ``contains`` the given string.
@@ -459,14 +469,17 @@ class LocalParticipantTestingGroup(
   ): List[(Boolean, ContractInstance)] = {
     def toOpt(str: String) = OptionUtil.emptyStringAsNone(str)
 
-    val pcs = state_inspection
-      .findContracts(
-        synchronizerAlias,
-        toOpt(exactId),
-        toOpt(filterPackage),
-        toOpt(filterTemplate),
-        limit.value,
-      )
+    val pcs = check(FeatureFlag.Testing)(
+      state_inspection
+        .findContracts(
+          synchronizerAlias,
+          toOpt(exactId),
+          toOpt(filterPackage),
+          toOpt(filterTemplate),
+          limit.value,
+        )
+    )
+
     if (activeSet) pcs.filter { case (isActive, _) => isActive }
     else pcs
   }
@@ -508,10 +521,18 @@ class LocalParticipantTestingGroup(
       from: Option[Instant] = None,
       to: Option[Instant] = None,
       limit: PositiveInt = defaultLimit,
+      warnOnDiscardedEnvelopes: Boolean = false,
   ): Seq[PossiblyIgnoredProtocolEvent] =
-    state_inspection
-      .findMessages(physicalSynchronizerId, from, to, Some(limit.value))
-      .map(_.valueOr(e => consoleEnvironment.raiseError(s"Cannot retrieve sequencer messages: $e")))
+    check(FeatureFlag.Testing)(
+      state_inspection
+        .findMessages(
+          physicalSynchronizerId,
+          from,
+          to,
+          Some(limit.value),
+          warnOnDiscardedEnvelopes = warnOnDiscardedEnvelopes,
+        )
+    )
 
   @Help.Summary(
     "Return the sync crypto api provider, which provides access to all cryptographic methods",
@@ -536,7 +557,9 @@ class LocalParticipantTestingGroup(
       synchronizerAlias: SynchronizerAlias,
       beforeOrAt: CantonTimestamp = CantonTimestamp.now(),
   ): Option[CantonTimestamp] =
-    state_inspection.noOutstandingCommitmentsTs(synchronizerAlias, beforeOrAt)
+    check(FeatureFlag.Testing)(
+      state_inspection.noOutstandingCommitmentsTs(synchronizerAlias, beforeOrAt)
+    )
 
   @Help.Summary(
     "Obtain access to the state inspection interface. Use at your own risk.",
@@ -607,27 +630,25 @@ class ParticipantPruningAdministrationGroup(
     )
 
   @Help.Summary(
-    "Return the highest participant ledger offset whose record time is before or at the given one (if any) at which pruning is safely possible",
-    FeatureFlag.Preview,
+    "Return the highest participant ledger offset whose record time is before or at the given one (if any) at which pruning is safely possible"
   )
-  def find_safe_offset(beforeOrAt: Instant = Instant.now()): Option[Long] =
-    check(FeatureFlag.Preview) {
-      val ledgerEnd = consoleEnvironment.run(
-        ledgerApiCommand(LedgerApiCommands.StateService.LedgerEnd())
-      )
+  def find_safe_offset(beforeOrAt: Instant = Instant.now()): Option[Long] = {
+    val ledgerEnd = consoleEnvironment.run(
+      ledgerApiCommand(LedgerApiCommands.StateService.LedgerEnd())
+    )
 
-      consoleEnvironment
-        .run(
-          adminCommand(
-            ParticipantAdminCommands.Pruning
-              .GetSafePruningOffsetCommand(beforeOrAt, ledgerEnd)
-          )
+    consoleEnvironment
+      .run(
+        adminCommand(
+          ParticipantAdminCommands.Pruning
+            .GetSafePruningOffsetCommand(beforeOrAt, ledgerEnd)
         )
-    }
+      )
+  }
 
   @Help.Summary(
     "Prune only internal ledger state up to the specified offset inclusively.",
-    FeatureFlag.Preview,
+    FeatureFlag.Testing,
   )
   @Help.Description(
     """Special-purpose variant of the ``prune`` command that prunes only partial,
@@ -640,7 +661,7 @@ class ParticipantPruningAdministrationGroup(
       |offset returned by ``find_safe_offset`` on any synchronizer with events preceding the pruning offset."""
   )
   def prune_internally(pruneUpTo: Long): Unit =
-    check(FeatureFlag.Preview) {
+    check(FeatureFlag.Testing) {
       consoleEnvironment.run(
         adminCommand(ParticipantAdminCommands.Pruning.PruneInternallyCommand(pruneUpTo))
       )
@@ -661,18 +682,16 @@ class ParticipantPruningAdministrationGroup(
       retention: config.PositiveDurationSeconds,
       pruneInternallyOnly: Boolean = false,
   ): Unit =
-    check(FeatureFlag.Preview) {
-      consoleEnvironment.run(
-        runner.adminCommand(
-          SetParticipantScheduleCommand(
-            cron,
-            maxDuration,
-            retention,
-            pruneInternallyOnly,
-          )
+    consoleEnvironment.run(
+      runner.adminCommand(
+        SetParticipantScheduleCommand(
+          cron,
+          maxDuration,
+          retention,
+          pruneInternallyOnly,
         )
       )
-    }
+    )
 
   @Help.Summary("Inspect the automatic, participant-specific pruning schedule.")
   @Help.Description(
@@ -706,7 +725,7 @@ class ParticipantPruningAdministrationGroup(
 }
 
 class LocalCommitmentsAdministrationGroup(
-    runner: AdminCommandRunner with BaseInspection[ParticipantNode],
+    runner: AdminCommandRunner & BaseInspection[ParticipantNode],
     override val consoleEnvironment: ConsoleEnvironment,
     override val loggerFactory: NamedLoggerFactory,
 ) extends CommitmentsAdministrationGroup(runner, consoleEnvironment, loggerFactory) {
@@ -820,7 +839,7 @@ class CommitmentsAdministrationGroup(
       physicalSynchronizerId: PhysicalSynchronizerId,
       timestamp: CantonTimestamp,
       counterParticipant: ParticipantId,
-      timeout: NonNegativeDuration = timeouts.unbounded,
+      timeout: config.NonNegativeDuration = timeouts.unbounded,
   ): Seq[CommitmentContractMetadata] =
     check(FeatureFlag.Preview) {
       val counterContracts = consoleEnvironment.run {
@@ -885,7 +904,7 @@ class CommitmentsAdministrationGroup(
       timestamp: CantonTimestamp,
       expectedSynchronizerId: SynchronizerId,
       downloadPayload: Boolean = false,
-      timeout: NonNegativeDuration = timeouts.unbounded,
+      timeout: config.NonNegativeDuration = timeouts.unbounded,
   ): Seq[CommitmentInspectContract] = {
 
     val contractsData = consoleEnvironment.run {
@@ -1402,6 +1421,40 @@ class CommitmentsAdministrationGroup(
       )
     )
 
+  @Help.Summary(
+    "Reinitializes commitments from the current ACS. Filtering is possible by synchronizers, counter-participants" +
+      "and stakeholder groups."
+  )
+  @Help.Description(
+    """The command is useful if the participant's commitments got corrupted due to a bug. The command reinitializes the
+      |commitments for the given synchronizers and counter-participants, and containing contracts with stakeholders
+      |including the given parties.
+      |If `synchronizers` is empty, the command considers all synchronizers.
+      |If `counterParticipants` is empty, the command considers all counter-participants.
+      |If `partyIds` is empty, the command considers all stakeholder groups.
+      |`timeout` specifies how long the commands waits for the reinitialization to complete. Granularities smaller than
+      |a second are ignored. Past this timeout, the operator can query the status of the reinitialization using
+      |`commitment_reinitialization_status`. The command returns a sequence pairs of synchronizer IDs and the
+      |reinitialization status for each synchronizer: either the ACS timestamp of the reinitialization, or an error
+      |message if reinitialization failed."""
+  )
+  def reinitialize_commitments(
+      synchronizerIds: Seq[SynchronizerId],
+      counterParticipants: Seq[ParticipantId],
+      partyIds: Seq[PartyId],
+      timeout: NonNegativeDuration,
+  ): Seq[CommitmentReinitializationInfo] = consoleEnvironment.run(
+    runner.adminCommand(
+      ReinitializeCommitments(
+        synchronizerIds,
+        counterParticipants,
+        partyIds,
+        timeout,
+        logger,
+      )
+    )
+  )
+
   private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
   private implicit val ec: ExecutionContext = consoleEnvironment.environment.executionContext
 }
@@ -1441,7 +1494,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
   def id: ParticipantId
 
   protected def waitPackagesVetted(
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded
   ): Unit
 
   protected def participantIsActiveOnSynchronizer(
@@ -1635,9 +1688,9 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         "Vet all packages contained in the DAR archive identified by the provided main package-id."
       )
       def enable(mainPackageId: String, synchronize: Boolean = true): Unit =
-        check(FeatureFlag.Preview)(consoleEnvironment.run {
+        consoleEnvironment.run {
           adminCommand(ParticipantAdminCommands.Package.VetDar(mainPackageId, synchronize))
-        })
+        }
 
       @Help.Summary(
         "Revoke vetting for all packages contained in the DAR archive identified by the provided main package-id."
@@ -1647,11 +1700,10 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           |This command is potentially dangerous and misuse
           |can lead the participant to fail in processing transactions""")
       def disable(mainPackageId: String): Unit =
-        check(FeatureFlag.Preview)(consoleEnvironment.run {
+        consoleEnvironment.run {
           adminCommand(ParticipantAdminCommands.Package.UnvetDar(mainPackageId))
-        })
+        }
     }
-
   }
 
   @Help.Summary("Manage raw Daml-LF packages")
@@ -1898,6 +1950,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           priority - The priority of the synchronizer. The higher the more likely a synchronizer will be used.
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
           sequencerTrustThreshold - Set the minimum number of sequencers that must agree before a message is considered valid.
+          sequencerLivenessMargin - Set the number of extra subscriptions to maintain beyond `sequencerTrustThreshold` in order to ensure liveness.
           submissionRequestAmplification - Define how often client should try to send a submission request that is eligible for deduplication.
           validation - Whether to validate the connectivity and ids of the given sequencers (default All)
         """)
@@ -1912,6 +1965,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           consoleEnvironment.commandTimeouts.bounded
         ),
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
+        sequencerLivenessMargin: NonNegativeInt = NonNegativeInt.zero,
         submissionRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
@@ -1924,6 +1978,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         maxRetryDelay = maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
         priority = priority,
         sequencerTrustThreshold = sequencerTrustThreshold,
+        sequencerLivenessMargin = sequencerLivenessMargin,
         submissionRequestAmplification = submissionRequestAmplification,
       )
       connect_by_config(config, validation, synchronize)
@@ -1941,6 +1996,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           priority - The priority of the synchronizer. The higher the more likely a synchronizer will be used.
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
           sequencerTrustThreshold - Set the minimum number of sequencers that must agree before a message is considered valid.
+          sequencerLivenessMargin - Set the number of extra subscriptions to maintain beyond `sequencerTrustThreshold` in order to ensure liveness.
           submissionRequestAmplification - Define how often client should try to send a submission request that is eligible for deduplication.
           validation - Whether to validate the connectivity and ids of the given sequencers (default All)
         """)
@@ -1954,6 +2010,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           consoleEnvironment.commandTimeouts.bounded
         ),
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
+        sequencerLivenessMargin: NonNegativeInt = NonNegativeInt.zero,
         submissionRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
@@ -1965,6 +2022,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         psid = physicalSynchronizerId,
         priority,
         sequencerTrustThreshold = sequencerTrustThreshold,
+        sequencerLivenessMargin = sequencerLivenessMargin,
         submissionRequestAmplification = submissionRequestAmplification,
       )
       connect_by_config(config, validation, synchronize)
@@ -2058,6 +2116,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           consoleEnvironment.commandTimeouts.bounded
         ),
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
+        sequencerAlias: SequencerAlias = SequencerAlias.Default,
     ): SynchronizerConnectionConfig = {
       val config = ParticipantCommands.synchronizers.to_config(
         synchronizerAlias,
@@ -2067,6 +2126,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         certificatesPath,
         priority,
         timeTrackerConfig = timeTrackerConfig,
+        sequencerAlias = sequencerAlias,
       )
       connect_by_config(config, validation, synchronize)
       config
@@ -2354,7 +2414,7 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
   // can be hidden behind the `testing` feature flag
   private def ping_internal(
       participantId: ParticipantId,
-      timeout: NonNegativeDuration,
+      timeout: config.NonNegativeDuration,
       synchronizerId: Option[SynchronizerId],
       id: String,
   ): Either[String, Duration] =
@@ -2379,7 +2439,7 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
   )
   def ping(
       participantId: ParticipantId,
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ping,
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.ping,
       synchronizerId: Option[SynchronizerId] = None,
       id: String = "",
   ): Duration = {
@@ -2400,7 +2460,7 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
   )
   def maybe_ping(
       participantId: ParticipantId,
-      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ping,
+      timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.ping,
       synchronizerId: Option[SynchronizerId] = None,
       id: String = "",
   ): Option[Duration] = check(FeatureFlag.Testing) {

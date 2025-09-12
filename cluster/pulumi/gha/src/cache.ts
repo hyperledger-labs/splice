@@ -3,7 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
+import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 export function createCachePvc(
   runnersNamespace: k8s.core.v1.Namespace,

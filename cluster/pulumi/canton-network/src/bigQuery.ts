@@ -5,20 +5,25 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
-import { InstalledHelmChart, installPostgresPasswordSecret } from 'splice-pulumi-common';
-import { config } from 'splice-pulumi-common/src/config';
+import {
+  InstalledHelmChart,
+  installPostgresPasswordSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import {
   Postgres,
   CloudPostgres,
   generatePassword,
   privateNetwork,
   protectCloudSql,
-} from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   ExactNamespace,
   CLUSTER_BASENAME,
   commandScriptPath,
-} from 'splice-pulumi-common/src/utils';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
+
+import { allFunctions } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -154,6 +159,9 @@ function installDatastream(
           singleTargetDataset: {
             datasetId: pulumi.interpolate`projects/${bigQueryDataset.project}/datasets/${bigQueryDataset.datasetId}`,
           },
+          // editing dataFreshness does not alter existing BQ tables, see its
+          // docstring or https://github.com/hyperledger-labs/splice/issues/2011
+          dataFreshness: '14400s',
         },
         destinationConnectionProfile: destination.name,
       },
@@ -178,6 +186,38 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
       cluster: CLUSTER_BASENAME,
     },
   });
+}
+
+function installFunctions(
+  scanDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): gcp.bigquery.Dataset {
+  const datasetName = 'functions';
+  const dataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  scanDataset.project.apply(project => {
+    // We don't just run allFunctions.map() because we want to sequence the creation, since every function
+    // might depend on those before it.
+    let lastResource: gcp.bigquery.Routine | undefined = undefined;
+    for (const f in allFunctions) {
+      lastResource = allFunctions[f].toPulumi(
+        project,
+        dataset,
+        scanDataset,
+        lastResource ? [lastResource] : dependsOn
+      );
+    }
+  });
+
+  return dataset;
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -398,6 +438,13 @@ export function configureScanBigQuery(
     passwordSecret
   );
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
-  installDatastream(postgres, sourceProfile, destinationProfile, dataset, pubRepSlots);
+  const stream = installDatastream(
+    postgres,
+    sourceProfile,
+    destinationProfile,
+    dataset,
+    pubRepSlots
+  );
+  installFunctions(dataset, [stream]);
   return;
 }

@@ -54,7 +54,6 @@ import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInit
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
@@ -229,12 +228,8 @@ class DomainMigrationInitializer(
         dsoAutomationService,
       )
       _ <- rotateGenesisGovernanceKeyForSV1(newCometBftNode, domainMigrationConfig.name)
-      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
-        decentralizedSynchronizerId,
-        dsoAutomationService,
-        svAutomation,
-        skipTrafficReconciliationTriggers = true,
-      )
+      // Restore users and user metadata first as scan depends on metadata
+      // for startup and we depend on scan starting for BFT peer reconciliation.
       _ <- new ParticipantUsersDataRestorer(
         svAutomation.connection,
         loggerFactory,
@@ -244,6 +239,13 @@ class DomainMigrationInitializer(
         upgradesConfig,
         packageVersionSupport,
         svStore.key.svParty,
+      )
+      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
+        decentralizedSynchronizerId,
+        dsoAutomationService,
+        svAutomation,
+        skipTrafficReconciliationTriggers = true,
+        unpauseSynchronizer = true,
       )
     } yield (
       decentralizedSynchronizerId,
@@ -273,14 +275,6 @@ class DomainMigrationInitializer(
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
-      _ <- participantAdminConnection
-        .ensureDomainParameters(
-          domainMigrationDump.nodeIdentities.synchronizerId,
-          // TODO(DACH-NY/canton-network-node#8761) hard code for now
-          _.tryUpdate(confirmationRequestsMaxRate =
-            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
-          ),
-        )
       _ = logger.info("resumed domain")
     } yield {}
   }

@@ -11,6 +11,7 @@ import org.scalacheck.Arbitrary
 
 final class GeneratorsTopology(protocolVersion: ProtocolVersion) {
   import com.digitalasset.canton.config.GeneratorsConfig.*
+  import com.digitalasset.canton.Generators.*
 
   implicit val fingerprintArb: Arbitrary[Fingerprint] = Arbitrary(
     string68Arb.arbitrary.map(Fingerprint.tryFromString)
@@ -27,8 +28,15 @@ final class GeneratorsTopology(protocolVersion: ProtocolVersion) {
   implicit val synchronizerIdArb: Arbitrary[SynchronizerId] = genArbitrary
   implicit val mediatorIdArb: Arbitrary[MediatorId] = genArbitrary
   implicit val sequencerIdArb: Arbitrary[SequencerId] = genArbitrary
+  implicit val participantIdArb: Arbitrary[ParticipantId] = genArbitrary
   implicit val memberArb: Arbitrary[Member] = genArbitrary
   implicit val partyIdArb: Arbitrary[PartyId] = genArbitrary
+  implicit val externalPartyArb: Arbitrary[ExternalParty] = Arbitrary(
+    for {
+      partyId <- Arbitrary.arbitrary[PartyId]
+      signingFingerprints <- nonEmptyListGen[Fingerprint]
+    } yield ExternalParty(partyId, signingFingerprints)
+  )
   implicit val identityArb: Arbitrary[Identity] = genArbitrary
 
   implicit val physicalSynchronizerIdArb: Arbitrary[PhysicalSynchronizerId] = Arbitrary(for {

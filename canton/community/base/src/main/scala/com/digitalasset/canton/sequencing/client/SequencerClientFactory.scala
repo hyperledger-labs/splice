@@ -54,7 +54,7 @@ trait SequencerClientFactory {
       requestSigner: RequestSigner,
       sequencerConnections: SequencerConnections,
       synchronizerPredecessor: Option[SynchronizerPredecessor],
-      expectedSequencers: NonEmpty[Map[SequencerAlias, SequencerId]],
+      expectedSequencersO: Option[NonEmpty[Map[SequencerAlias, SequencerId]]],
       connectionPool: SequencerConnectionXPool,
   )(implicit
       executionContext: ExecutionContextExecutor,
@@ -98,7 +98,7 @@ object SequencerClientFactory {
           requestSigner: RequestSigner,
           sequencerConnections: SequencerConnections,
           synchronizerPredecessor: Option[SynchronizerPredecessor],
-          expectedSequencers: NonEmpty[Map[SequencerAlias, SequencerId]],
+          expectedSequencersO: Option[NonEmpty[Map[SequencerAlias, SequencerId]]],
           connectionPool: SequencerConnectionXPool,
       )(implicit
           executionContext: ExecutionContextExecutor,
@@ -123,10 +123,12 @@ object SequencerClientFactory {
             loggerFactory,
           )
 
-        val sequencerTransportsMap = makeTransport(
-          sequencerConnections,
-          member,
-          requestSigner,
+        val sequencerTransportsMapO = Option.when(!config.useNewConnectionPool)(
+          makeTransport(
+            sequencerConnections,
+            member,
+            requestSigner,
+          )
         )
 
         def getTrafficStateWithTransports(
@@ -137,7 +139,11 @@ object SequencerClientFactory {
               s"Retrieving traffic state from synchronizer for $member at $ts",
               futureSupervisor,
               logger,
-              sequencerTransportsMap,
+              sequencerTransportsMapO.getOrElse(
+                throw new IllegalStateException(
+                  "sequencerTransportsMap undefined while using transports"
+                )
+              ),
               sequencerConnections.sequencerTrustThreshold,
             )(
               _.getTrafficStateForMember(
@@ -163,7 +169,7 @@ object SequencerClientFactory {
           for {
             connections <- EitherT.fromEither[FutureUnlessShutdown](
               NonEmpty
-                .from(connectionPool.getOneConnectionPerSequencer())
+                .from(connectionPool.getOneConnectionPerSequencer("get-traffic-state"))
                 .toRight(
                   s"No connection available to retrieve traffic state from synchronizer for $member"
                 )
@@ -199,9 +205,10 @@ object SequencerClientFactory {
         for {
           sequencerTransports <- EitherT.fromEither[FutureUnlessShutdown](
             SequencerTransports.from(
-              sequencerTransportsMap,
-              expectedSequencers,
+              sequencerTransportsMapO,
+              expectedSequencersO,
               sequencerConnections.sequencerTrustThreshold,
+              sequencerConnections.sequencerLivenessMargin,
               sequencerConnections.submissionRequestAmplification,
             )
           )
@@ -253,8 +260,7 @@ object SequencerClientFactory {
 
           // fetch the initial set of pending sends to initialize the client with.
           // as it owns the client that should be writing to this store it should not be racy.
-          initialPendingSends <- EitherT
-            .right(sendTrackerStore.fetchPendingSends)
+          initialPendingSends = sendTrackerStore.fetchPendingSends
           trafficStateController = new TrafficStateController(
             member,
             loggerFactory,

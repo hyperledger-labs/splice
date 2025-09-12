@@ -1,10 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
+import com.digitalasset.canton.ConsoleScriptRunner
 import com.digitalasset.canton.crypto.{CryptoKeyPair, Fingerprint}
 import com.digitalasset.canton.topology.ParticipantId
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  ConfigTransforms,
+  ParticipantBootstrapDumpConfig,
+  SpliceConfig,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ensureNovelDamlNames,
   selfSignedTokenAuthSourceTransform,
@@ -12,14 +17,16 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAllSvAppConfigs,
   updateAllValidatorConfigs,
 }
-import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 import monocle.macros.syntax.lens.*
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with StandaloneCanton {
@@ -97,9 +104,10 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
     implicit env =>
       startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-      val svParticipantDump = clue("Getting participant identities dump from SV1") {
-        sv1ValidatorBackend.dumpParticipantIdentities()
-      }
+      val svParticipantDump =
+        clue("Getting participant identities dump from SV1 via validator API") {
+          sv1ValidatorBackend.dumpParticipantIdentities()
+        }
 
       clue("Checking exported key names for SV1") {
         val keyNames = svParticipantDump.keys.map(_.name.value)
@@ -107,6 +115,27 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
         keyNames should contain(s"$prefix-namespace")
         keyNames should contain(s"$prefix-signing")
         keyNames should contain(s"$prefix-encryption")
+      }
+
+      val svParticipantDumpManual = clue(
+        "Getting participant identities dump from SV1 manually"
+      ) {
+        val dumpPath = Files.createTempFile("manual-participant-dump", ".json")
+        manuallyDumpParticipantIdentities(
+          "sv1Validator.participantClient",
+          dumpPath,
+        )
+        NodeIdentitiesDump
+          .fromJsonFile(
+            dumpPath,
+            ParticipantId.tryFromProtoPrimitive,
+          )
+          .value
+      }
+
+      clue("Manually dumped identities match the ones dumped via the API") {
+        // we don't care about the version
+        svParticipantDumpManual shouldBe svParticipantDump.copy(version = None)
       }
 
       withCanton(
@@ -141,6 +170,35 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
           ).toSet
         }
       }
+  }
+
+  private def manuallyDumpParticipantIdentities(
+      participantHandle: String,
+      dumpPath: Path,
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    val originalDumpScriptPath = File(
+      "apps/app/src/pack/examples/recovery/manual-identities-dump.sc"
+    )
+
+    // the original script assumes that the participant is called `participant`
+    // and that the dump will be written to `identities-dump.json`; we need to adjust both
+    val modifiedDumpScriptPath = Files.createTempFile("modified-manual-identities-dump", ".sc")
+
+    clue("Modifying dump script") {
+      val originalScript = originalDumpScriptPath.contentAsString
+      val modifiedScript = originalScript
+        .replaceAll("participant.", s"$participantHandle.")
+        .replaceAll("identities-dump.json", dumpPath.toAbsolutePath.toString)
+      File(modifiedDumpScriptPath).writeText(modifiedScript)
+    }
+
+    clue("Running modified dump script") {
+      ConsoleScriptRunner.run(
+        env.environment,
+        File(modifiedDumpScriptPath).toJava,
+        logger,
+      )
+    }
   }
 
   // TODO(tech-debt) Consider removing this method in favor of making `useSelfSignedTokensForLedgerApiAuth` take an `ignore` parameter

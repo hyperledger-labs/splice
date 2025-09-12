@@ -3,13 +3,18 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SPLICE_ROOT } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { Input } from '@pulumi/pulumi';
-import { SPLICE_ROOT } from 'splice-pulumi-common';
 
 export function createGrafanaDashboards(namespace: Input<string>): void {
   createdNestedConfigMapForFolder(
     namespace,
     `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
+  );
+  createConfigMapForFolder(
+    namespace,
+    `${SPLICE_ROOT}/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/block/bftordering/examples/observability/grafana/dashboards/Canton/`,
+    'canton-bft'
   );
 }
 

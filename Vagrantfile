@@ -64,7 +64,8 @@ Vagrant.configure("2") do |config|
       [[ -f "$NIX_CACHE_IMAGE_PATH" ]] || { truncate -s "${NIX_CACHE_SIZE}G" "$NIX_CACHE_IMAGE_PATH"; mkfs.ext4 "$NIX_CACHE_IMAGE_PATH"; }
       nix_cache_image_fstab="$NIX_CACHE_IMAGE_PATH $NIX_CACHE_MOUNT_PATH ext4 loop 0 0"
       append_line_to_file "$nix_cache_image_fstab" /etc/fstab
-      mount -a
+      nix_daemon_needs_restart=false
+      mountpoint "$NIX_CACHE_MOUNT_PATH" || { mount "$NIX_CACHE_MOUNT_PATH" && nix_daemon_needs_restart=true; }
 
       # Bind mounts for /nix/store and /nix/var/nix/db
       mkdir -p "$NIX_CACHE_MOUNT_PATH/store" "$NIX_CACHE_MOUNT_PATH/var/nix/db"
@@ -74,6 +75,9 @@ Vagrant.configure("2") do |config|
       append_line_to_file "$nix_store_fstab" /etc/fstab
       append_line_to_file "$nix_db_fstab" /etc/fstab
       mount -a
+
+      # Restart the Nix Daemon if needed
+      if "$nix_daemon_needs_restart"; then systemctl restart nix-daemon.service; fi
     SHELL
   end
 

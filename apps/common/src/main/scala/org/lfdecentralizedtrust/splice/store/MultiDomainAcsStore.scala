@@ -7,7 +7,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, ExercisedEvent}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -26,7 +26,6 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   PackageQualifiedName,
-  QualifiedName,
   TemplateJsonDecoder,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -362,39 +361,28 @@ object MultiDomainAcsStore {
         TemplateFilter[?, ?, R],
       ],
       interfaceFilters: Map[
-        PackageQualifiedName,
+        Identifier, // interfaces are not (currently) upgradeable, so we match by package-id
         InterfaceFilter[?, ?, ?, IR],
       ],
   ) extends ContractFilter[R, IR] {
 
-    private val templateFiltersWithoutPackageNames = filtersWithoutPackageNames(templateFilters)
-
-    private val interfaceFiltersWithoutPackageNames = filtersWithoutPackageNames(interfaceFilters)
-
-    // TODO(#829) Drop this once the ledger API exposes package names on the read path.
-    private def filtersWithoutPackageNames[F](
-        filters: Map[PackageQualifiedName, F]
-    ): Map[QualifiedName, F] =
-      filters.view.map { case (name, filter) =>
-        name.qualifiedName -> filter
-      }.toMap
-
     override val ingestionFilter =
       IngestionFilter(
         primaryParty,
-        interfaceFilters.values.map(_.interfaceId).toSeq,
+        // In interface filters the ledger API warns when using a package id so we convert to a package name here.
+        interfaceFilters.keys.map(PackageQualifiedName.getFromResources(_)).toSeq,
       )
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
-      val matchesTemplate = templateFiltersWithoutPackageNames
-        .get(QualifiedName(ev.getTemplateId))
+      val matchesTemplate = templateFilters
+        .get(PackageQualifiedName.fromEvent(ev))
         .exists(_.evPredicate(ev))
       lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
-        interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier)).exists(_.evPredicate(ev))
+        interfaceFilters.get(identifier).exists(_.evPredicate(ev))
       }
       lazy val interfaceToFailureMap = ev.getFailedInterfaceViews.asScala.filter {
         case (identifier, _) =>
-          interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier))
+          interfaceFilters.contains(identifier)
       }
       if (interfaceToFailureMap.nonEmpty) {
         elc.error(
@@ -409,10 +397,11 @@ object MultiDomainAcsStore {
     override def shouldArchive(
         exercisedEvent: ExercisedEvent
     ): Boolean = {
-      templateFiltersWithoutPackageNames.contains(
-        QualifiedName(exercisedEvent.getTemplateId)
+      val packageIdQualifiedName = PackageQualifiedName.fromEvent(exercisedEvent)
+      templateFilters.contains(
+        packageIdQualifiedName
       ) || exercisedEvent.getImplementedInterfaces.asScala.exists(interfaceId =>
-        interfaceFiltersWithoutPackageNames.contains(QualifiedName(interfaceId))
+        interfaceFilters.contains(interfaceId)
       )
     }
 
@@ -420,7 +409,7 @@ object MultiDomainAcsStore {
         ev: CreatedEvent
     ): Option[R] = {
       for {
-        templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
+        templateFilter <- templateFilters.get(PackageQualifiedName.fromEvent(ev))
         row <- templateFilter.matchingContractToRow(ev)
       } yield row
     }
@@ -439,7 +428,7 @@ object MultiDomainAcsStore {
       )
       val interfaceRowDatas = for {
         (identifier, _) <- ev.getInterfaceViews.asScala
-        interfaceFilter <- interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier))
+        interfaceFilter <- interfaceFilters.get(identifier)
         result <- interfaceFilter.matchingContractToRow(ev)
       } yield result
 
@@ -482,7 +471,7 @@ object MultiDomainAcsStore {
       TemplateFilter[TCid, T, R],
   ) =
     (
-      PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId),
+      PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId),
       TemplateFilter(
         ev => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev)
@@ -500,11 +489,11 @@ object MultiDomainAcsStore {
   )(p: Contract[ICid, View] => Boolean)(
       encode: EncodeInterfaceToRow[ICid, View, IR]
   ): (
-      PackageQualifiedName,
+      Identifier,
       InterfaceFilter[ICid, Marker, View, IR],
   ) =
     (
-      PackageQualifiedName(interfaceCompanion.getTemplateIdWithPackageId),
+      interfaceCompanion.getTemplateIdWithPackageId,
       InterfaceFilter(
         interfaceCompanion.TEMPLATE_ID_WITH_PACKAGE_ID,
         ev => {
@@ -524,7 +513,7 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
-      includeInterfaces: Seq[Identifier],
+      includeInterfaces: Seq[PackageQualifiedName],
       includeCreatedEventBlob: Boolean = true,
   ) {
 
@@ -542,9 +531,9 @@ object MultiDomainAcsStore {
                   com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
                     Some(
                       com.daml.ledger.api.v2.value.Identifier(
-                        packageId = interfaceId.getPackageId,
-                        moduleName = interfaceId.getModuleName,
-                        entityName = interfaceId.getEntityName,
+                        packageId = s"#${interfaceId.packageName}",
+                        moduleName = interfaceId.qualifiedName.moduleName,
+                        entityName = interfaceId.qualifiedName.entityName,
                       )
                     ),
                     includeInterfaceView = true,
@@ -751,7 +740,7 @@ object MultiDomainAcsStore {
         traceContext: TraceContext
     ): Future[Unit]
 
-    def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
+    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit] =
       ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))

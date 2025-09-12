@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import com.digitalasset.canton.crypto.TestHash
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.CantonTimestamp.{Epoch, ofEpochMilli}
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
@@ -56,6 +57,7 @@ import com.digitalasset.canton.{
   HasExecutorService,
   InUS,
   ReassignmentCounter,
+  RepairCounter,
   RequestCounter,
 }
 import org.scalactic.source
@@ -845,9 +847,7 @@ final class ConflictDetectorTest
 
         _ <- checkInvalidCommitSet(cd, RequestCounter(4), ofEpochMilli(4))(
           mkActivenessSet(useOnly = Set(coid00)),
-          mkCommitSet(unassign =
-            Map(coid00 -> (sourceSynchronizer1.unwrap -> reassignmentCounter1))
-          ),
+          mkCommitSet(unassign = Map(coid00 -> (targetSynchronizer1 -> reassignmentCounter1))),
         )("Unassigned contract only used, not locked.")
       } yield succeed
     }
@@ -1296,8 +1296,8 @@ final class ConflictDetectorTest
         actRes = mkActivenessResult(prior = Map(coid00 -> Some(active), coid01 -> Some(active)))
         commitSet = mkCommitSet(unassign =
           Map(
-            coid00 -> (synchronizer1 -> reassignmentCounter1),
-            coid01 -> (synchronizer2 -> reassignmentCounter2),
+            coid00 -> (targetSynchronizer1 -> reassignmentCounter1),
+            coid01 -> (targetSynchronizer2 -> reassignmentCounter2),
           )
         )
         _ <- singleCRwithTR(cd, tor.rc, activenessSet, actRes, commitSet, tor.timestamp)
@@ -1359,7 +1359,7 @@ final class ConflictDetectorTest
         )
         commitSet = mkCommitSet(
           arch = Set(coid00),
-          unassign = Map(coid01 -> (synchronizer1 -> reassignmentCounter2)),
+          unassign = Map(coid01 -> (targetSynchronizer1 -> reassignmentCounter2)),
           assign = Map(coid20 -> (sourceSynchronizer2, reassignmentIds(0))),
           create = Set(coid10),
         )
@@ -1467,8 +1467,8 @@ final class ConflictDetectorTest
             coid11 -> (sourceSynchronizer1, reassignmentIds(0)),
           ),
           unassign = Map(
-            coid20 -> (synchronizer1 -> reassignmentCounter1),
-            coid11 -> (synchronizer2 -> reassignmentCounter2),
+            coid20 -> (targetSynchronizer1 -> reassignmentCounter1),
+            coid11 -> (targetSynchronizer2 -> reassignmentCounter2),
           ),
           arch = Set(coid10),
         )
@@ -1522,7 +1522,7 @@ final class ConflictDetectorTest
         )
         fin1 <- cd
           .finalizeRequest(
-            mkCommitSet(unassign = Map(coid00 -> (synchronizer2 -> reassignmentCounter2))),
+            mkCommitSet(unassign = Map(coid00 -> (targetSynchronizer2 -> reassignmentCounter2))),
             tor,
           )
           .flatten
@@ -1598,7 +1598,7 @@ final class ConflictDetectorTest
         commitSet1 = mkCommitSet(
           create = Set(coid10),
           arch = Set(coid00),
-          unassign = Map(coid01 -> (synchronizer1 -> reassignmentCounter1)),
+          unassign = Map(coid01 -> (targetSynchronizer1 -> reassignmentCounter1)),
         )
         actSet2 = mkActivenessSet(
           assign = Set(coid10),
@@ -1608,13 +1608,13 @@ final class ConflictDetectorTest
         commitSet2 = mkCommitSet(
           assign = Map(coid10 -> (sourceSynchronizer2, reassignmentIds(0))),
           unassign = Map(
-            coid00 -> (synchronizer2 -> reassignmentCounter1),
-            coid01 -> (synchronizer2 -> reassignmentCounter2),
+            coid00 -> (targetSynchronizer2 -> reassignmentCounter1),
+            coid01 -> (targetSynchronizer2 -> reassignmentCounter2),
           ),
         )
         ts = ofEpochMilli(1000)
         // tor1 and tor2 are at different timestamps as the request counter does not affect
-        // the order in the backing active contract store and because the canton protorol
+        // the order in the backing active contract store and because in the canton protocol
         // timestamps and request counters are mutually strictly monotonic.
         tor2 = TimeOfRequest(RequestCounter(2), ts.immediateSuccessor)
         tor1 = TimeOfRequest(RequestCounter(1), ts)
@@ -1707,7 +1707,7 @@ final class ConflictDetectorTest
           // This runs after committing the request, but before the reassignment store is updated
           val actSetOut = mkActivenessSet(deact = Set(coid00))
           val commitSetOut =
-            mkCommitSet(unassign = Map(coid00 -> (synchronizer1 -> reassignmentCounter1)))
+            mkCommitSet(unassign = Map(coid00 -> (targetSynchronizer1 -> reassignmentCounter1)))
           CheckedT((for {
             _ <- singleCRwithTR(
               cd,
@@ -1767,7 +1767,7 @@ final class ConflictDetectorTest
 
         commitSet1 = mkCommitSet(
           arch = Set(coid00),
-          unassign = Map(coid01 -> (synchronizer1 -> reassignmentCounter1)),
+          unassign = Map(coid01 -> (targetSynchronizer1 -> reassignmentCounter1)),
         )
         fin1 <- cd.finalizeRequest(commitSet1, tor1).flatten
         _ = assert(fin1 == Either.unit)
@@ -1867,6 +1867,36 @@ final class ConflictDetectorTest
             },
           )
         )
+      } yield succeed
+    }
+
+    "record replicated contract during a request archiving it" inUS {
+      val toc0 = TimeOfChange(Epoch, Some(RepairCounter(10)))
+      val tor1 = TimeOfRequest(RequestCounter(1), Epoch.plusSeconds(1))
+      val addPartyRequestId = TestHash.digest(0)
+      for {
+        acs <- mkAcs()
+        cd = mkCd(acs)
+
+        // Initiate an archive of an unknown contract absent from the ACS.
+        cr1 <- prefetchAndCheck(
+          cd,
+          tor1.rc,
+          ActivenessSet(mkActivenessCheck(lockMaybeUnknown = Set(coid00)), Set.empty),
+        )
+        // Contract is locked and not flagged as unknown as it is legitimately unknown.
+        _ = assert(cr1 == mkActivenessResult())
+        _ = checkContractState(cd, coid00, 0, 1, 0)(s"Unknown contract $coid00 is locked.")
+        // Contract becomes known before its archive is finalized.
+        _ = cd.addReplicatedContracts(
+          addPartyRequestId,
+          Seq((coid00, sourceSynchronizer1, initialReassignmentCounter, toc0)),
+        )
+        // Finalizing the result succeeds without internal consistency errors.
+        finalizeResult <- cd.finalizeRequest(mkCommitSet(arch = Set(coid00)), tor1).flatten
+        _ = assert(finalizeResult == Either.unit)
+        // And contract is archived.
+        _ <- checkContractState(acs, coid00, (Archived, tor1))(s"contract $coid00 gets archived")
       } yield succeed
     }
   }

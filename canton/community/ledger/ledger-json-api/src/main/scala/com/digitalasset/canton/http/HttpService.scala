@@ -28,6 +28,7 @@ import com.digitalasset.canton.ledger.client.services.admin.{
 }
 import com.digitalasset.canton.ledger.participant.state.PackageSyncService
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.tracing.NoTracing
 import io.grpc.Channel
 import io.grpc.health.v1.health.{HealthCheckRequest, HealthGrpc}
@@ -53,6 +54,7 @@ class HttpService(
     httpsConfiguration: Option[TlsServerConfig],
     channel: Channel,
     packageSyncService: PackageSyncService,
+    packagePreferenceBackend: PackagePreferenceBackend,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     asys: ActorSystem,
@@ -74,7 +76,10 @@ class HttpService(
       import startSettings.*
       val DummyUserId: UserId = UserId("HTTP-JSON-API-Gateway")
 
-      implicit val settings: ServerSettings = ServerSettings(asys).withTransparentHeadRequests(true)
+      val settings: ServerSettings = ServerSettings(asys)
+        .withTransparentHeadRequests(true)
+        .mapTimeouts(_.withRequestTimeout(startSettings.server.requestTimeout))
+
       implicit val wsConfig = startSettings.websocketConfig.getOrElse(WebsocketConfig())
 
       val clientConfig = LedgerClientConfiguration(
@@ -111,6 +116,7 @@ class HttpService(
             ledgerClient,
             metadataServiceEnabled = startSettings.damlDefinitionsServiceEnabled,
             packageSyncService,
+            packagePreferenceBackend,
             mat.executionContext,
             loggerFactory,
           )
@@ -223,7 +229,10 @@ object HttpService extends NoTracing {
   //              and inline.
   // Decode JWT without any validation
   private val decodeJwt: EndpointsCompanion.ValidateJwt =
-    jwt => JwtDecoder.decode(jwt).leftMap(e => EndpointsCompanion.Unauthorized(e.shows))
+    jwt =>
+      \/.fromEither(
+        JwtDecoder.decode(jwt).leftMap(e => EndpointsCompanion.Unauthorized(e.prettyPrint))
+      )
 
   private[http] def createPortFile(
       file: Path,

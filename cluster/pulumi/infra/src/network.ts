@@ -12,8 +12,8 @@ import {
   GCP_PROJECT,
   getDnsNames,
   isDevNet,
-} from 'splice-pulumi-common';
-import { infraAffinityAndTolerations } from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { gcpDnsProject } from './config';
 
@@ -81,7 +81,7 @@ function certManager(certManagerNamespaceName: string): certmanager.CertManager 
     installCRDs: true,
     helmOptions: {
       namespace: ns.metadata.name,
-      version: '1.14.5',
+      version: '1.18.2',
     },
     ...infraAffinityAndTolerations,
     webhook: {

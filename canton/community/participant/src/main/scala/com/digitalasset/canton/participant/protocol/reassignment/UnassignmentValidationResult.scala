@@ -44,8 +44,8 @@ final case class UnassignmentValidationResult(
 ) extends ReassignmentValidationResult {
   val submitterMetadata: ReassignmentSubmitterMetadata = unassignmentData.submitterMetadata
   val sourceSynchronizer: ReassignmentTag.Source[PhysicalSynchronizerId] =
-    unassignmentData.sourceSynchronizer
-  val targetSynchronizer: Target[PhysicalSynchronizerId] = unassignmentData.targetSynchronizer
+    unassignmentData.sourcePSId
+  val targetSynchronizer: Target[PhysicalSynchronizerId] = unassignmentData.targetPSId
   val stakeholders: Set[LfPartyId] = unassignmentData.stakeholders.all
   val targetTimestamp: CantonTimestamp = unassignmentData.targetTimestamp
 
@@ -66,7 +66,11 @@ final case class UnassignmentValidationResult(
       .map { case (contractId, reassignmentCounter) =>
         (
           contractId,
-          CommitSet.UnassignmentCommit(targetSynchronizer, stakeholders, reassignmentCounter),
+          CommitSet.UnassignmentCommit(
+            targetSynchronizer.map(_.logical),
+            stakeholders,
+            reassignmentCounter,
+          ),
         )
       })
       .toMap
@@ -138,7 +142,12 @@ object UnassignmentValidationResult {
         Unit,
       ],
       submitterCheckResult: Option[ReassignmentValidationError],
-  ) extends ReassignmentValidationResult.CommonValidationResult
+  ) extends ReassignmentValidationResult.CommonValidationResult {
+
+    // During unassignment the reassignment id is computed, rather than being passed in
+    // so there's no need to validate it.
+    def reassignmentIdResult: Option[ReassignmentValidationError] = None
+  }
 
   final case class ReassigningParticipantValidationResult(
       errors: Seq[ReassignmentValidationError]

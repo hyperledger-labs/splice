@@ -3,12 +3,10 @@
 
 import dayjs from 'dayjs';
 import { useAppForm } from '../../hooks/form';
-import { CommonFormData } from './CreateProposalform';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
 import { useMemo, useState } from 'react';
 import {
   validateEffectiveDate,
@@ -20,27 +18,25 @@ import {
   validateWeight,
 } from './formValidators';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { CommonProposalFormData } from '../../utils/types';
+import { ProposalSummary } from '../governance/ProposalSummary';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
 
 interface ExtraFormField {
   sv: string;
   weight: string;
 }
 
-type UpdateSvRewardWeightFormData = CommonFormData & ExtraFormField;
+export type UpdateSvRewardWeightFormData = CommonProposalFormData & ExtraFormField;
 
-interface UpdateSvRewardWeightFormProps {
-  onSubmit: (
-    data: UpdateSvRewardWeightFormData,
-    action: ActionRequiringConfirmation
-  ) => Promise<void>;
-}
-
-export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> = props => {
-  const { onSubmit } = props;
-  const [effectivityType, setEffectivityType] = useState('custom');
+export const UpdateSvRewardWeightForm: React.FC = _ => {
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const mutation = useProposalMutation();
 
   const svs = useMemo(
     () => dsoInfosQuery.data?.dsoRules.payload.svs.entriesArray() || [],
@@ -59,7 +55,10 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
   const defaultValues: UpdateSvRewardWeightFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
-    effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    effectiveDate: {
+      type: 'custom',
+      effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    },
     url: '',
     summary: '',
     sv: '',
@@ -68,7 +67,8 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
 
   const form = useAppForm({
     defaultValues,
-    onSubmit: ({ value }) => {
+
+    onSubmit: async ({ value }) => {
       const action: ActionRequiringConfirmation = {
         tag: 'ARC_DsoRules',
         value: {
@@ -81,162 +81,145 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
           },
         },
       };
-      console.log('submit sv reward weight form data: ', value, 'with action:', action);
-      onSubmit(value, action);
+
+      if (!showConfirmation) {
+        setShowConfirmation(true);
+      } else {
+        await mutation.mutateAsync({ formData: value, action }).catch(e => {
+          console.error(`Failed to submit proposal`, e);
+        });
+      }
     },
 
     validators: {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
           expiration: value.expiryDate,
-          effectiveDate: value.effectiveDate,
+          effectiveDate: value.effectiveDate.effectiveDate,
         });
       },
     },
   });
 
   return (
-    <FormLayout form={form} id="update-sv-reward-weight-form">
-      <form.AppField name="action">
-        {field => (
-          <field.TextField
-            title="Action"
-            id="update-sv-reward-weight-action"
-            muiTextFieldProps={{ disabled: true }}
+    <>
+      <FormLayout form={form} id="update-sv-reward-weight-form">
+        {showConfirmation ? (
+          <ProposalSummary
+            actionName={form.state.values.action}
+            url={form.state.values.url}
+            summary={form.state.values.summary}
+            expiryDate={form.state.values.expiryDate}
+            effectiveDate={form.state.values.effectiveDate.effectiveDate}
+            formType="sv-reward-weight"
+            svRewardWeightMember={form.state.values.sv}
+            svRewardWeight={form.state.values.weight}
+            onEdit={() => setShowConfirmation(false)}
+            onSubmit={() => {}}
           />
-        )}
-      </form.AppField>
-
-      <form.AppField
-        name="expiryDate"
-        validators={{
-          onChange: ({ value }) => validateExpiration(value),
-          onBlur: ({ value }) => validateExpiration(value),
-        }}
-      >
-        {field => (
-          <field.DateField
-            title="Vote Proposal Expiration"
-            description="This is the last day voters can vote on this proposal"
-            id="update-sv-reward-weight-expiry-date"
-          />
-        )}
-      </form.AppField>
-
-      <form.Field
-        name="effectiveDate"
-        validators={{
-          onChange: ({ value }) => validateEffectiveDate(value),
-          onBlur: ({ value }) => validateEffectiveDate(value),
-        }}
-        children={_ => {
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="h5" gutterBottom>
-                Vote Proposal Effectivity
-              </Typography>
-
-              <RadioGroup
-                value={effectivityType}
-                onChange={e => setEffectivityType(e.target.value)}
-              >
-                <FormControlLabel
-                  value="custom"
-                  control={<Radio />}
-                  label={<Typography>Custom</Typography>}
+        ) : (
+          <>
+            <form.AppField name="action">
+              {field => (
+                <field.TextField
+                  title="Action"
+                  id="update-sv-reward-weight-action"
+                  muiTextFieldProps={{ disabled: true }}
                 />
+              )}
+            </form.AppField>
 
-                {effectivityType === 'custom' && (
-                  <form.AppField name="effectiveDate">
-                    {field => (
-                      <field.DateField
-                        description="Select the date and time the proposal will take effect"
-                        minDate={dayjs(form.getFieldValue('expiryDate'))}
-                        id="update-sv-reward-weight-effective-date"
-                      />
-                    )}
-                  </form.AppField>
-                )}
-
-                <FormControlLabel
-                  value="threshold"
-                  control={<Radio />}
-                  label={
-                    <Box>
-                      <Typography>Make effective at threshold</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        This will allow the vote proposal to take effect immediately when 2/3 vote
-                        in favor
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mt: 2 }}
+            <form.AppField
+              name="expiryDate"
+              validators={{
+                onChange: ({ value }) => validateExpiration(value),
+                onBlur: ({ value }) => validateExpiration(value),
+              }}
+            >
+              {field => (
+                <field.DateField
+                  title="Vote Proposal Expiration"
+                  description="This is the last day voters can vote on this proposal"
+                  id="update-sv-reward-weight-expiry-date"
                 />
-              </RadioGroup>
-            </Box>
-          );
-        }}
-      />
+              )}
+            </form.AppField>
 
-      <form.AppField
-        name="summary"
-        validators={{
-          onBlur: ({ value }) => validateSummary(value),
-          onChange: ({ value }) => validateSummary(value),
-        }}
-      >
-        {field => <field.TextArea title="Proposal Summary" id="update-sv-reward-weight-summary" />}
-      </form.AppField>
+            <form.AppField
+              name="effectiveDate"
+              validators={{
+                onChange: ({ value }) => validateEffectiveDate(value),
+                onBlur: ({ value }) => validateEffectiveDate(value),
+              }}
+              children={_ => (
+                <EffectiveDateField
+                  initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+                  id="update-sv-reward-weight-effective-date"
+                />
+              )}
+            />
 
-      <form.AppField
-        name="url"
-        validators={{
-          onBlur: ({ value }) => validateUrl(value),
-          onChange: ({ value }) => validateUrl(value),
-        }}
-      >
-        {field => <field.TextField title="URL" id="update-sv-reward-weight-url" />}
-      </form.AppField>
+            <form.AppField
+              name="summary"
+              validators={{
+                onBlur: ({ value }) => validateSummary(value),
+                onChange: ({ value }) => validateSummary(value),
+              }}
+            >
+              {field => (
+                <field.TextArea title="Proposal Summary" id="update-sv-reward-weight-summary" />
+              )}
+            </form.AppField>
 
-      <form.AppField
-        name="sv"
-        validators={{
-          onBlur: ({ value }) => validateSvSelection(value),
-          onChange: ({ value }) => validateSvSelection(value),
-        }}
-      >
-        {field => (
-          <field.SelectField
-            title="Member"
-            options={svOptions}
-            id="update-sv-reward-weight-member"
-          />
+            <form.AppField
+              name="url"
+              validators={{
+                onBlur: ({ value }) => validateUrl(value),
+                onChange: ({ value }) => validateUrl(value),
+              }}
+            >
+              {field => <field.TextField title="URL" id="update-sv-reward-weight-url" />}
+            </form.AppField>
+
+            <form.AppField
+              name="sv"
+              validators={{
+                onBlur: ({ value }) => validateSvSelection(value),
+                onChange: ({ value }) => validateSvSelection(value),
+              }}
+            >
+              {field => (
+                <field.SelectField
+                  title="Member"
+                  options={svOptions}
+                  id="update-sv-reward-weight-member"
+                />
+              )}
+            </form.AppField>
+
+            <form.AppField
+              name="weight"
+              validators={{
+                onBlur: ({ value }) => validateWeight(value),
+                onChange: ({ value }) => validateWeight(value),
+              }}
+            >
+              {field => <field.TextField title="Weight" id="update-sv-reward-weight-weight" />}
+            </form.AppField>
+          </>
         )}
-      </form.AppField>
 
-      <form.AppField
-        name="weight"
-        validators={{
-          onBlur: ({ value }) => validateWeight(value),
-          onChange: ({ value }) => validateWeight(value),
-        }}
-      >
-        {field => <field.TextField title="Weight" id="update-sv-reward-weight-weight" />}
-      </form.AppField>
+        <form.AppForm>
+          <ProposalSubmissionError error={mutation.error} />
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {form.state.errors.map((error, index) => (
-          <Alert severity="error" key={index}>
-            <Typography key={index} variant="h6" color="error">
-              {error}
-            </Typography>
-          </Alert>
-        ))}
-      </Box>
+          <form.FormErrors />
 
-      <form.AppForm>
-        <form.FormControls />
-      </form.AppForm>
-    </FormLayout>
+          <form.FormControls
+            showConfirmation={showConfirmation}
+            onEdit={() => setShowConfirmation(false)}
+          />
+        </form.AppForm>
+      </FormLayout>
+    </>
   );
 };

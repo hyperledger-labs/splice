@@ -109,7 +109,7 @@ spec:
                 path: postgresPassword
       containers:
       - name: postgres-exporter
-        image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
         env:
           - name: DATA_SOURCE_PASS_FILE
             value: /tmp/pwd
@@ -227,4 +227,13 @@ app: {{ .app }}
 {{ toYaml . }}
 {{- end }}
 {{- end }}
+{{- end -}}
+{{- define "splice-util-lib.render-nested-config" }}
+{{- range $key, $value := . }}
+{{ $key | kebabcase }} = {{- if kindIs "map" $value }} {
+{{- include "splice-util-lib.render-nested-config" $value | trim | nindent 2 }}
+}
+{{- else }} {{ $value }}
+{{- end }}
+{{- end -}}
 {{- end -}}

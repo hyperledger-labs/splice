@@ -3,7 +3,7 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "51",
+          "contractId" : "52",
           "contractKey" : null,
           "createArgument" : null,
           "createdAt" : "1971-01-01T00:00:00Z",
@@ -77,7 +77,7 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "68",
+          "contractId" : "69",
           "contractKey" : null,
           "createArgument" : null,
           "createdAt" : "1971-01-01T00:00:00Z",
@@ -108,7 +108,7 @@
                   "amount" : "200.0000000000",
                   "executeBefore" : "2025-06-18T00:00:00.000000Z",
                   "inputHoldingCids" : [
-                    "69"
+                    "70"
                   ],
                   "instrumentId" : {
                     "admin" : "dso::normalized",

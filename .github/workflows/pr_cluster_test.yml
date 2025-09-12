@@ -12,6 +12,7 @@ jobs:
 
   get_head:
     runs-on: ubuntu-24.04
+    if: github.event.issue.pull_request
     outputs:
       sha: ${{ steps.get_head.outputs.sha }}
       repo: ${{ steps.get_head.outputs.repo }}

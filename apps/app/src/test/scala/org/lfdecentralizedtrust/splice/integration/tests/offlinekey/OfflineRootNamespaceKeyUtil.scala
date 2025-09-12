@@ -9,7 +9,6 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.transaction.{
   DelegationRestriction,
   NamespaceDelegation,
-  OwnerToKeyMapping,
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
@@ -125,10 +124,8 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
     val encryptionKey =
       node.keys.secret.generate_encryption_key("ecryption")
     node.topology.owner_to_key_mappings.propose(
-      OwnerToKeyMapping(
-        node.id.member,
-        NonEmpty(Seq, signingKey, encryptionKey),
-      ),
+      node.id.member,
+      NonEmpty(Seq, signingKey, encryptionKey),
       Some(PositiveInt.one),
       signedBy = Seq(delegatedNamespaceKey.fingerprint, signingKey.fingerprint),
     )

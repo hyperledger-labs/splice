@@ -44,21 +44,19 @@ trait SequencerBftAdminConnection {
   ): Future[Seq[(Option[SequencerId], Option[P2PEndpoint.Id])]] = {
     runCmd(
       SequencerBftAdminCommands.GetPeerNetworkStatus(None)
-    ).map(_.endpointStatuses.map { endpointStatus =>
-      endpointStatus match {
-        case PeerConnectionStatus.PeerIncomingConnection(sequencerId) => (Some(sequencerId), None)
-        case PeerConnectionStatus.PeerEndpointIdStatus(id, health) =>
-          health.status match {
-            case PeerEndpointHealthStatus.UnknownEndpoint =>
-              None -> Some(id)
-            case PeerEndpointHealthStatus.Unauthenticated =>
-              None -> Some(id)
-            case PeerEndpointHealthStatus.Disconnected =>
-              None -> Some(id)
-            case PeerEndpointHealthStatus.Authenticated(sequencerId) =>
-              Some(sequencerId) -> Some(id)
-          }
-      }
+    ).map(_.endpointStatuses.map {
+      case PeerConnectionStatus.PeerIncomingConnection(sequencerId) => (Some(sequencerId), None)
+      case PeerConnectionStatus.PeerEndpointStatus(id, isOutgoing @ _, health) =>
+        health.status match {
+          case PeerEndpointHealthStatus.UnknownEndpoint =>
+            None -> Some(id)
+          case PeerEndpointHealthStatus.Unauthenticated =>
+            None -> Some(id)
+          case PeerEndpointHealthStatus.Disconnected =>
+            None -> Some(id)
+          case PeerEndpointHealthStatus.Authenticated(sequencerId) =>
+            Some(sequencerId) -> Some(id)
+        }
     })
   }
 

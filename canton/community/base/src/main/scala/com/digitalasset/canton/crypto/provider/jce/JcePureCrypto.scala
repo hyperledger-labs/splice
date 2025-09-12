@@ -13,6 +13,11 @@ import com.digitalasset.canton.config.{
   SessionEncryptionKeyCacheConfig,
 }
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
+import com.digitalasset.canton.crypto.HmacError.{
+  FailedToComputeHmac,
+  InvalidHmacSecret,
+  UnknownHmacAlgorithm,
+}
 import com.digitalasset.canton.crypto.deterministic.encryption.DeterministicRandom
 import com.digitalasset.canton.crypto.{SignatureCheckError, *}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -26,12 +31,11 @@ import com.digitalasset.canton.util.{EitherUtil, ErrorUtil, ShowUtil}
 import com.digitalasset.canton.version.HasToByteString
 import com.github.blemale.scaffeine.Cache
 import com.google.common.annotations.VisibleForTesting
-import com.google.crypto.tink.hybrid.subtle.AeadOrDaead
 import com.google.crypto.tink.internal.EllipticCurvesUtil
 import com.google.crypto.tink.subtle.*
 import com.google.crypto.tink.subtle.EllipticCurves.EcdsaEncoding
 import com.google.crypto.tink.subtle.Enums.HashType
-import com.google.crypto.tink.{Aead, PublicKeySign, PublicKeyVerify}
+import com.google.crypto.tink.{PublicKeySign, PublicKeyVerify}
 import com.google.protobuf.ByteString
 import org.bouncycastle.crypto.DataLengthException
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
@@ -42,13 +46,16 @@ import org.bouncycastle.jce.spec.IESParameterSpec
 import java.security.interfaces.*
 import java.security.{
   GeneralSecurityException,
+  InvalidKeyException,
+  NoSuchAlgorithmException,
   PrivateKey as JPrivateKey,
   PublicKey as JPublicKey,
   SecureRandom,
   Security,
   Signature as JSignature,
 }
-import javax.crypto.Cipher
+import javax.crypto.spec.SecretKeySpec
+import javax.crypto.{Cipher, Mac}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
@@ -262,26 +269,6 @@ class JcePureCrypto(
         )
         .leftMap(err => DecryptionError.FailedToDecrypt(err.toString))
     } yield ByteString.copyFrom(plaintext)
-
-  // Internal helper class for the symmetric encryption as part of the hybrid encryption scheme.
-  private object Aes128GcmDemHelper extends EciesAeadHkdfDemHelper {
-
-    override def getSymmetricKeySizeInBytes: Int = SymmetricKeyScheme.Aes128Gcm.keySizeInBytes
-
-    override def getAeadOrDaead(symmetricKeyValue: Array[Byte]): AeadOrDaead = new AeadOrDaead(
-      new Aead {
-        override def encrypt(plaintext: Array[Byte], associatedData: Array[Byte]): Array[Byte] = {
-          val encrypter = new AesGcmJce(symmetricKeyValue)
-          encrypter.encrypt(plaintext, associatedData)
-        }
-
-        override def decrypt(ciphertext: Array[Byte], associatedData: Array[Byte]): Array[Byte] = {
-          val decrypter = new AesGcmJce(symmetricKeyValue)
-          decrypter.decrypt(ciphertext, associatedData)
-        }
-      }
-    )
-  }
 
   /** Produces an EC-DSA signature with the given private signing key.
     *
@@ -590,43 +577,6 @@ class JcePureCrypto(
     } yield ()
   }
 
-  private def encryptWithEciesP256HmacSha256Aes128Gcm[M <: HasToByteString](
-      message: M,
-      publicKey: EncryptionPublicKey,
-  ): Either[EncryptionError, AsymmetricEncrypted[M]] =
-    for {
-      ecPublicKey <- toJavaPublicKey(
-        publicKey,
-        { case k: ECPublicKey => Right(k) },
-        EncryptionError.InvalidEncryptionKey.apply,
-      )
-      encrypter <- Either
-        .catchOnly[GeneralSecurityException](
-          new EciesAeadHkdfHybridEncrypt(
-            ecPublicKey,
-            Array[Byte](),
-            "HmacSha256",
-            EllipticCurves.PointFormatType.UNCOMPRESSED,
-            Aes128GcmDemHelper,
-          )
-        )
-        .leftMap(err => EncryptionError.InvalidEncryptionKey(ErrorUtil.messageWithStacktrace(err)))
-      ciphertext <- Either
-        .catchOnly[GeneralSecurityException](
-          encrypter
-            .encrypt(
-              message.toByteString.toByteArray,
-              Array[Byte](),
-            )
-        )
-        .leftMap(err => EncryptionError.FailedToEncrypt(ErrorUtil.messageWithStacktrace(err)))
-      encrypted = new AsymmetricEncrypted[M](
-        ByteString.copyFrom(ciphertext),
-        EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm,
-        publicKey.fingerprint,
-      )
-    } yield encrypted
-
   private def encryptWithEciesP256HmacSha256Aes128Cbc[M <: HasToByteString](
       message: M,
       publicKey: EncryptionPublicKey,
@@ -723,56 +673,12 @@ class JcePureCrypto(
           ),
       )
       .flatMap {
-        case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm =>
-          encryptWithEciesP256HmacSha256Aes128Gcm(
+        case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc =>
+          encryptWithEciesP256HmacSha256Aes128Cbc(
             message,
             publicKey,
+            JceSecureRandom.random.get(),
           )
-        case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc =>
-          val enabledEncryptionCheck =
-            Option(System.getProperty("canton.encryption-check")).exists(_.toLowerCase == "true")
-          // Check that two deterministic encryptions yield the same ciphertext and fail otherwise
-          // TODO remove this again once we figured out the encryption corruption problem
-          //  https://github.com/DACH-NY/cn-test-failures/issues/4655
-          if (enabledEncryptionCheck) {
-            implicit val traceContext: TraceContext = TraceContext.todo
-            // "def" on purpose, as the generator is stateful
-            def deterministicRng = DeterministicRandom.getDeterministicRandomGenerator(
-              message.toByteString,
-              publicKey.fingerprint,
-              loggerFactory,
-            )
-            for {
-              firstEncryption <- encryptWithEciesP256HmacSha256Aes128Cbc(
-                message,
-                publicKey,
-                deterministicRng,
-              )
-              secondEncryption <- encryptWithEciesP256HmacSha256Aes128Cbc(
-                message,
-                publicKey,
-                deterministicRng,
-              )
-              _ <- Either.cond(
-                firstEncryption == secondEncryption,
-                (),
-                EncryptionError.FailedToEncrypt(
-                  s"""Deterministic encryption check failed:
-                       |Expected two encryptions with the same input and deterministic RNG to yield identical ciphertexts.
-                       |However, they differed:
-                       |First ciphertext:  $firstEncryption
-                       |Second ciphertext: $secondEncryption
-                       |""".stripMargin
-                ),
-              )
-            } yield firstEncryption
-          } else {
-            encryptWithEciesP256HmacSha256Aes128Cbc(
-              message,
-              publicKey,
-              JceSecureRandom.random.get(),
-            )
-          }
         case EncryptionAlgorithmSpec.RsaOaepSha256 =>
           encryptWithRSAOaepSha256(
             message,
@@ -809,12 +715,6 @@ class JcePureCrypto(
         )
 
         scheme match {
-          case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm =>
-            Left(
-              EncryptionError.UnsupportedSchemeForDeterministicEncryption(
-                s"${EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm.name} does not support deterministic asymmetric/hybrid encryption"
-              )
-            )
           case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc =>
             encryptWithEciesP256HmacSha256Aes128Cbc(
               message,
@@ -855,36 +755,6 @@ class JcePureCrypto(
         )
       plaintext <-
         encrypted.encryptionAlgorithmSpec match {
-          case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm =>
-            for {
-              ecPrivateKey <- toJavaPrivateKey(
-                privateKey,
-                { case k: ECPrivateKey => Right(k) },
-                DecryptionError.InvalidEncryptionKey.apply,
-              )
-              decrypter <- Either
-                .catchOnly[GeneralSecurityException](
-                  new EciesAeadHkdfHybridDecrypt(
-                    ecPrivateKey,
-                    Array[Byte](),
-                    "HmacSha256",
-                    EllipticCurves.PointFormatType.UNCOMPRESSED,
-                    Aes128GcmDemHelper,
-                  )
-                )
-                .leftMap(err =>
-                  DecryptionError.InvalidEncryptionKey(ErrorUtil.messageWithStacktrace(err))
-                )
-              plaintext <- Either
-                .catchOnly[GeneralSecurityException](
-                  decrypter.decrypt(encrypted.ciphertext.toByteArray, Array[Byte]())
-                )
-                .leftMap(err =>
-                  DecryptionError.FailedToDecrypt(ErrorUtil.messageWithStacktrace(err))
-                )
-              message <- deserialize(ByteString.copyFrom(plaintext))
-                .leftMap(DecryptionError.FailedToDeserialize.apply)
-            } yield message
           case EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc =>
             for {
               ecPrivateKey <- toJavaPrivateKey(
@@ -991,6 +861,25 @@ class JcePureCrypto(
 
   override protected[crypto] def generateRandomBytes(length: Int): Array[Byte] =
     JceSecureRandom.generateRandomBytes(length)
+
+  private[crypto] def computeHmacWithSecretInternal(
+      secret: ByteString,
+      message: ByteString,
+      algorithm: HmacAlgorithm,
+  ): Either[HmacError, Hmac] =
+    for {
+      mac <- Either
+        .catchOnly[NoSuchAlgorithmException](
+          Mac.getInstance(algorithm.name, JceSecurityProvider.bouncyCastleProvider)
+        )
+        .leftMap(ex => UnknownHmacAlgorithm(algorithm, ex))
+      key = new SecretKeySpec(secret.toByteArray, algorithm.name)
+      _ <- Either.catchOnly[InvalidKeyException](mac.init(key)).leftMap(ex => InvalidHmacSecret(ex))
+      hmacBytes <- Either
+        .catchOnly[IllegalStateException](mac.doFinal(message.toByteArray))
+        .leftMap(ex => FailedToComputeHmac(ex))
+      hmac <- Hmac.create(ByteString.copyFrom(hmacBytes), algorithm)
+    } yield hmac
 
   override def deriveSymmetricKey(
       password: String,

@@ -47,7 +47,7 @@ import com.digitalasset.canton.participant.admin.inspection.{
   JournalGarbageCollectorControl,
   SyncStateInspection,
 }
-import com.digitalasset.canton.participant.admin.repair.RepairService
+import com.digitalasset.canton.participant.admin.repair.{CommitmentsService, RepairService}
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.protocol.ContractAuthenticator
@@ -167,7 +167,7 @@ class CantonSyncService(
     with Spanning
     with NamedLogging
     with HasCloseContext
-    with InternalStateServiceProviderImpl {
+    with InternalIndexServiceProviderImpl {
 
   private val connectionsManager = new SynchronizerConnectionsManager(
     participantId,
@@ -339,6 +339,14 @@ class CantonSyncService(
       loggerFactory,
     )
 
+  val commitmentsService: CommitmentsService = new CommitmentsService(
+    ledgerApiIndexer.asEval(TraceContext.empty),
+    parameters,
+    syncPersistentStateManager,
+    connectedSynchronizersLookup,
+    loggerFactory,
+  )
+
   val dynamicSynchronizerParameterGetter =
     new CantonDynamicSynchronizerParameterGetter(
       syncCrypto,
@@ -400,6 +408,7 @@ class CantonSyncService(
   lazy val stateInspection = new SyncStateInspection(
     syncPersistentStateManager,
     participantNodePersistentState,
+    synchronizerConnectionConfigStore,
     parameters.processingTimeouts,
     new JournalGarbageCollectorControl {
       override def disable(
@@ -427,7 +436,6 @@ class CantonSyncService(
   override def prune(
       pruneUpToInclusive: Offset,
       submissionId: LedgerSubmissionId,
-      _pruneAllDivulgedContracts: Boolean, // Canton always prunes divulged contracts ignoring this flag
   ): CompletionStage[PruningResult] =
     withNewTrace("CantonSyncService.prune") { implicit traceContext => span =>
       span.setAttribute("submission_id", submissionId)
@@ -545,7 +553,7 @@ class CantonSyncService(
         //                      is already sanity checked wrt Canton TX normalization rules
         wfTransaction <- EitherT.fromEither[FutureUnlessShutdown](
           WellFormedTransaction
-            .normalizeAndCheck(transaction, metadata, WithoutSuffixes)
+            .check(transaction, metadata, WithoutSuffixes)
             .leftMap(RoutingInternalError.IllformedTransaction.apply)
         )
         submitted <- transactionRoutingProcessor.submitTransaction(
@@ -938,7 +946,7 @@ class CantonSyncService(
             .migrateSynchronizer(
               source,
               target,
-              targetSynchronizerInfo.map(_.synchronizerId),
+              targetSynchronizerInfo.map(_.psid),
             )
             .leftMap[SyncServiceError](
               SyncServiceError.SyncServiceMigrationError(source, target.map(_.synchronizerAlias), _)
@@ -1104,7 +1112,7 @@ class CantonSyncService(
         _ = logger.debug(s"Awaiting tick at $tick from $alias for migration")
         _ <- EitherT.right(
           FutureUnlessShutdown.outcomeF(
-            syncService.timeTracker.awaitTick(tick).fold(Future.unit)(_.void)
+            syncService.timeTracker.awaitTick(tick).getOrElse(Future.unit)
           )
         )
         _ <- repairService
@@ -1157,8 +1165,9 @@ class CantonSyncService(
     val instances = Seq(
       migrationService,
       repairService,
+      commitmentsService,
       pruningProcessor,
-    ) ++ syncCrypto.ips.allSynchronizers.toSeq ++ Seq(
+      syncCrypto,
       connectionsManager,
       transactionRoutingProcessor,
       synchronizerRegistry,

@@ -11,7 +11,7 @@ import com.digitalasset.canton.RichGeneratedMessage
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.crypto.{HashPurpose, Signature, SynchronizerCryptoClient}
+import com.digitalasset.canton.crypto.{Signature, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
@@ -19,20 +19,22 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbExceptionRetryPolicy, Storage}
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.sequencing.protocol.SequencerErrors.SubmissionRequestRefused
+import com.digitalasset.canton.sequencing.protocol.SequencerErrors.{
+  Overloaded,
+  SubmissionRequestRefused,
+}
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.sequencing.traffic.{
   TrafficControlErrors,
   TrafficPurchasedSubmissionHandler,
 }
-import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.synchronizer.block.BlockSequencerStateManagerBase
 import com.digitalasset.canton.synchronizer.block.data.SequencerBlockStore
 import com.digitalasset.canton.synchronizer.block.update.BlockUpdateGeneratorImpl
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.PruningError.UnsafePruningPoint
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequest
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.BlockNotFound
@@ -148,6 +150,14 @@ class BlockSequencer(
         )
     }
 
+  private val circuitBreaker = BlockSequencerCircuitBreaker(
+    blockSequencerConfig.circuitBreaker,
+    clock,
+    metrics,
+    materializer,
+    loggerFactory,
+  )
+
   private val (killSwitchF, done) = {
     val headState = stateManager.getHeadState
     noTracingLogger.info(s"Subscribing to block source from ${headState.block.height + 1}")
@@ -182,7 +192,7 @@ class BlockSequencer(
       .async
       .via(stateManager.applyBlockUpdate(this))
       .wireTap { lastTs =>
-        metrics.block.delay.updateValue((clock.now - lastTs.value).toMillis)
+        circuitBreaker.registerLastBlockTimestamp(lastTs)
       }
     PekkoUtil.runSupervised(
       driverSource.toMat(Sink.ignore)(Keep.both),
@@ -248,28 +258,8 @@ class BlockSequencer(
 
   override def adminServices: Seq[ServerServiceDefinition] = blockOrderer.adminServices
 
-  private def signOrderingRequest[A <: HasCryptographicEvidence](
-      content: SignedContent[SubmissionRequest]
-  )(implicit
-      tc: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, SignedOrderingRequest] = {
-    val privateCrypto = cryptoApi.currentSnapshotApproximation
-    for {
-      signed <- SignedContent
-        .create(
-          cryptoApi.pureCrypto,
-          privateCrypto,
-          OrderingRequest.create(sequencerId, content, protocolVersion),
-          Some(privateCrypto.ipsSnapshot.timestamp),
-          HashPurpose.OrderingRequestSignature,
-          protocolVersion,
-        )
-        .leftMap(error => SequencerErrors.Internal(s"Could not sign ordering request: $error"))
-    } yield signed
-  }
-
   private def enforceRateLimiting(
-      request: SignedContent[SubmissionRequest]
+      request: SignedSubmissionRequest
   )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
     blockRateLimitManager
       .validateRequestAtSubmissionTime(
@@ -331,6 +321,23 @@ class BlockSequencer(
     }
   }
 
+  private def rejectSubmissionsIfOverloaded(
+      submission: SubmissionRequest
+  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+    if (circuitBreaker.shouldRejectRequests(submission))
+      EitherT.leftT(
+        Overloaded("Sequencer can't take requests because it is behind on processing events")
+      )
+    else EitherT.rightT(())
+
+  private def rejectAcknowledgementIfOverloaded()
+      : EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+    if (circuitBreaker.shouldRejectAcknowledgements)
+      EitherT.leftT(
+        Overloaded("Sequencer can't take requests because it is behind on processing events")
+      )
+    else EitherT.rightT(())
+
   override protected def sendAsyncSignedInternal(
       signedSubmission: SignedContent[SubmissionRequest]
   )(implicit
@@ -351,7 +358,11 @@ class BlockSequencer(
     )
 
     for {
+
       _ <- rejectSubmissionsBeforeOrAtSequencingTimeLowerBound()
+      _ <-
+        if (submission.isConfirmationRequest) rejectSubmissionsIfOverloaded(submission)
+        else EitherT.rightT[FutureUnlessShutdown, SequencerDeliverError](())
       // TODO(i17584): revisit the consequences of no longer enforcing that
       //  aggregated submissions with signed envelopes define a topology snapshot
       _ <- validateMaxSequencingTime(submission)
@@ -369,12 +380,11 @@ class BlockSequencer(
           s"Invoking send operation on the ledger with the following protobuf message serialized to bytes ${prettyPrinter
               .printAdHoc(submission.toProtoVersioned)}"
         )
-      signedOrderingRequest <- signOrderingRequest(signedSubmission)
       _ <- enforceRateLimiting(signedSubmission)
       _ <- EitherT(
         futureSupervisor.supervised(
           s"Sending submission request with id ${submission.messageId} from $sender to ${batch.allRecipients}"
-        )(blockOrderer.send(signedOrderingRequest).value)
+        )(blockOrderer.send(signedSubmission).value)
       ).mapK(FutureUnlessShutdown.outcomeK)
     } yield ()
   }
@@ -387,6 +397,9 @@ class BlockSequencer(
     val req = signedAcknowledgeRequest.content
     logger.debug(s"Request for member ${req.member} to acknowledge timestamp ${req.timestamp}")
     for {
+      _ <- EitherTUtil.toFutureUnlessShutdown(
+        rejectAcknowledgementIfOverloaded().leftMap(_.asGrpcError)
+      )
       _ <- EitherTUtil.toFutureUnlessShutdown(
         rejectSubmissionsBeforeOrAtSequencingTimeLowerBound().leftMap(_.asGrpcError)
       )
@@ -588,7 +601,7 @@ class BlockSequencer(
       )
   }
 
-  override def locatePruningTimestamp(index: PositiveInt)(implicit
+  override def findPruningTimestamp(index: PositiveInt)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, PruningSupportError, Option[CantonTimestamp]] =
     EitherT.leftT[FutureUnlessShutdown, Option[CantonTimestamp]](PruningError.NotSupported)
@@ -606,11 +619,14 @@ class BlockSequencer(
       _ = logger.trace(s"Storage active: ${storage.isActive}")
     } yield {
       if (!ledgerStatus.isActive) SequencerHealthStatus(isActive = false, ledgerStatus.description)
-      else
+      else if (!isStorageActive)
+        SequencerHealthStatus(isActive = false, Some("Can't connect to database"))
+      else if (circuitBreaker.shouldRejectRequests(SubmissionRequestType.ConfirmationRequest))
         SequencerHealthStatus(
-          isStorageActive,
-          if (isStorageActive) None else Some("Can't connect to database"),
+          isActive = false,
+          Some("Overloaded. Can't receive requests at the moment"),
         )
+      else SequencerHealthStatus(isActive = true, None)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
@@ -631,6 +647,7 @@ class BlockSequencer(
       ),
       AsyncCloseable("done", done, timeouts.shutdownProcessing), // Close the consumer first
       SyncCloseable("blockOrderer.close()", blockOrderer.close()),
+      SyncCloseable("cryptoApi.close()", cryptoApi.close()),
     )
   }
 
@@ -658,9 +675,11 @@ class BlockSequencer(
         // Even though it may be more recent than the TrafficConsumed timestamp of individual members,
         // we are sure that nothing has been consumed since then, because by the time we update getHeadState.block.lastTs
         // all traffic has been consumed for that block. This means we can use this timestamp to compute an updated
-        // base traffic that will be correct.
-        case LatestSafe => Some(stateManager.getHeadState.block.lastTs)
-        case LatestApproximate => Some(clock.now.max(stateManager.getHeadState.block.lastTs))
+        // base traffic that will be correct. More precisely, we take the immediate successor such that we include
+        // all the changes of that last block.
+        case LatestSafe => Some(stateManager.getHeadState.block.lastTs.immediateSuccessor)
+        case LatestApproximate =>
+          Some(clock.now.max(stateManager.getHeadState.block.lastTs.immediateSuccessor))
       }
 
       blockRateLimitManager.getStates(

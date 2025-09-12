@@ -46,11 +46,20 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
-} from 'splice-pulumi-common';
-import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  CantonBftSynchronizerNode,
+  configForSv,
+  svsConfig,
+  updateHistoryBackfillingValues,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import {
+  CloudPostgres,
+  SplicePostgres,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
+import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
@@ -110,7 +119,7 @@ export async function installNode(
     ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', ''))!
     : undefined;
 
-  const { sv, validator } = await installSvAndValidator(
+  await installSvAndValidator(
     {
       xns,
       decentralizedSynchronizerMigrationConfig,
@@ -132,6 +141,11 @@ export async function installNode(
   );
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
+
+  if (svsConfig?.scan?.externalRateLimits) {
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+  }
+
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
@@ -154,14 +168,12 @@ export async function installNode(
       },
       rateLimit: {
         scan: {
-          acs: {
-            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
-          },
+          enable: false,
         },
       },
     },
     activeVersion,
-    { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
+    { dependsOn: ingressImagePullDeps }
   );
 }
 
@@ -280,6 +292,7 @@ async function installSvAndValidator(
         },
       ]
     : [];
+  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
@@ -292,13 +305,26 @@ async function installSvAndValidator(
       skipInitialization:
         svsConfig?.synchronizer?.skipInitialization &&
         !svsConfig?.synchronizer.forceSvRunbookInitialization,
+      ...(useCantonBft
+        ? {
+            enableBftSequencer: true,
+          }
+        : {}),
     },
-    cometBFT: {
-      ...(valuesFromYamlFile.cometBFT || {}),
-      externalGovernanceKey: cometBftGovernanceKey
-        ? true
-        : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
-    },
+    ...(useCantonBft
+      ? {
+          cometBFT: {
+            enabled: false,
+          },
+        }
+      : {
+          cometBFT: {
+            ...(valuesFromYamlFile.cometBFT || {}),
+            externalGovernanceKey: cometBftGovernanceKey
+              ? true
+              : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
+          },
+        }),
     migration: {
       ...valuesFromYamlFile.migration,
       migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
@@ -374,6 +400,9 @@ async function installSvAndValidator(
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
+  const externalSequencerP2pAddress = (
+    canton.decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
+  ).externalSequencerP2pAddress;
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
@@ -382,6 +411,17 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
+    ...(useCantonBft
+      ? {
+          bftSequencers: [
+            {
+              p2pUrl: externalSequencerP2pAddress,
+              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              sequencerAddress: canton.decentralizedSynchronizer.namespaceInternalSequencerAddress,
+            },
+          ],
+        }
+      : {}),
   };
 
   const scanValuesWithFixedTokens = {
@@ -398,8 +438,7 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svAppSecret, appsPg])
-        .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : []),
+        .concat([svAppSecret, appsPg]),
     }
   );
 

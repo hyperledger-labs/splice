@@ -434,6 +434,7 @@ Services               Port         Routes
 ``validator-app``      5003         ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator``
 ``ans-web-ui``                      ``https://cns.validator.<YOUR_HOSTNAME>``
 ``validator-app``      5003         ``https://cns.validator.<YOUR_HOSTNAME>/api/validator``
+``participant``        7575         ``https://<YOUR_HOSTNAME>/api/json-api`` (optional, not required by the validator itself but if you want to access the ledger API yourself. You can change the route freely)
 ====================== ============ ===========================================================================
 
 * ``https://wallet.validator.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``validator`` namespace
@@ -756,4 +757,3 @@ values for ``splice-participant`` or ``splice-validator``:
       - name: my-extra-container
         image: busybox
         command: [ "sh", "-c", "echo 'example extra container'" ]
-
