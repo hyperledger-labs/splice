@@ -216,10 +216,10 @@ export class BQColumn {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public toPulumi(): any {
+  public toPulumi(simpleSqlTypes: boolean = false): any {
     return {
       name: this.name,
-      type: this.type.toPulumi(),
+      type: simpleSqlTypes ? this.type.toSql() : this.type.toPulumi(),
     };
   }
 
@@ -308,6 +308,7 @@ export class BQLogicalView extends BQFunction {
     dashboardsDataset: gcp.bigquery.Dataset,
     dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Table {
+
     return new gcp.bigquery.Table(
       this.name,
       {
@@ -320,6 +321,7 @@ export class BQLogicalView extends BQFunction {
             scanDataset,
             dashboardsDataset
           ),
+          useLegacySql: false,
         },
       },
       { dependsOn }
@@ -413,9 +415,7 @@ export class BQTable {
       datasetId: installInDataset.datasetId,
       tableId: this.name,
       deletionProtection,
-      schema: JSON.stringify({
-        fields: this.columns.map(col => col.toPulumi()),
-      }),
+      schema: JSON.stringify(this.columns.map(col => col.toPulumi(true))),
     });
   }
 
