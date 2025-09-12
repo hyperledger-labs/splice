@@ -6,6 +6,7 @@ import {
   BQArray,
   BQColumn,
   BQFunctionArgument,
+  BQLogicalView,
   BQProcedure,
   BQScalarFunction,
   BQStruct,
@@ -671,6 +672,10 @@ const all_stats = new BQTableFunction(
   `
 );
 
+/**
+ * Functions and procedures for the dashboards dataset: ones that are used to actually populate the data in the tables used by the dashboards.
+ */
+
 const all_days_since_genesis = new BQTableFunction(
   'all_days_since_genesis',
   [],
@@ -742,6 +747,47 @@ const fill_all_stats = new BQProcedure(
   `
 );
 
+/**
+ * Views for the dashboards dataset: auxiliary computations used by the dashboards.
+ */
+
+const monthly_burn = new BQLogicalView(
+  'monthly_burn',
+  `
+    SELECT
+        as_of_record_time as monthly_as_of_record_time,
+        SUM(daily_burn) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn
+      FROM
+        \`$$DASHBOARDS_DATASET$$.dashboards-data\`
+  `
+);
+
+const daily_unminted = new BQLogicalView(
+  'daily_unminted',
+  `
+    SELECT
+        as_of_record_time as daily_as_of_record_time,
+        unminted - LAG(unminted) OVER (
+            ORDER BY as_of_record_time
+        ) AS daily_unminted
+    FROM
+        \`$$DASHBOARDS_DATASET$$.dashboards-data\`
+  `
+);
+
+const all_data = new BQLogicalView(
+  'all_data',
+  `
+    SELECT *
+    FROM
+        \`$$DASHBOARDS_DATASET$$.dashboards-data\` computed
+        JOIN \`$$DASHBOARDS_DATASET$$.monthly_burn\` monthly_burn
+          ON computed.as_of_record_time = monthly_burn.monthly_as_of_record_time
+        JOIN \`$$DASHBOARDS_DATASET$$.daily_unminted\` daily_unminted
+          ON computed.as_of_record_time = daily_unminted.daily_as_of_record_time
+  `
+);
+
 export const allScanFunctions = [
   iso_timestamp,
   daml_prim_path,
@@ -793,7 +839,12 @@ export const computedDataTable = new BQTable('dashboards-data', [
 ]);
 
 export const allDashboardFunctions = [
+  /* Functions and routines */
   all_days_since_genesis,
   days_with_missing_stats,
   fill_all_stats,
+  /* Views */
+  monthly_burn,
+  daily_unminted,
+  all_data,
 ];
