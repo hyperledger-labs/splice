@@ -5562,6 +5562,12 @@
               "value": "/share/source/splice"
             },
             "type": "Literal"
+          },
+          "SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME": {
+            "literal": {
+              "value": "validator-runbook"
+            },
+            "type": "Literal"
           }
         },
         "fluxSource": {

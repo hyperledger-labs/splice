@@ -137,3 +137,8 @@ svs:
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true
+validators:
+  validator-runbook:
+    namespace: validator
+    partyHint: 'digitalasset-testValidator-1'
+    onboardingSecret: 'validatorsecret'
