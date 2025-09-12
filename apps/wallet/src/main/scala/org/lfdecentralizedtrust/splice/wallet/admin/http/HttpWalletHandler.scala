@@ -454,7 +454,7 @@ class HttpWalletHandler(
       )
       retryProvider.retryForClientCalls(
         "accept_app_payment",
-        s"Accept app payment request  for contract $requestCid",
+        "Accept app payment request",
         exerciseWalletAmuletAction(
           new amuletoperation.CO_AppPayment(requestCid),
           user,
