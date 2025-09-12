@@ -110,6 +110,7 @@ class DomainMigrationInitializer(
   private val domainDataRestorer = new DomainDataRestorer(
     participantAdminConnection,
     config.timeTrackerMinObservationDuration,
+    config.timeTrackerObservationLatency,
     loggerFactory,
   )
 

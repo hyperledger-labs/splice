@@ -76,6 +76,7 @@ class ValidatorAutomationService(
     initialSynchronizerTime: Option[CantonTimestamp],
     maxVettingDelay: NonNegativeFiniteDuration,
     params: SpliceParametersConfig,
+    latestPackagesOnly: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -222,6 +223,7 @@ class ValidatorAutomationService(
       scanConnection,
       triggerContext,
       maxVettingDelay,
+      latestPackagesOnly,
     )
   )
 

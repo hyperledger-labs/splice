@@ -43,7 +43,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       .withScanDisabledMiningRoundsCache()
       .withAmuletPrice(walletAmuletPrice)
 
-  override def walletAmuletPrice = SpliceUtil.damlDecimal(0.00001)
+  def coinPrice = BigDecimal(0.00001)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(coinPrice)
 
   override protected def runTokenStandardCliSanityCheck = false
 
@@ -553,6 +554,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
       numActiveValidators: Long,
       avgTps: Double,
       peakTps: Double,
+      minCoinPrice: BigDecimal,
+      maxCoinPrice: BigDecimal,
+      avgCoinPrice: BigDecimal,
   )
 
   private def parseQueryResults(result: bq.TableResult) = {
@@ -593,6 +597,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
       numActiveValidators = int("num_active_validators"),
       avgTps = float("average_tps"),
       peakTps = float("peak_tps"),
+      minCoinPrice = bd("daily_min_coin_price"),
+      maxCoinPrice = bd("daily_max_coin_price"),
+      avgCoinPrice = bd("daily_avg_coin_price"),
     )
   }
 
@@ -612,6 +619,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
         ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
         ("num_active_validators", results.numActiveValidators, validators),
+        ("daily_min_coin_price", results.minCoinPrice, coinPrice),
+        ("daily_max_coin_price", results.maxCoinPrice, coinPrice),
+        ("daily_avg_coin_price", results.avgCoinPrice, coinPrice),
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue

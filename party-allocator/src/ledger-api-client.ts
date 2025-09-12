@@ -15,7 +15,7 @@ import {
   Signature,
   SignedTransaction,
   SigningPublicKey,
-} from "canton-json-api-v2-openapi";
+} from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as crypto from "node:crypto";
 

@@ -225,6 +225,9 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
         { name: 'num_active_validators', type: 'INT64' },
         { name: 'average_tps', type: 'FLOAT64' },
         { name: 'peak_tps', type: 'FLOAT64' },
+        { name: 'daily_min_coin_price', type: 'BIGNUMERIC' },
+        { name: 'daily_max_coin_price', type: 'BIGNUMERIC' },
+        { name: 'daily_avg_coin_price', type: 'BIGNUMERIC' },
       ]),
     },
     { dependsOn: [dataset] }
