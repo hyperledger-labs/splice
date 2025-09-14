@@ -19,4 +19,5 @@ Community-Contributed Documentation
    oidc-config-okta-keycloak.rst
    docker-compose-helm-chart.rst
    helm-kubernetes-templating-tool.rst
+   keycloak-docker-canton-validator-config.rst
    
