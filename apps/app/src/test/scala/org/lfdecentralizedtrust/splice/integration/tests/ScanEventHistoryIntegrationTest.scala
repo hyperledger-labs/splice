@@ -171,14 +171,15 @@ class ScanEventHistoryIntegrationTest
       newSinceTop.take(2).map(e => EventId.updateIdFromEventId(e.eventId)).toVector
     }
 
-    // getEventById should return the update, but no verdicts while mediator is unavailable
+    // getEventById should cause 404 while the verdict store has not synced
     expectedUpdateIds.foreach { id =>
-      val ev = sv1ScanBackend.getEventById(
-        id,
-        Some(CompactJson),
-      )
-      ev.update shouldBe defined
-      ev.verdict shouldBe empty
+      val failure = Try {
+        sv1ScanBackend.getEventById(
+          id,
+          Some(CompactJson),
+        )
+      }
+      assert(failure.isFailure)
     }
 
     // Re-enable mediator connectivity and expect ingestion to resume
@@ -235,7 +236,7 @@ class ScanEventHistoryIntegrationTest
         Some(CompactJson),
       )
     }
-    failure.isSuccess shouldBe false
+    assert(failure.isFailure)
   }
 
   "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>
