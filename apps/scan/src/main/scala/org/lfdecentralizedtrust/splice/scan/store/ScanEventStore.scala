@@ -28,10 +28,18 @@ class ScanEventStore(
   type Verdict = (VerdictT, Seq[TransactionViewT])
   type Event = (Option[Verdict], Option[TreeUpdateWithMigrationId])
 
-  def getEventByUpdateId(updateId: String)(implicit tc: TraceContext): Future[Option[Event]] = {
+  def getEventByUpdateId(
+      updateId: String,
+      currentMigrationId: Long,
+  )(implicit tc: TraceContext): Future[Option[Event]] = {
     val fUpdate = updateHistory.getUpdate(updateId)
     val fVerdict = verdictStore.getVerdictByUpdateId(updateId)
     for {
+      currentCap <- resolveCurrentMigrationCap(
+        verdictStore.lastIngestedRecordTime,
+        updateHistory.lastIngestedRecordTime,
+        currentMigrationId,
+      )
       updateO <- fUpdate
       verdictO <- fVerdict
       verdictWithViewsO <- verdictO match {
@@ -39,7 +47,12 @@ class ScanEventStore(
         case None => Future.successful(None)
       }
     } yield {
-      if (updateO.isEmpty && verdictWithViewsO.isEmpty) None else Some((verdictWithViewsO, updateO))
+      val isAllowed = ScanEventStore.allowF(afterO = None, currentMigrationId, currentCap)
+      val updateAllowed = updateO.forall(u => isAllowed(u.migrationId, u.update.update.recordTime))
+      val verdictAllowed = verdictO.forall(v => isAllowed(v.migrationId, v.recordTime))
+      if (!updateAllowed || !verdictAllowed) None
+      else if (updateO.isEmpty && verdictWithViewsO.isEmpty) None
+      else Some((verdictWithViewsO, updateO))
     }
   }
 

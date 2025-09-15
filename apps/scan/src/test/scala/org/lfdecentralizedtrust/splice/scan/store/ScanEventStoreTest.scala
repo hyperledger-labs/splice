@@ -29,7 +29,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         _ <- insertVerdict(ctx.verdictStore, updateId, recordTs)
 
-        eventOpt <- ctx.eventStore.getEventByUpdateId(updateId)
+        eventOpt <- ctx.eventStore.getEventByUpdateId(updateId, domainMigrationId)
         histUpdateOpt <- ctx.updateHistory.getUpdate(updateId)
       } yield {
         val (verdictOpt, updateOpt) = eventOpt.value
@@ -72,7 +72,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           domainMigrationId,
           pageLimit,
         )
-        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2, domainMigrationId)
       } yield {
         // Expect only the first update (with a verdict) to appear for the current migration
         hasVerdict(events1, updateId1) shouldBe true
@@ -84,10 +84,8 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         events3.isEmpty shouldBe true
 
-        // But fetching by the specific update_id still returns the update
-        val (verdictO, updateO) = updateEventOpt.value
-        verdictO shouldBe None
-        updateO.map(_.update.update.updateId) shouldBe Some(updateId2)
+        // Fetching by id should be filtered as well
+        updateEventOpt.isEmpty shouldBe true
       }
     }
 
@@ -121,7 +119,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           domainMigrationId,
           pageLimit,
         )
-        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2, domainMigrationId)
       } yield {
         // Expect only the first update (with a verdict) to appear for the current migration
         hasVerdict(events1, updateId1) shouldBe true
@@ -133,10 +131,8 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         events3.isEmpty shouldBe true
 
-        // But fetching by the specific update_id still returns the event with verdict
-        val (verdictO, updateO) = updateEventOpt.value
-        updateO shouldBe None
-        verdictO.map(_._1.updateId) shouldBe Some(updateId2)
+        // Fetching by id should be filtered as well
+        updateEventOpt.isEmpty shouldBe true
       }
     }
 
@@ -217,8 +213,8 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         // after recordTs1
         events3 <- fetchEvents(ctx1.eventStore, Some((mig0, recordTs1)), mig1, pageLimit)
         // Fetch by id works across migrationIds
-        e1 <- ctx1.eventStore.getEventByUpdateId(updateId1)
-        e2 <- ctx1.eventStore.getEventByUpdateId(updateId2)
+        e1 <- ctx1.eventStore.getEventByUpdateId(updateId1, domainMigrationId)
+        e2 <- ctx1.eventStore.getEventByUpdateId(updateId2, domainMigrationId)
       } yield {
         // Cursor before ts1 should match no-cursor results
         events shouldBe events2
@@ -258,8 +254,6 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         events <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
 
-        // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
-        // byId <- ctx.eventStore.getEventByUpdateId(reassignment.updateId)
       } yield {
         hasUpdate(events, reassignment.updateId) shouldBe true
 
@@ -269,10 +263,6 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         val histUpdateOpt =
           histUpdates.find(_.update.update.updateId == reassignment.updateId)
         eventUpdateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
-
-        // val (verdictO, updateO) = byId.value
-        // verdictO shouldBe None
-        // updateO.map(_.update.update.updateId) shouldBe Some(reassignment.updateId)
       }
     }
 
@@ -289,9 +279,6 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         events <- fetchEvents(ctx.eventStore, None, domainMigrationId, pageLimit)
         histUpdates <- ctx.updateHistory.getUpdatesWithoutImportUpdates(None, pageLimit)
-
-        // currently does not provide reassignment updates, same behaviour as getUpdateByIdV2
-        // byId <- ctx.eventStore.getEventByUpdateId(reassignment.updateId)
       } yield {
         hasUpdate(events, reassignment.updateId) shouldBe true
 
@@ -301,10 +288,6 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
         val histUpdateOpt =
           histUpdates.find(_.update.update.updateId == reassignment.updateId)
         eventUpdateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
-
-        // val (verdictO, updateO) = byId.value
-        // verdictO shouldBe None
-        // updateO.map(_.update.update.updateId) shouldBe Some(reassignment.updateId)
       }
     }
 
@@ -383,7 +366,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           domainMigrationId,
           pageLimit,
         )
-        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2, domainMigrationId)
       } yield {
         hasUpdate(events1, assignment1.updateId) shouldBe true
         hasVerdict(events1, updateId2) shouldBe false
@@ -392,10 +375,8 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         events3.isEmpty shouldBe true
 
-        // Fetching by id does returns verdict
-        val (verdictO, updateO) = updateEventOpt.value
-        updateO shouldBe None
-        verdictO.map(_._1.updateId) shouldBe Some(updateId2)
+        // Fetching by id should be filtered as well
+        updateEventOpt.isEmpty shouldBe true
       }
     }
 
@@ -475,7 +456,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           domainMigrationId,
           pageLimit,
         )
-        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2)
+        updateEventOpt <- ctx.eventStore.getEventByUpdateId(updateId2, domainMigrationId)
       } yield {
         hasUpdate(events1, unassignment1.updateId) shouldBe true
         hasVerdict(events1, updateId2) shouldBe false
@@ -484,10 +465,8 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
         events3.isEmpty shouldBe true
 
-        // Fetching by id does return verdict
-        val (verdictO, updateO) = updateEventOpt.value
-        updateO shouldBe None
-        verdictO.map(_._1.updateId) shouldBe Some(updateId2)
+        // Fetching by id should be filtered as well
+        updateEventOpt.isEmpty shouldBe true
       }
     }
 

@@ -833,7 +833,10 @@ class HttpScanHandler(
   ): Future[Either[definitions.ErrorResponse, definitions.EventHistoryItem]] = {
     implicit val tc = extracted
     for {
-      eventO <- eventStore.getEventByUpdateId(updateId)
+      eventO <- eventStore.getEventByUpdateId(
+        updateId,
+        store.updateHistory.domainMigrationInfo.currentMigrationId,
+      )
     } yield {
       eventO match {
         case None => Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
