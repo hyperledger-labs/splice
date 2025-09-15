@@ -156,7 +156,18 @@ class TokenStandardTransferIntegrationTest
         }
       }
 
-      // TODO(#2255): check the exact balances once the wallet backend supports it
+      // Thanks for zero fees we can check the exact balances w/o complex fee calculations.
+      clue("Check the exact balances of alice ") {
+        val balances = aliceWalletClient.balance()
+        balances.unlockedQty shouldBe BigDecimal(19980.0)
+        balances.lockedQty shouldBe BigDecimal(10.0)
+      }
+
+      clue("Check the exact balances of bob ") {
+        val balances = bobWalletClient.balance()
+        balances.unlockedQty shouldBe BigDecimal(10.0)
+        balances.lockedQty shouldBe BigDecimal(0.0)
+      }
 
       checkTxHistory(
         aliceWalletClient,

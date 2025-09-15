@@ -36,14 +36,22 @@ object TopupUtil {
     .synchronizerFees(topupParameters.topupAmount, extraTrafficPrice, amuletPrice)
     ._2
 
-  def currentWalletBalance(scanConnection: ScanConnection, store: UserWalletStore)(implicit
+  private def currentWalletBalance(scanConnection: ScanConnection, store: UserWalletStore)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[BigDecimal] = for {
     latestRound <- scanConnection.getLatestOpenMiningRound()
     roundNum = latestRound.payload.round.number
-    walletBalance <- store.getAmuletBalanceWithHoldingFees(roundNum).map(_._1)
+    walletBalance <- store
+      .getAmuletBalanceWithHoldingFees(
+        roundNum,
+        // Note we are taking the conservative approach here to always deduct holding fees to avoid
+        // attempting to top-up when we don't have the funds.
+        // TODO(#2257): switch the param once the holding fees change landed on MainNet
+        deductHoldingFees = true,
+      )
+      .map(_._1)
   } yield walletBalance
 
   def hasSufficientFundsForTopup(
