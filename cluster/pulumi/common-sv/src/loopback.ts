@@ -18,7 +18,10 @@ export function installSvLoopback(namespace: ExactNamespace): pulumi.Resource[] 
   return installLoopback(namespace, true);
 }
 
-export function installLoopback(namespace: ExactNamespace, cometbft: boolean = false): pulumi.Resource[] {
+export function installLoopback(
+  namespace: ExactNamespace,
+  cometbft: boolean = false
+): pulumi.Resource[] {
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
@@ -127,7 +130,9 @@ export function installLoopback(namespace: ExactNamespace, cometbft: boolean = f
     { dependsOn: [namespace.ns] }
   );
 
-  const cometBftVirtualService = cometbft ? [getCometBftVirtualService(namespace, clusterHostname)] : [];
+  const cometBftVirtualService = cometbft
+    ? [getCometBftVirtualService(namespace, clusterHostname)]
+    : [];
 
   return [serviceEntry, virtualService, ...cometBftVirtualService];
 }
