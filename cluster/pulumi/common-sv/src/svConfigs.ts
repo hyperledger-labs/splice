@@ -12,7 +12,7 @@ import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validato
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 import { StaticSvConfig } from './config';
-import { dsoSize } from './dsoConfig';
+import { dsoSize, skipExtraSvs } from './dsoConfig';
 import { configForSv, configuredExtraSvs } from './singleSvConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
@@ -457,6 +457,6 @@ export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
 // if config.yaml contains any SVs that don't match the standard sv-X pattern, we deploy them independently of DSO_SIZE
 export const coreSvsToDeploy: StaticSvConfig[] = standardSvConfigs
   .slice(0, dsoSize)
-  .concat(extraSvConfigs);
+  .concat(skipExtraSvs ? [] : extraSvConfigs);
 
 export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);

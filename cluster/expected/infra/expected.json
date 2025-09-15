@@ -441,7 +441,7 @@
           "*.validator.mock.network.canton.global",
           "*.validator1.mock.network.canton.global",
           "*.splitwell.mock.network.canton.global",
-          "*.mock.network.canton.global",
+          "*.sv.mock.network.canton.global",
           "*.sv-2.mock.network.canton.global",
           "*.sv-2-eng.mock.network.canton.global",
           "*.sv-3-eng.mock.network.canton.global",
@@ -458,13 +458,13 @@
           "*.sv-14-eng.mock.network.canton.global",
           "*.sv-15-eng.mock.network.canton.global",
           "*.sv-16-eng.mock.network.canton.global",
-          "*.sv.mock.network.canton.global",
+          "*.sv-1.mock.network.canton.global",
           "mock.global.canton.network.digitalasset.com",
           "*.mock.global.canton.network.digitalasset.com",
           "*.validator.mock.global.canton.network.digitalasset.com",
           "*.validator1.mock.global.canton.network.digitalasset.com",
           "*.splitwell.mock.global.canton.network.digitalasset.com",
-          "*.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com",
           "*.sv-2.mock.global.canton.network.digitalasset.com",
           "*.sv-2-eng.mock.global.canton.network.digitalasset.com",
           "*.sv-3-eng.mock.global.canton.network.digitalasset.com",
@@ -481,7 +481,7 @@
           "*.sv-14-eng.mock.global.canton.network.digitalasset.com",
           "*.sv-15-eng.mock.global.canton.network.digitalasset.com",
           "*.sv-16-eng.mock.global.canton.network.digitalasset.com",
-          "*.sv.mock.global.canton.network.digitalasset.com"
+          "*.sv-1.mock.global.canton.network.digitalasset.com"
         ],
         "issuerRef": {
           "name": "letsencrypt-production"
