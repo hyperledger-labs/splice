@@ -61,7 +61,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     )
   }
   private val functionsDatasetName = s"functions_$uuid"
-  private val dashboardsDatasetName = s"dasboards_$uuid"
+  private val dashboardsDatasetName = s"dashboards_$uuid"
 
   // Test data parameters
   private val mintedAppRewardsAmount = BigDecimal(0)
