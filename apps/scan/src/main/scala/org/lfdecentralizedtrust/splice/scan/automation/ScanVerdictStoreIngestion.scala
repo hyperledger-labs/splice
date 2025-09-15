@@ -28,8 +28,8 @@ import org.apache.pekko.stream.scaladsl.{Keep, Source}
 import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Failure
 
@@ -47,6 +47,7 @@ class ScanVerdictStoreIngestion(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
     prettyVerdictBatch: Pretty[Seq[v30.Verdict]],
 ) extends SourceBasedTrigger[Seq[v30.Verdict]]
     with NamedLogging {
@@ -61,10 +62,9 @@ class ScanVerdictStoreIngestion(
       this,
       grpcClientMetrics,
       context.loggerFactory,
-    )(ec)
+    )(ec, esf)
 
   override protected def source(implicit tc: TraceContext): Source[Seq[v30.Verdict], NotUsed] = {
-    val batchSize = math.max(1, config.mediatorVerdictIngestion.batchSize)
 
     def mediatorClientSource
         : Source[Seq[v30.Verdict], (KillSwitch, scala.concurrent.Future[Done])] = {
@@ -75,11 +75,12 @@ class ScanVerdictStoreIngestion(
               .maxVerdictRecordTime(migrationId)
               .map(_.getOrElse(CantonTimestamp.MinValue))
           )
-          .flatMapConcat { resumeTs =>
-            mediatorClient
-              .streamVerdicts(Some(resumeTs))
-              .groupedWithin(batchSize, config.mediatorVerdictIngestion.batchMaxWait.underlying)
-          }
+          .map(ts => Some(ts))
+          .flatMapConcat(mediatorClient.streamVerdicts)
+          .groupedWithin(
+            math.max(1, config.mediatorVerdictIngestion.batchSize),
+            config.mediatorVerdictIngestion.batchMaxWait.underlying,
+          )
 
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)
       withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }

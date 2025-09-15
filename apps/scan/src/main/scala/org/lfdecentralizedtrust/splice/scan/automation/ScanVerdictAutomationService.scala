@@ -24,6 +24,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.ExecutionContextExecutor
 import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion.prettyVerdictBatch
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 
 class ScanVerdictAutomationService(
     config: ScanAppBackendConfig,
@@ -39,6 +40,7 @@ class ScanVerdictAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: io.opentelemetry.api.trace.Tracer,
+    esf: ExecutionSequencerFactory,
 ) extends AutomationService(
       config.automation,
       clock,

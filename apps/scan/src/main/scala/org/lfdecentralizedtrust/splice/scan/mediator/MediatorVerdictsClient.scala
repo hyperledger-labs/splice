@@ -5,95 +5,64 @@ package org.lfdecentralizedtrust.splice.scan.mediator
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.stream.QueueOfferResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.discard.Implicits.*
-import com.digitalasset.canton.networking.grpc.{
-  ClientChannelBuilder,
-  ForwardingStreamObserver,
-  GrpcManagedChannel,
-}
+import com.digitalasset.canton.networking.grpc.{ClientChannelBuilder, GrpcManagedChannel}
 import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.admin.api.client.commands.MediatorInspectionCommands
-import io.grpc.Context
-import io.grpc.stub.StreamObserver
 import com.digitalasset.canton.lifecycle.HasRunOnClosing
 import org.lfdecentralizedtrust.splice.admin.api.client.{
   GrpcClientMetrics,
   GrpcMetricsClientInterceptor,
 }
 import com.digitalasset.canton.tracing.TraceContextGrpc
+import com.daml.grpc.adapter.client.pekko.ClientAdapter
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 
 import scala.concurrent.ExecutionContext
-import java.util.concurrent.Executor
 
 final class MediatorVerdictsClient(
     mediatorAdminClientConfig: com.digitalasset.canton.config.FullClientConfig,
     hasRunOnClosing: HasRunOnClosing,
     grpcClientMetrics: GrpcClientMetrics,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext)
+)(implicit ec: ExecutionContext, esf: ExecutionSequencerFactory)
     extends AutoCloseable
     with NamedLogging {
 
-  private implicit val executor: Executor = (command: Runnable) => ec.execute(command)
+  override def close(): Unit = managedChannel.close()
 
   private val managedChannel: GrpcManagedChannel = GrpcManagedChannel(
     "mediator-verdicts-client",
-    ClientChannelBuilder.createChannelBuilderToTrustedServer(mediatorAdminClientConfig).build(),
+    ClientChannelBuilder
+      .createChannelBuilderToTrustedServer(mediatorAdminClientConfig)(ec.execute(_))
+      .build(),
     hasRunOnClosing,
     logger,
   )
 
-  override def close(): Unit = managedChannel.close()
-
   def streamVerdicts(
       resumeFromTs: Option[CantonTimestamp]
   )(implicit tc: TraceContext): Source[v30.Verdict, NotUsed] = {
-    Source
-      .queue[v30.Verdict](bufferSize = 128)
-      .mapMaterializedValue { queue =>
-        val verdictObserver = new StreamObserver[v30.Verdict] {
-          override def onNext(value: v30.Verdict): Unit =
-            queue.offer(value).discard[QueueOfferResult]
-          override def onError(t: Throwable): Unit = queue.fail(t)
-          override def onCompleted(): Unit = queue.complete()
-        }
+    val req = v30.VerdictsRequest(
+      mostRecentlyReceivedRecordTime = resumeFromTs.map(_.toProtoTimestamp)
+    )
 
-        val mediatorVerdicts = MediatorInspectionCommands.MediatorVerdicts(
-          mostRecentlyReceivedRecordTimeOfRequest = resumeFromTs,
-          observer = verdictObserver,
+    val stub = TraceContextGrpc.addTraceContextToCallOptions(
+      v30.MediatorInspectionServiceGrpc
+        .stub(managedChannel.channel)
+        .withInterceptors(
+          TraceContextGrpc.clientInterceptor,
+          new GrpcMetricsClientInterceptor(grpcClientMetrics),
         )
+    )
 
-        val rawObserver = new ForwardingStreamObserver[v30.VerdictsResponse, v30.Verdict](
-          verdictObserver,
-          mediatorVerdicts.extractResults,
-        )
-
-        val svc = mediatorVerdicts
-          .createService(managedChannel.channel)
-          .withInterceptors(
-            TraceContextGrpc.clientInterceptor,
-            new GrpcMetricsClientInterceptor(grpcClientMetrics),
-          )
-        val ctx = Context.current().withCancellation()
-        mediatorVerdicts.createRequestInternal() match {
-          case Right(req) =>
-            ctx.run(() =>
-              TraceContextGrpc.withGrpcContext(tc) {
-                mediatorVerdicts.doRequest(svc, req, rawObserver)
-              }
-            )
-          case Left(err) => queue.fail(new IllegalArgumentException(err))
-        }
-        ctx
-      }
-      .watchTermination() { (ctx, done) =>
-        done.onComplete(_ => ctx.cancel(io.grpc.Status.CANCELLED.asException()))(ec)
-        NotUsed
-      }
+    ClientAdapter
+      .serverStreaming(
+        req,
+        stub.verdicts,
+      )
+      .mapConcat(_.verdict)
       .mapMaterializedValue(_ => NotUsed)
   }
 }
