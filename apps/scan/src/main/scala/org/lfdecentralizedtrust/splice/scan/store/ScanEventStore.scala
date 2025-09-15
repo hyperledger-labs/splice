@@ -73,33 +73,21 @@ class ScanEventStore(
       def keyVerdict(v: VerdictT) = (v.migrationId, v.recordTime)
       def keyUpdate(u: TreeUpdateWithMigrationId) = (u.migrationId, u.update.update.recordTime)
 
-      // For the currentMigrationId we expect data to be present in both tables
-      // In case data in either table is missing for currentMigrationId, no events would be returned
-      val capO: Option[CantonTimestamp] = (maxVerdictO, maxUpdateO) match {
-        case (Some(v), Some(u)) => Some(if (v < u) v else u)
-        case _ => Some(CantonTimestamp.MinValue)
-      }
+      val currentMigrationCap: Option[CantonTimestamp] = getCurrentMigrationCap(
+        maxVerdictO,
+        maxUpdateO,
+      )
 
-      def allow(mig: Long, rt: CantonTimestamp): Boolean = {
-        afterO match {
-          case Some((afterMig, afterRt)) if mig == afterMig =>
-            if (mig < currentMigrationId) rt > afterRt
-            else rt > afterRt && capO.forall(rt <= _)
-          case _ if mig < currentMigrationId =>
-            // For prior migrations, stream everything in order
-            rt > CantonTimestamp.MinValue
-          case _ =>
-            rt > CantonTimestamp.MinValue && capO.forall(rt <= _)
-        }
-      }
+      val isAllowed: (Long, CantonTimestamp) => Boolean =
+        allow(afterO, currentMigrationId, currentMigrationCap)
 
       val verdictByKey: Map[(Long, CantonTimestamp), Verdict] = verdicts
-        .filter(v => allow(v.migrationId, v.recordTime))
+        .filter(v => isAllowed(v.migrationId, v.recordTime))
         .map(v => keyVerdict(v) -> (v -> viewsByVerdictId.getOrElse(v.rowId, Seq.empty)))
         .toMap
 
       val updateByKey: Map[(Long, CantonTimestamp), TreeUpdateWithMigrationId] = updates
-        .filter(u => allow(u.migrationId, u.update.update.recordTime))
+        .filter(u => isAllowed(u.migrationId, u.update.update.recordTime))
         .map(u => keyUpdate(u) -> u)
         .toMap
 
@@ -119,30 +107,19 @@ class ScanEventStore(
       currentMigrationId: Long,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[Event]] = {
-    val capO: Option[CantonTimestamp] =
-      (verdictStore.lastIngestedRecordTime, updateHistory.lastIngestedRecordTime) match {
-        case (Some(v), Some(u)) => Some(if (v < u) v else u)
-        case _ => None
-      }
+    val currentMigrationCap: Option[CantonTimestamp] = getCurrentMigrationCap(
+      verdictStore.lastIngestedRecordTime,
+      updateHistory.lastIngestedRecordTime,
+    )
 
     afterO match {
-      case Some((afterMig, _)) if afterMig == currentMigrationId && capO.isEmpty =>
+      case Some((afterMig, _)) if afterMig == currentMigrationId && currentMigrationCap.isEmpty =>
         // fall back to reading max recordTime from DB, if the in-memory refs
         // are not initialized, which may happen if there has been no ingestion
         getEventsReference(afterO, currentMigrationId, limit)
       case _ =>
-        def allow(mig: Long, rt: CantonTimestamp): Boolean = {
-          afterO match {
-            case Some((afterMig, afterRt)) if mig == afterMig =>
-              if (mig < currentMigrationId) rt > afterRt
-              else rt > afterRt && capO.forall(rt <= _)
-            case _ if mig < currentMigrationId =>
-              // For prior migrations, stream everything in order
-              rt > CantonTimestamp.MinValue
-            case _ =>
-              rt > CantonTimestamp.MinValue && capO.forall(rt <= _)
-          }
-        }
+        val isAllowed: (Long, CantonTimestamp) => Boolean =
+          allow(afterO, currentMigrationId, currentMigrationCap)
 
         val verdictsF = verdictStore.listVerdicts(
           afterO = afterO,
@@ -153,7 +130,7 @@ class ScanEventStore(
 
         for {
           verdicts <- verdictsF
-          cappedVerdicts = verdicts.filter(v => allow(v.migrationId, v.recordTime))
+          cappedVerdicts = verdicts.filter(v => isAllowed(v.migrationId, v.recordTime))
           // Fetch views only for filtered verdicts
           verdictsWithViews <- Future.traverse(cappedVerdicts)(v =>
             verdictStore.listTransactionViews(v.rowId).map(views => v -> views)
@@ -167,7 +144,7 @@ class ScanEventStore(
             }
 
           val filteredUpdates =
-            updatesAll.filter(u => allow(u.migrationId, u.update.update.recordTime))
+            updatesAll.filter(u => isAllowed(u.migrationId, u.update.update.recordTime))
 
           val mergedSorted = {
             val fromUpdates = filteredUpdates.iterator.foldLeft(
@@ -193,5 +170,32 @@ class ScanEventStore(
             .toSeq
         }
     }
+  }
+
+  private def allow(
+      afterO: Option[(Long, CantonTimestamp)],
+      currentMigrationId: Long,
+      currentMigrationCap: Option[CantonTimestamp],
+  )(mig: Long, rt: CantonTimestamp): Boolean = {
+    afterO match {
+      case Some((afterMig, afterRt)) if mig == afterMig =>
+        if (mig < currentMigrationId) rt > afterRt
+        else rt > afterRt && currentMigrationCap.forall(rt <= _)
+      case _ if mig < currentMigrationId =>
+        // For prior migrations, stream everything in order
+        rt > CantonTimestamp.MinValue
+      case _ =>
+        rt > CantonTimestamp.MinValue && currentMigrationCap.forall(rt <= _)
+    }
+  }
+
+  // For the currentMigrationId we expect data to be present in both tables
+  // In case data in either table is missing for currentMigrationId, no events would be returned
+  private def getCurrentMigrationCap(
+      verdictMaxRt: Option[CantonTimestamp],
+      updateMaxRt: Option[CantonTimestamp],
+  ): Option[CantonTimestamp] = (verdictMaxRt, updateMaxRt) match {
+    case (Some(v), Some(u)) => Some(if (v < u) v else u)
+    case _ => Some(CantonTimestamp.MinValue)
   }
 }
