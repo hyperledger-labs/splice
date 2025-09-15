@@ -556,7 +556,9 @@ lazy val `party-allocator` =
           false,
         ),
       ),
-      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`token-standard-cli` / Compile / npmInstall).value,
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {
@@ -590,9 +592,15 @@ lazy val `party-allocator` =
           Some(npmRootDir.value),
         )
       },
-      Compile / compile := {
+      npmBuild := {
+        val log = streams.value.log
         npmInstall.value
-        (Compile / compile).value
+        runCommand(
+          Seq("npm", "run", "build"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
       },
     )
 

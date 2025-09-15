@@ -95,6 +95,7 @@ async function setupTopology(
     keyPair.privateKey,
   );
   const allocatePartyResponse = await client.allocateExternalParty(
+    partyHint,
     synchronizerId,
     generateTopologyResponse.topologyTransactions!.map((t) => ({
       transaction: t,
