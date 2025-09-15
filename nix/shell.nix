@@ -60,6 +60,7 @@ in pkgs.mkShell {
     python3
     python3Packages.aiohttp
     python3Packages.auth0-python
+    python3Packages.termcolor
     python3Packages.colorlog
     python3Packages.pycryptodome
     (python3Packages.datadog.overrideAttrs (old: {
