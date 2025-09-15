@@ -1,19 +1,25 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+// This is part of `common-sv` to avoid circular dependencies between `common` and `common-sv`.
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
-import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
+import {
+  isDevNet,
+  isMainNet,
+  CLUSTER_HOSTNAME,
+  DecentralizedSynchronizerUpgradeConfig,
+  ExactNamespace,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
-import { isDevNet, isMainNet } from '../../common';
-import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';
-import { CLUSTER_HOSTNAME, ExactNamespace } from './utils';
+import { allSvsToDeploy, coreSvsToDeploy } from './svConfigs';
+import { cometBFTExternalPort } from './synchronizer/cometbftConfig';
 
 export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numCoreSvsToDeploy = coreSvsToDeploy.length;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
   const port = (migration: number, node: number) => ({
     number: cometBFTExternalPort(migration, node),
@@ -67,15 +73,11 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     { dependsOn: [namespace.ns] }
   );
 
-  const svHosts = Array.from({ length: numSVs }, (_, i) =>
-    i == 0
-      ? [`sv-2.${clusterHostname}`, `*.sv-2.${clusterHostname}`]
-      : [`sv-${i + 1}-eng.${clusterHostname}`, `*.sv-${i + 1}-eng.${clusterHostname}`]
-  ).flat();
+  const svHosts = allSvsToDeploy
+    .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
+    .flat();
   const allHosts = [
     clusterHostname,
-    `sv.${clusterHostname}`,
-    `*.sv.${clusterHostname}`,
     `validator.${clusterHostname}`,
     `*.validator.${clusterHostname}`,
     `validator1.${clusterHostname}`,

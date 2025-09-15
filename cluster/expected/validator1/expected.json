@@ -191,6 +191,11 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-0-2-p2p",
+            "number": 26026,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-1-0-p2p",
             "number": 26106,
             "protocol": "TCP"
@@ -198,6 +203,11 @@
           {
             "name": "cometbft-1-1-p2p",
             "number": 26116,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-2-p2p",
+            "number": 26126,
             "protocol": "TCP"
           },
           {
@@ -211,6 +221,11 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-2-2-p2p",
+            "number": 26226,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-3-0-p2p",
             "number": 26306,
             "protocol": "TCP"
@@ -221,6 +236,11 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-3-2-p2p",
+            "number": 26326,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-4-0-p2p",
             "number": 26406,
             "protocol": "TCP"
@@ -228,6 +248,11 @@
           {
             "name": "cometbft-4-1-p2p",
             "number": 26416,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-2-p2p",
+            "number": 26426,
             "protocol": "TCP"
           }
         ],
@@ -257,8 +282,6 @@
         ],
         "hosts": [
           "mock.global.canton.network.digitalasset.com",
-          "sv.mock.global.canton.network.digitalasset.com",
-          "*.sv.mock.global.canton.network.digitalasset.com",
           "validator.mock.global.canton.network.digitalasset.com",
           "*.validator.mock.global.canton.network.digitalasset.com",
           "validator1.mock.global.canton.network.digitalasset.com",
@@ -266,7 +289,11 @@
           "splitwell.mock.global.canton.network.digitalasset.com",
           "*.splitwell.mock.global.canton.network.digitalasset.com",
           "sv-2.mock.global.canton.network.digitalasset.com",
-          "*.sv-2.mock.global.canton.network.digitalasset.com"
+          "*.sv-2.mock.global.canton.network.digitalasset.com",
+          "sv-1.mock.global.canton.network.digitalasset.com",
+          "*.sv-1.mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com"
         ],
         "http": [
           {
@@ -295,8 +322,6 @@
                 ],
                 "sniHosts": [
                   "mock.global.canton.network.digitalasset.com",
-                  "sv.mock.global.canton.network.digitalasset.com",
-                  "*.sv.mock.global.canton.network.digitalasset.com",
                   "validator.mock.global.canton.network.digitalasset.com",
                   "*.validator.mock.global.canton.network.digitalasset.com",
                   "validator1.mock.global.canton.network.digitalasset.com",
@@ -304,7 +329,11 @@
                   "splitwell.mock.global.canton.network.digitalasset.com",
                   "*.splitwell.mock.global.canton.network.digitalasset.com",
                   "sv-2.mock.global.canton.network.digitalasset.com",
-                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                  "*.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sv-1.mock.global.canton.network.digitalasset.com",
+                  "*.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com"
                 ]
               }
             ],

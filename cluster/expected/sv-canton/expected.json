@@ -3378,16 +3378,16 @@
         "node": {
           "enableTimeoutCommit": false,
           "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26326",
-          "id": "5af57aa83abcec085c949323ed8538108757be9c",
+          "id": "d825622358065aea3cb3b3479cf64d172675037e",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26326,
           "keysSecret": "",
-          "privateKey": "sv-da-1-cometbft-keys-node-private-key",
+          "privateKey": "svda1-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
-            "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
-            "privateKey": "sv-da-1-cometbft-keys-validator-private-key",
-            "publicKey": "sv-da-1-cometbft-keys-validator-public-key"
+            "keyAddress": "2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7",
+            "privateKey": "svda1-cometbft-keys-validator-private-key",
+            "publicKey": "svda1-cometbft-keys-validator-public-key"
           }
         },
         "nodeName": "Digital-Asset-1",
@@ -3477,16 +3477,16 @@
         "node": {
           "enableTimeoutCommit": false,
           "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26426",
-          "id": "5af57aa83abcec085c949323ed8538108757be9c",
+          "id": "d825622358065aea3cb3b3479cf64d172675037e",
           "identifier": "global-domain-4-cometbft",
           "istioPort": 26426,
           "keysSecret": "",
-          "privateKey": "sv-da-1-cometbft-keys-node-private-key",
+          "privateKey": "svda1-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
-            "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
-            "privateKey": "sv-da-1-cometbft-keys-validator-private-key",
-            "publicKey": "sv-da-1-cometbft-keys-validator-public-key"
+            "keyAddress": "2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7",
+            "privateKey": "svda1-cometbft-keys-validator-private-key",
+            "publicKey": "svda1-cometbft-keys-validator-public-key"
           }
         },
         "nodeName": "Digital-Asset-1",
