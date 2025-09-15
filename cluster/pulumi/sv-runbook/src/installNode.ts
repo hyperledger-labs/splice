@@ -48,7 +48,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
-  installLoopback,
+  installSvLoopback,
   svsConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
@@ -107,7 +107,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
