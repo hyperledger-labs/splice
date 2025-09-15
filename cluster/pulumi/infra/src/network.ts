@@ -181,16 +181,16 @@ function clusterCertificate(
   });
 
   const certDnsNames = dnsNames
-    .map(dnsName => [
-      `${dnsName}`,
-      `*.${dnsName}`,
-      `*.validator.${dnsName}`,
-      `*.validator1.${dnsName}`,
-      `*.splitwell.${dnsName}`,
-      `*.sv.${dnsName}`,
-    ].concat(
-      svConfigs.map(sv => `*.${sv.ingressName}.${dnsName}`)
-    ))
+    .map(dnsName =>
+      [
+        `${dnsName}`,
+        `*.${dnsName}`,
+        `*.validator.${dnsName}`,
+        `*.validator1.${dnsName}`,
+        `*.splitwell.${dnsName}`,
+        `*.sv.${dnsName}`,
+      ].concat(svConfigs.map(sv => `*.${sv.ingressName}.${dnsName}`))
+    )
     .flat();
 
   return new k8s.apiextensions.CustomResource(
