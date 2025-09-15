@@ -772,20 +772,13 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
   private def hasVerdict(events: Seq[ScanEventStore#Event], updateId: String): Boolean =
     events.exists(_._1.exists(_._1.updateId == updateId))
 
-  // Wrapper that calls both reference and more optimized API and asserts equality
   private def fetchEvents(
       es: ScanEventStore,
       afterO: Option[(Long, CantonTimestamp)],
       currentMigrationId: Long,
       limit: PageLimit,
   ): Future[Seq[ScanEventStore#Event]] = {
-    for {
-      ref <- es.getEventsReference(afterO, currentMigrationId, limit)(traceContext)
-      alt <- es.getEvents(afterO, currentMigrationId, limit)(traceContext)
-    } yield {
-      ref shouldBe alt
-      ref
-    }
+    es.getEvents(afterO, currentMigrationId, limit)(traceContext)
   }
 
   private case class EventStoreCtx(
