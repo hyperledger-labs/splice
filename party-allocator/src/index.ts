@@ -251,7 +251,13 @@ async function main() {
     console.debug(`Processing batch starting at ${index}`);
     const batchSize = Math.min(config.parallelism, config.maxParties - index);
     const batch = Array.from({ length: batchSize }, (_, i) =>
-      setupParty(client, config.userId, synchronizerId, index + i, validatorPartyId),
+      setupParty(
+        client,
+        config.userId,
+        synchronizerId,
+        index + i,
+        validatorPartyId,
+      ),
     );
     await Promise.all(batch);
     index += batchSize;
@@ -260,4 +266,4 @@ async function main() {
 
 await main();
 
-export { };
+export {};

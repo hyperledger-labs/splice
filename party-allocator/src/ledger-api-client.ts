@@ -84,20 +84,22 @@ export class LedgerApiClient {
     onboardingTransactions: SignedTransaction[],
     multiHashSignatures: Signature[],
   ): Promise<void> {
-    return this.retry(`allocate external party ${partyId}`, () =>
-      this.als.run({ url: undefined }, async () => {
-        const response = await this.api.getV2PartiesParty(partyId);
-        if (response?.partyDetails?.length === 0) {
-          await this.api.postV2PartiesExternalAllocate({
-            synchronizer,
-            identityProviderId: "",
-            onboardingTransactions,
-            multiHashSignatures,
-          });
-      } else {
-        console.log(`Party id ${partyId} is already allocated`);
-      }},
-      ),
+    return this.retry(
+      `allocate external party ${partyId}`,
+      () =>
+        this.als.run({ url: undefined }, async () => {
+          const response = await this.api.getV2PartiesParty(partyId);
+          if (response?.partyDetails?.length === 0) {
+            await this.api.postV2PartiesExternalAllocate({
+              synchronizer,
+              identityProviderId: "",
+              onboardingTransactions,
+              multiHashSignatures,
+            });
+          } else {
+            console.log(`Party id ${partyId} is already allocated`);
+          }
+        }),
       120, // party allocations take forever so we also retry forever aka 2min
     );
   }
@@ -161,33 +163,51 @@ export class LedgerApiClient {
     );
   }
 
-  async grantUserRights(userId: string, actAs: string[]): Promise<GrantUserRightsResponse> {
-    const actAsRights: Right[] = actAs.map(party => {
-        const right = new Kind();
-        right.CanActAs = { value: { party } };
-        return {kind: right};
+  async grantUserRights(
+    userId: string,
+    actAs: string[],
+  ): Promise<GrantUserRightsResponse> {
+    const actAsRights: Right[] = actAs.map((party) => {
+      const right = new Kind();
+      right.CanActAs = { value: { party } };
+      return { kind: right };
     });
     return this.retry(`Grant user rights to ${userId}, actAs: ${actAs}`, () =>
-      this.als.run({url: undefined}, () =>
-        this.api.postV2UsersUserIdRights(userId, {userId: userId, identityProviderId: "", rights: actAsRights})
-      )
+      this.als.run({ url: undefined }, () =>
+        this.api.postV2UsersUserIdRights(userId, {
+          userId: userId,
+          identityProviderId: "",
+          rights: actAsRights,
+        }),
+      ),
     );
   }
 
-  async revokeUserRights(userId: string, actAs: string[]): Promise<RevokeUserRightsResponse> {
-    const actAsRights: Right[] = actAs.map(party => {
-        const right = new Kind();
-        right.CanActAs = { value: { party } };
-        return {kind: right};
+  async revokeUserRights(
+    userId: string,
+    actAs: string[],
+  ): Promise<RevokeUserRightsResponse> {
+    const actAsRights: Right[] = actAs.map((party) => {
+      const right = new Kind();
+      right.CanActAs = { value: { party } };
+      return { kind: right };
     });
     return this.retry(`Revoke user rights to ${userId}, actAs: ${actAs}`, () =>
-      this.als.run({url: undefined}, () =>
-        this.api.patchV2UsersUserIdRights(userId, {userId: userId, identityProviderId: "", rights: actAsRights})
-      )
+      this.als.run({ url: undefined }, () =>
+        this.api.patchV2UsersUserIdRights(userId, {
+          userId: userId,
+          identityProviderId: "",
+          rights: actAsRights,
+        }),
+      ),
     );
   }
 
-  async withUserRights<T>(userId: string, actAs: string[], t: () => Promise<T>): Promise<T> {
+  async withUserRights<T>(
+    userId: string,
+    actAs: string[],
+    t: () => Promise<T>,
+  ): Promise<T> {
     await this.grantUserRights(userId, actAs);
     try {
       return await t();
