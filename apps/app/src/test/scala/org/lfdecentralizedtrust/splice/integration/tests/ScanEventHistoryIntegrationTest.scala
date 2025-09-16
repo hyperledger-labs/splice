@@ -23,6 +23,7 @@ import definitions.UpdateHistoryReassignment.Event.members.{
 import scala.concurrent.duration.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.concurrent.Threading
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTest
@@ -327,11 +328,14 @@ class ScanEventHistoryIntegrationTest
       newSinceTop.take(4).map(e => EventId.updateIdFromEventId(e.eventId))
     }
 
-    // Wait for scan backend to do ingestion
+    // Wait for scan backend to begin doing ingestion
     eventually() {
       val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
-      eh.size should be >= 2
+      eh should not be empty
     }
+
+    // Wait some more to ensure we have synced both stores
+    Threading.sleep(1000)
 
     // Verify events contain all updateIds, no duplicates, and verdicts are present for each update
     val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
