@@ -31,7 +31,7 @@ async function runStacksDown() {
   const svRunbookStack = await stack('sv-runbook', 'sv-runbook', true, {});
   operations.push(downOperation(svRunbookStack, abortController));
   const validatorOperations = await startDownOperationsForValidatorStacks(abortController);
-  operations.concat(validatorOperations);
+  operations = operations.concat(validatorOperations);
   const deploymentStack = await stack('deployment', 'deployment', true, {});
   operations.push(downOperation(deploymentStack, abortController));
 
