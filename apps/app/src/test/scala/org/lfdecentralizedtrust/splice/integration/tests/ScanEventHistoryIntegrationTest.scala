@@ -28,6 +28,7 @@ import com.digitalasset.canton.config.RequireTypes.Port
 class ScanEventHistoryIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
+    with WalletTxLogTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
@@ -141,10 +142,10 @@ class ScanEventHistoryIntegrationTest
     val cursorBefore = eventuallySucceeds() { lastCursor() }
 
     // Also record wallet top event to derive updateIds for taps
-    val topBeforeO = aliceWalletClient
-      .listTransactions(beginAfterId = None, pageSize = 1)
-      .headOption
-      .map(_.eventId)
+    val topBeforeO = withoutDevNetTopups(
+      aliceWalletClient
+        .listTransactions(beginAfterId = None, pageSize = 1)
+    ).headOption.map(_.eventId)
 
     // Generate new updates while mediator ingestion is unavailable
     aliceWalletClient.tap(5)
@@ -160,7 +161,8 @@ class ScanEventHistoryIntegrationTest
 
     // Fetch the updateIds for the taps from wallet history
     val expectedUpdateIds = eventuallySucceeds() {
-      val latest = aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10)
+      val latest =
+        withoutDevNetTopups(aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10))
       val newSinceTop = topBeforeO match {
         case Some(prev) => latest.takeWhile(_.eventId != prev)
         case None => latest
@@ -203,16 +205,18 @@ class ScanEventHistoryIntegrationTest
 
     val _ = onboardAliceAndBob()
     // Get the current top wallet transaction event id (if any)
-    val topBeforeO = aliceWalletClient
-      .listTransactions(beginAfterId = None, pageSize = 1)
-      .headOption
+    val topBeforeO = withoutDevNetTopups(
+      aliceWalletClient
+        .listTransactions(beginAfterId = None, pageSize = 1)
+    ).headOption
       .map(_.eventId)
 
     // Create a new event (tap) and capture its update id from wallet transaction history
     aliceWalletClient.tap(4)
 
     val updateIdFromTap = eventuallySucceeds() {
-      val latest = aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10)
+      val latest =
+        withoutDevNetTopups(aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10))
       // Prefer the first new entry different from the previous top if available
       val candidateEventId = topBeforeO match {
         case Some(prev) =>
@@ -255,25 +259,43 @@ class ScanEventHistoryIntegrationTest
     val cursorBeforeTaps = eventuallySucceeds() { lastCursor() }
 
     // Also record wallet top eventId to derive updateIds for taps deterministically
-    val topBeforeAll = aliceWalletClient
-      .listTransactions(beginAfterId = None, pageSize = 1)
-      .headOption
-      .map(_.eventId)
+    val topBeforeAll = withoutDevNetTopups(
+      aliceWalletClient
+        .listTransactions(beginAfterId = None, pageSize = 1)
+    ).headOption.map(_.eventId)
 
     // Two taps while scan is running
     aliceWalletClient.tap(1)
     aliceWalletClient.tap(2)
 
-    // Ensure those initial taps have verdicts attached after the baseline cursor
+    // Obtain updateIds for the two initial taps from wallet history
+    val expectedFirstUpdateIds = eventuallySucceeds() {
+      val latest =
+        withoutDevNetTopups(aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10))
+      val newSinceTop = topBeforeAll match {
+        case Some(prev) => latest.takeWhile(_.eventId != prev)
+        case None => latest
+      }
+      newSinceTop.size should be >= 2
+      newSinceTop.take(2).map(e => EventId.updateIdFromEventId(e.eventId))
+    }
+
+    // Ensure those initial taps are present with verdicts after the baseline cursor
     eventually() {
       val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
-      val txItems = eventHistory.collect {
-        case item if item.update.exists {
-          case UpdateHistoryTransactionV2(_) => true; case _ => false
-        } =>
-          item
-      }
-      txItems.size should be >= 2
+      val ids = eventHistory
+        .collect {
+          case item if item.update.exists {
+                case UpdateHistoryTransactionV2(_) => true; case _ => false
+              } =>
+            item
+        }
+        .flatMap(_.update)
+        .collect {
+          case UpdateHistoryTransactionV2(tx) => tx.updateId
+          case UpdateHistoryReassignment(r) => r.updateId
+        }
+      expectedFirstUpdateIds.toSet.subsetOf(ids.toSet) shouldBe true
     }
 
     val cursorBeforeRestart = eventuallySucceeds() { lastCursor() }
@@ -294,7 +316,8 @@ class ScanEventHistoryIntegrationTest
 
     // Derive the updateIds for the four taps from wallet history
     val expectedUpdateIds = eventuallySucceeds() {
-      val latest = aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 20)
+      val latest =
+        withoutDevNetTopups(aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 20))
       val newSinceTop = topBeforeAll match {
         case Some(prev) => latest.takeWhile(_.eventId != prev)
         case None => latest
@@ -306,23 +329,34 @@ class ScanEventHistoryIntegrationTest
     // Wait for scan backend to do ingestion
     eventually() {
       val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
-      eh should not be empty
+      eh.size should be >= 2
     }
 
-    // Verify: contains all expected updateIds, no duplicates, and verdicts attached
+    // Verify events contain all updateIds, no duplicates, and verdicts are present for each update
     val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
     val txItems = eventHistory.collect {
       case item if item.update.exists {
-        case UpdateHistoryTransactionV2(_) => true; case _ => false
-      } =>
+            case UpdateHistoryTransactionV2(_) => true; case _ => false
+          } =>
         item
     }
     val ids = txItems.flatMap(_.update).collect {
       case UpdateHistoryTransactionV2(tx) => tx.updateId
       case UpdateHistoryReassignment(r) => r.updateId
     }
-    expectedUpdateIds.toSet.subsetOf(ids.toSet) shouldBe true
-    ids.distinct.size shouldBe ids.size // no duplicates
+    val expectedSet = expectedUpdateIds.toSet
+    val presentSet = ids.toSet
+    val missing = expectedSet.diff(presentSet)
+
+    withClue(s"Missing expected updateIds: ${missing
+        .mkString(",")} | expected=${expectedSet.size}, present=${presentSet.size}") {
+
+      missing shouldBe empty
+    }
+
+    withClue("ids should not have duplicates") {
+      ids.distinct.size shouldBe ids.size
+    }
   }
 
   // Fetch events and assert every tx update has a matching verdict
