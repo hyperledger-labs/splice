@@ -3,12 +3,16 @@
 import {
   Command,
   createConfiguration,
+  CreatedEvent,
   DeduplicationPeriod2,
   DefaultApi,
   DisclosedContract,
+  Filters,
   GenerateExternalPartyTopologyResponse,
+  GetActiveContractsRequest,
   GrantUserRightsResponse,
   HttpAuthAuthentication,
+  IdentifierFilter,
   Kind,
   RequestContext,
   ResponseContext,
@@ -161,6 +165,45 @@ export class LedgerApiClient {
           },
         }),
       ),
+    );
+  }
+
+  async queryContracts(
+    parties: string[],
+    templateIds: string[],
+  ): Promise<CreatedEvent[]> {
+    const ledgerEnd = (
+      await this.als.run({ url: undefined }, () =>
+        this.api.getV2StateLedgerEnd(),
+      )
+    ).offset;
+    const toTemplateFilter = (t: string) => {
+      const idFilter = new IdentifierFilter();
+      idFilter.TemplateFilter = {
+        value: { includeCreatedEventBlob: false, templateId: t },
+      };
+      return idFilter;
+    };
+    const filters: Filters = {
+      cumulative: templateIds.map((t) => ({
+        identifierFilter: toTemplateFilter(t),
+      })),
+    };
+    const request: GetActiveContractsRequest = {
+      verbose: false,
+      activeAtOffset: ledgerEnd,
+      eventFormat: {
+        verbose: false,
+        filtersByParty: Object.fromEntries(parties.map((p) => [p, filters])),
+      },
+    };
+    const responses = await this.als.run({ url: undefined }, () =>
+      this.api.postV2StateActiveContracts(request),
+    );
+    return responses.flatMap((r) =>
+      r.contractEntry.JsActiveContract.createdEvent
+        ? [r.contractEntry.JsActiveContract.createdEvent]
+        : [],
     );
   }
 
