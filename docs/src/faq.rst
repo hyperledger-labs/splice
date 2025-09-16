@@ -142,7 +142,7 @@ ________
 
     Then you can add an extra limit on query `(?limit=xyz)` to the request but the result will never exceed server limit.
 
-    One alternative is the use the websockets APIs  which don't have a hard limit.
+    One alternative is the use the `websockets APIs <https://docs.digitalasset.com/build/3.3/reference/json-api/asyncapi.html>`__  which don't have a hard limit.
 
     Another alternative is to use the `PQS <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/pqs/index.html>`__
     which can simplify debugging via `Daml Shell <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/debug/daml-shell/index.html#contract-summaries>`__.
@@ -153,8 +153,6 @@ ________
     trying a transaction with multiple roots:  ``Only single root transactions can currently be externally signed``.
 
     The recommended approach is to wrap the two calls in a little helper contract. Here is `an example <https://github.com/hyperledger-labs/splice/pull/1907/files#diff-90d0ed0955b3e59b9edec55e5191d155335bae39a258dbd029b53a4e53e15db3>`__.
-
-  .. TODO(2178)::  use a permalink to point to the example once the PR is merged
 
   How can our application match registered public keys with their corresponding parties to identify the party associated with an onboarded user?
 
