@@ -35,9 +35,12 @@ function getDsoSize(): number {
 
 export const dsoSize = getDsoSize();
 
+// Used by `cnluster --sv1-only`
+export const skipExtraSvs = config.envFlag('SPLICE_SKIP_EXTRA_SVS', false);
+
 function getAllSvNamesToDeploy(): string[] {
   const coreSvs = Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
-  const extraSvs = configuredExtraSvs;
+  const extraSvs = skipExtraSvs ? [] : configuredExtraSvs;
   const svRunbook = DeploySvRunbook ? ['sv'] : [];
   return [coreSvs, extraSvs, svRunbook].flat();
 }

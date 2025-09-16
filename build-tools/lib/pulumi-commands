@@ -203,6 +203,7 @@ function _cluster_apply() {
         SPLICE_DEPLOY_SPLITWELL=false \
         SPLICE_DEPLOY_SV_RUNBOOK=false \
         SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
+        SPLICE_SKIP_EXTRA_SVS=true \
         _pulumi_automation_run_up
     else
       _info "Applying all"
