@@ -21,6 +21,7 @@ import {
 } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as crypto from "node:crypto";
+import { logger } from "./logger.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -43,11 +44,11 @@ export class LedgerApiClient {
           {
             post: async (context: ResponseContext) => {
               const url = this.als.getStore()?.url || "<unknown>";
-              console.log(`[Response] ${url} ${context.httpStatusCode}`);
+              logger.debug(`[Response] ${url} ${context.httpStatusCode}`);
               return context;
             },
             pre: async (context: RequestContext) => {
-              console.log(`[Request] ${context.getUrl()}`);
+              logger.debug(`[Request] ${context.getUrl()}`);
               const store = this.als.getStore();
               if (store) {
                 store.url = context.getUrl();
@@ -97,7 +98,7 @@ export class LedgerApiClient {
               multiHashSignatures,
             });
           } else {
-            console.log(`Party id ${partyId} is already allocated`);
+            logger.info(`Party id ${partyId} is already allocated`);
           }
         }),
       120, // party allocations take forever so we also retry forever aka 2min
@@ -228,14 +229,16 @@ export class LedgerApiClient {
       try {
         return await task();
       } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : JSON.stringify(e);
         if (attempt < maxRetries) {
-          const errorMessage =
-            e instanceof Error ? e.message : JSON.stringify(e);
-          console.error(
-            `Task ${description} failed after ${attempt} attempts: ${errorMessage}`,
+          logger.info(
+            `Task ${description} failed after ${attempt} attempts (max ${maxRetries}): ${errorMessage}`,
           );
           await delay(delayMs);
         } else {
+          logger.error(
+            `Task ${description} failed after ${attempt} attempts, giving up: ${errorMessage}`,
+          );
           throw e;
         }
       }
