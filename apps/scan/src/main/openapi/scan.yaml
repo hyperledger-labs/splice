@@ -1560,7 +1560,8 @@ paths:
       operationId: "getEventHistory"
       description: |
         Returns the event history in ascending order, paged, from ledger begin or optionally starting after a record time.
-        Updates are ordered lexicographically by `(migration id, record time)`.
+        An event bears some combination of a transaction, a contract reassignment, and a verdict.
+        Events are ordered lexicographically by `(migration id, record time)`.
         For a given migration id, each event has a unique record time.
         The record time ranges of different migrations may overlap, i.e.,
         it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
@@ -1589,6 +1590,7 @@ paths:
       operationId: "getEventById"
       description: |
         Returns the event with the given update_id.
+        An event bears some combination of a transaction, a contract reassignment, and a verdict.
       parameters:
         - name: "update_id"
           in: "path"
@@ -3711,8 +3713,11 @@ components:
     EventHistoryItem:
       type: object
       description: |
-        An event history item may contain a transaction update, a verdict from mediator, or both.
-        When both are present, they have the same `update_id` and `record_time`.
+        An event history item may contain a transaction update, a verdict from a mediator, both, or a contract reassignment.
+        If an event pertains to a contract reassignment, there will be no verdict data.
+        If an event pertains to a wholly private transaction, there will only be verdict data.
+        If an event pertains to a transaction that is partially private, it may also bear verdict information for the private portions.
+        When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
