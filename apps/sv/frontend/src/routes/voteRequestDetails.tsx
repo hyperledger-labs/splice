@@ -83,7 +83,7 @@ export const VoteRequestDetails: React.FC = () => {
     url: request.reason.url,
     summary: request.reason.body,
     isVoteRequest: hasVoteRequest,
-    proposal: buildProposal(request.action),
+    proposal: buildProposal(request.action, dsoInfosQuery.data),
   } as ProposalDetails;
 
   const votingInformation: ProposalVotingInformation = {

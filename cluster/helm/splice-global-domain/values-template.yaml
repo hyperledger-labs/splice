@@ -27,7 +27,7 @@ sequencer:
     port: 5432
   resources:
     limits:
-      cpu: "4"
+      cpu: "8"
       memory: 6Gi
     requests:
       cpu: "3"

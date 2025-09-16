@@ -571,20 +571,18 @@ class WalletIntegrationTest
         sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
         val (_, cid) = actAndCheck(
           "Create TransferPreapproval",
-          aliceWalletClient.createTransferPreapproval(),
+          createTransferPreapprovalIfNotExists(aliceWalletClient),
         )(
           "Scan lookup returns TransferPreapproval",
-          inside(_) {
-            case CreateTransferPreapprovalResponse.Created(c) => {
-              val contractFromScan =
-                sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
-              contractFromScan.contractId shouldBe c
+          c => {
+            val contractFromScan =
+              sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+            contractFromScan.contractId shouldBe c
 
-              val contractFromValidatorBackend =
-                aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
-              contractFromValidatorBackend.contractId shouldBe c
-              contractFromValidatorBackend.contractId
-            }
+            val contractFromValidatorBackend =
+              aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+            contractFromValidatorBackend.contractId shouldBe c
+            contractFromValidatorBackend.contractId
           },
         )
         aliceWalletClient.createTransferPreapproval() shouldBe CreateTransferPreapprovalResponse
@@ -720,28 +718,24 @@ class WalletIntegrationTest
         aliceValidatorWalletClient.tap(10.0)
         actAndCheck(
           "Create TransferPreapproval for end user",
-          aliceWalletClient.createTransferPreapproval(),
+          createTransferPreapprovalIfNotExists(aliceWalletClient),
         )(
           "Scan lookup returns TransferPreapproval for end user",
-          inside(_) {
-            case CreateTransferPreapprovalResponse.Created(c) => {
-              val contractFromScan =
-                sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
-              contractFromScan.contractId shouldBe c
-            }
+          c => {
+            val contractFromScan =
+              sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+            contractFromScan.contractId shouldBe c
           },
         )
         actAndCheck(
           "Create TransferPreapproval for validator operator",
-          aliceValidatorWalletClient.createTransferPreapproval(),
+          createTransferPreapprovalIfNotExists(aliceValidatorWalletClient),
         )(
           "Scan lookup returns TransferPreapproval",
-          inside(_) {
-            case CreateTransferPreapprovalResponse.Created(c) => {
-              val contractFromScan =
-                sv1ScanBackend.lookupTransferPreapprovalByParty(validatorOperatorParty).value
-              contractFromScan.contractId shouldBe c
-            }
+          c => {
+            val contractFromScan =
+              sv1ScanBackend.lookupTransferPreapprovalByParty(validatorOperatorParty).value
+            contractFromScan.contractId shouldBe c
           },
         )
     }

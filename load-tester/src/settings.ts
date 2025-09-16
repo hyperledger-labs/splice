@@ -40,6 +40,11 @@ export const configSchema = z.object({
     duration: z.string().min(1),
     iterationsPerMinute: z.coerce.number().min(1),
   }),
+  adaptiveScenario: z.object({
+    enabled: z.boolean(),
+    maxVUs: z.number(),
+    duration: z.string(),
+  }),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -50,6 +55,17 @@ export default {
   ...config,
   options: {
     scenarios: {
+      ...(config.adaptiveScenario.enabled
+        ? {
+            adaptive_load: {
+              executor: 'externally-controlled',
+              vus: 1,
+              maxVUs: config.adaptiveScenario.maxVUs,
+              // How long the test lasts
+              duration: config.adaptiveScenario.duration,
+            },
+          }
+        : {}),
       generate_load: {
         executor: 'constant-arrival-rate',
 

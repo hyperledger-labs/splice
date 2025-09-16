@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import { Release } from '@pulumi/kubernetes/helm/v3';
-import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
   CLUSTER_HOSTNAME,
@@ -19,7 +17,7 @@ import {
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CometbftSynchronizerNode,
@@ -27,9 +25,11 @@ import {
   installCometBftNode,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
-} from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { Release } from '@pulumi/kubernetes/helm/v3';
+import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 
 abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource
@@ -55,6 +55,7 @@ abstract class InStackDecentralizedSynchronizerNode
   }
 
   protected installDecentralizedSynchronizer(
+    svConfig: SingleSvConfiguration,
     dbs: {
       setCoreDbNames: boolean;
       sequencerPostgres: Postgres;
@@ -70,6 +71,7 @@ abstract class InStackDecentralizedSynchronizerNode
         },
     version: CnChartVersion,
     logLevel?: LogLevel,
+    logLevelStdout?: LogLevel,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -93,6 +95,7 @@ abstract class InStackDecentralizedSynchronizerNode
         ...decentralizedSynchronizerValues,
         ...{
           logLevel: logLevel,
+          logLevelStdout: logLevelStdout,
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
             persistence: {
@@ -104,6 +107,7 @@ abstract class InStackDecentralizedSynchronizerNode
             },
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
+            additionalEnvVars: svConfig.sequencer?.additionalEnvVars,
             ...sequencerResources,
           },
           mediator: {
@@ -189,6 +193,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     onboardingName: string,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
+    disableProtection?: boolean,
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
@@ -204,6 +209,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       cometbft.enableStateSync,
       cometbft.enableTimeoutCommit,
       imagePullServiceAccountName,
+      disableProtection,
       {
         ...opts,
         parent: this,
@@ -213,6 +219,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     this.cometbft = { ...cometbft, onboardingName };
     this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
     this.installDecentralizedSynchronizer(
+      svConfig,
       dbs,
       active,
       {
@@ -222,6 +229,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       },
       version,
       svConfig.logging?.cantonLogLevel,
+      svConfig.logging?.cantonStdoutLogLevel,
       imagePullServiceAccountName,
       opts
     );
@@ -230,6 +238,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
 
 export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecentralizedSynchronizerNode {
   constructor(
+    svConfig: SingleSvConfiguration,
     migrationId: DomainMigrationIndex,
     ingressName: string,
     xns: ExactNamespace,
@@ -240,12 +249,12 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     },
     active: boolean,
     version: CnChartVersion,
-    logLevel?: LogLevel,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
     this.installDecentralizedSynchronizer(
+      svConfig,
       dbs,
       active,
       {
@@ -254,7 +263,8 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
         externalPort: 443,
       },
       version,
-      logLevel,
+      svConfig.logging?.cantonLogLevel,
+      svConfig.logging?.cantonStdoutLogLevel,
       imagePullServiceAccountName,
       opts
     );

@@ -316,7 +316,7 @@ Note that the entire command must be quoted in this case, especially if it has s
 - `damlBuild`: create `.dar` files for all Daml projects
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `amulet` to call it.
 - `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors.
-
+- `updateTestConfigForParallelRuns`: Updates the test configuration files that drive how tests are executed in parallel in CI. You need to run this when you add a new unit or integration test, and commit the changes to the test-*.log files that it saves, otherwise the static checks will fail in CI.
 Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
@@ -450,3 +450,16 @@ To make sure your lock files match CI, run the following steps:
 1. `find . -name '.daml' | xargs rm -r`
 2. `sbt compile`
 3. Check-in the updated lock file which should now match CI.
+
+## Cpu.registerObservers exception
+
+If you are encountering an exception:
+```
+Exception in thread "main" java.lang.ExceptionInInitializerError
+        at io.opentelemetry.instrumentation.runtimemetrics.java8.Cpu.registerObservers(Cpu.java:51)
+        at com.digitalasset.canton.metrics.MetricsConfig$JvmMetrics$.setup(MetricsRegistry.scala:97)
+[...]
+Caused by: java.lang.NullPointerException: Cannot invoke "jdk.internal.platform.CgroupInfo.getMountPoint()" because "anyController" is null
+        at java.base/jdk.internal.platform.cgroupv2.CgroupV2Subsystem.getInstance(CgroupV2Subsystem.java:80)
+```
+in start-canton.sh, try adding: `export ADDITIONAL_JAVA_TOOLS_OPTIONS="-XX:-UseContainerSupport"` to .envrc.private

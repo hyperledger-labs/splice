@@ -42,7 +42,8 @@ class AppUpgradeIntegrationTest
     with PostgresAroundEach
     with ProcessTestUtil
     with SplitwellTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletTxLogTestUtil {
 
   private val splitwellDarPathV1 =
     s"daml/splitwell/.daml/dist/splitwell-base.dar"
@@ -174,7 +175,7 @@ class AppUpgradeIntegrationTest
 
           val bobTxsBeforeUpgrade =
             clue("Check that bob validator can see the tap in the wallet tx history") {
-              val txs = bobValidatorWalletClient.listTransactions(None, 10)
+              val txs = withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
               inside(txs(0)) { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.amount shouldBe walletUsdToAmulet(BigDecimal(1_000_001))
               }
@@ -189,7 +190,8 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Check that bob still sees the same wallet tx history") {
-            val txsAfter = bobValidatorWalletClient.listTransactions(None, 10)
+            val txsAfter =
+              withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
             txsAfter should contain allElementsOf bobTxsBeforeUpgrade
           }
 

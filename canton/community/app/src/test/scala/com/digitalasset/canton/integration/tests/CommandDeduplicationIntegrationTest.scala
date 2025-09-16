@@ -57,11 +57,13 @@ import org.scalatest.Assertion
 
 import java.time.Duration
 import scala.Ordered.orderingToOrdered
+import scala.annotation.nowarn
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 import DeduplicationPeriod.{DeduplicationDuration, DeduplicationOffset}
 
+@nowarn("cat=deprecation")
 trait CommandDeduplicationIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
@@ -258,6 +260,9 @@ trait CommandDeduplicationIntegrationTest
 
       logger.debug("Resubmit with short deduplication duration")
       simClock.advance(java.time.Duration.ofSeconds(600))
+      // Get some event sequenced so that the ordering layer take notice of
+      // the time change for the next command submissions
+      participant1.testing.fetch_synchronizer_time(daId)
       val submissionId5 = "fifth-submission"
       submitAsync(submissionId5, DeduplicationDuration(java.time.Duration.ofSeconds(599)))
       val (completion5, _) =

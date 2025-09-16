@@ -150,6 +150,7 @@ services:
     image: "nginx:${NGINX_VERSION}"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx:/etc/nginx/includes
     ports:
       - 80:80
     depends_on:

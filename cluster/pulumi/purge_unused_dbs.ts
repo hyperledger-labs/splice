@@ -5,7 +5,7 @@ import * as gcp from '@pulumi/gcp';
 import * as automation from '@pulumi/pulumi/automation';
 import * as readline from 'readline';
 import { program } from 'commander';
-import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { stack } from './pulumi';
 import { runSvCantonForAllMigrations } from './sv-canton/pulumi';

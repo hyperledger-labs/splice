@@ -1,0 +1,30 @@
+name: Scala Test for BigQuery
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'The commit SHA to use for the build'
+        required: false
+        default: ''
+        type: string
+  schedule:
+    # wrt avoiding top of hour:
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+    - cron: '17 1 * * 1-5'
+
+jobs:
+  scala_test_bigquery:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-medium
+      test_names_file: 'test-full-class-names-bigquery.log'
+      start_canton_options: -s
+      parallelism: 1
+      test_name: bigquery
+      with_gcp_creds: true
+      # We run `npm build` in pulumi, as we run the sql-codegen from there in this test
+      pre_sbt_cmd: 'make cluster/pulumi/build'
+      commit_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha }}
+      daml_base_version: ''
+      oss_only: false
+    secrets: inherit

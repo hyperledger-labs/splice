@@ -103,6 +103,9 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     // the party is available via the scan proxy
     aliceValidatorBackend.scanProxy.getDsoParty() shouldBe dsoParty
 
+    // dso info is available on the scan proxy
+    aliceValidatorBackend.scanProxy.getDsoInfo() shouldBe sv1ScanBackend.getDsoInfo()
+
     // check that the dsoGovernance are not vetted
     aliceValidatorBackend.participantClient.topology.vetted_packages
       .list(filterParticipant = aliceValidatorBackend.participantClient.id.toProtoPrimitive)

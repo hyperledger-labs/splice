@@ -23,7 +23,7 @@ jobs:
         id: setup
         uses: ./.github/actions/tests/common_test_setup
         with:
-          test_name: static_tests
+          test_name: docs
           save_nix_cache: true
           save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           oss_only: true

@@ -80,8 +80,10 @@ object BuildCommon {
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
         scalacOptions ++= Seq(
           "-Wconf:src=src_managed/.*:silent",
+          // Silencing deprecation warnings for now for javaapi, remove when on canton-3.4
+          "-Wconf:msg=.*package command_service.*|.*CommandService.*|.*package update_service.*|.*UpdateService.*|.*transaction_filter.*|.*package data.*|.*package transaction.*&cat=deprecation:silent",
           // renable once scala is > 2.13.15 https://github.com/scala/bug/issues/13041
-//          "-Wunused:patvars",
+          // "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
           // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning
@@ -1670,7 +1672,7 @@ object BuildCommon {
       Some(workingDir),
     )
     def openApiSettings(
-        npmName: String,
+        unscopedNpmName: String,
         openApiSpec: String,
         directory: String = "openapi-ts-client",
     ): Seq[Setting[_]] = Seq(
@@ -1682,9 +1684,7 @@ object BuildCommon {
             baseDirectory.value / ".." / "common/src/main/openapi/common-external.yaml"
 
           generateOpenApiClient(
-            npmName = npmName,
-            npmModuleName = npmName,
-            npmProjectName = npmName,
+            unscopedNpmName = unscopedNpmName,
             openApiSpec = openApiSpec,
             cacheFileDependencies = Set(commonInternalOpenApiFile, commonExternalOpenApiFile),
             directory = directory,
@@ -1695,9 +1695,7 @@ object BuildCommon {
     )
 
     def generateOpenApiClient(
-        npmName: String,
-        npmModuleName: String,
-        npmProjectName: String,
+        unscopedNpmName: String,
         openApiSpec: String,
         cacheFileDependencies: Set[File] = Set.empty[File],
         directory: String,
@@ -1707,6 +1705,7 @@ object BuildCommon {
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory / directory
 
+      val npmName = s"@lfdecentralizedtrust/$unscopedNpmName"
       val openApiSpecFile = baseDirectory.value / subPath / openApiSpec
       val template = templateDirectory.value
       val outputDir = outputPrefix.fold(baseDirectory.value)(new java.io.File(_)) / directory
@@ -1722,9 +1721,9 @@ object BuildCommon {
             "-p",
             s"npmName=$npmName",
             "-p",
-            s"moduleName=$npmModuleName",
+            s"moduleName=$npmName",
             "-p",
-            s"projectName=$npmProjectName",
+            s"projectName=$npmName",
             "-p",
             "enumPropertyNaming=original",
             "-p",

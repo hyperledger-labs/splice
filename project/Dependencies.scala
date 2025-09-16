@@ -6,7 +6,7 @@ import sbt.*
 object Dependencies {
   private final val CD = CantonDependencies
 
-  lazy val scala_version = "2.13.15"
+  lazy val scala_version = "2.13.16"
 
   lazy val scalatest_version = "3.2.11"
 
@@ -36,7 +36,7 @@ object Dependencies {
     "com.daml" %% "daml-lf-validation" % CantonDependencies.daml_libraries_version
 
   lazy val pekko_http_cors =
-    "org.apache.pekko" %% "pekko-http-cors" % "1.0.0"
+    "org.apache.pekko" %% "pekko-http-cors" % CantonDependencies.pekko_http_version
 
   lazy val spray_json =
     "io.spray" %% "spray-json" % "1.3.6"

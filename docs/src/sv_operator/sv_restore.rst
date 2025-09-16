@@ -15,7 +15,7 @@ There are three ways to recover from disasters:
    network is still healthy, a :ref:`Restore from backup <sv_backup_restore>` is
    usually sufficient.
 
-#. If a full backup is unavailable but an identity backup has been
+#. If a full backup is unavailable but an identities backup has been
    created, the balance of the SV can be :ref:`recovered <sv_reonboard>` on a dedicated
    validator but the SV must be onboarded as a separate node.
 

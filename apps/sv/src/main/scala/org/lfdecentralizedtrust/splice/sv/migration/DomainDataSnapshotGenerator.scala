@@ -42,6 +42,7 @@ class DomainDataSnapshotGenerator(
     participantAdminConnection
   )
 
+  // This is the unsafe version used for disaster recovery that allows exporting at any timestamp.
   def getDomainDataSnapshot(
       timestamp: Instant,
       partyId: Option[PartyId],
@@ -68,12 +69,13 @@ class DomainDataSnapshotGenerator(
     dars,
   )
 
+  // This is the safe version used for migrations that exports at the timestamp where we pause the synchronizer.
   def getDomainMigrationSnapshot(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
     decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-    domainParamsStateTopology <- domainStateTopology
+    participantParamsState <- domainStateTopology
       .firstAuthorizedStateForTheLatestSynchronizerParametersState(
         decentralizedSynchronizer
       )
@@ -82,7 +84,7 @@ class DomainDataSnapshotGenerator(
           .withDescription("No domain state topology found")
           .asRuntimeException()
       }
-    timestamp = CantonTimestamp.tryFromInstant(domainParamsStateTopology.base.validFrom)
+    timestamp = CantonTimestamp.tryFromInstant(participantParamsState.exportTimestamp)
     _ = logger.info(s"Taking domain migration snapshot at $timestamp")
     genesisState <- sequencerAdminConnection.traverse { sequencerConnection =>
       for {
@@ -97,10 +99,12 @@ class DomainDataSnapshotGenerator(
               decentralizedSynchronizer
             )
           } yield {
-            if (sequencerDomainParameters.base.serial < domainParamsStateTopology.base.serial) {
+            if (
+              sequencerDomainParameters.base.serial < participantParamsState.currentState.base.serial
+            ) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${domainParamsStateTopology.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
+                  s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${participantParamsState.currentState.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
                 )
                 .asRuntimeException()
             }
@@ -117,7 +121,7 @@ class DomainDataSnapshotGenerator(
               .asRuntimeException()
           }
         sequencerPausedTimestamp = CantonTimestamp.tryFromInstant(
-          sequencerDomainParamsPaused.base.validFrom
+          sequencerDomainParamsPaused.exportTimestamp
         )
         _ = if (sequencerPausedTimestamp != timestamp) {
           throw Status.INTERNAL

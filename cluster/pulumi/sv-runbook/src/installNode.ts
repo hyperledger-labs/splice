@@ -25,7 +25,6 @@ import {
   validatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
-  installLoopback,
   imagePullSecret,
   CnInput,
   sequencerPruningConfig,
@@ -46,11 +45,19 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
-} from 'splice-pulumi-common';
-import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  configForSv,
+  installSvLoopback,
+  svsConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import {
+  CloudPostgres,
+  SplicePostgres,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
+import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
@@ -94,13 +101,13 @@ export async function installNode(
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE: svNamespaceStr,
+      namespace: svNamespaceStr,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -132,6 +139,11 @@ export async function installNode(
   );
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
+
+  if (svsConfig?.scan?.externalRateLimits) {
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+  }
+
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
@@ -154,9 +166,7 @@ export async function installNode(
       },
       rateLimit: {
         scan: {
-          acs: {
-            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
-          },
+          enable: false,
         },
       },
     },
@@ -378,7 +388,6 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
@@ -468,6 +477,7 @@ async function installSvAndValidator(
                 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
             },
           ]),
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
   };
 

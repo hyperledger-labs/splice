@@ -33,6 +33,7 @@ org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
 org.lfdecentralizedtrust.splice.unit.store.db.AcsJdbcTypesTest
 org.lfdecentralizedtrust.splice.util.AmuletConfigScheduleTest
 org.lfdecentralizedtrust.splice.util.PolicyTest
+org.lfdecentralizedtrust.splice.util.SpliceCircuitBreakerTest
 org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest
 org.lfdecentralizedtrust.splice.util.SpliceUtilTest
 org.lfdecentralizedtrust.splice.util.TransactionTreeExtensionsTest

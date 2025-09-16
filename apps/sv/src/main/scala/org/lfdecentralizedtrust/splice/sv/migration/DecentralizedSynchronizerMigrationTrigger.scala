@@ -10,14 +10,12 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.migration.{AcsExporter, DomainMigrationTrigger}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -85,19 +83,12 @@ final class DecentralizedSynchronizerMigrationTrigger(
   override protected def generateDump(task: DomainMigrationTrigger.Task)(implicit
       tc: TraceContext
   ): Future[DomainMigrationDump] = for {
-    _ <- ensureDomainIsPaused(task.synchronizerId)
+    _ <- SynchronizerMigrationUtil.ensureSynchronizerIsPaused(
+      participantAdminConnection,
+      task.synchronizerId,
+    )
     dump <- exportMigrationDump(task.migrationId)
   } yield dump
-
-  private def ensureDomainIsPaused(
-      decentralizedSynchronizerId: SynchronizerId
-  )(implicit tc: TraceContext): Future[TopologyResult[SynchronizerParametersState]] = for {
-    domainParamsTopologyResult <- participantAdminConnection
-      .ensureDomainParameters(
-        decentralizedSynchronizerId,
-        _.tryUpdate(confirmationRequestsMaxRate = NonNegativeInt.zero),
-      )
-  } yield domainParamsTopologyResult
 
   private def exportMigrationDump(migrationId: Long)(implicit
       ec: ExecutionContext,

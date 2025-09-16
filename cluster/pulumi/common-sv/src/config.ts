@@ -13,9 +13,10 @@ import {
   SvCometBftGovernanceKey,
   SvIdKey,
   ValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { SweepConfig } from 'splice-pulumi-common-validator';
-import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
+  RateLimitSchema,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 import { SingleSvConfiguration } from './singleSvConfig';
@@ -50,7 +51,9 @@ export interface StaticSvConfig {
   onboardingName: string;
   validatorWalletUser?: string;
   auth0ValidatorAppName: string;
+  auth0ValidatorAppClientId?: string;
   auth0SvAppName: string;
+  auth0SvAppClientId?: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
@@ -95,11 +98,11 @@ export const SvConfigSchema = z.object({
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
+          protected: z.boolean().optional(),
         })
         .optional(),
       scan: z
         .object({
-          enableImportUpdatesBackfill: z.boolean().optional(),
           rateLimit: z
             .object({
               acs: z
@@ -109,6 +112,7 @@ export const SvConfigSchema = z.object({
                 .optional(),
             })
             .optional(),
+          externalRateLimits: RateLimitSchema,
         })
         .optional(),
       synchronizer: z
@@ -133,13 +137,3 @@ export const svsConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
 // eslint-disable-next-line
 // @ts-ignore
 export const initialRound = SvConfigSchema.parse(clusterYamlConfig).initialRound;
-
-export const updateHistoryBackfillingValues = svsConfig?.scan?.enableImportUpdatesBackfill
-  ? {
-      updateHistoryBackfilling: {
-        enabled: true,
-        importUpdatesEnabled: true,
-        batchSize: 100,
-      },
-    }
-  : undefined;

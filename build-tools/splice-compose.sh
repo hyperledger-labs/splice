@@ -57,7 +57,7 @@ function _do_start_validator {
     "$@" \
       | tee -a "${SPLICE_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${SPLICE_ROOT}/log/compose.log for details"
 
-  for c in validator participant; do
+  for c in validator participant nginx; do
     docker logs -f splice-validator-${c}-1 >> "${SPLICE_ROOT}/log/compose-${c}.clog" 2>&1 &
   done
 

@@ -5,6 +5,7 @@ import {
   ActionRequiringConfirmation,
   AmuletRules_ActionRequiringConfirmation,
   DsoRules_ActionRequiringConfirmation,
+  SvInfo,
   Vote,
   VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
@@ -20,6 +21,8 @@ import {
   UpdateSvRewardWeightProposal,
   ProposalListingStatus,
   YourVoteStatus,
+  ConfigFormData,
+  ConfigChange,
 } from '../utils/types';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
@@ -84,7 +87,7 @@ export function computeYourVote(votes: Vote[], svPartyId: string | undefined): Y
   return vote ? (vote.accept ? 'accepted' : 'rejected') : 'no-vote';
 }
 
-export function buildProposal(action: ActionRequiringConfirmation): Proposal {
+export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: DsoInfo): Proposal {
   if (action.tag === 'ARC_DsoRules') {
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
@@ -92,11 +95,17 @@ export function buildProposal(action: ActionRequiringConfirmation): Proposal {
         return {
           memberToOffboard: dsoAction.value.sv,
         } as OffBoardMemberProposal;
-      case 'SRARC_UpdateSvRewardWeight':
+      case 'SRARC_UpdateSvRewardWeight': {
+        const allSvInfos = dsoInfo?.dsoRules.payload.svs.entriesArray() || [];
+        const svPartyId = dsoInfo?.svPartyId || '';
+        const currentWeight = getSvRewardWeight(allSvInfos, svPartyId);
+
         return {
           svToUpdate: dsoAction.value.svParty,
+          currentWeight: currentWeight,
           weightChange: dsoAction.value.newRewardWeight,
         } as UpdateSvRewardWeightProposal;
+      }
       case 'SRARC_GrantFeaturedAppRight':
         return {
           provider: dsoAction.value.provider,
@@ -149,4 +158,32 @@ export function getInitialExpiration(dsoInfo: DsoInfo | undefined): Dayjs {
     Math.floor(parseInt(dsoInfo.dsoRules.payload.config.voteRequestTimeout.microseconds!) / 1000),
     'milliseconds'
   );
+}
+
+/**
+ * Builds a list of config changes from the form data and filters out the ones that have not changed
+ **/
+export function configFormDataToConfigChanges(
+  formData: ConfigFormData,
+  configChanges: ConfigChange[],
+  onlyChangedFields = true
+): ConfigChange[] {
+  const changes = configChanges.map(change => {
+    const fieldState = formData[change.fieldName];
+    return {
+      fieldName: change.fieldName,
+      label: change.label,
+      currentValue: change.currentValue,
+      newValue: fieldState?.value || '',
+    } as ConfigChange;
+  });
+
+  return onlyChangedFields
+    ? changes.filter(change => change.currentValue !== change.newValue)
+    : changes;
+}
+
+export function getSvRewardWeight(svs: [string, SvInfo][], svPartyId: string): string {
+  const svInfo = svs.find(sv => sv[0] === svPartyId);
+  return svInfo ? svInfo[1].svRewardWeight : '';
 }

@@ -9,9 +9,15 @@ export interface ConfigFieldProps {
   configChange: ConfigChange;
 }
 
+export type ConfigFieldState = {
+  fieldName: string;
+  value: string;
+};
+
 export const ConfigField: React.FC<ConfigFieldProps> = props => {
   const { configChange } = props;
-  const field = useFieldContext<string>();
+  const field = useFieldContext<ConfigFieldState>();
+
   return (
     <>
       <Box
@@ -21,15 +27,20 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
           alignItems: 'center',
         }}
       >
-        <Typography variant="body1">{configChange.label}</Typography>
+        <Typography variant="body1" data-testid={`config-label-${configChange.fieldName}`}>
+          {configChange.label}
+        </Typography>
 
         <Box sx={{ width: 250 }}>
           <MuiTextField
             variant="outlined"
             size="small"
-            value={field.state.value}
+            // We choose empty string to represent fields that could be undefined because their values have not been set.
+            value={field.state.value?.value ? field.state.value.value : ''}
             onBlur={field.handleBlur}
-            onChange={e => field.handleChange(e.target.value)}
+            onChange={e =>
+              field.handleChange({ fieldName: configChange.fieldName, value: e.target.value })
+            }
             color={field.state.meta.isDefaultValue ? 'primary' : 'secondary'}
             focused={!field.state.meta.isDefaultValue}
             autoComplete="off"
@@ -37,6 +48,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
               sx: {
                 textAlign: 'right',
               },
+              'data-testid': `config-field-${configChange.fieldName}`,
             }}
           />
 
@@ -45,6 +57,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
               variant="caption"
               color="text.secondary"
               sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
+              data-testid={`config-current-value-${configChange.fieldName}`}
             >
               Current Configuration: {configChange.currentValue}
             </Typography>

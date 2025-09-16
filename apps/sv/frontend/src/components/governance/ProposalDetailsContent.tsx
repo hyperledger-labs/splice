@@ -12,13 +12,13 @@ import { PartyId, theme } from '@lfdecentralizedtrust/splice-common-frontend';
 import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Link as RouterLink } from 'react-router-dom';
 import {
-  ConfigChange,
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
   VoteStatus,
 } from '../../utils/types';
 import { ProposalVoteForm } from './ProposalVoteForm';
+import { ConfigValuesChanges } from './ConfigValuesChanges';
 
 dayjs.extend(relativeTime);
 
@@ -132,6 +132,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             {proposalDetails.action === 'SRARC_UpdateSvRewardWeight' && (
               <UpdateSvRewardWeightSection
                 svToUpdate={proposalDetails.proposal.svToUpdate}
+                currentWeight={proposalDetails.proposal.currentWeight}
                 weightChange={proposalDetails.proposal.weightChange}
               />
             )}
@@ -523,136 +524,42 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
 
 interface UpdateSvRewardWeightSectionProps {
   svToUpdate: string;
+  currentWeight: string;
   weightChange: string;
 }
 
 const UpdateSvRewardWeightSection = ({
   svToUpdate,
+  currentWeight,
   weightChange,
 }: UpdateSvRewardWeightSectionProps) => {
   return (
-    <Box
-      sx={{ py: 1 }}
-      id="proposal-details-update-sv-reward-weight-section"
-      data-testid="proposal-details-update-sv-reward-weight-section"
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-          Member
-        </Typography>
-        <Box sx={{ mb: 1 }}>
-          <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
-        </Box>
-
-        <DetailItem
-          label="Weight"
-          value={weightChange}
-          labelId="proposal-details-weight-label"
-          valueId="proposal-details-weight-value"
-        />
-      </Box>
-    </Box>
-  );
-};
-
-interface ConfigRulesChangesProps {
-  changes: ConfigChange[];
-}
-
-const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
-  return (
-    <Box
-      sx={{ py: 1 }}
-      id="proposal-details-config-changes-section"
-      data-testid="proposal-details-config-changes-section"
-    >
-      <Typography
-        variant="subtitle2"
-        color="text.secondary"
-        gutterBottom
-        sx={{ mb: 2 }}
-        data-testid="proposal-details-config-changes-section-title"
+    <>
+      <Box
+        sx={{ py: 1 }}
+        id="proposal-details-update-sv-reward-weight-section"
+        data-testid="proposal-details-update-sv-reward-weight-section"
       >
-        Proposed Changes
-      </Typography>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-        {changes.length === 0 && (
-          <Box sx={{ py: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              No changes found.
-            </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Member
+          </Typography>
+          <Box sx={{ mb: 1 }}>
+            <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
           </Box>
-        )}
-
-        {changes.map((change, index) => (
-          <Box
-            key={index}
-            sx={{ display: 'flex', alignItems: 'center', gap: 2 }}
-            data-testid="config-change"
-          >
-            <Typography
-              variant="body1"
-              sx={{ minWidth: 200 }}
-              data-testid="config-change-field-label"
-            >
-              {change.label}
-            </Typography>
-
-            <Box
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                borderRadius: 1,
-                minWidth: 80,
-                textAlign: 'center',
-              }}
-              data-testid="config-change-current-value-container"
-            >
-              {change.isId ? (
-                <PartyId partyId={`${change.currentValue}`} id="config-change-current-value" />
-              ) : (
-                <Typography
-                  variant="body2"
-                  fontFamily="monospace"
-                  data-testid="config-change-current-value"
-                >
-                  {change.currentValue}
-                </Typography>
-              )}
-            </Box>
-
-            <Typography variant="body1" sx={{ mx: 1 }}>
-              →
-            </Typography>
-
-            <Box
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                borderRadius: 1,
-                minWidth: 80,
-                textAlign: 'center',
-              }}
-              data-testid="config-change-new-value-container"
-            >
-              {change.isId ? (
-                <PartyId partyId={`${change.newValue}`} id="config-change-new-value" />
-              ) : (
-                <Typography
-                  variant="body2"
-                  fontFamily="monospace"
-                  data-testid="config-change-new-value"
-                >
-                  {change.newValue}
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        ))}
+        </Box>
       </Box>
-    </Box>
+
+      <ConfigValuesChanges
+        changes={[
+          {
+            label: 'Weight',
+            fieldName: 'svRewardWeight',
+            currentValue: currentWeight,
+            newValue: weightChange,
+          },
+        ]}
+      />
+    </>
   );
 };

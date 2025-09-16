@@ -1,15 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Output } from '@pulumi/pulumi';
-import { DecentralizedSynchronizerMigrationConfig } from 'splice-pulumi-common';
+import { DecentralizedSynchronizerMigrationConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CrossStackCometBftDecentralizedSynchronizerNode,
   CrossStackDecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   StaticCometBftConfigWithNodeName,
-} from 'splice-pulumi-common-sv';
-import { SvConfig } from 'splice-pulumi-common-sv/src/config';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
+import { Output } from '@pulumi/pulumi';
 
 export function buildCrossStackCantonDependencies(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,

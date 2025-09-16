@@ -529,7 +529,7 @@ class ConnectedSynchronizer(
         clock,
         logger,
         parameters.delayLoggingThreshold,
-        metrics.sequencerClient.handler.delay,
+        metrics.sequencerClient.handler.sequencingTimeMetrics,
       )
 
       def firstUnpersistedEventScF: FutureUnlessShutdown[SequencerCounter] =
@@ -724,10 +724,7 @@ class ConnectedSynchronizer(
       // has "caught up" on messages from the synchronizer (and so should have seen all the assignments)
       // TODO(i9009): This assumes the participant and synchronizer clocks are synchronized, which may not be the case
       _waitForReplay <- FutureUnlessShutdown.outcomeF(
-        timeTracker
-          .awaitTick(clock.now)
-          .map(_.void)
-          .getOrElse(Future.unit)
+        timeTracker.awaitTick(clock.now).getOrElse(Future.unit)
       )
 
       _params <- performUnlessClosingUSF(functionFullName)(

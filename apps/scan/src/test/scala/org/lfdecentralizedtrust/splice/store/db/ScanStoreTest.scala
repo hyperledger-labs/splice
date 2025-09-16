@@ -1830,7 +1830,6 @@ abstract class ScanStoreTest
           first <- dummyDomain.create(
             firstDsoRules,
             recordTime = recordTimeFirst,
-            packageName = "splice-dso-governance",
           )(
             store.updateHistory
           )
@@ -1838,12 +1837,10 @@ abstract class ScanStoreTest
           _ <- dummyDomain.create(
             secondDsoRules,
             recordTime = recordTimeSecond,
-            packageName = "splice-dso-governance",
           )(store.updateHistory)
           _ <- dummyDomain.create(
             thirdDsoRules,
             recordTime = recordTimeThird,
-            packageName = "splice-dso-governance",
           )(store.updateHistory)
           result <- store.lookupContractByRecordTime(
             DsoRules.COMPANION,
@@ -1870,7 +1867,6 @@ abstract class ScanStoreTest
           first <- dummyDomain.create(
             firstAmuletRules,
             recordTime = recordTimeFirst,
-            packageName = "splice-amulet",
           )(
             store.updateHistory
           )
@@ -1878,14 +1874,12 @@ abstract class ScanStoreTest
           _ <- dummyDomain.create(
             secondAmuletRules,
             recordTime = recordTimeSecond,
-            packageName = "splice-amulet",
           )(
             store.updateHistory
           )
           _ <- dummyDomain.create(
             thirdAmuletRules,
             recordTime = recordTimeThird,
-            packageName = "splice-amulet",
           )(store.updateHistory)
           result <- store.lookupContractByRecordTime(
             AmuletRules.COMPANION,

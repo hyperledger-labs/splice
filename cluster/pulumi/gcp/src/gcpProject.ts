@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { config, GcpServiceAccount } from 'splice-pulumi-common';
+import { config, GcpServiceAccount } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
 

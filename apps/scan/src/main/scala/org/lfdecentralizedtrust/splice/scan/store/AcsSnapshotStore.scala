@@ -23,6 +23,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
+import slick.dbio.DBIOAction
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
@@ -39,10 +40,10 @@ class AcsSnapshotStore(
     with AcsQueries
     with LimitHelpers
     with NamedLogging {
-
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   override val profile: JdbcProfile = storage.profile.jdbc
+  import profile.api.jdbcActionExtensionMethods
 
   private def historyId = updateHistory.historyId
 
@@ -150,6 +151,18 @@ class AcsSnapshotStore(
     }.andThen { _ =>
       AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
     }
+  }
+
+  def deleteSnapshot(
+      snapshot: AcsSnapshot
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    val statement = DBIOAction.seq(
+      sqlu"""delete from acs_snapshot where snapshot_record_time = ${snapshot.snapshotRecordTime}""",
+      sqlu"""delete from acs_snapshot_data where row_id between ${snapshot.firstRowId} and ${snapshot.lastRowId}""",
+    )
+    storage.update(statement.transactionally, "deleteSnapshot")
   }
 
   def queryAcsSnapshot(
@@ -369,7 +382,7 @@ object AcsSnapshotStore {
 
   private val holdingsTemplates =
     Vector(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID).map(
-      PackageQualifiedName(_)
+      PackageQualifiedName.getFromResources
     )
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
@@ -380,14 +393,14 @@ object AcsSnapshotStore {
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
     if (
-      PackageQualifiedName(createdEvent.getTemplateId) == PackageQualifiedName(
+      PackageQualifiedName.fromEvent(createdEvent) == PackageQualifiedName.getFromResources(
         Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
       )
     ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
       if (
-        PackageQualifiedName(createdEvent.getTemplateId) != PackageQualifiedName(
+        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName.getFromResources(
           LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
         )
       ) {

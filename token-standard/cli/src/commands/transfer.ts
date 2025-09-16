@@ -1,5 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { ExerciseCommand } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
+import dayjs from "dayjs";
+import {
+  createConfiguration,
+  ServerConfiguration,
+  DefaultApi as TransferFactoryAPI,
+} from "@lfdecentralizedtrust/transfer-instruction-openapi";
 import {
   createLedgerApiClient,
   filtersByParty,
@@ -7,13 +14,6 @@ import {
 } from "../apis/ledger-api-utils";
 import { HoldingInterface } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
-import { ExerciseCommand } from "canton-json-api-v2-openapi";
-import dayjs from "dayjs";
-import {
-  createConfiguration,
-  DefaultApi as TransferFactoryAPI,
-  ServerConfiguration,
-} from "transfer-instruction-openapi";
 
 interface TransferCommandOptions {
   sender: string;
@@ -26,6 +26,7 @@ interface TransferCommandOptions {
   instrumentId: string;
   transferFactoryRegistryUrl: string;
   userId: string;
+  reason: string;
 }
 
 export async function transfer(
@@ -42,6 +43,7 @@ export async function transfer(
       instrumentAdmin,
       instrumentId,
       transferFactoryRegistryUrl,
+      reason,
     } = opts;
     const ledgerClient = createLedgerApiClient(opts);
     const transferRegistryConfig = createConfiguration({
@@ -81,7 +83,11 @@ export async function transfer(
         requestedAt: now,
         executeBefore: now.add(24, "hour").toISOString(),
         inputHoldingCids,
-        meta: { values: {} },
+        meta: {
+          values: {
+            "splice.lfdecentralizedtrust.org/reason": reason,
+          },
+        },
       },
       extraArgs: {
         context: { values: {} },

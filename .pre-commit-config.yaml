@@ -21,7 +21,7 @@ repos:
         language: system
         require_serial: true
         pass_filenames: false
-        entry: "bash -c 'git diff --staged --diff-filter=AD --name-only --exit-code -- '**/test/**/*.scala' || sbt --client \"printTests\"' bash"
+        entry: "bash -c 'git diff --staged --diff-filter=AD --name-only --exit-code -- '**/test/**/*.scala' || sbt --client \"updateTestConfigForParallelRuns\"' bash"
         always_run: true
       - id: dars_lock
         name: dars_lock
@@ -60,7 +60,7 @@ repos:
       - id: gha_lint
         name: static check github actions
         language: system
-        entry: "actionlint"
+        entry: "scripts/actionlint.sh"
         files: '^.github/.*$'
         pass_filenames: false
       - id: check-trailing-whitespace

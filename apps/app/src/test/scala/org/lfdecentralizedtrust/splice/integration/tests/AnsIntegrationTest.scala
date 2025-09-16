@@ -24,7 +24,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
@@ -33,7 +32,7 @@ import org.slf4j.event.Level
 
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.time.temporal.ChronoUnit
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
@@ -154,19 +153,12 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           val aliceRefs = setupUser(aliceStaticRefs)
 
           requestAndPayForEntry(aliceRefs, testEntryName)
-          eventually() {
-            val entry =
-              try
-                loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
-                  sv1ScanBackend.lookupEntryByName(testEntryName),
-                  forAll(_)(_.errorMessage should include("Entry with name")),
-                )
-              catch {
-                case e: CommandFailure if e.getMessage contains "Entry with name" => fail(e)
-              }
-            entry.name shouldBe testEntryName
-            entry.user shouldBe aliceRefs.userParty.toProtoPrimitive
+          val entry = eventuallySucceeds(timeUntilSuccess = 2.minutes) {
+            sv1ScanBackend.lookupEntryByName(testEntryName)
           }
+          entry.name shouldBe testEntryName
+          entry.user shouldBe aliceRefs.userParty.toProtoPrimitive
+
         }
     }
 

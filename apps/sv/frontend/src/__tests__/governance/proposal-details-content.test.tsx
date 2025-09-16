@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import {
   ProposalDetailsContent,
@@ -8,7 +8,12 @@ import {
 } from '../../components/governance/ProposalDetailsContent';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { ProposalDetails, ProposalVote, ProposalVotingInformation } from '../../utils/types';
+import {
+  ProposalDetails,
+  ProposalVote,
+  ProposalVotingInformation,
+  UpdateSvRewardWeightProposal,
+} from '../../utils/types';
 import userEvent from '@testing-library/user-event';
 import { SvConfigProvider } from '../../utils';
 import { server, svUrl } from '../setup/setup';
@@ -260,13 +265,15 @@ describe('Proposal Details Content', () => {
   });
 
   test('should render update sv reward weight proposal details', () => {
+    const svToUpdate = 'sv2';
     const updateSvRewardWeightDetails = {
       actionName: 'Update SV Reward Weight',
       action: 'SRARC_UpdateSvRewardWeight',
       proposal: {
-        svToUpdate: 'sv2',
+        svToUpdate: svToUpdate,
+        currentWeight: '999',
         weightChange: '1000',
-      },
+      } as UpdateSvRewardWeightProposal,
     } as ProposalDetails;
 
     render(
@@ -284,18 +291,9 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Update SV Reward Weight/);
 
-    const updateSvRewardWeightSection = screen.getByTestId(
-      'proposal-details-update-sv-reward-weight-section'
-    );
-    expect(updateSvRewardWeightSection).toBeDefined();
-
-    const svToUpdate = within(updateSvRewardWeightSection).getByTestId(
-      'proposal-details-member-party-id-input'
-    );
-    expect(svToUpdate.getAttribute('value')).toBe('sv2');
-
-    const weightChange = screen.getByTestId('proposal-details-weight-value');
-    expect(weightChange.textContent).toBe('1000');
+    expect(screen.getByTestId('config-change-field-label').textContent).toBe('Weight');
+    expect(screen.getByTestId('config-change-current-value').textContent).toBe('999');
+    expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
   });
 
   test('should render amulet rules config proposal details', () => {
@@ -858,7 +856,14 @@ describe('Proposal Details > Votes & Voting', () => {
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
     expect(submitButton).toBeDefined();
 
-    await user.click(submitButton);
+    // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
+    // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
+    user.click(submitButton);
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      expect(submitButton.textContent).toMatch(/Submitting/);
+    });
 
     const submissionMessage = await screen.findByTestId('submission-message');
     expect(submissionMessage).toBeDefined();
@@ -919,14 +924,21 @@ describe('Proposal Details > Votes & Voting', () => {
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
     expect(submitButton).toBeDefined();
 
-    await user.click(submitButton);
+    // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
+    // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
+    user.click(submitButton);
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      expect(submitButton.textContent).toMatch(/Submitting/);
+    });
 
     const submissionMessage = await screen.findByTestId('submission-message');
     expect(submissionMessage).toBeDefined();
 
-    const successMessage = await screen.findByTestId('vote-submission-error');
+    const errorMessage = await screen.findByTestId('vote-submission-error');
 
-    expect(successMessage.textContent).toMatch(/Something went wrong, unable to cast vote/);
+    expect(errorMessage.textContent).toMatch(/Something went wrong, unable to cast vote/);
   });
 
   test('prevent submission if provided url is invalid', async () => {

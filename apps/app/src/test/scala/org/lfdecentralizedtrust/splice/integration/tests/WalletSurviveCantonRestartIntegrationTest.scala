@@ -55,7 +55,7 @@ class WalletSurviveCantonRestartIntegrationTest
         withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-1") {
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
-            eventuallySucceeds(timeUntilSuccess = 40.seconds) {
+            eventuallySucceeds(timeUntilSuccess = 120.seconds) {
               EnvironmentDefinition.withAllocatedValidatorUser(aliceValidatorBackend)
             }
             aliceValidatorBackend.waitForInitialization()

@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
@@ -765,7 +766,8 @@ class HttpSvHandler(
           _.exerciseValidatorOnboarding_Match(secret.secret, candidateParty.toProtoPrimitive)
         ),
       ) map (_.update)
-      _ <- dsoStoreWithIngestion.connection
+      _ <- dsoStoreWithIngestion
+        .connection(SpliceLedgerConnectionPriority.Low)
         .submit(Seq(svParty), Seq(dsoParty), cmds)
         .withSynchronizerId(dsoRules.domain)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
@@ -806,7 +808,8 @@ class HttpSvHandler(
                     svParty.toProtoPrimitive,
                   )
                 )
-                dsoStoreWithIngestion.connection
+                dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
                   .submit(actAs = Seq(svParty), readAs = Seq(dsoParty), cmd)
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(

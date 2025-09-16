@@ -5,20 +5,25 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
-import { InstalledHelmChart, installPostgresPasswordSecret } from 'splice-pulumi-common';
-import { config } from 'splice-pulumi-common/src/config';
+import {
+  InstalledHelmChart,
+  installPostgresPasswordSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import {
   Postgres,
   CloudPostgres,
   generatePassword,
   privateNetwork,
   protectCloudSql,
-} from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   ExactNamespace,
   CLUSTER_BASENAME,
   commandScriptPath,
-} from 'splice-pulumi-common/src/utils';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
+
+import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -154,6 +159,9 @@ function installDatastream(
           singleTargetDataset: {
             datasetId: pulumi.interpolate`projects/${bigQueryDataset.project}/datasets/${bigQueryDataset.datasetId}`,
           },
+          // editing dataFreshness does not alter existing BQ tables, see its
+          // docstring or https://github.com/hyperledger-labs/splice/issues/2011
+          dataFreshness: '14400s',
         },
         destinationConnectionProfile: destination.name,
       },
@@ -178,6 +186,77 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
       cluster: CLUSTER_BASENAME,
     },
   });
+}
+
+function installDashboardsDataset(): gcp.bigquery.Dataset {
+  const datasetName = 'dashboards';
+  const dataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  computedDataTable.toPulumi(
+    dataset,
+    // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
+    false
+  );
+
+  return dataset;
+}
+
+function installFunctions(
+  scanDataset: gcp.bigquery.Dataset,
+  dashboardsDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): gcp.bigquery.Dataset {
+  const datasetName = 'functions';
+  const functionsDataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  scanDataset.project.apply(project => {
+    // We don't just run allFunctions.map() because we want to sequence the creation, since every function
+    // might depend on those before it.
+    let lastResource: pulumi.Resource | undefined = undefined;
+    for (const f in allScanFunctions) {
+      lastResource = allScanFunctions[f].toPulumi(
+        project,
+        functionsDataset,
+        functionsDataset,
+        scanDataset,
+        dashboardsDataset,
+        lastResource
+          ? [lastResource]
+          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
+      );
+    }
+
+    for (const f in allDashboardFunctions) {
+      lastResource = allDashboardFunctions[f].toPulumi(
+        project,
+        dashboardsDataset,
+        functionsDataset,
+        scanDataset,
+        dashboardsDataset,
+        lastResource
+          ? [lastResource]
+          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
+      );
+    }
+  });
+
+  return functionsDataset;
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -398,6 +477,14 @@ export function configureScanBigQuery(
     passwordSecret
   );
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
-  installDatastream(postgres, sourceProfile, destinationProfile, dataset, pubRepSlots);
+  const stream = installDatastream(
+    postgres,
+    sourceProfile,
+    destinationProfile,
+    dataset,
+    pubRepSlots
+  );
+  const dashboardsDataset = installDashboardsDataset();
+  installFunctions(dataset, dashboardsDataset, [stream]);
   return;
 }

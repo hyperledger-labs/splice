@@ -15,19 +15,42 @@ There are three ways to recover from disasters:
    network is still healthy, a :ref:`Restore from backup <validator_backup_restore>` is
    usually sufficient.
 
-#. If a full backup is unavailable but an identity backup has been
+#. If a full backup is unavailable but an identities backup has been
    created, the balance of the validator can be :ref:`recovered <validator_reonboard>` on a new
    validator.
 
 #. Lastly, for network-wide failures, a more complex :ref:`Disaster recovery procedure <validator_network_dr>` is required.
 
+.. note :: A recovery of assets is **only** possible if at least **one** of the following holds:
+
+  - A recent :ref:`database backup <validator-database-backup>` is available, or:
+  - An up-to-date :ref:`identities backup <validator-identities-backup>` is available, or:
+  - The validator participant was using an :ref:`external KMS <validator-kms>` to manage its keys and the KMS still retains those keys.
+    (Note that recovering the validator from only KMS keys
+    - i.e., without an identities backup or database backup -
+    is an involved process that is not explicitly documented here.)
+
+  If neither of the above holds, it is not possible to recover the relevant participant secret keys to prove asset ownership.
 
 .. _validator_backup_restore:
 
 Restoring a validator from backups
 ++++++++++++++++++++++++++++++++++
 
-Assuming backups have been taken, the entire node can be restored from backups.
+The entire node can be restored from backups as long as **all** of the following hold:
+
+- A :ref:`database backup <validator-database-backup>` is available.
+- The database backup is less than 30 days old.
+  Due to sequencer pruning, a participant that is more than 30 days behind will be unable to catch up on the synchronizer
+  to become fully operational again.
+- If the backup was taken before the synchronizer underwent a :ref:`major upgrade <validator-upgrades>`,
+  then restoring the node from the backup will only be possible if synchronizer nodes on the old migration ID are still available.
+  If this is true, you must restore the node on the old migration ID first and can then move it through
+  the regular :ref:`migration process <validator-upgrades>` so it becomes fully operational on the new migration ID.
+
+If one of the above does not hold, it might still be possible to recover the node using the
+:ref:`re-onboarding <validator_reonboard>` procedure discussed below.
+
 The following steps can be taken to restore a node from backups:
 
 
@@ -62,24 +85,33 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 .. _validator_reonboard:
 
-Re-onboard a validator and recover balances of all users it hosts
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Recovery from an identities backup: Re-onboard a validator and recover balances of all users it hosts
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 In the case of a catastrophic failure of the validator node, some data owned by the validator and users
 it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved
-by deploying a new validator node with control over the original validator's participant keys.
+by deploying a new validator node with control over the original validator's namespace key.
+The namespace key must be provided via an identities backup file.
+It is used by the new validator for migrating the parties hosted on the original validator to the new validator.
+SVs assist this process by providing information about all contracts known to them that the migrated parties are stakeholders of.
 
-In order to be able to recover the data, you must have a backup of the identities of the
-validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
+The following steps assume that you have a backup of the identities of the
+validator, as created in the :ref:`Backup of Node Identities <validator-identities-backup>` section.
+In case you do not have such a backup but instead have a backup of the validator participant's database,
+you can :ref:`assemble an identities backup manually <validator_manual_dump>`.
 
 To recover from the identities backup, we deploy a new validator with
 some special configuration described below. Refer to either the
-docker-compose deployment instructions or the kubernetes instructions
+:ref:`docker-compose deployment instructions <validator_disaster_recovery-docker-compose-deployment>`
+or the
+:ref:`kubernetes instructions <validator_reonboard_k8s>`
 depending on which setup you chose.
 
 Once the new validator is up and running, you should be able to login as the administrator
-and see its balance. Other users hosted on the validator would need to re-onboard, but their
-coin balance and CNS entries should be recovered.
+and see its balance. Other users hosted on the validator will need to re-onboard, but their
+coin balance and CNS entries should be recovered and will accessible to users that have re-onboarded.
+
+In case of issues, please consult the :ref:`troubleshooting <validator_disaster_recovery_troubleshooting>` section below.
 
 .. warning:: This process preserves all party IDs and all contracts shared
              with the DSO party.  This means that you *must* keep
@@ -88,6 +120,8 @@ coin balance and CNS entries should be recovered.
              new onboarding secret, double check your configuration
              instead of requesting a new secret.
 
+.. _validator_reonboard_k8s:
+
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -95,8 +129,8 @@ To re-onboard a validator in a Kubernetes deployment and recover the balances of
 repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
 While doing so, please note the following:
 
-* Create a Kubernetes secret with the content of the identities dump file.
-  Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
+* Create a Kubernetes secret with the content of the identities backup file.
+  Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a backup file path, you can create the secret with the following command:
 
 .. code-block:: bash
 
@@ -124,9 +158,40 @@ To re-onboard a validator in a Docker-compose deployment and recover the balance
 
     ./start.sh -s "<SPONSOR_SV_URL>" -o "" -p <party_hint> -m "<MIGRATION_ID>" -i "<node_identities_dump_file>" -P "<new_participant_id>" -w
 
-where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
+where ``<node_identities_dump_file>`` is the path to the file containing the node identities backup, and
 ``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
 Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
+
+.. _validator_manual_dump:
+
+Obtaining an Identities Backup from a Participant Database Backup
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In case you do not have a usable identities backup but instead have a backup of the validator participant's database,
+you can assemble an identities backup manually.
+Here is one possible way to do so:
+
+#. Restore the database backup into a temporary postgres instance and deploy a temporary participant against that instance.
+
+   * See the section on :ref:`restoring a validator from backups <validator_backup_restore>` for pointers that match your deployment model.
+   * You only need to restore and scale up the participant, i.e., you can ignore the validator app and its database.
+   * In case the restored participant shuts down immediately due to failures, add the following :ref:`additional configuration <configuration_ad_hoc>`:
+
+    .. code-block:: yaml
+
+        additionalEnvVars:
+            - name: ADDITIONAL_CONFIG_EXIT_ON_FATAL_FAILURES
+              value: canton.parameters.exit-on-fatal-failures = false
+
+#. Open a :ref:`Canton console <console_access>` to the temporary participant.
+#. Run below commands in the opened console. This will store the backup into a *local* file
+   (relative to the local directory from which you opened the console) called ``identities-dump.json``.
+
+    .. literalinclude:: ../../../apps/app/src/pack/examples/recovery/manual-identities-dump.sc
+
+   Note that above commands need to be adapted if your participant is configured to store keys in an :ref:`external KMS <validator-kms>`.
+
+.. _validator_disaster_recovery_troubleshooting:
 
 Limitations and Troubleshooting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -151,29 +216,32 @@ If you still observe issues, in particular you observe
 something has likely gone wrong while importing the active contracts
 of at least one of the parties hosted on your node. To address this, you can usually:
 
-1. First make sure all parties are on a consistent node. The most
+1. First make sure all parties are hosted on the same node. The most
    common case is that either the parties are still on the old node
-   with the old participant id or they have been migrated to the new
+   with the old participant ID or they have been migrated to the new
    node. You can check by opening a :ref:`Canton console
    <console_access>` to any participant on the network (i.e., you can also ask another validator or SV operator for this information) and running the
-   following query where <namespace> is the part after the ``::`` in
-   your participant id.
+   following query where <namespace> is the part after the ``::`` in, for example, your validator party ID.
 
    .. code::
 
       val syncId = participant.synchronizers.list_connected().head.synchronizerId
       participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
 
-   If all parties are on the same node, proceed with the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node through (adjust the parameters as required for your parties):
+   If all parties are on the same node, proceed to the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node by opening a console to the new node and running the following command
+   (adjust the parameters as required for your parties):
 
    .. code::
 
-      participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((<participant-id>, <participant-permission>)), store = syncId)
+      val participantId = participant.id // ID of the new participant
+      participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
 
-2. If your parties are still on the original node that you took identity dumps from, you can use your existing dump.
-   If your parties have been migrated already, take a new dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id``
-   field in your identity dump to the participant id of the new node.
-   You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different ``<new_participant_id>``.
+2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
+   If your parties have been migrated to the new node already, take a new identities dump from the new node.
+   If the new node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant ID of the new node.
+   You can obtain the ``id`` in the correct format by, for example, running ``participant.id.toProtoPrimitive`` in a Canton console to the participant.
+   You can now take down the node to which you originally tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different participant ID prefix
+   (i.e., a different ``newParticipantIdentifier`` / ``<new_participant_id>`` depending on your deployment model).
 
 .. _validator_recover_external_party:
 
@@ -188,7 +256,7 @@ hosting it becomes unusable for whatever reason.
              recovery **must** be a **completely new validator**. An existing validator
              may brick completely due to some limitations around party
              migrations and there is no way to recover from that at
-             this point. Recovering a validator from an identity backup does not classify
+             this point. Recovering a validator from an identities backup does not classify
              as a completely new validator here. You must setup it with a completely new identity
              and a completely clean database.
              This limitation is expected to be lifted in
@@ -207,7 +275,7 @@ it on multiple nodes, you will need to adjust this.
 
 .. code::
 
-   // replace YOUR_PARTY_ID by the id of your external party
+   // replace YOUR_PARTY_ID by the ID of your external party
    val partyId = PartyId.tryFromProtoPrimitive("YOUR_PARTY_ID")
    val participantId = participant.id
    val synchronizerId = participant.synchronizers.id_of("global")
@@ -271,7 +339,7 @@ We can now check that the topology transaction got correctly applied and get the
 
 .. code::
 
-    // The detailed output will slightly vary. Make sure that you see the new participant id though.
+    // The detailed output will slightly vary. Make sure that you see the new participant ID though.
     participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
       res36: Seq[topology.ListPartyToParticipantResult] = Vector(
         ListPartyToParticipantResult(

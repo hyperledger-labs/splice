@@ -2,7 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ContractId } from '@daml/types';
-import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import {
+  ActionRequiringConfirmation,
+  VoteRequest,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ConfigFieldState } from '../components/form-components/ConfigField';
+import { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
+import { OffboardSvFormData } from '../components/forms/OffboardSvForm';
+import { GrantRevokeFeaturedAppFormData } from '../components/forms/GrantRevokeFeaturedAppForm';
+import { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
+import { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
 
 export interface OffBoardMemberProposal {
   memberToOffboard: string;
@@ -16,16 +25,30 @@ export interface UnfeatureAppProposal {
   rightContractId: string;
 }
 
+/**
+ * A config change represents a field that has been changed in a config.
+ * This could be DSO or Amulet Configs.
+ */
 export interface ConfigChange {
+  /**
+   * A unique name based on the json path of the field
+   */
   fieldName: string;
+  /**
+   * A label that can displayed to the user
+   */
   label: string;
   currentValue: string;
   newValue: string | number;
+  /**
+   * If the field is an id, e.g a party id.
+   */
   isId?: boolean;
 }
 
 export interface UpdateSvRewardWeightProposal {
   svToUpdate: string;
+  currentWeight: string;
   weightChange: string;
 }
 
@@ -126,3 +149,34 @@ export type ProposalVote = {
       reason: VoteReason;
     }
 );
+
+export type ConfigFormData = Record<string, ConfigFieldState>;
+
+export interface CommonProposalFormData {
+  action: string;
+  expiryDate: string;
+  effectiveDate: Effectivity;
+  url: string;
+  summary: string;
+}
+
+export type EffectivityType = 'custom' | 'threshold';
+
+export interface Effectivity {
+  type: EffectivityType;
+  effectiveDate: string | undefined;
+}
+
+export interface ProposalMutationArgs {
+  formData: ProposalFormData;
+  action: ActionRequiringConfirmation;
+}
+
+export type NonConfigProposalFormData =
+  | UpdateSvRewardWeightFormData
+  | OffboardSvFormData
+  | GrantRevokeFeaturedAppFormData;
+
+export type ConfigProposalFormData = SetDsoConfigCompleteFormData | SetAmuletConfigCompleteFormData;
+
+export type ProposalFormData = NonConfigProposalFormData | ConfigProposalFormData;

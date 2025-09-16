@@ -1,9 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as postgres from 'splice-pulumi-common/src/postgres';
-import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   ansDomainPrefix,
@@ -28,7 +27,6 @@ import {
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
-  installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   networkWideConfig,
@@ -40,29 +38,31 @@ import {
   SvIdKey,
   svUserIds,
   validatorOnboardingSecretName,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installSvLoopback,
   SvParticipant,
-  updateHistoryBackfillingValues,
-} from 'splice-pulumi-common-sv';
-import { svsConfig, SvConfig } from 'splice-pulumi-common-sv/src/config';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import {
   installValidatorApp,
   installValidatorSecrets,
-} from 'splice-pulumi-common-validator/src/validator';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { initialAmuletPrice } from 'splice-pulumi-common/src/initialAmuletPrice';
-import { jmxOptions } from 'splice-pulumi-common/src/jmx';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
+import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { Resource } from '@pulumi/pulumi';
 
 import {
   delegatelessAutomationExpectedTaskDuration,
   delegatelessAutomationExpiredRewardCouponBatchSize,
 } from '../../common/src/automation';
+import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
 import { installInfo } from './info';
@@ -128,7 +128,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
@@ -297,9 +297,7 @@ export async function installSvNode(
       },
       rateLimit: {
         scan: {
-          acs: {
-            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
-          },
+          enable: false,
         },
       },
     },
@@ -375,15 +373,18 @@ async function installValidator(
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
-    additionalEnvVars: bftSequencerConnection
-      ? undefined
-      : [
-          {
-            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-            value:
-              'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
-          },
-        ],
+    additionalEnvVars: [
+      ...(bftSequencerConnection
+        ? []
+        : [
+            {
+              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+              value:
+                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
+            },
+          ]),
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
+    ],
   });
 
   return validator;
@@ -581,8 +582,12 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
-    ...updateHistoryBackfillingValues,
+    additionalEnvVars: config.scanApp?.additionalEnvVars || [],
   };
+
+  if (svsConfig?.scan?.externalRateLimits) {
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+  }
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
     // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft

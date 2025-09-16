@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
   CO_SubscriptionAcceptAndMakeInitialPayment,
   CO_SubscriptionMakePayment,
   CO_Tap,
+  CO_TransferPreapprovalSend,
   ExtAmuletOperation,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
@@ -56,17 +57,17 @@ import org.lfdecentralizedtrust.splice.history.{
   AmuletRules_CreateTransferPreapproval,
   AnsRules_CollectEntryRenewalPayment,
   AnsRules_CollectInitialEntryPayment,
+  CreateTokenStandardTransferInstruction,
   LockedAmuletExpireAmulet,
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
   Mint,
   Tap,
-  CreateTokenStandardTransferInstruction,
+  Transfer,
   TransferInstructionCreate,
   TransferInstruction_Accept,
   TransferInstruction_Reject,
   TransferInstruction_Withdraw,
-  Transfer,
   TransferPreapproval_Renew,
   TransferPreapproval_Send,
 }
@@ -247,7 +248,7 @@ class UserWalletTxLogParser(
                           _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
                           _: CO_CompleteBuyTrafficRequest | _: CO_CreateExternalPartySetupProposal |
                           _: CO_AcceptTransferPreapprovalProposal | _: CO_RenewTransferPreapproval |
-                          _: CO_Tap | _: ExtAmuletOperation =>
+                          _: CO_Tap | _: CO_TransferPreapprovalSend | _: ExtAmuletOperation =>
                         State.empty
                       case _ => {
                         throw new RuntimeException(s"Invalid operation $op")

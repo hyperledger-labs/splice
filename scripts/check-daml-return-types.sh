@@ -13,12 +13,14 @@ source "${TOOLS_LIB}/libcli.source"
 # - splitwell models
 # - token standard APIs and tests
 # - `AmuletRules_Transfer` returning `TransferResult` which seems acceptable to keep, given how common it is in the codebase
+# - splice-util-featured-app-proxies, which use `ProxyResult <iface_result>`
 # - WalletAppInstall choices proxying token standard choices
 outliers=$(rg -IN -e \
   "^[ \\t]*(nonconsuming )?choice " \
   -g '!daml/splitwell' \
   -g '!daml/*test' \
   -g '!daml/splice-api-token-burn-mint-v1' \
+  -g '!daml/splice-util-featured-app-proxies' \
   "${SPLICE_ROOT}"/daml/  | \
   sed 's/\(nonconsuming \)\?choice //g' | \
   sed 's/ //g' | \

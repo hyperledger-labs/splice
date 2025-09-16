@@ -13,7 +13,3 @@ validator1:
     maxDuration: "5m"
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
-sv:
-  scan:
-    # TODO(#1164): Remove this once the import update backfilling is enabled by default
-    enableImportUpdatesBackfill : true

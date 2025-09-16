@@ -6,33 +6,39 @@ import {
   config,
   DeploySvRunbook,
   DeployValidatorRunbook,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
-} from 'splice-pulumi-common-validator/src/validators';
-import { GitFluxRef, StackFromRef } from 'splice-pulumi-common/src/operator/flux-source';
-import { createStackCR, EnvRefs } from 'splice-pulumi-common/src/operator/stack';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
+import {
+  GitFluxRef,
+  StackFromRef,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/flux-source';
+import {
+  createStackCR,
+  EnvRefs,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
 export function getSpliceStacksFromMainReference(): StackFromRef[] {
   const ret: StackFromRef[] = [];
   if (DeploySvRunbook) {
-    ret.push({ project: 'sv-runbook', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'sv-runbook', stack: `sv-runbook.${CLUSTER_BASENAME}` });
   }
   if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
-    ret.push({ project: 'multi-validator', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` });
   }
   if (DeployValidatorRunbook) {
-    ret.push({ project: 'validator-runbook', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'validator-runbook', stack: `validator-runbook.${CLUSTER_BASENAME}` });
   }
   if (mustInstallValidator1) {
-    ret.push({ project: 'validator1', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` });
   }
   if (mustInstallSplitwell) {
-    ret.push({ project: 'splitwell', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'splitwell', stack: `splitwell.${CLUSTER_BASENAME}` });
   }
-  ret.push({ project: 'infra', stack: CLUSTER_BASENAME });
-  ret.push({ project: 'canton-network', stack: CLUSTER_BASENAME });
+  ret.push({ project: 'infra', stack: `infra.${CLUSTER_BASENAME}` });
+  ret.push({ project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` });
   return ret;
 }
 
@@ -63,21 +69,7 @@ export function installSpliceStacks(
       envRefs,
       gcpSecret,
       {},
-      [],
-      // reduce parallelism to ensure rolling updates as during startup the nodes use lots of memory, leading to memory pressure on the nodes
-      // and in some cases the pods get evicted
-      10
-    );
-  }
-  if (DeployValidatorRunbook) {
-    createStackCR(
-      'validator-runbook',
-      'validator-runbook',
-      namespace,
-      config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'),
-      reference,
-      envRefs,
-      gcpSecret
+      []
     );
   }
   if (mustInstallValidator1) {

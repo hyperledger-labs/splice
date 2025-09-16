@@ -49,12 +49,11 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigra
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import org.lfdecentralizedtrust.splice.util.{SynchronizerMigrationUtil, TemplateJsonDecoder}
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
@@ -65,6 +64,7 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.io.FileNotFoundException
 import java.nio.file.Path
@@ -110,6 +110,7 @@ class DomainMigrationInitializer(
   private val domainDataRestorer = new DomainDataRestorer(
     participantAdminConnection,
     config.timeTrackerMinObservationDuration,
+    config.timeTrackerObservationLatency,
     loggerFactory,
   )
 
@@ -177,14 +178,15 @@ class DomainMigrationInitializer(
         participantAdminConnection,
         Some(localSynchronizerNode),
       )
+      connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       _ <- SetupUtil
         .grantSvUserRightActAsDso(
-          svAutomation.connection,
+          connection,
           config.ledgerApiUser,
           svStore.key.dsoParty,
         )
       _ <- DomainMigrationInfo.saveToUserMetadata(
-        svAutomation.connection,
+        connection,
         config.ledgerApiUser,
         migrationInfo,
       )
@@ -198,7 +200,7 @@ class DomainMigrationInitializer(
       )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
-        svAutomation.connection,
+        connection,
         loggerFactory,
       )
       dsoAutomationService =
@@ -236,7 +238,7 @@ class DomainMigrationInitializer(
         skipTrafficReconciliationTriggers = true,
       )
       _ <- new ParticipantUsersDataRestorer(
-        svAutomation.connection,
+        connection,
         loggerFactory,
       ).restoreParticipantUsersData(migrationDump.participantUsers)
       _ <- establishInitialRound(
@@ -273,14 +275,10 @@ class DomainMigrationInitializer(
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
-      _ <- participantAdminConnection
-        .ensureDomainParameters(
-          domainMigrationDump.nodeIdentities.synchronizerId,
-          // TODO(DACH-NY/canton-network-node#8761) hard code for now
-          _.tryUpdate(confirmationRequestsMaxRate =
-            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
-          ),
-        )
+      _ <- SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+        participantAdminConnection,
+        domainMigrationDump.nodeIdentities.synchronizerId,
+      )
       _ = logger.info("resumed domain")
     } yield {}
   }

@@ -1,6 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+{{ if .Values.validatorWebUi.enabled }}
 {{- $walletWebUiLabel :=  "wallet-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
@@ -101,3 +102,4 @@ spec:
     port: {{ .Values.service.wallet.port }}
     targetPort: http
     protocol: TCP
+{{- end }}

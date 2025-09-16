@@ -1,0 +1,38 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Splice-info values"
+templates:
+  - deployment.yaml
+
+release:
+  # Set for testing labels
+  name: mock
+  namespace: mons
+chart:
+  # Override for testing labels
+  version: 0.1.1
+  appVersion: 0.1.0
+imagePullPolicy: IfNotPresent
+nginxImage: "some-nginx-image"
+
+tests:
+  - it: "should include runtime details env vars"
+    set:
+      runtimeDetails:
+        scanUrl: "https://scan.url"
+        logToStderrAfterFailures: 123
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: "nginx"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='content-runtime-updater')].env[?(@.name=='SCAN_URL')].value
+          value: "https://scan.url"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='content-runtime-updater')].env[?(@.name=='LOG_TO_STDERR_AFTER_FAILURES')].value
+          value: "123"

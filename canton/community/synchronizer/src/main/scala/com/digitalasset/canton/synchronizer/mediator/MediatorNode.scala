@@ -546,7 +546,7 @@ class MediatorNodeBootstrap(
         timeouts,
         synchronizerLoggerFactory,
       )
-      sendTrackerStore = SendTrackerStore(storage)
+      sendTrackerStore = SendTrackerStore()
       sequencerCounterTrackerStore = SequencerCounterTrackerStore(
         storage,
         indexedSynchronizerId,
@@ -676,7 +676,6 @@ class MediatorNodeBootstrap(
             mediatorId
           ).callback(
             new InitialTopologySnapshotValidator(
-              staticSynchronizerParameters.protocolVersion,
               new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
               synchronizerTopologyStore,
               arguments.parameterConfig.processingTimeouts,

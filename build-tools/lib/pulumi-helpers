@@ -44,6 +44,13 @@ function _resolve_pulumi_stack() {
         pulumi_stack="$CLOUDSDK_CORE_PROJECT"
     elif [[ $pulumi_project == "sv-canton" ]]; then
         pulumi_stack="$pulumi_project.${SPLICE_SV}-migration-${SPLICE_MIGRATION_ID}.$GCP_CLUSTER_BASENAME"
+    elif [[ $pulumi_project == "validator-runbook" ]]; then
+      validator_name="${SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME:-validator-runbook}"
+      if [[ $validator_name == "validator-runbook" ]]; then
+        pulumi_stack="validator-runbook.$GCP_CLUSTER_BASENAME"
+      else
+        pulumi_stack="validators.${validator_name}.$GCP_CLUSTER_BASENAME"
+      fi
     else
         pulumi_stack="$pulumi_project.$GCP_CLUSTER_BASENAME"
     fi
@@ -74,61 +81,6 @@ function _infra_up() {
       _uses_pulumi_stack infra
 
       subcmd_pulumi infra up --yes --skip-preview
-}
-
-function _cluster_apply() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --skip-infra)
-                skipInfra="yes"
-                shift
-                ;;
-            --sv1-only)
-                sv1Only="yes"
-                shift
-                ;;
-            -*)
-                _error "Unknown option $1"
-                ;;
-        esac
-    done
-
-    if [ -z "${skipInfra:-}" ]; then
-      _info "Applying Pulumi Cluster stack"
-      subcmd_pulumi cluster up --yes --skip-preview
-      _info "Applying Pulumi Infra Stack"
-      _infra_up
-    else
-        _info "Skipping infra deployment"
-    fi
-
-    _info "Applying Pulumi Stack"
-
-    subcmd_install_data_export_bucket_key
-
-    if [ -n "${sv1Only:-}" ]; then
-      _info "Applying SV1 only"
-      DSO_SIZE=1 \
-        SPLICE_DEPLOY_VALIDATOR1=false \
-        SPLICE_DEPLOY_SPLITWELL=false \
-        SPLICE_DEPLOY_SV_RUNBOOK=false \
-        SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
-        _pulumi_automation_run_up
-    else
-      _info "Applying all"
-      DISABLE_COMETBFT_STATE_SYNC=true \
-        SPLICE_DEPLOY_SV_RUNBOOK=false \
-        SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
-        _pulumi_automation_run_up
-    fi
-}
-
-function _pulumi_automation_run_up() {
-    if [ $# -eq 1 ]; then
-        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run up
-    else
-        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run up
-    fi
 }
 
 function _remove_pulumi_finalizers() {

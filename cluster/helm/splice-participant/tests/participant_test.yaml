@@ -11,16 +11,16 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+set:
+  persistence:
+    host: mock-pg-host
+    schema: participant
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    targetAudience: "mock_audience"
 tests:
   - it: "sets labels as expected"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       # Explicit migration ID for testing
       metrics:
         enabled: true
@@ -73,19 +73,17 @@ tests:
           path: spec.template.metadata.annotations
   - it: "deploys as expected with some AWS KMS config"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       # More interesting options
       kms:
         # All of these are mock values; we translate to Canton config directly
         type: awwws
         region: mock_region
         extraCantonKey: mock_value
+        mapCantonKey:
+          firstMapEntry: first_map_value
+          secondMapEntry: second_map_value
+          recursiveMapEntry:
+            recursiveMap: recursive_value
       additionalEnvVars:
         - name: AWWWS_ACCESS_KEY_ID
           valueFrom:
@@ -106,7 +104,7 @@ tests:
           content:
             # We don't really care about the name of the env var but helm unittest wants it
             name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
-            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    region = mock_region\n    type = awwws\n  }\n}        \n"
+            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    map-canton-key = {\n      first-map-entry = first_map_value\n      recursive-map-entry = {\n        recursive-map = recursive_value\n      }\n      second-map-entry = second_map_value\n    }\n    region = mock_region\n    type = awwws\n  }\n}        \n"
       # Secret configured via Helm with valueFrom
       - contains:
           path: spec.template.spec.containers[0].env
@@ -118,13 +116,6 @@ tests:
                 key: accessKeyId
   - it: "handles multiline additionalEnvVars values"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       additionalEnvVars:
         - name: CUSTOM
           value: |
@@ -146,3 +137,32 @@ tests:
           content:
             name: CUSTOM
             value: "multi\nline\nenvironment\nvariable\n"
+  - it: "extraVolumes are differentiated correctly"
+    set:
+      extraVolumes:
+        - name: secret-volume
+          secret:
+            secretName: secret_name
+        - name: pvc-volume
+          persistentVolumeClaim:
+            claimName: claim_name
+        - name: empty-dir-volume
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # range of extraVolumes with correct refs
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: secret-volume
+              secret:
+                secretName: secret_name
+            - name: pvc-volume
+              persistentVolumeClaim:
+                claimName: claim_name
+            - name: empty-dir-volume

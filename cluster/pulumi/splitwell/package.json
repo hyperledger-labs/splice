@@ -1,13 +1,13 @@
 {
-  "name": "splitwell",
+  "name": "@lfdecentralizedtrust/splice-pulumi-splitwell",
   "main": "src/index.ts",
   "devDependencies": {
     "@types/sinon": "^10.0.15",
     "sinon": "^15.0.4"
   },
   "dependencies": {
-    "splice-pulumi-common": "1.0.0",
-    "splice-pulumi-common-validator": "1.0.0"
+    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
+    "@lfdecentralizedtrust/splice-pulumi-common-validator": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

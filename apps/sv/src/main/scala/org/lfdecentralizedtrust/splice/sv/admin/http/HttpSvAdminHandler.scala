@@ -39,19 +39,22 @@ import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 
 import java.util.Optional
-import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, Contract, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  BackupDump,
+  Codec,
+  Contract,
+  SynchronizerMigrationUtil,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.config.{
   NonNegativeDuration,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.syntax.EncoderOps
@@ -62,6 +65,7 @@ import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesC
 import org.lfdecentralizedtrust.splice.migration.ParticipantUsersDataExporter
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
 import java.time.Instant
@@ -458,7 +462,10 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.pauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-        _ <- changeDomainRatePerParticipant(decentralizedSynchronizer, NonNegativeInt.zero)
+        _ <- SynchronizerMigrationUtil.ensureSynchronizerIsPaused(
+          participantAdminConnection,
+          decentralizedSynchronizer,
+        )
       } yield v0.SvAdminResource.PauseDecentralizedSynchronizerResponseOK
     }
   }
@@ -472,9 +479,9 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.unpauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-        _ <- changeDomainRatePerParticipant(
+        _ <- SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+          participantAdminConnection,
           decentralizedSynchronizer,
-          DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
         )
       } yield v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponseOK
     }
@@ -493,7 +500,7 @@ class HttpSvAdminHandler(
                 DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
-                    svStoreWithIngestion.connection,
+                    svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
                     participantAdminConnection,
                     synchronizerNode,
                     loggerFactory,
@@ -533,7 +540,9 @@ class HttpSvAdminHandler(
     val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
       for {
-        participantUsersData <- new ParticipantUsersDataExporter(svStoreWithIngestion.connection)
+        participantUsersData <- new ParticipantUsersDataExporter(
+          svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Medium)
+        )
           .exportParticipantUsersData()
       } yield domainDataSnapshotGenerator
         .getDomainDataSnapshot(
@@ -612,20 +621,6 @@ class HttpSvAdminHandler(
         .pure[Future]
     } { call }
 
-  private def changeDomainRatePerParticipant(
-      decentralizedSynchronizerId: SynchronizerId,
-      rate: NonNegativeInt,
-  )(implicit
-      tc: TraceContext
-  ) = for {
-    id <- participantAdminConnection.getId()
-    result <- participantAdminConnection
-      .ensureDomainParameters(
-        decentralizedSynchronizerId,
-        _.tryUpdate(confirmationRequestsMaxRate = rate),
-      )
-  } yield result
-
   override def triggerDomainMigrationDump(
       respond: SvAdminResource.TriggerDomainMigrationDumpResponse.type
   )(
@@ -640,7 +635,7 @@ class HttpSvAdminHandler(
                 dump <- DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
-                    svStoreWithIngestion.connection,
+                    svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
                     participantAdminConnection,
                     synchronizerNode,
                     loggerFactory,

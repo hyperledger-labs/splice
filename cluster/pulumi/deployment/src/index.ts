@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { DecentralizedSynchronizerUpgradeConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { gitRepoForRef } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/flux-source';
+import { createEnvRefs } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 import { core } from '@pulumi/kubernetes';
-import { DecentralizedSynchronizerUpgradeConfig } from 'splice-pulumi-common';
-import { gitRepoForRef } from 'splice-pulumi-common/src/operator/flux-source';
-import { createEnvRefs } from 'splice-pulumi-common/src/operator/stack';
 
 import { spliceEnvConfig } from '../../common/src/config/envConfig';
 import {
@@ -11,6 +11,7 @@ import {
   installMigrationSpecificStacks,
 } from './stacks/migration';
 import { getSpliceStacksFromMainReference, installSpliceStacks } from './stacks/splice';
+import { installAllValidatorStacks } from './stacks/validators';
 
 if (!DecentralizedSynchronizerUpgradeConfig.active.releaseReference) {
   throw new Error('No release reference found for active migration');
@@ -36,3 +37,4 @@ const credentialsSecret = new core.v1.Secret('gke-credentials', {
 
 installSpliceStacks(mainStackReference, envRefs, namespace, credentialsSecret);
 installMigrationSpecificStacks(mainStackReference, envRefs, namespace, credentialsSecret);
+installAllValidatorStacks(mainStackReference, envRefs, namespace, credentialsSecret);

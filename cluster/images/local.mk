@@ -27,6 +27,7 @@ images := \
 	docs \
 	gcs-proxy \
 	load-tester \
+	party-allocator \
 	multi-validator \
 	multi-participant \
 	\

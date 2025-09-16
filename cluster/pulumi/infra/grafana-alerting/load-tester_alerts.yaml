@@ -196,7 +196,7 @@ groups:
         panelId: 28
         noDataState: $NODATA
         execErrState: Alerting
-        for: 1m
+        for: 15m # give some time for restarts
         annotations:
           __dashboardUid__: ccbb2351-2ae2-462f-ae0e-f2c893ad1028
           __panelId__: "28"

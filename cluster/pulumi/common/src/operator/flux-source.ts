@@ -78,8 +78,8 @@ export function gitRepoForRef(
           name: ref.gitReference,
         },
         include: stacksToCopy.map(stack => ({
-          fromPath: `${ref.pulumiStacksDir}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
-          toPath: `${ref.pulumiBaseDir}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
+          fromPath: `${ref.pulumiStacksDir}/${stack.project}/Pulumi.${stack.stack}.yaml`,
+          toPath: `${ref.pulumiBaseDir}/${stack.project}/Pulumi.${stack.stack}.yaml`,
           repository: {
             name: `splice-node-${nameSuffix}-base`,
           },

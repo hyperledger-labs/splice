@@ -1,6 +1,6 @@
 [
   {
-    "contractId": "51",
+    "contractId": "52",
     "payload": {
       "meta": {
         "values": {}
@@ -30,7 +30,7 @@
     }
   },
   {
-    "contractId": "68",
+    "contractId": "69",
     "payload": {
       "meta": {
         "values": {}
@@ -44,7 +44,7 @@
         "amount": "200.0000000000",
         "executeBefore": "2025-06-18T00:00:00.000000Z",
         "inputHoldingCids": [
-          "69"
+          "70"
         ],
         "instrumentId": {
           "admin": "dso::normalized",

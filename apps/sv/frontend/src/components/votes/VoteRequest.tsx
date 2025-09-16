@@ -190,8 +190,6 @@ export const CreateVoteRequest: React.FC = () => {
     expiresAt = undefined;
   }
 
-  const expirationInDays = dayjs(expiresAt).diff(dayjs(), 'day');
-
   const handleConfirmationAccept = () => {
     createVoteRequestMutation.mutate();
     setConfirmDialogOpen(false);
@@ -305,6 +303,9 @@ export const CreateVoteRequest: React.FC = () => {
                         'data-testid': 'datetime-picker-vote-request-expiration',
                       },
                     },
+                    openPickerButton: {
+                      'data-testid': 'datetime-picker-vote-request-expiration-button',
+                    } as Record<string, string>,
                   }}
                   closeOnSelect
                 />
@@ -312,6 +313,7 @@ export const CreateVoteRequest: React.FC = () => {
               <Typography variant="body2" mt={1}>
                 Expires{' '}
                 <DateWithDurationDisplay
+                  id="vote-request-expiration-duration"
                   datetime={expiration?.toDate()}
                   enableDuration
                   onlyDuration
@@ -441,7 +443,6 @@ export const CreateVoteRequest: React.FC = () => {
                 }
                 expiresAt={new Date(expiresAt!)}
                 effectiveAt={effectivity?.toDate()}
-                expirationInDays={expirationInDays}
                 confirmationDialogProps={{
                   showDialog: confirmDialogOpen,
                   onAccept: handleConfirmationAccept,

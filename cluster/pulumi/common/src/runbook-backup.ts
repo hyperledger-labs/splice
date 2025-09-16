@@ -20,7 +20,7 @@ type BootstrapCliConfig = {
 
 type BootstrapParams = {
   xns: ExactNamespace;
-  RUNBOOK_NAMESPACE: string;
+  namespace: string;
   CLUSTER_BASENAME: string;
   participantIdentitiesFile?: string;
   bootstrappingConfig: BootstrapCliConfig;
@@ -33,13 +33,8 @@ type BootstrapResources = {
 };
 
 export async function setupBootstrapping(config: BootstrapParams): Promise<BootstrapResources> {
-  const {
-    xns,
-    RUNBOOK_NAMESPACE,
-    CLUSTER_BASENAME,
-    participantIdentitiesFile,
-    bootstrappingConfig,
-  } = config;
+  const { xns, namespace, CLUSTER_BASENAME, participantIdentitiesFile, bootstrappingConfig } =
+    config;
 
   if (participantIdentitiesFile && bootstrappingConfig) {
     console.error(
@@ -66,7 +61,7 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
       backupInterval: '10m',
       location: {
         bucket: bootstrapBucketSpec,
-        prefix: `${CLUSTER_BASENAME}/${RUNBOOK_NAMESPACE}`,
+        prefix: `${CLUSTER_BASENAME}/${namespace}`,
       },
     };
     backupConfigSecret = installBootstrapDataBucketSecret(xns, backupConfig.location.bucket);

@@ -14,6 +14,8 @@ recover, e.g. due to misconfiguration or bugs. In such cases, you will need to
 restore a component or the a full validator node from
 backups or from dumps of the components that are still operational.
 
+.. _validator-identities-backup:
+
 Backup of Node Identities
 +++++++++++++++++++++++++
 
@@ -36,6 +38,8 @@ as obtained from your OAuth provider. For context, see the Authentication sectio
 If you are using a docker-compose deployment, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
 If you are running the docker-compose deployment with no auth, you can use the utility Python script ``get-token.py``
 to generate a token for the ``curl`` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+
+.. _validator-database-backup:
 
 Backups of postgres instances
 +++++++++++++++++++++++++++++

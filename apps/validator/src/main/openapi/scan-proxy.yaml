@@ -19,6 +19,18 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetDsoPartyIdResponse"
+  /v0/scan-proxy/dso:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getDsoInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
   /v0/scan-proxy/featured-apps/{provider_party_id}:
     get:
       tags: [ scan-proxy ]
@@ -241,4 +253,3 @@ components:
       properties:
         amulet_rules:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
-

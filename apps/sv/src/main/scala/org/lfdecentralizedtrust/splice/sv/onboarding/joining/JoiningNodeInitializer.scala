@@ -75,6 +75,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -147,7 +148,8 @@ class JoiningNodeInitializer(
         // This is changed to false after SV onboarding completes.
         manualConnect = true,
         timeTracker = SynchronizerTimeTrackerConfig(
-          minObservationDuration = config.timeTrackerMinObservationDuration
+          minObservationDuration = config.timeTrackerMinObservationDuration,
+          observationLatency = config.timeTrackerObservationLatency,
         ),
       )
     )
@@ -187,21 +189,22 @@ class JoiningNodeInitializer(
         participantAdminConnection,
         localSynchronizerNode,
       )
+      connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       _ <- DomainMigrationInfo.saveToUserMetadata(
-        svAutomation.connection,
+        connection,
         config.ledgerApiUser,
         migrationInfo,
       )
       _ <- joiningConfig.fold(Future.unit)(onboardingConfig =>
         SetupUtil.ensureSvNameMetadataAnnotation(
-          svAutomation.connection,
+          connection,
           config,
           onboardingConfig.name,
         )
       )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
-        svAutomation.connection,
+        connection,
         loggerFactory,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
@@ -231,7 +234,7 @@ class JoiningNodeInitializer(
           logger.info("DSO party is authorized to our participant.")
           for {
             _ <- SetupUtil.grantSvUserRightActAsDso(
-              svAutomation.connection,
+              connection,
               config.ledgerApiUser,
               svStore.key.dsoParty,
             )
@@ -284,7 +287,7 @@ class JoiningNodeInitializer(
       // This is needed so that all scans can aggregate and backfill using the same initial round
       // Note: we accept the risk that sponsors could maliciously set a wrong initialRound as this is dev/testnet only.
       _ <- establishInitialRound(
-        svAutomation.connection,
+        connection,
         upgradesConfig,
         packageVersionSupport,
         svParty,
@@ -348,7 +351,7 @@ class JoiningNodeInitializer(
     val dsoPartyId = dsoStore.key.dsoParty
     val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
-      dsoAutomationService.connection,
+      dsoAutomationService.connection(SpliceLedgerConnectionPriority.Low),
       config.legacyMigrationId,
       clock,
       retryProvider,
@@ -372,7 +375,7 @@ class JoiningNodeInitializer(
         waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator,
         SetupUtil.ensureDsoPartyMetadataAnnotation(
-          svSvAutomationService.connection,
+          svSvAutomationService.connection(SpliceLedgerConnectionPriority.Low),
           config,
           dsoPartyId,
         ),
@@ -702,7 +705,8 @@ class JoiningNodeInitializer(
                         amuletRules.contractId,
                       )
                     )
-                    dsoStoreWithIngestion.connection
+                    dsoStoreWithIngestion
+                      .connection(SpliceLedgerConnectionPriority.Low)
                       .submit(Seq(dsoStore.key.svParty), Seq(dsoStore.key.dsoParty), cmd)
                       .noDedup
                       .yieldUnit()
@@ -759,7 +763,7 @@ class JoiningNodeInitializer(
                 // grantUserRights call will fail.
                 _ <- initConnection.waitForPartyOnLedgerApi(svStore.key.dsoParty)
                 _ <- SetupUtil.grantSvUserRightActAsDso(
-                  svStoreWithIngestion.connection,
+                  svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
                   config.ledgerApiUser,
                   svStore.key.dsoParty,
                 )
@@ -821,6 +825,7 @@ class JoiningNodeInitializer(
           clock,
           participantAdminConnection,
           loggerFactory,
+          config.latestPackagesOnly,
         )
         _ <- vetting.vetCurrentPackages(
           synchronizerId,

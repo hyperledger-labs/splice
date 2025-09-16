@@ -335,6 +335,14 @@ abstract class ValidatorAppReference(
         )
       }
     }
+    def getDsoInfo(): definitions.GetDsoInfoResponse = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanProxyAppClient.GetDsoInfo
+        )
+      }
+    }
+
     def getAnsRules(): ContractWithState[AnsRules.ContractId, AnsRules] = {
       consoleEnvironment.run {
         httpCommand(

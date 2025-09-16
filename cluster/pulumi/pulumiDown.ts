@@ -3,11 +3,12 @@
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
-} from 'splice-pulumi-common-validator/src/validators';
-import { startDownOperationsForCantonStacks } from 'sv-canton-pulumi-deployment/pulumiDown';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
+import { startDownOperationsForCantonStacks } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/pulumiDown';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { downOperation } from './pulumiOperations';
+import { startDownOperationsForValidatorStacks } from './validator-runbook/pulumiDown';
 
 const abortController = new PulumiAbortController();
 
@@ -29,8 +30,8 @@ async function runStacksDown() {
   operations.push(downOperation(multiValidatorStack, abortController));
   const svRunbookStack = await stack('sv-runbook', 'sv-runbook', true, {});
   operations.push(downOperation(svRunbookStack, abortController));
-  const validatorRunbookStack = await stack('validator-runbook', 'validator-runbook', true, {});
-  operations.push(downOperation(validatorRunbookStack, abortController));
+  const validatorOperations = await startDownOperationsForValidatorStacks(abortController);
+  operations = operations.concat(validatorOperations);
   const deploymentStack = await stack('deployment', 'deployment', true, {});
   operations.push(downOperation(deploymentStack, abortController));
 

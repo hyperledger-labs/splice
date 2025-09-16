@@ -91,11 +91,9 @@ inputs:
     required: false
     default: "false"
 
-
 runs:
   using: "composite"
   steps:
-
     - name: Setup
       uses: ./.github/actions/tests/common_test_setup
       with:
@@ -235,16 +233,16 @@ runs:
     - name: Wait for Canton to be ready
       shell: bash
       run: |
-          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
-            echo "This job does not require Canton"
-            exit 0
-          fi
-          start_canton_options="${{ inputs.start_canton_options }}"
-          if [[ "$start_canton_options" == *"-w"* ]]; then
-            ./wait-for-canton.sh -w
-          elif [[ "$start_canton_options" == *"-s"* ]]; then
-            ./wait-for-canton.sh -s
-          fi
+        if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+          echo "This job does not require Canton"
+          exit 0
+        fi
+        start_canton_options="${{ inputs.start_canton_options }}"
+        if [[ "$start_canton_options" == *"-w"* ]]; then
+          ./wait-for-canton.sh -w
+        elif [[ "$start_canton_options" == *"-s"* ]]; then
+          ./wait-for-canton.sh -s
+        fi
 
     - name: Run tests
       uses: ./.github/actions/sbt/execute_sbt_command
@@ -276,7 +274,6 @@ runs:
             ./stop-frontends.sh
           fi
 
-
     - name: Check logs for errors
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
@@ -305,7 +302,7 @@ runs:
       if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./.github/actions/tests/failure_notifications
       with:
-        workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'
-        service_account: '${{ inputs.failure_notifications_invoker_sa }}'
-        notifications_url: '${{ inputs.failure_notifications_invoker_url }}'
-        slack_channel: '${{ inputs.failure_notifications_slack_channel }}'
+        workload_identity_provider: "${{ inputs.google_workload_identity_provider }}"
+        service_account: "${{ inputs.failure_notifications_invoker_sa }}"
+        notifications_url: "${{ inputs.failure_notifications_invoker_url }}"
+        slack_channel: "${{ inputs.failure_notifications_slack_channel }}"

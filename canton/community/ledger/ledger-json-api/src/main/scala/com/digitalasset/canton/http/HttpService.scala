@@ -54,6 +54,7 @@ import java.io.InputStream
 import java.nio.file.{Files, Path}
 import java.security.{Key, KeyStore}
 import javax.net.ssl.SSLContext
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Using
 
@@ -79,6 +80,7 @@ class HttpService(
   private val directEc = DirectExecutionContext(noTracingLogger)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  @nowarn("cat=deprecation")
   def acquire()(implicit context: ResourceContext): Resource[ServerBinding] =
     Resource({
       logger.info(s"Starting JSON API server, ${lc.makeString}")
@@ -86,7 +88,10 @@ class HttpService(
       import startSettings.*
       val DummyUserId: UserId = UserId("HTTP-JSON-API-Gateway")
 
-      implicit val settings: ServerSettings = ServerSettings(asys).withTransparentHeadRequests(true)
+      val settings: ServerSettings = ServerSettings(asys)
+        .withTransparentHeadRequests(true)
+        .mapTimeouts(_.withRequestTimeout(startSettings.server.requestTimeout))
+
       implicit val wsConfig = startSettings.websocketConfig.getOrElse(WebsocketConfig())
 
       val clientConfig = LedgerClientConfiguration(

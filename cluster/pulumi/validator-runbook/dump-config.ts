@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
-import { Auth0Config } from 'splice-pulumi-common';
+import { Auth0Config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
 async function main() {
   await initDumpConfig();
+  // eslint-disable-next-line no-process-env
+  process.env.SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME = 'validator-runbook';
   const installNode = await import('./src/installNode');
   const auth0Cfg: Auth0Config = {
     appToClientId: {
@@ -34,7 +36,7 @@ async function main() {
   };
   const secrets = new SecretsFixtureMap();
 
-  installNode.installNode({
+  await installNode.installNode({
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
     getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
@@ -43,4 +45,7 @@ async function main() {
   });
 }
 
-main();
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

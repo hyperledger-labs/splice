@@ -196,7 +196,6 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      enableImportUpdateBackfilling(),
     )
   }
 
@@ -875,11 +874,5 @@ object ConfigTransforms {
 
     rows.toMap
   }
-
-  def enableImportUpdateBackfilling(): ConfigTransform =
-    updateAllScanAppConfigs((_, config) =>
-      config
-        .copy(updateHistoryBackfillImportUpdatesEnabled = true)
-    )
 
 }

@@ -1,8 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { readAndParseYaml } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import util from 'node:util';
-import { config } from 'splice-pulumi-common';
-import { readAndParseYaml } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const configsDir = config.requireEnv('GCP_PROJECT_CONFIGS_DIR');

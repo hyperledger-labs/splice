@@ -39,33 +39,21 @@ case class ScanAppBackendConfig(
     enableForcedAcsSnapshots: Boolean = false,
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
-    parameters: SpliceParametersConfig = SpliceParametersConfig(
-      batching = BatchingConfig(),
-      customTimeouts = ScanAppBackendConfig.DefaultCustomTimeouts,
-    ),
+    parameters: SpliceParametersConfig = SpliceParametersConfig(),
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
-    updateHistoryBackfillImportUpdatesEnabled: Boolean = false,
+    updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
-    // TODO(#1164): Enable by default
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
-}
-
-object ScanAppBackendConfig {
-
-  val DefaultCustomTimeouts: Map[String, NonNegativeFiniteDuration] = Map(
-    "getAcsSnapshot" -> NonNegativeFiniteDuration.ofMinutes(1L)
-  )
-
 }
 
 final case class ScanCacheConfig(

@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   DestinationBackfillingInfo,
@@ -68,6 +69,23 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
+/** Stores all original daml updates visible to `updateStreamParty`.
+  *
+  * ==Related triggers==
+  *
+  * The following triggers perform long-running background tasks related to [[UpdateHistory]],
+  * and must complete in the following order:
+  *
+  *   1. [[DeleteCorruptAcsSnapshotTrigger]] deletes all ACS snapshots that were computed from this UpdateHistory while
+  *      it was missing import updates. Such snapshots are easily identified by the trigger.
+  *      UpdateHistory has an in-memory flag (as part of [[UpdateHistory.State]]) that stores
+  *      whether all corrupt updates have been deleted.
+  *      See [[corruptAcsSnapshotsDeleted]] and [[markCorruptAcsSnapshotsDeleted]].
+  *   1. [[ScanHistoryBackfillingTrigger]] backfills missing updates from peer scan applications.
+  *      Information on the progress of this backfilling process is stored in the database.
+  *      See [[destinationHistory.markBackfillingComplete]] and [[destinationHistory.markImportUpdatesBackfillingComplete]].
+  *   1. [[AcsSnapshotTrigger]] backfills ACS snapshots.
+  */
 class UpdateHistory(
     storage: DbStorage,
     val domainMigrationInfo: DomainMigrationInfo,
@@ -246,14 +264,6 @@ class UpdateHistory(
             .map(_.map(LegacyOffset.Api.assertFromStringToLong))
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
-
-          _ <-
-            if (enableImportUpdateBackfill) {
-              deleteInvalidAcsSnapshots(newHistoryId)
-            } else {
-              logger.info(s"Not deleting invalid ACS snapshots for history $newHistoryId")
-              Future.unit
-            }
         } yield {
           state.updateAndGet(
             _.copy(
@@ -654,21 +664,17 @@ class UpdateHistory(
     """
   }
 
-  private[this] def deleteInvalidAcsSnapshots(
-      historyId: Long
-  )(implicit tc: TraceContext): Future[Unit] = {
-    assert(enableImportUpdateBackfill)
-    def migrationsWithCorruptSnapshots(): Future[Set[Long]] = {
-      for {
-        migrationsWithImportUpdates <- storage
-          .query(
-            // The following is equivalent to:
-            //    """select distinct migration_id
-            //    from update_history_transactions
-            //    where history_id = $historyId
-            //    and record_time = ${CantonTimestamp.MinValue}"""
-            // but it uses a recursive CTE to implement a loose index scan
-            sql"""
+  def migrationsWithCorruptSnapshots()(implicit tc: TraceContext): Future[Set[Long]] = {
+    for {
+      migrationsWithImportUpdates <- storage
+        .query(
+          // The following is equivalent to:
+          //    """select distinct migration_id
+          //    from update_history_transactions
+          //    where history_id = $historyId
+          //    and record_time = ${CantonTimestamp.MinValue}"""
+          // but it uses a recursive CTE to implement a loose index scan
+          sql"""
               with recursive t as (
                 (
                   select migration_id
@@ -688,56 +694,34 @@ class UpdateHistory(
               )
               select migration_id from t where migration_id is not null
              """.as[Long],
-            "deleteInvalidAcsSnapshots.1",
-          )
-        firstMigrationId <- getFirstMigrationId(historyId)
-        migrationsWithSnapshots <- storage
-          .query(
-            sql"""
+          "deleteInvalidAcsSnapshots.1",
+        )
+      firstMigrationIdO <- getFirstMigrationId(historyId)
+      migrationsWithSnapshots <- storage
+        .query(
+          sql"""
                select distinct migration_id
                from acs_snapshot
                where history_id = $historyId
              """.as[Long],
-            "deleteInvalidAcsSnapshots.2",
-          )
-      } yield {
-        val migrationsThatNeedImportUpdates: Set[Long] =
-          migrationsWithSnapshots.toSet - firstMigrationId.getOrElse(
-            throw new RuntimeException("No first migration found")
-          )
-        migrationsThatNeedImportUpdates -- migrationsWithImportUpdates.toSet
-      }
-    }
-
-    for {
-      state <- getBackfillingStateForHistory(historyId)
-      _ <- state match {
-        // Note: we want to handle the case where backfilling finished before import update backfilling was implemented,
-        // because in that case UpdateHistory signalled that history was complete when it fact it was missing import updates,
-        // which caused [[AcsSnapshotTrigger]] to compute corrupt snapshots.
-        // It is fine to run the code below on each application startup because it only deletes corrupt snapshots.
-        case BackfillingState.InProgress(_, _) =>
-          logger.info(
-            s"This update history may be missing import updates, checking for corrupt ACS snapshots"
-          )
-          migrationsWithCorruptSnapshots()
-            .flatMap { migrations =>
-              Future.sequence(migrations.map { migrationId =>
-                deleteAcsSnapshotsAfter(historyId, migrationId, CantonTimestamp.MinValue)
-              })
-            }
-            .andThen { case _ =>
-              logger.info(s"Finished checking for corrupt ACS snapshots")
-            }
-        case _ =>
-          logger.debug(
-            s"History is in backfilling state $state, no need to check for corrupt ACS snapshots"
-          )
-          Future.unit
-      }
+          "deleteInvalidAcsSnapshots.2",
+        )
     } yield {
-      ()
+      firstMigrationIdO match {
+        case None =>
+          Set.empty
+        case Some(firstMigrationId) =>
+          val migrationsThatNeedImportUpdates: Set[Long] =
+            migrationsWithSnapshots.toSet - firstMigrationId
+          migrationsThatNeedImportUpdates -- migrationsWithImportUpdates.toSet
+      }
     }
+  }
+
+  def corruptAcsSnapshotsDeleted: Boolean = state.get.corruptSnapshotsDeleted
+  def markCorruptAcsSnapshotsDeleted(): Unit = {
+    state.updateAndGet(_.copy(corruptSnapshotsDeleted = true))
+    ()
   }
 
   private[this] def cleanUpDataAfterDomainMigration(
@@ -1361,13 +1345,30 @@ class UpdateHistory(
     }
   }
 
+  /** Decodes the result of fetching one import contract ([[SelectFromImportUpdates]]) into
+    * an artificial update ([[UpdateHistoryResponse]]) with exactly one create event.
+    *
+    * The result of this method should be consistent and stable. Values of fields that could
+    * differ across SVs or across Canton versions are rewritten using determinisitic values.
+    *
+    * The deterministic values chosen here will be persisted in the UpdateHistory database
+    * of late-joining SVs when they backfill import updates.
+    * If you change any of the deterministic values here, it will lead to BFT consistency
+    * warnings until all SV nodes have deployed the new version.
+    */
   private def decodeImportTransaction(
       updateRow: SelectFromImportUpdates
   ): UpdateHistoryResponse = {
-    // The result should be consistent across SVs, so we generate a deterministic update id and event id.
     // We don't use any prefix so that we can use an index on contract ids when fetching import updates.
     val updateId = updateRow.contractId
     val eventNodeId = 0
+    // The prefix needs to be preserved, because we're relying on it to determine whether a given update
+    // was an import update.
+    val workflowId = s"${IMPORT_ACS_WORKFLOW_ID_PREFIX}-${updateId}"
+    // Command id and participant offset are not included in API responses,
+    // but we're making them consistent anyway.
+    val commandId = ""
+    val offset = 0L
 
     val createEvent = new CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
@@ -1394,10 +1395,10 @@ class UpdateHistory(
       update = TransactionTreeUpdate(
         new TransactionTree(
           /*updateId = */ updateId,
-          /*commandId = */ updateRow.commandId.getOrElse(missingString),
-          /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
+          /*commandId = */ commandId,
+          /*workflowId = */ workflowId,
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
-          /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
+          /*offset = */ offset,
           /*eventsById = */ java.util.Map.of(eventNodeId, createEvent),
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
@@ -2232,11 +2233,15 @@ object UpdateHistory {
   )
 
   case class State(
-      historyId: Option[Long]
+      historyId: Option[Long],
+      corruptSnapshotsDeleted: Boolean,
   ) {}
 
   object State {
-    def empty(): State = State(None)
+    def empty(): State = State(
+      historyId = None,
+      corruptSnapshotsDeleted = false,
+    )
   }
 
   sealed trait BackfillingState

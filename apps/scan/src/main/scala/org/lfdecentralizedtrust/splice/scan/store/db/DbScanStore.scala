@@ -1081,7 +1081,7 @@ class DbScanStore(
       tc: TraceContext,
   ): Future[Option[Contract[TCId, T]]] = {
     val templateId = companionClass.typeId(companion)
-    val packageName = PackageQualifiedName(templateId).packageName
+    val packageName = PackageQualifiedName.getFromResources(templateId).packageName
     for {
       row <- storage
         .querySingle(

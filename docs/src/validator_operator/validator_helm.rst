@@ -119,7 +119,9 @@ OIDC Provider Requirements
 ++++++++++++++++++++++++++
 
 This section provides pointers for setting up an OIDC provider for use with your Validator node.
-Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.
+Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.  
+
+These docs focus on Auth0, and are being continuously tested and maintained. Other OIDC providers can be used, and are in active use by various community members, who have contributed some notes and examples in `Okta and Keycloak community authored examples </community/oidc-config-okta-keycloak.html>`.
 
 Your OIDC provider must be reachable [#reach]_ at a well known (HTTPS) URL.
 In the following, we will refer to this URL as ``OIDC_AUTHORITY_URL``.
@@ -434,6 +436,7 @@ Services               Port         Routes
 ``validator-app``      5003         ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator``
 ``ans-web-ui``                      ``https://cns.validator.<YOUR_HOSTNAME>``
 ``validator-app``      5003         ``https://cns.validator.<YOUR_HOSTNAME>/api/validator``
+``participant``        7575         ``https://<YOUR_HOSTNAME>/api/json-api`` (optional, not required by the validator itself but if you want to access the ledger API yourself. You can change the route freely)
 ====================== ============ ===========================================================================
 
 * ``https://wallet.validator.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``validator`` namespace
@@ -756,4 +759,3 @@ values for ``splice-participant`` or ``splice-validator``:
       - name: my-extra-container
         image: busybox
         command: [ "sh", "-c", "echo 'example extra container'" ]
-

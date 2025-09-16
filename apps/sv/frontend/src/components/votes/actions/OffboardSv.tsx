@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
-import React, { useState } from 'react';
+import React, { SelectHTMLAttributes, useState } from 'react';
 
 import { FormControl, NativeSelect, Stack, Typography } from '@mui/material';
 
@@ -49,14 +49,23 @@ const OffboardSv: React.FC<{ chooseAction: (action: ActionRequiringConfirmation)
       <Typography variant="h6">Member</Typography>
       <FormControl fullWidth>
         <NativeSelect
-          inputProps={{ id: 'display-members' }}
+          inputProps={
+            {
+              id: 'display-members',
+              'data-testid': 'display-members',
+            } as SelectHTMLAttributes<HTMLSelectElement>
+          }
           value={member}
           onChange={e => setMemberAction(e.target.value)}
         >
           <option>No member selected</option>
           {memberOptions &&
             memberOptions.map((member, index) => (
-              <option key={'member-option-' + index} value={member.key}>
+              <option
+                key={'member-option-' + index}
+                value={member.key}
+                data-testid={'display-members-option'}
+              >
                 {member.value}
               </option>
             ))}

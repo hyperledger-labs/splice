@@ -46,6 +46,9 @@ If you are planning to work on an issue please assign yourself to it (if you are
 
 Every contribution must be tested in an automated test! For further details see the [Testing README](TESTING.md).
 
+Also note that the splice CI [enforces](https://github.com/cncf/dco2) that all commits on a pull request contain a valid `Signed-off-by: Your Name <your@email.com>` line,
+to confirm adherence to the [DCO](https://developercertificate.org/) requirements.
+
 ## Branch Naming
 
 If you are a Splice Contributor and therefore have write permissions to the Splice repo directly,

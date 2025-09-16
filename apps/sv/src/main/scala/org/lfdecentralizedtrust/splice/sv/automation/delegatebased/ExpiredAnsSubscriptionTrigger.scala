@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -52,7 +53,8 @@ class ExpiredAnsSubscriptionTrigger(
         Optional.of(controller),
       )
     )
-    result <- svTaskContext.connection
+    result <- svTaskContext
+      .connection(SpliceLedgerConnectionPriority.Low)
       .submit(
         actAs = Seq(store.key.svParty),
         readAs = Seq(store.key.dsoParty),

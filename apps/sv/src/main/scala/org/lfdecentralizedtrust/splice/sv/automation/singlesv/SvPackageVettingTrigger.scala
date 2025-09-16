@@ -20,10 +20,15 @@ class SvPackageVettingTrigger(
     store: SvDsoStore,
     override protected val context: TriggerContext,
     maxVettingDelay: NonNegativeFiniteDuration,
+    latestPackagesOnly: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PackageVettingTrigger(SvPackageVettingTrigger.packages, maxVettingDelay) {
+) extends PackageVettingTrigger(
+      SvPackageVettingTrigger.packages,
+      maxVettingDelay,
+      latestPackagesOnly,
+    ) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
     store.getDsoRules().map(_.domain)

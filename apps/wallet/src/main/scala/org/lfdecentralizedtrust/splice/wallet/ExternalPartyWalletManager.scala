@@ -4,8 +4,8 @@
 package org.lfdecentralizedtrust.splice.wallet
 
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -42,6 +42,7 @@ class ExternalPartyWalletManager(
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    params: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -171,6 +172,7 @@ class ExternalPartyWalletManager(
       participantId,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      params,
     )
     (externalPartyRetryProvider, walletService)
   }

@@ -9,18 +9,18 @@ import {
   installLedgerApiUserSecret,
   SpliceCustomResourceOptions,
   withAddedDependencies,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   InstalledMigrationSpecificSv,
   installSvParticipant,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
-} from 'splice-pulumi-common-sv';
-import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { installPostgres, Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   InStackCantonBftDecentralizedSynchronizerNode,
   InStackCometBftDecentralizedSynchronizerNode,
-} from 'sv-canton-pulumi-deployment/src/decentralizedSynchronizerNode';
+} from '@lfdecentralizedtrust/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
 
 export function installCantonComponents(
   xns: ExactNamespace,
@@ -116,6 +116,7 @@ export function installCantonComponents(
     );
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(
+          svConfig,
           migrationId,
           svConfig.ingressName,
           xns,
@@ -126,7 +127,6 @@ export function installCantonComponents(
           },
           isActiveMigration,
           migrationInfo.version,
-          svConfig.logging?.cantonLogLevel,
           imagePullServiceAccountName,
           opts
         )
@@ -145,6 +145,7 @@ export function installCantonComponents(
           svConfig.onboardingName,
           migrationInfo.version,
           imagePullServiceAccountName,
+          disableProtection,
           opts
         );
     return {

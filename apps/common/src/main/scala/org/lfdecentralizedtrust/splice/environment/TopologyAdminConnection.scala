@@ -1235,7 +1235,7 @@ abstract class TopologyAdminConnection(
       })
   }
 
-  def listSynchronizerParametersState(
+  def listSynchronizerParametersStateHistory(
       synchronizerId: SynchronizerId,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[SynchronizerParametersState]]] = {
@@ -1266,6 +1266,26 @@ abstract class TopologyAdminConnection(
       (item: ListSynchronizerParametersStateResult) =>
         TopologyResult(item.context, SynchronizerParametersState(synchronizerId, item.item)),
     )
+  }
+
+  def lookupSynchronizerParametersState(
+      storeId: TopologyStoreId,
+      synchronizerId: SynchronizerId,
+      topologyTransactionType: TopologyTransactionType,
+  )(implicit tc: TraceContext): Future[Option[TopologyResult[SynchronizerParametersState]]] = {
+    runCommandM(
+      storeId,
+      topologyTransactionType,
+      TimeQuery.HeadState,
+    )(
+      baseQuery =>
+        TopologyAdminCommands.Read.SynchronizerParametersState(
+          baseQuery,
+          synchronizerId.filterString,
+        ),
+      (item: ListSynchronizerParametersStateResult) =>
+        TopologyResult(item.context, SynchronizerParametersState(synchronizerId, item.item)),
+    ).map(_.headOption)
   }
 
   private def listNamespaceDelegation(namespace: Namespace, target: Option[SigningPublicKey])(

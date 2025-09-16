@@ -3,16 +3,16 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
-import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import {
   CLUSTER_BASENAME,
   config,
   infraAffinityAndTolerations,
   isMainNet,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 
 import { spliceEnvConfig } from '../config/envConfig';
-import { PulumiOperatorGracePeriod } from './config';
+import { configForStack, PulumiOperatorGracePeriod } from './config';
 import { GitFluxRef } from './flux-source';
 
 export type EnvRefs = { [key: string]: unknown };
@@ -81,8 +81,7 @@ export function createStackCR(
   envRefs: EnvRefs,
   gcpSecret: k8s.core.v1.Secret,
   extraEnvs: { [key: string]: string } = {},
-  dependsOn: pulumi.Resource[] = [],
-  parallelism: number = 64
+  dependsOn: pulumi.Resource[] = []
 ): CustomResource {
   const sa = new k8s.core.v1.ServiceAccount(`${name}-sa`, {
     metadata: {
@@ -211,7 +210,7 @@ export function createStackCR(
           retryOnUpdateConflict: true,
           updateTemplate: {
             spec: {
-              parallel: parallelism,
+              parallel: configForStack(name).parallelism || 64,
             },
           },
           // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.2.0/docs/stacks.md#stackspecworkspacetemplatespec

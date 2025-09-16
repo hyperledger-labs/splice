@@ -45,10 +45,13 @@ Onboarding Process Overview
 
 Onboarding a Validator involves the following steps (for each network you want to join).
 
-1. Provide your sponsoring SV with the egress IP for your Validator node. Note that at this point
-   this can also be accomplished by connecting your validator through a VPN run by an SV. This
-   can be useful when trying to run a validator from a local laptop.
-   This option may be removed in the future.
+1. Provide your sponsoring SV with the egress IP for your Validator node.
+   Only one IP may be provided per network, and this IP must be distinct from the IP you use for any other of the three networks.
+
+   .. note::
+      At this point this can also be accomplished by connecting your validator through a VPN run by an SV
+      This can be useful when trying to run a validator from a local laptop.
+      This option may be removed in the future.
 2. Wait for super validators to adopt the new IP allowlist. This usually takes between 2-7 days.
 3. If you want to access the Canton Coin Scan Web UI from your laptop, you also need to ensure that
    you can connect to a VPN operated by one of the SVs. This is required as laptops usually
@@ -89,10 +92,12 @@ Note that the following snippet requires installing `jq <https://jqlang.org/>`_.
 
 .. parsed-literal::
 
-   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans | .[].scans | .[] | .publicUrl' ); do
-     echo -n "$url: ";
-     curl -sSL --connect-timeout 5 --fail-with-body $url/api/scan/version | jq -r '.version';
-   done
+   (set -o pipefail
+   CURL='curl -fsS -m 5 --connect-timeout 5'
+   for url in $($CURL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans[].scans[].publicUrl'); do
+     echo -n "$url: "
+     $CURL "$url"/api/scan/version | jq -r '.version'
+   done)
 
 You should see output in the form shown below, where each line indicates one SV and the version it is on. If you see timeouts that SV has not yet added you to their allowlist,
 if you do not get any errors, then all SVs have added you. Note that the URLs and versions will vary over time so don't try to compare exactly.
@@ -118,12 +123,13 @@ Note that the following snippet requires installing `jq <https://jqlang.org/>`_ 
 
 .. parsed-literal::
 
-   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers | .[] | .sequencers.[].url | sub("https://"; "")' ); do
-     echo -n "$url: ";
-     grpcurl --max-time 10 $url:443 grpc.health.v1.Health/Check;
-   done
+   (set -o pipefail
+   for url in $(curl -fsS -m 5 --connect-timeout 5 |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers[].sequencers[].url | sub("https://"; "")'); do
+     echo -n "$url: "
+     grpcurl --max-time 10 "$url":443 grpc.health.v1.Health/Check
+   done)
 
-Sequencers that are functional and have whitelisted your IP correctly will return ``status: SERVING`` in the ``grpcurl`` output.
+Sequencers that are functional and have whitelisted your IP correctly will return ``"status": "SERVING"`` in the ``grpcurl`` output.
 
 .. code-block:: bash
 
@@ -157,6 +163,9 @@ Sequencers that are functional and have whitelisted your IP correctly will retur
    sequencer-1.sv-1.test.global.canton.network.digitalasset.com: {
      "status": "SERVING"
    }
+
+The default configuration for both of these requires access to at least 2/3 of the SVs for each of scans and sequencers.
+You may, at your option and own risk, configure connection to a single trusted scan and sequencer as described under :ref:`validator helm chart configuration <helm-validator-install>`, at the cost of losing BFT integrity guarantees.
 
 Stay Connected
 --------------

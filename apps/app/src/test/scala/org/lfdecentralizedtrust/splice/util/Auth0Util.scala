@@ -39,37 +39,30 @@ class Auth0Util(
   val api = new ManagementAPI(domain, requestManagementAPIToken())
 
   def createUser()(implicit tc: TraceContext): Auth0User = {
-    val user = new User()
-    val rand = new scala.util.Random
-    // The randomly generated password is prefixed with enough constants to prevent unfortunate weak passwords that fail auth0 checks
-    val password = s"aB3${rand.alphanumeric.take(20).mkString}${rand.nextInt()}"
-    val username = (new scala.util.Random).alphanumeric.take(20).mkString
-    val email = s"$username@canton-network-test.com"
-    user.setPassword(password.toCharArray)
-    user.setEmail(email)
-    user.setVerifyEmail(false) // avoid auth0 trying to send mails
-    user.setConnection("Username-Password-Authentication")
-    logger.debug(s"Creating user with username $username email $email and password $password")
-    val id = executeManagementApiRequest(
-      api.users().create(user),
-      Function unlift (inferNewUserByEmail(email, _)),
-    ).getId
-    logger.debug(s"Created user ${email} with password ${password} (id: ${id})")
-    new Auth0User(id, email, password, this)
-  }
-
-  private[this] def inferNewUserByEmail(email: String, e: Throwable)(implicit
-      tc: TraceContext
-  ): Option[User] =
-    // A "user already exists" error may be caused by our retries, try finding the user by email
-    executeManagementApiRequest(api.users().listByEmail(email, null)).asScala match {
-      case user +: _ =>
-        logger.debug("Error caught, but found the user by email, so trying to use it", e)
-        Some(user)
-      case _ =>
-        logger.debug(s"Failed to create user with email $email, but no user found by that email")
-        None
+    // Note that a "user already exists" error may be caused by our retries if we retry only the create-user call,
+    // so in a retry we also choose a new username, email address, etc.
+    retry.retryAuth0CallsForTests {
+      val user = new User()
+      val rand = new scala.util.Random
+      // The randomly generated password is prefixed with enough constants to prevent unfortunate weak passwords that fail auth0 checks
+      val password = s"aB3${rand.alphanumeric.take(20).mkString}${rand.nextInt()}"
+      val username = (new scala.util.Random).alphanumeric.take(20).mkString
+      val email = s"$username@canton-network-test.com"
+      user.setPassword(password.toCharArray)
+      user.setEmail(email)
+      user.setVerifyEmail(false) // avoid auth0 trying to send mails
+      user.setConnection("Username-Password-Authentication")
+      // Auth0 management API calls are rate limited, with limits much lower than
+      // the rate limits for the auth API calls.
+      // Here we simply assume a generic rate limit of 2 calls per second and
+      // wait before each management API call
+      Threading.sleep(500)
+      logger.debug(s"Creating user with username $username email $email and password $password")
+      val id = api.users().create(user).execute().getId
+      logger.debug(s"Created user ${email} with password ${password} (id: ${id})")
+      new Auth0User(id, email, password, this)
     }
+  }
 
   def deleteUser(id: String): Unit = {
     // Called from AutoCloseable.close, which doesn't propagate the trace context
@@ -93,8 +86,7 @@ class Auth0Util(
   }
 
   private[this] def executeManagementApiRequest[T](
-      req: com.auth0.net.Request[T],
-      recover: retry.Recover[T] = PartialFunction.empty,
+      req: com.auth0.net.Request[T]
   )(implicit traceContext: TraceContext) =
     retry.retryAuth0CallsForTests {
       // Auth0 management API calls are rate limited, with limits much lower than
@@ -103,16 +95,13 @@ class Auth0Util(
       // wait before each management API call
       Threading.sleep(500)
       req.execute()
-    }(recover)
-
+    }
 }
 
 object Auth0Util {
 
   trait Auth0Retry {
-    final type Recover[T] = PartialFunction[Throwable, T]
-
-    def retryAuth0CallsForTests[T](f: => T)(recover: Recover[T])(implicit
+    def retryAuth0CallsForTests[T](f: => T)(implicit
         traceContext: TraceContext
     ): T
   }
@@ -144,11 +133,10 @@ object Auth0Util {
         clientSecret,
         loggerFactory,
         new Auth0Retry {
-          def handleExceptions[T](e: Throwable, recover: Recover[T])(implicit
+          def handleExceptions[T](e: Throwable)(implicit
               traceContext: TraceContext
           ): T =
             e match {
-              case recover(t) => t
               case auth0Exception: Auth0Exception => {
                 logger.debug("Auth0 exception raised, triggering retry...", auth0Exception)
                 fail(auth0Exception)
@@ -162,14 +150,14 @@ object Auth0Util {
 
           override def retryAuth0CallsForTests[T](
               f: => T
-          )(recover: Recover[T])(implicit traceContext: TraceContext): T = {
+          )(implicit traceContext: TraceContext): T = {
             eventually() {
               try {
                 f
               } catch {
                 // the sync client wraps the exceptions because why not
-                case failsafe: FailsafeException => handleExceptions(failsafe.getCause, recover)
-                case NonFatal(cause) => handleExceptions(cause, recover)
+                case failsafe: FailsafeException => handleExceptions(failsafe.getCause)
+                case NonFatal(cause) => handleExceptions(cause)
               }
             }
           }

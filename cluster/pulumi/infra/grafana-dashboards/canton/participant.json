@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3569,
+  "id": 4651,
   "links": [],
   "panels": [
     {
@@ -462,7 +462,7 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 21
       },
@@ -508,24 +508,11 @@
       "type": "timeseries"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 31
-      },
-      "id": 8,
-      "panels": [],
-      "title": "Commands",
-      "type": "row"
-    },
-    {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Daml commands through the synchronous CommandService currently in flight",
+      "description": "Events received from the sequencer",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -577,17 +564,17 @@
               }
             ]
           },
-          "unit": "submissions"
+          "unit": "epm"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 10,
         "w": 12,
-        "x": 0,
-        "y": 32
+        "x": 12,
+        "y": 21
       },
-      "id": 11,
+      "id": 13,
       "options": {
         "legend": {
           "calcs": [
@@ -614,7 +601,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "expr": "rate(daml_sequencer_client_handler_sequencer_events{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -625,8 +612,130 @@
           "useBackend": false
         }
       ],
-      "title": "In Flight Commands",
+      "title": "Events received",
       "type": "timeseries"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 8,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Daml commands through the synchronous CommandService currently in flight",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "submissions"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 32
+          },
+          "id": 11,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Last *",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "12.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS}"
+              },
+              "disableTextWrap": false,
+              "editorMode": "code",
+              "expr": "daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+              "fullMetaSearch": false,
+              "includeNullMetadata": true,
+              "instant": false,
+              "interval": "1m",
+              "legendFormat": "{{namespace}} {{job}} {{node}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "In Flight Commands",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Commands",
+      "type": "row"
     },
     {
       "collapsed": false,
@@ -634,7 +743,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 32
       },
       "id": 5,
       "panels": [],
@@ -689,7 +798,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 33
       },
       "id": 4,
       "options": {
@@ -732,7 +841,7 @@
     }
   ],
   "preload": false,
-  "refresh": "",
+  "refresh": "5m",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
@@ -740,10 +849,10 @@
       {
         "current": {
           "text": [
-            "sv-1"
+            "sv-8"
           ],
           "value": [
-            "sv-1"
+            "sv-8"
           ]
         },
         "datasource": {
@@ -822,12 +931,12 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Participant",
   "uid": "edkzo5ukgeqyoc",
-  "version": 4
+  "version": 2
 }
