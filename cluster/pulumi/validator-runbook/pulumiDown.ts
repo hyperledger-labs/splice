@@ -21,7 +21,7 @@ export async function startDownOperationsForValidatorStacks(
       name: `down-${stackSummary.name}`,
       promise: stack(
         'validator-runbook',
-        stackSummary.name.slice(0, -`.${ClusterBasename}`),
+        stackSummary.name.slice(0, stackSummary.name.length - (ClusterBasename.length + 1)),
         true,
         {}
         // eslint-disable-next-line promise/prefer-await-to-then
