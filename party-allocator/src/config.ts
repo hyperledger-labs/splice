@@ -4,6 +4,7 @@ import z from "zod";
 
 const partyAllocationsSchema = z.object({
   token: z.string(),
+  userId: z.string(),
   jsonLedgerApiUrl: z.string(),
   scanApiUrl: z.string(),
   validatorApiUrl: z.string(),

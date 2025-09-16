@@ -1,16 +1,19 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
-  AllocateExternalPartyResponse,
   Command,
   createConfiguration,
   DeduplicationPeriod2,
   DefaultApi,
   DisclosedContract,
   GenerateExternalPartyTopologyResponse,
+  GrantUserRightsResponse,
   HttpAuthAuthentication,
+  Kind,
   RequestContext,
   ResponseContext,
+  RevokeUserRightsResponse,
+  Right,
   ServerConfiguration,
   Signature,
   SignedTransaction,
@@ -76,20 +79,28 @@ export class LedgerApiClient {
   }
 
   async allocateExternalParty(
-    hint: string,
+    partyId: string,
     synchronizer: string,
     onboardingTransactions: SignedTransaction[],
     multiHashSignatures: Signature[],
-  ): Promise<AllocateExternalPartyResponse> {
-    return this.retry(`allocate external party ${hint}`, () =>
-      this.als.run({ url: undefined }, () =>
-        this.api.postV2PartiesExternalAllocate({
-          synchronizer,
-          identityProviderId: "",
-          onboardingTransactions,
-          multiHashSignatures,
+  ): Promise<void> {
+    return this.retry(
+      `allocate external party ${partyId}`,
+      () =>
+        this.als.run({ url: undefined }, async () => {
+          const response = await this.api.getV2PartiesParty(partyId);
+          if (response?.partyDetails?.length === 0) {
+            await this.api.postV2PartiesExternalAllocate({
+              synchronizer,
+              identityProviderId: "",
+              onboardingTransactions,
+              multiHashSignatures,
+            });
+          } else {
+            console.log(`Party id ${partyId} is already allocated`);
+          }
         }),
-      ),
+      120, // party allocations take forever so we also retry forever aka 2min
     );
   }
 
@@ -104,7 +115,7 @@ export class LedgerApiClient {
     const preparedTransaction = await this.retry(`prepare ${description}`, () =>
       this.als.run({ url: undefined }, () =>
         this.api.postV2InteractiveSubmissionPrepare({
-          userId: "participant_admin",
+          userId: "",
           actAs: [actAs],
           readAs: [],
           disclosedContracts,
@@ -129,7 +140,7 @@ export class LedgerApiClient {
         this.api.postV2InteractiveSubmissionExecute({
           deduplicationPeriod,
           submissionId: crypto.randomUUID(),
-          userId: "participant_admin",
+          userId: "",
           hashingSchemeVersion: preparedTransaction.hashingSchemeVersion,
           preparedTransaction: preparedTransaction.preparedTransaction,
           partySignatures: {
@@ -152,10 +163,63 @@ export class LedgerApiClient {
     );
   }
 
+  async grantUserRights(
+    userId: string,
+    actAs: string[],
+  ): Promise<GrantUserRightsResponse> {
+    const actAsRights: Right[] = actAs.map((party) => {
+      const right = new Kind();
+      right.CanActAs = { value: { party } };
+      return { kind: right };
+    });
+    return this.retry(`Grant user rights to ${userId}, actAs: ${actAs}`, () =>
+      this.als.run({ url: undefined }, () =>
+        this.api.postV2UsersUserIdRights(userId, {
+          userId: userId,
+          identityProviderId: "",
+          rights: actAsRights,
+        }),
+      ),
+    );
+  }
+
+  async revokeUserRights(
+    userId: string,
+    actAs: string[],
+  ): Promise<RevokeUserRightsResponse> {
+    const actAsRights: Right[] = actAs.map((party) => {
+      const right = new Kind();
+      right.CanActAs = { value: { party } };
+      return { kind: right };
+    });
+    return this.retry(`Revoke user rights to ${userId}, actAs: ${actAs}`, () =>
+      this.als.run({ url: undefined }, () =>
+        this.api.patchV2UsersUserIdRights(userId, {
+          userId: userId,
+          identityProviderId: "",
+          rights: actAsRights,
+        }),
+      ),
+    );
+  }
+
+  async withUserRights<T>(
+    userId: string,
+    actAs: string[],
+    t: () => Promise<T>,
+  ): Promise<T> {
+    await this.grantUserRights(userId, actAs);
+    try {
+      return await t();
+    } finally {
+      await this.revokeUserRights(userId, actAs);
+    }
+  }
+
   async retry<T>(
     description: string,
     task: () => Promise<T>,
-    maxRetries: number = 20,
+    maxRetries: number = 60,
     delayMs: number = 1000,
   ): Promise<T> {
     let attempt = 1;
