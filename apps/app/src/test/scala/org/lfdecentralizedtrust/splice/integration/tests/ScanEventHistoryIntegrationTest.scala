@@ -339,7 +339,7 @@ class ScanEventHistoryIntegrationTest
       }
     }
 
-    withClue("Update events with missing verdict: " + missing.mkString(",")) {
+    silentClue("Update events with missing verdict: " + missing.mkString(",")) {
       missing shouldBe empty
     }
 
