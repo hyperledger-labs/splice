@@ -517,7 +517,7 @@ abstract class ScanAppReference(
   def getEventById(
       updateId: String,
       damlValueEncoding: Option[definitions.DamlValueEncoding],
-  ): definitions.EventHistoryItem = {
+  ): Option[definitions.EventHistoryItem] = {
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetEventById(updateId, damlValueEncoding)

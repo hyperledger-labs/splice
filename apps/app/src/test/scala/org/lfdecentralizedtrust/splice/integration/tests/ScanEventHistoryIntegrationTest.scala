@@ -21,7 +21,6 @@ import definitions.UpdateHistoryReassignment.Event.members.{
 }
 
 import scala.concurrent.duration.*
-import scala.util.Try
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 
@@ -173,13 +172,11 @@ class ScanEventHistoryIntegrationTest
 
     // getEventById should cause 404 while the verdict store has not synced
     expectedUpdateIds.foreach { id =>
-      val failure = Try {
-        sv1ScanBackend.getEventById(
-          id,
-          Some(CompactJson),
-        )
-      }
-      assert(failure.isFailure)
+      val res = sv1ScanBackend.getEventById(
+        id,
+        Some(CompactJson),
+      )
+      res shouldBe None
     }
 
     // Re-enable mediator connectivity and expect ingestion to resume
@@ -190,12 +187,16 @@ class ScanEventHistoryIntegrationTest
       eventHistory should not be empty
     }
     expectedUpdateIds.foreach { id =>
-      val eventById = sv1ScanBackend.getEventById(
+      val eventByIdO = sv1ScanBackend.getEventById(
         id,
         Some(CompactJson),
       )
-      eventById.update shouldBe defined
-      eventById.verdict shouldBe defined
+      eventByIdO match {
+        case Some(eventById) =>
+          eventById.update shouldBe defined
+          eventById.verdict shouldBe defined
+        case None => fail("Expected event for update id but got None")
+      }
     }
   }
 
@@ -230,24 +231,24 @@ class ScanEventHistoryIntegrationTest
 
     // Both update, and verdict should be returned
     val eventById = eventuallySucceeds() {
-      sv1ScanBackend.getEventById(
-        updateIdFromTap,
-        Some(CompactJson),
-      )
+      sv1ScanBackend
+        .getEventById(
+          updateIdFromTap,
+          Some(CompactJson),
+        )
+        .getOrElse(fail("Expected event for valid update id"))
     }
 
     eventById.update shouldBe defined
     eventById.verdict shouldBe defined
 
-    // Missing id: expect 404 -> client raises an error
+    // Missing id: expect 404 -> client returns None
     val missingId = "does-not-exist-12345"
-    val failure = Try {
-      sv1ScanBackend.getEventById(
-        missingId,
-        Some(CompactJson),
-      )
-    }
-    assert(failure.isFailure)
+    val res = sv1ScanBackend.getEventById(
+      missingId,
+      Some(CompactJson),
+    )
+    res shouldBe None
   }
 
   "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>

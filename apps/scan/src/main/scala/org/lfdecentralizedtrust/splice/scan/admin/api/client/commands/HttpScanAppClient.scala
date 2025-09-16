@@ -1406,7 +1406,7 @@ object HttpScanAppClient {
       damlValueEncoding: Option[definitions.DamlValueEncoding],
   ) extends InternalBaseCommand[
         http.GetEventByIdResponse,
-        definitions.EventHistoryItem,
+        Option[definitions.EventHistoryItem],
       ] {
     override def submitRequest(
         client: http.ScanClient,
@@ -1421,7 +1421,9 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetEventByIdResponse.OK(response) =>
-        Right(response)
+        Right(Some(response))
+      case http.GetEventByIdResponse.NotFound(_) =>
+        Right(None)
     }
   }
 
