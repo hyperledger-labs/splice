@@ -67,13 +67,21 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
                 "http://testUrl:8081",
               )
             ),
-            parameters =
-              config.parameters.copy(customTimeouts = config.parameters.customTimeouts.map {
+            parameters = config.parameters.copy(
+              customTimeouts = config.parameters.customTimeouts.map {
                 // guaranteeing a timeout for first test below
                 case (key @ "getAcsSnapshot", _) =>
                   key -> NonNegativeFiniteDuration.ofMillis(1L)
                 case other => other
-              }),
+              },
+              // used for the rate limit test
+              rateLimiting = config.parameters.rateLimiting.copy(
+                rateLimiters =
+                  config.parameters.rateLimiting.rateLimiters + ("getAggregatedRounds" -> SpliceRateLimitConfig(
+                    ratePerSecond = 5
+                  ))
+              ),
+            ),
           )
         )(config)
       )
@@ -753,43 +761,43 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     import env.{actorSystem, executionContext}
 
     def doCall() = {
-      sv1ScanBackend.getAcsSnapshot(
-        PartyId.tryCreate("rate-limit-party", dsoParty.namespace),
-        None,
-      )
+      sv1ScanBackend.getAggregatedRounds()
     }
 
-    loggerFactory.suppressWarningsAndErrors {
-      // ignore timeout failures
-      Try {
-        doCall()
-      }.discard
+    loggerFactory.assertLoggedWarningsAndErrorsSeq(
+      {
+        Try {
+          doCall()
+        }.discard
 
-      Threading.sleep(1000) // wait for the rate limiter to start
+        Threading.sleep(1000) // wait for the rate limiter to start
 
-      val results = SpliceRateLimiterTest
-        .runRateLimited(
-          10,
-          50,
-        ) {
-          Future {
-            blocking {
-              doCall()
+        val results = SpliceRateLimiterTest
+          .runRateLimited(
+            10,
+            50,
+          ) {
+            Future {
+              blocking {
+                doCall()
+              }
             }
-          }
-        } futureValue
+          } futureValue
 
-      // 2 is the limit from where the rate limiter starts to kick in
-      // then 2 every second
-      // first second is 2 (full capacity) + 2 (capacity added after consumption)
-      // then 2 every second
-      val maxAccepted = 12
-      // account for bursts in the stream used to rate limit the calls in `runRateLimited`
-      val minAccepted = 4
-      results.count(identity) should (be >= minAccepted and be <= maxAccepted)
+        // 5 is the limit from where the rate limiter starts to kick in
+        // then 5 every second
+        // first second is 5 (full capacity) + 5 (capacity added after consumption)
+        // then 5 every second
+        val maxAccepted = 30
+        // account for bursts in the stream used to rate limit the calls in `runRateLimited`
+        val minAccepted = 10
+        results.count(identity) should (be >= minAccepted and be <= maxAccepted)
 
-    }
-
+      },
+      forAll(_) {
+        _.message should include("Too Many Requests")
+      },
+    )
   }
 
   def expectedSenderFee(amount: BigDecimal) = {
