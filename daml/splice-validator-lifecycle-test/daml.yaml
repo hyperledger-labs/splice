@@ -17,4 +17,4 @@ codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
     decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceValidatorLifecycleTest
-    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
+    output-directory: target/daml-codegen-java
