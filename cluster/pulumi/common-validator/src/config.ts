@@ -4,7 +4,7 @@ import {
   DeployValidatorRunbook,
   KmsConfigSchema,
   LogLevelSchema,
-} from '@lfdecentralizedtrust/splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { clusterSubConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 

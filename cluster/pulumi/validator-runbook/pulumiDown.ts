@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
+import { ClusterBasename } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/gcpConfig';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from '../pulumi';
 import { downStack } from '../pulumiOperations';
@@ -13,7 +13,7 @@ export async function startDownOperationsForValidatorStacks(
     all: false,
   });
   const allValidatorsForCluster = allValidatorStacks.filter(stack => {
-    stack.name.endsWith(CLUSTER_BASENAME);
+    stack.name.endsWith(ClusterBasename);
   });
   return allValidatorsForCluster.map(stackSummary => {
     return {

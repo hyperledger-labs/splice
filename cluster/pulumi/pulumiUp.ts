@@ -26,7 +26,7 @@ async function runAllStacksUp() {
     operations.push(upOperation(svRunbook, abortController));
   }
   const validators = runAllValidatorsUp(abortController);
-  operations.concat(validators);
+  operations = operations.concat(validators);
   const cantonStacks = runSvCantonForAllMigrations(
     'up',
     stack => {
