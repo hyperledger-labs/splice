@@ -26,7 +26,8 @@ Each party that is allocated is setup through the following steps:
 To enable the party allocator to run against the validator runbook enable it through the following setting in `config.yaml`.
 
 ```
-validator:
-  partyAllocator:
-    enable: true
+validators:
+  validator-runbook:
+    partyAllocator:
+      enable: true
 ```

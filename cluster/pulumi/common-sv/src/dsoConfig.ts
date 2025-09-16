@@ -35,7 +35,7 @@ function getDsoSize(): number {
 
 export const dsoSize = getDsoSize();
 
-// Usd by `cnluster --sv1-only`
+// Used by `cnluster --sv1-only`
 export const skipExtraSvs = config.envFlag('SPLICE_SKIP_EXTRA_SVS', false);
 
 function getAllSvNamesToDeploy(): string[] {

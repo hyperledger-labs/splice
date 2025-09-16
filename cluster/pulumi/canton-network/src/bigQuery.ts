@@ -228,7 +228,7 @@ function installFunctions(
   scanDataset.project.apply(project => {
     // We don't just run allFunctions.map() because we want to sequence the creation, since every function
     // might depend on those before it.
-    let lastResource: gcp.bigquery.Routine | undefined = undefined;
+    let lastResource: pulumi.Resource | undefined = undefined;
     for (const f in allScanFunctions) {
       lastResource = allScanFunctions[f].toPulumi(
         project,
