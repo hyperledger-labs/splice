@@ -94,8 +94,8 @@ async function setupTopology(
     Buffer.from(generateTopologyResponse.multiHash, "base64"),
     keyPair.privateKey,
   );
-  const allocatePartyResponse = await client.allocateExternalParty(
-    partyHint,
+  await client.allocateExternalParty(
+    generateTopologyResponse.partyId,
     synchronizerId,
     generateTopologyResponse.topologyTransactions!.map((t) => ({
       transaction: t,
@@ -110,7 +110,7 @@ async function setupTopology(
       },
     ],
   );
-  return allocatePartyResponse.partyId;
+  return generateTopologyResponse.partyId;
 }
 
 async function tap(
@@ -193,6 +193,7 @@ async function generateKeyPair(index: number) {
 
 async function setupParty(
   client: LedgerApiClient,
+  userId: string,
   synchronizerId: string,
   index: number,
   validatorPartyId: string,
@@ -209,14 +210,16 @@ async function setupParty(
     keyPair,
   );
 
-  await tap(client, synchronizerId, partyId, keyPair);
-  await setupPreapproval(
-    client,
-    synchronizerId,
-    partyId,
-    validatorPartyId,
-    keyPair,
-  );
+  await client.withUserRights(userId, [partyId], async () => {
+    await tap(client, synchronizerId, partyId, keyPair);
+    await setupPreapproval(
+      client,
+      synchronizerId,
+      partyId,
+      validatorPartyId,
+      keyPair,
+    );
+  });
   console.debug(`Finished setup for party ${index}`);
 }
 
@@ -248,7 +251,7 @@ async function main() {
     console.debug(`Processing batch starting at ${index}`);
     const batchSize = Math.min(config.parallelism, config.maxParties - index);
     const batch = Array.from({ length: batchSize }, (_, i) =>
-      setupParty(client, synchronizerId, index + i, validatorPartyId),
+      setupParty(client, config.userId, synchronizerId, index + i, validatorPartyId),
     );
     await Promise.all(batch);
     index += batchSize;
@@ -257,4 +260,4 @@ async function main() {
 
 await main();
 
-export {};
+export { };
