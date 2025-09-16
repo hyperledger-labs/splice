@@ -122,7 +122,7 @@ class ScanEventStore(
       memVerdictRt: Option[CantonTimestamp],
       memUpdateRt: Option[CantonTimestamp],
       currentMigrationId: Long,
-  )(implicit tc: TraceContext): Future[Option[CantonTimestamp]] = {
+  )(implicit tc: TraceContext): Future[CantonTimestamp] = {
     val verdictF = memVerdictRt match {
       case some @ Some(_) => Future.successful(some)
       case None => verdictStore.maxVerdictRecordTime(currentMigrationId)
@@ -143,17 +143,17 @@ object ScanEventStore {
   def allowF(
       afterO: Option[(Long, CantonTimestamp)],
       currentMigrationId: Long,
-      currentMigrationCap: Option[CantonTimestamp],
+      currentMigrationCap: CantonTimestamp,
   )(mig: Long, rt: CantonTimestamp): Boolean = {
     afterO match {
       case Some((afterMig, afterRt)) if mig == afterMig =>
         if (mig < currentMigrationId) rt > afterRt
-        else rt > afterRt && currentMigrationCap.forall(rt <= _)
+        else rt > afterRt && rt <= currentMigrationCap
       case _ if mig < currentMigrationId =>
         // For prior migrations, stream everything in order
         rt > CantonTimestamp.MinValue
       case _ =>
-        rt > CantonTimestamp.MinValue && currentMigrationCap.forall(rt <= _)
+        rt > CantonTimestamp.MinValue && rt <= currentMigrationCap
     }
   }
 
@@ -162,9 +162,9 @@ object ScanEventStore {
   def getCurrentMigrationCap(
       verdictMaxRt: Option[CantonTimestamp],
       updateMaxRt: Option[CantonTimestamp],
-  ): Option[CantonTimestamp] = (verdictMaxRt, updateMaxRt) match {
-    case (Some(v), Some(u)) => Some(if (v < u) v else u)
-    case _ => Some(CantonTimestamp.MinValue)
+  ): CantonTimestamp = (verdictMaxRt, updateMaxRt) match {
+    case (Some(v), Some(u)) => if (v < u) v else u
+    case _ => CantonTimestamp.MinValue
   }
 
 }
