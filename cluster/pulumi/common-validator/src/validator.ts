@@ -81,7 +81,7 @@ type BasicValidatorConfig = {
   logLevel?: LogLevel;
 };
 
-export type ValidatorConfig = BasicValidatorConfig & {
+export type ValidatorInstallConfig = BasicValidatorConfig & {
   svValidator: false;
   onboardingSecret: string;
   svSponsorAddress?: string;
@@ -113,7 +113,7 @@ type SvValidatorConfig = BasicValidatorConfig & {
 };
 
 export async function installValidatorApp(
-  baseConfig: ValidatorConfig | SvValidatorConfig
+  baseConfig: ValidatorInstallConfig | SvValidatorConfig
 ): Promise<pulumi.Resource> {
   const backupConfig = baseConfig.backupConfig
     ? {

@@ -198,3 +198,7 @@ cluster:
       nodeType: n2-standard-16
 networkWide:
   maxVettingDelay: 1m
+validators:
+  extra-validator:
+    namespace: validator
+    partyHint: 'extra-validator'
