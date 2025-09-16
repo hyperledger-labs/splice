@@ -65,14 +65,15 @@ function toDisclosedContract(c: any): DisclosedContract {
   };
 }
 
-async function getPreapproval(partyId: string) {
-  const response = await fetch(
-    `${config.scanApiUrl}/api/scan/v0/transfer-preapprovals/by-party/${partyId}`,
+async function getPreapproval(client: LedgerApiClient, partyId: string) {
+  const response = await client.queryContracts(
+    [partyId],
+    ["#splice-amulet:Splice.AmuletRules:TransferPreapproval"],
   );
-  if (response.status === 404) {
-    throw new Error(`No preapproval for ${partyId}: ${await response.text()}`);
+  if (response.length > 0) {
+    return response[0];
   }
-  return response.json();
+  throw new Error(`No preapproval for ${partyId}`);
 }
 
 async function setupTopology(
@@ -171,11 +172,7 @@ async function setupPreapproval(
     [],
     command2,
   );
-  await client.retry(
-    "getPreapproval",
-    () => getPreapproval(partyId),
-    120, // long retry as scan caches this.
-  );
+  await client.retry("getPreapproval", () => getPreapproval(client, partyId));
 }
 
 function pubKeyPath(index: number) {
