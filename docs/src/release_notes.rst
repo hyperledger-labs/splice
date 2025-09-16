@@ -19,6 +19,12 @@ Upcoming
 
   - Expose ``/dso`` endpoint from scan proxy
 
+- Deployment
+
+  - Participant
+
+     - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
 0.4.16
 ------
 
