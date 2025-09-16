@@ -621,6 +621,124 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
       }
     }
 
+    "check filtering logic of allowF and getCurrentMigrationCap" in {
+
+      val recordTs1 = CantonTimestamp.now()
+      val recordTs2 = recordTs1.plusSeconds(1)
+      val recordTs3 = recordTs2.plusSeconds(1)
+      val recordTs4 = recordTs3.plusSeconds(1)
+
+      // getCurrentMigrationCap picks min when both defined
+      ScanEventStore.getCurrentMigrationCap(
+        Some(recordTs1),
+        Some(recordTs2),
+      ) shouldBe recordTs1
+      ScanEventStore.getCurrentMigrationCap(
+        Some(recordTs2),
+        Some(recordTs1),
+      ) shouldBe recordTs1
+      ScanEventStore.getCurrentMigrationCap(
+        Some(recordTs2),
+        Some(recordTs2),
+      ) shouldBe recordTs2
+
+      // missing max recordTime gives MinValue
+      ScanEventStore.getCurrentMigrationCap(
+        None,
+        Some(recordTs1),
+      ) shouldBe CantonTimestamp.MinValue
+      ScanEventStore.getCurrentMigrationCap(
+        Some(recordTs1),
+        None,
+      ) shouldBe CantonTimestamp.MinValue
+      ScanEventStore.getCurrentMigrationCap(
+        None,
+        None,
+      ) shouldBe CantonTimestamp.MinValue
+
+      val mig0 = domainMigrationId
+      val mig1 = mig0 + 1
+      val mig2 = mig1 + 1
+
+      val capMin = CantonTimestamp.MinValue
+      val cap2 = recordTs2
+      val cap3 = recordTs3
+
+      {
+        val allow = ScanEventStore.allowF(
+          afterO = None,
+          currentMigrationId = mig1,
+          currentMigrationCap = capMin,
+        )
+        allow(mig0, recordTs1) shouldBe true // prior migration is always allowed
+        allow(mig0, recordTs2) shouldBe true // prior migration is always allowed
+        allow(mig0, recordTs3) shouldBe true // prior migration is always allowed
+        allow(mig1, recordTs1) shouldBe false // > cap
+        allow(mig1, recordTs2) shouldBe false // > cap
+        allow(mig1, recordTs3) shouldBe false // > cap
+      }
+
+      {
+        val allow = ScanEventStore.allowF(
+          afterO = None,
+          currentMigrationId = mig1,
+          currentMigrationCap = cap2,
+        )
+        allow(mig0, recordTs1) shouldBe true // prior migration is always allowed
+        allow(mig0, recordTs2) shouldBe true // prior migration is always allowed
+        allow(mig0, recordTs3) shouldBe true // prior migration is always allowed
+        allow(mig1, recordTs1) shouldBe true // <= cap
+        allow(mig1, recordTs2) shouldBe true // <= cap
+        allow(mig1, recordTs3) shouldBe false // > cap
+      }
+
+      {
+        val allow = ScanEventStore.allowF(
+          afterO = Some((mig0, recordTs1)),
+          currentMigrationId = mig1,
+          currentMigrationCap = capMin,
+        )
+        allow(mig0, recordTs1) shouldBe false // equal to after
+        allow(mig0, recordTs2) shouldBe true
+        allow(mig1, recordTs1) shouldBe false // > cap
+      }
+
+      {
+        val allow = ScanEventStore.allowF(
+          afterO = Some((mig0, recordTs1)),
+          currentMigrationId = mig1,
+          currentMigrationCap = cap3,
+        )
+        allow(mig0, recordTs1) shouldBe false // equal to after
+        allow(mig0, recordTs2) shouldBe true
+        allow(mig1, recordTs1) shouldBe true // <= cap
+        allow(mig1, recordTs2) shouldBe true // <= cap
+        allow(mig1, recordTs3) shouldBe true // equal to cap is allowed
+        allow(mig1, recordTs4) shouldBe false // above cap is blocked
+      }
+
+      {
+        val allow = ScanEventStore.allowF(
+          afterO = Some((mig1, recordTs2)),
+          currentMigrationId = mig1,
+          currentMigrationCap = cap3,
+        )
+        allow(mig1, recordTs2) shouldBe false // equal to after
+        allow(mig1, recordTs3) shouldBe true // > after and == cap
+        allow(mig1, recordTs4) shouldBe false // > cap
+      }
+
+      {
+        val allow = ScanEventStore.allowF(
+          afterO = Some((mig2, recordTs2)),
+          currentMigrationId = mig2,
+          currentMigrationCap = cap2,
+        )
+        allow(mig1, recordTs3) shouldBe true // prior migration is always allowed
+        allow(mig2, recordTs2) shouldBe false // equal to after
+        allow(mig2, recordTs3) shouldBe false // > after and > cap
+      }
+    }
   }
 
   private def newUpdateHistory(
