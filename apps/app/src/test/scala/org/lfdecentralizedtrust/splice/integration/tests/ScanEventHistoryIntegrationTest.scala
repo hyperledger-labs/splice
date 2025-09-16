@@ -71,60 +71,58 @@ class ScanEventHistoryIntegrationTest
     aliceWalletClient.tap(1)
 
     // Verify that new events are visible after the cursor
-    eventually() {
-      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTap))
-      eventHistory.nonEmpty shouldBe true
+    val eventHistory = eventually() {
+      val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTap))
+      eh should not be empty
+      eh
+    }
 
-      // Basic checks for page limit and encoding
-      val smallerLimit = eventHistory.size - 1
-      val withCompactEncoding = sv1ScanBackend.getEventHistory(
-        count = smallerLimit,
-        after = Some(cursorBeforeTap),
-        encoding = CompactJson,
-      )
+    // Basic checks for page limit and encoding
+    val smallerLimit = eventHistory.size - 1
+    val withCompactEncoding = sv1ScanBackend.getEventHistory(
+      count = smallerLimit,
+      after = Some(cursorBeforeTap),
+      encoding = CompactJson,
+    )
 
-      withCompactEncoding.size shouldBe smallerLimit
+    withCompactEncoding.size shouldBe smallerLimit
 
-      val withProtobufEncoding = sv1ScanBackend.getEventHistory(
-        count = smallerLimit,
-        after = Some(cursorBeforeTap),
-        encoding = ProtobufJson,
-      )
+    val withProtobufEncoding = sv1ScanBackend.getEventHistory(
+      count = smallerLimit,
+      after = Some(cursorBeforeTap),
+      encoding = ProtobufJson,
+    )
 
-      withProtobufEncoding.size shouldBe smallerLimit
+    withProtobufEncoding.size shouldBe smallerLimit
 
-      val txIdsCompact = withCompactEncoding
-        .collect {
-          case item if item.update.exists {
-                case UpdateHistoryTransactionV2(_) => true; case _ => false
-              } =>
-            item
-        }
-        .flatMap(_.update)
-        .collect {
-          case UpdateHistoryTransactionV2(tx) => tx.updateId
-          case UpdateHistoryReassignment(r) => r.updateId
-        }
-        .toSet
-
-      val txIdsProtobuf = withProtobufEncoding
-        .collect {
-          case item if item.update.exists {
-                case UpdateHistoryTransactionV2(_) => true; case _ => false
-              } =>
-            item
-        }
-        .flatMap(_.update)
-        .collect {
-          case UpdateHistoryTransactionV2(tx) => tx.updateId
-          case UpdateHistoryReassignment(r) => r.updateId
-        }
-        .toSet
-
-      withClue("Mismatch between CompactJson and ProtobufJson update ids") {
-        txIdsProtobuf shouldBe txIdsCompact
+    val txIdsCompact = withCompactEncoding
+      .collect {
+        case item
+            if item.update.exists { case UpdateHistoryTransactionV2(_) => true; case _ => false } =>
+          item
       }
+      .flatMap(_.update)
+      .collect {
+        case UpdateHistoryTransactionV2(tx) => tx.updateId
+        case UpdateHistoryReassignment(r) => r.updateId
+      }
+      .toSet
 
+    val txIdsProtobuf = withProtobufEncoding
+      .collect {
+        case item
+            if item.update.exists { case UpdateHistoryTransactionV2(_) => true; case _ => false } =>
+          item
+      }
+      .flatMap(_.update)
+      .collect {
+        case UpdateHistoryTransactionV2(tx) => tx.updateId
+        case UpdateHistoryReassignment(r) => r.updateId
+      }
+      .toSet
+
+    withClue("Mismatch between CompactJson and ProtobufJson update ids") {
+      txIdsProtobuf shouldBe txIdsCompact
     }
   }
 
@@ -136,8 +134,10 @@ class ScanEventHistoryIntegrationTest
 
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    val (aliceParty, _) = onboardAliceAndBob()
+    val _ = onboardAliceAndBob()
 
+    // There may be some data already in scan's DB even with disabled proxy
+    // Get the last available event in DB
     val cursorBefore = eventuallySucceeds() { lastCursor() }
 
     // Also record wallet top event to derive updateIds for taps
@@ -151,14 +151,12 @@ class ScanEventHistoryIntegrationTest
     aliceWalletClient.tap(6)
 
     // While mediator ingestion is down, history after cursor should be empty due to capping
-    eventually() {
-      val eventHistory = sv1ScanBackend.getEventHistory(
-        count = pageLimit,
-        after = Some(cursorBefore),
-        encoding = CompactJson,
-      )
-      eventHistory shouldBe empty
-    }
+    val historyWhileDown = sv1ScanBackend.getEventHistory(
+      count = pageLimit,
+      after = Some(cursorBefore),
+      encoding = CompactJson,
+    )
+    historyWhileDown shouldBe empty
 
     // Fetch the updateIds for the taps from wallet history
     val expectedUpdateIds = eventuallySucceeds() {
@@ -187,7 +185,15 @@ class ScanEventHistoryIntegrationTest
 
     eventually() {
       val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBefore))
-      eventHistory.nonEmpty shouldBe true
+      eventHistory should not be empty
+    }
+    expectedUpdateIds.foreach { id =>
+      val eventById = sv1ScanBackend.getEventById(
+        id,
+        Some(CompactJson),
+      )
+      eventById.update shouldBe defined
+      eventById.verdict shouldBe defined
     }
   }
 
@@ -195,7 +201,7 @@ class ScanEventHistoryIntegrationTest
     initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    val (aliceParty, _) = onboardAliceAndBob()
+    val _ = onboardAliceAndBob()
     // Get the current top wallet transaction event id (if any)
     val topBeforeO = aliceWalletClient
       .listTransactions(beginAfterId = None, pageSize = 1)
@@ -219,14 +225,15 @@ class ScanEventHistoryIntegrationTest
     }
 
     // Both update, and verdict should be returned
-    eventually() {
-      val eventById = sv1ScanBackend.getEventById(
+    val eventById = eventuallySucceeds() {
+      sv1ScanBackend.getEventById(
         updateIdFromTap,
         Some(CompactJson),
       )
-      eventById.update shouldBe defined
-      eventById.verdict shouldBe defined
     }
+
+    eventById.update shouldBe defined
+    eventById.verdict shouldBe defined
 
     // Missing id: expect 404 -> client raises an error
     val missingId = "does-not-exist-12345"
@@ -243,9 +250,9 @@ class ScanEventHistoryIntegrationTest
     initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    val (aliceParty, _) = onboardAliceAndBob()
+    val _ = onboardAliceAndBob()
 
-    val cursorBeforeRestart = eventuallySucceeds() { lastCursor() }
+    val cursorBeforeTaps = eventuallySucceeds() { lastCursor() }
 
     // Also record wallet top eventId to derive updateIds for taps deterministically
     val topBeforeAll = aliceWalletClient
@@ -259,15 +266,17 @@ class ScanEventHistoryIntegrationTest
 
     // Ensure those initial taps have verdicts attached after the baseline cursor
     eventually() {
-      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
+      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
       val txItems = eventHistory.collect {
         case item if item.update.exists {
-              case UpdateHistoryTransactionV2(_) => true; case _ => false
-            } =>
+          case UpdateHistoryTransactionV2(_) => true; case _ => false
+        } =>
           item
       }
       txItems.size should be >= 2
     }
+
+    val cursorBeforeRestart = eventuallySucceeds() { lastCursor() }
 
     // Stop scan to pause ingestion, wait until fully stopped
     sv1ScanBackend.stop()
@@ -294,22 +303,26 @@ class ScanEventHistoryIntegrationTest
       newSinceTop.take(4).map(e => EventId.updateIdFromEventId(e.eventId))
     }
 
-    // Verify: contains all expected updateIds, no duplicates, and verdicts attached
+    // Wait for scan backend to do ingestion
     eventually() {
-      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
-      val txItems = eventHistory.collect {
-        case item if item.update.exists {
-              case UpdateHistoryTransactionV2(_) => true; case _ => false
-            } =>
-          item
-      }
-      val ids = txItems.flatMap(_.update).collect {
-        case UpdateHistoryTransactionV2(tx) => tx.updateId
-        case UpdateHistoryReassignment(r) => r.updateId
-      }
-      expectedUpdateIds.toSet.subsetOf(ids.toSet) shouldBe true
-      ids.distinct.size shouldBe ids.size // no duplicates
+      val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
+      eh should not be empty
     }
+
+    // Verify: contains all expected updateIds, no duplicates, and verdicts attached
+    val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
+    val txItems = eventHistory.collect {
+      case item if item.update.exists {
+        case UpdateHistoryTransactionV2(_) => true; case _ => false
+      } =>
+        item
+    }
+    val ids = txItems.flatMap(_.update).collect {
+      case UpdateHistoryTransactionV2(tx) => tx.updateId
+      case UpdateHistoryReassignment(r) => r.updateId
+    }
+    expectedUpdateIds.toSet.subsetOf(ids.toSet) shouldBe true
+    ids.distinct.size shouldBe ids.size // no duplicates
   }
 
   // Fetch events and assert every tx update has a matching verdict
