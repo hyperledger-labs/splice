@@ -158,3 +158,17 @@ test('backfilling indicator does not shows when response is unclear', async () =
   const backfillingIndicator = screen.queryByTestId('backfilling-alert');
   expect(backfillingIndicator).toBeNull();
 });
+
+// the server handler returns no fees by default
+test('Fees with value 0 are not shown', async () => {
+  const user = userEvent.setup();
+  render(<AppWithConfig />);
+  await user.click(screen.getByText(`${spliceInstanceNames.amuletName} Activity`));
+
+  expect(await screen.findByText('Synchronizer Fee')).toBeDefined();
+  expect(await screen.findByText('Holding Fee')).toBeDefined();
+
+  expect(screen.queryByText('Base Transfer Fee')).toBeNull();
+  expect(screen.queryByText('Transfer Fee')).toBeNull();
+  expect(screen.queryByText('Lock Holder Fee')).toBeNull();
+});

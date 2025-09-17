@@ -297,13 +297,16 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
           ];
         }
       },
-      [
-        {
-          fee: toPercent(transferFees.initialRate),
-          range: `< ${BigNumber(transferFees.steps[0]._1)} USD`,
-          last: false,
-        },
-      ]
+      // the default for reduce is always called, and this blows up when fetching steps[0]._1 if there are no steps
+      transferFees.steps.length > 0
+        ? [
+            {
+              fee: toPercent(transferFees.initialRate),
+              range: `< ${BigNumber(transferFees.steps[0]._1)} USD`,
+              last: false,
+            },
+          ]
+        : []
     )
     .filter(step => !step.fee.eq(0));
 
