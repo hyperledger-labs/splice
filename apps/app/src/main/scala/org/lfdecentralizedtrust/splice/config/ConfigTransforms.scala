@@ -196,6 +196,7 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
+      disableZeroFees(),
     )
   }
 
@@ -291,6 +292,9 @@ object ConfigTransforms {
         )
       )
     )
+
+  def disableZeroFees(): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
 
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
