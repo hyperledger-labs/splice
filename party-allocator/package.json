@@ -19,6 +19,8 @@
   "devDependencies": {
     "@lfdecentralizedtrust/canton-json-api-v2-openapi": "file:../token-standard/dependencies/canton-json-api-v2/openapi-ts-client",
     "@lfdecentralizedtrust/transfer-instruction-openapi": "file:../token-standard/splice-api-token-transfer-instruction-v1/openapi-ts-client",
+    "@opentelemetry/exporter-prometheus": "^0.205.0",
+    "@opentelemetry/sdk-metrics": "^2.1.0",
     "@types/node": "^24.3.1",
     "@typescript-eslint/eslint-plugin": "^7.7.1",
     "esbuild": "^0.25.9",
