@@ -140,5 +140,6 @@ svs:
 validators:
   validator-runbook:
     namespace: validator
+    nodeIdentifier: 'validator-runbook'
     partyHint: 'digitalasset-testValidator-1'
     onboardingSecret: 'validatorsecret'
