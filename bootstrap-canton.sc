@@ -16,26 +16,12 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.console.commands.TopologyAdministrationGroup
-import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, StoredTopologyTransactions}
-import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.sequencing.SequencerConnectionValidation
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 
 println("Running canton bootstrap script...")
 
 val domainParametersConfig = SynchronizerParametersConfig(
   alphaVersionSupport = true
 )
-
-def dropSignatures(tx: GenericSignedTopologyTransaction): GenericSignedTopologyTransaction = {
-  tx.transaction.mapping match {
-    case OwnerToKeyMapping(member, _) =>
-      val signaturesToRemove = tx.signatures.forgetNE.filter(_.signedBy != member.namespace.fingerprint).map(_.signedBy)
-      tx.removeSignatures(signaturesToRemove).get
-    case _ => tx
-  }
-}
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
@@ -47,119 +33,44 @@ def bootstrapOtherDomain(
     name: String,
     sequencer: LocalSequencerReference,
     mediator: LocalMediatorReference,
-    extraParticipant : LocalInstanceReference,
 ) = {
-  // first synchronizer method
-  val synchronizerName = name
-  val mediatorsToSequencers = Seq(mediator).map(_ -> (Seq(sequencer), PositiveInt.one)).toMap
-  val synchronizerThreshold = PositiveInt.one
-  val staticSynchronizerParameters = staticParameters(sequencer)
-  val mediatorRequestAmplification = SubmissionRequestAmplification.NoAmplification
-
-  // second synchronizer method
-  val sequencers =
-    Seq(sequencer).groupBy(_.id).flatMap(_._2.headOption.toList).toList
-  val synchronizerOwners = Seq(sv1Participant)
-  val mediators = mediatorsToSequencers.keys.toSeq
-
-  // run bootstrap method
-  val synchronizerNamespace =
-    DecentralizedNamespaceDefinition.computeNamespace(synchronizerOwners.map(_.namespace).toSet)
-  val synchronizerId = SynchronizerId(
-    UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
+  bootstrap.synchronizer(
+    name,
+    synchronizerOwners = Seq(sequencer),
+    sequencers = Seq(sequencer),
+    mediators = Seq(mediator),
+    synchronizerThreshold = PositiveInt.one,
+    staticSynchronizerParameters = staticParameters(sequencer),
   )
-
-  val tempStoreForBootstrap = synchronizerOwners
-    .map(
-      _.topology.stores.create_temporary_topology_store(
-        s"$synchronizerName-setup",
-        staticSynchronizerParameters.protocolVersion,
-      )
-    )
-    .headOption
-    .getOrElse(sys.error("No synchronizer owners specified."))
-
-  val identityTransactions =
-    (sequencers ++ mediators ++ synchronizerOwners ++ Seq(extraParticipant)).flatMap(
-      _.topology.transactions.identity_transactions()
-    )
-
-  synchronizerOwners.foreach(
-    _.topology.transactions.load(
-      identityTransactions,
-      store = tempStoreForBootstrap,
-      ForceFlag.AlienMember,
-    )
-  )
-
-  val (_, foundingTxs) =
-    bootstrap.decentralized_namespace(
-      synchronizerOwners,
-      synchronizerThreshold,
-      store = tempStoreForBootstrap,
-    )
-
-  val synchronizerGenesisTxs = synchronizerOwners.flatMap(
-    _.topology.synchronizer_bootstrap.generate_genesis_topology(
-      synchronizerId,
-      synchronizerOwners.map(_.id.member),
-      sequencers.map(_.id),
-      mediators.map(_.id),
-      store = tempStoreForBootstrap,
-      mediatorThreshold = PositiveInt.one,
-    )
-  )
-
-  val initialTopologyState = (identityTransactions ++ foundingTxs ++ synchronizerGenesisTxs)
-    .mapFilter(_.selectOp[TopologyChangeOp.Replace])
-    .distinct
-
-  val merged = SignedTopologyTransactions.compact(initialTopologyState).map(_.updateIsProposal(false))
-
-  val storedTopologySnapshot = StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
-    merged.map(stored =>
-      StoredTopologyTransaction(
-        sequenced = SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-        validFrom = EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-        validUntil = None,
-        transaction = dropSignatures(stored),
-        rejectionReason = None,
-      )
-    )
-  ).toByteString(staticSynchronizerParameters.protocolVersion)
-
-  sequencers
-    .filterNot(_.health.initialized())
-    .foreach(x =>
-      x.setup
-        .assign_from_genesis_state(storedTopologySnapshot, staticSynchronizerParameters)
-        .discard
-    )
-
-  mediatorsToSequencers
-    .filter(!_._1.health.initialized())
-    .foreach { case (mediator, (mediatorSequencers, threshold)) =>
-      mediator.setup.assign(
-        synchronizerId,
-        SequencerConnections.tryMany(
-          mediatorSequencers
-            .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
-          threshold,
-          mediatorRequestAmplification,
+  // For some stupid reason bootstrap.domain does not allow changing the dynamic domain parameters
+  // so we overwrite it here.
+  val synchronizerId = sequencer.synchronizer_id
+  // Align the reconciliation interval and catchup config with what our triggers set.
+  // This doesn't really matter for splitwell but it matters for the soft synchronizer upgrade test.
+  sequencer.topology.synchronizer_parameters.propose_update(
+    synchronizerId,
+    parameters =>
+      parameters.update(
+        reconciliationInterval = PositiveDurationSeconds.ofMinutes(30),
+        acsCommitmentsCatchUpParameters = Some(
+          AcsCommitmentsCatchUpParameters(
+            catchUpIntervalSkip = PositiveInt.tryCreate(24),
+            nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
+          )
         ),
-        // if we run bootstrap ourselves, we should have been able to reach the nodes
-        // so we don't want the bootstrapping to fail spuriously here in the middle of
-        // the setup
-        SequencerConnectionValidation.Disabled,
-      )
-    }
-
-  synchronizerOwners.foreach(
-    _.topology.stores.drop_temporary_topology_store(tempStoreForBootstrap)
+        preparationTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofHours(24),
+        mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofHours(48),
+      ),
+    signedBy = Some(sequencer.id.uid.namespace.fingerprint),
+    // This is test code so just force the change.
+    force = ForceFlags(ForceFlag.PreparationTimeRecordTimeToleranceIncrease),
   )
 }
 
-bootstrapOtherDomain("global-domain", globalSequencerSv1, globalMediatorSv1, aliceParticipant)
+Seq(
+  ("splitwell", splitwellSequencer, splitwellMediator),
+  ("splitwellUpgrade", splitwellUpgradeSequencer, splitwellUpgradeMediator),
+).foreach((bootstrapOtherDomain _).tupled)
 
 // These user allocations are only there
 // for local testing. Our tests allocate their own users.

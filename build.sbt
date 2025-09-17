@@ -1945,6 +1945,10 @@ updateTestConfigForParallelRuns := {
       "SvOffboardingIntegrationTest",
       "ManualStartIntegrationTest",
     ).exists(name.contains)
+  def isManualSignatureIntegrationTest(name: String): Boolean =
+    Seq(
+      "ManualSignatureIntegrationTest"
+    ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isLocalNetTest(name: String): Boolean =
@@ -1968,6 +1972,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "manual tests with custom canton instance",
+      "test-full-class-names-signatures.log",
+      (t: String) => isManualSignatureIntegrationTest(t),
+    ),
     (
       "Unit tests",
       "test-full-class-names-non-integration.log",
