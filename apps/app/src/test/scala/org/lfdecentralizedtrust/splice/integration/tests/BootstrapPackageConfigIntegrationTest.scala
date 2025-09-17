@@ -303,7 +303,12 @@ class BootstrapPackageConfigIntegrationTest
         ).foreach { case (participantClient, scheduledTimeO) =>
           clue(s"Vetting state for ${participantClient.id}") {
             eventually() {
-              vettingIsUpdatedForTheNewConfig(participantClient, scheduledTimeO)
+              vettingIsUpdatedForTheNewConfig(
+                participantClient,
+                scheduledTimeO,
+                Some(vettingScheduledTime),
+                Some(vettingScheduledTime),
+              )
             }
           }
         }
@@ -428,8 +433,8 @@ class BootstrapPackageConfigIntegrationTest
   private def vettingIsUpdatedForTheNewConfig(
       participantClient: ParticipantClientReference,
       scheduledTimeO: Option[CantonTimestamp],
-      scheduledTime1: Option[CantonTimestamp] = None,
-      scheduledTime2: Option[CantonTimestamp] = None,
+      scheduledTime1: Option[CantonTimestamp],
+      scheduledTime2: Option[CantonTimestamp],
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val vettingTopologyState = participantClient.topology.vetted_packages.list(
       store = Some(
@@ -445,7 +450,7 @@ class BootstrapPackageConfigIntegrationTest
         packageName: PackageIdResolver.Package,
     ): Unit = {
       val allPackagesVersions = DarResources.lookupAllPackageVersions(packageName.packageName)
-      val expectedToBeVettedAmuletVersions = allPackagesVersions
+      val expectedToBeVettedVersions = allPackagesVersions
         .filter(
           _.metadata.version > PackageIdResolver.readPackageVersion(
             initialPackageConfig.toPackageConfig,
@@ -453,11 +458,11 @@ class BootstrapPackageConfigIntegrationTest
           )
         )
         .filter(_.metadata.version <= bootstrapPackage.metadata.version)
-      expectedToBeVettedAmuletVersions.foreach { expectedVettedVersion =>
-        val newAmuletVettedPackage = vettingState.packages
+      expectedToBeVettedVersions.foreach { expectedVettedVersion =>
+        val newVettedPackage = vettingState.packages
           .find(_.packageId == expectedVettedVersion.packageId)
           .value
-        newAmuletVettedPackage.validFrom should (
+        newVettedPackage.validFrom should (
           equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
         )
       }
