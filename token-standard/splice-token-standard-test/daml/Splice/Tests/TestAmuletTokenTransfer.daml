@@ -156,8 +156,7 @@ setupTwoStepTransfer feesConfig = do
   [senderChangeCid] <- pure result.senderChangeCids
   Some senderChange <- queryInterfaceContractId @Holding alice senderChangeCid
   senderChange.lock === None
-  -- TODO(#2230): switch to checking exact balance once no fees need to be reserved for holding fees
-  WalletClient.checkHoldingApprox  alice senderChangeCid (1000.0 - transfer.amount)
+  checkHoldingWith feesConfig alice senderChangeCid (1000.0 - transfer.amount)
   expectBurn feesConfig result.meta
   pure (testSetup, aliceInstrCid)
 
@@ -289,7 +288,7 @@ test_two_step_success : FeesConfig -> Script ()
 test_two_step_success feesConfig = do
   (TestSetup {..}, aliceInstrCid) <- setupTwoStepTransfer feesConfig
 
-  -- check lock context
+  -- check locked holding
   [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
   let expectedLock = Some $ Lock with
         expiresAt = Some (defaultTransfer.executeBefore)
@@ -297,6 +296,12 @@ test_two_step_success feesConfig = do
         holders = [registry.dso]
         context = Some "transfer to 'bob'"
   lockedHolding.lock === expectedLock
+  case feesConfig of
+    NoFees -> lockedHolding.amount === 10.0 -- yay, no fee reserve required!
+    WithFees ->
+      unless (lockedHolding.amount > 10.0) $
+        abort "Expected locked holding amount to be greater than 10.0 due to fees reserve"
+
 
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
@@ -312,17 +317,16 @@ test_two_step_success feesConfig = do
       meta = emptyMetadata
 
   TransferInstructionResult_Completed receiverHoldingCids <- pure result.output
-  case result.senderChangeCids of
-    [holdingCid] ->
-      -- TODO(#2230): switch to checking exact balance once no fees need to be reserved for holding fees
-      -- checkHoldingWith feesConfig alice holdingCid 1.0
-      WalletClient.checkHoldingApprox alice holdingCid 1.0
-    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  case feesConfig of
+    NoFees -> result.senderChangeCids === [] -- no fee reserve required! yay!
+    WithFees ->
+      case result.senderChangeCids of
+        [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 1.0
+        cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+
   case receiverHoldingCids of
     [holdingCid] ->
-      -- TODO(#2230): switch to checking exact balance once no fees need to be reserved for holding fees
-      -- checkHoldingWith feesConfig bob holdingCid 10.0
-      WalletClient.checkHoldingApprox bob holdingCid 10.0
+      checkHoldingWith feesConfig bob holdingCid 10.0
     cids -> abort ("Unexpected number of receiverHoldingCids: " <> show cids)
   expectBurn feesConfig result.meta
 
@@ -359,9 +363,7 @@ test_two_step_withdraw feesConfig = do
 
   case result.senderChangeCids of
     [holdingCid] ->
-      -- TODO(#2230): switch to checking exact balance once no fees need to be reserved for holding fees
-      -- checkHoldingWith feesConfig alice holdingCid 10.0
-      WalletClient.checkHoldingApprox alice holdingCid 10.0
+      checkHoldingWith feesConfig alice holdingCid 10.0
     cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
   TransferInstructionResult_Failed === result.output
 
@@ -450,9 +452,7 @@ test_two_step_reject feesConfig = do
 
   case result.senderChangeCids of
     [holdingCid] ->
-      -- TODO(#2230): switch to checking exact balance once no fees need to be reserved for holding fees
-      -- checkHoldingWith feesConfig alice holdingCid 10.0
-      WalletClient.checkHoldingApprox alice holdingCid 10.0
+      checkHoldingWith feesConfig alice holdingCid 10.0
     cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
   result.output === TransferInstructionResult_Failed
 

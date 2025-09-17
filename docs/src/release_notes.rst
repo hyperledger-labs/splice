@@ -25,10 +25,11 @@ Upcoming
 
   - Implement `CIP-XXX - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/pull/97/files>`__ with the following changes:
 
+     - Change all Amulet transfers to not charge holding fees on inputs.
      - Fix a bug in the validation of ``AmuletConfig`` that prevented
-       setting the CC transfer fees to zero.
+       setting the Amulet transfer fees to zero.
      - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
-       that prevented featured app rewards to be issued when the CC usage fees are zero.
+       that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
 
      These Daml changes requires an upgrade to the following Daml versions:
 
@@ -42,6 +43,18 @@ Upcoming
      wallet             0.1.14
      walletPayments     0.1.14
      ================== =======
+
+ .. important::
+
+     App devs that predict holding fees on transfers must adjust their code to
+     no longer expect any holding fees once this Daml change gets voted in.
+
+     The simplest option is to make your code independent of whether the change was voted in
+     by removing the prediction of holding fees. You can instead
+     extract the actual holding fees charged from the transfer transaction itself;
+     i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+     of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+     of the ``TransferResult``.
 
 - Deployment
 
