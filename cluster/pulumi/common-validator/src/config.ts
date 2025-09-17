@@ -5,7 +5,7 @@ import {
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
-import { clusterSubConfig } from 'splice-pulumi-common/src/config/configLoader';
+import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const ValidatorNodeConfigSchema = z.object({
