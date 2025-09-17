@@ -241,8 +241,8 @@ async function main() {
     const match = f.match(/(?<index>.*)_priv.key/);
     return parseInt(match?.groups?.index || "0");
   });
-  const maxIndex = keyIndices.length > 0 ? Math.max(...keyIndices) : 0;
-  // We just reinitialize the party at maxIndex from scratch and accept that we allocate slightly more than maxParties in case of restarts instead of trying to clever
+  const maxIndex = keyIndices.length > 0 ? Math.max(...keyIndices) + 1 : 0;
+  // We just reinitialize the party at maxIndex + 1 from scratch instead of trying to clever
   // and incrementally handle all kinds of failures.
   logger.info(`Starting at ${maxIndex}`);
 
@@ -265,6 +265,15 @@ async function main() {
     logger.info(`Completed batch`);
     index += batchSize;
   }
+  logger.info(`Party allocator, completed. Sleeping`);
+  // sleep forever so k8s doesn't restart it over and over.
+  // For some reason, nodejs is too smart and await new Promise(() => {}) does not actually work.
+  await sleepForever();
+}
+
+async function sleepForever() {
+  await new Promise((resolve) => setInterval(() => resolve(1000 * 60 * 60)));
+  sleepForever;
 }
 
 await main();
