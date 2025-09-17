@@ -31,7 +31,7 @@ import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.Failure
+import scala.util.{Failure, Success}
 
 import com.digitalasset.canton.mediator.admin.v30
 
@@ -116,15 +116,18 @@ class ScanVerdictStoreIngestion(
         batch.map(toDbRowAndViews)
       store
         .insertVerdictAndTransactionViews(items)
-        .map { _ =>
-          val lastRecordTime = batch.lastOption
-            .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
-            .getOrElse(CantonTimestamp.MinValue)
-          ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
-          batch.foreach(_ => ingestionMetrics.verdictCount.mark())
-          TaskSuccess(s"inserted ${batch.size} verdicts")
+        .transform {
+          case Success(_) =>
+            val lastRecordTime = batch.lastOption
+              .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
+              .getOrElse(CantonTimestamp.MinValue)
+            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
+            batch.foreach(_ => ingestionMetrics.verdictCount.mark())
+            Success(TaskSuccess(s"inserted ${batch.size} verdicts"))
+          case Failure(ex) =>
+            ingestionMetrics.errors.mark()
+            Failure(ex)
         }
-        .andThen { case Failure(_) => ingestionMetrics.errors.mark() }
     }
   }
 
