@@ -33,7 +33,6 @@
         "canton-network",
         "cluster",
         "gcp",
-        "gcp-project",
         "infra",
         "sv-runbook",
         "observability",
