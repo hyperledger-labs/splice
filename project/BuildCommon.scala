@@ -1672,7 +1672,7 @@ object BuildCommon {
       Some(workingDir),
     )
     def openApiSettings(
-        npmName: String,
+        unscopedNpmName: String,
         openApiSpec: String,
         directory: String = "openapi-ts-client",
     ): Seq[Setting[_]] = Seq(
@@ -1684,9 +1684,7 @@ object BuildCommon {
             baseDirectory.value / ".." / "common/src/main/openapi/common-external.yaml"
 
           generateOpenApiClient(
-            npmName = npmName,
-            npmModuleName = npmName,
-            npmProjectName = npmName,
+            unscopedNpmName = unscopedNpmName,
             openApiSpec = openApiSpec,
             cacheFileDependencies = Set(commonInternalOpenApiFile, commonExternalOpenApiFile),
             directory = directory,
@@ -1697,9 +1695,7 @@ object BuildCommon {
     )
 
     def generateOpenApiClient(
-        npmName: String,
-        npmModuleName: String,
-        npmProjectName: String,
+        unscopedNpmName: String,
         openApiSpec: String,
         cacheFileDependencies: Set[File] = Set.empty[File],
         directory: String,
@@ -1709,6 +1705,7 @@ object BuildCommon {
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory / directory
 
+      val npmName = s"@lfdecentralizedtrust/$unscopedNpmName"
       val openApiSpecFile = baseDirectory.value / subPath / openApiSpec
       val template = templateDirectory.value
       val outputDir = outputPrefix.fold(baseDirectory.value)(new java.io.File(_)) / directory
@@ -1724,9 +1721,9 @@ object BuildCommon {
             "-p",
             s"npmName=$npmName",
             "-p",
-            s"moduleName=$npmModuleName",
+            s"moduleName=$npmName",
             "-p",
-            s"projectName=$npmProjectName",
+            s"projectName=$npmName",
             "-p",
             "enumPropertyNaming=original",
             "-p",

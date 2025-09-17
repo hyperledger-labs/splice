@@ -1431,7 +1431,9 @@ paths:
       x-jvm-package: scan
       operationId: "listTransactionHistory"
       description: |
-        **Deprecated**. Lists transactions, by default in ascending order, paged, from ledger begin or optionally starting after a provided event id.
+        **Deprecated with known bugs that will not be fixed, use /v2/updates instead**.
+
+        Lists transactions, by default in ascending order, paged, from ledger begin or optionally starting after a provided event id.
       requestBody:
         required: true
         content:

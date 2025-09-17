@@ -25,7 +25,6 @@ import {
   validatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
-  installLoopback,
   imagePullSecret,
   CnInput,
   sequencerPruningConfig,
@@ -49,8 +48,8 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
+  installSvLoopback,
   svsConfig,
-  updateHistoryBackfillingValues,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
@@ -102,13 +101,13 @@ export async function installNode(
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE: svNamespaceStr,
+      namespace: svNamespaceStr,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -389,7 +388,6 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
@@ -479,6 +477,7 @@ async function installSvAndValidator(
                 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
             },
           ]),
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
   };
 

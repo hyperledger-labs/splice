@@ -9,7 +9,6 @@ export * from './domainMigration';
 export * from './helm';
 export * from './ingress';
 export * from './jmx';
-export * from './loopback';
 export * from './multiValidator';
 export * from './onboarding';
 export * from './persistence';

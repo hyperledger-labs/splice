@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { spliceEnvConfig } from './envConfig';
 
 export * from './configSchema';
+export * from './kms';
 export { spliceEnvConfig as config } from './envConfig';
 
 export const DeploySvRunbook = spliceEnvConfig.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);

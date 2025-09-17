@@ -129,14 +129,12 @@ describe('Offboard SV Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
     await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
 
     await waitFor(() => {
@@ -159,10 +157,7 @@ describe('Offboard SV Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.clear(expiryDateInput);
     await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
     await waitFor(() => {
@@ -171,7 +166,6 @@ describe('Offboard SV Form', () => {
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(effectiveDateInput);
     await user.type(effectiveDateInput, validEffectiveDate);
 
     await waitFor(() => {

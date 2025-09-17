@@ -8,6 +8,11 @@
 Alternative Docker Compose Deployment
 =====================================
 
+.. warning::
+
+   This section features solutions shared by community members. While they haven’t been formally tested by the Splice maintainers, 
+   users are encouraged to verify the information independently. Contributions to enhance accuracy and completeness are always welcome.
+
 This guide introduces a community-contributed Docker Compose solution for deploying Canton validator nodes and supporting infrastructure, following the ``x-docker`` standard used by Mario Delgado’s team for onboarding blockchains.
 Note that while it was tested during a scheduled upgrade on DevNet, that required
 updating the ``.env`` file with the migration ID, renaming the databases (with a planned change to use standardized names like ``participant_${MIGRATION_ID}`` and ``validator_${MIGRATION_ID}``), and including ``validator-migration.yaml`` as part of the migration setup. For further information, please contact the authors of the contribution.

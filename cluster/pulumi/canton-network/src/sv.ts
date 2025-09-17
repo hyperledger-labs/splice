@@ -27,7 +27,6 @@ import {
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
-  installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   networkWideConfig,
@@ -45,8 +44,8 @@ import {
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installSvLoopback,
   SvParticipant,
-  updateHistoryBackfillingValues,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import {
@@ -129,7 +128,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
@@ -374,15 +373,18 @@ async function installValidator(
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
-    additionalEnvVars: bftSequencerConnection
-      ? undefined
-      : [
-          {
-            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-            value:
-              'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
-          },
-        ],
+    additionalEnvVars: [
+      ...(bftSequencerConnection
+        ? []
+        : [
+            {
+              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+              value:
+                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
+            },
+          ]),
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
+    ],
   });
 
   return validator;
@@ -581,7 +583,6 @@ function installScan(
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
-    ...updateHistoryBackfillingValues,
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

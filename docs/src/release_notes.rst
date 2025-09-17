@@ -11,10 +11,98 @@ Release Notes
 Upcoming
 --------
 
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+
+- Validator
+
+  - Expose ``/dso`` endpoint from scan proxy
+
+- Daml
+
+  .. TODO(#2241): add proper link and number
+
+  - Implement `CIP-XXX - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/pull/97/files>`__ with the following changes:
+
+     - Change all Amulet transfers to not charge holding fees on inputs.
+     - Fix a bug in the validation of ``AmuletConfig`` that prevented
+       setting the Amulet transfer fees to zero.
+     - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
+       that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.14
+     amuletNameService  0.1.14
+     dsoGovernance      0.1.19
+     validatorLifecycle 0.1.5
+     wallet             0.1.14
+     walletPayments     0.1.14
+     ================== =======
+
+ .. important::
+
+     App devs that predict holding fees on transfers must adjust their code to
+     no longer expect any holding fees once this Daml change gets voted in.
+
+     The simplest option is to make your code independent of whether the change was voted in
+     by removing the prediction of holding fees. You can instead
+     extract the actual holding fees charged from the transfer transaction itself;
+     i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+     of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+     of the ``TransferResult``.
+
+- Deployment
+
+  - Participant
+
+     - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
+0.4.16
+------
+
+- Daml
+
+  - Add the ``splice-util-featured-app-proxies``
+    :ref:`package <featured_app_activity_markers_api>` to simplify
+    the creation of featured app activity markers for token standard actions.
+    This is a utility package that is not uploaded by default to a validator node.
+    An example use-case for this package is an exchange that wants to
+    `earn app rewards on deposits and withdrawals <https://docs.digitalasset.com/integrate/devnet/exchange-integration/extensions.html>`__
+    of CN token standard tokens.
+
+- Docs
+
+  - SV
+
+    - Document process for :ref:`ignoring party IDs for reward expiry automation <sv_ops_ignored_rewards_party_ids>`
+      that is currently recommended after each Daml upgrade,
+      to reduce the impact of validators that are unable to complete
+      the Daml upgrade due to being on an outdated version of Splice.
+
+    - Make the filter for ignoring party ids for reward expiry automation also ignore beneficiaries for SV reward coupons so
+      that it is not required to ignore the SV if only one beneficiary has problems.
+
+0.4.15
+------
+
 - Canton
 
     - SV
         - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
+
+    - Ledger API
+
+        - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
+          a prepared transaction can be used.
+        - Add an alpha version of ``com.daml.ledger.api.v2.admin.PartyManagementService/GenerateExternalPartyTopology`` and
+          ``com.daml.ledger.api.v2.admin.PartyManagementService/AllocateExternalParty``. These endpoints can be used instead of
+          the validator endpoints ``/v0/admin/external-party/topology/generate`` and ``/v0/admin/external-party/topology/submit``
+          and will eventually supersede them.
 
 - Docs
 
@@ -26,8 +114,16 @@ Upcoming
 
   - Cometbft
 
-     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage. 
+     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
      - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
+
+0.4.14
+------
+
+- SV app
+
+   - Add the option to ignore certain parties when running expiry on reward contracts. This can added to the app configuration. Example: ``canton.sv-apps.sv.automation.ignored-expired-rewards-party-ids = [ "test-party::1220b3eeb21b02e14945e419c5d9e986ce8102171c50e1444010ab054e11eba262c9" ]``
+
 
 0.4.13
 ------

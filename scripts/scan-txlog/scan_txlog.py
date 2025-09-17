@@ -1545,9 +1545,11 @@ class EffectiveAmount:
         initial_amount = amount.get_expiring_amount_initial_amount()
         rate_per_round = amount.get_expiring_amount_rate_per_round()
         round_diff = max(0, round_number - created_at)
-        effective_amount = max(
-            initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
-        )
+        effective_amount = initial_amount
+        # ^ field kept for backwards-compatibility, before the CC fee removal CIP this used to be:
+        #     max(
+        #         initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+        #     )
         return EffectiveAmount(
             effective_amount, initial_amount, created_at, rate_per_round, round_diff
         )
@@ -1578,9 +1580,9 @@ class PerPartyState:
         self.validator_activity_records = {}
         self.open_mining_round_numbers = open_mining_round_numbers
 
-    def __effective_amount__(self, amount, round_number):
-        effective = EffectiveAmount.from_amount_and_round(amount, round_number)
-        return f"round {round_number}: {effective.effective_amount} = {effective.initial_amount} - {effective.round_diff} * {effective.rate_per_round}"
+    # def __effective_amount__(self, amount, round_number):
+    #     effective = EffectiveAmount.from_amount_and_round(amount, round_number)
+    #     return f"round {round_number}: {effective.effective_amount} = {effective.initial_amount} - {effective.round_diff} * {effective.rate_per_round}"
 
     def __str__(self):
         lines = []
@@ -1594,16 +1596,17 @@ class PerPartyState:
                 lines += [
                     f"  {initial_amount}, created in round {created_at}, holding fee rate: {rate_per_round} CC/round"
                 ]
-                if not self.args.hide_details:
-                    lines += [
-                        "    projected effective amounts: "
-                        + ", ".join(
-                            [
-                                self.__effective_amount__(amount, round_number)
-                                for round_number in self.open_mining_round_numbers
-                            ]
-                        ),
-                    ]
+                # TODO(#2248): change this to show TTL of amulet
+                # if not self.args.hide_details:
+                #     lines += [
+                #         "    projected effective amounts: "
+                #         + ", ".join(
+                #             [
+                #                 self.__effective_amount__(amount, round_number)
+                #                 for round_number in self.open_mining_round_numbers
+                #             ]
+                #         ),
+                #     ]
         if self.locked_amulets:
             lines += ["locked_amulets:"]
             for locked_amulet in self.locked_amulets:
@@ -1618,16 +1621,17 @@ class PerPartyState:
                 lines += [
                     f"  {initial_amount}, created in round {created_at}, holding fee rate: {rate_per_round} CC/round, locked to owner and {lock_holders} until {expires_at}",
                 ]
-                if not self.args.hide_details:
-                    lines += [
-                        "    projected effective amounts: "
-                        + ", ".join(
-                            [
-                                self.__effective_amount__(amount, round_number)
-                                for round_number in self.open_mining_round_numbers
-                            ]
-                        ),
-                    ]
+                # TODO(#2248): change this to show TTL of amulet
+                # if not self.args.hide_details:
+                #     lines += [
+                #         "    projected effective amounts: "
+                #         + ", ".join(
+                #             [
+                #                 self.__effective_amount__(amount, round_number)
+                #                 for round_number in self.open_mining_round_numbers
+                #             ]
+                #         ),
+                #     ]
         if self.sv_reward_coupons:
             lines += [f"sv_activity_records: {self.sv_reward_coupons}"]
         if self.unfeatured_app_reward_coupons:

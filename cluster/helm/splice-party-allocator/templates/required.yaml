@@ -1,0 +1,13 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
+
+{{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
+
+{{ $_ := required ".Values.jsonLegerApiUrl is required." .Values.jsonLedgerApiUrl }}
+{{ $_ := required ".Values.scanApiUrl is required." .Values.scanApiUrl }}
+{{ $_ := required ".Values.validatorApiUrl is required." .Values.validatorApiUrl }}
+{{ $_ := required ".Values.maxParties is required." .Values.maxParties }}
+{{ $_ := required ".Values.keysDirectory is required." .Values.keysDirectory }}
+{{ $_ := required ".Values.parallelism is required." .Values.parallelism }}

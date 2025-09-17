@@ -26,7 +26,7 @@ export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
       allSvsToDeploy.map(sv => {
         return {
           project: 'sv-canton',
-          stack: `${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
+          stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
         };
       })
     )
@@ -48,7 +48,7 @@ export function installMigrationSpecificStacks(
           allSvsToDeploy.map(sv => {
             return {
               project: 'sv-canton',
-              stack: `${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
+              stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
             };
           })
         )

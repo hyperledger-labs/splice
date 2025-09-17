@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   VoteRequest,
 }
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
 import java.util.Optional
@@ -45,7 +46,8 @@ class CloseVoteRequestTrigger(
       amuletRules <- store.getAmuletRules()
       amuletRulesId = amuletRules.contractId
       res <- for {
-        outcome <- svTaskContext.connection
+        outcome <- svTaskContext
+          .connection(SpliceLedgerConnectionPriority.High)
           .submit(
             Seq(store.key.svParty),
             Seq(store.key.dsoParty),

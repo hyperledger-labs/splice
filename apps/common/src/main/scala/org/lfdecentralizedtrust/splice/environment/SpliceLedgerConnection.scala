@@ -38,7 +38,7 @@ import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.{CircuitBreaker, CircuitBreakerOpenException}
+import org.apache.pekko.pattern.CircuitBreakerOpenException
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.{Done, NotUsed}
@@ -56,6 +56,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   DisclosedContracts,
+  SpliceCircuitBreaker,
 }
 import shapeless.<:!<
 
@@ -738,7 +739,7 @@ class SpliceLedgerConnection(
     contractDowngradeErrorCallbacks: AtomicReference[Seq[() => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: Long => Future[Unit],
-    commandCircuitBreaker: CircuitBreaker,
+    commandCircuitBreaker: SpliceCircuitBreaker,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends BaseLedgerConnection(
       client,

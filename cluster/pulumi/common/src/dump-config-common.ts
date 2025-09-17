@@ -39,6 +39,8 @@ export const cantonNetworkAuth0Config = {
     sv4_validator: 'sv4-validator-client-id',
     sv: 'sv-client-id',
     validator: 'sv-client-id',
+    'sv-da-1': 'sv-da-1-client-id',
+    'sv-da-1_validator': 'sv-da-1-validator-client-id',
   },
   namespaceToUiToClientId: {
     validator1: {
@@ -70,6 +72,11 @@ export const cantonNetworkAuth0Config = {
       wallet: 'sv-4-wallet-ui-client-id',
       cns: 'sv-4-cns-ui-client-id',
       sv: 'sv-4-sv-ui-client-id',
+    },
+    'sv-da-1': {
+      wallet: 'sv-da-1-wallet-ui-client-id',
+      cns: 'sv-da-1-cns-ui-client-id',
+      sv: 'sv-da-1-sv-ui-client-id',
     },
   },
   appToApiAudience: {},
