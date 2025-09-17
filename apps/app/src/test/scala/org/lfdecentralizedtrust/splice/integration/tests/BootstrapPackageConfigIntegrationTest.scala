@@ -21,6 +21,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   SplitwellAppClientReference,
@@ -36,13 +40,15 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
+import org.lfdecentralizedtrust.splice.util.SpliceUtil
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SplitwellTestUtil, StandaloneCanton}
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
+import scala.concurrent.duration.DurationInt
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class BootstrapPackageConfigIntegrationTest
@@ -65,7 +71,7 @@ class BootstrapPackageConfigIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   // Factored out so we can reuse it in the test
-  val initialAmulet = DarResources.amulet_0_1_9
+  val initialAmulet = DarResources.amulet_0_1_10
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
@@ -88,6 +94,16 @@ class BootstrapPackageConfigIntegrationTest
       )
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      )
+      .addConfigTransforms(
+        // we are casting two votes in quick succession; and we don't want to wait for the cooldown
+        (_, config) => ConfigTransforms.withNoVoteCooldown(config)
+      )
+      // Disable automerging to make the tx history deterministic
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Validator)(
+          _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
       )
       .withSequencerConnectionsFromScanDisabled() // The direct ledger API submissions for splitwell interact poorly with domain disconnects
 
@@ -229,37 +245,34 @@ class BootstrapPackageConfigIntegrationTest
         )
       )
 
-      actAndCheck(timeUntilSuccess = 30.seconds)(
-        "Voting on a AmuletRules config change for upgraded packages", {
-          val (_, voteRequest) = actAndCheck(
-            "Creating vote request",
-            eventuallySucceeds() {
-              sv1Backend.createVoteRequest(
-                sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
-                upgradeAction,
-                "url",
-                "description",
-                expiration,
-                Some(scheduledTime),
-              )
-            },
-          )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+      val (_, voteRequest) = actAndCheck(
+        "Creating vote request for upgraded packages",
+        eventuallySucceeds() {
+          sv1Backend.createVoteRequest(
+            sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+            upgradeAction,
+            "url",
+            "description",
+            expiration,
+            Some(scheduledTime),
+          )
+        },
+      )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-          clue(s"sv1-3 accept") {
-            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(sv =>
-              eventuallySucceeds() {
-                sv.castVote(
-                  voteRequest.contractId,
-                  isAccepted = true,
-                  "url",
-                  "description",
-                )
-              }
+      actAndCheck(timeUntilSuccess = 30.seconds)(
+        s"sv1-3 accept vote request for upraded packages",
+        Seq(sv1Backend, sv2Backend, sv3Backend).map(sv =>
+          eventuallySucceeds() {
+            sv.castVote(
+              voteRequest.contractId,
+              isAccepted = true,
+              "url",
+              "description",
             )
           }
-        },
+        ),
       )(
-        "observing AmuletRules with upgraded config",
+        "observe AmuletRules with upgraded config",
         _ => {
           val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
 
@@ -333,6 +346,78 @@ class BootstrapPackageConfigIntegrationTest
       eventuallySucceeds() {
         sv1ScanBackend.getExternalPartyAmuletRules()
       }
+    }
+
+    // We check this as splice-amulet < 0.1.14 did not support setting the fees to zero;
+    // and we want to ensure that the upgrade works as expected.
+    clue("Change AmuletConfig to zero fees") {
+      // Here we pick an expiration far enough in the future to surely get the test through,
+      // as we can observe the completion of the vote request via the config change.
+      val expiration = new RelTime(3_600_000_000L)
+      val amuletRules = sv2ScanBackend.getAmuletRules()
+      val amuletConfig = amuletRules.payload.configSchedule.initialValue
+      val newAmuletConfig = new AmuletConfig(
+        SpliceUtil.defaultTransferConfig(
+          amuletConfig.transferConfig.maxNumInputs.toInt,
+          amuletConfig.transferConfig.holdingFee.rate,
+          zeroTransferFees = true,
+        ),
+        amuletConfig.issuanceCurve,
+        amuletConfig.decentralizedSynchronizer,
+        amuletConfig.tickDuration,
+        amuletConfig.packageConfig,
+        java.util.Optional.empty(),
+        java.util.Optional.empty(),
+      )
+
+      val upgradeAction = new ARC_AmuletRules(
+        new CRARC_SetConfig(
+          new AmuletRules_SetConfig(
+            newAmuletConfig,
+            amuletConfig,
+          )
+        )
+      )
+
+      clue("Double-check that no vote request exists") {
+        sv1Backend.listVoteRequests() shouldBe empty
+      }
+
+      val (_, voteRequest) = actAndCheck(
+        "Create vote request to vote for zero fees",
+        eventuallySucceeds() {
+          sv1Backend.createVoteRequest(
+            sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+            upgradeAction,
+            "url",
+            "description",
+            expiration,
+            None,
+          )
+        },
+      )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+
+      actAndCheck(
+        s"sv1-3 accept vote request for zero fees",
+        Seq(sv1Backend, sv2Backend, sv3Backend).map(sv =>
+          eventuallySucceeds() {
+            sv.castVote(
+              voteRequest.contractId,
+              isAccepted = true,
+              "url",
+              "description",
+            )
+          }
+        ),
+      )(
+        "observe AmuletRules with upgraded config",
+        _ => {
+          val newAmuletRules = sv1ScanBackend.getAmuletRules().contract.payload
+          val newCreateFee: BigDecimal =
+            newAmuletRules.configSchedule.initialValue.transferConfig.createFee.fee
+          newCreateFee shouldBe BigDecimal(0)
+        },
+      )
     }
 
     clue("Splitwell can complete payment request on new DAR versions") {
