@@ -135,9 +135,12 @@ class NodeInitializer(
             for {
               // rotate existing keys that are not signed
               _ <- synchronizerId match {
-                case Some(synchronizerId) =>
-                  rotateOwnerToKeyMappingNotSignedByKeys(id, nodeIdentity, synchronizerId)
-                case None => Future.successful()
+                case Some(syncId) =>
+                  println("ENTERING")
+                  rotateOwnerToKeyMappingNotSignedByKeys(id, nodeIdentity, syncId)
+                case None =>
+                  println("NOT ENTERING")
+                  Future.unit
               }
               // fixes previously initialized nodes with messed up keys
               _ <- rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
@@ -336,7 +339,6 @@ class NodeInitializer(
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
     for {
-      // FIXME: clean this logic
       fullTxHistory <- connection.listAllTransactions(
         store = TopologyStoreId.SynchronizerStore(synchronizerId),
         timeQuery = TimeQuery.Range(None, None),
@@ -375,6 +377,7 @@ class NodeInitializer(
             )
           case key => Future.successful(key)
         }
+        logger.info(s"rotated keys ${rotatedKeys}")
         for {
           newKeys <- Future.sequence(rotatedKeys)
           _ <- connection.ensureOwnerToKeyMapping(

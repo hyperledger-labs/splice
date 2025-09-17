@@ -137,6 +137,7 @@ class SvApp(
       retryProvider,
     )
     (for {
+      synchronizerId <- participantAdminConnection.getSynchronizerId(config.domains.global.alias)
       _ <-
         appInitStep("Ensure participant is initialized with expected id") {
           config.onboarding match {
@@ -177,6 +178,7 @@ class SvApp(
                     config.participantBootstrappingDump,
                     loggerFactory,
                     retryProvider,
+                    synchronizerId,
                   )
               }
           }
@@ -415,6 +417,15 @@ class SvApp(
             }
           } yield res
       }
+//      syncId <- participantAdminConnection.getSynchronizerId(config.domains.global.alias)
+//      _ <- ParticipantInitializer.ensureParticipantRotatesKeys(
+//        cantonIdentifierConfig.participant,
+//        participantAdminConnection,
+//        config.participantBootstrappingDump,
+//        loggerFactory,
+//        retryProvider,
+//        syncId,
+//      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection(SpliceLedgerConnectionPriority.Low),

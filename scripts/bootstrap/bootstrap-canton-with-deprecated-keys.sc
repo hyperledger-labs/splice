@@ -171,6 +171,8 @@ bootstrapDomainWithUnsignedKeys(
   aliceParticipant,
 )
 
+sv1Participant.synchronizers.connect_local(globalSequencerSv1, "global")
+
 // These user allocations are only there
 // for local testing. Our tests allocate their own users.
 println(s"Allocating users for local testing...")
