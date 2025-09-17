@@ -326,7 +326,7 @@ async function main() {
   const client = new LedgerApiClient(config.jsonLedgerApiUrl, config.token);
 
   // We process batches of config.batchSize with parallelism of config.parallelism.
-  // Batch size is really just there to limit memory usage from umresolved promises.
+  // Batch size is really just there to limit memory usage from unresolved promises.
   const limit = pLimit(config.parallelism);
 
   let index = maxIndex;
