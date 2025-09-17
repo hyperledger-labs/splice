@@ -7,4 +7,4 @@ dir := $(call current_dir)
 JQ_FILTER := '(.. | .chart? | strings) |= sub("^/.*?(?=/cluster/helm/)"; "") | sort_by("\(.name)|\(.type)")'
 
 
-include $(PULUMI_TEST_DIR)/pulumi-test.mk
+include $(PULUMI_TEST_DIR)/pulumi-test-clusters.mk
