@@ -181,7 +181,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     requests <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION, limit)
   } yield requests map (_.contract)
 
-  def getAmuletBalanceWithHoldingFees(asOfRound: Long)(implicit
+  def getAmuletBalanceWithHoldingFees(asOfRound: Long, deductHoldingFees: Boolean)(implicit
       tc: TraceContext
   ): Future[(BigDecimal, BigDecimal)] = for {
     amulets <- multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
@@ -192,12 +192,16 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
         .sum
     val totalAmount =
       amulets.view
-        .map(c => BigDecimal(SpliceUtil.currentAmount(c.payload, asOfRound)))
+        .map(c =>
+          BigDecimal(
+            SpliceUtil.currentAmount(c.payload, asOfRound, deductHoldingFees = deductHoldingFees)
+          )
+        )
         .sum
     (totalAmount, holdingFees)
   }
 
-  def getLockedAmuletBalance(asOfRound: Long)(implicit
+  def getLockedAmuletBalance(asOfRound: Long, deductHoldingFees: Boolean)(implicit
       tc: TraceContext
   ): Future[BigDecimal] = for {
     lockedAmulets <- multiDomainAcsStore.listContracts(
@@ -205,7 +209,12 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     )
   } yield {
     val totalAmount = lockedAmulets.view
-      .map(c => BigDecimal(SpliceUtil.currentAmount(c.payload.amulet, asOfRound)))
+      .map(c =>
+        BigDecimal(
+          SpliceUtil
+            .currentAmount(c.payload.amulet, asOfRound, deductHoldingFees = deductHoldingFees)
+        )
+      )
       .sum
     totalAmount
   }
