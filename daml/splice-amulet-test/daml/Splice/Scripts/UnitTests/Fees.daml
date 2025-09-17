@@ -33,12 +33,18 @@ test_chargeRatePerDay = do
 
 test_validSteppedRate : Script ()
 test_validSteppedRate = do
-    test True [(100.0, 0.001), (1000.0, 0.0001), (100000.0, 0.00001)]
-    test False []
-    test False [(100.0, 0.001), (100.0, 0.0001)]
-    test False [(100.0, 0.001), (90.0, 0.0001)]
+    test True 0.1 [(100.0, 0.001), (1000.0, 0.0001), (100000.0, 0.00001)]
+    test True 0.1 [(100.0, 0.0)]
+    test True 0.1 [(100.0, 0.0), (1000.0, 0.0), (100000.0, 0.0)]
+    test True 0.0 [(100.0, 0.0), (1000.0, 0.0), (100000.0, 0.0)]
+    test True 0.1 []
+    test True 0.0 []
+    test False 0.1 [(100.0, 0.001), (100.0, 0.0001)]
+    test False 0.1 [(100.0, 0.001), (90.0, 0.0001)]
+    test False (-0.1) []
+    test False 0.1 [(100.0, -0.001)]
   where
-    test isValid steps = do
-        let steppedRate = SteppedRate with initialRate = 0.01, steps
+    test isValid initialRate steps = do
+        let steppedRate = SteppedRate with initialRate, steps
         unless (isValid == validSteppedRate steppedRate) $
             error $ "SteppedRate validity check failed for " <> show (isValid, steppedRate)

@@ -75,7 +75,6 @@ validSteppedRate : SteppedRate -> Bool
 validSteppedRate SteppedRate{initialRate, steps} =
   validRate initialRate &&
   all (\(step, rate) -> 0.0 < step && validRate rate) steps &&
-  not (null steps) &&
   strictlyAscending (map fst steps)
   where
     validRate : Decimal -> Bool
