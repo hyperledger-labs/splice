@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest}
@@ -24,6 +25,7 @@ import scala.concurrent.duration.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.metrics.MetricValue
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTest
@@ -61,6 +63,10 @@ class ScanEventHistoryIntegrationTest
 
     val cursorBeforeTap = eventuallySucceeds() { lastCursor() }
 
+    val countBefore = scanVerdictCountMetric()
+    val lastRtBefore = scanVerdictLastRecordTimeUsMetric()
+    val errorsBefore = scanVerdictErrorsMetric()
+
     // Before doing tap, using the cursor should be empty
     val eventHistoryAfterLastCursor = sv1ScanBackend.getEventHistory(
       count = pageLimit,
@@ -76,6 +82,16 @@ class ScanEventHistoryIntegrationTest
       val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTap))
       eh should not be empty
       eh
+    }
+
+    // DB metrics should be updated
+    eventually() {
+      val countAfter = scanVerdictCountMetric()
+      val lastRtAfter = scanVerdictLastRecordTimeUsMetric()
+      val errorsAfter = scanVerdictErrorsMetric()
+      countAfter should be > countBefore
+      lastRtAfter should be >= lastRtBefore
+      errorsAfter shouldBe errorsBefore
     }
 
     // Basic checks for page limit and encoding
@@ -437,4 +453,27 @@ class ScanEventHistoryIntegrationTest
     }
     updateCursor.orElse(item.verdict.map(v => (v.migrationId, v.recordTime)))
   }
+
+  private def getLongMetricOr0(name: String)(implicit env: SpliceTestConsoleEnvironment): Long =
+    sv1ScanBackend.metrics.list(name).get(name) match {
+      case None => 0L
+      case Some(_) =>
+        sv1ScanBackend.metrics
+          .get(name)
+          .select[MetricValue.LongPoint]
+          .value
+          .value
+    }
+
+  private def scanVerdictCountMetric()(implicit env: SpliceTestConsoleEnvironment): Long =
+    getLongMetricOr0(s"$MetricsPrefix.scan.verdict_ingestion.count")
+
+  private def scanVerdictLastRecordTimeUsMetric()(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Long =
+    getLongMetricOr0(s"$MetricsPrefix.scan.verdict_ingestion.last_record_time_us")
+
+  private def scanVerdictErrorsMetric()(implicit env: SpliceTestConsoleEnvironment): Long =
+    getLongMetricOr0(s"$MetricsPrefix.scan.verdict_ingestion.errors")
+
 }
