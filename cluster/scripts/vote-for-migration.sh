@@ -95,7 +95,7 @@ function get_merged_config() {
 other_svs=()
 
 # standard (eng) SVs
-DSO_SIZE=${DSO_SIZE:-4}
+DSO_SIZE=${DSO_SIZE:-3}
 for ((i=2; i<=DSO_SIZE; i++)); do
   other_svs+=("sv-$i")
 done
