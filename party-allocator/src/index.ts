@@ -14,6 +14,7 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { AggregationType, MeterProvider } from "@opentelemetry/sdk-metrics";
 import { Counter, Gauge, Histogram } from "@opentelemetry/api";
 import { performance } from "perf_hooks"; // Use high-resolution monotonic clock
+import pLimit from "p-limit";
 
 async function timed<T>(metric: Histogram, operation: () => Promise<T>) {
   const startTime = performance.now();
@@ -324,21 +325,34 @@ async function main() {
 
   const client = new LedgerApiClient(config.jsonLedgerApiUrl, config.token);
 
+  // We process batches of config.batchSize with parallelism of config.parallelism.
+  // Batch size is really just there to limit memory usage from umresolved promises.
+  const limit = pLimit(config.parallelism);
+
   let index = maxIndex;
+  let maxPartyAllocated = index;
   while (index < config.maxParties) {
     metrics.totalPartiesAllocated.record(index);
     logger.info(`Processing batch starting at ${index}`);
-    const batchSize = Math.min(config.parallelism, config.maxParties - index);
-    const batch = Array.from({ length: batchSize }, (_, i) =>
-      setupParty(
-        metrics,
-        client,
-        config.userId,
-        synchronizerId,
-        index + i,
-        validatorPartyId,
-      ).then(() => metrics.partiesAllocatedCounter.add(1)),
-    );
+    const batchSize = Math.min(config.batchSize, config.maxParties - index);
+    const batch = Array.from({ length: batchSize }, (_, i) => {
+      const partyIndex = index + i;
+      return limit(async () =>
+        setupParty(
+          metrics,
+          client,
+          config.userId,
+          synchronizerId,
+          partyIndex,
+          validatorPartyId,
+        ).then(() => {
+          metrics.partiesAllocatedCounter.add(1);
+          maxPartyAllocated = Math.max(maxPartyAllocated, partyIndex);
+          logger.error(`Updating metric to ${maxPartyAllocated} ${partyIndex}`);
+          metrics.totalPartiesAllocated.record(maxPartyAllocated);
+        }),
+      );
+    });
     await Promise.all(batch);
     logger.info(`Completed batch`);
     index += batchSize;

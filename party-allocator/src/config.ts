@@ -11,6 +11,7 @@ const partyAllocationsSchema = z.object({
   maxParties: z.number(),
   keyDirectory: z.string(),
   parallelism: z.number().default(20),
+  batchSize: z.number().default(1000),
 });
 
 type PartyAllocationsConf = z.infer<typeof partyAllocationsSchema>;
