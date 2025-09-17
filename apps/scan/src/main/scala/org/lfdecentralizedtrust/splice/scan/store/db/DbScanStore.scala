@@ -611,7 +611,7 @@ class DbScanStore(
               and     rpt.closed_round = ap.closed_round
               where   rpt.store_id = $roundTotalsStoreId;
               """.as[Option[BigDecimal]].headOption,
-              "getTotalAmuletBalance",
+              "getTotalAmuletBalanceForLastAggregatedRound",
             )
           } else {
             // fall back if the requested round is not the latest aggregated round.
@@ -695,7 +695,7 @@ class DbScanStore(
              where   rpt.store_id = $roundTotalsStoreId
              and     rpt.party = $partyId;
            """.as[Option[BigDecimal]].headOption,
-            "getWalletBalance",
+            "getWalletBalanceForLastAggregatedRound",
           )
         } else {
           storage.query(
