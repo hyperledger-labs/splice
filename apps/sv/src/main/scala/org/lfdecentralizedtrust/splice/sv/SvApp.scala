@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.http.v0.sv.SvResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
@@ -571,6 +571,10 @@ class SvApp(
         timeouts,
         loggerFactory,
       )
+      httpRateLimiter = new HttpRateLimiter(
+        config.parameters.rateLimiting,
+        metrics.openTelemetryMetricsFactory,
+      )
 
       route = cors(
         CorsSettings(ac)
@@ -593,13 +597,15 @@ class SvApp(
               metrics.httpServerMetrics
                 .withMetrics(service)(operation)
                 .tflatMap(_ => {
-                  config.parameters.customTimeouts.get(operation) match {
-                    case Some(customTimeout) =>
-                      withRequestTimeout(
-                        customTimeout.duration,
-                        errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
-                      )
-                    case None => Directive.Empty
+                  httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
+                    config.parameters.customTimeouts.get(operation) match {
+                      case Some(customTimeout) =>
+                        withRequestTimeout(
+                          customTimeout.duration,
+                          errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
+                        )
+                      case None => Directive.Empty
+                    }
                   }
                 })
             }
