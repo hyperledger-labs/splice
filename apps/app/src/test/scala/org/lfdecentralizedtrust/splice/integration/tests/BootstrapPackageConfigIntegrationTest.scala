@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
+import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources, PackageIdResolver}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -71,7 +71,7 @@ class BootstrapPackageConfigIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   // Factored out so we can reuse it in the test
-  val initialAmulet = DarResources.amulet_0_1_10
+  val initialAmulet: DarResource = DarResources.amulet_0_1_10
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
@@ -440,25 +440,31 @@ class BootstrapPackageConfigIntegrationTest
       filterParticipant = participantClient.id.filterString,
     )
     val vettingState = vettingTopologyState.loneElement.item
-    val amuletPackageName = DarResources.amulet.bootstrap.metadata.name
-    val allAmuletVersion = DarResources.lookupAllPackageVersions(amuletPackageName)
-    val expectedToBeVettedAmuletVersions = allAmuletVersion
-      .filter(
-        _.metadata.version > PackageIdResolver.readPackageVersion(
-          initialPackageConfig.toPackageConfig,
-          PackageIdResolver.Package.SpliceAmulet,
+    def packagesAreVetted(
+        bootstrapPackage: DarResource,
+        packageName: PackageIdResolver.Package,
+    ): Unit = {
+      val allPackagesVersions = DarResources.lookupAllPackageVersions(packageName.packageName)
+      val expectedToBeVettedAmuletVersions = allPackagesVersions
+        .filter(
+          _.metadata.version > PackageIdResolver.readPackageVersion(
+            initialPackageConfig.toPackageConfig,
+            packageName,
+          )
         )
-      )
-      .filter(_.metadata.version <= DarResources.amulet.bootstrap.metadata.version)
-    expectedToBeVettedAmuletVersions.foreach { expectedVettedVersion =>
-      val newAmuletVettedPackage = vettingState.packages
-        .find(_.packageId == expectedVettedVersion.packageId)
-        .value
-
-      newAmuletVettedPackage.validFrom should (
-        equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
-      )
+        .filter(_.metadata.version <= bootstrapPackage.metadata.version)
+      expectedToBeVettedAmuletVersions.foreach { expectedVettedVersion =>
+        val newAmuletVettedPackage = vettingState.packages
+          .find(_.packageId == expectedVettedVersion.packageId)
+          .value
+        newAmuletVettedPackage.validFrom should (
+          equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
+        )
+      }
     }
+    packagesAreVetted(DarResources.amulet.bootstrap, PackageIdResolver.Package.SpliceAmulet)
+    // also check wallet because for the sv we have 2 vetting triggers, and the wallet is used in the tap call but it's vetted by the validator trigger (amulet rules can be vetted by any of the triggers)
+    packagesAreVetted(DarResources.wallet.bootstrap, PackageIdResolver.Package.SpliceWallet)
   }
 
   private def alicesTapsWithPackageId(
