@@ -15,7 +15,7 @@ wallet UI:
 
       -  *Amulet legacy transfer* offer where the receiver has to accept the transfer offer and then automation on the sender’s side completes the transfer. The ``provider`` party on the
          :ref:`AppRewardCoupon <type-splice-amulet-apprewardcoupon-57229>`
-         is the ``sender``. The ``sender`` is assigned to the :ref:`ValidatorRewardCoupon <type-splice-amulet-validatorrewardcoupon-76808>`
+         is the party of the sender's validator node's operator. The ``sender`` is assigned to the :ref:`ValidatorRewardCoupon <type-splice-amulet-validatorrewardcoupon-76808>`
          user field. These transfers are never featured.
 
       -  A two-step, *CN token standard based*
