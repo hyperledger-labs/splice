@@ -11,6 +11,12 @@ Release Notes
 Upcoming
 --------
 
+- Canton
+
+  - Add ``CanExecuteAs`` and ``CanExecuteAsAnyParty`` user rights that can be used for the
+    ``InteractiveSubmissionService/ExecuteSubmission`` endpoint. ``CanActAs`` permissions imply
+    ``CanExecuteAs`` so this is backwards compatible.
+
 - LocalNet
 
   - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
