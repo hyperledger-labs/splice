@@ -86,6 +86,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directive
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -587,20 +588,34 @@ class SvApp(
       ) {
         withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {
-            HttpErrorHandler(loggerFactory)(traceContext) {
+            val errorHandler = new HttpErrorHandler(loggerFactory)
+            def buildOperation(service: String, operation: String) = {
+              metrics.httpServerMetrics
+                .withMetrics(service)(operation)
+                .tflatMap(_ => {
+                  config.parameters.customTimeouts.get(operation) match {
+                    case Some(customTimeout) =>
+                      withRequestTimeout(
+                        customTimeout.duration,
+                        errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
+                      )
+                    case None => Directive.Empty
+                  }
+                })
+            }
+
+            errorHandler.directive(traceContext) {
               concat(
                 SvResource.routes(
                   handler,
                   operation =>
-                    metrics.httpServerMetrics
-                      .withMetrics("sv")(operation)
+                    buildOperation("sv", operation)
                       .tflatMap(_ => provide(traceContext)),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
                   operation =>
-                    metrics.httpServerMetrics
-                      .withMetrics("svAdmin")(operation)
+                    buildOperation("svAdmin", operation)
                       .tflatMap(_ =>
                         AdminAuthExtractor(
                           verifier,
