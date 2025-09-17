@@ -9,6 +9,7 @@ import {
 import { readdir, writeFile } from "node:fs/promises";
 import { config } from "./config.js";
 import fs from "fs";
+import { logger } from "./logger.js";
 
 async function getAmuletRules() {
   const response = await fetch(
@@ -64,14 +65,15 @@ function toDisclosedContract(c: any): DisclosedContract {
   };
 }
 
-async function getPreapproval(partyId: string) {
-  const response = await fetch(
-    `${config.scanApiUrl}/api/scan/v0/transfer-preapprovals/by-party/${partyId}`,
+async function getPreapproval(client: LedgerApiClient, partyId: string) {
+  const response = await client.queryContracts(
+    [partyId],
+    ["#splice-amulet:Splice.AmuletRules:TransferPreapproval"],
   );
-  if (response.status === 404) {
-    throw new Error(`No preapproval for ${partyId}`);
+  if (response.length > 0) {
+    return response[0];
   }
-  return response.json();
+  throw new Error(`No preapproval for ${partyId}`);
 }
 
 async function setupTopology(
@@ -94,8 +96,8 @@ async function setupTopology(
     Buffer.from(generateTopologyResponse.multiHash, "base64"),
     keyPair.privateKey,
   );
-  const allocatePartyResponse = await client.allocateExternalParty(
-    partyHint,
+  await client.allocateExternalParty(
+    generateTopologyResponse.partyId,
     synchronizerId,
     generateTopologyResponse.topologyTransactions!.map((t) => ({
       transaction: t,
@@ -110,7 +112,7 @@ async function setupTopology(
       },
     ],
   );
-  return allocatePartyResponse.partyId;
+  return generateTopologyResponse.partyId;
 }
 
 async function tap(
@@ -170,7 +172,7 @@ async function setupPreapproval(
     [],
     command2,
   );
-  await client.retry("getPreapproval", () => getPreapproval(partyId));
+  await client.retry("getPreapproval", () => getPreapproval(client, partyId));
 }
 
 function pubKeyPath(index: number) {
@@ -193,11 +195,12 @@ async function generateKeyPair(index: number) {
 
 async function setupParty(
   client: LedgerApiClient,
+  userId: string,
   synchronizerId: string,
   index: number,
   validatorPartyId: string,
 ) {
-  console.debug(`Starting setup for party ${index}`);
+  logger.info(`Starting setup for party ${index}`);
   const partyHint = `party-${index}`;
   await getOpenRound();
   const keyPair = await generateKeyPair(index);
@@ -209,25 +212,27 @@ async function setupParty(
     keyPair,
   );
 
-  await tap(client, synchronizerId, partyId, keyPair);
-  await setupPreapproval(
-    client,
-    synchronizerId,
-    partyId,
-    validatorPartyId,
-    keyPair,
-  );
-  console.debug(`Finished setup for party ${index}`);
+  await client.withUserRights(userId, [partyId], async () => {
+    await tap(client, synchronizerId, partyId, keyPair);
+    await setupPreapproval(
+      client,
+      synchronizerId,
+      partyId,
+      validatorPartyId,
+      keyPair,
+    );
+  });
+  logger.info(`Finished setup for party ${index}`);
 }
 
 async function main() {
-  console.debug(
+  logger.info(
     `Running with config: ${JSON.stringify({ ...config, ...{ token: "<redacted>" } })}`,
   );
   const synchronizerId = await getSynchronizerId();
-  console.debug(`Synchronizer id: ${synchronizerId}`);
+  logger.info(`Synchronizer id: ${synchronizerId}`);
   const validatorPartyId = await getValidatorPartyId();
-  console.debug(`Validator party id: ${validatorPartyId}`);
+  logger.info(`Validator party id: ${validatorPartyId}`);
   if (!fs.existsSync(config.keyDirectory)) {
     fs.mkdirSync(config.keyDirectory);
   }
@@ -239,18 +244,25 @@ async function main() {
   const maxIndex = keyIndices.length > 0 ? Math.max(...keyIndices) : 0;
   // We just reinitialize the party at maxIndex from scratch and accept that we allocate slightly more than maxParties in case of restarts instead of trying to clever
   // and incrementally handle all kinds of failures.
-  console.debug(`Starting at ${maxIndex}`);
+  logger.info(`Starting at ${maxIndex}`);
 
   const client = new LedgerApiClient(config.jsonLedgerApiUrl, config.token);
 
   let index = maxIndex;
   while (index < config.maxParties) {
-    console.debug(`Processing batch starting at ${index}`);
+    logger.info(`Processing batch starting at ${index}`);
     const batchSize = Math.min(config.parallelism, config.maxParties - index);
     const batch = Array.from({ length: batchSize }, (_, i) =>
-      setupParty(client, synchronizerId, index + i, validatorPartyId),
+      setupParty(
+        client,
+        config.userId,
+        synchronizerId,
+        index + i,
+        validatorPartyId,
+      ),
     );
     await Promise.all(batch);
+    logger.info(`Completed batch`);
     index += batchSize;
   }
 }

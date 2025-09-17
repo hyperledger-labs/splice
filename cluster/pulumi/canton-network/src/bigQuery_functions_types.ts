@@ -111,7 +111,7 @@ abstract class BQFunction {
     scanDataset: gcp.bigquery.Dataset,
     dashboardsDataset: gcp.bigquery.Dataset,
     dependsOn?: pulumi.Resource[]
-  ): gcp.bigquery.Routine;
+  ): pulumi.Resource;
   public abstract toSql(
     project: string,
     installInDataset: string,
@@ -216,10 +216,10 @@ export class BQColumn {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public toPulumi(): any {
+  public toPulumi(simpleSqlTypes: boolean = false): any {
     return {
       name: this.name,
-      type: this.type.toPulumi(),
+      type: simpleSqlTypes ? this.type.toSql() : this.type.toPulumi(),
     };
   }
 
@@ -287,6 +287,58 @@ export class BQTableFunction extends BQFunction {
       RETURNS TABLE<
         ${this.returnTableType.map(col => col.toSql()).join(',\n        ')}
       >
+      AS (
+      ${body}
+      );
+    `;
+  }
+}
+
+// While logical views are created as a Table in pulumi, we model them as a function, so that we can treat their query similarly to the function bodies.
+export class BQLogicalView extends BQFunction {
+  public constructor(name: string, definitionBody: string) {
+    super(name, [], definitionBody);
+  }
+
+  public toPulumi(
+    project: string,
+    installInDataset: gcp.bigquery.Dataset,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset,
+    dependsOn?: pulumi.Resource[]
+  ): gcp.bigquery.Table {
+    return new gcp.bigquery.Table(
+      this.name,
+      {
+        datasetId: installInDataset.datasetId,
+        tableId: this.name,
+        deletionProtection: false, // no point in deletion protection for a view, it doesn't hold data
+        view: {
+          query: this.replaceDatasetsPulumi(
+            project,
+            functionsDataset,
+            scanDataset,
+            dashboardsDataset
+          ),
+          useLegacySql: false,
+        },
+      },
+      { dependsOn }
+    );
+  }
+
+  public toSql(
+    project: string,
+    installInDataset: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string {
+    const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
+
+    return `
+      CREATE OR REPLACE VIEW ${installInDataset}.${this.name}
       AS (
       ${body}
       );
@@ -363,9 +415,7 @@ export class BQTable {
       datasetId: installInDataset.datasetId,
       tableId: this.name,
       deletionProtection,
-      schema: JSON.stringify({
-        fields: this.columns.map(col => col.toPulumi()),
-      }),
+      schema: JSON.stringify(this.columns.map(col => col.toPulumi(true))),
     });
   }
 

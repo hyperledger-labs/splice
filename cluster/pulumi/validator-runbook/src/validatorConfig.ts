@@ -1,35 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ValidatorNodeConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  allValidatorsConfig,
+  ValidatorConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import util from 'node:util';
-import { config } from 'splice-pulumi-common';
-import { clusterSubConfig } from 'splice-pulumi-common/src/config/configLoader';
-import { z } from 'zod';
 
-const ValidatorConfigSchema = z
-  .object({
-    namespace: z.string(),
-    partyHint: z.string(),
-    migrateParty: z.boolean().default(false),
-    newParticipantId: z.string().optional(),
-    onboardingSecret: z.string().optional(),
-    partyAllocator: z
-      .object({
-        enable: z.boolean(),
-      })
-      .default({ enable: false }),
-  })
-  .and(ValidatorNodeConfigSchema);
-
-const ValidatorsConfigSchema = z.record(z.string(), ValidatorConfigSchema);
-type ValidatorsConfig = z.infer<typeof ValidatorsConfigSchema>;
-type ValidatorConfig = z.infer<typeof ValidatorConfigSchema>;
-
-const allValidatorsConfig: ValidatorsConfig = ValidatorsConfigSchema.parse(
-  clusterSubConfig('validators')
-);
-
-function getValidatorConfig(validatorName: string): ValidatorConfig {
+function getValidatorConfig(validatorName: string) {
   const config = allValidatorsConfig[validatorName] as ValidatorConfig;
   if (!config) {
     throw new Error(`No configuration found for validator ${validatorName}`);

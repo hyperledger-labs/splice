@@ -1,35 +1,34 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+// This is part of `common-sv` to avoid circular dependencies between `common` and `common-sv`.
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
-import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
+import {
+  isDevNet,
+  isMainNet,
+  CLUSTER_HOSTNAME,
+  DecentralizedSynchronizerUpgradeConfig,
+  ExactNamespace,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
-import { isDevNet, isMainNet } from '../../common';
-import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';
-import { CLUSTER_HOSTNAME, ExactNamespace } from './utils';
+import { allSvsToDeploy, coreSvsToDeploy } from './svConfigs';
+import { cometBFTExternalPort } from './synchronizer/cometbftConfig';
 
-export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
+export function installSvLoopback(namespace: ExactNamespace): pulumi.Resource[] {
+  return installLoopback(namespace, true);
+}
+
+export function installLoopback(
+  namespace: ExactNamespace,
+  cometbft: boolean = false
+): pulumi.Resource[] {
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numCoreSvsToDeploy = coreSvsToDeploy.length;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
-  const port = (migration: number, node: number) => ({
-    number: cometBFTExternalPort(migration, node),
-    name: `cometbft-${migration}-${node}-p2p`,
-    protocol: 'TCP',
-  });
-  const cometBFTPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
-    const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
-      port(migration, node + 1)
-    );
-    if (!isMainNet) {
-      // For non-mainnet clusters, include "node 0" for the sv runbook
-      ret.unshift(port(migration, 0));
-    }
-    return ret;
-  });
+  const cometBFTPorts = cometbft ? getCometBftPorts(numMigrations, numSVs) : [];
 
   const clusterHostname = CLUSTER_HOSTNAME;
   const serviceEntry = new k8s.apiextensions.CustomResource(
@@ -67,15 +66,11 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     { dependsOn: [namespace.ns] }
   );
 
-  const svHosts = Array.from({ length: numSVs }, (_, i) =>
-    i == 0
-      ? [`sv-2.${clusterHostname}`, `*.sv-2.${clusterHostname}`]
-      : [`sv-${i + 1}-eng.${clusterHostname}`, `*.sv-${i + 1}-eng.${clusterHostname}`]
-  ).flat();
+  const svHosts = allSvsToDeploy
+    .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
+    .flat();
   const allHosts = [
     clusterHostname,
-    `sv.${clusterHostname}`,
-    `*.sv.${clusterHostname}`,
     `validator.${clusterHostname}`,
     `*.validator.${clusterHostname}`,
     `validator1.${clusterHostname}`,
@@ -135,7 +130,40 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     { dependsOn: [namespace.ns] }
   );
 
-  const cometBftVirtualService = new k8s.apiextensions.CustomResource(
+  const cometBftVirtualService = cometbft
+    ? [getCometBftVirtualService(namespace, clusterHostname)]
+    : [];
+
+  return [serviceEntry, virtualService, ...cometBftVirtualService];
+}
+
+// custom version of https://istio.io/latest/docs/reference/config/networking/service-entry/#ServicePort
+type ServicePort = {
+  number: number;
+  name: string;
+  protocol: string;
+};
+
+function getCometBftPorts(numMigrations: number, numSvs: number): ServicePort[] {
+  const port = (migration: number, node: number) => ({
+    number: cometBFTExternalPort(migration, node),
+    name: `cometbft-${migration}-${node}-p2p`,
+    protocol: 'TCP',
+  });
+  return Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
+    const ret = Array.from({ length: numSvs }, (_, node) => node).map(node =>
+      port(migration, node + 1)
+    );
+    if (!isMainNet) {
+      // For non-mainnet clusters, include "node 0" for the sv runbook
+      ret.unshift(port(migration, 0));
+    }
+    return ret;
+  });
+}
+
+function getCometBftVirtualService(namespace: ExactNamespace, clusterHostname: string) {
+  return new k8s.apiextensions.CustomResource(
     `loopback-cometbft-${namespace.logicalName}`,
     {
       apiVersion: 'networking.istio.io/v1alpha3',
@@ -171,6 +199,4 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     },
     { dependsOn: [namespace.ns] }
   );
-
-  return [serviceEntry, virtualService, cometBftVirtualService];
 }

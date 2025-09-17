@@ -203,6 +203,7 @@ function _cluster_apply() {
         SPLICE_DEPLOY_SPLITWELL=false \
         SPLICE_DEPLOY_SV_RUNBOOK=false \
         SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
+        SPLICE_SKIP_EXTRA_SVS=true \
         _pulumi_automation_run_up
     else
       _info "Applying all"
@@ -375,11 +376,11 @@ function subcmd_apply_validator(){
     _prompt_to_confirm
     _cluster_must_exist
 
+    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
+
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
-
-    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
 
     subcmd_pulumi validator-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
@@ -414,11 +415,11 @@ function subcmd_ci_apply_validator() {
        _info "Bootstrapping Validator from ${BOOTSTRAPPING_CONFIG}"
     fi
 
+    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
+
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
-
-    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
 
     subcmd_pulumi validator-runbook up --yes --skip-preview "${args[@]}"
 }

@@ -1,16 +1,23 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
-  AllocateExternalPartyResponse,
   Command,
   createConfiguration,
+  CreatedEvent,
   DeduplicationPeriod2,
   DefaultApi,
   DisclosedContract,
+  Filters,
   GenerateExternalPartyTopologyResponse,
+  GetActiveContractsRequest,
+  GrantUserRightsResponse,
   HttpAuthAuthentication,
+  IdentifierFilter,
+  Kind,
   RequestContext,
   ResponseContext,
+  RevokeUserRightsResponse,
+  Right,
   ServerConfiguration,
   Signature,
   SignedTransaction,
@@ -18,6 +25,7 @@ import {
 } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as crypto from "node:crypto";
+import { logger } from "./logger.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -40,11 +48,11 @@ export class LedgerApiClient {
           {
             post: async (context: ResponseContext) => {
               const url = this.als.getStore()?.url || "<unknown>";
-              console.log(`[Response] ${url} ${context.httpStatusCode}`);
+              logger.debug(`[Response] ${url} ${context.httpStatusCode}`);
               return context;
             },
             pre: async (context: RequestContext) => {
-              console.log(`[Request] ${context.getUrl()}`);
+              logger.debug(`[Request] ${context.getUrl()}`);
               const store = this.als.getStore();
               if (store) {
                 store.url = context.getUrl();
@@ -76,20 +84,28 @@ export class LedgerApiClient {
   }
 
   async allocateExternalParty(
-    hint: string,
+    partyId: string,
     synchronizer: string,
     onboardingTransactions: SignedTransaction[],
     multiHashSignatures: Signature[],
-  ): Promise<AllocateExternalPartyResponse> {
-    return this.retry(`allocate external party ${hint}`, () =>
-      this.als.run({ url: undefined }, () =>
-        this.api.postV2PartiesExternalAllocate({
-          synchronizer,
-          identityProviderId: "",
-          onboardingTransactions,
-          multiHashSignatures,
+  ): Promise<void> {
+    return this.retry(
+      `allocate external party ${partyId}`,
+      () =>
+        this.als.run({ url: undefined }, async () => {
+          const response = await this.api.getV2PartiesParty(partyId);
+          if (response?.partyDetails?.length === 0) {
+            await this.api.postV2PartiesExternalAllocate({
+              synchronizer,
+              identityProviderId: "",
+              onboardingTransactions,
+              multiHashSignatures,
+            });
+          } else {
+            logger.info(`Party id ${partyId} is already allocated`);
+          }
         }),
-      ),
+      120, // party allocations take forever so we also retry forever aka 2min
     );
   }
 
@@ -104,7 +120,7 @@ export class LedgerApiClient {
     const preparedTransaction = await this.retry(`prepare ${description}`, () =>
       this.als.run({ url: undefined }, () =>
         this.api.postV2InteractiveSubmissionPrepare({
-          userId: "participant_admin",
+          userId: "",
           actAs: [actAs],
           readAs: [],
           disclosedContracts,
@@ -129,7 +145,7 @@ export class LedgerApiClient {
         this.api.postV2InteractiveSubmissionExecute({
           deduplicationPeriod,
           submissionId: crypto.randomUUID(),
-          userId: "participant_admin",
+          userId: "",
           hashingSchemeVersion: preparedTransaction.hashingSchemeVersion,
           preparedTransaction: preparedTransaction.preparedTransaction,
           partySignatures: {
@@ -152,10 +168,102 @@ export class LedgerApiClient {
     );
   }
 
+  async queryContracts(
+    parties: string[],
+    templateIds: string[],
+  ): Promise<CreatedEvent[]> {
+    const ledgerEnd = (
+      await this.als.run({ url: undefined }, () =>
+        this.api.getV2StateLedgerEnd(),
+      )
+    ).offset;
+    const toTemplateFilter = (t: string) => {
+      const idFilter = new IdentifierFilter();
+      idFilter.TemplateFilter = {
+        value: { includeCreatedEventBlob: false, templateId: t },
+      };
+      return idFilter;
+    };
+    const filters: Filters = {
+      cumulative: templateIds.map((t) => ({
+        identifierFilter: toTemplateFilter(t),
+      })),
+    };
+    const request: GetActiveContractsRequest = {
+      verbose: false,
+      activeAtOffset: ledgerEnd,
+      eventFormat: {
+        verbose: false,
+        filtersByParty: Object.fromEntries(parties.map((p) => [p, filters])),
+      },
+    };
+    const responses = await this.als.run({ url: undefined }, () =>
+      this.api.postV2StateActiveContracts(request),
+    );
+    return responses.flatMap((r) =>
+      r.contractEntry.JsActiveContract.createdEvent
+        ? [r.contractEntry.JsActiveContract.createdEvent]
+        : [],
+    );
+  }
+
+  async grantUserRights(
+    userId: string,
+    actAs: string[],
+  ): Promise<GrantUserRightsResponse> {
+    const actAsRights: Right[] = actAs.map((party) => {
+      const right = new Kind();
+      right.CanActAs = { value: { party } };
+      return { kind: right };
+    });
+    return this.retry(`Grant user rights to ${userId}, actAs: ${actAs}`, () =>
+      this.als.run({ url: undefined }, () =>
+        this.api.postV2UsersUserIdRights(userId, {
+          userId: userId,
+          identityProviderId: "",
+          rights: actAsRights,
+        }),
+      ),
+    );
+  }
+
+  async revokeUserRights(
+    userId: string,
+    actAs: string[],
+  ): Promise<RevokeUserRightsResponse> {
+    const actAsRights: Right[] = actAs.map((party) => {
+      const right = new Kind();
+      right.CanActAs = { value: { party } };
+      return { kind: right };
+    });
+    return this.retry(`Revoke user rights to ${userId}, actAs: ${actAs}`, () =>
+      this.als.run({ url: undefined }, () =>
+        this.api.patchV2UsersUserIdRights(userId, {
+          userId: userId,
+          identityProviderId: "",
+          rights: actAsRights,
+        }),
+      ),
+    );
+  }
+
+  async withUserRights<T>(
+    userId: string,
+    actAs: string[],
+    t: () => Promise<T>,
+  ): Promise<T> {
+    await this.grantUserRights(userId, actAs);
+    try {
+      return await t();
+    } finally {
+      await this.revokeUserRights(userId, actAs);
+    }
+  }
+
   async retry<T>(
     description: string,
     task: () => Promise<T>,
-    maxRetries: number = 20,
+    maxRetries: number = 60,
     delayMs: number = 1000,
   ): Promise<T> {
     let attempt = 1;
@@ -164,14 +272,16 @@ export class LedgerApiClient {
       try {
         return await task();
       } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : JSON.stringify(e);
         if (attempt < maxRetries) {
-          const errorMessage =
-            e instanceof Error ? e.message : JSON.stringify(e);
-          console.error(
-            `Task ${description} failed after ${attempt} attempts: ${errorMessage}`,
+          logger.info(
+            `Task ${description} failed after ${attempt} attempts (max ${maxRetries}): ${errorMessage}`,
           );
           await delay(delayMs);
         } else {
+          logger.error(
+            `Task ${description} failed after ${attempt} attempts, giving up: ${errorMessage}`,
+          );
           throw e;
         }
       }

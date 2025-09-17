@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   exactNamespace,
-  installLoopback,
   numInstances,
   imagePullSecret,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';

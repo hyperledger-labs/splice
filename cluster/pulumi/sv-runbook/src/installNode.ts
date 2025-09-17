@@ -25,7 +25,6 @@ import {
   validatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
-  installLoopback,
   imagePullSecret,
   CnInput,
   sequencerPruningConfig,
@@ -47,7 +46,11 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { configForSv, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  configForSv,
+  installSvLoopback,
+  svsConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
   CloudPostgres,
@@ -104,7 +107,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 

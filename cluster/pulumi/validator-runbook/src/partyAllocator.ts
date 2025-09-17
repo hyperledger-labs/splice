@@ -4,6 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
   CnInput,
+  DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   InstalledHelmChart,
   installSpliceHelmChart,
@@ -18,8 +19,8 @@ export function installPartyAllocator(
     'party-allocator',
     'splice-party-allocator',
     {
-      jsonLedgerApiUrl: 'http://participant:7575',
-      scanApiUrl: 'http://scan.sv-1:5012',
+      jsonLedgerApiUrl: `http://participant-${DecentralizedSynchronizerUpgradeConfig.active.id}:7575`,
+      scanApiUrl: 'http://scan-app.sv-1:5012',
       validatorApiUrl: 'http://validator-app:5003',
       maxParties: 100,
       keysDirectory: '/keys',

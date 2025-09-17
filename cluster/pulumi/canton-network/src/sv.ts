@@ -27,7 +27,6 @@ import {
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
-  installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   networkWideConfig,
@@ -45,6 +44,7 @@ import {
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installSvLoopback,
   SvParticipant,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
@@ -128,7 +128,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
