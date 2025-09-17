@@ -19,6 +19,49 @@ Upcoming
 
   - Expose ``/dso`` endpoint from scan proxy
 
+- Daml
+
+  .. TODO(#2241): add proper link and number
+
+  - Implement `CIP-XXX - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/pull/97/files>`__ with the following changes:
+
+     - Change all Amulet transfers to not charge holding fees on inputs.
+     - Fix a bug in the validation of ``AmuletConfig`` that prevented
+       setting the Amulet transfer fees to zero.
+     - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
+       that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.14
+     amuletNameService  0.1.14
+     dsoGovernance      0.1.19
+     validatorLifecycle 0.1.5
+     wallet             0.1.14
+     walletPayments     0.1.14
+     ================== =======
+
+ .. important::
+
+     App devs that predict holding fees on transfers must adjust their code to
+     no longer expect any holding fees once this Daml change gets voted in.
+
+     The simplest option is to make your code independent of whether the change was voted in
+     by removing the prediction of holding fees. You can instead
+     extract the actual holding fees charged from the transfer transaction itself;
+     i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+     of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+     of the ``TransferResult``.
+
+- Deployment
+
+  - Participant
+
+     - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
 0.4.16
 ------
 

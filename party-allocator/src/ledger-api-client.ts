@@ -3,12 +3,16 @@
 import {
   Command,
   createConfiguration,
+  CreatedEvent,
   DeduplicationPeriod2,
   DefaultApi,
   DisclosedContract,
+  Filters,
   GenerateExternalPartyTopologyResponse,
+  GetActiveContractsRequest,
   GrantUserRightsResponse,
   HttpAuthAuthentication,
+  IdentifierFilter,
   Kind,
   RequestContext,
   ResponseContext,
@@ -21,6 +25,7 @@ import {
 } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as crypto from "node:crypto";
+import { logger } from "./logger.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -43,11 +48,11 @@ export class LedgerApiClient {
           {
             post: async (context: ResponseContext) => {
               const url = this.als.getStore()?.url || "<unknown>";
-              console.log(`[Response] ${url} ${context.httpStatusCode}`);
+              logger.debug(`[Response] ${url} ${context.httpStatusCode}`);
               return context;
             },
             pre: async (context: RequestContext) => {
-              console.log(`[Request] ${context.getUrl()}`);
+              logger.debug(`[Request] ${context.getUrl()}`);
               const store = this.als.getStore();
               if (store) {
                 store.url = context.getUrl();
@@ -97,7 +102,7 @@ export class LedgerApiClient {
               multiHashSignatures,
             });
           } else {
-            console.log(`Party id ${partyId} is already allocated`);
+            logger.info(`Party id ${partyId} is already allocated`);
           }
         }),
       120, // party allocations take forever so we also retry forever aka 2min
@@ -160,6 +165,45 @@ export class LedgerApiClient {
           },
         }),
       ),
+    );
+  }
+
+  async queryContracts(
+    parties: string[],
+    templateIds: string[],
+  ): Promise<CreatedEvent[]> {
+    const ledgerEnd = (
+      await this.als.run({ url: undefined }, () =>
+        this.api.getV2StateLedgerEnd(),
+      )
+    ).offset;
+    const toTemplateFilter = (t: string) => {
+      const idFilter = new IdentifierFilter();
+      idFilter.TemplateFilter = {
+        value: { includeCreatedEventBlob: false, templateId: t },
+      };
+      return idFilter;
+    };
+    const filters: Filters = {
+      cumulative: templateIds.map((t) => ({
+        identifierFilter: toTemplateFilter(t),
+      })),
+    };
+    const request: GetActiveContractsRequest = {
+      verbose: false,
+      activeAtOffset: ledgerEnd,
+      eventFormat: {
+        verbose: false,
+        filtersByParty: Object.fromEntries(parties.map((p) => [p, filters])),
+      },
+    };
+    const responses = await this.als.run({ url: undefined }, () =>
+      this.api.postV2StateActiveContracts(request),
+    );
+    return responses.flatMap((r) =>
+      r.contractEntry.JsActiveContract.createdEvent
+        ? [r.contractEntry.JsActiveContract.createdEvent]
+        : [],
     );
   }
 
@@ -228,14 +272,16 @@ export class LedgerApiClient {
       try {
         return await task();
       } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : JSON.stringify(e);
         if (attempt < maxRetries) {
-          const errorMessage =
-            e instanceof Error ? e.message : JSON.stringify(e);
-          console.error(
-            `Task ${description} failed after ${attempt} attempts: ${errorMessage}`,
+          logger.info(
+            `Task ${description} failed after ${attempt} attempts (max ${maxRetries}): ${errorMessage}`,
           );
           await delay(delayMs);
         } else {
+          logger.error(
+            `Task ${description} failed after ${attempt} attempts, giving up: ${errorMessage}`,
+          );
           throw e;
         }
       }
