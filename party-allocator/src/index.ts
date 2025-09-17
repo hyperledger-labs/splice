@@ -348,7 +348,6 @@ async function main() {
         ).then(() => {
           metrics.partiesAllocatedCounter.add(1);
           maxPartyAllocated = Math.max(maxPartyAllocated, partyIndex);
-          logger.error(`Updating metric to ${maxPartyAllocated} ${partyIndex}`);
           metrics.totalPartiesAllocated.record(maxPartyAllocated);
         }),
       );
