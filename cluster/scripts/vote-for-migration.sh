@@ -84,16 +84,24 @@ echo "Casting votes on $vote_request_cid with: $vote_data"
 
 DSO_SIZE=${DSO_SIZE:-4}
 other_svs=()
+# standard (eng) SVs
 for ((i=2; i<=DSO_SIZE; i++)); do
   other_svs+=("sv-$i")
+done
+# extra SVs from all the config.yaml files
+extra_svs=$(yq '. *= load("../config.yaml") | . *= load("config.yaml") | .svs | keys | .[] | select(test("^(default|sv-[0-9]+)$") | not)' < "$SPLICE_ROOT/cluster/deployment/config.yaml")
+for sv in $extra_svs; do
+  other_svs+=("$sv")
 done
 
 for sv in "${other_svs[@]}"
 do
   token=$(cncluster get_token "$sv" sv)
   echo "Casting vote on $sv"
+  subdomain=$(yq '. *= load("../config.yaml") | . *= load("config.yaml")' < "$SPLICE_ROOT/cluster/deployment/config.yaml" | yq -r ".svs.$sv.subdomain // \"$sv-eng\"")
+
   curl -s --fail-with-body --show-error --retry 10 --retry-delay 10 --retry-all-errors \
-    -X POST "https://sv.$sv-eng.$GCP_CLUSTER_HOSTNAME/api/sv/v0/admin/sv/votes" \
+    -X POST "https://sv.$subdomain.$GCP_CLUSTER_HOSTNAME/api/sv/v0/admin/sv/votes" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $token" \
     --data-raw "$vote_data"
