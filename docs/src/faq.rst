@@ -137,7 +137,7 @@ ________
           }
         }
 
-    As per the information in `Adding ad-hoc configuration <https://docs.dev.sync.global/deployment/configuration.html#adding-ad-hoc-configuration>`__,
+    As per the information in :ref:`Adding ad-hoc configuration <configuration_ad_hoc>`,
     add an environment variable ``ADDITIONAL_CONFIG_JSON_LIMIT=canton.participants.participant.http-ledger-api.websocket-config { http-list-max-elements-limit = 1000, http-list-wait-time = 2s }`` to your Canton participant docker process
 
     Then you can add an extra limit on query `(?limit=xyz)` to the request but the result will never exceed server limit.
