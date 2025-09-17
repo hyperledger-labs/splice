@@ -21,17 +21,17 @@ Upcoming
 
 - Daml
 
-  .. TODO(#2241): add proper link and number
-
-  - Implement `CIP-XXX - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/pull/97/files>`__ with the following changes:
+  - Implement `CIP-0078 - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__
+    with the following changes:
 
      - Change all Amulet transfers to not charge holding fees on inputs.
-     - Fix a bug in the validation of ``AmuletConfig`` that prevented
+     - Fix a bug in the ``ensure`` clause of ``AmuletRules`` that prevented
        setting the Amulet transfer fees to zero.
      - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
        that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
 
-     These Daml changes requires an upgrade to the following Daml versions:
+     These Daml changes require an upgrade to the following Daml versions **before**
+     voting to set the transfer fees to zero:
 
      ================== =======
      name               version
@@ -46,15 +46,28 @@ Upcoming
 
  .. important::
 
-     App devs that predict holding fees on transfers must adjust their code to
-     no longer expect any holding fees once this Daml change gets voted in.
+     **Action required from app devs:**
 
-     The simplest option is to make your code independent of whether the change was voted in
-     by removing the prediction of holding fees. You can instead
-     extract the actual holding fees charged from the transfer transaction itself;
-     i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
-     of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
-     of the ``TransferResult``.
+     1. **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.14`` must recompile their Daml code
+        to link against ``splice-amulet >= 0.1.14``.
+
+        The reason being that earlier versions of the ``AmuletRules`` template
+        do not support setting the transfer fees to zero. Attempting to downgrade to them will raise a
+        ``PRECONDITION_FAILED`` error stating that the ``ensure`` clause evaluated to ``false``.
+
+        No change is required for apps that build against the :ref:`token_standard`
+        or :ref:`featured_app_activity_markers_api`.
+
+     2. **App devs whose app predicts holding fees on transfers** must adjust their code to
+        no longer expect any holding fees once this Daml change gets voted in.
+
+        The simplest option is to make your code independent of whether the change was voted in
+        by removing the prediction of holding fees. You can instead
+        extract the actual holding fees charged from the transfer transaction itself;
+        i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+        of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+        of the ``TransferResult``.
+
 
 - Deployment
 
