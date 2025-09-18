@@ -20,7 +20,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.environment.{
   CommandPriority,
   PackageVersionSupport,
@@ -45,7 +44,6 @@ import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletServ
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
-import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
@@ -80,6 +78,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletRequest,
   CreateTokenStandardTransferRequest,
 }
+import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import java.math.RoundingMode as JRM
 import java.util.UUID
@@ -100,22 +99,21 @@ class HttpWalletHandler(
     mat: Materializer,
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.WalletHandler[TracedUser]
+) extends v0.WalletHandler[WalletUserRequest]
     with HttpWalletHandlerUtil {
   protected val workflowId = this.getClass.getSimpleName
 
   override def list(respond: r0.ListResponse.type)()(
-      tuser: TracedUser
+      tuser: WalletUserRequest
   ): Future[r0.ListResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.list") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
         currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
-        amulets <- userStore.multiDomainAcsStore.listContracts(
+        amulets <- userWallet.store.multiDomainAcsStore.listContracts(
           amuletCodegen.Amulet.COMPANION
         )
-        lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
+        lockedAmulets <- userWallet.store.multiDomainAcsStore.listContracts(
           amuletCodegen.LockedAmulet.COMPANION
         )
       } yield r0.ListResponseOK(
@@ -129,36 +127,35 @@ class HttpWalletHandler(
 
   override def listAcceptedAppPayments(
       respond: v0.WalletResource.ListAcceptedAppPaymentsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListAcceptedAppPaymentsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[v0.WalletResource.ListAcceptedAppPaymentsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContractsWithState(
       walletCodegen.AcceptedAppPayment.COMPANION,
-      user,
+      userWallet.store,
       d0.ListAcceptedAppPaymentsResponse(_),
     )
   }
 
   override def listAcceptedTransferOffers(
       respond: v0.WalletResource.ListAcceptedTransferOffersResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListAcceptedTransferOffersResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[v0.WalletResource.ListAcceptedTransferOffersResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContracts(
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
-      user,
+      userWallet.store,
       d0.ListAcceptedTransferOffersResponse(_),
     )
   }
 
   override def getAppPaymentRequest(respond: r0.GetAppPaymentRequestResponse.type)(
       contractId: String
-  )(tuser: TracedUser): Future[r0.GetAppPaymentRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.GetAppPaymentRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getAppPaymentRequest") { _ => _ =>
       val requestCid =
         Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(contractId)
       for {
-        userStore <- getUserStore(user)
-        appPaymentRequest <- userStore.getAppPaymentRequest(requestCid)
+        appPaymentRequest <- userWallet.store.getAppPaymentRequest(requestCid)
       } yield r0.GetAppPaymentRequestResponseOK(
         appPaymentRequest.toHttp
       )
@@ -167,46 +164,46 @@ class HttpWalletHandler(
 
   override def listAppPaymentRequests(
       respond: v0.WalletResource.ListAppPaymentRequestsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListAppPaymentRequestsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[v0.WalletResource.ListAppPaymentRequestsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.listAppPaymentRequests") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
-        appPaymentRequests <- userStore.listAppPaymentRequests()
+        appPaymentRequests <- userWallet.store.listAppPaymentRequests()
       } yield d0.ListAppPaymentRequestsResponse(appPaymentRequests.map(_.toHttp).toVector)
     }
   }
 
   override def listAppRewardCoupons(respond: v0.WalletResource.ListAppRewardCouponsResponse.type)()(
-      tuser: TracedUser
+      tuser: WalletUserRequest
   ): Future[v0.WalletResource.ListAppRewardCouponsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContracts(
       amuletCodegen.AppRewardCoupon.COMPANION,
-      user,
+      userWallet.store,
       d0.ListAppRewardCouponsResponse(_),
     )
   }
 
   override def listSubscriptionInitialPayments(
       respond: v0.WalletResource.ListSubscriptionInitialPaymentsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListSubscriptionInitialPaymentsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(
+      tuser: WalletUserRequest
+  ): Future[v0.WalletResource.ListSubscriptionInitialPaymentsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContracts(
       subsCodegen.SubscriptionInitialPayment.COMPANION,
-      user,
+      userWallet.store,
       d0.ListSubscriptionInitialPaymentsResponse(_),
     )
   }
 
   override def listSubscriptionRequests(
       respond: v0.WalletResource.ListSubscriptionRequestsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListSubscriptionRequestsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[v0.WalletResource.ListSubscriptionRequestsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.listSubscriptionRequests") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
-        subRequests <- userStore.listSubscriptionRequests()
+        subRequests <- userWallet.store.listSubscriptionRequests()
       } yield {
         d0.ListSubscriptionRequestsResponse(subRequests.map(_.toHttp).toVector)
       }
@@ -214,14 +211,13 @@ class HttpWalletHandler(
   }
 
   override def listSubscriptions(respond: v0.WalletResource.ListSubscriptionsResponse.type)()(
-      tuser: TracedUser
+      tuser: WalletUserRequest
   ): Future[v0.WalletResource.ListSubscriptionsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
 
     withSpan(s"$workflowId.listSubscriptions") { implicit traceContext => _ =>
       for {
-        userStore <- getUserStore(user)
-        subscriptions <- userStore.listSubscriptions(walletManager.clock.now)
+        subscriptions <- userWallet.store.listSubscriptions(walletManager.clock.now)
       } yield {
         v0.WalletResource.ListSubscriptionsResponseOK(
           d0.ListSubscriptionsResponse(
@@ -244,13 +240,12 @@ class HttpWalletHandler(
 
   override def listValidatorRewardCoupons(
       respond: v0.WalletResource.ListValidatorRewardCouponsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListValidatorRewardCouponsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[v0.WalletResource.ListValidatorRewardCouponsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.listValidatorRewardCoupons") { implicit traceContext => _ =>
       for {
-        userStore <- getUserStore(user)
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
-          userStore,
+          userWallet.store,
           Limit.DefaultLimit,
           None,
         )
@@ -262,33 +257,35 @@ class HttpWalletHandler(
 
   override def listValidatorFaucetCoupons(
       respond: v0.WalletResource.ListValidatorFaucetCouponsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListValidatorFaucetCouponsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[v0.WalletResource.ListValidatorFaucetCouponsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContracts(
       validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION,
-      user,
+      userWallet.store,
       d0.ListValidatorFaucetCouponsResponse(_),
     )
   }
 
   override def listValidatorLivenessActivityRecords(
       respond: v0.WalletResource.ListValidatorLivenessActivityRecordsResponse.type
-  )()(tuser: TracedUser): Future[v0.WalletResource.ListValidatorLivenessActivityRecordsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(
+      tuser: WalletUserRequest
+  ): Future[v0.WalletResource.ListValidatorLivenessActivityRecordsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContracts(
       validatorLicenseCodegen.ValidatorLivenessActivityRecord.COMPANION,
-      user,
+      userWallet.store,
       d0.ListValidatorLivenessActivityRecordsResponse(_),
     )
   }
 
   override def listSvRewardCoupons(respond: v0.WalletResource.ListSvRewardCouponsResponse.type)()(
-      tUser: TracedUser
+      tUser: WalletUserRequest
   ): Future[v0.WalletResource.ListSvRewardCouponsResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     listContracts(
       amuletCodegen.SvRewardCoupon.COMPANION,
-      user,
+      userWallet.store,
       d0.ListSvRewardCouponsResponse(_),
     )
   }
@@ -297,13 +294,12 @@ class HttpWalletHandler(
       respond: v0.WalletResource.ListTransactionsResponse.type
   )(
       request: d0.ListTransactionsRequest
-  )(tuser: TracedUser): Future[r0.ListTransactionsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.ListTransactionsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.listTransactions") { implicit traceContext => _ =>
+      val beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
       for {
-        userStore <- getUserStore(user)
-        beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
-        transactions <- userStore.listTransactions(
+        transactions <- userWallet.store.listTransactions(
           beginAfterId,
           PageLimit.tryCreate(request.pageSize.toInt),
         )
@@ -320,9 +316,9 @@ class HttpWalletHandler(
   override def selfGrantFeatureAppRight(
       respond: v0.WalletResource.SelfGrantFeatureAppRightResponse.type
   )(request: Option[Json])(
-      tuser: TracedUser
+      tuser: WalletUserRequest
   ): Future[r0.SelfGrantFeatureAppRightResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.selfGrantFeatureAppRight") { implicit traceContext => _ =>
       for {
         amuletRules <- scanConnection.getAmuletRulesWithState()
@@ -334,28 +330,27 @@ class HttpWalletHandler(
               )
               .map(_.exerciseResult.featuredAppRight)
           )
-        )(user, disclosedContracts = _.disclosedContracts(amuletRules))
+        )(userWallet, disclosedContracts = _.disclosedContracts(amuletRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
   }
   override def acceptTransferOffer(respond: r0.AcceptTransferOfferResponse.type)(
       contractId: String
-  )(tuser: TracedUser): Future[r0.AcceptTransferOfferResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.AcceptTransferOfferResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.acceptTransferOffer") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
         "accept_transfer",
         "accept transfer offer",
         for {
-          userStore <- getUserStore(user)
           commandPriority <-
-            if (userStore.key.endUserParty != userStore.key.validatorParty)
+            if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
               Future.successful(CommandPriority.Low)
             else
               TopupUtil
                 .hasSufficientFundsForTopup(
                   scanConnection,
-                  userStore,
+                  userWallet.store,
                   validatorTopupConfig,
                   walletManager.clock,
                 )
@@ -376,7 +371,7 @@ class HttpWalletHandler(
                   }
               )
             })(
-              user,
+              userWallet,
               priority = commandPriority,
             )
         } yield outcome,
@@ -386,8 +381,8 @@ class HttpWalletHandler(
   }
   override def rejectTransferOffer(respond: r0.RejectTransferOfferResponse.type)(
       contractId: String
-  )(tuser: TracedUser): Future[r0.RejectTransferOfferResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.RejectTransferOfferResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.rejectTransferOffer") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
         "reject_transfer",
@@ -405,7 +400,7 @@ class HttpWalletHandler(
               .map(_ => r0.RejectTransferOfferResponseOK)
           )
         })(
-          user
+          userWallet
         ),
         logger,
       )
@@ -414,8 +409,8 @@ class HttpWalletHandler(
 
   override def withdrawTransferOffer(respond: r0.WithdrawTransferOfferResponse.type)(
       contractId: String
-  )(tuser: TracedUser): Future[r0.WithdrawTransferOfferResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.WithdrawTransferOfferResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.withdrawTransferOffer") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
         "withdraw_transfer",
@@ -436,7 +431,7 @@ class HttpWalletHandler(
               .map(_ => r0.WithdrawTransferOfferResponseOK)
           )
         })(
-          user
+          userWallet
         ),
         logger,
       )
@@ -445,8 +440,8 @@ class HttpWalletHandler(
 
   override def acceptAppPaymentRequest(
       respond: r0.AcceptAppPaymentRequestResponse.type
-  )(contractId: String)(tuser: TracedUser): Future[r0.AcceptAppPaymentRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(contractId: String)(tuser: WalletUserRequest): Future[r0.AcceptAppPaymentRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.acceptAppPaymentRequest") { _ => _ =>
       val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
         contractId
@@ -456,7 +451,7 @@ class HttpWalletHandler(
         "Accept app payment request",
         exerciseWalletAmuletAction(
           new amuletoperation.CO_AppPayment(requestCid),
-          user,
+          userWallet,
           (outcome: COO_AcceptedAppPayment) =>
             r0.AcceptAppPaymentRequestResponse.OK(
               d0.AcceptAppPaymentRequestResponse(
@@ -471,8 +466,8 @@ class HttpWalletHandler(
 
   override def rejectAppPaymentRequest(
       respond: r0.RejectAppPaymentRequestResponse.type
-  )(contractId: String)(tuser: TracedUser): Future[r0.RejectAppPaymentRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(contractId: String)(tuser: WalletUserRequest): Future[r0.RejectAppPaymentRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.rejectAppPaymentRequest") { implicit traceContext => _ =>
       val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
         contractId
@@ -486,7 +481,7 @@ class HttpWalletHandler(
               .exerciseWalletAppInstall_AppPaymentRequest_Reject(requestCid)
               .map(_ => r0.RejectAppPaymentRequestResponseOK)
           )
-        })(user),
+        })(userWallet),
         logger,
       )
     }
@@ -494,14 +489,13 @@ class HttpWalletHandler(
 
   override def getSubscriptionRequest(respond: r0.GetSubscriptionRequestResponse.type)(
       contractId: String
-  )(tuser: TracedUser): Future[r0.GetSubscriptionRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.GetSubscriptionRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getSubscriptionRequest") { implicit traceContext => _ =>
       val requestCid =
         Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(contractId)
       for {
-        userStore <- getUserStore(user)
-        subscriptionRequest <- userStore.getSubscriptionRequest(requestCid)
+        subscriptionRequest <- userWallet.store.getSubscriptionRequest(requestCid)
       } yield r0.GetSubscriptionRequestResponseOK(
         subscriptionRequest.toHttp
       )
@@ -510,8 +504,8 @@ class HttpWalletHandler(
 
   override def acceptSubscriptionRequest(
       respond: r0.AcceptSubscriptionRequestResponse.type
-  )(contractId: String)(tuser: TracedUser): Future[r0.AcceptSubscriptionRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(contractId: String)(tuser: WalletUserRequest): Future[r0.AcceptSubscriptionRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.acceptSubscriptionRequest") { implicit traceContext => _ =>
       val requestCid =
         Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
@@ -522,7 +516,7 @@ class HttpWalletHandler(
         "Accept subscription and make initial payment",
         exerciseWalletAmuletAction(
           new amuletoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
-          user,
+          userWallet,
           (outcome: amuletoperationoutcome.COO_SubscriptionInitialPayment) =>
             d0.AcceptSubscriptionRequestResponse(
               Codec.encodeContractId(outcome.contractIdValue)
@@ -535,8 +529,8 @@ class HttpWalletHandler(
 
   override def cancelSubscriptionRequest(
       respond: r0.CancelSubscriptionRequestResponse.type
-  )(contractId: String)(tuser: TracedUser): Future[r0.CancelSubscriptionRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(contractId: String)(tuser: WalletUserRequest): Future[r0.CancelSubscriptionRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.cancelSubscriptionRequest") { implicit traceContext => _ =>
       val requestCid =
         Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
@@ -553,7 +547,7 @@ class HttpWalletHandler(
               )
               .map(_ => r0.CancelSubscriptionRequestResponseOK)
           )
-        )(user),
+        )(userWallet),
         logger,
       )
     }
@@ -561,8 +555,8 @@ class HttpWalletHandler(
 
   override def rejectSubscriptionRequest(
       respond: r0.RejectSubscriptionRequestResponse.type
-  )(contractId: String)(tuser: TracedUser): Future[r0.RejectSubscriptionRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(contractId: String)(tuser: WalletUserRequest): Future[r0.RejectSubscriptionRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.rejectSubscriptionRequest") { implicit traceContext => _ =>
       val requestCid = Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
         contractId
@@ -576,32 +570,31 @@ class HttpWalletHandler(
               .exerciseWalletAppInstall_SubscriptionRequest_Reject(requestCid)
               .map(_ => r0.RejectSubscriptionRequestResponseOK)
           )
-        )(user),
+        )(userWallet),
         logger,
       )
     }
   }
 
   override def getBalance(respond: r0.GetBalanceResponse.type)()(
-      tuser: TracedUser
+      tuser: WalletUserRequest
   ): Future[r0.GetBalanceResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getBalance") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
         noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
-          userStore.key.dsoParty,
+          userWallet.store.key.dsoParty,
           walletManager.clock.now,
         )
         deductHoldingFees = !noHoldingFeesOnTransfers.supported
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
           .map(_.payload.round.number)
-        (unlockedQty, unlockedHoldingFees) <- userStore.getAmuletBalanceWithHoldingFees(
+        (unlockedQty, unlockedHoldingFees) <- userWallet.store.getAmuletBalanceWithHoldingFees(
           currentRound,
           deductHoldingFees = deductHoldingFees,
         )
-        lockedQty <- userStore.getLockedAmuletBalance(
+        lockedQty <- userWallet.store.getLockedAmuletBalance(
           currentRound,
           deductHoldingFees = deductHoldingFees,
         )
@@ -617,18 +610,17 @@ class HttpWalletHandler(
   }
 
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(
-      tuser: TracedUser
+      tuser: WalletUserRequest
   ): Future[r0.TapResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.tap") { _ => _ =>
       val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
+      val commandId = CommandId(
+        "org.lfdecentralizedtrust.splice.wallet.tap",
+        Seq(userWallet.store.key.endUserParty),
+        request.commandId.getOrElse(UUID.randomUUID().toString),
+      )
       for {
-        userStore <- getUserStore(user)
-        commandId = CommandId(
-          "org.lfdecentralizedtrust.splice.wallet.tap",
-          Seq(userStore.key.endUserParty),
-          request.commandId.getOrElse(UUID.randomUUID().toString),
-        )
         r <- retryProvider.retryForClientCalls(
           "tap",
           "Tap",
@@ -639,7 +631,7 @@ class HttpWalletHandler(
               operation = new amuletoperation.CO_Tap(
                 amount.divide(openRound.payload.amuletPrice, JRM.CEILING)
               ),
-              user = user,
+              userWallet = userWallet,
               processResponse = (outcome: amuletoperationoutcome.COO_Tap) =>
                 d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
               dedupConfig = Some(
@@ -656,42 +648,13 @@ class HttpWalletHandler(
     }
   }
 
-  override def userStatus(respond: r0.UserStatusResponse.type)()(
-      tuser: TracedUser
-  ): Future[r0.UserStatusResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
-    withSpan(s"$workflowId.userStatus") { implicit traceContext => _ =>
-      for {
-        optWallet <- walletManager.lookupUserWallet(user)
-        hasFeaturedAppRight <- optWallet match {
-          case None => Future(false)
-          case Some(wallet) =>
-            wallet.store.lookupFeaturedAppRight().map(_.isDefined)
-        }
-        optInstall <- optWallet match {
-          case None =>
-            Future(None)
-          case Some(w) => w.store.lookupInstall()
-        }
-      } yield {
-        d0.UserStatusResponse(
-          partyId = optWallet.fold("")(_.store.key.endUserParty.toProtoPrimitive),
-          userOnboarded = optWallet.isDefined,
-          userWalletInstalled = optInstall.isDefined,
-          hasFeaturedAppRight = hasFeaturedAppRight,
-        )
-      }
-    }
-  }
-
   override def cancelFeaturedAppRights(
       respond: r0.CancelFeaturedAppRightsResponse.type
-  )()(tuser: TracedUser): Future[r0.CancelFeaturedAppRightsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[r0.CancelFeaturedAppRightsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.cancelFeaturedAppRights") { implicit traceContext => _ =>
       for {
-        userStore <- getUserStore(user)
-        featuredAppRight <- userStore.lookupFeaturedAppRight()
+        featuredAppRight <- userWallet.store.lookupFeaturedAppRight()
         result <- featuredAppRight match {
           case None =>
             logger.info(s"No featured app right found for user ${user} - nothing to cancel")
@@ -706,7 +669,7 @@ class HttpWalletHandler(
                     .exerciseWalletAppInstall_FeaturedAppRights_Cancel(cid.contractId)
                     .map(_ => r0.CancelFeaturedAppRightsResponseOK)
                 )
-              })(user),
+              })(userWallet),
               logger,
             )
         }
@@ -716,12 +679,11 @@ class HttpWalletHandler(
 
   override def createTransferPreapproval(
       respond: r0.CreateTransferPreapprovalResponse.type
-  )()(tuser: TracedUser): Future[r0.CreateTransferPreapprovalResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[r0.CreateTransferPreapprovalResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.createTransferPreapproval") { implicit traceContext => _ =>
+      val store = userWallet.store
       for {
-        wallet <- getUserWallet(user)
-        store = wallet.store
         domain <- scanConnection.getAmuletRulesDomain()(traceContext)
         result <- store.lookupTransferPreapproval(store.key.endUserParty) flatMap {
           case QueryResult(_, Some(existingPreapproval)) =>
@@ -740,7 +702,7 @@ class HttpWalletHandler(
                 case QueryResult(_, Some(proposal)) => Future.successful(proposal.contractId)
                 case QueryResult(proposalOffSet, None) =>
                   val dedupOffset = Ordering[Long].min(preapprovalOffset, proposalOffSet)
-                  createTransferPreapprovalProposal(wallet, domain, dedupOffset)
+                  createTransferPreapprovalProposal(userWallet, domain, dedupOffset)
               }
               _ = logger.debug(
                 s"Created TransferPreapprovalProposal with contract ID $proposalCid. Now waiting for automation to create the TransferPreapproval."
@@ -811,8 +773,8 @@ class HttpWalletHandler(
 
   def transferPreapprovalSend(respond: r0.TransferPreapprovalSendResponse.type)(
       body: d0.TransferPreapprovalSendRequest
-  )(tuser: TracedUser): Future[r0.TransferPreapprovalSendResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )(tuser: WalletUserRequest): Future[r0.TransferPreapprovalSendResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.transferPreapprovalSend") { _ => _ =>
       val receiver = Codec.tryDecode(Codec.Party)(body.receiverPartyId)
       val amount = Codec.tryDecode(Codec.JavaBigDecimal)(body.amount)
@@ -824,14 +786,13 @@ class HttpWalletHandler(
               .asRuntimeException
           )
         case Some(preapproval) =>
+          val sender = userWallet.store.key.endUserParty
           for {
-            wallet <- getUserWallet(user)
-            sender = wallet.store.key.endUserParty
             featuredAppRight <- scanConnection
               .lookupFeaturedAppRight(PartyId.tryFromProtoPrimitive(preapproval.payload.provider))
             supportsDescription <- packageVersionSupport
               .supportsDescriptionInTransferPreapprovals(
-                Seq(receiver, sender, wallet.store.key.dsoParty),
+                Seq(receiver, sender, userWallet.store.key.dsoParty),
                 walletManager.clock.now,
               )
               .map(_.supported)
@@ -842,10 +803,10 @@ class HttpWalletHandler(
                 amount,
                 Option.when(supportsDescription)(body.description).flatten.toJava,
               ),
-              user,
+              userWallet,
               (_: amuletoperationoutcome.COO_TransferPreapprovalSend) =>
                 r0.TransferPreapprovalSendResponse.OK,
-              extraDisclosedContracts = wallet.connection.disclosedContracts(
+              extraDisclosedContracts = userWallet.connection.disclosedContracts(
                 preapproval,
                 // Approximating the state of featured app right to be the same as the preapproval
                 // as scan currently does not return a ContractWithState.
@@ -871,20 +832,19 @@ class HttpWalletHandler(
       respond: WalletResource.CreateTokenStandardTransferResponse.type
   )(
       request: CreateTokenStandardTransferRequest
-  )(extracted: TracedUser): Future[WalletResource.CreateTokenStandardTransferResponse] = {
-    implicit val TracedUser(user, traceContext) = extracted
+  )(extracted: WalletUserRequest): Future[WalletResource.CreateTokenStandardTransferResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
     withSpan(s"$workflowId.createTokenStandardTransfer") { _ => _ =>
+      val commandId = CommandId(
+        "org.lfdecentralizedtrust.splice.wallet.createTokenStandardTransfer",
+        Seq(userWallet.store.key.endUserParty),
+        request.trackingId,
+      )
+      val dedupConfig = AmuletOperationDedupConfig(
+        commandId,
+        dedupDuration,
+      )
       (for {
-        userWallet <- getUserWallet(user)
-        commandId = CommandId(
-          "org.lfdecentralizedtrust.splice.wallet.createTokenStandardTransfer",
-          Seq(userWallet.store.key.endUserParty),
-          request.trackingId,
-        )
-        dedupConfig = AmuletOperationDedupConfig(
-          commandId,
-          dedupDuration,
-        )
         result <- userWallet.treasury.enqueueTokenStandardTransferOperation(
           Codec.tryDecode(Codec.Party)(request.receiverPartyId),
           BigDecimal(request.amount),
@@ -922,11 +882,11 @@ class HttpWalletHandler(
 
   override def listTokenStandardTransfers(
       respond: WalletResource.ListTokenStandardTransfersResponse.type
-  )()(tuser: TracedUser): Future[WalletResource.ListTokenStandardTransfersResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[WalletResource.ListTokenStandardTransfersResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     listContracts(
       AmuletTransferInstruction.COMPANION,
-      user,
+      userWallet.store,
       contracts =>
         WalletResource.ListTokenStandardTransfersResponse.OK(
           d0.ListTokenStandardTransfersResponse(contracts)
@@ -937,9 +897,9 @@ class HttpWalletHandler(
   override def acceptTokenStandardTransfer(
       respond: WalletResource.AcceptTokenStandardTransferResponse.type
   )(contractId: String)(
-      tUser: TracedUser
+      tUser: WalletUserRequest
   ): Future[WalletResource.AcceptTokenStandardTransferResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     withSpan(s"$workflowId.acceptTokenStandardTransfer") { implicit traceContext => _ =>
       val requestCid = Codec.tryDecodeJavaContractIdInterface(
         transferinstructionv1.TransferInstruction.INTERFACE
@@ -957,7 +917,7 @@ class HttpWalletHandler(
               )
           )
         })(
-          user,
+          userWallet,
           disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
         )
       } yield WalletResource.AcceptTokenStandardTransferResponseOK(
@@ -969,9 +929,9 @@ class HttpWalletHandler(
   override def rejectTokenStandardTransfer(
       respond: WalletResource.RejectTokenStandardTransferResponse.type
   )(contractId: String)(
-      tUser: TracedUser
+      tUser: WalletUserRequest
   ): Future[WalletResource.RejectTokenStandardTransferResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     withSpan(s"$workflowId.rejectTokenStandardTransfer") { implicit traceContext => _ =>
       val requestCid = Codec.tryDecodeJavaContractIdInterface(
         transferinstructionv1.TransferInstruction.INTERFACE
@@ -989,7 +949,7 @@ class HttpWalletHandler(
               )
           )
         })(
-          user,
+          userWallet,
           disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
         )
       } yield WalletResource.RejectTokenStandardTransferResponseOK(
@@ -1001,9 +961,9 @@ class HttpWalletHandler(
   override def withdrawTokenStandardTransfer(
       respond: WalletResource.WithdrawTokenStandardTransferResponse.type
   )(contractId: String)(
-      tUser: TracedUser
+      tUser: WalletUserRequest
   ): Future[WalletResource.WithdrawTokenStandardTransferResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     withSpan(s"$workflowId.withdrawTokenStandardTransfer") { implicit traceContext => _ =>
       val requestCid = Codec.tryDecodeJavaContractIdInterface(
         transferinstructionv1.TransferInstruction.INTERFACE
@@ -1021,7 +981,7 @@ class HttpWalletHandler(
               )
           )
         })(
-          user,
+          userWallet,
           disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
         )
       } yield WalletResource.WithdrawTokenStandardTransferResponseOK(
@@ -1032,48 +992,47 @@ class HttpWalletHandler(
 
   override def allocateAmulet(respond: WalletResource.AllocateAmuletResponse.type)(
       body: AllocateAmuletRequest
-  )(extracted: TracedUser): Future[WalletResource.AllocateAmuletResponse] = {
-    implicit val TracedUser(user, traceContext) = extracted
+  )(extracted: WalletUserRequest): Future[WalletResource.AllocateAmuletResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
     withSpan(s"$workflowId.allocateAmulet") { _ => _ =>
       val now = walletManager.clock.now.toInstant
-      for {
-        userWallet <- getUserWallet(user)
-        sender = userWallet.store.key.endUserParty
-        commandId = CommandId(
-          "org.lfdecentralizedtrust.splice.wallet.allocateAmulet",
-          Seq(sender),
-          Seq(
-            body.settlement.executor,
-            body.settlement.settlementRef.id,
-            body.settlement.settlementRef.cid.getOrElse(""),
-            body.transferLegId,
-          ),
-        )
-        specification = new allocationv1.AllocationSpecification(
-          new allocationv1.SettlementInfo(
-            body.settlement.executor,
-            new allocationv1.Reference(
-              body.settlement.settlementRef.id,
-              body.settlement.settlementRef.cid.map(cid => new AnyContract.ContractId(cid)).toJava,
-            ),
-            Codec.tryDecode(Codec.Timestamp)(body.settlement.requestedAt).toInstant,
-            Codec.tryDecode(Codec.Timestamp)(body.settlement.allocateBefore).toInstant,
-            Codec.tryDecode(Codec.Timestamp)(body.settlement.settleBefore).toInstant,
-            new metadatav1.Metadata(body.settlement.meta.getOrElse(Map.empty).asJava),
-          ),
+      val sender = userWallet.store.key.endUserParty
+      val commandId = CommandId(
+        "org.lfdecentralizedtrust.splice.wallet.allocateAmulet",
+        Seq(sender),
+        Seq(
+          body.settlement.executor,
+          body.settlement.settlementRef.id,
+          body.settlement.settlementRef.cid.getOrElse(""),
           body.transferLegId,
-          new allocationv1.TransferLeg(
-            sender.toProtoPrimitive,
-            body.transferLeg.receiver,
-            Codec.tryDecode(Codec.JavaBigDecimal)(body.transferLeg.amount),
-            new holdingv1.InstrumentId(userWallet.store.key.dsoParty.toProtoPrimitive, "Amulet"),
-            new metadatav1.Metadata(body.transferLeg.meta.getOrElse(Map.empty).asJava),
+        ),
+      )
+      val specification = new allocationv1.AllocationSpecification(
+        new allocationv1.SettlementInfo(
+          body.settlement.executor,
+          new allocationv1.Reference(
+            body.settlement.settlementRef.id,
+            body.settlement.settlementRef.cid.map(cid => new AnyContract.ContractId(cid)).toJava,
           ),
-        )
-        dedupConfig = AmuletOperationDedupConfig(
-          commandId,
-          dedupDuration,
-        )
+          Codec.tryDecode(Codec.Timestamp)(body.settlement.requestedAt).toInstant,
+          Codec.tryDecode(Codec.Timestamp)(body.settlement.allocateBefore).toInstant,
+          Codec.tryDecode(Codec.Timestamp)(body.settlement.settleBefore).toInstant,
+          new metadatav1.Metadata(body.settlement.meta.getOrElse(Map.empty).asJava),
+        ),
+        body.transferLegId,
+        new allocationv1.TransferLeg(
+          sender.toProtoPrimitive,
+          body.transferLeg.receiver,
+          Codec.tryDecode(Codec.JavaBigDecimal)(body.transferLeg.amount),
+          new holdingv1.InstrumentId(userWallet.store.key.dsoParty.toProtoPrimitive, "Amulet"),
+          new metadatav1.Metadata(body.transferLeg.meta.getOrElse(Map.empty).asJava),
+        ),
+      )
+      val dedupConfig = AmuletOperationDedupConfig(
+        commandId,
+        dedupDuration,
+      )
+      for {
         result <- userWallet.treasury.enqueueAmuletAllocationOperation(
           specification,
           requestedAt = now,
@@ -1108,11 +1067,11 @@ class HttpWalletHandler(
 
   override def listAmuletAllocations(
       respond: WalletResource.ListAmuletAllocationsResponse.type
-  )()(tUser: TracedUser): Future[WalletResource.ListAmuletAllocationsResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+  )()(tUser: WalletUserRequest): Future[WalletResource.ListAmuletAllocationsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     listContracts(
       amuletAllocationCodegen.AmuletAllocation.COMPANION,
-      user,
+      userWallet.store,
       contracts => d0.ListAllocationsResponse(contracts.map(d0.Allocation(_))),
     )
   }
@@ -1144,17 +1103,16 @@ class HttpWalletHandler(
       respond: WalletResource.WithdrawAmuletAllocationResponse.type
   )(
       contractId: String
-  )(tUser: TracedUser): Future[WalletResource.WithdrawAmuletAllocationResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+  )(tUser: WalletUserRequest): Future[WalletResource.WithdrawAmuletAllocationResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     withSpan(s"$workflowId.withdrawAmuletAllocation") { implicit traceContext => _ =>
       val allocationCid = Codec.tryDecodeJavaContractId(
         amuletAllocationCodegen.AmuletAllocation.COMPANION
       )(
         contractId
       )
+      val store = userWallet.store
       for {
-        wallet <- getUserWallet(user)
-        store = wallet.store
         allocation <- store.multiDomainAcsStore
           .getContractById(
             amuletAllocationCodegen.AmuletAllocation.COMPANION
@@ -1169,7 +1127,7 @@ class HttpWalletHandler(
         context <- scanConnection.getAllocationWithdrawContext(
           allocation.contractId.toInterface(allocationv1.Allocation.INTERFACE)
         )
-        result <- wallet.connection
+        result <- userWallet.connection
           .submit(
             Seq(store.key.validatorParty, store.key.endUserParty),
             Seq.empty,
@@ -1191,11 +1149,6 @@ class HttpWalletHandler(
     }
   }
 
-  private[this] def getUserTreasury(user: String)(implicit
-      tc: TraceContext
-  ): Future[TreasuryService] =
-    getUserWallet(user).map(_.treasury)
-
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.
     *
@@ -1210,14 +1163,13 @@ class HttpWalletHandler(
       R,
   ](
       operation: installCodegen.AmuletOperation,
-      user: String,
+      userWallet: UserWalletService,
       processResponse: ExpectedCOO => R,
       dedupConfig: Option[AmuletOperationDedupConfig] = None,
       extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[R] =
     for {
-      userTreasury <- getUserTreasury(user)
-      res <- userTreasury
+      res <- userWallet.treasury
         .enqueueAmuletOperation(
           operation,
           dedup = dedupConfig,
@@ -1258,41 +1210,13 @@ class HttpWalletHandler(
     }
   }
 
-  override def featureSupport(respond: WalletResource.FeatureSupportResponse.type)()(
-      tuser: TracedUser
-  ): Future[WalletResource.FeatureSupportResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
-    withSpan(s"$workflowId.featureSupport") { _ => _ =>
-      val parties = Seq(store.walletKey.dsoParty)
-      val now = CantonTimestamp.now()
-      for {
-        tokenStandard <- packageVersionSupport.supportsTokenStandard(parties, now)
-        preapprovalDescription <- packageVersionSupport.supportsDescriptionInTransferPreapprovals(
-          parties,
-          now,
-        )
-        noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
-          store.walletKey.dsoParty,
-          now,
-        )
-      } yield WalletResource.FeatureSupportResponse.OK(
-        d0.WalletFeatureSupportResponse(
-          tokenStandard = tokenStandard.supported,
-          transferPreapprovalDescription = preapprovalDescription.supported,
-          noHoldingFeesOnTransfers = noHoldingFeesOnTransfers.supported,
-        )
-      )
-    }
-  }
-
   override def listAllocationRequests(
       respond: WalletResource.ListAllocationRequestsResponse.type
-  )()(tuser: TracedUser): Future[WalletResource.ListAllocationRequestsResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
+  )()(tuser: WalletUserRequest): Future[WalletResource.ListAllocationRequestsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.listInterfaces") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
-        contracts <- userStore.multiDomainAcsStore.listInterfaceViews(
+        contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
           allocationrequestv1.AllocationRequest.INTERFACE
         )
       } yield d0.ListAllocationRequestsResponse(
@@ -1308,17 +1232,16 @@ class HttpWalletHandler(
       respond: WalletResource.RejectAllocationRequestResponse.type
   )(
       contractId: String
-  )(tUser: TracedUser): Future[WalletResource.RejectAllocationRequestResponse] = {
-    implicit val TracedUser(user, traceContext) = tUser
+  )(tUser: WalletUserRequest): Future[WalletResource.RejectAllocationRequestResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
     withSpan(s"$workflowId.rejectAllocationRequest") { implicit traceContext => _ =>
       val allocationRequestCid = Codec.tryDecodeJavaContractIdInterface(
         allocationrequestv1.AllocationRequest.INTERFACE
       )(
         contractId
       )
+      val store = userWallet.store
       for {
-        wallet <- getUserWallet(user)
-        store = wallet.store
         allocationRequest <- store.multiDomainAcsStore
           .findInterfaceViewByContractId(
             allocationrequestv1.AllocationRequest.INTERFACE
@@ -1334,7 +1257,7 @@ class HttpWalletHandler(
                 .asRuntimeException()
             )
           )
-        result <- wallet.connection
+        result <- userWallet.connection
           .submit(
             Seq(store.key.validatorParty, store.key.endUserParty),
             Seq.empty,

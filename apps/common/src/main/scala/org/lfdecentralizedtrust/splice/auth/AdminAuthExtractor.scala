@@ -3,89 +3,92 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
-import org.apache.pekko.http.scaladsl.model.{HttpEntity, HttpResponse, MediaTypes, StatusCodes}
 import org.apache.pekko.http.scaladsl.server.Directive1
-import org.apache.pekko.http.scaladsl.server.Directives.{complete, onComplete, provide}
-import org.apache.pekko.util.ByteString
-import org.lfdecentralizedtrust.splice.auth.{AuthExtractor, SignatureVerifier}
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
+import org.apache.pekko.http.scaladsl.server.Directives.{onComplete, provide}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Printer
-import io.circe.syntax.EncoderOps
 
 import scala.util.Success
 
-final case class Response(user: String)
-
-object AdminAuthExtractor {
-  def apply(
-      verifier: SignatureVerifier,
-      adminParty: PartyId,
-      ledgerConnection: SpliceLedgerConnection,
-      loggerFactory: NamedLoggerFactory,
-      realm: String,
-  )(implicit traceContext: TraceContext): String => Directive1[AuthExtractor.TracedUser] = {
-    new AdminAuthExtractor(
-      verifier,
-      adminParty,
-      ledgerConnection,
-      loggerFactory,
-      realm,
-    ).directiveForOperationId
-  }
-}
-
-// Auth extractor for admin APIs that only
-// allow access to users that have actAs rights for a specific admin party, e.g.,
-// the sv party or the validator operator party.
+/** Auth extractor for APIs that perform administrative actions on the participant
+  *
+  * Authentication: request must have a valid JWT token authenticating the user
+  *
+  * Authorization: user must be active, have actAs rights for the validator/sv app operator party,
+  *                and have ParticipantAdmin rights
+  */
 final class AdminAuthExtractor(
     verifier: SignatureVerifier,
     adminParty: PartyId,
-    ledgerConnection: SpliceLedgerConnection,
+    rightsProvider: UserRightsProvider,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
 )(implicit
     traceContext: TraceContext
 ) extends AuthExtractor(verifier, loggerFactory, realm)(traceContext) {
 
-  override def directiveForOperationId(
+  def directiveForOperationId(
       operationId: String
-  ): Directive1[AuthExtractor.TracedUser] = {
-    super
-      .directiveForOperationId(operationId)
-      .flatMap { tuser =>
-        val AuthExtractor.TracedUser(user, traceContext) = tuser
-        implicit val tc = traceContext
+  ): Directive1[AdminAuthExtractor.AdminUserRequest] = {
+    authenticateLedgerApiUser(operationId)
+      .flatMap { authenticatedUser =>
         onComplete(
-          ledgerConnection.getOptionalPrimaryParty(user) zip ledgerConnection.getUserActAs(user)
+          rightsProvider.getUser(authenticatedUser) zip rightsProvider.listUserRights(
+            authenticatedUser
+          )
         ).flatMap {
-          case Success((Some(party), actAs)) if party == adminParty && actAs.contains(adminParty) =>
-            provide(tuser)
+          case Success((Some(user), rights)) =>
+            if (user.isDeactivated) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                "User is deactivated",
+              )
+            } else if (!hasPrimaryParty(user, adminParty)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"Primary party of user ${user.getPrimaryParty} is not equal to the operator party ${adminParty}",
+              )
+            } else if (!canActAs(rights, adminParty)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"User may not act as the operator party ${adminParty}",
+              )
+            } else if (!isParticipantAdmin(rights)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"User is not a participant administrator",
+              )
+            } else {
+              provide(AdminAuthExtractor.AdminUserRequest(traceContext))
+            }
           case _ =>
-            logger.warn(s"Authorization Failed for $adminParty")
-            val contentType = MediaTypes.`application/json`
-            val errorResponse =
-              ErrorResponse(
-                s"Authorization Failed for $adminParty"
-              )
-            val responseEntity = HttpEntity(
-              contentType = contentType,
-              ByteString(
-                Printer.noSpaces
-                  .printToByteBuffer(errorResponse.asJson, contentType.charset.nioCharset())
-              ),
-            )
-            complete(
-              HttpResponse(
-                StatusCodes.Forbidden,
-                entity = responseEntity,
-              )
-            )
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
         }
       }
   }
+}
 
+object AdminAuthExtractor {
+  final case class AdminUserRequest(traceContext: TraceContext)
+
+  def apply(
+      verifier: SignatureVerifier,
+      adminParty: PartyId,
+      rightsProvider: UserRightsProvider,
+      loggerFactory: NamedLoggerFactory,
+      realm: String,
+  )(implicit traceContext: TraceContext): String => Directive1[AdminUserRequest] = {
+    new AdminAuthExtractor(
+      verifier,
+      adminParty,
+      rightsProvider,
+      loggerFactory,
+      realm,
+    ).directiveForOperationId
+  }
 }
