@@ -339,6 +339,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
         ): Seq[JavaTransaction] = {
           ledgerApi.ledger_api.updates
             .transactions(
+              // upcast from PartyId to Party
               partyIds.map(p => p),
               completeAfter,
               beginOffset,
