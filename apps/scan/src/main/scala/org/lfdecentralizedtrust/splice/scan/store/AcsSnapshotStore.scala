@@ -9,6 +9,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, Locke
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   AcsSnapshot,
   QueryAcsSnapshotResult,
+  amuletQualifiedName,
+  lockedAmuletQualifiedName,
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
@@ -149,16 +151,9 @@ class AcsSnapshotStore(
           $historyId,
           min(inserted_rows.row_id),
           max(inserted_rows.row_id),
-          sum(case when inserted_rows.template_id = ${PackageQualifiedName
-            .getFromResources(
-              Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
-            )
-            .toString} and stakeholder=$dsoParty then (create_arguments->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric else 0 end),
-          sum(case when inserted_rows.template_id = ${PackageQualifiedName
-            .getFromResources(
-              LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
-            )
-            .toString} and stakeholder=$dsoParty then (create_arguments->'record'->'fields'->0->'value'->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric else 0 end)
+          -- the stakeholder filter ensures that we don't double-count amulet amounts
+          sum(case when inserted_rows.template_id = $amuletQualifiedName and stakeholder=$dsoParty then (create_arguments->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric else 0 end),
+          sum(case when inserted_rows.template_id = $lockedAmuletQualifiedName and stakeholder=$dsoParty then (create_arguments->'record'->'fields'->0->'value'->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric else 0 end)
         from inserted_rows
         join creates_to_insert on inserted_rows.create_id = creates_to_insert.row_id
         having min(inserted_rows.row_id) is not null;
@@ -402,10 +397,11 @@ object AcsSnapshotStore {
       afterToken: Option[Long],
   )
 
-  private val holdingsTemplates =
-    Vector(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID).map(
-      PackageQualifiedName.getFromResources
-    )
+  private val amuletQualifiedName =
+    PackageQualifiedName.getFromResources(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID)
+  private val lockedAmuletQualifiedName =
+    PackageQualifiedName.getFromResources(LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID)
+  private val holdingsTemplates = Vector(amuletQualifiedName, lockedAmuletQualifiedName)
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
     Contract[LockedAmulet.ContractId, LockedAmulet],
