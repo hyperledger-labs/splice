@@ -7,14 +7,16 @@ import com.daml.ledger.javaapi.data.User
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class UncachedUserRightsProvider(
     connection: SpliceLedgerConnection
-)(implicit tc: TraceContext)
+)(implicit tc: TraceContext, ec: ExecutionContext)
     extends UserRightsProvider {
   override def listUserRights(userId: String): Future[Set[User.Right]] =
     connection.listUserRights(userId)
-  override def getUser(userName: String): Future[Option[User]] =
+  override def getUser(userName: String): Future[Option[User]] = {
+    // TODO:
     connection.getUser(userName).map(Some(_))
+  }
 }

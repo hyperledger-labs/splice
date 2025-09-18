@@ -3,26 +3,22 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
-import com.daml.ledger.javaapi.data.User
 import org.apache.pekko.http.scaladsl.server.Directive1
 import org.apache.pekko.http.scaladsl.server.Directives.{onComplete, provide}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.Optional
 import scala.util.Success
 
-/** Auth extractor for APIs that perform administrative actions on the participant
+/** Auth extractor for APIs that are only available for authenticated users,
+  * but otherwise do not require special authorization.
   *
   * Authentication: request must have a valid JWT token authenticating the user
   *
-  * Authorization: user must be active, have actAs rights for the validator/sv app operator party,
-  *                and have ParticipantAdmin rights
+  * Authorization: user must be active
   */
-final class AdminAuthExtractor(
+final class UserAuthExtractor(
     verifier: SignatureVerifier,
-    adminParty: PartyId,
     rightsProvider: UserRightsProvider,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
@@ -30,28 +26,16 @@ final class AdminAuthExtractor(
     traceContext: TraceContext
 ) extends AuthExtractor(verifier, loggerFactory, realm)(traceContext) {
 
-  private def isAuthorizedAsAdmin(
-      user: User,
-      rights: Set[User.Right],
-  ): Boolean = {
-    !user.isDeactivated &&
-    hasPrimaryParty(user, adminParty) &&
-    canActAs(rights, adminParty) &&
-    isParticipantAdmin(rights)
-  }
-
   def directiveForOperationId(
       operationId: String
-  ): Directive1[AdminAuthExtractor.AdminUserRequest] = {
+  ): Directive1[UserAuthExtractor.UserRequest] = {
     authenticateLedgerApiUser(operationId)
       .flatMap { authenticatedUser =>
         onComplete(
-          rightsProvider.getUser(authenticatedUser) zip rightsProvider.listUserRights(
-            authenticatedUser
-          )
+          rightsProvider.getUser(authenticatedUser)
         ).flatMap {
-          case Success((Some(user), rights)) if isAuthorizedAsAdmin(user, rights) =>
-            provide(AdminAuthExtractor.AdminUserRequest(traceContext))
+          case Success(Some(user)) if !user.isDeactivated =>
+            provide(UserAuthExtractor.UserRequest(user.getId, traceContext))
           case _ =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId)
         }
@@ -59,19 +43,17 @@ final class AdminAuthExtractor(
   }
 }
 
-object AdminAuthExtractor {
-  final case class AdminUserRequest(traceContext: TraceContext)
+object UserAuthExtractor {
+  final case class UserRequest(user: String, traceContext: TraceContext)
 
   def apply(
       verifier: SignatureVerifier,
-      adminParty: PartyId,
       rightsProvider: UserRightsProvider,
       loggerFactory: NamedLoggerFactory,
       realm: String,
-  )(implicit traceContext: TraceContext): String => Directive1[AdminUserRequest] = {
-    new AdminAuthExtractor(
+  )(implicit traceContext: TraceContext): String => Directive1[UserRequest] = {
+    new UserAuthExtractor(
       verifier,
-      adminParty,
       rightsProvider,
       loggerFactory,
       realm,
