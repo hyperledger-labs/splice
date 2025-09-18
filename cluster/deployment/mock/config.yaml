@@ -114,18 +114,22 @@ svs:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomScanAppJvmFlag"
     svApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomSvAppJvmFlag"
     participant:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomParticipantJvmFlag"
     sequencer:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomSequencerJvmFlag"
   sv:
     participant:
       bftSequencerConnection: false

@@ -46,6 +46,7 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
+  getAdditionalJvmOptions,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
@@ -328,6 +329,7 @@ async function installSvAndValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
+    additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {

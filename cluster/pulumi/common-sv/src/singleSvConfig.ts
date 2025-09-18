@@ -16,18 +16,23 @@ const EnvVarConfigSchema = z.object({
 
 const SvSequencerConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
 });
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
   bftSequencerConnection: z.boolean().optional(),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
 });
 const SvAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
 });
 const ScanAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
 });
+
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 const SingleSvConfigSchema = z
