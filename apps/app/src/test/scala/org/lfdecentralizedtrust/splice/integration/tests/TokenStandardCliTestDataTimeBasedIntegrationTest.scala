@@ -837,7 +837,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           JsEventServiceCodecs.getEventsByContractIdRequestRW(
             event_query_service.GetEventsByContractIdRequest(
               cid,
-              Seq.empty,
               Some(
                 EventFormat(
                   filtersByParty(
