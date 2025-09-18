@@ -8,8 +8,8 @@ import {
   domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
+  getAdditionalJvmOptions,
   installSpliceHelmChart,
-  jmxOptions,
   loadYamlFromFile,
   LogLevel,
   sanitizedForPostgres,
@@ -128,7 +128,7 @@ abstract class InStackDecentralizedSynchronizerNode
             },
           },
           livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,
-          additionalJvmOptions: jmxOptions(),
+          additionalJvmOptions: getAdditionalJvmOptions(svConfig.sequencer?.additionalJvmOptions),
           pvc: spliceConfig.configuration.persistentSequencerHeapDumps
             ? {
                 size: '10Gi',

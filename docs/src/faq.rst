@@ -138,7 +138,7 @@ ________
         }
 
     As per the information in :ref:`Adding ad-hoc configuration <configuration_ad_hoc>`,
-    add an environment variable ``ADDITIONAL_CONFIG_JSON_LIMIT=canton.participants.participant.http-ledger-api.websocket-config { http-list-max-elements-limit = 1000, http-list-wait-time = 2s }`` to your Canton participant docker process
+    add an environment variable ``ADDITIONAL_CONFIG_JSON_LIMIT=canton.participants.participant.http-ledger-api.websocket-config { http-list-max-elements-limit = 1000, http-list-wait-time = 2s }`` to your Canton participant docker process.
 
     Then you can add an extra limit on query `(?limit=xyz)` to the request but the result will never exceed server limit.
 
@@ -163,23 +163,23 @@ ________
       * Make the mapping deterministic. Parties have format ``name::key_fingerprint`` where the fingerprint is computed from the public key. So if you always choose a deterministic name
         (e.g. "ledger", or another fingerprint), then you don't need to read the mapping at all because you can compute the fingerprint.
         Special consideration is needed here if you start using different keys for the "namespace root", which determines the fingerprint, the signing key, and/or a delegated "intermediary namespace key".
-      * You can also filter by signed key through the ``filter_signed_key`` field in the ``base_query`` . If you use the fingerprint of the party’s it should give you a decent filter.
+      * You can also filter by signed key through the ``filter_signed_key`` field in the ``base_query`` . If you use the fingerprint of the party, it should give you a decent filter.
         This can be used by any of the ``List***Request`` `APIs <https://github.com/digital-asset/canton/blob/eeb56bc5d9779a7f918893b7a6b15e0b312a044e/community/base/src/main/protobuf/com/digitalasset/canton/topology/admin/v30/topology_manager_read_service.proto#L14>`__,
         like ``ListPartyToKeyMapping``.
 
-  How do I know I find the specifications for the latest API version for a Dev/Test/MainNet release?
+  How do I find the specifications for the latest API version for a Dev/Test/MainNet release?
 
-    The Canton Network capabilities are always being enhanced so you need use the latest API version specification.  The steps for the JSON API or gRPC API are similar.
+    The Canton Network capabilities are always being enhanced so you need to use the latest API version specification.  The steps for the JSON API or gRPC API are similar.
 
       - For the JSON API's OpenAPI or AsyncAPI specifications, follow these steps:
 
-        * Find the network's SDK Version from the Splice docs. For example, DevNet's version information
+        * Find the network's SDK version from the Splice docs. For example, DevNet's version information
           `is here <https://docs.dev.sync.global/app_dev/overview/version_information.html>`__.  For TestNet, substitute ``test`` in the URL.
         * Record the major and minor semver digits for the Canton version.  For example, if the snapshot is
           ``3.3.0-snapshot.20250827.16063.0.vdc9a8874`` then the important version information is ``3.3``.
         * Go to the open source `Canton Git repo <https://github.com/digital-asset/canton>`__.
         * Pick the appropriate release line by selecting the drop down that says `main` to expose
-          the different branches that are available.  Then selecting the release line that has the same
+          the different branches that are available.  Then select the release line that has the same
           version found above.  In this example, the release line to select is ``release-line-3.3``.
         * This is the most up to date code for that release line.  So follow the path
           ``/canton/tree/main/community/ledger/ledger-json-api/src/test/resources/json-api-docs`` to the ``openapi.yaml`` and ``asyncapi.yaml`` files.
@@ -192,11 +192,11 @@ ________
 
         * For AsyncAPI:  ``http://<host>:<port>/docs/asyncapi``
 
-      - For  the GRP protobuf definitions, follow the same steps as above but change the last step to be:
+      - For  the GRPC protobuf definitions, follow the same steps as above but change the last step to be:
 
         * Follow the path ``/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2`` to the ``proto`` files.
 
-  Are there working example of using the websocket version of the json api?
+  Are there working examples of using the websocket version of the json api?
 
     There are examples avalable.  See `here <https://github.com/digital-asset/canton/tree/main/community/app/src/pack/examples/09-json-api>`__.
     This `file <https://github.com/digital-asset/canton/blob/main/community/app/src/pack/examples/09-json-api/wsacs.sh>`__ sends a request via websocket as
@@ -204,14 +204,14 @@ ________
 
   The ``v2/updates/trees`` JSON ledger api is deprecated so what is replacing it?
 
-    An ``v2/updates`` is being added in 3.3 and be available soon.  In the interim, you can use ``v2/updates/flat`` which has the same behavior as ``UpdateService.GetUpdates``.
+    A ``v2/updates`` is being added in 3.3 and will be available soon.  In the interim, you can use ``v2/updates/flat`` which has the same behavior as ``UpdateService.GetUpdates``.
 
 Token Standard
 ______________
 
 .. glossary::
 
-  What would the best practice to including the ``DAR`` file of token standard into my `daml` project for data-dependencies  to point to?
+  What would be the best practice to including the ``DAR`` file of token standard into my `daml` project for data-dependencies  to point to?
 
     * Copy the token standard dars from `the repo <https://github.com/hyperledger-labs/splice/tree/main/daml/dars>`__
       and check them into your own repo.
@@ -224,13 +224,3 @@ ______________
   Is there any open-source wallet implementation for canton coins?
 
     There's a wallet SDK `here <https://docs.digitalasset.com/integrate/devnet/index.html>`__ which is under rapid development.  No OSS UI yet though.
-
-
-
-
-
-
-
-
-
-

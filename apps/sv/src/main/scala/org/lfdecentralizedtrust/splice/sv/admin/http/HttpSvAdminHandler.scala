@@ -304,10 +304,12 @@ class HttpSvAdminHandler(
             case None => Optional.empty()
           },
           dsoStoreWithIngestion,
+          retryProvider,
+          logger,
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.CreateVoteRequestResponseOK)
+          case Right(_) => Future.successful(v0.SvAdminResource.CreateVoteRequestResponseOK)
         }
     }
   }
