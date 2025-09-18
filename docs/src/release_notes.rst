@@ -13,7 +13,7 @@ Upcoming
 
   - Daml
 
-    - release ``splice-util-featured-app-proxies-1.1.0``, which
+    - release ``FOO-wallet-amulet-proxy-1.1.0``, which
       add support for a ``WalletUserProxy``, which simplifies
       the creation of featured app activity markers for the wallet app provider
       when their users engage in token standard workflows.
@@ -111,7 +111,7 @@ Upcoming
 
 - Daml
 
-  - Add the ``splice-util-featured-app-proxies``
+  - Add the ``FOO-wallet-amulet-proxy``
     :ref:`package <featured_app_activity_markers_api>` to simplify
     the creation of featured app activity markers for token standard actions.
     This is a utility package that is not uploaded by default to a validator node.

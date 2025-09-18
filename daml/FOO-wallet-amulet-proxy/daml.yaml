@@ -1,5 +1,5 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
-name: splice-util-featured-app-proxies
+name: FOO-wallet-amulet-proxy
 source: daml
 version: 1.1.0
 dependencies:
@@ -10,6 +10,12 @@ data-dependencies:
   - ../../token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
   - ../../token-standard/splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+
+  # Build this against the most recent released and voted-in version of Amulet on MainNet to ensure compatibility
+  # with the .dars vetted by the SV nodes.
+  #
+  # At the time of writing (2025-09-18), this was `splice-amulet-0.1.9`.
+  - ../dars/splice-wallet-0.1.9.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

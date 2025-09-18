@@ -9,7 +9,7 @@
 -- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
 -- The mechanism for getting the featured app activity markers is generic.
 --
-module Splice.Util.FeaturedApp.IntegrationTests.TestFeaturedDepositsAndWithdrawals where
+module FOO.Util.FeaturedApp.IntegrationTests.TestFeaturedDepositsAndWithdrawals where
 
 import qualified Splice.Amulet
 
@@ -17,7 +17,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 import Splice.Api.FeaturedAppRightV1
-import Splice.Util.FeaturedApp.DelegateProxy
+import FOO.Util.FeaturedApp.DelegateProxy
 
 import Daml.Script
 

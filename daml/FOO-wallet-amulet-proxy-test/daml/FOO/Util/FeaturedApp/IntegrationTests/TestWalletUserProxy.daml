@@ -8,14 +8,16 @@
 -- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
 -- The mechanism for getting the featured app activity markers is generic.
 --
-module Splice.Util.FeaturedApp.IntegrationTests.TestWalletUserProxy where
+module FOO.Util.FeaturedApp.IntegrationTests.TestWalletUserProxy where
 
 import qualified Splice.Amulet
-import Splice.Util.FeaturedApp.WalletUserProxy
+import FOO.Util.FeaturedApp.WalletUserProxy
 
 import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Splice.Wallet.TransferPreapproval
 
 import Daml.Script
 
@@ -37,6 +39,35 @@ data WalletProviderData = WalletProviderData with
   proxyCid : ContractId WalletUserProxy
   featuredAppRightCid : ContractId FeaturedAppRight
   extraDisclosuresForProxy : Disclosures'
+
+test_featured_proposal_creation : Script ()
+test_featured_proposal_creation = do
+  -- disable transfer fees to check that only the featured app activity markers will be there
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
+
+  -- setup alice
+  alice <- allocatePartyExact "alice"
+
+  -- create transfer preapproval proposal
+  submitWithDisclosures' alice aliceProvider.extraDisclosuresForProxy $ exerciseCmd
+    (aliceProvider.proxyCid)
+    WalletUserProxy_Create_TransferPreapprovalProposal with
+      proxyArg = ProxyArg with
+        user = alice
+        featuredAppRightCid = aliceProvider.featuredAppRightCid
+        choiceArg = TransferPreapprovalProposal with
+          receiver = alice
+          provider = aliceProvider.provider
+
+  -- check that exactly two markers exist
+  expectActivityMarkers registry aliceProvider alice
+
+  pure ()
+
 
 -- | Test that both offer and accept grant activity markers
 test_two_step_featured_app_markers : Script ()

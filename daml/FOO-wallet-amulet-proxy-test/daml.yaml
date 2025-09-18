@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
-name: splice-util-featured-app-proxies-test
+name: FOO-wallet-amulet-proxy-test
 description: |
   Tests for the featured app proxies delivered as part of Splice.
 
@@ -21,10 +21,24 @@ data-dependencies:
   - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
   - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
   - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
+
+  # Note that the test actually uses newer versions of the splice-amulet and splice-wallet dars,
+  # and thus shows that the proxy code will continue working even if they are upgraded.
+  #
+  # We are though in a lucky situation here, as the Amulet specific choice only creates a contract.
+  # If it tried to exercise a choice then the upgrading constraints are more stringent.
+  # We thus do not recommend doing so. For choices having an interface to intermediate between
+  # the wallet app and the Amulet app is recommended.
+  #
+  # The point where it will stop working is when the SV nodes unvet the splice-amulet-0.1.9 dar.
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
-  - ../splice-util-featured-app-proxies/.daml/dist/splice-util-featured-app-proxies-current.dar
+  - ../FOO-wallet-amulet-proxy/.daml/dist/FOO-wallet-amulet-proxy-current.dar
+
+  # Import the correct wallet-yaml version here, as that simplifies writing the script code.
+  # No need to explicitly downgrade the proposal.
+  - ../dars/splice-wallet-0.1.9.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
