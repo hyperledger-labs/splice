@@ -154,6 +154,7 @@ class UserWalletAutomationService(
           connection(SpliceLedgerConnectionPriority.Low),
           config,
           scanConnection,
+          packageVersionSupport,
         )
       )
     }
@@ -173,7 +174,9 @@ class UserWalletAutomationService(
     )
   }
 
-  registerTrigger(new AmuletMetricsTrigger(triggerContext, store, scanConnection))
+  registerTrigger(
+    new AmuletMetricsTrigger(triggerContext, store, scanConnection, packageVersionSupport)
+  )
 
   if (txLogBackfillEnabled) {
     registerTrigger(

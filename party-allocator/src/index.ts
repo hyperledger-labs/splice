@@ -10,6 +10,21 @@ import { readdir, writeFile } from "node:fs/promises";
 import { config } from "./config.js";
 import fs from "fs";
 import { logger } from "./logger.js";
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { AggregationType, MeterProvider } from "@opentelemetry/sdk-metrics";
+import { Counter, Gauge, Histogram } from "@opentelemetry/api";
+import { performance } from "perf_hooks"; // Use high-resolution monotonic clock
+import pLimit from "p-limit";
+
+async function timed<T>(metric: Histogram, operation: () => Promise<T>) {
+  const startTime = performance.now();
+  try {
+    return await operation();
+  } finally {
+    const endTime = performance.now();
+    metric.record(endTime - startTime);
+  }
+}
 
 async function getAmuletRules() {
   const response = await fetch(
@@ -194,6 +209,7 @@ async function generateKeyPair(index: number) {
 }
 
 async function setupParty(
+  metrics: Metrics,
   client: LedgerApiClient,
   userId: string,
   synchronizerId: string,
@@ -205,27 +221,85 @@ async function setupParty(
   await getOpenRound();
   const keyPair = await generateKeyPair(index);
 
-  const partyId = await setupTopology(
-    client,
-    synchronizerId,
-    partyHint,
-    keyPair,
+  const partyId = await timed(metrics.partyAllocationLatencyMs, () =>
+    setupTopology(client, synchronizerId, partyHint, keyPair),
   );
 
-  await client.withUserRights(userId, [partyId], async () => {
-    await tap(client, synchronizerId, partyId, keyPair);
-    await setupPreapproval(
+  await timed(metrics.tapLatencyMs, () =>
+    tap(client, synchronizerId, partyId, keyPair),
+  );
+  await timed(metrics.preapprovalLatencyMs, () =>
+    setupPreapproval(
       client,
       synchronizerId,
       partyId,
       validatorPartyId,
       keyPair,
-    );
-  });
+    ),
+  );
   logger.info(`Finished setup for party ${index}`);
 }
 
+export type Metrics = {
+  partiesAllocatedCounter: Counter;
+  totalPartiesAllocated: Gauge;
+  partyAllocationLatencyMs: Histogram;
+  tapLatencyMs: Histogram;
+  preapprovalLatencyMs: Histogram;
+};
+
+function setupMetrics(): Metrics {
+  const exporter = new PrometheusExporter({
+    port: 10013,
+    prefix: "party_allocator",
+  });
+  const meterProvider = new MeterProvider({
+    readers: [exporter],
+    views: [
+      // The opentelemetry library has support for exponential histograms but the prometheus exporter does not so
+      // we go for explicit buckets here.
+      {
+        aggregation: {
+          type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+          options: {
+            boundaries: [
+              0, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000,
+            ],
+          },
+        },
+        instrumentName: "latency_*",
+      },
+    ],
+  });
+  const meter = meterProvider.getMeter("party_allocator");
+  const partiesAllocatedCounter = meter.createCounter("parties_allocated", {
+    description: "Counter for number of parties that have been allocated",
+  });
+  const totalPartiesAllocated = meter.createGauge("total_parties_allocated", {
+    description: "Total number of parties that have been allocated",
+  });
+  const partyAllocationLatencyMs = meter.createHistogram(
+    "latency_party_allocation",
+    { description: "Latency of the topology setup of a party in ms" },
+  );
+  const tapLatencyMs = meter.createHistogram("latency_tap", {
+    description: "Latency of executing a tap for a party in ms",
+  });
+  const preapprovalLatencyMs = meter.createHistogram("latency_preapproval", {
+    description:
+      "Latency of setting up the preapproval including waiting for the validator automation to accept the proposal in ms",
+  });
+  return {
+    partiesAllocatedCounter,
+    totalPartiesAllocated,
+    partyAllocationLatencyMs,
+    tapLatencyMs,
+    preapprovalLatencyMs,
+  };
+}
+
 async function main() {
+  const metrics = setupMetrics();
   logger.info(
     `Running with config: ${JSON.stringify({ ...config, ...{ token: "<redacted>" } })}`,
   );
@@ -242,25 +316,43 @@ async function main() {
     return parseInt(match?.groups?.index || "0");
   });
   const maxIndex = keyIndices.length > 0 ? Math.max(...keyIndices) + 1 : 0;
+  metrics.totalPartiesAllocated.record(maxIndex);
   // We just reinitialize the party at maxIndex + 1 from scratch instead of trying to clever
   // and incrementally handle all kinds of failures.
   logger.info(`Starting at ${maxIndex}`);
 
   const client = new LedgerApiClient(config.jsonLedgerApiUrl, config.token);
 
+  // This is idempotent so we just always grant it. We don't revoke it at the end as keeping it doesn't do any harm
+  await client.grantExecuteAndReadAsAnyPartyRights(config.userId);
+
+  // We process batches of config.batchSize with parallelism of config.parallelism.
+  // Batch size is really just there to limit memory usage from unresolved promises.
+  const limit = pLimit(config.parallelism);
+
   let index = maxIndex;
+  let maxPartyAllocated = index;
   while (index < config.maxParties) {
+    metrics.totalPartiesAllocated.record(index);
     logger.info(`Processing batch starting at ${index}`);
-    const batchSize = Math.min(config.parallelism, config.maxParties - index);
-    const batch = Array.from({ length: batchSize }, (_, i) =>
-      setupParty(
-        client,
-        config.userId,
-        synchronizerId,
-        index + i,
-        validatorPartyId,
-      ),
-    );
+    const batchSize = Math.min(config.batchSize, config.maxParties - index);
+    const batch = Array.from({ length: batchSize }, (_, i) => {
+      const partyIndex = index + i;
+      return limit(async () =>
+        setupParty(
+          metrics,
+          client,
+          config.userId,
+          synchronizerId,
+          partyIndex,
+          validatorPartyId,
+        ).then(() => {
+          metrics.partiesAllocatedCounter.add(1);
+          maxPartyAllocated = Math.max(maxPartyAllocated, partyIndex);
+          metrics.totalPartiesAllocated.record(maxPartyAllocated);
+        }),
+      );
+    });
     await Promise.all(batch);
     logger.info(`Completed batch`);
     index += batchSize;

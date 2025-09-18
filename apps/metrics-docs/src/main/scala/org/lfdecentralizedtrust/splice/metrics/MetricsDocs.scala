@@ -13,6 +13,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.admin.api.client.DamlGrpcClientMetrics
 import org.lfdecentralizedtrust.splice.automation.TriggerMetrics
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
+import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningMetrics
 import org.lfdecentralizedtrust.splice.sv.automation.ReportSvStatusMetricsExportTrigger
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStoreMetrics
@@ -98,6 +99,7 @@ object MetricsDocs {
       NamedLoggerFactory.root,
       ProcessingTimeout(),
     )
+    new ScanMediatorVerdictIngestionMetrics(generator)
     val scanMetrics = generator.getAll()
     generator.reset()
     GeneratedMetrics(

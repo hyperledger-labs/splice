@@ -20,6 +20,7 @@ import {
   exactNamespace,
   failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
+  getAdditionalJvmOptions,
   imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
@@ -54,7 +55,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
-import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { Resource } from '@pulumi/pulumi';
 
@@ -385,6 +385,7 @@ async function installValidator(
           ]),
       ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
+    additionalJvmOptions: svConfig.validatorApp?.additionalJvmOptions || '',
   });
 
   return validator;
@@ -497,7 +498,7 @@ function installSvApp(
     metrics: {
       enable: true,
     },
-    additionalJvmOptions: jmxOptions(),
+    additionalJvmOptions: getAdditionalJvmOptions(config.svApp?.additionalJvmOptions),
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     participantAddress: participant.internalClusterAddress,
     onboardingPollingInterval: config.onboardingPollingInterval,
@@ -562,9 +563,10 @@ function installScan(
     },
     isFirstSv: config.isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
-    additionalJvmOptions: jmxOptions(),
+    additionalJvmOptions: getAdditionalJvmOptions(config.scanApp?.additionalJvmOptions),
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
+    mediatorAddress: decentralizedSynchronizerNode.namespaceInternalMediatorAddress,
     participantAddress: participant.internalClusterAddress,
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,

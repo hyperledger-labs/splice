@@ -1,0 +1,117 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Test that the config change to roll out the zero fees actually works.
+module Splice.Scripts.TestZeroFeeRollout where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Daml.Script
+
+import DA.Action (when, unless)
+import DA.Time
+
+import Splice.Fees
+import Splice.AmuletRules
+
+import Splice.Scripts.Util
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+
+test_zero_fees_rollout : Script ()
+test_zero_fees_rollout = script do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+      noTransferFee = False
+
+  -- Alice gets funds to self-merge
+  alice <- allocatePartyExact "alice"
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 50.0
+
+  -- Check initial balance setup
+  WalletClient.checkBalance alice registry.instrumentId 50.0
+
+  -- create fake the app instance so we can also use the Amulet internal script utilities
+  let dso = registry.dso
+  dsoUserId <- validateUserId "dummy-dso-user"
+  createUser (User dsoUserId (Some dso)) [CanActAs dso]
+  let app = AmuletApp with
+        dso
+        dsoUser = AmuletUser with
+          primaryParty = dso
+          userId = dsoUserId
+
+  -- adjust the AmuletConfig to configure no fees
+  (rulesCid, rules) <- getAmuletRules app
+  let baseConfig = rules.configSchedule.initialValue
+  submit registry.dso $ exerciseCmd rulesCid AmuletRules_SetConfig with
+    newConfig = baseConfig with
+      transferConfig = baseConfig.transferConfig with
+        createFee = FixedFee 0.0
+        holdingFee = RatePerRound 0.0
+        lockHolderFee = FixedFee 0.0
+        transferFee = SteppedRate with
+          initialRate = 0.0
+          steps = []
+    baseConfig
+
+  let getBalance = do
+        holdings <- WalletClient.listHoldings alice registry.instrumentId
+        return (sum (map (._2.amount) holdings))
+
+  let doSelfTransfer amount expectedFees = do
+        now <- getTime
+        balanceBefore <- getBalance
+        inputHoldingCids <- WalletClient.listHoldingCids alice registry.instrumentId
+        let transfer = Api.Token.TransferInstructionV1.Transfer with
+              sender = alice
+              receiver = alice
+              amount
+              instrumentId = registry.instrumentId
+              requestedAt = now
+              executeBefore = now `addRelTime` days 1
+              inputHoldingCids
+              meta = emptyMetadata
+
+        enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+          expectedAdmin = registry.dso
+          transfer
+          extraArgs = emptyExtraArgs
+        submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+        balanceAfter <- getBalance
+        if (expectedFees >= 0.0)
+          then unless (balanceBefore - balanceAfter >= expectedFees) $
+            error $ "Expected fees of at least " <> show expectedFees <> " but balance only changed by " <> show (balanceBefore - balanceAfter)
+          else when (balanceBefore - balanceAfter > 0.0) $
+            error $ "Expected no fees but balance changed by " <> show (balanceBefore - balanceAfter)
+
+  -- there are three rounds open here with fees configured
+  doSelfTransfer 5.0 0.12
+
+  -- after advancing mining rounds: the oldest round is archived, and the newest one
+  -- has no fees configured, but cannot be used as it's target start date is in the future
+  runNextIssuance app
+
+  -- self-transfer still incurs fees
+  doSelfTransfer 20.0 0.12
+
+  -- another advance: the second newst mining round becomes usable
+  runNextIssuance app
+
+  -- yay, self-transfer is now free
+  doSelfTransfer 10.0 0.0
+
+  -- as we are at it: test that we can merge it all into one holding
+  balance <- getBalance
+  doSelfTransfer balance 0.0
+
+  holdings <- WalletClient.listHoldings alice registry.instrumentId
+  unless (length holdings == 1) $
+    error $ "Expected exactly one holding after self-merge, but got: " <> show holdings
+
+  pure ()
+

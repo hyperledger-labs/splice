@@ -33,11 +33,15 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpTokenStandardMetadataHandler,
   HttpTokenStandardTransferInstructionHandler,
 }
-import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
+import org.lfdecentralizedtrust.splice.scan.automation.{
+  ScanAutomationService,
+  ScanVerdictAutomationService,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
 }
@@ -210,6 +214,12 @@ class ScanApp(
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
       )
+      scanVerdictStore = DbScanVerdictStore(storage, loggerFactory)(ec)
+      scanEventStore = new ScanEventStore(
+        scanVerdictStore,
+        store.updateHistory,
+        loggerFactory,
+      )(ec)
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,
@@ -252,6 +262,17 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
+      verdictAutomation = new ScanVerdictAutomationService(
+        config,
+        clock,
+        retryProvider,
+        loggerFactory,
+        nodeMetrics.grpcClientMetrics,
+        scanVerdictStore,
+        migrationInfo.currentMigrationId,
+        synchronizerId,
+        nodeMetrics.verdictIngestion,
+      )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
         config.svUser,
@@ -260,6 +281,7 @@ class ScanApp(
         sequencerAdminConnection,
         store,
         acsSnapshotStore,
+        scanEventStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
@@ -362,6 +384,8 @@ class ScanApp(
         storage,
         store,
         automation,
+        verdictAutomation,
+        scanEventStore,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
         timeouts,
         bftSequencersWithAdminConnections.map(_._1),
@@ -371,7 +395,7 @@ class ScanApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   protected[this] override def automationServices(st: ScanApp.State) =
-    Seq(st.automation)
+    Seq(st.automation, st.verdictAutomation)
 }
 
 object ScanApp {
@@ -382,17 +406,21 @@ object ScanApp {
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
+      verdictAutomation: ScanVerdictAutomationService,
+      eventStore: ScanEventStore,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       bftSequencersAdminConnections: Seq[SequencerAdminConnection],
   ) extends AutoCloseable
       with HasHealth {
-    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+    override def isHealthy: Boolean =
+      storage.isActive && automation.isHealthy && verdictAutomation.isHealthy
 
     override def close(): Unit = {
       LifeCycle.close(bftSequencersAdminConnections*)(logger)
       LifeCycle.close(
         automation,
+        verdictAutomation,
         store,
         storage,
         sequencerAdminConnection,

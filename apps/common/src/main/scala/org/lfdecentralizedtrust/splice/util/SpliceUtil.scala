@@ -523,9 +523,12 @@ object SpliceUtil {
   def currentAmount(
       amulet: Amulet,
       currentRound: Long,
-  ): java.math.BigDecimal = {
-    amulet.amount.initialAmount.subtract(holdingFee(amulet, currentRound))
-  }
+      deductHoldingFees: Boolean = true,
+  ): java.math.BigDecimal =
+    if (deductHoldingFees)
+      amulet.amount.initialAmount.subtract(holdingFee(amulet, currentRound))
+    else
+      amulet.amount.initialAmount
 
   def amuletExpiresAt(amulet: Amulet): Round = {
     val rounds = amulet.amount.initialAmount

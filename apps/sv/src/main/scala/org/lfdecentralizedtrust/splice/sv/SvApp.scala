@@ -930,11 +930,13 @@ object SvApp {
       expiration: Json,
       effectiveTime: Optional[Instant],
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
       templateJsonDecoder: TemplateJsonDecoder,
-  ): Future[Either[String, Unit]] = {
+  ): Future[Either[String, splice.dsorules.VoteRequest.ContractId]] = {
     val decodedExpiration = templateJsonDecoder.decodeValue(
       RelTime.valueDecoder(),
       RelTime._packageId,
@@ -956,36 +958,43 @@ object SvApp {
           )
         case QueryResult(offset, None) =>
           for {
-            dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
-            reason = new Reason(reasonUrl, reasonDescription)
-            request = new DsoRules_RequestVote(
-              requester,
-              decodedAction,
-              reason,
-              java.util.Optional.of(decodedExpiration),
-              effectiveTime,
+            res <- retryProvider.retryForClientCalls(
+              "createVoteRequest",
+              "createVoteRequest",
+              for {
+                dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
+                reason = new Reason(reasonUrl, reasonDescription)
+                request = new DsoRules_RequestVote(
+                  requester,
+                  decodedAction,
+                  reason,
+                  java.util.Optional.of(decodedExpiration),
+                  effectiveTime,
+                )
+                cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
+                res <- dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
+                  .submit(
+                    actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
+                    readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
+                    cmd,
+                  )
+                  .withDedup(
+                    commandId = SpliceLedgerConnection.CommandId(
+                      "org.lfdecentralizedtrust.splice.sv.requestVote",
+                      Seq(
+                        dsoStoreWithIngestion.store.key.dsoParty,
+                        dsoStoreWithIngestion.store.key.svParty,
+                      ),
+                      action.toString,
+                    ),
+                    deduplicationOffset = offset,
+                  )
+                  .yieldResult()
+              } yield res,
+              logger,
             )
-            cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
-            _ <- dsoStoreWithIngestion
-              .connection(SpliceLedgerConnectionPriority.Low)
-              .submit(
-                actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
-                readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
-                cmd,
-              )
-              .withDedup(
-                commandId = SpliceLedgerConnection.CommandId(
-                  "org.lfdecentralizedtrust.splice.sv.requestVote",
-                  Seq(
-                    dsoStoreWithIngestion.store.key.dsoParty,
-                    dsoStoreWithIngestion.store.key.svParty,
-                  ),
-                  action.toString,
-                ),
-                deduplicationOffset = offset,
-              )
-              .yieldUnit()
-          } yield Right(())
+          } yield Right(res.exerciseResult.voteRequest)
       }
   }
 
