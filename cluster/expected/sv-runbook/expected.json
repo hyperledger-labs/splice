@@ -777,6 +777,11 @@
             "name": "SV2",
             "publicKey": "PUBLIC_KEY_2==",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "Digital-Asset-1",
+            "publicKey": "THIS_IS_THE_WRONG_KEY",
+            "rewardWeightBps": 150000
           }
         ],
         "auth": {
