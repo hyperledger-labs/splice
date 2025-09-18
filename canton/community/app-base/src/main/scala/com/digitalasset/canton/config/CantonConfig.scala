@@ -64,7 +64,11 @@ import com.digitalasset.canton.platform.config.{
   TopologyAwarePackageSelectionConfig,
 }
 import com.digitalasset.canton.pureconfigutils.SharedConfigReaders.catchConvertError
-import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
+import com.digitalasset.canton.sequencing.authentication.{
+  AuthenticationTokenManagerConfig,
+  AuthenticationTokenManagerExponentialBackoffConfig,
+  AuthenticationTokenManagerExponentialBackoffJitterConfig,
+}
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.synchronizer.block.{SequencerDriver, SequencerDriverFactory}
 import com.digitalasset.canton.synchronizer.config.PublicServerConfig
@@ -967,6 +971,9 @@ object CantonConfig {
     lazy implicit final val circuitBreakerConfigReader
         : ConfigReader[BlockSequencerConfig.CircuitBreakerConfig] =
       deriveReader[BlockSequencerConfig.CircuitBreakerConfig]
+    lazy implicit val blockSequencerStreamInstrumentationConfigReader
+        : ConfigReader[BlockSequencerStreamInstrumentationConfig] =
+      deriveReader[BlockSequencerStreamInstrumentationConfig]
     lazy implicit final val blockSequencerConfigReader: ConfigReader[BlockSequencerConfig] =
       deriveReader[BlockSequencerConfig]
     lazy implicit final val sequencerWriterCommitModeConfigReader: ConfigReader[CommitMode] =
@@ -1189,6 +1196,8 @@ object CantonConfig {
         deriveReader[SessionEncryptionKeyCacheConfig]
       implicit val cacheConfigReader: ConfigReader[CacheConfig] =
         deriveReader[CacheConfig]
+      implicit val cacheConfigWithSizeOnlyReader: ConfigReader[CacheConfigWithSizeOnly] =
+        deriveReader[CacheConfigWithSizeOnly]
       deriveReader[CachingConfigs]
     }
 
@@ -1255,6 +1264,18 @@ object CantonConfig {
 
     lazy implicit val authTokenManagerConfigReader: ConfigReader[AuthenticationTokenManagerConfig] =
       deriveReader[AuthenticationTokenManagerConfig]
+    lazy implicit val authTokenManagerExponentialBackoffConfigReader
+        : ConfigReader[AuthenticationTokenManagerExponentialBackoffConfig] =
+      deriveReader[AuthenticationTokenManagerExponentialBackoffConfig]
+    lazy implicit val authTokenManagerExponentialBackoffJitterConfigReader
+        : ConfigReader[AuthenticationTokenManagerExponentialBackoffJitterConfig] =
+      deriveReader[AuthenticationTokenManagerExponentialBackoffJitterConfig]
+    lazy implicit val authTokenManagerExponentialBackoffJitterEqualConfigReader
+        : ConfigReader[AuthenticationTokenManagerExponentialBackoffJitterConfig.Equal.type] =
+      deriveReader[AuthenticationTokenManagerExponentialBackoffJitterConfig.Equal.type]
+    lazy implicit val authTokenManagerExponentialBackoffJitterFullConfigReader
+        : ConfigReader[AuthenticationTokenManagerExponentialBackoffJitterConfig.Full.type] =
+      deriveReader[AuthenticationTokenManagerExponentialBackoffJitterConfig.Full.type]
     lazy implicit final val sequencerClientConfigReader: ConfigReader[SequencerClientConfig] =
       deriveReader[SequencerClientConfig]
 
@@ -1607,6 +1628,9 @@ object CantonConfig {
     lazy implicit final val circuitBreakerConfigWriter
         : ConfigWriter[BlockSequencerConfig.CircuitBreakerConfig] =
       deriveWriter[BlockSequencerConfig.CircuitBreakerConfig]
+    lazy implicit val blockSequencerStreamInstrumentationConfigWriter
+        : ConfigWriter[BlockSequencerStreamInstrumentationConfig] =
+      deriveWriter[BlockSequencerStreamInstrumentationConfig]
     lazy implicit final val blockSequencerConfigWriter: ConfigWriter[BlockSequencerConfig] =
       deriveWriter[BlockSequencerConfig]
     lazy implicit final val sequencerReaderConfigWriter: ConfigWriter[SequencerReaderConfig] =
@@ -1835,6 +1859,8 @@ object CantonConfig {
       implicit val sessionEncryptionKeyCacheConfigWriter
           : ConfigWriter[SessionEncryptionKeyCacheConfig] =
         deriveWriter[SessionEncryptionKeyCacheConfig]
+      implicit val cacheConfigWithSizeOnlyWriter: ConfigWriter[CacheConfigWithSizeOnly] =
+        deriveWriter[CacheConfigWithSizeOnly]
       deriveWriter[CachingConfigs]
     }
 
@@ -1881,6 +1907,18 @@ object CantonConfig {
 
     lazy implicit val authTokenManagerConfigWriter: ConfigWriter[AuthenticationTokenManagerConfig] =
       deriveWriter[AuthenticationTokenManagerConfig]
+    lazy implicit val authTokenManagerExponentialBackoffConfigWriter
+        : ConfigWriter[AuthenticationTokenManagerExponentialBackoffConfig] =
+      deriveWriter[AuthenticationTokenManagerExponentialBackoffConfig]
+    lazy implicit val authTokenManagerExponentialBackoffJitterConfigWriter
+        : ConfigWriter[AuthenticationTokenManagerExponentialBackoffJitterConfig] =
+      deriveWriter[AuthenticationTokenManagerExponentialBackoffJitterConfig]
+    lazy implicit val authTokenManagerExponentialBackoffJitterEqualConfigWriter
+        : ConfigWriter[AuthenticationTokenManagerExponentialBackoffJitterConfig.Equal.type] =
+      deriveWriter[AuthenticationTokenManagerExponentialBackoffJitterConfig.Equal.type]
+    lazy implicit val authTokenManagerExponentialBackoffJitterFullConfigWriter
+        : ConfigWriter[AuthenticationTokenManagerExponentialBackoffJitterConfig.Full.type] =
+      deriveWriter[AuthenticationTokenManagerExponentialBackoffJitterConfig.Full.type]
     lazy implicit final val sequencerClientConfigWriter: ConfigWriter[SequencerClientConfig] =
       deriveWriter[SequencerClientConfig]
 
