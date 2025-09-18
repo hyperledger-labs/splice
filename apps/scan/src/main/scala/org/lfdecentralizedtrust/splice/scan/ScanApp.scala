@@ -306,7 +306,10 @@ class ScanApp(
 
       tokenStandardMetadataHandler = new HttpTokenStandardMetadataHandler(
         store,
+        acsSnapshotStore,
         config.spliceInstanceNames,
+        packageVersionSupport,
+        clock,
         loggerFactory,
       )
 
