@@ -23,7 +23,8 @@ export function getAmuletRulesResponse(zeroTransferFees: boolean): GetAmuletRule
   };
 }
 
-export function amuletRules(zeroTransferFees: boolean): unknown {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function amuletRules(zeroTransferFees: boolean): any {
   const transferFeeSteps = zeroTransferFees
     ? []
     : [
@@ -53,7 +54,7 @@ export function amuletRules(zeroTransferFees: boolean): unknown {
             fee: zeroTransferFees ? '0.0' : '0.005',
           },
           createFee: {
-            fee: zeroTransferFees ? '0.0' : '0.03',
+            fee: zeroTransferFees ? '0.0' : '0.031',
           },
           extraFeaturedAppRewardAmount: '1.0',
           maxNumLockHolders: '50',
