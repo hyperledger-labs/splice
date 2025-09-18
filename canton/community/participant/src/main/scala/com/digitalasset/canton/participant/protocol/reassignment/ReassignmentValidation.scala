@@ -27,8 +27,7 @@ import scala.concurrent.ExecutionContext
 private[reassignment] trait ReassignmentValidation[
     View <: FullReassignmentViewTree,
     CommonResult <: ReassignmentValidationResult.CommonValidationResult,
-    ReassigningParticipantResult
-      <: ReassignmentValidationResult.ReassigningParticipantValidationResult,
+    ReassigningParticipantResult <: ReassignmentValidationResult.ReassigningParticipantValidationResult,
 ] {
   type ReassigningParticipantValidationData
 

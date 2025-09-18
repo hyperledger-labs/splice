@@ -219,12 +219,7 @@ object SignedProtocolMessage
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = {
-    val typedMessage = TypedSignedProtocolMessageContent(message)
-    for {
-      signature <- mkSignature(typedMessage, cryptoApi)
-    } yield SignedProtocolMessage(typedMessage, NonEmpty(Seq, signature))
-  }
+  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = ???
 
   @VisibleForTesting
   private[canton] def mkSignature[M <: SignedProtocolMessageContent](

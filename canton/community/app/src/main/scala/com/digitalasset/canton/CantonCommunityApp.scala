@@ -5,14 +5,26 @@ package com.digitalasset.canton
 
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.{CantonConfig, CommunityCantonEdition}
-import com.digitalasset.canton.environment.{CommunityEnvironmentFactory, EnvironmentFactory}
-import com.typesafe.config.Config
+import com.digitalasset.canton.environment.{
+  CantonEnvironment,
+  CommunityEnvironmentFactory,
+  EnvironmentFactory,
+}
 
 object CantonCommunityApp extends CantonAppDriver {
 
-  override def loadConfig(config: Config): Either[CantonConfigError, CantonConfig] =
+  override type Config = CantonConfig
+
+  override type E = CantonEnvironment
+
+  override def loadConfig(
+      config: com.typesafe.config.Config
+  ): Either[CantonConfigError, CantonConfig] =
     CantonConfig.loadAndValidate(config, CommunityCantonEdition)
 
-  override protected def environmentFactory: EnvironmentFactory =
+  override protected def environmentFactory: EnvironmentFactory[CantonConfig, CantonEnvironment] =
     CommunityEnvironmentFactory
+
+  override def withManualStart(config: CantonConfig): CantonConfig =
+    config.copy(parameters = config.parameters.copy(manualStart = true))
 }

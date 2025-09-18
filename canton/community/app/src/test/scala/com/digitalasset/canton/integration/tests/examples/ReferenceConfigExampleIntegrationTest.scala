@@ -9,6 +9,7 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{CantonConfig, EnterpriseCantonEdition, TestingConfigInternal}
 import com.digitalasset.canton.console.{LocalInstanceReference, RemoteInstanceReference}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
@@ -19,7 +20,7 @@ import monocle.macros.syntax.lens.*
 
 class ReferenceConfigSandboxExampleIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   registerPlugin(
@@ -73,7 +74,7 @@ class ReferenceConfigSandboxExampleIntegrationTest
 // The values from the UsePostgres script are not adopted by the external reference config.
 class ReferenceConfigExampleIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   registerPlugin(new UsePostgres(loggerFactory))

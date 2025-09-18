@@ -27,6 +27,7 @@ class GrpcCtlRunnerTest extends AsyncWordSpec with BaseTest {
           channel,
           None,
           1000.milliseconds,
+          _ => false,
         ) map { result =>
           result shouldBe "result"
         }

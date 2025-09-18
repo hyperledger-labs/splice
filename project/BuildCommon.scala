@@ -140,7 +140,6 @@ object BuildCommon {
 
   lazy val removeCompileFlagsForDaml =
     Seq(
-      "-Xsource:3",
       "-deprecation",
       "-Xfatal-warnings",
       "-Wunused:implicits",
@@ -1006,21 +1005,21 @@ object BuildCommon {
         Compile / damlCodeGeneration :=
           Seq(
             (
-              (Compile / sourceDirectory).value / "daml" / "AdminWorkflows",
-              (Compile / damlDarOutput).value / "AdminWorkflows-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-ping",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-ping-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
             (
-              (Compile / sourceDirectory).value / "daml" / "PartyReplication",
-              (Compile / damlDarOutput).value / "PartyReplication-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-party-replication-alpha",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-party-replication-alpha-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
         Compile / damlBuildOrder := Seq(
-          "daml/AdminWorkflows/daml.yaml",
-          "daml/PartyReplication/daml.yaml",
+          "daml/canton-builtin-admin-workflow-ping/daml.yaml",
+          "daml/canton-builtin-admin-workflow-party-replication-alpha/daml.yaml",
         ),
         // TODO(DACH-NY/canton-network-node#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again
@@ -1462,9 +1461,7 @@ object BuildCommon {
         sharedCantonSettings,
         removeTestSources,
         sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3") :+ "-Wnonunit-statement",
+        scalacOptions --= removeCompileFlagsForDaml :+ "-Wnonunit-statement",
         scalacOptions += "-Wconf:src=src_managed/.*:silent" ++ Seq(
           "lint-byname-implicit",
           "other-match-analysis",
@@ -1489,6 +1486,7 @@ object BuildCommon {
           scalaz_scalacheck % Test,
           scalatestScalacheck % Test,
           ujson_circe,
+          upickle,
         ),
         Test / damlCodeGeneration := Seq(
           (
@@ -1506,9 +1504,7 @@ object BuildCommon {
       .apply("canton-transcode", file("canton/community/ledger/transcode/"))
       .settings(
         sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3"),
+        scalacOptions --= removeCompileFlagsForDaml,
         libraryDependencies ++= Seq(
           daml_lf_language,
           "com.lihaoyi" %% "ujson" % "4.0.2",
