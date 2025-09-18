@@ -50,6 +50,3 @@ create table scan_verdict_transaction_view_store
     -- Composite primary key
     primary key (verdict_row_id, view_id)
 );
-
--- Index for efficient lookups by verdict_row_id
-create index scan_verdict_tx_view_verdict_id on scan_verdict_transaction_view_store (verdict_row_id);
