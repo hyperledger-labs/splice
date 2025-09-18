@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbParameterUtils, DbStorage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.SynchronizerId
@@ -14,7 +14,7 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
 import io.circe.Json
-import slick.jdbc.{GetResult, PositionedParameters, PositionedResult, SetParameter}
+import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
 import java.util.concurrent.atomic.AtomicReference
@@ -117,23 +117,6 @@ class DbScanVerdictStore(
   type VerdictT = DbScanVerdictStore.VerdictT
   val VerdictT = DbScanVerdictStore.VerdictT
 
-  private implicit val intArrayGetResult: GetResult[Array[Int]] = (r: PositionedResult) => {
-    val sqlArray = r.rs.getArray(r.skip.currentPos)
-    if (sqlArray == null) Array.emptyIntArray
-    else
-      sqlArray.getArray match {
-        case arr: Array[java.lang.Integer] => arr.map(_.intValue())
-        case arr: Array[Int] => arr
-        case x: Array[?] =>
-          // fallback: attempt to parse string representation
-          x.map(_.toString.toInt)
-        case other =>
-          throw new IllegalStateException(
-            s"Expected an array of integers, but got $other. Are you sure you selected an integer array column?"
-          )
-      }
-  }
-
   private implicit val GetResultVerdictRow: GetResult[VerdictT] = GetResult { prs =>
     import prs.*
     VerdictT(
@@ -162,10 +145,6 @@ class DbScanVerdictStore(
       intArrayGetResult(prs).toSeq,
     )
   }
-
-  private implicit val intSeqSetParameter: SetParameter[Seq[Int]] =
-    (ints: Seq[Int], pp: PositionedParameters) =>
-      DbParameterUtils.setArrayIntOParameterDb(Some(ints.toArray), pp)
 
   private def sqlInsertVerdictReturningId(rowT: VerdictT) = {
     sql"""
