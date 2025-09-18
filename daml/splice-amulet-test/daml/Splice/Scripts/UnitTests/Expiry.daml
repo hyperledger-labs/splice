@@ -3,13 +3,21 @@
 
 module Splice.Scripts.UnitTests.Expiry where
 
+import Splice.Amulet.TokenApiUtils
+import Splice.Expiry
+import Splice.Fees
+import Splice.Types
+import Splice.Round
+import Splice.Schedule
+import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Scripts.Util
+
 import DA.Assert
+import DA.Date
 import DA.Time
 
 import Daml.Script
 
-import Splice.Expiry
-import Splice.Amulet.TokenApiUtils
 
 test_timeLockEncoding : Script ()
 test_timeLockEncoding = do
@@ -28,3 +36,102 @@ test_timeLockEncoding = do
 
     fromAnyValue (toAnyValue testLock1) === Right testLock1
     fromAnyValue (toAnyValue testLock2) === Right testLock2
+
+
+testBoundedSet : Script ()
+testBoundedSet = script do
+  let rate = RatePerRound 0.000005
+      round0 = Round 0
+      round1 = Round 1
+  -- overflow when applying div
+  amountExpiresAt (expiringAmount rate maxDecimalDiv10 round0) === AfterMaxBound
+  amountExpiresAt (expiringAmount rate 49999999999999999999999.9999999999 round0) === AfterMaxBound
+
+  -- overflow when applying ceiling
+  amountExpiresAt (expiringAmount rate 46116860184273.87903505 round0) === AfterMaxBound
+
+  -- overflow when applying addBoundedRelRound
+  amountExpiresAt (expiringAmount rate 46116860184273.879035 round1) === AfterMaxBound
+
+  -- no overflow
+  amountExpiresAt (expiringAmount rate 46116860184273.879035 round0) === Singleton (Round maxInt)
+  amountExpiresAt (expiringAmount rate 46116860184273.87903 round1) === Singleton (Round maxInt)
+  amountExpiresAt (expiringAmount rate 46116860184273.87903 round0) === Singleton (Round (maxInt - 1))
+  return ()
+
+testEstimateOpenRoundCreatedAt : Script ()
+testEstimateOpenRoundCreatedAt = script do
+  app <- setupApp
+  currentTime <- getTime
+  let amuletPrice = 2.5
+      tickDuration = seconds 150
+
+      t00_00 = currentTime
+      t02_30 = addRelRoundN 1 currentTime tickDuration
+      t05_00 = addRelRoundN 2 currentTime tickDuration
+      t07_30 = addRelRoundN 3 currentTime tickDuration
+      t10_00 = addRelRoundN 4 currentTime tickDuration
+      t12_30 = addRelRoundN 5 currentTime tickDuration
+
+      issuingFor0 = days 0
+      issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
+
+      amuletConfigUsd = defaultAmuletConfig
+      transferConfigUsd = amuletConfigUsd.transferConfig
+      issuanceConfig0 = getValueAsOf issuingFor0 amuletConfigUsd.issuanceCurve
+      issuanceConfig3 = getValueAsOf issuingFor3 amuletConfigUsd.issuanceCurve
+      openRound0 = OpenMiningRound with dso = app.dso; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
+
+
+  let almostMax = time (date 9999 Dec 31) 23 57 30
+  -- estimated to be at 9999-12-31T23:57:30.000000Z
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408704)) === Some (Singleton (almostMax))
+  -- estimated to be at 10000-01-01T00:00:00.000000Z, which is larger than max value of DA.Time. ie, 9999-12-31T23:59:59.999999Z
+  -- this will be regarded as never expired. (AfterMaxTime)
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408705)) === Some AfterMaxBound
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 61489146914)) === Some AfterMaxBound
+
+  -- estimate the creation time of round relative to round 0
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (-1))) === None
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (0))) === None
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1)) === Some (Singleton t00_00) -- T00:00:00
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 2)) === Some (Singleton t02_30) -- T00:02:30
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 3)) === Some (Singleton t05_00) -- T00:05:00
+
+  -- estimate the creation time of round relative to round 3
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round (3))) === None
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 4)) === Some (Singleton t07_30) -- T00:07:30
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 5)) === Some (Singleton t10_00) -- T00:10:00
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 6)) === Some (Singleton t12_30) -- T00:12:30
+
+
+
+testAmountExpiresAt : Script ()
+testAmountExpiresAt = do
+  let largeAmount = ExpiringAmount with
+        initialAmount = 26116860184273.879035
+        createdAt = Round 4000000000000000000
+        ratePerRound = RatePerRound(0.000005)
+  amountExpiresAt largeAmount === Singleton (Round(maxInt))
+
+  let largeAmountThatOverflow = largeAmount with
+        initialAmount = largeAmount.initialAmount + 0.000005
+  amountExpiresAt largeAmountThatOverflow === AfterMaxBound
+
+  let largeAmountCreatedAt0ThatOverflow = ExpiringAmount with
+        initialAmount = 46116860184273.87904
+        createdAt = Round 0
+        ratePerRound = RatePerRound(0.000005)
+  amountExpiresAt largeAmountCreatedAt0ThatOverflow === AfterMaxBound
+
+  let amountWithLargestAmountAndLeastHoldingFee = ExpiringAmount with
+        initialAmount = maxDecimalDiv10
+        createdAt = Round 0
+        ratePerRound = RatePerRound(0.0000000001)
+  amountExpiresAt amountWithLargestAmountAndLeastHoldingFee === AfterMaxBound
+
+addRelRoundN : Int -> Time -> RelTime -> Time
+addRelRoundN n t relTime
+  | n <= 0 = t
+  | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
