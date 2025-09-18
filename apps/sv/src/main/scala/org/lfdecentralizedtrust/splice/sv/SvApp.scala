@@ -352,15 +352,20 @@ class SvApp(
             }
           } yield res
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
-          val appInitConnection = ledgerClient
-            .readOnlyConnection(
-              this.getClass.getSimpleName,
-              loggerFactory,
-            )
           for {
-            dsoParty <- appInitStep("Get DSO party from user metadata") {
-              appInitConnection.getDsoPartyFromUserMetadata(config.ledgerApiUser)
+            cometBftNode <- SvUtil.mapToCometBftNode(
+              cometBftClient,
+              cometBftConfig,
+              participantAdminConnection,
+              logger,
+              loggerFactory,
+              retryProvider,
+            )
+            res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
+              val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
+              initializer.joinDsoAndOnboardNodes()
             }
+            dsoParty = res._5.key.dsoParty
             hostDsoParty <- retryProvider.getValueWithRetries(
               RetryFor.WaitingOnInitDependency,
               "has_dso_party",
@@ -406,18 +411,6 @@ class SvApp(
               } else {
                 Future.unit
               }
-            }
-            cometBftNode <- SvUtil.mapToCometBftNode(
-              cometBftClient,
-              cometBftConfig,
-              participantAdminConnection,
-              logger,
-              loggerFactory,
-              retryProvider,
-            )
-            res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
-              val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
-              initializer.joinDsoAndOnboardNodes()
             }
           } yield res
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
