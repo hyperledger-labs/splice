@@ -187,7 +187,7 @@ class AcsSnapshotStore(
     for {
       snapshot <- storage
         .querySingle(
-          sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id
+          sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance
             from acs_snapshot
             where snapshot_record_time = $snapshot
               and migration_id = $migrationId
