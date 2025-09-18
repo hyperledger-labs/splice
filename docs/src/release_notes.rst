@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.17
+------
 
 .. important::
 
@@ -35,25 +35,6 @@ Upcoming
        of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
        of the ``TransferResult``.
 
-- Canton
-
-  - Add ``CanExecuteAs`` and ``CanExecuteAsAnyParty`` user rights that can be used for the
-    ``InteractiveSubmissionService/ExecuteSubmission`` endpoint. ``CanActAs`` permissions imply
-    ``CanExecuteAs`` so this is backwards compatible.
-
-- LocalNet
-
-  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
-
-- Validator
-
-  - Expose ``/dso`` endpoint from scan proxy
-
-- Wallet
-
-  - Do not deduct holding fees from available balance if ``splice-amulet >= 0.1.14``
-    is configured in the ``AmuletConfig`` of the network.
-
 - Daml
 
   - Implement Daml changes for `CIP-0078 - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__:
@@ -78,12 +59,41 @@ Upcoming
      walletPayments     0.1.14
      ================== =======
 
+- Canton
+
+  - Add ``CanExecuteAs`` and ``CanExecuteAsAnyParty`` user rights that can be used for the
+    ``InteractiveSubmissionService/ExecuteSubmission`` endpoint. ``CanActAs`` permissions imply
+    ``CanExecuteAs`` so this is backwards compatible.
+
+- Validator
+
+  - Expose ``/dso`` endpoint from scan proxy
+
+- Wallet
+
+  - Do not deduct holding fees from available balance if ``splice-amulet >= 0.1.14``
+    is configured in the ``AmuletConfig`` of the network.
 
 - Deployment
 
   - Participant
 
      - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
+  - Validator
+
+    - Allow disabling the deployment of ``ans-web-ui`` and ``wallet-web-ui`` in the ``splice-validator`` helm chart by setting
+      ``.ansWebUi.enabled`` and ``validatorWebUi.enabled`` to ``false``.
+      Thanks to Marcin Kocur for contributing this change in https://github.com/hyperledger-labs/splice/pull/2171
+
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+
+- Community docs
+
+  - Add :ref:`Keycloak Configuration Guide for Validators <keycloak_canton_validator_config_guide>`.
+    Thanks to mikeProDev for contributing this change in https://github.com/hyperledger-labs/splice/pull/2247
 
 0.4.16
 ------
