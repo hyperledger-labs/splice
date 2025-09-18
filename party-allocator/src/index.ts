@@ -225,20 +225,18 @@ async function setupParty(
     setupTopology(client, synchronizerId, partyHint, keyPair),
   );
 
-  await client.withUserRights(userId, [partyId], async () => {
-    await timed(metrics.tapLatencyMs, () =>
-      tap(client, synchronizerId, partyId, keyPair),
-    );
-    await timed(metrics.preapprovalLatencyMs, () =>
-      setupPreapproval(
-        client,
-        synchronizerId,
-        partyId,
-        validatorPartyId,
-        keyPair,
-      ),
-    );
-  });
+  await timed(metrics.tapLatencyMs, () =>
+    tap(client, synchronizerId, partyId, keyPair),
+  );
+  await timed(metrics.preapprovalLatencyMs, () =>
+    setupPreapproval(
+      client,
+      synchronizerId,
+      partyId,
+      validatorPartyId,
+      keyPair,
+    ),
+  );
   logger.info(`Finished setup for party ${index}`);
 }
 
@@ -324,6 +322,9 @@ async function main() {
   logger.info(`Starting at ${maxIndex}`);
 
   const client = new LedgerApiClient(config.jsonLedgerApiUrl, config.token);
+
+  // This is idempotent so we just always grant it. We don't revoke it at the end as keeping it doesn't do any harm
+  await client.grantExecuteAndReadAsAnyPartyRights(config.userId);
 
   // We process batches of config.batchSize with parallelism of config.parallelism.
   // Batch size is really just there to limit memory usage from unresolved promises.

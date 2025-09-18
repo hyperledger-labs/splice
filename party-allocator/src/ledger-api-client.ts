@@ -16,8 +16,6 @@ import {
   Kind,
   RequestContext,
   ResponseContext,
-  RevokeUserRightsResponse,
-  Right,
   ServerConfiguration,
   Signature,
   SignedTransaction,
@@ -207,57 +205,25 @@ export class LedgerApiClient {
     );
   }
 
-  async grantUserRights(
+  async grantExecuteAndReadAsAnyPartyRights(
     userId: string,
-    actAs: string[],
   ): Promise<GrantUserRightsResponse> {
-    const actAsRights: Right[] = actAs.map((party) => {
-      const right = new Kind();
-      right.CanActAs = { value: { party } };
-      return { kind: right };
-    });
-    return this.retry(`Grant user rights to ${userId}, actAs: ${actAs}`, () =>
-      this.als.run({ url: undefined }, () =>
-        this.api.postV2UsersUserIdRights(userId, {
-          userId: userId,
-          identityProviderId: "",
-          rights: actAsRights,
-        }),
-      ),
+    const executeRight = new Kind();
+    executeRight.CanExecuteAsAnyParty = { value: {} };
+    // execute does not imply read as so we also need to grant that.
+    const readRight = new Kind();
+    readRight.CanReadAsAnyParty = { value: {} };
+    return this.retry(
+      `Grant ExecuteAsAnyParty and ReadAsAnyParty rights to ${userId}`,
+      () =>
+        this.als.run({ url: undefined }, () =>
+          this.api.postV2UsersUserIdRights(userId, {
+            userId: userId,
+            identityProviderId: "",
+            rights: [{ kind: executeRight }, { kind: readRight }],
+          }),
+        ),
     );
-  }
-
-  async revokeUserRights(
-    userId: string,
-    actAs: string[],
-  ): Promise<RevokeUserRightsResponse> {
-    const actAsRights: Right[] = actAs.map((party) => {
-      const right = new Kind();
-      right.CanActAs = { value: { party } };
-      return { kind: right };
-    });
-    return this.retry(`Revoke user rights to ${userId}, actAs: ${actAs}`, () =>
-      this.als.run({ url: undefined }, () =>
-        this.api.patchV2UsersUserIdRights(userId, {
-          userId: userId,
-          identityProviderId: "",
-          rights: actAsRights,
-        }),
-      ),
-    );
-  }
-
-  async withUserRights<T>(
-    userId: string,
-    actAs: string[],
-    t: () => Promise<T>,
-  ): Promise<T> {
-    await this.grantUserRights(userId, actAs);
-    try {
-      return await t();
-    } finally {
-      await this.revokeUserRights(userId, actAs);
-    }
   }
 
   async retry<T>(
