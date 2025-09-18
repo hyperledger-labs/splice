@@ -4,18 +4,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Script to display Pulumi preview outputs from CircleCI jobs in a readable format.
+Script to display Pulumi preview outputs from CircleCI jobs or local files in a readable format.
 
 Usage:
-  ./check_preview.py JOB_ID_OR_URL [--verbose] [--output-file OUTPUT_FILE] [--hide-config]
-                                   [--hide-env] [--gh-org GH_ORG] [--gh-repo GH_REPO]
-                                   [--include-ops OPERATIONS] [--exclude-ops OPERATIONS]
-                                   [--include-types RESOURCE_TYPES] [--exclude-types RESOURCE_TYPES]
-                                   [--include-id-pattern PATTERNS] [--exclude-id-pattern PATTERNS]
-                                   [--summary] [--count-only]
+  ./check_preview.py JOB_ID_OR_FILE [--verbose] [--output-file OUTPUT_FILE] [--hide-config]
+                                    [--hide-env] [--gh-org GH_ORG] [--gh-repo GH_REPO]
+                                    [--include-ops OPERATIONS] [--exclude-ops OPERATIONS]
+                                    [--include-types RESOURCE_TYPES] [--exclude-types RESOURCE_TYPES]
+                                    [--include-id-pattern PATTERNS] [--exclude-id-pattern PATTERNS]
+                                    [--summary] [--count-only]
 
 Arguments:
-  JOB_ID_OR_URL        CircleCI job ID or full URL
+  JOB_ID_OR_FILE       CircleCI job ID, full URL, or a local file path
   --verbose            Show detailed diagnostic information during processing
   --output-file        File to save the raw output to (default: pulumi_preview_output.txt)
   --hide-config        Redact configuration blocks that start with 'Loaded'
@@ -40,7 +40,6 @@ Filtering Options:
 Output Options:
   --summary           Show only a summary of changes by resource type
   --count-only        Show only the count of resources by operation type
-
   --gh-org            GitHub organization name (default: DACH-NY)
   --gh-repo           GitHub repository name (default: canton-network-internal)
 """
@@ -55,10 +54,14 @@ from termcolor import colored
 from enum import Enum, auto
 from dataclasses import dataclass, field
 from collections import defaultdict
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set, Any, Callable, TypeVar, Union
 
 # Pattern to match all ANSI escape sequences
 ANSI_ESCAPE_PATTERN = r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+
+#
+# Data Classes (immutable data records)
+#
 
 # Resource operation types
 class ResourceOp(Enum):
@@ -69,131 +72,223 @@ class ResourceOp(Enum):
     REPLACE = auto()
     UNKNOWN = auto()
 
-# Resource metadata entry
-@dataclass
+@dataclass(frozen=True)
+class FilterArgs:
+    """Immutable record for filter arguments"""
+    hide_config: bool = False
+    hide_env: bool = False
+    hide_grafana: bool = False
+    clean_output: bool = False
+    include_ops: Optional[str] = None
+    exclude_ops: Optional[str] = None
+    include_types: Optional[str] = None
+    exclude_types: Optional[str] = None
+    include_id_pattern: Optional[str] = None
+    exclude_id_pattern: Optional[str] = None
+    summary: bool = False
+    count_only: bool = False
+    verbose: bool = False
+    quiet: bool = False
+
+@dataclass(frozen=True)
 class MetadataEntry:
+    """Immutable record for a metadata entry"""
     key: str
     value: str
     original_line: str
 
-# Resource representation
 @dataclass
-class Resource:
-    operation: ResourceOp
-    resource_type: str
-    metadata: List[MetadataEntry] = field(default_factory=list)
-    header_line: Optional[str] = None
-    header_line_idx: int = -1
-    metadata_lines: List[Tuple[int, str]] = field(default_factory=list)
-    content_lines: List[Tuple[int, str]] = field(default_factory=list)  # Non-metadata content lines (changes, etc.)
-    all_lines: List[int] = field(default_factory=list)  # All line indices that belong to this resource
-
-    def should_display(self, filter_args):
-        """
-        Determine if this resource should be displayed based on filter arguments.
-
-        Args:
-            filter_args: Filter arguments from command line
-
-        Returns:
-            True if the resource should be displayed, False otherwise
-        """
-        return resource_matches_filter(self, filter_args)
+class ContentLine:
+    """Basic content line information"""
+    line_idx: int  # Line number in the original file
+    content: str   # Original content with ANSI codes
+    stripped: str = None  # Content with ANSI codes stripped
 
     def __post_init__(self):
-        if self.metadata is None:
-            self.metadata = []
-        if self.metadata_lines is None:
-            self.metadata_lines = []
-        if self.content_lines is None:
-            self.content_lines = []
-        if self.all_lines is None:
-            self.all_lines = []
+        if self.stripped is None:
+            self.stripped = strip_ansi(self.content).strip()
 
-    def should_hide(self, hide_env: bool) -> bool:
-        """Determine if this resource should be hidden based on filtering options."""
-        # We no longer need to treat READ operations differently
-        # Just return False as we handle filtering elsewhere
-        return False
+# Content types (records containing just data)
+@dataclass
+class ResourceContent:
+    """Resource content with metadata and content lines"""
+    line_idx: int
+    content: str
+    resource_type: str
+    operation: ResourceOp
+    metadata: List[MetadataEntry] = field(default_factory=list)
+    metadata_lines: List[ContentLine] = field(default_factory=list)
+    content_lines: List[ContentLine] = field(default_factory=list)
 
-def strip_ansi(text):
-    """Remove ANSI escape sequences from text.
+    def get_line_indices(self) -> List[int]:
+        """Get all line indices this resource covers"""
+        indices = [self.line_idx]
+        indices.extend(line.line_idx for line in self.metadata_lines)
+        indices.extend(line.line_idx for line in self.content_lines)
+        return indices
 
-    Args:
-        text: String to clean
+@dataclass
+class ConfigContent:
+    """Configuration content"""
+    line_idx: int
+    content: str
+    is_header: bool
+    brace_count: int
 
-    Returns:
-        String with ANSI escape sequences removed
-    """
+@dataclass
+class EnvironmentContent:
+    """Environment variable or flag"""
+    line_idx: int
+    content: str
+
+@dataclass
+class HeaderContent:
+    """Section header like 'Resources:'"""
+    line_idx: int
+    content: str
+    header_type: str
+
+@dataclass
+class EmptyContent:
+    """Empty line"""
+    line_idx: int
+    content: str
+
+@dataclass
+class OtherContent:
+    """Any other content"""
+    line_idx: int
+    content: str
+    is_delimiter: bool = False
+
+# Union type for all content
+ContentType = Union[
+    ResourceContent,
+    ConfigContent,
+    EnvironmentContent,
+    HeaderContent,
+    EmptyContent,
+    OtherContent
+]
+
+@dataclass
+class ParsedOutput:
+    """Container for all parsed content"""
+    resources: List[ResourceContent] = field(default_factory=list)
+    configs: List[ConfigContent] = field(default_factory=list)
+    environments: List[EnvironmentContent] = field(default_factory=list)
+    headers: List[HeaderContent] = field(default_factory=list)
+    empty_lines: List[EmptyContent] = field(default_factory=list)
+    other_content: List[OtherContent] = field(default_factory=list)
+
+    def all_content(self) -> List[ContentType]:
+        """Get all content in order of line_idx"""
+        all_items: List[ContentType] = []
+        all_items.extend(self.resources)
+        all_items.extend(self.configs)
+        all_items.extend(self.environments)
+        all_items.extend(self.headers)
+        all_items.extend(self.empty_lines)
+        all_items.extend(self.other_content)
+        return sorted(all_items, key=lambda x: x.line_idx)
+
+#
+# Parsing Functions
+#
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from text."""
     return re.sub(ANSI_ESCAPE_PATTERN, '', text)
 
+def clean_ansi_empty_line(line: str) -> bool:
+    """Check if a line is effectively empty after removing ANSI color codes."""
+    return not bool(strip_ansi(line).strip())
 
-def parse_resource_header(line: str) -> Optional[Resource]:
-    """
-    Parse a line to see if it's a resource operation header.
-    Returns a Resource object if it is, None otherwise.
+def parse_comma_separated_patterns(pattern_str: str) -> List[str]:
+    """Parse a comma-separated string of patterns."""
+    if not pattern_str:
+        return []
+    return [p.strip() for p in pattern_str.split(',') if p.strip()]
 
-    Args:
-        line: The line to parse (should be stripped of ANSI codes and whitespace)
+def matches_pattern(value: str, patterns: List[str]) -> bool:
+    """Check if a value matches any of the given patterns."""
+    if not value or not patterns:
+        return False
 
-    Returns:
-        Resource object if the line is a resource header, None otherwise
-    """
-    # Check for different resource operation patterns
-    # All formats follow the pattern: [symbol] resource_type: (operation)
-    create_match = re.match(r'^\+\s+(.+?):\s*\(create\)$', line)
-    read_match = re.match(r'^(?:>|\+|\-|~|\+-)\s+(.+?):\s*\(read\)$', line)  # Match any symbol for read
-    update_match = re.match(r'^~\s+(.+?):\s*\(update\)$', line)
-    delete_match = re.match(r'^-\s+(.+?):\s*\(delete\)$', line)
-    replace_match = re.match(r'^\+-\s+(.+?):\s*\(replace\)$', line)
+    for pattern in patterns:
+        # For patterns containing .* use regex directly without escaping dots
+        if '.*' in pattern:
+            try:
+                if re.search(pattern, value):
+                    return True
+            except re.error:
+                regex_pattern = pattern.replace(".", "\\.").replace("*", ".*").replace("?", ".")
+                if re.match(f"^{regex_pattern}$", value):
+                    return True
+        else:
+            # Standard glob pattern conversion
+            regex_pattern = pattern.replace(".", "\\.").replace("*", ".*").replace("?", ".")
+            if re.match(f"^{regex_pattern}$", value):
+                return True
+    return False
 
-    # Handle create operations
-    if create_match:
-        resource_type = create_match.group(1)
-        return Resource(operation=ResourceOp.CREATE, resource_type=resource_type)
+def parse_resource_header(line: str) -> Optional[Tuple[str, ResourceOp]]:
+    """Parse a resource header from a line."""
+    # Basic checks before regex - improve performance
+    first_char = line[0] if line else ''
+    if first_char not in ['+', '-', '~', '>', ' ']:
+        return None
 
-    # Handle read operations
-    elif read_match:
-        resource_type = read_match.group(1)
-        return Resource(operation=ResourceOp.READ, resource_type=resource_type)
+    # If line doesn't contain operation markers, skip
+    if '(create)' not in line and '(update)' not in line and '(read)' not in line and \
+       '(delete)' not in line and '(replace)' not in line:
+        return None
 
-    # Handle update operations
-    elif update_match:
-        resource_type = update_match.group(1)
-        return Resource(operation=ResourceOp.UPDATE, resource_type=resource_type)
+    # Extremely simplified parsing based on operation markers
+    if '(create)' in line and line.strip().startswith('+'):
+        resource_type = line.split('(create)')[0].strip()
+        if resource_type.endswith(':'):
+            resource_type = resource_type[:-1].strip()
+        if resource_type.startswith('+ '):
+            resource_type = resource_type[2:].strip()
+        return (resource_type, ResourceOp.CREATE)
 
-    # Handle delete operations
-    elif delete_match:
-        resource_type = delete_match.group(1)
-        return Resource(operation=ResourceOp.DELETE, resource_type=resource_type)
+    elif '(read)' in line and line.strip().startswith('>'):
+        resource_type = line.split('(read)')[0].strip()
+        if resource_type.endswith(':'):
+            resource_type = resource_type[:-1].strip()
+        if resource_type.startswith('> '):
+            resource_type = resource_type[2:].strip()
+        return (resource_type, ResourceOp.READ)
 
-    # Handle replace operations
-    elif replace_match:
-        resource_type = replace_match.group(1)
-        return Resource(operation=ResourceOp.REPLACE, resource_type=resource_type)
+    elif '(update)' in line and line.strip().startswith('~'):
+        resource_type = line.split('(update)')[0].strip()
+        if resource_type.endswith(':'):
+            resource_type = resource_type[:-1].strip()
+        if resource_type.startswith('~ '):
+            resource_type = resource_type[2:].strip()
+        return (resource_type, ResourceOp.UPDATE)
+
+    elif '(delete)' in line and line.strip().startswith('-'):
+        resource_type = line.split('(delete)')[0].strip()
+        if resource_type.endswith(':'):
+            resource_type = resource_type[:-1].strip()
+        if resource_type.startswith('- '):
+            resource_type = resource_type[2:].strip()
+        return (resource_type, ResourceOp.DELETE)
+
+    elif '(replace)' in line and line.strip().startswith('+-'):
+        resource_type = line.split('(replace)')[0].strip()
+        if resource_type.endswith(':'):
+            resource_type = resource_type[:-1].strip()
+        if resource_type.startswith('+- '):
+            resource_type = resource_type[3:].strip()
+        return (resource_type, ResourceOp.REPLACE)
 
     return None
 
-
 def parse_metadata_line(line: str) -> Optional[MetadataEntry]:
-    """
-    Parse a line to extract metadata in the form [key=value] or similar.
-
-    The line must match the exact pattern of [key=value] where:
-    1. The line starts with '['
-    2. Followed by a key that does not contain '=' or '['
-    3. Followed by '='
-    4. Followed by a value that does not contain ']'
-    5. Ending with ']'
-
-    Args:
-        line: The line to parse (should be stripped of ANSI codes and whitespace)
-
-    Returns:
-        MetadataEntry if the line contains metadata, None otherwise
-    """
-    # Use a strict regex pattern to match only true metadata lines
-    # This avoids matching array outputs or other content with brackets
+    """Parse metadata from a line."""
     metadata_match = re.match(r'^\[([^=\[\]]+)=([^\]]+)\]$', line.strip())
 
     if metadata_match:
@@ -201,7 +296,6 @@ def parse_metadata_line(line: str) -> Optional[MetadataEntry]:
         value = metadata_match.group(2).strip()
         return MetadataEntry(key=key, value=value, original_line=line)
 
-    # Also check for key:value pattern as a backup
     metadata_match = re.match(r'^\[([^:\[\]]+):([^\]]+)\]$', line.strip())
     if metadata_match:
         key = metadata_match.group(1).strip()
@@ -210,23 +304,583 @@ def parse_metadata_line(line: str) -> Optional[MetadataEntry]:
 
     return None
 
+def is_environment_line(line: str) -> bool:
+    """Check if a line is environment-related."""
+    env_patterns = [
+        "Environment Flag",
+        "Read option env",
+    ]
+
+    for pattern in env_patterns:
+        if pattern in line:
+            return True
+    return False
+
+def is_config_header(line: str) -> bool:
+    """Check if a line is a configuration header."""
+    return "Loaded" in line and "{" in line.split("Loaded", 1)[1]
+
+def is_section_header(line: str) -> bool:
+    """Check if a line is a section header."""
+    header_types = ["resources", "summary", "warning", "error"]
+    content_lower = line.lower()
+    return (line == "Resources:" or
+            line.startswith("Resources:") or
+            any(f"{header}:" in content_lower for header in header_types))
+
+def get_header_type(line: str) -> str:
+    """Get the type of section header."""
+    header_types = ["resources", "summary", "warning", "error"]
+    content_lower = line.lower()
+    for header_type in header_types:
+        if f"{header_type}:" in content_lower:
+            return header_type
+    return "unknown"
+
+def categorize_line(idx: int, line: str) -> ContentType:
+    """Categorize a line of content into its appropriate type."""
+    stripped = strip_ansi(line).strip()
+
+    # Skip empty lines
+    if not stripped:
+        return EmptyContent(idx, line)
+
+    # Check if it's a resource header
+    resource_header = parse_resource_header(stripped)
+    if resource_header:
+        return ResourceContent(idx, line, resource_header[0], resource_header[1])
+
+    # Check if it's a delimiter line (like "--- Output from...")
+    if stripped.startswith("--- Output from") and stripped.endswith("---"):
+        # These are delimiter lines that separate different output sections
+        # They should be treated as OtherContent with a special flag
+        return OtherContent(idx, line, is_delimiter=True)
+
+    # Check if it's an environment line
+    if is_environment_line(stripped):
+        return EnvironmentContent(idx, line)
+
+    # Check if it's a configuration header
+    if is_config_header(stripped):
+        brace_count = stripped.count('{') - stripped.count('}')
+        return ConfigContent(idx, line, True, brace_count)
+
+    # Check if it's part of a configuration block (non-header)
+    # We'll identify this when parsing the content as a whole
+
+    # Check if it's a section header (like "Resources:")
+    if is_section_header(stripped):
+        return HeaderContent(idx, line, get_header_type(stripped))
+
+    # Default to other content
+    return OtherContent(idx, line)
+
+def parse_content_lines(lines: List[str]) -> ParsedOutput:
+    """Parse raw lines into structured content."""
+    result = ParsedOutput()
+
+    # First pass - categorize lines and identify resources
+    content_by_idx = {}
+    resource_indices = []
+    resource_by_idx = {}
+
+    # Track configuration blocks
+    in_config_block = False
+    current_brace_count = 0
+
+    for i, line in enumerate(lines):
+        # Skip lines that are just ANSI codes with no content
+        if clean_ansi_empty_line(line):
+            content = EmptyContent(i, line)
+            result.empty_lines.append(content)
+            content_by_idx[i] = content
+            continue
+
+        # Basic categorization first
+        content = categorize_line(i, line)
+
+        # Check if this is a config header to start tracking a new config block
+        stripped = strip_ansi(line).strip()
+
+        if isinstance(content, ConfigContent) and content.is_header:
+            in_config_block = True
+            current_brace_count = content.brace_count
+            content_by_idx[i] = content
+            result.configs.append(content)
+            continue
+
+        # Handle continued config block content
+        if in_config_block:
+            # Count braces to track nesting
+            current_brace_count += stripped.count('{') - stripped.count('}')
+
+            # This is part of a config block, mark it as such
+            config_content = ConfigContent(i, line, False, current_brace_count)
+            content_by_idx[i] = config_content
+            result.configs.append(config_content)
+
+            # If we've closed all braces, we're out of the config block
+            if current_brace_count <= 0:
+                in_config_block = False
+
+            continue
+
+        # Process non-config content
+        if isinstance(content, ResourceContent):
+            resource_indices.append(i)
+            resource_by_idx[i] = content
+            result.resources.append(content)
+        elif isinstance(content, EnvironmentContent):
+            result.environments.append(content)
+        elif isinstance(content, HeaderContent):
+            result.headers.append(content)
+        elif isinstance(content, EmptyContent):
+            result.empty_lines.append(content)
+        else:
+            result.other_content.append(content)
+
+        content_by_idx[i] = content
+
+    # Second pass - associate metadata and content with resources
+    for idx, resource_idx in enumerate(resource_indices):
+        resource = resource_by_idx[resource_idx]
+
+        # Determine where this resource ends
+        end_idx = len(lines)
+        if idx < len(resource_indices) - 1:
+            end_idx = resource_indices[idx + 1]
+
+        # Process lines from after the resource header to the end of the resource
+        i = resource_idx + 1
+        resource_ended = False
+
+        while i < end_idx and not resource_ended:
+            if i in content_by_idx:
+                content = content_by_idx[i]
+
+                # Check if we've hit a delimiter line - that means the resource content has ended
+                if isinstance(content, OtherContent) and getattr(content, 'is_delimiter', False):
+                    resource_ended = True
+                    continue
+
+                if isinstance(content, EmptyContent):
+                    # Skip empty lines but keep track of them
+                    pass
+                elif isinstance(content, OtherContent):
+                    # Check if it's metadata for the resource
+                    line_content = strip_ansi(content.content).strip()
+                    metadata_entry = parse_metadata_line(line_content)
+                    if metadata_entry:
+                        resource.metadata.append(metadata_entry)
+                        resource.metadata_lines.append(ContentLine(i, content.content, line_content))
+                    else:
+                        # It's content for the resource
+                        resource.content_lines.append(ContentLine(i, content.content, line_content))
+            i += 1
+
+    return result
+
+#
+# Filter Functions
+#
+
+def is_grafana_resource(resource: ResourceContent) -> bool:
+    """Check if a resource is Grafana-related."""
+    # Check if this is a ConfigMap resource
+    if "kubernetes:core/v1:ConfigMap" not in resource.resource_type:
+        return False
+
+    # Check if any metadata contains grafana identifiers
+    for meta in resource.metadata:
+        if meta.key == "id":
+            id_value = meta.value
+            if ("observability/cn-grafana" in id_value or
+                "grafana-dashboards" in id_value or
+                "grafana-alerting" in id_value):
+                return True
+
+    # Check content lines for grafana identifiers
+    for content_line in resource.content_lines:
+        if ("observability/cn-grafana" in content_line.stripped or
+            "grafana-dashboards" in content_line.stripped or
+            "grafana-alerting" in content_line.stripped):
+            return True
+
+    return False
+
+def get_resource_id(resource: ResourceContent) -> Optional[str]:
+    """Extract the ID of a resource from its metadata."""
+    # First try to find the ID in metadata
+    for meta in resource.metadata:
+        if meta.key == "id":
+            return meta.value
+
+    # If we didn't find an ID in metadata, check URN patterns
+    for meta in resource.metadata:
+        if meta.key == "urn" and "::canton-network::" in meta.value:
+            # Try to extract ID from the end of the URN
+            parts = meta.value.split("::")
+            if len(parts) >= 3:
+                potential_id = parts[-1]
+                if potential_id and potential_id != "":
+                    return potential_id
+
+    return None
+
+def filter_resources(resources: List[ResourceContent], filter_args: FilterArgs) -> List[ResourceContent]:
+    """Apply all filters to resources and return the filtered list."""
+    filtered_resources = list(resources)  # Start with all resources
+
+    # Apply operation filters
+    if filter_args.include_ops:
+        op_types = parse_comma_separated_patterns(filter_args.include_ops)
+        if op_types:
+            filtered_resources = [r for r in filtered_resources
+                                if r.operation.name.lower() in [op.lower() for op in op_types]]
+
+    if filter_args.exclude_ops:
+        op_types = parse_comma_separated_patterns(filter_args.exclude_ops)
+        if op_types:
+            filtered_resources = [r for r in filtered_resources
+                                if r.operation.name.lower() not in [op.lower() for op in op_types]]
+
+    # Apply resource type filters
+    if filter_args.include_types:
+        type_patterns = parse_comma_separated_patterns(filter_args.include_types)
+        if type_patterns:
+            filtered_resources = [r for r in filtered_resources
+                                if matches_pattern(r.resource_type, type_patterns)]
+
+    if filter_args.exclude_types:
+        type_patterns = parse_comma_separated_patterns(filter_args.exclude_types)
+        if type_patterns:
+            filtered_resources = [r for r in filtered_resources
+                                if not matches_pattern(r.resource_type, type_patterns)]
+
+    # Apply ID pattern filters
+    if filter_args.include_id_pattern:
+        id_patterns = parse_comma_separated_patterns(filter_args.include_id_pattern)
+        if id_patterns:
+            filtered_resources = [r for r in filtered_resources
+                                if get_resource_id(r) and matches_pattern(get_resource_id(r), id_patterns)]
+
+    if filter_args.exclude_id_pattern:
+        id_patterns = parse_comma_separated_patterns(filter_args.exclude_id_pattern)
+        if id_patterns:
+            filtered_resources = [r for r in filtered_resources
+                                if not (get_resource_id(r) and matches_pattern(get_resource_id(r), id_patterns))]
+
+    # Hide Grafana resources if requested
+    if filter_args.hide_grafana:
+        filtered_resources = [r for r in filtered_resources if not is_grafana_resource(r)]
+
+    return filtered_resources
+
+
+def should_display_resource(resource: ResourceContent, filter_args: FilterArgs) -> bool:
+    """Legacy function - use filter_resources instead."""
+    # Check if we should hide grafana resources
+    if filter_args.hide_grafana and is_grafana_resource(resource):
+        return False
+
+    # Check for operation filtering
+    if filter_args.include_ops:
+        op_types = parse_comma_separated_patterns(filter_args.include_ops)
+        if op_types:
+            # Convert ResourceOp enum value to string and check if it's in the list
+            resource_op_name = resource.operation.name.lower()
+            if resource_op_name not in [op.lower() for op in op_types]:
+                return False
+
+    if filter_args.exclude_ops:
+        op_types = parse_comma_separated_patterns(filter_args.exclude_ops)
+        if op_types:
+            # Convert ResourceOp enum value to string and check if it's in the list
+            resource_op_name = resource.operation.name.lower()
+            if resource_op_name in [op.lower() for op in op_types]:
+                return False
+
+    # Check for resource type filtering
+    if filter_args.include_types:
+        type_patterns = parse_comma_separated_patterns(filter_args.include_types)
+        if type_patterns and not matches_pattern(resource.resource_type, type_patterns):
+            return False
+
+    if filter_args.exclude_types:
+        type_patterns = parse_comma_separated_patterns(filter_args.exclude_types)
+        if type_patterns and matches_pattern(resource.resource_type, type_patterns):
+            return False
+
+    # Check for ID-based filtering
+    resource_id = get_resource_id(resource)
+
+    # If ID-based filtering is requested, exclude resources without IDs
+    if filter_args.include_id_pattern and not resource_id:
+        return False
+
+    if resource_id:
+        if filter_args.include_id_pattern:
+            id_patterns = parse_comma_separated_patterns(filter_args.include_id_pattern)
+            if id_patterns and not matches_pattern(resource_id, id_patterns):
+                return False
+
+        if filter_args.exclude_id_pattern:
+            id_patterns = parse_comma_separated_patterns(filter_args.exclude_id_pattern)
+            if id_patterns and matches_pattern(resource_id, id_patterns):
+                return False
+
+    # If we reached here, the resource passes all filters
+    return True
+
+def should_display_config(config: ConfigContent, filter_args: FilterArgs) -> bool:
+    """Check if a configuration should be displayed."""
+    # If hide_config is set, don't display any config content
+    # Otherwise, only hide if summary or count_only is set
+    return not (filter_args.hide_config or filter_args.summary or filter_args.count_only)
+
+def should_display_env(env: EnvironmentContent, filter_args: FilterArgs) -> bool:
+    """Check if an environment line should be displayed."""
+    return not (filter_args.hide_env or filter_args.summary or filter_args.count_only)
+
+def should_display_header(header: HeaderContent, filter_args: FilterArgs) -> bool:
+    """Check if a section header should be displayed."""
+    # Always show headers unless we're in summary or count mode
+    return not (filter_args.summary or filter_args.count_only)
+
+def should_display_empty(empty: EmptyContent, filter_args: FilterArgs) -> bool:
+    """Check if an empty line should be displayed."""
+    return not (filter_args.summary or filter_args.count_only)
+
+def should_display_other(other: OtherContent, filter_args: FilterArgs) -> bool:
+    """Check if other content should be displayed."""
+    return not (filter_args.summary or filter_args.count_only)
+
+def should_display_content(content: ContentType, filter_args: FilterArgs) -> bool:
+    """Check if content should be displayed based on filters."""
+    if isinstance(content, ResourceContent):
+        return should_display_resource(content, filter_args)
+    elif isinstance(content, ConfigContent):
+        return should_display_config(content, filter_args)
+    elif isinstance(content, EnvironmentContent):
+        return should_display_env(content, filter_args)
+    elif isinstance(content, HeaderContent):
+        return should_display_header(content, filter_args)
+    elif isinstance(content, EmptyContent):
+        return should_display_empty(content, filter_args)
+    elif isinstance(content, OtherContent):
+        return should_display_other(content, filter_args)
+    return False
+
+def filter_content(parsed: ParsedOutput, filter_args: FilterArgs) -> ParsedOutput:
+    """Apply filters to the parsed content."""
+    # First filter resources based on operation filters
+    filtered_resources = [r for r in parsed.resources if should_display_resource(r, filter_args)]
+
+    # Get set of line indices from resources that should be displayed
+    resource_indices = set()
+    for resource in filtered_resources:
+        resource_indices.update(resource.get_line_indices())
+
+    # Return a new ParsedOutput with filtered content
+    return ParsedOutput(
+        resources=filtered_resources,
+        configs=[c for c in parsed.configs if should_display_config(c, filter_args)],
+        environments=[e for e in parsed.environments if should_display_env(e, filter_args)],
+        headers=[h for h in parsed.headers if should_display_header(h, filter_args)],
+        empty_lines=[e for e in parsed.empty_lines if should_display_empty(e, filter_args)],
+        other_content=[o for o in parsed.other_content if should_display_other(o, filter_args)]
+    )
+
+#
+# Output Functions
+#
+
+def display_content(content: ContentType) -> None:
+    """Display a single content item."""
+    if isinstance(content, ResourceContent):
+        # Print the resource header
+        print(content.content)
+
+        # Print metadata lines
+        for line in content.metadata_lines:
+            print(line.content)
+
+        # Print content lines
+        for line in content.content_lines:
+            print(line.content)
+    elif isinstance(content, ConfigContent):
+        if content.is_header:
+            # Redact config blocks
+            loaded_text = strip_ansi(content.content).split("Loaded", 1)[1].split("{", 1)[0].strip()
+            print(colored(f"Loaded {loaded_text} REDACTED", "blue"))
+        # Always skip non-header config content as part of the block
+    else:
+        # For all other content types, just print the content
+        print(content.content)
+
+def display_parsed_content(parsed: ParsedOutput, filter_args: FilterArgs) -> None:
+    """Display filtered content in the appropriate format."""
+    # Apply all resource filters
+    filtered_resources = filter_resources(parsed.resources, filter_args)
+
+    if filter_args.count_only:
+        display_count_only(filtered_resources)
+    elif filter_args.summary:
+        display_summary(filtered_resources)
+    else:
+        # Display content with proper filtering
+        filtered_content = parsed.all_content()
+        display_filtered_content(filtered_content, filtered_resources, filter_args)
+
+    if not filter_args.quiet:
+        # Display the count of filtered resources
+        print(colored(f"Filtered resources: {len(filtered_resources)}", "cyan"))
+
+def display_filtered_content(all_content: List[ContentType], resources: List[ResourceContent], filter_args: FilterArgs) -> None:
+    """Display filtered content with proper resource filtering.
+
+    Uses filter_args to determine what content to show:
+    - hide_config: Hides configuration blocks
+    - hide_env: Hides environment variables and flags
+    - clean_output: Hides miscellaneous content that isn't recognized as resources
+    """
+    # We'll rebuild the output line by line
+    output_lines = []    # Start with the Resources header
+    output_lines.append("Resources:")
+
+    # Add each filtered resource and its content
+    for resource in resources:
+        # Add a blank line before each resource (except the first one)
+        if output_lines[-1] != "Resources:":
+            output_lines.append("")
+
+        # Add the resource header
+        output_lines.append(resource.content)
+
+        # Add metadata lines
+        for line in resource.metadata_lines:
+            output_lines.append(line.content)
+
+        # Add content lines
+        for line in resource.content_lines:
+            output_lines.append(line.content)
+
+    # Add a line break after resources section
+    if resources:
+        output_lines.append("")
+
+    # Add OtherContent based on clean_output flag
+    # Debug info about OtherContent if verbose
+    if filter_args.verbose:
+        print(colored("\nDEBUG - Processing OtherContent:", "magenta"))
+
+    for content in all_content:
+        if isinstance(content, OtherContent):
+            stripped_content = strip_ansi(content.content).strip()
+            is_delimiter = stripped_content.startswith("--- Output from") and stripped_content.endswith("---")
+
+            # Debug each OtherContent line if verbose
+            if filter_args.verbose:
+                print(colored(f"  OtherContent: '{stripped_content[:50]}{'...' if len(stripped_content) > 50 else ''}' | Delimiter: {content.is_delimiter} | Adding: {not filter_args.clean_output}", "magenta"))
+
+            # Only add if we're not in clean output mode
+            if not filter_args.clean_output:
+                output_lines.append(content.content)
+    # With clean_output, we don't show any OtherContent including "More content" indicators and delimiter lines
+
+    # Print all the output lines
+    if filter_args.verbose:
+        print(colored(f"\nDEBUG - Final output: {len(output_lines)} lines", "yellow"))
+
+    for line in output_lines:
+        print(line)
+
+def display_count_only(resources: List[ResourceContent]) -> None:
+    """Display only the count of resources by operation type."""
+    resources_by_op = defaultdict(int)
+
+    for resource in resources:
+        resources_by_op[resource.operation.name] += 1
+
+    # Color mapping for operations
+    op_colors = {
+        ResourceOp.CREATE.name: "green",
+        ResourceOp.UPDATE.name: "yellow",
+        ResourceOp.DELETE.name: "red",
+        ResourceOp.REPLACE.name: "magenta",
+        ResourceOp.READ.name: "blue",
+        ResourceOp.UNKNOWN.name: "white"
+    }
+
+    # Print the counts by operation
+    print(colored("Resource count by operation:", "cyan", attrs=["bold"]))
+    for op, count in sorted(resources_by_op.items()):
+        color = op_colors.get(op, "white")
+        print(colored(f"{op}: ", color) + str(count))
+
+    total = sum(resources_by_op.values())
+    print(colored(f"Total: {total}", "cyan", attrs=["bold"]))
+
+def display_summary(resources: List[ResourceContent]) -> None:
+    """Display a summary of resources by operation type."""
+    resources_by_op = defaultdict(int)
+
+    for resource in resources:
+        resources_by_op[resource.operation.name] += 1
+
+    # Color mapping for operations
+    op_colors = {
+        ResourceOp.CREATE.name: "green",
+        ResourceOp.UPDATE.name: "yellow",
+        ResourceOp.DELETE.name: "red",
+        ResourceOp.REPLACE.name: "magenta",
+        ResourceOp.READ.name: "blue",
+        ResourceOp.UNKNOWN.name: "white"
+    }
+
+    # Print summary with resource types
+    print(colored("Resource summary by operation:", "cyan", attrs=["bold"]))
+
+    # Group resources by operation and type
+    by_op_and_type = defaultdict(lambda: defaultdict(list))
+    for res in resources:
+        by_op_and_type[res.operation.name][res.resource_type].append(res)
+
+    # Print summary by operation and type
+    for op in sorted(by_op_and_type.keys()):
+        op_color = op_colors.get(op, "white")
+        type_count = len(by_op_and_type[op])
+        resource_count = sum(len(resources) for resources in by_op_and_type[op].values())
+
+        print(colored(f"{op}: ", op_color, attrs=["bold"]) +
+              f"{resource_count} resources of {type_count} types")
+
+        # Print resource types
+        for res_type, res_list in sorted(by_op_and_type[op].items()):
+            print(colored(f"  - {res_type}: ", op_color) + str(len(res_list)))
+
+    print(colored(f"Total filtered resources: {len(resources)}", "cyan", attrs=["bold"]))
+
+#
+# CLI and Main Functions
+#
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Display Pulumi preview outputs from CircleCI jobs"
+        description="Display Pulumi preview outputs from CircleCI jobs or local files"
     )
 
     # Add a hidden quiet flag
     parser.add_argument(
         "--quiet",
         action="store_true",
-        default=False,  # Default to non-quiet mode
-        help=argparse.SUPPRESS  # Hide from help output
+        default=False,
+        help=argparse.SUPPRESS
     )
     parser.add_argument(
-        "job_or_url",
-        help="CircleCI job ID or full URL"
+        "job_or_file",
+        help="CircleCI job ID, full URL, or local file path with Pulumi output"
     )
     parser.add_argument(
         "--verbose",
@@ -247,6 +901,11 @@ def parse_args():
         "--hide-env",
         action="store_true",
         help="Hide environment-related lines: \"Read option env\", \"Environment Flag\", and all resource read operations including their metadata"
+    )
+    parser.add_argument(
+        "--clean-output",
+        action="store_true",
+        help="Hide miscellaneous content that isn't recognized as resources, configs, or other structured data"
     )
     parser.add_argument(
         "--gh-org",
@@ -293,8 +952,6 @@ def parse_args():
         type=str
     )
 
-    # Resource name filtering is not supported - only ID-based filtering is available
-
     # Resource ID filtering
     parser.add_argument(
         "--include-id-pattern",
@@ -319,9 +976,26 @@ def parse_args():
         help="Show only the count of resources by operation type"
     )
 
-
     return parser.parse_args()
 
+def args_to_filter_args(args) -> FilterArgs:
+    """Convert argparse namespace to FilterArgs."""
+    return FilterArgs(
+        hide_config=getattr(args, 'hide_config', False),
+        hide_env=getattr(args, 'hide_env', False),
+        hide_grafana=getattr(args, 'hide_grafana', False),
+        clean_output=getattr(args, 'clean_output', False),
+        include_ops=getattr(args, 'include_ops', None),
+        exclude_ops=getattr(args, 'exclude_ops', None),
+        include_types=getattr(args, 'include_types', None),
+        exclude_types=getattr(args, 'exclude_types', None),
+        include_id_pattern=getattr(args, 'include_id_pattern', None),
+        exclude_id_pattern=getattr(args, 'exclude_id_pattern', None),
+        summary=getattr(args, 'summary', False),
+        count_only=getattr(args, 'count_only', False),
+        verbose=getattr(args, 'verbose', False),
+        quiet=getattr(args, 'quiet', False)
+    )
 
 def get_circleci_token(args):
     """Get CircleCI API token from argument or environment variable."""
@@ -332,11 +1006,9 @@ def get_circleci_token(args):
         sys.exit(1)
     return token
 
-
-def extract_job_id(job_or_url):
-    """Extract job ID from the input string."""
-    return job_or_url.split("/")[-1]
-
+def extract_job_id(job_or_file):
+    """Extract job ID from the input string (works with job ID, URL, or file path)."""
+    return job_or_file.split("/")[-1]
 
 def get_output_urls(job_id, token, org, repo):
     """Get output URLs from CircleCI API."""
@@ -359,14 +1031,12 @@ def get_output_urls(job_id, token, org, repo):
         print(colored(f"Error: Failed to get job info: {e}", "red"), file=sys.stderr)
         sys.exit(1)
 
-
 def redact_url(url):
-    """Redact sensitive tokens from URLs by cutting off everything after token= and replacing with <REDACTED_TOKEN>."""
+    """Redact sensitive tokens from URLs."""
     if "token=" in url:
         base_url = url.split("token=")[0] + "token="
         return base_url + "<REDACTED_TOKEN>"
     return url
-
 
 def fetch_and_save_output(url, output_file, verbose=False, quiet=False):
     """Fetch output from CircleCI and save it to a file."""
@@ -425,580 +1095,34 @@ def fetch_and_save_output(url, output_file, verbose=False, quiet=False):
         print(colored(f"Error: Invalid JSON response from {url}", "red"))
         return False
 
+def process_output_file(output_file, filter_args: FilterArgs):
+    """Process the output file - parse, filter, and display.
 
-def is_environment_line(line):
-    """
-    Check if a line is related to environment settings.
-
-    Args:
-        line: The line to check (should be stripped of ANSI codes)
-
-    Returns:
-        True if the line is environment-related, False otherwise
-    """
-    return "Environment Flag" in line or "Read option env" in line
-
-
-def parse_comma_separated_patterns(pattern_str):
-    """
-    Parse a comma-separated string of patterns.
-
-    Args:
-        pattern_str: Comma-separated string of patterns
-
-    Returns:
-        List of patterns, or empty list if pattern_str is None
-    """
-    if not pattern_str:
-        return []
-
-    return [p.strip() for p in pattern_str.split(',') if p.strip()]
-
-
-def matches_pattern(value, patterns):
-    """
-    Check if a value matches any of the given patterns.
-    Patterns can include wildcards (* and ?) as well as regex-style patterns.
-    Supports patterns like '.*validator.*' to match substrings anywhere in the value.
-
-    Args:
-        value: String to match against patterns
-        patterns: List of patterns that can include wildcards or regex patterns
-
-    Returns:
-        True if the value matches any pattern, False otherwise
-    """
-    if not value or not patterns:
-        return False
-
-    for pattern in patterns:
-        # For patterns containing .* use regex directly without escaping dots
-        # This allows patterns like '.*validator.*' to work as expected
-        if '.*' in pattern:
-            # For .*-containing patterns, compile the regex directly
-            try:
-                if re.search(pattern, value):
-                    return True
-            except re.error:
-                # If the pattern isn't valid regex, fall back to standard glob matching
-                regex_pattern = pattern.replace(".", "\\.").replace("*", ".*").replace("?", ".")
-                if re.match(f"^{regex_pattern}$", value):
-                    return True
-        else:
-            # Standard glob pattern conversion
-            regex_pattern = pattern.replace(".", "\\.").replace("*", ".*").replace("?", ".")
-            if re.match(f"^{regex_pattern}$", value):
-                return True
-
-    return False
-
-
-def resource_matches_filter(resource, filter_args):
-    """
-    Check if a resource matches the given filter arguments.
-
-    Args:
-        resource: Resource object to check
-        filter_args: Filter arguments from command line
-
-    Returns:
-        True if the resource should be included in output, False if it should be filtered out
-    """
-    # If no filter arguments provided, include everything
-    if filter_args is None:
-        return True
-
-    verbose = hasattr(filter_args, 'verbose') and filter_args.verbose
-
-    # Filter by operation type
-    if hasattr(filter_args, 'include_ops') and filter_args.include_ops:
-        op_types = parse_comma_separated_patterns(filter_args.include_ops)
-        if op_types and resource.operation.name.lower() not in [op.lower() for op in op_types]:
-            return False
-
-    if hasattr(filter_args, 'exclude_ops') and filter_args.exclude_ops:
-        op_types = parse_comma_separated_patterns(filter_args.exclude_ops)
-        if op_types and resource.operation.name.lower() in [op.lower() for op in op_types]:
-            return False
-
-    # Filter by resource type
-    if hasattr(filter_args, 'include_types') and filter_args.include_types:
-        type_patterns = parse_comma_separated_patterns(filter_args.include_types)
-        if type_patterns and not matches_pattern(resource.resource_type, type_patterns):
-            return False
-
-    if hasattr(filter_args, 'exclude_types') and filter_args.exclude_types:
-        type_patterns = parse_comma_separated_patterns(filter_args.exclude_types)
-        if type_patterns and matches_pattern(resource.resource_type, type_patterns):
-            return False
-
-    # Only ID-based filtering is supported
-
-    # Filter by ID pattern (checks metadata for id=value)
-    resource_id = None
-
-    if verbose:
-        print(colored(f"Checking resource: {resource.resource_type} ({resource.operation.name})", "blue"))
-
-    # First try to find the ID in metadata
-    for meta in resource.metadata:
-        if meta.key == "id":
-            resource_id = meta.value
-            if verbose:
-                print(colored(f"  Found ID in metadata: {resource_id}", "blue"))
-            break
-
-    if verbose and not resource_id:
-        print(colored("  No ID found for this resource", "yellow"))
-        # Print all metadata to help with debugging
-        print(colored("  Available metadata:", "blue"))
-        for meta in resource.metadata:
-            print(colored(f"    {meta.key}={meta.value}", "blue"))
-
-    # If ID-based filtering is requested, exclude resources without IDs
-    if hasattr(filter_args, 'include_id_pattern') and filter_args.include_id_pattern and not resource_id:
-        if verbose:
-            print(colored("  No ID found - excluding from ID filter results", "yellow"))
-        return False
-
-    if resource_id:
-        if hasattr(filter_args, 'include_id_pattern') and filter_args.include_id_pattern:
-            id_patterns = parse_comma_separated_patterns(filter_args.include_id_pattern)
-            if id_patterns and not matches_pattern(resource_id, id_patterns):
-                if verbose:
-                    print(colored(f"  ID '{resource_id}' doesn't match include patterns '{filter_args.include_id_pattern}'", "yellow"))
-                return False
-
-        if hasattr(filter_args, 'exclude_id_pattern') and filter_args.exclude_id_pattern:
-            id_patterns = parse_comma_separated_patterns(filter_args.exclude_id_pattern)
-            if id_patterns and matches_pattern(resource_id, id_patterns):
-                if verbose:
-                    print(colored(f"  ID '{resource_id}' matches exclude patterns '{filter_args.exclude_id_pattern}'", "yellow"))
-                return False
-
-    # If we reached here, the resource passes all filters
-    return True
-def pre_filter_line(line, hide_env=False):
-    """
-    Pre-filter a line based on simple pattern matching.
-    Only filters environment lines directly.
-    Resource filtering is now handled by the structured parsing logic.
-
-    Args:
-        line: The line to check
-        hide_env: If True, filter out lines containing "Read option env" or "Environment Flag"
-
-    Returns:
-        True if the line should be kept, False if it should be filtered out
-    """
-    # Handle empty lines with color codes by checking if strip removes all content
-    if not strip_ansi(line).strip():
-        return True  # Keep empty lines for now, they'll be handled later
-
-    # Check if it's an environment flag or read option line
-    if hide_env:
-        # Remove ANSI color codes for more reliable detection
-        stripped = strip_ansi(line)
-        # Only filter environment flag lines here
-        if is_environment_line(stripped):
-            return False
-
-    # Keep all other lines - resource filtering happens in the structured parsing
-    return True
-
-
-def clean_ansi_empty_line(line):
-    """
-    Check if a line is effectively empty after removing ANSI color codes.
-    Args:
-        line: The line to check
-    Returns:
-        True if the line is empty after removing color codes, False otherwise
-    """
-    # Remove ANSI color codes and check if anything remains
-    return not bool(strip_ansi(line).strip())
-
-
-def parse_resources(lines, verbose=False):
-    """
-    Parse all resources from the Pulumi output lines.
-
-    This completely rewritten function ensures proper resource boundaries detection
-    and tracks all lines associated with each resource.
-
-    Args:
-        lines: List of output lines
-        verbose: Whether to print verbose information
-
-    Returns:
-        List of Resource objects
-    """
-    resources = []
-    i = 0
-
-    # First pass - identify all resource headers
-    while i < len(lines):
-        line = lines[i]
-        stripped = strip_ansi(line).strip()
-
-        # Skip empty lines
-        if not stripped:
-            i += 1
-            continue
-
-        # Check for resource header
-        resource = parse_resource_header(stripped)
-        if resource:
-            if verbose:
-                print(colored(f"Found resource header: {resource.operation.name} on {resource.resource_type}", "blue"))
-
-            # Initialize the resource
-            resource.header_line = line
-            resource.header_line_idx = i
-            resource.all_lines = [i]  # Start with the header line
-            resources.append(resource)
-
-        i += 1
-
-    # Second pass - assign lines to resources
-    for idx, resource in enumerate(resources):
-        header_idx = resource.header_line_idx
-
-        # Determine where this resource ends (either at the next resource header or some heuristic)
-        end_idx = len(lines)
-        if idx < len(resources) - 1:
-            # End at the line before the next resource header
-            end_idx = resources[idx + 1].header_line_idx
-
-        # Now go through lines from header to end, collecting metadata and resource lines
-        i = header_idx + 1
-        while i < end_idx:
-            line = lines[i]
-            stripped = strip_ansi(line).strip()
-
-            # Skip empty lines but include them in the resource's all_lines
-            if not stripped:
-                resource.all_lines.append(i)
-                i += 1
-                continue
-
-            # Check if this is metadata
-            metadata_entry = parse_metadata_line(stripped)
-            if metadata_entry:
-                resource.metadata.append(metadata_entry)
-                resource.metadata_lines.append((i, line))
-                if verbose and metadata_entry.key == "id":
-                    print(colored(f"  Found ID: {metadata_entry.value}", "blue"))
-            else:
-                # This is content (version changes, property changes, etc.)
-                resource.content_lines.append((i, line))
-
-            # Add this line to the resource's tracked lines
-            resource.all_lines.append(i)
-            i += 1
-
-
-    return resources
-def parse_and_print_output(output_file, hide_config=False, hide_env=False,
-                          verbose=False, hide_grafana=False, filter_args=None,
-                          summary_only=False, count_only=False):
-    """Parse the saved output file and print it with formatting.
-
-    Args:
-        output_file: Path to the output file to parse
-        hide_config: If True, hide configuration blocks that start with 'Loaded'
-        hide_env: If True, hide lines related to environment and resource reads
-        verbose: If True, show additional diagnostic information
-        hide_grafana: If True, hide Grafana dashboard changes
-        filter_args: Arguments for filtering resources by type, operation, id, etc.
-        summary_only: If True, show only summary of changes
-        count_only: If True, show only count of resources by operation type
+    Works with both CircleCI job outputs saved to a file and directly provided local files.
     """
     try:
-        if verbose:
+        if filter_args.verbose:
             print(colored(f"Parsing output from {output_file}", "cyan"))
 
         with open(output_file, 'r') as f:
             content = f.read()
 
-        # Process and print the content
-        all_lines = content.split('\n')
+        # Process the content
+        lines = content.split('\n')
 
-        # First pass: filter out lines with only ANSI color codes and no actual content
-        filtered_lines = []
-        for line in all_lines:
-            if not clean_ansi_empty_line(line):
-                filtered_lines.append(line)
-        if verbose and len(filtered_lines) < len(all_lines):
-            print(colored(f"Filtered out {len(all_lines) - len(filtered_lines)} empty ANSI lines", "blue"))
+        # Parse content into structured data
+        parsed = parse_content_lines(lines)
 
-        all_lines = filtered_lines
+        # For debugging
+        if filter_args.verbose:
+            print(f"Found {len(parsed.resources)} resources")
+            for resource in parsed.resources:
+                print(f"  Resource: {resource.resource_type} ({resource.operation.name})")
 
-        # Parse resources structurally
-        resources = parse_resources(all_lines, verbose)
-        if verbose:
-            print(colored(f"Found {len(resources)} resources in the output", "blue"))
+        # Don't modify the resources array here - filtering is handled in display function
 
-        # Process resources based on filters
-        # Track resources by operation for summary
-        resources_by_op = defaultdict(int)
-        filtered_resources = []
-
-        # Create a set of line indices to hide
-        lines_to_hide = set()
-
-        for resource in resources:
-            # Count by operation for summary
-            resources_by_op[resource.operation.name] += 1
-
-            # Check if this resource should be filtered out based on the filter arguments
-            should_be_hidden = filter_args and not resource.should_display(filter_args)
-
-            if should_be_hidden:
-                # Add ALL lines belonging to this resource to the hide set
-                for line_idx in resource.all_lines:
-                    lines_to_hide.add(line_idx)
-            else:
-                filtered_resources.append(resource)
-
-        # Handle summary or count only modes
-        if summary_only or count_only:
-            op_colors = {
-                ResourceOp.CREATE.name: "green",
-                ResourceOp.UPDATE.name: "yellow",
-                ResourceOp.DELETE.name: "red",
-                ResourceOp.REPLACE.name: "magenta",
-                ResourceOp.READ.name: "blue",
-                ResourceOp.UNKNOWN.name: "white"
-            }
-
-            if count_only:
-                # Just print the counts by operation
-                print(colored("Resource count by operation:", "cyan", attrs=["bold"]))
-                for op, count in sorted(resources_by_op.items()):
-                    color = op_colors.get(op, "white")
-                    print(colored(f"{op}: ", color) + str(count))
-
-                total = sum(resources_by_op.values())
-                print(colored(f"Total: {total}", "cyan", attrs=["bold"]))
-                return
-
-            if summary_only:
-                # Print summary with resource types
-                print(colored("Resource summary by operation:", "cyan", attrs=["bold"]))
-
-                # Group resources by operation and type
-                by_op_and_type = defaultdict(lambda: defaultdict(list))
-                for res in filtered_resources:
-                    by_op_and_type[res.operation.name][res.resource_type].append(res)
-
-                # Print summary by operation and type
-                for op in sorted(by_op_and_type.keys()):
-                    op_color = op_colors.get(op, "white")
-                    type_count = len(by_op_and_type[op])
-                    resource_count = sum(len(resources) for resources in by_op_and_type[op].values())
-
-                    print(colored(f"{op}: ", op_color, attrs=["bold"]) +
-                          f"{resource_count} resources of {type_count} types")
-
-                    # Print resource types
-                    for res_type, res_list in sorted(by_op_and_type[op].items()):
-                        print(colored(f"  - {res_type}: ", op_color) + str(len(res_list)))
-
-                print(colored(f"Total filtered resources: {len(filtered_resources)}", "cyan", attrs=["bold"]))
-                return
-
-
-
-        # Second pass: pre-filter environment lines directly
-        # Resource lines will be filtered based on the lines_to_hide set
-        filtered_lines = []
-        for i, line in enumerate(all_lines):
-            if i in lines_to_hide:
-                continue  # Skip lines that should be hidden
-
-            if pre_filter_line(line, hide_env):
-                filtered_lines.append(line)
-
-        if verbose and len(filtered_lines) < len(all_lines):
-            print(colored(f"Filtered out {len(all_lines) - len(filtered_lines)} lines", "blue"))
-
-        lines = filtered_lines
-
-        # State variables for tracking config blocks and sections
-        in_config_block = False
-        in_grafana_block = False  # Track if we're in a grafana change block
-        brace_count = 0
-        reached_resources = False
-        last_line_was_hidden = False  # Track any hidden line, not just hideed configs
-        grafana_indent_level = 0  # Track the base indentation level of the grafana block
-
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-
-            # Skip empty lines after any hidden content to avoid excessive spacing
-            if last_line_was_hidden and not line.strip():
-                last_line_was_hidden = True  # Keep the hidden state for consecutive empty lines
-                i += 1
-                continue
-
-            # Reset hidden line tracker by default
-            last_line_was_hidden = False
-
-            # Check if we've reached the Resources section which is the end of a Pulumi command
-            # Strip ANSI escape codes before checking for Resources text
-            stripped_content = strip_ansi(line).strip()
-            if stripped_content == "Resources:" or stripped_content.startswith("Resources:"):
-                reached_resources = True
-                in_grafana_block = False  # Exit grafana block if we were in one
-                print(line)  # Print the Resources line with original formatting
-                i += 1
-                continue
-            # Check for grafana ConfigMaps if hide_grafana is enabled
-            if hide_grafana and not in_grafana_block and "kubernetes:core/v1:ConfigMap:" in line.strip():
-                # Look ahead to see if the next line contains a grafana ID
-                next_line_idx = i + 1
-                found_grafana = False
-                metadata_end_idx = next_line_idx
-
-                # Look through the next few lines for grafana identifiers
-                for j in range(next_line_idx, min(next_line_idx + 10, len(lines))):
-                    stripped_j = strip_ansi(lines[j])
-                    if not stripped_j.strip():
-                        continue
-                    if "observability/cn-grafana" in stripped_j or "grafana-dashboards" in stripped_j or "grafana-alerting" in stripped_j:
-                        found_grafana = True
-                        metadata_end_idx = j
-                    # If we find a line that starts a new resource, stop looking
-                    if (stripped_j.strip().startswith("+") or stripped_j.strip().startswith("~") or
-                        stripped_j.strip().startswith("-")) and ":" in stripped_j and not "data:" in stripped_j:
-                        break
-
-                if found_grafana:
-                    # This is a grafana dashboard change, skip until we find a non-grafana change
-                    in_grafana_block = True
-
-                    # Calculate the indentation level to know when we exit this resource block
-                    # Use the main resource line's indentation, not the metadata lines
-                    stripped_line = strip_ansi(line)
-                    indent_match = re.match(r'^(\s*)', stripped_line)
-                    if indent_match:
-                        grafana_indent_level = len(indent_match.group(1))
-                    else:
-                        grafana_indent_level = 0
-
-                    # Look ahead for data block to handle the case where it's indented differently
-                    for j in range(metadata_end_idx + 1, min(metadata_end_idx + 5, len(lines))):
-                        stripped_j = strip_ansi(lines[j])
-                        if "data:" in stripped_j:
-                            # Use the indentation of the parent element for tracking
-                            data_indent_match = re.match(r'^(\s*)', stripped_j)
-                            if data_indent_match:
-                                grafana_indent_level = len(data_indent_match.group(1)) - 2  # Adjust to parent level
-                                break
-
-                    if verbose:
-                        print(colored(f"Skipping grafana dashboard change, base indent level: {grafana_indent_level}", "blue"))
-
-                    last_line_was_hidden = True
-                    i += 1
-                    continue
-
-            # If we're in a grafana block, skip all content until we find a new resource at the same or higher level
-            if hide_grafana and in_grafana_block:
-                # Check the indentation of this line to see if we've exited the grafana block
-                stripped_line = strip_ansi(line)
-                indent_match = re.match(r'^(\s*)', stripped_line)
-                current_indent = len(indent_match.group(1)) if indent_match else 0
-
-                # Exit conditions for grafana block:
-                # 1. We hit the Resources section
-                # 2. We've returned to the same or higher level of indentation with a new resource marker (+ or ~ or -)
-                stripped_content = strip_ansi(line).strip()
-                if stripped_content == "Resources:" or stripped_content.startswith("Resources:"):
-                    in_grafana_block = False  # Exit grafana block
-                elif (current_indent <= grafana_indent_level and
-                     (stripped_content.startswith("+") or stripped_content.startswith("~") or stripped_content.startswith("-")) and
-                     ((":" in stripped_content and "(" in stripped_content and ")" in stripped_content))):
-
-                    # Check if this new resource is also a grafana dashboard that should be ignored
-                    # If it is, don't exit the block - we'll process it in the next iteration
-                    is_another_grafana = False
-
-                    # Check if this is a ConfigMap replacement that might be a grafana dashboard
-                    if "kubernetes:core/v1:ConfigMap:" in stripped_content:
-                        # Look ahead to check if it has grafana identifiers
-                        next_line_idx = i + 1
-                        while next_line_idx < len(lines) and not lines[next_line_idx].strip():
-                            next_line_idx += 1
-
-                        # Check the next few non-empty lines for grafana identifiers
-                        for j in range(next_line_idx, min(next_line_idx + 5, len(lines))):
-                            if j < len(lines):
-                                stripped_j = strip_ansi(lines[j])
-                                if stripped_j.strip():
-                                    if "observability/cn-grafana" in stripped_j or "grafana-dashboards" in stripped_j:
-                                        is_another_grafana = True
-                                        if verbose:
-                                            print(colored("Found another grafana dashboard, continuing to skip", "blue"))
-                                        break
-
-                    # Only exit grafana block if this is NOT another grafana dashboard
-                    if not is_another_grafana:
-                        in_grafana_block = False
-                        if verbose:
-                            print(colored(f"Found new resource at indent level {current_indent}, exiting grafana block", "blue"))
-
-                # If still in grafana block, skip this line
-                if in_grafana_block:
-                    last_line_was_hidden = True
-                    i += 1
-                    continue
-
-            # Check for configuration sections if hiding is enabled
-            stripped_line = strip_ansi(line)
-            if hide_config and "Loaded" in stripped_line and "{" in stripped_line.split("Loaded", 1)[1]:
-                # Extract the prefix of what's being loaded for a more informative message
-                loaded_text = stripped_line.split("Loaded", 1)[1].split("{", 1)[0].strip()
-                print(colored(f"Loaded {loaded_text} REDACTED", "blue"))
-                in_config_block = True
-                brace_count = stripped_line.count('{') - stripped_line.count('}')
-                last_line_was_hidden = True
-                i += 1
-                continue
-
-            # Count braces if we're in a config block that needs hiding
-            if hide_config and in_config_block:
-                stripped_line = strip_ansi(line)
-                brace_count += stripped_line.count('{') - stripped_line.count('}')
-                if brace_count <= 0:
-                    in_config_block = False
-                last_line_was_hidden = True
-                i += 1
-                continue
-
-            # Print line with original coloring
-            stripped = strip_ansi(line).strip()
-            if stripped:  # Only print non-empty lines
-                # Check if this is a resource header and apply nice formatting if desired
-                resource_header = parse_resource_header(stripped)
-                if resource_header:
-                    # Just print the original line with its coloring
-                    print(line)
-                else:
-                    # Print regular line or metadata
-                    print(line)
-            elif not last_line_was_hidden:  # Print empty lines only if not following hidden content
-                print(line)
-
-            # Stop after Resources section if we see a line with repeated "="
-            if reached_resources and "=" * 10 in line:
-                if verbose:
-                    print(colored("Found end of resources section, stopping output", "cyan"))
-                break
-
-            i += 1
+        # Display the filtered content
+        display_parsed_content(parsed, filter_args)
 
         return True
 
@@ -1007,20 +1131,31 @@ def parse_and_print_output(output_file, hide_config=False, hide_env=False,
         return False
     except Exception as e:
         print(colored(f"Error parsing output file: {e}", "red"))
+        import traceback
+        traceback.print_exc()
         return False
 
-
 def main():
+    """Main entry point."""
     args = parse_args()
 
     # Check if help was requested - handle differently
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
         return
 
-    token = get_circleci_token(args)
-    job_id = extract_job_id(args.job_or_url)
-    output_file = args.output_file
+    # Create filter args object
+    filter_args = args_to_filter_args(args)
 
+    # Check if input is a file path
+    if os.path.isfile(args.job_or_file):
+        print(f"Processing local file {args.job_or_file} directly...")
+        process_output_file(args.job_or_file, filter_args)
+        return
+
+    # Otherwise, treat as a CircleCI job ID or URL
+    token = get_circleci_token(args)
+    job_id = extract_job_id(args.job_or_file)
+    output_file = args.output_file
     if not args.quiet:
         print(colored(f"Fetching preview for CircleCI job {job_id}...", "cyan"))
 
@@ -1055,22 +1190,15 @@ def main():
         print(colored("Now displaying parsed output:", "cyan"))
         print(colored("=" * 80, "blue"))
 
-    # Parse and display the output
-    parse_and_print_output(
-        output_file,
-        hide_config=args.hide_config,
-        hide_env=args.hide_env,
-        verbose=args.verbose,
-        hide_grafana=args.hide_grafana,
-        filter_args=args,
-        summary_only=args.summary,
-        count_only=args.count_only
-    )
+    # Convert args to FilterArgs
+    filter_args = args_to_filter_args(args)
+
+    # Process and display the output
+    process_output_file(output_file, filter_args)
 
     if not args.quiet:
         print(colored("=" * 80, "blue"))
         print(colored(f"Finished processing. Raw output saved to {output_file}", "cyan"))
-
 
 if __name__ == "__main__":
     try:
