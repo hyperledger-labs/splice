@@ -16,7 +16,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
+              expr: quantile($WASTED_TRAFFIC_ALERT_QUANTILE, increase(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -30,22 +30,22 @@ groups:
             datasourceUid: __expr__
             model:
               conditions:
-                - evaluator:
-                    params:
-                      - $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - C
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
+                  - evaluator:
+                      params:
+                          - $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params:
+                          - C
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
               datasource:
-                type: __expr__
-                uid: __expr__
+                  type: __expr__
+                  uid: __expr__
               expression: wasted_traffic
               intervalMs: 1000
               maxDataPoints: 43200
@@ -59,9 +59,9 @@ groups:
         annotations:
           __dashboardUid__: fdnphvrryfq4gf
           __panelId__: "6"
-          description: The rate of traffic wasted by member {{ $labels.member }} exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm
+          description: The $WASTED_TRAFFIC_ALERT_QUANTILE quantile of of traffic wasted across members exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm
           severity: critical
-          summary: Traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm)
+          summary: $WASTED_TRAFFIC_ALERT_QUANTILE quantile of traffic wasted across members exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm)
         labels: {}
         isPaused: false
       - uid: 5dcddc9a5487

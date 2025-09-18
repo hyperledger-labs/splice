@@ -82,6 +82,8 @@ Example URLs for accessing the Scan Bulk Data API are:
 
 Please note the `api/scan` prefix in the URLs, which is the base path for the Scan API.
 
+.. _updates_section:
+
 Updates
 ~~~~~~~
 
@@ -151,6 +153,8 @@ start with migration ID 0 and keep incrementing it by one
 until you find the lowest migration id that includes a higher record time than the one you specified in `after_record_time`.
 
 After getting the first page of updates, use the ``after`` field as described in the above section to fetch subsequent pages.
+
+.. _update_response_section:
 
 Reading the response
 """"""""""""""""""""
@@ -367,6 +371,42 @@ In general, processing the updates involves the following steps:
   - Keep track of governance decisions
 
 * And ensure that parsing does not break when new fields or templates are introduced.
+
+Events
+~~~~~~
+
+While Updates encapsulate all of the information required to determine the state of the network, the Scan App also exposes the history of consensus data flowing through the SV node mediator:
+
+* A **verdict** is the result tabulated by the SV node mediator which confirms the validity of the private portions of the transactions the node processes.
+* An **event** combines updates and verdicts. If a transaction is private, only the verdict information may be available. If it is partially private, the public portion will be included, possibly with the private portion's verdict. Reassignments do not have associated verdicts.
+
+.. note:: Verdict data is ephemeral and routinely pruned within the mediator. The Scan App will save this historical data, but cannot reproduce anything that has already been pruned. This data is not essential for computing the current state of the network or any active contract state.
+
+`/v0/events <scan_openapi.html#post--v0-events>`_
+provides a JSON encoded version of the recorded event history. As with :ref:`Updates <updates_section>`, once you have an ``update_id`` for a specific event, you can retrieve the details by using
+`/v0/events/\{update_id\} <scan_openapi.html#get--v0-events-update_id>`_.
+
+Requesting all events, as well as requesting updates from an arbitrary record time, work the same way as with the :ref:`update api <v2_updates>`.
+
+Reading the event response
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The response returns a list of objects, each of which may include an ``update`` field and a ``verdict`` field. At least one of these fields will be present. The contents of the ``update`` field follow the format of :ref:`update response objects <update_response_section>`. The contents of the ``verdict`` field is an object containing the following fields:
+
+* **update_id** : This is the same as the ``update_id`` field of an update. If both an update and verdict are returned, they will agree.
+* **migration_id** : This is the same as the ``migration_id`` field of an update. If both an update and verdict are returned, they will agree.
+* **domain_id** : The synchronization domain that processed the transaction. If both an update and verdict are returned, this will agree with the update's ``synchronizer_id`` field.
+* **record_time**: The time at which the update the verdict pertains to was sequenced. If both an update and verdict are returned, they will agree.
+* **finalization_time**: The time at which the mediator finished gathering all the confirmations required to compute its verdict.
+* **submitting_parties**: The parties on whose behalf the transaction was submitted.
+* **verdict_result**: The final result computed by the mediator, whether the result was unspecified, accepted, or rejected.
+* **mediator_group**: An opaque ID for the group of mediators which validated this transaction, including the one on the SV node.
+* **transaction_views**: An array of objects which detail the (private) transaction views that needed to be confirmed by the mediator. Each transaction view contains:
+
+   * **view_id**: An opaque ID identifying the view across involved mediators
+   * **informees**: The parties informed of the contents of the transaction view
+   * **confirming_parties**: The parties responsible for confirming the validity of the transaction view, along with their quorum threshold.
+   * **sub_views**: Other views that the current one depends on, referred to by their ``view_id`` fields.
 
 ACS Snapshots
 ~~~~~~~~~~~~~

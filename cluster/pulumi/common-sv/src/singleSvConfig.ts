@@ -21,6 +21,7 @@ const EnvVarConfigSchema = z.object({
 const SvSequencerConfigSchema = z
   .object({
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
   })
   .strict();
 const SvParticipantConfigSchema = z
@@ -28,6 +29,7 @@ const SvParticipantConfigSchema = z
     kms: KmsConfigSchema.optional(),
     bftSequencerConnection: z.boolean().optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
   })
   .strict();
 const Auth0ConfigSchema = z
@@ -45,6 +47,7 @@ const SvAppConfigSchema = z
       })
       .optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),
   })
   .strict();
@@ -57,12 +60,14 @@ const ScanAppConfigSchema = z
       })
       .optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
   })
   .strict();
 const ValidatorAppConfigSchema = z
   .object({
     walletUser: z.string().optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),
   })
   .strict();
