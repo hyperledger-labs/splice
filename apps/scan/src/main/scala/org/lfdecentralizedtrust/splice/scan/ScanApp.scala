@@ -188,6 +188,7 @@ class ScanApp(
       acsSnapshotStore = AcsSnapshotStore(
         storage,
         store.updateHistory,
+        dsoParty,
         migrationInfo.currentMigrationId,
         loggerFactory,
       )
