@@ -144,6 +144,8 @@ interface TransferOfferProps {
 // but not to f+1 Scans (which are required to get the accept/reject context from).
 // Or overall other transient errors.
 // Ultimately, it should go through so as long as it's visible to the validator.
+// Our default retry waiting time is `1s * 1.5^attempt`, which sums up to ~13s over 5 attempts.
+// Longer timeouts are not recommended as the user might give up and reload the page to try again manually.
 const TRANSFER_OFFER_ACTION_RETRIES_COUNT = 5;
 
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
