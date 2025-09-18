@@ -24,7 +24,6 @@ import definitions.UpdateHistoryReassignment.Event.members.{
 import scala.concurrent.duration.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.metrics.MetricValue
 
 class ScanEventHistoryIntegrationTest
@@ -112,31 +111,8 @@ class ScanEventHistoryIntegrationTest
 
     withProtobufEncoding.size shouldBe smallerLimit
 
-    val txIdsCompact = withCompactEncoding
-      .collect {
-        case item
-            if item.update.exists { case UpdateHistoryTransactionV2(_) => true; case _ => false } =>
-          item
-      }
-      .flatMap(_.update)
-      .collect {
-        case UpdateHistoryTransactionV2(tx) => tx.updateId
-        case UpdateHistoryReassignment(r) => r.updateId
-      }
-      .toSet
-
-    val txIdsProtobuf = withProtobufEncoding
-      .collect {
-        case item
-            if item.update.exists { case UpdateHistoryTransactionV2(_) => true; case _ => false } =>
-          item
-      }
-      .flatMap(_.update)
-      .collect {
-        case UpdateHistoryTransactionV2(tx) => tx.updateId
-        case UpdateHistoryReassignment(r) => r.updateId
-      }
-      .toSet
+    val txIdsCompact = extractTxUpdateIds(withCompactEncoding).toSet
+    val txIdsProtobuf = extractTxUpdateIds(withProtobufEncoding).toSet
 
     withClue("Mismatch between CompactJson and ProtobufJson update ids") {
       txIdsProtobuf shouldBe txIdsCompact
@@ -301,22 +277,9 @@ class ScanEventHistoryIntegrationTest
     // Ensure those initial taps are present with verdicts after the baseline cursor
     eventually() {
       val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
-      val ids = eventHistory
-        .collect {
-          case item if item.update.exists {
-                case UpdateHistoryTransactionV2(_) => true; case _ => false
-              } =>
-            item
-        }
-        .flatMap(_.update)
-        .collect {
-          case UpdateHistoryTransactionV2(tx) => tx.updateId
-          case UpdateHistoryReassignment(r) => r.updateId
-        }
+      val ids = extractTxUpdateIds(eventHistory)
       expectedFirstUpdateIds.toSet.subsetOf(ids.toSet) shouldBe true
     }
-
-    val cursorBeforeRestart = eventuallySucceeds() { lastCursor() }
 
     // Stop scan to pause ingestion, wait until fully stopped
     sv1ScanBackend.stop()
@@ -344,39 +307,24 @@ class ScanEventHistoryIntegrationTest
       newSinceTop.take(4).map(e => EventId.updateIdFromEventId(e.eventId))
     }
 
-    // Wait for scan backend to begin doing ingestion
-    eventually() {
-      val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeRestart))
-      eh should not be empty
-    }
-
-    // Wait some more to ensure we have synced both stores
-    Threading.sleep(1000)
-
     // Verify events contain all updateIds, no duplicates, and verdicts are present for each update
-    val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
-    val txItems = eventHistory.collect {
-      case item if item.update.exists {
-            case UpdateHistoryTransactionV2(_) => true; case _ => false
-          } =>
-        item
-    }
-    val ids = txItems.flatMap(_.update).collect {
-      case UpdateHistoryTransactionV2(tx) => tx.updateId
-      case UpdateHistoryReassignment(r) => r.updateId
-    }
-    val expectedSet = expectedUpdateIds.toSet
-    val presentSet = ids.toSet
-    val missing = expectedSet.diff(presentSet)
+    val eventHistoryAfter = eventuallySucceeds() {
+      val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTaps))
+      val ids = extractTxUpdateIds(eh)
+      val expectedSet = expectedUpdateIds.toSet
+      val presentSet = ids.toSet
+      val missing = expectedSet.diff(presentSet)
 
-    withClue(s"Missing expected updateIds: ${missing
-        .mkString(",")} | expected=${expectedSet.size}, present=${presentSet.size}") {
-
-      missing shouldBe empty
+      silentClue(s"Missing expected updateIds: ${missing
+          .mkString(",")} | expected=${expectedSet.size}, present=${presentSet.size}") {
+        missing shouldBe empty
+      }
+      eh
     }
 
+    val finalIds = extractTxUpdateIds(eventHistoryAfter)
     withClue("ids should not have duplicates") {
-      ids.distinct.size shouldBe ids.size
+      finalIds.distinct.size shouldBe finalIds.size
     }
   }
 
@@ -412,6 +360,20 @@ class ScanEventHistoryIntegrationTest
     }
 
     eventHistory
+  }
+
+  // Extract all transaction updateIds from the history
+  private def extractTxUpdateIds(eventHistory: Seq[EventHistoryItem]): Seq[String] = {
+    val txItems = eventHistory.collect {
+      case item if item.update.exists {
+            case UpdateHistoryTransactionV2(_) => true; case _ => false
+          } =>
+        item
+    }
+    txItems.flatMap(_.update).collect {
+      case UpdateHistoryTransactionV2(tx) => tx.updateId
+      case UpdateHistoryReassignment(r) => r.updateId
+    }
   }
 
   // Obtain last (migrationId, recordTime) provided by the event stream
