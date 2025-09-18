@@ -42,6 +42,9 @@ pulumi-clean: cluster/pulumi/clean
 .PHONY: pulumi-build
 pulumi-build: cluster/pulumi/build
 
+.PHONY: pulumi-format
+pulumi-format: cluster/pulumi/format
+
 .PHONY: clean
 clean: cluster/clean
 	rm -rf apps/app/target/release
