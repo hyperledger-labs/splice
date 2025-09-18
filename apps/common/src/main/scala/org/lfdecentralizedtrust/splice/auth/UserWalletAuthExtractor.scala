@@ -3,14 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
-import com.daml.ledger.javaapi.data.User
 import org.apache.pekko.http.scaladsl.server.Directive1
 import org.apache.pekko.http.scaladsl.server.Directives.{onComplete, provide}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.Optional
 import scala.util.Success
 
 final case class Response(user: String)
@@ -20,16 +18,15 @@ final case class Response(user: String)
   * **Authorization**: user must be active, have actAs rights for the given admin party,
   *                    and have ParticipantAdmin rights
   */
-object AdminAuthExtractor {
+object UserWalletAuthExtractor {
   final case class AdminUserRequest(traceContext: TraceContext)
 
   def apply(
       verifier: SignatureVerifier,
       adminParty: PartyId,
-      rightsProvider: UserRightsProvider,
       loggerFactory: NamedLoggerFactory,
       realm: String,
-  )(implicit traceContext: TraceContext): String => Directive1[AdminUserRequest] = {
+  )(implicit traceContext: TraceContext): String => Directive1[AdminAuthExtractor.User] = {
     new AdminAuthExtractor(
       verifier,
       adminParty,
@@ -54,13 +51,15 @@ final class AdminAuthExtractor(
 ) extends AuthExtractor(verifier, loggerFactory, realm)(traceContext) {
 
   private def isAuthorizedAsAdmin(
-      user: User,
-      rights: Set[User.Right],
+      user: UserRightsProvider.User,
+      rights: Seq[UserRightsProvider.UserRight],
   ): Boolean = {
     !user.isDeactivated &&
-    hasPrimaryParty(user, adminParty) &&
-    canActAs(rights, adminParty) &&
-    isParticipantAdmin(rights)
+    user.primaryParty.contains(adminParty) &&
+    rights.exists { case UserRightsProvider.UserRight.CanActAs(`adminParty`) =>
+      true
+    } &&
+    rights.contains(UserRightsProvider.UserRight.ParticipantAdmin)
   }
 
   def directiveForOperationId(
