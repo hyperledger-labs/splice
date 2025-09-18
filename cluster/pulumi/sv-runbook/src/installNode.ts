@@ -296,6 +296,7 @@ async function installSvAndValidator(
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
+    // TODO(tech-debt): it's a bit confusing: we *only* approve from approved-sv-identities files here (so no "local" SV overrides)
     approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),

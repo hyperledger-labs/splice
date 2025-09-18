@@ -1235,7 +1235,7 @@
             },
             "approvedSvIdentities": {
               "type": "md5",
-              "value": "7dc4e6604e5b8d704a0ad2994ac501ff"
+              "value": "5871224b744b45122540483fddbd550f"
             }
           },
           "network": "test",
@@ -1649,7 +1649,7 @@
           {
             "name": "Digital-Asset-1",
             "publicKey": "svda1-id-public-key",
-            "rewardWeightBps": 10000
+            "rewardWeightBps": 150000
           }
         ],
         "auth": {
@@ -2076,7 +2076,7 @@
             },
             "approvedSvIdentities": {
               "type": "md5",
-              "value": "7dc4e6604e5b8d704a0ad2994ac501ff"
+              "value": "5871224b744b45122540483fddbd550f"
             }
           },
           "network": "test",
@@ -2490,7 +2490,7 @@
           {
             "name": "Digital-Asset-1",
             "publicKey": "svda1-id-public-key",
-            "rewardWeightBps": 10000
+            "rewardWeightBps": 150000
           }
         ],
         "auth": {
