@@ -6,16 +6,15 @@ package com.digitalasset.canton.integration
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.{CantonConfig, ConsoleCommandTimeout}
+import com.digitalasset.canton.config.ConsoleCommandTimeout
 import com.digitalasset.canton.console.ParticipantReference
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.trailingnone.TrailingNone
 import com.digitalasset.canton.topology.PartyId
 
 /** Adds the ability to create TrailingNone instances to integration tests.
   */
 trait HasTrailingNoneUtils {
-  this: BaseIntegrationTest[CantonConfig, CantonEnvironment] =>
+  this: BaseIntegrationTest =>
 
   def createTrailingNoneContract(
       participant: ParticipantReference,
