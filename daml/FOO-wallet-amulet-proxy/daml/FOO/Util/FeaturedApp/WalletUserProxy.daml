@@ -11,10 +11,12 @@
 -- Note: use the `DelegateProxy` if you are building an app that uses multiple parties
 -- for its own operations.
 --
-module Splice.Util.FeaturedApp.WalletUserProxy where
+module FOO.Util.FeaturedApp.WalletUserProxy where
 
 
 import DA.Foldable (forA_)
+
+import Splice.Wallet.TransferPreapproval
 
 import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationV1
@@ -117,9 +119,36 @@ template WalletUserProxy with
           allocation <- fetch cid
           pure (view allocation).allocation.transferLeg.sender
 
+    nonconsuming choice WalletUserProxy_Create_TransferPreapprovalProposal
+      : ProxyResult (ContractId TransferPreapprovalProposal)
+      with
+        proxyArg : ProxyArg TransferPreapprovalProposal
+      controller proxyArg.user
+      do
+        require "provider matches" (proxyArg.choiceArg.provider == provider)
+        exerciseProxyCreate this proxyArg (.receiver)
+
 
 -- Utilities
 -------------
+
+-- | Shared code to execute the proxied create.
+exerciseProxyCreate
+  : forall t. (Template t, HasCreate t) => WalletUserProxy -> ProxyArg t -> (t -> Party) -> Update (ProxyResult (ContractId t))
+exerciseProxyCreate proxy proxyArg getExpectedUser = do
+  let ProxyArg{..} = proxyArg
+  appRight <- fetch featuredAppRightCid
+  -- validate the user and provider
+  require "User matches expected user" (getExpectedUser proxyArg.choiceArg == user)
+  forA_ proxy.optAllowList $ \allowList ->
+    require "User is in the allow list" (user `elem` allowList)
+  require "App right matches expected provider" ((view appRight).provider == proxy.provider)
+  -- create marker
+  markerResult <- exercise featuredAppRightCid FeaturedAppRight_CreateActivityMarker with
+    beneficiaries = proxyBeneficiaries proxy user
+  -- exercise proxied create
+  cid <- create proxyArg.choiceArg
+  pure ProxyResult with markerResult; choiceResult = cid
 
 -- | Shared code to execute the proxied choice.
 exerciseProxyChoice

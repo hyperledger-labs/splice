@@ -47,7 +47,7 @@ Featured App Activity Markers API (CIP-0047)
    .. toctree::
       :maxdepth: 1
 
-      ../api/splice-util-featured-app-proxies/index
+      ../api/FOO-wallet-amulet-proxy/index
 
 
 Additional Splice Daml APIs

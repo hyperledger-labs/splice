@@ -101,8 +101,8 @@ lazy val root: Project = (project in file("."))
     `splice-wallet-payments-daml`,
     `splice-wallet-daml`,
     `splice-wallet-test-daml`,
-    `splice-util-featured-app-proxies-daml`,
-    `splice-util-featured-app-proxies-test-daml`,
+    `FOO-wallet-amulet-proxy-daml`,
+    `FOO-wallet-amulet-proxy-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -227,7 +227,7 @@ lazy val docs = project
           (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
-          (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value ++
+          (`FOO-wallet-amulet-proxy-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -743,9 +743,9 @@ lazy val `splice-wallet-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `splice-util-featured-app-proxies-daml` =
+lazy val `FOO-wallet-amulet-proxy-daml` =
   project
-    .in(file("daml/splice-util-featured-app-proxies"))
+    .in(file("daml/FOO-wallet-amulet-proxy"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -757,15 +757,15 @@ lazy val `splice-util-featured-app-proxies-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `splice-util-featured-app-proxies-test-daml` =
+lazy val `FOO-wallet-amulet-proxy-test-daml` =
   project
-    .in(file("daml/splice-util-featured-app-proxies-test"))
+    .in(file("daml/FOO-wallet-amulet-proxy-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
-          (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
+          (`FOO-wallet-amulet-proxy-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
     .dependsOn(`canton-bindings-java`)

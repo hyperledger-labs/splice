@@ -2,13 +2,13 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Unit tests for the WalletUserProxy module.
-module Splice.Util.FeaturedApp.UnitTests.WalletUserProxy where
+module FOO.Util.FeaturedApp.UnitTests.WalletUserProxy where
 
 import DA.Assert ((===))
 import DA.Optional
 
 import Splice.Api.FeaturedAppRightV1
-import Splice.Util.FeaturedApp.WalletUserProxy
+import FOO.Util.FeaturedApp.WalletUserProxy
 
 import Daml.Script
 

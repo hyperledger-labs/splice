@@ -3,7 +3,7 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-splice-util-featured-app-proxies docs
+FOO-wallet-amulet-proxy docs
 =====================================
 
 .. toctree::
