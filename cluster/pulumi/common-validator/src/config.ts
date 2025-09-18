@@ -5,7 +5,7 @@ import {
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
-import { clusterSubConfig } from 'splice-pulumi-common/src/config/configLoader';
+import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const ValidatorNodeConfigSchema = z.object({
@@ -28,6 +28,9 @@ export const ValidatorConfigSchema = z
   .object({
     namespace: z.string(),
     partyHint: z.string(),
+    nodeIdentifier: z.string().optional(),
+    // Default to admin@validator.com at the validator-test tenant by default
+    operatorWalletUserId: z.string().default('auth0|6526fab5214c99a9a8e1e3cc'),
     migrateParty: z.boolean().default(false),
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),

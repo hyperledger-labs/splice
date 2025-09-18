@@ -651,7 +651,7 @@ class SV1Initializer(
                   sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
                   sv1Config.initialPackageConfig.toPackageConfig,
                   sv1Config.initialHoldingFee,
-                  sv1Config.initialCreateFee,
+                  sv1Config.zeroTransferFees,
                   sv1Config.initialTransferPreapprovalFee,
                   sv1Config.initialFeaturedAppActivityMarkerAmount,
                 )

@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
+  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
@@ -47,6 +48,11 @@ class TokenStandardTransferIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAllSvAppFoundDsoConfigs_(
+          _.copy(zeroTransferFees = true)
         )(config)
       )
   }
@@ -150,6 +156,19 @@ class TokenStandardTransferIntegrationTest
         }
       }
 
+      // Thanks for zero fees we can check the exact balances w/o complex fee calculations.
+      clue("Check the exact balances of alice ") {
+        val balances = aliceWalletClient.balance()
+        balances.unlockedQty shouldBe BigDecimal(19980.0)
+        balances.lockedQty shouldBe BigDecimal(10.0)
+      }
+
+      clue("Check the exact balances of bob ") {
+        val balances = bobWalletClient.balance()
+        balances.unlockedQty shouldBe BigDecimal(10.0)
+        balances.lockedQty shouldBe BigDecimal(0.0)
+      }
+
       checkTxHistory(
         aliceWalletClient,
         Seq(
@@ -160,18 +179,17 @@ class TokenStandardTransferIntegrationTest
             logEntry.receivers shouldBe Seq(
               PartyAndAmount(bobUserParty.toProtoPrimitive, BigDecimal(10.0))
             )
-            // The balance of the sender actually goes up here as the remainder of the locked amulet goes back to them.
-            logEntry.sender.value.amount should beAround(BigDecimal(12.3))
+            logEntry.sender.value.amount shouldBe (BigDecimal(0.0))
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.TransferInstruction_Withdraw.toProto
             logEntry.transferInstructionCid shouldBe cids(1).contractId
-            logEntry.amount should beAround(BigDecimal(34))
+            logEntry.amount shouldBe BigDecimal(10.0)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.TransferInstruction_Reject.toProto
             logEntry.transferInstructionCid shouldBe cids(0).contractId
-            logEntry.amount should beAround(BigDecimal(34))
+            logEntry.amount shouldBe BigDecimal(10.0)
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
@@ -182,7 +200,7 @@ class TokenStandardTransferIntegrationTest
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
-            logEntry.sender.value.amount should beAround(BigDecimal(-47))
+            logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
@@ -193,7 +211,7 @@ class TokenStandardTransferIntegrationTest
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
-            logEntry.sender.value.amount should beAround(BigDecimal(-47))
+            logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
@@ -204,7 +222,7 @@ class TokenStandardTransferIntegrationTest
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
-            logEntry.sender.value.amount should beAround(BigDecimal(-47))
+            logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
@@ -215,7 +233,7 @@ class TokenStandardTransferIntegrationTest
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
-            logEntry.sender.value.amount should beAround(BigDecimal(-47))
+            logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
@@ -233,8 +251,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.receivers shouldBe Seq(
               PartyAndAmount(bobUserParty.toProtoPrimitive, BigDecimal(10.0))
             )
-            // The balance of the sender actually goes up here as the remainder of the locked amulet goes back to them.
-            logEntry.sender.value.amount should beAround(BigDecimal(12.3))
+            logEntry.sender.value.amount shouldBe (BigDecimal(0.0))
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.TransferInstruction_Withdraw.toProto
@@ -284,6 +301,8 @@ class TokenStandardTransferIntegrationTest
           },
         ),
       )
+
+      // TODO(#2254): check the exact balances once the scan backend supports it
 
       val activityTxs = sv1ScanBackend
         .listActivity(None, 1000)
@@ -307,7 +326,7 @@ class TokenStandardTransferIntegrationTest
         forExactly(1, transfer.balanceChanges) { change =>
           {
             change.party shouldBe aliceUserParty.toProtoPrimitive
-            BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(-22))
+            BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(-10))
           }
         }
         forExactly(1, transfer.balanceChanges) { change =>
@@ -350,12 +369,13 @@ class TokenStandardTransferIntegrationTest
           transfer.sender.party shouldBe aliceUserParty.toProtoPrimitive
           val receiver = transfer.receivers.loneElement
           receiver.party shouldBe aliceUserParty.toProtoPrimitive
-          BigDecimal(receiver.amount) should beAround(BigDecimal(34))
+          BigDecimal(receiver.amount) shouldBe (BigDecimal(10))
           val balanceChange = transfer.balanceChanges.loneElement
           balanceChange.party shouldBe aliceUserParty.toProtoPrimitive
-          BigDecimal(balanceChange.changeToInitialAmountAsOfRoundZero) should beAround(
-            BigDecimal(-13)
-          )
+          // Alice now additional owns the locked amulet, which means its
+          // initial amount as of round zero goes up by one holding fee
+          BigDecimal(balanceChange.changeToInitialAmountAsOfRoundZero) should
+            ((be >= BigDecimal(0)) and (be <= BigDecimal(0.5)))
         }
       }
     }
@@ -436,7 +456,7 @@ class TokenStandardTransferIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.LockedAmuletOwnerExpired.toProto
-            logEntry.amount should beAround(34)
+            logEntry.amount shouldBe (10)
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
@@ -447,7 +467,7 @@ class TokenStandardTransferIntegrationTest
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
-            logEntry.sender.value.amount should beAround(BigDecimal(-47))
+            logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto

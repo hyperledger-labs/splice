@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.http.v0.sv.SvResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
@@ -86,6 +86,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directive
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -570,6 +571,10 @@ class SvApp(
         timeouts,
         loggerFactory,
       )
+      httpRateLimiter = new HttpRateLimiter(
+        config.parameters.rateLimiting,
+        metrics.openTelemetryMetricsFactory,
+      )
 
       route = cors(
         CorsSettings(ac)
@@ -587,20 +592,36 @@ class SvApp(
       ) {
         withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {
-            HttpErrorHandler(loggerFactory)(traceContext) {
+            val errorHandler = new HttpErrorHandler(loggerFactory)
+            def buildOperation(service: String, operation: String) = {
+              metrics.httpServerMetrics
+                .withMetrics(service)(operation)
+                .tflatMap(_ => {
+                  httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
+                    config.parameters.customTimeouts.get(operation) match {
+                      case Some(customTimeout) =>
+                        withRequestTimeout(
+                          customTimeout.duration,
+                          errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
+                        )
+                      case None => Directive.Empty
+                    }
+                  }
+                })
+            }
+
+            errorHandler.directive(traceContext) {
               concat(
                 SvResource.routes(
                   handler,
                   operation =>
-                    metrics.httpServerMetrics
-                      .withMetrics("sv")(operation)
+                    buildOperation("sv", operation)
                       .tflatMap(_ => provide(traceContext)),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
                   operation =>
-                    metrics.httpServerMetrics
-                      .withMetrics("svAdmin")(operation)
+                    buildOperation("svAdmin", operation)
                       .tflatMap(_ =>
                         AdminAuthExtractor(
                           verifier,
@@ -909,11 +930,13 @@ object SvApp {
       expiration: Json,
       effectiveTime: Optional[Instant],
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
       templateJsonDecoder: TemplateJsonDecoder,
-  ): Future[Either[String, Unit]] = {
+  ): Future[Either[String, splice.dsorules.VoteRequest.ContractId]] = {
     val decodedExpiration = templateJsonDecoder.decodeValue(
       RelTime.valueDecoder(),
       RelTime._packageId,
@@ -935,36 +958,43 @@ object SvApp {
           )
         case QueryResult(offset, None) =>
           for {
-            dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
-            reason = new Reason(reasonUrl, reasonDescription)
-            request = new DsoRules_RequestVote(
-              requester,
-              decodedAction,
-              reason,
-              java.util.Optional.of(decodedExpiration),
-              effectiveTime,
+            res <- retryProvider.retryForClientCalls(
+              "createVoteRequest",
+              "createVoteRequest",
+              for {
+                dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
+                reason = new Reason(reasonUrl, reasonDescription)
+                request = new DsoRules_RequestVote(
+                  requester,
+                  decodedAction,
+                  reason,
+                  java.util.Optional.of(decodedExpiration),
+                  effectiveTime,
+                )
+                cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
+                res <- dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
+                  .submit(
+                    actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
+                    readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
+                    cmd,
+                  )
+                  .withDedup(
+                    commandId = SpliceLedgerConnection.CommandId(
+                      "org.lfdecentralizedtrust.splice.sv.requestVote",
+                      Seq(
+                        dsoStoreWithIngestion.store.key.dsoParty,
+                        dsoStoreWithIngestion.store.key.svParty,
+                      ),
+                      action.toString,
+                    ),
+                    deduplicationOffset = offset,
+                  )
+                  .yieldResult()
+              } yield res,
+              logger,
             )
-            cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
-            _ <- dsoStoreWithIngestion
-              .connection(SpliceLedgerConnectionPriority.Low)
-              .submit(
-                actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
-                readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
-                cmd,
-              )
-              .withDedup(
-                commandId = SpliceLedgerConnection.CommandId(
-                  "org.lfdecentralizedtrust.splice.sv.requestVote",
-                  Seq(
-                    dsoStoreWithIngestion.store.key.dsoParty,
-                    dsoStoreWithIngestion.store.key.svParty,
-                  ),
-                  action.toString,
-                ),
-                deduplicationOffset = offset,
-              )
-              .yieldUnit()
-          } yield Right(())
+          } yield Right(res.exerciseResult.voteRequest)
       }
   }
 
