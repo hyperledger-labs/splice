@@ -16,7 +16,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: quantile($WASTED_TRAFFIC_ALERT_QUANTILE, increase(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*",member!~"PAR::DA-Helm-Test-Node::.*",member!~"PAR::Digital-Asset-2::.*",member!~"PAR::Digital-Asset-Eng-2::.*",member!~"PAR::Digital-Asset-Eng-3::.*",member!~"PAR::Digital-Asset-Eng-4::.*",member!~"PAR::Digital-Asset-Eng-5::.*",member!~"PAR::Digital-Asset-Eng-6::.*",member!~"PAR::Digital-Asset-Eng-7::.*",member!~"PAR::Digital-Asset-Eng-8::.*",member!~"PAR::Digital-Asset-Eng-9::.*",member!~"PAR::Digital-Asset-Eng-10::.*",member!~"PAR::Digital-Asset-Eng-11::.*",member!~"PAR::Digital-Asset-Eng-12::.*",member!~"PAR::Digital-Asset-Eng-13::.*",member!~"PAR::Digital-Asset-Eng-14::.*",member!~"PAR::Digital-Asset-Eng-15::.*"}[30m]))
+              expr: quantile($WASTED_TRAFFIC_ALERT_QUANTILE, increase(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -59,9 +59,9 @@ groups:
         annotations:
           __dashboardUid__: fdnphvrryfq4gf
           __panelId__: "6"
-          description: The $WASTED_TRAFFIC_ALERT_QUANTILE quantile of of traffic wasted across members exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last 30m
+          description: The $WASTED_TRAFFIC_ALERT_QUANTILE quantile of of traffic wasted across members exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm
           severity: critical
-          summary: $WASTED_TRAFFIC_ALERT_QUANTILE quantile of traffic wasted across members exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over 30m)
+          summary: $WASTED_TRAFFIC_ALERT_QUANTILE quantile of traffic wasted across members exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm)
         labels: {}
         isPaused: false
       - uid: 5dcddc9a5487
