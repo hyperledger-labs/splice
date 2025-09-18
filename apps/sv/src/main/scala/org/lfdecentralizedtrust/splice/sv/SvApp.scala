@@ -366,7 +366,6 @@ class SvApp(
               "has_dso_party",
               "Checks if the dso party exists on SV onboarding",
               for {
-
                 partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant()
                 hostDsoParty = partyToParticipantMapping.exists(_.mapping.partyId == dsoParty)
               } yield hostDsoParty,
@@ -386,6 +385,7 @@ class SvApp(
                 hasActiveProposalToHostDsoParty = inFlightPartyToParticipantProposals.exists(
                   _.mapping match {
                     case m: PartyToParticipant => m.partyId == dsoParty
+                    case _ => false
                   }
                 )
               } yield hasActiveProposalToHostDsoParty,
