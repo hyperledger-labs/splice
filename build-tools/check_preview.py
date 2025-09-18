@@ -441,14 +441,35 @@ def parse_content_lines(lines: List[str]) -> ParsedOutput:
 
         content_by_idx[i] = content
 
+    # Track delimiter indices
+    delimiter_indices = []
+    for i, content in content_by_idx.items():
+        if isinstance(content, OtherContent) and getattr(content, 'is_delimiter', False):
+            delimiter_indices.append(i)
+
     # Second pass - associate metadata and content with resources
     for idx, resource_idx in enumerate(resource_indices):
         resource = resource_by_idx[resource_idx]
 
         # Determine where this resource ends
         end_idx = len(lines)
+
+        # First check if there's a delimiter line before the next resource
+        delimiter_end = None
+        for d_idx in delimiter_indices:
+            if d_idx > resource_idx and (delimiter_end is None or d_idx < delimiter_end):
+                delimiter_end = d_idx
+
+        # Then check for the next resource
+        next_resource_end = None
         if idx < len(resource_indices) - 1:
-            end_idx = resource_indices[idx + 1]
+            next_resource_end = resource_indices[idx + 1]
+
+        # The end is the earlier of the delimiter or next resource
+        if delimiter_end is not None and (next_resource_end is None or delimiter_end < next_resource_end):
+            end_idx = delimiter_end
+        elif next_resource_end is not None:
+            end_idx = next_resource_end
 
         # Process lines from after the resource header to the end of the resource
         i = resource_idx + 1
@@ -577,61 +598,6 @@ def filter_resources(resources: List[ResourceContent], filter_args: FilterArgs) 
     return filtered_resources
 
 
-def should_display_resource(resource: ResourceContent, filter_args: FilterArgs) -> bool:
-    """Legacy function - use filter_resources instead."""
-    # Check if we should hide grafana resources
-    if filter_args.hide_grafana and is_grafana_resource(resource):
-        return False
-
-    # Check for operation filtering
-    if filter_args.include_ops:
-        op_types = parse_comma_separated_patterns(filter_args.include_ops)
-        if op_types:
-            # Convert ResourceOp enum value to string and check if it's in the list
-            resource_op_name = resource.operation.name.lower()
-            if resource_op_name not in [op.lower() for op in op_types]:
-                return False
-
-    if filter_args.exclude_ops:
-        op_types = parse_comma_separated_patterns(filter_args.exclude_ops)
-        if op_types:
-            # Convert ResourceOp enum value to string and check if it's in the list
-            resource_op_name = resource.operation.name.lower()
-            if resource_op_name in [op.lower() for op in op_types]:
-                return False
-
-    # Check for resource type filtering
-    if filter_args.include_types:
-        type_patterns = parse_comma_separated_patterns(filter_args.include_types)
-        if type_patterns and not matches_pattern(resource.resource_type, type_patterns):
-            return False
-
-    if filter_args.exclude_types:
-        type_patterns = parse_comma_separated_patterns(filter_args.exclude_types)
-        if type_patterns and matches_pattern(resource.resource_type, type_patterns):
-            return False
-
-    # Check for ID-based filtering
-    resource_id = get_resource_id(resource)
-
-    # If ID-based filtering is requested, exclude resources without IDs
-    if filter_args.include_id_pattern and not resource_id:
-        return False
-
-    if resource_id:
-        if filter_args.include_id_pattern:
-            id_patterns = parse_comma_separated_patterns(filter_args.include_id_pattern)
-            if id_patterns and not matches_pattern(resource_id, id_patterns):
-                return False
-
-        if filter_args.exclude_id_pattern:
-            id_patterns = parse_comma_separated_patterns(filter_args.exclude_id_pattern)
-            if id_patterns and matches_pattern(resource_id, id_patterns):
-                return False
-
-    # If we reached here, the resource passes all filters
-    return True
-
 def should_display_config(config: ConfigContent, filter_args: FilterArgs) -> bool:
     """Check if a configuration should be displayed."""
     # If hide_config is set, don't display any config content
@@ -658,7 +624,8 @@ def should_display_other(other: OtherContent, filter_args: FilterArgs) -> bool:
 def should_display_content(content: ContentType, filter_args: FilterArgs) -> bool:
     """Check if content should be displayed based on filters."""
     if isinstance(content, ResourceContent):
-        return should_display_resource(content, filter_args)
+        # Apply the same filters as filter_resources would
+        return content in filter_resources([content], filter_args)
     elif isinstance(content, ConfigContent):
         return should_display_config(content, filter_args)
     elif isinstance(content, EnvironmentContent):
@@ -673,8 +640,8 @@ def should_display_content(content: ContentType, filter_args: FilterArgs) -> boo
 
 def filter_content(parsed: ParsedOutput, filter_args: FilterArgs) -> ParsedOutput:
     """Apply filters to the parsed content."""
-    # First filter resources based on operation filters
-    filtered_resources = [r for r in parsed.resources if should_display_resource(r, filter_args)]
+    # First filter resources based on filter_resources function
+    filtered_resources = filter_resources(parsed.resources, filter_args)
 
     # Get set of line indices from resources that should be displayed
     resource_indices = set()
@@ -745,48 +712,70 @@ def display_filtered_content(all_content: List[ContentType], resources: List[Res
     - clean_output: Hides miscellaneous content that isn't recognized as resources
     """
     # We'll rebuild the output line by line
-    output_lines = []    # Start with the Resources header
-    output_lines.append("Resources:")
+    output_lines = []
 
-    # Add each filtered resource and its content
-    for resource in resources:
-        # Add a blank line before each resource (except the first one)
-        if output_lines[-1] != "Resources:":
-            output_lines.append("")
+    # Track if we need to insert a "Resources:" header
+    need_resources_header = True
 
-        # Add the resource header
-        output_lines.append(resource.content)
-
-        # Add metadata lines
-        for line in resource.metadata_lines:
-            output_lines.append(line.content)
-
-        # Add content lines
-        for line in resource.content_lines:
-            output_lines.append(line.content)
-
-    # Add a line break after resources section
-    if resources:
-        output_lines.append("")
-
-    # Add OtherContent based on clean_output flag
-    # Debug info about OtherContent if verbose
-    if filter_args.verbose:
-        print(colored("\nDEBUG - Processing OtherContent:", "magenta"))
-
+    # Track all content in original order, preserving delimiters
     for content in all_content:
-        if isinstance(content, OtherContent):
-            stripped_content = strip_ansi(content.content).strip()
-            is_delimiter = stripped_content.startswith("--- Output from") and stripped_content.endswith("---")
-
-            # Debug each OtherContent line if verbose
-            if filter_args.verbose:
-                print(colored(f"  OtherContent: '{stripped_content[:50]}{'...' if len(stripped_content) > 50 else ''}' | Delimiter: {content.is_delimiter} | Adding: {not filter_args.clean_output}", "magenta"))
-
-            # Only add if we're not in clean output mode
+        # Process delimiter lines first to ensure they separate sections properly
+        if isinstance(content, OtherContent) and content.is_delimiter:
             if not filter_args.clean_output:
+                # Add the delimiter with a blank line before and after for readability
+                if output_lines and output_lines[-1] != "":
+                    output_lines.append("")
                 output_lines.append(content.content)
-    # With clean_output, we don't show any OtherContent including "More content" indicators and delimiter lines
+                output_lines.append("")
+                # After a delimiter, we need a new Resources header
+                need_resources_header = True
+            continue
+
+        # If we need a header and this is a resource or the start of output, add it
+        if need_resources_header and isinstance(content, ResourceContent):
+            output_lines.append("Resources:")
+            output_lines.append("")
+            need_resources_header = False
+
+        # Process resources that passed filtering
+        if isinstance(content, ResourceContent) and content in resources:
+            if filter_args.verbose:
+                print(colored(f"  Including resource {content.resource_type} at line {content.line_idx}", "cyan"))
+
+            # Add a blank line before resources (except if this follows a header)
+            if output_lines and output_lines[-1] != "" and output_lines[-1] != "Resources:":
+                output_lines.append("")
+
+            # Add the resource header
+            output_lines.append(content.content)
+
+            # Add metadata lines
+            for line in content.metadata_lines:
+                output_lines.append(line.content)
+
+            # Add content lines
+            for line in content.content_lines:
+                output_lines.append(line.content)
+
+        # Handle other content types (non-resources)
+        elif not isinstance(content, ResourceContent):
+            if isinstance(content, OtherContent) and not filter_args.clean_output:
+                if filter_args.verbose:
+                    stripped_content = strip_ansi(content.content).strip()
+                    print(colored(f"  OtherContent: '{stripped_content[:50]}{'...' if len(stripped_content) > 50 else ''}' | Adding: {not filter_args.clean_output}", "magenta"))
+                output_lines.append(content.content)
+
+    # Make sure the output isn't empty
+    if not output_lines and resources:
+        output_lines.append("Resources:")
+        output_lines.append("")
+        for resource in resources:
+            output_lines.append(resource.content)
+            for line in resource.metadata_lines:
+                output_lines.append(line.content)
+            for line in resource.content_lines:
+                output_lines.append(line.content)
+            output_lines.append("")
 
     # Print all the output lines
     if filter_args.verbose:
