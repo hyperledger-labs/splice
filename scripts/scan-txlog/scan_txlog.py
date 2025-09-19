@@ -341,7 +341,13 @@ class ScanClient:
 
     async def get_amulet_token_metadata(self):
         response = await self.session.get(f"{self.url}/registry/metadata/v1/instruments/Amulet")
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            text = await response.text()
+            LOG.error(f"Failed to get amulet token metadata: {e}, response: {text}")
+            raise e
+
         json = await response.json()
         return json
 
