@@ -83,6 +83,7 @@ export function installSvParticipant(
         svConfig.participant?.additionalEnvVars || []
       ),
       logLevel: svConfig.logging?.cantonLogLevel,
+      logLevelStdout: svConfig.logging?.cantonStdoutLogLevel,
       participantAdminUserNameFrom,
       metrics: {
         enable: true,
