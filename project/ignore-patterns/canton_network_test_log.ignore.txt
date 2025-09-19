@@ -126,5 +126,7 @@ GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
 Circuit breaker .* tripped after .* failures.*SpliceCircuitBreakerTest
 
+# Expected log as the test deliberately restarts Canton
+Circuit breaker treasury tripped after 20 failures.*UserWalletService:WalletSurviveCantonRestartIntegrationTest
 
 # Make sure to have a trailing newline
