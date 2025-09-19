@@ -57,7 +57,8 @@ template AmuletConversionRateFeed
          forA_ nextUpdateAfter $ assertDeadlineExceeded "nextUpdateAfter"
          -- We use a rate limit of 0.5 ticks to avoid increasingly lagging behind rounds as your update will
          -- always be slightly slower than the minimum rate limit.
-         assertWithinDeadline "newNextUpdateAfter - 0.5 tickDuration" (newNextUpdateAfter `addRelTime` convertMicrosecondsToRelTime (- (convertRelTimeToMicroseconds currentConfig.tickDuration) / 2))
+         -- we add one extra microseconds so now + 5 minutes is allowed and the caller does not need to add the microsecond
+         assertWithinDeadline "newNextUpdateAfter - 0.5 tickDuration" (newNextUpdateAfter `addRelTime` convertMicrosecondsToRelTime (- (convertRelTimeToMicroseconds currentConfig.tickDuration) / 2 + 1))
          forA_ markerContextO $ \markerContext -> do
            _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
            exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
