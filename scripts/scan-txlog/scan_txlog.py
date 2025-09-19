@@ -339,6 +339,13 @@ class ScanClient:
         json = await response.json()
         return json
 
+    async def get_amulet_token_metadata(self):
+        response = await self.session.get(f"{self.url}/registry/metadata/v1/instruments/Amulet")
+        response.raise_for_status()
+        json = await response.json()
+        return json
+
+
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
 # Rounding is round_half_even.
@@ -3924,6 +3931,16 @@ class PerPartyBalance:
         # we deliberately cap the sum as opposed to each individual amulet to match scan
         return max(total, DamlDecimal("0"))
 
+    # ignores holding fees
+    def sum_amounts(self):
+        total = DamlDecimal("0")
+        for amulet in self.amulets:
+            total += amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+        for locked_amulet in self.locked_amulets:
+            amulet = locked_amulet.payload.get_locked_amulet_amulet()
+            total += amulet.get_amulet_amount().get_expiring_amount_initial_amount()
+        return total
+
 
 @dataclass
 class AppState:
@@ -4324,6 +4341,16 @@ async def main():
                 if len(missing_in_script) > 0:
                     missing = [found_in_snapshot[cid] for cid in missing_in_script]
                     LOG.error(f"Contracts missing in script ACS: {missing}")
+                if args.scan_balance_assertions:
+                    # this will only work if a snapshot was taken, which is guaranteed by compare_acs_with_snapshot=True
+                    token_metadata = await scan_client.get_amulet_token_metadata()
+                    latest_per_party_balances = app_state.state.balance_end_of_round().values()
+                    # sum up all balances
+                    total_balance = sum([p.sum_amounts() for p in latest_per_party_balances], DamlDecimal(0))
+                    if DamlDecimal(token_metadata['totalSupply']) != total_balance:
+                        LOG.error(f"Total supply mismatch: {token_metadata.totalSupply} in metadata (as of {token_metadata.totalSupplyAsOf}), {total_balance} in computed balances (as of {app_state.state.record_time})")
+
+
         duration = time.time() - begin_t
         LOG.info(
             f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s), {scan_client.retry_count} retries)"

@@ -5,17 +5,22 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.OptionT
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
-import org.lfdecentralizedtrust.splice.scan.store.ScanStore
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
 
 import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpTokenStandardMetadataHandler(
     store: ScanStore,
+    acsSnapshotStore: AcsSnapshotStore,
     spliceInstanceNames: SpliceInstanceNamesConfig,
+    packageVersionSupport: PackageVersionSupport,
+    clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends v1.Handler[TraceContext]
@@ -60,12 +65,37 @@ class HttpTokenStandardMetadataHandler(
       }
   }
 
-  private def lookupTotalSupply()(implicit ec: ExecutionContext, tc: TraceContext) = (
+  private def lookupTotalSupplyByLatestRound()(implicit ec: ExecutionContext, tc: TraceContext) =
     for {
       (latestRoundNr, effectiveAt) <- OptionT(store.lookupRoundOfLatestData())
       totalSupply <- OptionT.liftF(store.getTotalAmuletBalance(latestRoundNr))
     } yield (totalSupply, effectiveAt)
-  ).value
+
+  private def lookupTotalSupplyByLatestAcsSnapshot()(implicit tc: TraceContext) = {
+    for {
+      latestSnapshot <- OptionT(
+        acsSnapshotStore.lookupSnapshotBefore(acsSnapshotStore.currentMigrationId, clock.now)
+      )
+      unlocked <- OptionT.fromOption[Future](latestSnapshot.unlockedAmuletBalance)
+      locked <- OptionT.fromOption[Future](latestSnapshot.lockedAmuletBalance)
+    } yield (locked + unlocked) -> latestSnapshot.snapshotRecordTime.toInstant
+  }
+
+  private def lookupTotalSupply()(implicit tc: TraceContext) = {
+    for {
+      noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
+        store.key.dsoParty,
+        clock.now,
+      )
+      deductHoldingFees = !noHoldingFeesOnTransfers.supported
+      result <-
+        if (deductHoldingFees) {
+          lookupTotalSupplyByLatestRound().value
+        } else {
+          lookupTotalSupplyByLatestAcsSnapshot().orElse(lookupTotalSupplyByLatestRound()).value
+        }
+    } yield result
+  }
 
   private def getAmuletInstrument()(implicit ec: ExecutionContext, tc: TraceContext) =
     for {
