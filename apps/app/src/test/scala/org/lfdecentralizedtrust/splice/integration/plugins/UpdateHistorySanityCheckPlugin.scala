@@ -152,7 +152,7 @@ class UpdateHistorySanityCheckPlugin(
         .split("\\.")
         .toList match {
         case major :: minor :: patch :: Nil =>
-          major.toInt == 0 || minor.toInt == 1 || patch.toInt <= 13
+          major.toInt == 0 && minor.toInt == 1 && patch.toInt <= 13
         case _ =>
           throw new IllegalArgumentException(
             s"Amulet package version is ${amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet}, which is not x.y.z"
