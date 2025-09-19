@@ -360,9 +360,13 @@ class DamlDecimal:
                 Decimal("0.0000000001"), rounding=ROUND_HALF_EVEN
             )
         else:
-            self.decimal = decimal.quantize(
-                Decimal("0.0000000001"), rounding=ROUND_HALF_EVEN
-            )
+            try:
+                self.decimal = decimal.quantize(
+                    Decimal("0.0000000001"), rounding=ROUND_HALF_EVEN
+                )
+            except Exception as e:
+                LOG.error(f"Failed to treat {decimal} as DamlDecimal: {e}")
+                raise e
 
     def __mul__(self, other):
         return DamlDecimal(self.decimal * other.decimal)
