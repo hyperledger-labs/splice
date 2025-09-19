@@ -19,7 +19,12 @@ import io.circe.parser.parse as circeParse
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
-import org.lfdecentralizedtrust.splice.util.{Contract, LegacyOffset, QualifiedName}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  LegacyOffset,
+  PackageQualifiedName,
+  QualifiedName,
+}
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
 import com.digitalasset.canton.resource.DbParameterUtils
@@ -202,6 +207,9 @@ trait AcsJdbcTypes {
         )
       }
   }
+
+  protected implicit lazy val packageQualifiedNameSetParameter: SetParameter[PackageQualifiedName] =
+    SetParameter.SetString.contramap(_.toString)
 
   protected implicit lazy val qualifiedNameSetParameter: SetParameter[QualifiedName] =
     (v1: QualifiedName, v2: PositionedParameters) =>
