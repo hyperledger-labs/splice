@@ -6,7 +6,6 @@ infra:
 pulumiProjectConfig:
   default:
     cloudSql:
-      enabled: true
       protected: false
 validator1:
   participantPruningSchedule:
