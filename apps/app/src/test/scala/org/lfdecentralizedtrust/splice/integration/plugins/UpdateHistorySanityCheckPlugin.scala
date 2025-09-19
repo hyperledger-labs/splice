@@ -151,7 +151,7 @@ class UpdateHistorySanityCheckPlugin(
       amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet
         .split("\\.")
         .toList match {
-        case major :: minor :: patch :: Nil =>
+        case major :: minor :: patch :: _ =>
           major.toInt == 0 && minor.toInt == 1 && patch.toInt <= 13
         case _ =>
           throw new IllegalArgumentException(
