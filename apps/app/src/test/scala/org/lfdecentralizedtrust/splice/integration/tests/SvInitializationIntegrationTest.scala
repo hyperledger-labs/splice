@@ -20,6 +20,7 @@ import scala.jdk.OptionConverters.*
 
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
+  override protected def runEventHistorySanityCheck: Boolean = true
   override def environmentDefinition: EnvironmentDefinition =
     super.environmentDefinition
       .addConfigTransforms((_, config) =>
