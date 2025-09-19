@@ -33,7 +33,7 @@ template AmuletConversionRateFeed
   with
     publisher : Party
     dso : Party
-    nextUpdateAfter : Optional Time
+    nextUpdateAfter : Optional Time -- ^ The earliest time after which the publisher is  allowed to update this feed.
     amuletConversionRate : Decimal -- ^ conversion rate in USD/Amulet
   where
     signatory publisher
