@@ -146,7 +146,11 @@ class ValidatorApp(
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
     _ <- ensureVersionMatch(config.scanClient)
     _ <- withParticipantAdminConnection { participantAdminConnection =>
-      readRestoreDump match {
+      for {
+        synchronizerId <- participantAdminConnection.getSynchronizerId(
+          config.domains.global.alias
+        )
+      } yield readRestoreDump match {
         case Some(migrationDump) =>
           logger.info(
             "We're restoring from a migration dump, ensuring participant is initialized"
@@ -177,6 +181,7 @@ class ValidatorApp(
                 config.participantBootstrappingDump,
                 loggerFactory,
                 retryProvider,
+                synchronizerId,
               )
           }
       }

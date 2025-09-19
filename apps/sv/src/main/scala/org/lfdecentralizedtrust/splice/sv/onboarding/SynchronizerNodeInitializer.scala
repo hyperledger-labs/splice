@@ -9,9 +9,10 @@ import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{MediatorId, SequencerId}
+import com.digitalasset.canton.topology.{MediatorId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 
+import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 
 case class SynchronizerNodeInitializer(
@@ -40,6 +41,7 @@ object SynchronizerNodeInitializer {
       clock: Clock,
       logger: NamedLoggerFactory,
       retryProvider: RetryProvider,
+      @unused synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     val synchronizerNodeInitializer = SynchronizerNodeInitializer(
       synchronizerNode,
@@ -52,10 +54,12 @@ object SynchronizerNodeInitializer {
       _ <- synchronizerNodeInitializer.sequencerInitializer.initializeWithNewIdentityIfNeeded(
         identifierConfig.sequencer,
         SequencerId.apply,
+        None, // Some(synchronizerId),
       )
       _ <- synchronizerNodeInitializer.mediatorInitializer.initializeWithNewIdentityIfNeeded(
         identifierConfig.mediator,
         MediatorId.apply,
+        None, // Some(synchronizerId),
       )
     } yield ()
   }
