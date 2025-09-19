@@ -33,6 +33,18 @@ $(load-tester):
 $(party-allocator):
 	sbt --batch 'party-allocator/npmBuild'
 
+.PHONY: update-expected
+update-expected: cluster/pulumi/update-expected
+
+.PHONY: pulumi-clean
+pulumi-clean: cluster/pulumi/clean
+
+.PHONY: pulumi-build
+pulumi-build: cluster/pulumi/build
+
+.PHONY: pulumi-format
+pulumi-format: cluster/pulumi/format
+
 .PHONY: clean
 clean: cluster/clean
 	rm -rf apps/app/target/release
