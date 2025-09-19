@@ -259,6 +259,20 @@ function installFunctions(
   return functionsDataset;
 }
 
+function installScheduledTasks(dashboardsDataset: gcp.bigquery.Dataset): void {
+  pulumi.all([dashboardsDataset.project, dashboardsDataset.datasetId]).apply(([project, dataset]) => {
+    new gcp.bigquery.DataTransferConfig("scheduled_dashboard_update", {
+      displayName: "scheduled_dashboard_update",
+      dataSourceId: "scheduled_query",
+      schedule: "every day 13:00", // UTC
+      location: cloudsdkComputeRegion(),
+      params: {
+        query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
+      },
+    });
+  });
+}
+
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
 If you see an error like this
   gcp:datastream:ConnectionProfile (sv-4-scan-bq-cxn):
@@ -486,5 +500,6 @@ export function configureScanBigQuery(
   );
   const dashboardsDataset = installDashboardsDataset();
   installFunctions(dataset, dashboardsDataset, [stream]);
+  installScheduledTasks(dashboardsDataset);
   return;
 }
