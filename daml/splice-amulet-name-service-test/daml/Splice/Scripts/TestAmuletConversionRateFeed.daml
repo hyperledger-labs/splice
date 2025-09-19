@@ -40,7 +40,7 @@ testAmuletConversionRateFeed = do
 
   now <- getTime
 
-  cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+  AmuletConversionRateFeed_UpdateResult cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 2.0
     amuletRulesCid
     markerContextO = None
@@ -69,7 +69,7 @@ testAmuletConversionRateFeed = do
     newNextUpdateAfter = now `addRelTime` minutes 4
 
   -- succeeds if newNextUpdateAfter = now + 5 minutes
-  cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+  AmuletConversionRateFeed_UpdateResult cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 4.0
     amuletRulesCid
     markerContextO = Some MarkerContext with

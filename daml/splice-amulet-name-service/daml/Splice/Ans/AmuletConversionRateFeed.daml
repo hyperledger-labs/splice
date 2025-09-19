@@ -7,7 +7,6 @@
 -- very well if we widen the role of the ANS to serve as a store for
 -- public data of high-value to network participants. Evolving ANS in this direction
 -- is a long-standing plan.
---
 module Splice.Ans.AmuletConversionRateFeed where
 
 import DA.Assert
@@ -39,13 +38,13 @@ template AmuletConversionRateFeed
     signatory publisher
     observer dso
 
-    choice AmuletConversionRateFeed_ArchiveAsDso : ()
+    choice AmuletConversionRateFeed_ArchiveAsDso : AmuletConversionRateFeed_ArchiveAsDsoResult
       with
         reason : Text
       controller dso
-      do pure ()
+      do pure AmuletConversionRateFeed_ArchiveAsDsoResult
 
-    choice AmuletConversionRateFeed_Update : ContractId AmuletConversionRateFeed
+    choice AmuletConversionRateFeed_Update : AmuletConversionRateFeed_UpdateResult
       with
         amuletConversionRate : Decimal
         amuletRulesCid : ContractId AmuletRules
@@ -64,9 +63,16 @@ template AmuletConversionRateFeed
            exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
              with
                beneficiaries = markerContext.beneficiaries
-         create this with
+         cid <- create this with
            amuletConversionRate
            nextUpdateAfter = Some newNextUpdateAfter
+         pure AmuletConversionRateFeed_UpdateResult { cid }
 
 instance HasCheckedFetch Api.FeaturedAppRightView ForOwner where
   contractGroupId Api.FeaturedAppRightView{..} = ForOwner{dso,owner = provider}
+
+data AmuletConversionRateFeed_ArchiveAsDsoResult = AmuletConversionRateFeed_ArchiveAsDsoResult
+
+data AmuletConversionRateFeed_UpdateResult = AmuletConversionRateFeed_UpdateResult
+  with
+    cid : ContractId AmuletConversionRateFeed
