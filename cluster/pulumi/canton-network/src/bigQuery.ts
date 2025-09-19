@@ -268,6 +268,7 @@ function installScheduledTasks(dashboardsDataset: gcp.bigquery.Dataset): void {
         dataSourceId: 'scheduled_query',
         schedule: 'every day 13:00', // UTC
         location: cloudsdkComputeRegion(),
+        serviceAccountName: "circleci@da-cn-scratchnet.iam.gserviceaccount.com", // FIXME: de-hardcode
         params: {
           query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
         },
