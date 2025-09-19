@@ -259,20 +259,27 @@ function installFunctions(
   return functionsDataset;
 }
 
-function installScheduledTasks(dashboardsDataset: gcp.bigquery.Dataset): void {
+function installScheduledTasks(
+  dashboardsDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): void {
   pulumi
     .all([dashboardsDataset.project, dashboardsDataset.datasetId])
     .apply(([project, dataset]) => {
-      new gcp.bigquery.DataTransferConfig('scheduled_dashboard_update', {
-        displayName: 'scheduled_dashboard_update',
-        dataSourceId: 'scheduled_query',
-        schedule: 'every day 13:00', // UTC
-        location: cloudsdkComputeRegion(),
-        serviceAccountName: "circleci@da-cn-scratchnet.iam.gserviceaccount.com", // FIXME: de-hardcode
-        params: {
-          query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
+      new gcp.bigquery.DataTransferConfig(
+        'scheduled_dashboard_update',
+        {
+          displayName: 'scheduled_dashboard_update',
+          dataSourceId: 'scheduled_query',
+          schedule: 'every day 13:00', // UTC
+          location: cloudsdkComputeRegion(),
+          serviceAccountName: `bigquery@${project}.iam.gserviceaccount.com`,
+          params: {
+            query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
+          },
         },
-      });
+        { dependsOn: dependsOn }
+      );
     });
 }
 
@@ -503,6 +510,6 @@ export function configureScanBigQuery(
   );
   const dashboardsDataset = installDashboardsDataset();
   installFunctions(dataset, dashboardsDataset, [stream]);
-  installScheduledTasks(dashboardsDataset);
+  installScheduledTasks(dashboardsDataset, [functionsDataset, dataset]);
   return;
 }
