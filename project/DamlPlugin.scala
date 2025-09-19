@@ -74,7 +74,7 @@ object DamlPlugin extends AutoPlugin {
       damlDarOutput := damlSourceDirectory.value.getAbsoluteFile / ".daml" / "dist",
       damlDarLfVersion := "",
       damlDependencies := Seq(),
-      damlJavaCodegenOutput := sourceManaged.value / "daml-codegen-java",
+      damlJavaCodegenOutput := target.value / "daml-codegen-java",
       managedSourceDirectories ++= Seq(damlJavaCodegenOutput.value),
       damlBuildOrder := Seq(),
       damlCodeGeneration := Seq(),
