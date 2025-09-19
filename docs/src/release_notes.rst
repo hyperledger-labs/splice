@@ -8,6 +8,17 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - Daml
+
+    - release ``splice-util-featured-app-proxies-1.1.0``, which
+      add support for a ``WalletUserProxy``, which simplifies
+      the creation of featured app activity markers for the wallet app provider
+      when their users engage in token standard workflows.
+
+
 0.4.17
 ------
 

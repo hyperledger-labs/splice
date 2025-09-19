@@ -10,3 +10,8 @@ Note that this package is not uploaded by default to a validator node.
 You need to upload it yourself if you want to use it.
 
 You can rely on different splice releases to evolve this package in a backwards compatible way.
+
+### Release notes
+
+- 1.0.0: initial release
+- 1.1.0: add `WalletUserProxy` for wallet integrators
