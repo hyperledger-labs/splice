@@ -3886,7 +3886,7 @@ class State:
                     )
                 return HandleTransactionResult.empty()
 
-    def balance_end_of_round(self):
+    def get_per_party_balances(self):
         amulets = self.list_contracts(TemplateQualifiedNames.amulet)
         locked_amulets = self.list_contracts(TemplateQualifiedNames.locked_amulet)
         per_party_balances = {}
@@ -4178,7 +4178,7 @@ async def _check_scan_balance_assertions(
         LOG.info(msg)
         round_state = app_state.per_round_states[closed_round]
         del app_state.per_round_states[closed_round]
-        balances = round_state.balance_end_of_round()
+        balances = round_state.get_per_party_balances()
         lines = [msg, f"effective balances for closed round: {closed_round}"]
         matches = True
         scan_party_balances = await scan_client.party_balances(
@@ -4344,7 +4344,7 @@ async def main():
                 if args.scan_balance_assertions:
                     # this will only work if a snapshot was taken, which is guaranteed by compare_acs_with_snapshot=True
                     token_metadata = await scan_client.get_amulet_token_metadata()
-                    latest_per_party_balances = app_state.state.balance_end_of_round().values()
+                    latest_per_party_balances = app_state.state.get_per_party_balances().values()
                     # sum up all balances
                     total_balance = sum([p.sum_amounts() for p in latest_per_party_balances], DamlDecimal(0))
                     if DamlDecimal(token_metadata['totalSupply']) != total_balance:

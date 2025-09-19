@@ -9,10 +9,11 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
+import org.lfdecentralizedtrust.splice.scan.admin.http.HttpTokenStandardMetadataHandler.TotalSupply
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
 
-import java.time.ZoneOffset
+import java.time.{Instant, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpTokenStandardMetadataHandler(
@@ -69,7 +70,7 @@ class HttpTokenStandardMetadataHandler(
     for {
       (latestRoundNr, effectiveAt) <- OptionT(store.lookupRoundOfLatestData())
       totalSupply <- OptionT.liftF(store.getTotalAmuletBalance(latestRoundNr))
-    } yield (totalSupply, effectiveAt)
+    } yield TotalSupply(amount = totalSupply, asOfTimestamp = effectiveAt)
 
   private def lookupTotalSupplyByLatestAcsSnapshot()(implicit tc: TraceContext) = {
     for {
@@ -78,7 +79,10 @@ class HttpTokenStandardMetadataHandler(
       )
       unlocked <- OptionT.fromOption[Future](latestSnapshot.unlockedAmuletBalance)
       locked <- OptionT.fromOption[Future](latestSnapshot.lockedAmuletBalance)
-    } yield (locked + unlocked) -> latestSnapshot.snapshotRecordTime.toInstant
+    } yield TotalSupply(
+      amount = locked + unlocked,
+      asOfTimestamp = latestSnapshot.snapshotRecordTime.toInstant,
+    )
   }
 
   private def lookupTotalSupply()(implicit tc: TraceContext) = {
@@ -105,8 +109,8 @@ class HttpTokenStandardMetadataHandler(
       name = spliceInstanceNames.amuletName,
       symbol = spliceInstanceNames.amuletNameAcronym,
       decimals = 10,
-      totalSupply = optSupply.map(_._1.toString()),
-      totalSupplyAsOf = optSupply.map(_._2.atOffset(ZoneOffset.UTC)),
+      totalSupply = optSupply.map(_.amount.toString()),
+      totalSupplyAsOf = optSupply.map(_.asOfTimestamp.atOffset(ZoneOffset.UTC)),
       supportedApis = Map(
         "splice-api-token-metadata-v1" -> 1,
         "splice-api-token-holding-v1" -> 1,
@@ -118,4 +122,8 @@ class HttpTokenStandardMetadataHandler(
       ),
     )
 
+}
+
+object HttpTokenStandardMetadataHandler {
+  case class TotalSupply(amount: BigDecimal, asOfTimestamp: Instant)
 }
