@@ -146,6 +146,18 @@ class UpdateHistorySanityCheckPlugin(
 
   private def checkScanTxLogScript(scan: ScanAppBackendReference)(implicit tc: TraceContext) = {
     val snapshotRecordTime = scan.forceAcsSnapshotNow()
+    val amuletRules = scan.getAmuletRules()
+    val subtractHoldingFees: Boolean =
+      amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet
+        .split("\\.")
+        .toList match {
+        case major :: minor :: patch :: _ =>
+          major.toInt == 0 && minor.toInt == 1 && patch.toInt <= 13
+        case _ =>
+          throw new IllegalArgumentException(
+            s"Amulet package version is ${amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet}, which is not x.y.z"
+          )
+      }
 
     val readLines = mutable.Buffer[String]()
     val errorProcessor = ProcessLogger(line => readLines.append(line))
@@ -168,7 +180,9 @@ class UpdateHistorySanityCheckPlugin(
             snapshotRecordTime.toInstant.toString,
             "--compare-acs-with-snapshot",
             snapshotRecordTime.toInstant.toString,
-          ) ++ ignoredRootCreates.flatMap { templateId =>
+          ) ++ Option
+            .when(subtractHoldingFees)("--subtract-holding-fees-per-round")
+            .toList ++ ignoredRootCreates.flatMap { templateId =>
             Seq("--ignore-root-create", QualifiedName(templateId).toString)
           } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
             Seq("--ignore-root-exercise", s"${QualifiedName(templateId).toString}:$choice")
