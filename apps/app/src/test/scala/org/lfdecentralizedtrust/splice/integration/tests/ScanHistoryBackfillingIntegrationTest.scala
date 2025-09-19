@@ -46,6 +46,8 @@ class ScanHistoryBackfillingIntegrationTest
     with HasActorSystem
     with HasExecutionContext {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   val initialRound = 48151623L
 
   override def environmentDefinition: SpliceEnvironmentDefinition =

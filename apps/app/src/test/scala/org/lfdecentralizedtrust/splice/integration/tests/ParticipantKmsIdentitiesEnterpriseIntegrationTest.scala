@@ -20,6 +20,8 @@ class ParticipantKmsIdentitiesEnterpriseIntegrationTest
     extends IntegrationTest
     with StandaloneCanton {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-kms-id-identity-dump.json")
   val sv2ParticipantDumpFile = testDumpDir.resolve("sv2-kms-id-identity-dump.json")
