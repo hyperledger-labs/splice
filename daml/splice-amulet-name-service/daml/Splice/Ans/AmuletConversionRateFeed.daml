@@ -3,11 +3,11 @@
 
 -- | Templates to communicate amulet conversion rates.
 --
--- This does not fit a narrow interpretation of "Amulet Name Service", but it fits 
--- very well if we widen the role of the ANS to serve as a store for 
+-- This does not fit a narrow interpretation of "Amulet Name Service", but it fits
+-- very well if we widen the role of the ANS to serve as a store for
 -- public data of high-value to network participants. Evolving ANS in this direction
 -- is a long-standing plan.
--- 
+--
 module Splice.Ans.AmuletConversionRateFeed where
 
 import DA.Assert
@@ -66,16 +66,6 @@ template AmuletConversionRateFeed
          create this with
            amuletConversionRate
            nextUpdateAfter = Some newNextUpdateAfter
-
--- | Enforce that an action is not performed again before a cooldown period has passed.
--- Duplicated from DsoRules as we do not want a dependency on that
-enforceCooldown : Text -> RelTime -> Optional Time -> Update ()
-enforceCooldown cooldownName cooldown lastActionTime = do
-  case lastActionTime of
-    Some lastTime -> do
-      let nextAllowedTime = lastTime `addRelTime` cooldown
-      assertDeadlineExceeded cooldownName nextAllowedTime
-    None -> pure () -- no last action time, so no enforcement needed
 
 instance HasCheckedFetch Api.FeaturedAppRightView ForOwner where
   contractGroupId Api.FeaturedAppRightView{..} = ForOwner{dso,owner = provider}
