@@ -24,7 +24,7 @@ RUN mkdir -p /app/splice-node/docs/html/cn-release-bundles
 
 RUN ln -s splice-node/bin/splice-node splice-image-bin
 
-RUN addgroup -g 1001 -S nonroot && adduser -u 1001 -S -G nonroot nonroot
+RUN addgroup --gid 1001 nonroot && adduser --uid 1001 --gid 1001 nonroot
 RUN chown -R nonroot:nonroot /app
 RUN chown nonroot:nonroot splice-image-bin
 USER nonroot

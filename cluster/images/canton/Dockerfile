@@ -38,8 +38,7 @@ RUN ln -s bin/canton splice-image-bin
 # Add label for security scanners, compliance tools, and auditing purposes
 LABEL org.opencontainers.image.base.name="${BASE_IMAGE}"
 
-RUN addgroup -g 1001 -S nonroot && adduser -u 1001 -S -G nonroot nonroot
-
+RUN addgroup --gid 1001 nonroot && adduser --uid 1001 --gid 1001 nonroot
 RUN chown -R nonroot:nonroot /app
 RUN chown nonroot:nonroot splice-image-bin
 USER nonroot
