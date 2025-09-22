@@ -4158,6 +4158,11 @@ def _parse_cli_args():
         help="Before CIP 78, holding fees reduce the value of Amulets every round. After it, they do not. This flag enables the old behavior.",
         action="store_true",
     )
+    parser.add_argument(
+        "--compare-balances-with-total-supply",
+        help="Whether to compare the balances with those computed in the Token Standard 'getInstrument' endpoint",
+        action="store_true",
+    )
     return parser.parse_args()
 
 
@@ -4358,7 +4363,7 @@ async def main():
                 if len(missing_in_script) > 0:
                     missing = [found_in_snapshot[cid] for cid in missing_in_script]
                     LOG.error(f"Contracts missing in script ACS: {missing}")
-                if args.scan_balance_assertions:
+                if args.compare_balances_with_total_supply:
                     # this will only work if a snapshot was taken, which is guaranteed by compare_acs_with_snapshot=True
                     token_metadata = await scan_client.get_amulet_token_metadata()
                     latest_per_party_balances = app_state.state.get_per_party_balances().values()
