@@ -17,3 +17,7 @@ Max sequencing time.*is already past the sequencer clock timestamp
 
 # This kicks in when an interval is skipped, which can happen as we start canton nodes dynamically
 ACS_COMMITMENT_DEGRADATION.*The participant has activated ACS catchup mode
+
+# Noise from initializing the new bft layer
+Synchronizer 'global' failed the following topology transactions
+P2P connectivity is not ready
