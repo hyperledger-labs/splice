@@ -145,4 +145,7 @@ Rejected transaction due to a participant determined timeout
 # Seems like sometimes mediators time out maybe around onboarding, not worth investigating unless it causes issues.
 Sequencing result message timed out.*mediator=
 
+# TODO(DACH-NY/canton-network-internal#1781) Remove once Canton regression is fixed.
+Use of divulged contracts is deprecated and incompatible with pruning.
+
 # Make sure to have a trailing newline
