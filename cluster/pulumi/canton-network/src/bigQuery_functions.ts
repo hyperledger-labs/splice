@@ -751,9 +751,9 @@ const all_days_since_genesis = new BQTableFunction(
           -- DATE(
           --   TIMESTAMP_MICROS((SELECT MIN(record_time) FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
           --),
-          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 30 days until we confirm costs, and will
+          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 60 days until we confirm costs, and will
           -- backfill to genesis later.
-          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)),
+          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 DAY)),
           CURRENT_DATE
         )
       ) as day
@@ -817,7 +817,8 @@ const monthly_burn = new BQLogicalView(
   `
     SELECT
         as_of_record_time as monthly_as_of_record_time,
-        SUM(daily_burn) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn
+        SUM(daily_burn) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn,
+        SUM(daily_burn * daily_avg_coin_price) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn_usd
       FROM
         \`$$DASHBOARDS_DATASET$$.dashboards-data\`
   `
