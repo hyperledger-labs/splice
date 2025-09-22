@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.OptionT
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -75,7 +76,10 @@ class HttpTokenStandardMetadataHandler(
   private def lookupTotalSupplyByLatestAcsSnapshot()(implicit tc: TraceContext) = {
     for {
       latestSnapshot <- OptionT(
-        acsSnapshotStore.lookupSnapshotBefore(acsSnapshotStore.currentMigrationId, clock.now)
+        acsSnapshotStore.lookupSnapshotBefore(
+          acsSnapshotStore.currentMigrationId,
+          CantonTimestamp.now(),
+        )
       )
       unlocked <- OptionT.fromOption[Future](latestSnapshot.unlockedAmuletBalance)
       locked <- OptionT.fromOption[Future](latestSnapshot.lockedAmuletBalance)
