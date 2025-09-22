@@ -6,7 +6,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError.ConnectionErrors.SynchronizerIsNotAvailable
 
 import scala.concurrent.duration.*
 
