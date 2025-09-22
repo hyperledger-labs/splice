@@ -1841,8 +1841,6 @@ lazy val `apps-app`: Project =
     .in(file("apps/app"))
     .dependsOn(
       `apps-common`,
-      `splice-wallet-payments-daml`,
-      `splice-wallet-daml`,
       `apps-splitwell`,
       `apps-validator`,
       `apps-sv` % "compile->compile;test->test",
@@ -1851,6 +1849,7 @@ lazy val `apps-app`: Project =
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
+      `splice-util-featured-app-proxies-daml` % "test",
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
