@@ -1410,7 +1410,7 @@ class TransferInputs:
 
         return (output, effective_inputs, total_cc, all_inputs)
 
-    def summary(self):
+    def summary(self, subtract_holding_fees_per_round):
         output = []
         effective_inputs = []
         unfeatured_app_rewards = {}
@@ -1511,7 +1511,7 @@ class TransferInputs:
             for amulet in self.amulets:
                 amount = amulet.payload.get_amulet_amount()
                 effective = EffectiveAmount.from_amount_and_round(
-                    amount, self.round_number
+                    amount, self.round_number, subtract_holding_fees_per_round
                 )
                 effective_inputs += [effective.effective_amount]
 
@@ -1557,16 +1557,18 @@ class EffectiveAmount:
     rate_per_round: DamlDecimal
     round_diff: int
 
-    def from_amount_and_round(amount, round_number):
+    def from_amount_and_round(amount, round_number, subtract_holding_fees_per_round):
         created_at = amount.get_expiring_amount_created_at()
         initial_amount = amount.get_expiring_amount_initial_amount()
         rate_per_round = amount.get_expiring_amount_rate_per_round()
         round_diff = max(0, round_number - created_at)
-        effective_amount = initial_amount
-        # ^ field kept for backwards-compatibility, before the CC fee removal CIP this used to be:
-        #     max(
-        #         initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
-        #     )
+        # kept for backwards-compatibility (important for compatibility tests)
+        if subtract_holding_fees_per_round:
+            effective_amount = max(
+                initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+            )
+        else:
+            effective_amount = initial_amount
         return EffectiveAmount(
             effective_amount, initial_amount, created_at, rate_per_round, round_diff
         )
@@ -2382,7 +2384,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary()
+        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
         output_amulets_cids = res.get_transfer_result_created_amulets()
         output_fees = res.get_transfer_result_output_fees()
         sender_change_amulet_cid = res.get_transfer_result_sender_change_amulet()
@@ -2592,7 +2594,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary()
+        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
         amulet_paid = res.get_buy_member_traffic_result_amulet_paid()
         sender_change_cid = res.get_buy_member_traffic_result_sender_change_amulet()
         transfer_summary = res.get_buy_member_traffic_result_transfer_summary()
@@ -2804,7 +2806,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary()
+        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
         sender_change_cid = transfer_result.get_transfer_result_sender_change_amulet()
         output_fees = transfer_result.get_transfer_result_output_fees()
         if sender_change_cid:
@@ -4150,6 +4152,11 @@ def _parse_cli_args():
     parser.add_argument(
         "--compare-acs-with-snapshot",
         help="Compares the ACS at the end of the script with the ACS snapshot of the given record_time",
+    )
+    parser.add_argument(
+        "--subtract-holding-fees-per-round",
+        help="Before CIP 78, holding fees reduce the value of Amulets every round. After it, they do not. This flag enables the old behavior.",
+        action="store_true",
     )
     return parser.parse_args()
 
