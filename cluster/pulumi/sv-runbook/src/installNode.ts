@@ -112,10 +112,10 @@ export async function installNode(
 
   const imagePullDeps = imagePullSecret(xns);
 
-  const svKey = svKeyFromSecret('sv');
+  const svKey = svKeyFromSecret(svNamespaceStr.replace('-', '') + '-id');
 
   const cometBftGovernanceKey = svAppConfig.externalGovernanceKey
-    ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', ''))!
+    ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', '') + '-id')
     : undefined;
 
   const { sv, validator } = await installSvAndValidator(
