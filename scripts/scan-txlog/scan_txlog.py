@@ -4365,7 +4365,7 @@ async def main():
                     # sum up all balances
                     total_balance = sum([p.sum_amounts() for p in latest_per_party_balances], DamlDecimal(0))
                     if DamlDecimal(token_metadata['totalSupply']) != total_balance:
-                        LOG.error(f"Total supply mismatch: {token_metadata.totalSupply} in metadata (as of {token_metadata.totalSupplyAsOf}), {total_balance} in computed balances (as of {app_state.state.record_time})")
+                        LOG.error(f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})")
 
 
         duration = time.time() - begin_t
