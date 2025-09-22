@@ -24,5 +24,10 @@ RUN mkdir -p /app/splice-node/docs/html/cn-release-bundles
 
 RUN ln -s splice-node/bin/splice-node splice-image-bin
 
+RUN addgroup -g 1001 -S nonroot && adduser -u 1001 -S -G nonroot nonroot
+RUN chown -R nonroot:nonroot /app
+RUN chown nonroot:nonroot splice-image-bin
+USER nonroot
+
 # point entrypoint to the splice-node executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
