@@ -148,7 +148,7 @@ class UpdateHistorySanityCheckPlugin(
   private def checkScanTxLogScript(scan: ScanAppBackendReference)(implicit tc: TraceContext) = {
     val snapshotRecordTime = scan.forceAcsSnapshotNow()
     val amuletRules = scan.getAmuletRules()
-    val subtractHoldingFees: Boolean =
+    val amuletIncludesFees: Boolean =
       amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet
         .split("\\.")
         .toList match {
@@ -186,9 +186,11 @@ class UpdateHistorySanityCheckPlugin(
             "--compare-acs-with-snapshot",
             snapshotRecordTime.toInstant.toString,
           ) ++ Option
-            .when(subtractHoldingFees)("--subtract-holding-fees-per-round")
+            .when(amuletIncludesFees)("--subtract-holding-fees-per-round")
             .toList ++ Option
-            .when(compareBalancesWithTotalSupply)("--compare-balances-with-total-supply")
+            .when(compareBalancesWithTotalSupply && !amuletIncludesFees)(
+              "--compare-balances-with-total-supply"
+            )
             .toList ++ ignoredRootCreates.flatMap { templateId =>
             Seq("--ignore-root-create", QualifiedName(templateId).toString)
           } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
