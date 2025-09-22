@@ -1720,6 +1720,48 @@ class DbSvDsoStoreTest
     }
   }
 
+  "lookupAmuletConversionRateFeed" in {
+    val publisher1 = providerParty(1)
+    val publisher2 = providerParty(2)
+    def conversionRateFeed(publisher: PartyId, rate: BigDecimal) = {
+      val payload =
+        new amuletconversionratefeed.AmuletConversionRateFeed(
+          publisher.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
+          java.util.Optional.empty(),
+          rate.bigDecimal.setScale(10),
+        )
+      contract(
+        amuletconversionratefeed.AmuletConversionRateFeed.TEMPLATE_ID_WITH_PACKAGE_ID,
+        new amuletconversionratefeed.AmuletConversionRateFeed.ContractId(nextCid()),
+        payload,
+      )
+    }
+    val publisher1Feed1 = conversionRateFeed(publisher1, BigDecimal(42.0))
+    val publisher2Feed1 = conversionRateFeed(publisher2, BigDecimal(23.0))
+    val publisher1Feed2 = conversionRateFeed(publisher1, BigDecimal(23.0))
+    for {
+      store <- mkStore()
+      _ <- dummyDomain.create(publisher1Feed1)(
+        store.multiDomainAcsStore
+      )
+      result <- store.lookupAmuletConversionRateFeed(publisher1)
+      _ = result shouldBe Some(publisher1Feed1)
+      result <- store.lookupAmuletConversionRateFeed(publisher2)
+      _ = result shouldBe None
+      _ <- dummyDomain.create(publisher2Feed1)(
+        store.multiDomainAcsStore
+      )
+      result <- store.lookupAmuletConversionRateFeed(publisher2)
+      _ = result shouldBe Some(publisher2Feed1)
+      _ <- dummyDomain.create(publisher1Feed2)(
+        store.multiDomainAcsStore
+      )
+      result <- store.lookupAmuletConversionRateFeed(publisher1)
+      _ = result shouldBe Some(publisher1Feed2)
+    } yield succeed
+  }
+
   override protected def cleanDb(
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
