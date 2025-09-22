@@ -308,7 +308,22 @@ lazy val `splice-api-token-metadata-v1-daml` =
     .in(file("token-standard/splice-api-token-metadata-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val tokenMetadataOpenApiFile =
+            baseDirectory.value / "openapi/token-metadata-v1.yaml"
+
+          BuildCommon.TS.generateOpenApiClient(
+            unscopedNpmName = "token-metadata-openapi",
+            openApiSpec = "token-metadata-v1.yaml",
+            cacheFileDependencies = Set(tokenMetadataOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -1332,6 +1347,13 @@ lazy val `apps-scan-frontend` = {
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "@lfdecentralizedtrust/splice-scan-frontend",
       sharedFrontendSettings,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
+          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
+          false,
+        )
+      ),
     )
 }
 
