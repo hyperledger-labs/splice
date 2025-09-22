@@ -1,11 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.*
+import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
-import com.digitalasset.canton.console.CommandFailure
+import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
 
@@ -75,7 +77,7 @@ class WalletSurviveCantonRestartIntegrationTest
       clue("Second run of Canton participant") {
         withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-2") {
           clue("We can tap and list after Canton restart and domain reconnection") {
-            loggerFactory.assertLogs(
+            loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
               {
                 // Due to the circuit breaker kicking in, this might take a bit longer to succeed after some failures due to the disconnect
                 eventuallySucceeds(2.minutes) {
@@ -83,7 +85,13 @@ class WalletSurviveCantonRestartIntegrationTest
                 }
                 aliceWalletClient.list()
               },
-              _.warningMessage should include("Circuit breaker treasury tripped after 20 failures"),
+              logEntries => {
+                forAtMost(1, logEntries) { logEntry =>
+                  logEntry.message should include(
+                    "Circuit breaker treasury tripped after 20 failures"
+                  )
+                }
+              },
             )
           }
         }
