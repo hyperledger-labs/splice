@@ -57,88 +57,92 @@ class WalletTxLogTimeBasedIntegrationTest
 
   "A wallet" should {
 
-    "handle app and validator rewards" in { implicit env =>
-      val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWalletClient)
-      waitForWalletUser(bobValidatorWalletClient)
+    "handle app and validator rewards" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_14) in {
+      implicit env =>
+        val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
+        waitForWalletUser(aliceValidatorWalletClient)
+        waitForWalletUser(bobValidatorWalletClient)
 
-      clue("Tap to get some amulets") {
-        aliceWalletClient.tap(100.0)
-        aliceValidatorWalletClient.tap(100.0)
-      }
-
-      actAndCheck(
-        "Alice transfers some CC to Bob",
-        p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
-      )(
-        "Bob has received the CC",
-        _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
-      )
-
-      // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
-      clue("Advance rounds by 3 ticks.") {
-        advanceRoundsByOneTick
-        advanceRoundsByOneTick
-        advanceRoundsByOneTick
-      }
-
-      clue("Everyone still has their reward coupons") {
-        eventually() {
-          aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
-          aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+        clue("Tap to get some amulets") {
+          aliceWalletClient.tap(100.0)
+          aliceValidatorWalletClient.tap(100.0)
         }
-      }
 
-      val appRewards = aliceValidatorWalletClient.listAppRewardCoupons()
-      val validatorRewards = aliceValidatorWalletClient.listValidatorRewardCoupons()
-      val (appRewardAmount, validatorRewardAmount) =
-        getRewardCouponsValue(appRewards, validatorRewards, false)
+        actAndCheck(
+          "Alice transfers some CC to Bob",
+          p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
+        )(
+          "Bob has received the CC",
+          _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
+        )
 
-      actAndCheck(
-        "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
-        p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0),
-      )(
-        "Bob has received the CC",
-        _ => {
-          bobWalletClient.balance().unlockedQty should be > BigDecimal(49.0)
-        },
-      )
+        // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
+        clue("Advance rounds by 3 ticks.") {
+          advanceRoundsByOneTick
+          advanceRoundsByOneTick
+          advanceRoundsByOneTick
+        }
 
-      checkTxHistory(
-        bobWalletClient,
-        Seq[CheckTxHistoryFn](
-          { case logEntry: TransferTxLogEntry =>
-            // Alice's validator sending 10CC to Bob, using their validator&app rewards and their amulet
-            val senderAmount =
-              (BigDecimal(10) - appRewardAmount - validatorRewardAmount) max BigDecimal(0)
-            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto
-            logEntry.sender.value.party shouldBe aliceValidatorBackend
-              .getValidatorPartyId()
-              .toProtoPrimitive
-            logEntry.sender.value.amount should beWithin(-senderAmount - smallAmount, -senderAmount)
-            inside(logEntry.receivers) { case Seq(receiver) =>
-              receiver.party shouldBe bobUserParty.toProtoPrimitive
-              receiver.amount should beWithin(10 - smallAmount, BigDecimal(10))
-            }
-            logEntry.appRewardsUsed shouldBe appRewardAmount
-            logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
-            logEntry.amuletPrice shouldBe amuletPrice
+        clue("Everyone still has their reward coupons") {
+          eventually() {
+            aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
+            aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+          }
+        }
+
+        val appRewards = aliceValidatorWalletClient.listAppRewardCoupons()
+        val validatorRewards = aliceValidatorWalletClient.listValidatorRewardCoupons()
+        val (appRewardAmount, validatorRewardAmount) =
+          getRewardCouponsValue(appRewards, validatorRewards, false)
+
+        actAndCheck(
+          "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
+          p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0),
+        )(
+          "Bob has received the CC",
+          _ => {
+            bobWalletClient.balance().unlockedQty should be > BigDecimal(49.0)
           },
-          { case logEntry: TransferTxLogEntry =>
-            // Alice sending 40CC to Bob
-            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto
-            logEntry.sender.value.party shouldBe aliceUserParty.toProtoPrimitive
-            logEntry.sender.value.amount should beWithin(-40 - smallAmount, -40)
-            inside(logEntry.receivers) { case Seq(receiver) =>
-              receiver.party shouldBe bobUserParty.toProtoPrimitive
-              receiver.amount should beWithin(40 - smallAmount, 40)
-            }
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
-            logEntry.amuletPrice shouldBe amuletPrice
-          },
-        ),
-      )
+        )
+
+        checkTxHistory(
+          bobWalletClient,
+          Seq[CheckTxHistoryFn](
+            { case logEntry: TransferTxLogEntry =>
+              // Alice's validator sending 10CC to Bob, using their validator&app rewards and their amulet
+              val senderAmount =
+                (BigDecimal(10) - appRewardAmount - validatorRewardAmount) max BigDecimal(0)
+              logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto
+              logEntry.sender.value.party shouldBe aliceValidatorBackend
+                .getValidatorPartyId()
+                .toProtoPrimitive
+              logEntry.sender.value.amount should beWithin(
+                -senderAmount - smallAmount,
+                -senderAmount,
+              )
+              inside(logEntry.receivers) { case Seq(receiver) =>
+                receiver.party shouldBe bobUserParty.toProtoPrimitive
+                receiver.amount should beWithin(10 - smallAmount, BigDecimal(10))
+              }
+              logEntry.appRewardsUsed shouldBe appRewardAmount
+              logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
+              logEntry.senderHoldingFees shouldBe BigDecimal(0)
+              logEntry.amuletPrice shouldBe amuletPrice
+            },
+            { case logEntry: TransferTxLogEntry =>
+              // Alice sending 40CC to Bob
+              logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto
+              logEntry.sender.value.party shouldBe aliceUserParty.toProtoPrimitive
+              logEntry.sender.value.amount should beWithin(-40 - smallAmount, -40)
+              inside(logEntry.receivers) { case Seq(receiver) =>
+                receiver.party shouldBe bobUserParty.toProtoPrimitive
+                receiver.amount should beWithin(40 - smallAmount, 40)
+              }
+              logEntry.senderHoldingFees shouldBe BigDecimal(0)
+              logEntry.amuletPrice shouldBe amuletPrice
+            },
+          ),
+        )
     }
 
     "include correct fees" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_14) in {
