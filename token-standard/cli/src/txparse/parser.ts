@@ -661,7 +661,6 @@ export class TransactionParser {
           ),
           verbose: false,
         },
-        requestingParties: [],
       })
       .catch((err) => {
         // This will happen for holdings with consuming choices

@@ -13,7 +13,7 @@ export function createGrafanaDashboards(namespace: Input<string>): void {
   );
   createConfigMapForFolder(
     namespace,
-    `${SPLICE_ROOT}/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/block/bftordering/examples/observability/grafana/dashboards/Canton/`,
+    `${SPLICE_ROOT}/canton/community/app/src/pack/examples/13-observability/grafana/dashboards/Canton/`,
     'canton-bft'
   );
 }

@@ -182,7 +182,7 @@ import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
 import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{Party, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPartyId}
 import com.google.protobuf.empty.Empty
@@ -238,7 +238,7 @@ object LedgerApiCommands {
     }
 
     final case class Update(
-        party: PartyId,
+        party: Party,
         annotationsUpdate: Option[Map[String, String]],
         resourceVersionO: Option[String],
         identityProviderId: String,
@@ -301,7 +301,7 @@ object LedgerApiCommands {
         Right(response.partyDetails)
     }
 
-    final case class GetParty(party: PartyId, identityProviderId: String)
+    final case class GetParty(party: Party, identityProviderId: String)
         extends BaseCommand[GetPartiesRequest, GetPartiesResponse, PartyDetails] {
 
       override protected def createRequest(): Either[String, GetPartiesRequest] =
@@ -499,13 +499,18 @@ object LedgerApiCommands {
     trait HasRights {
       def actAs: Set[LfPartyId]
       def readAs: Set[LfPartyId]
+      def executeAs: Set[LfPartyId]
       def participantAdmin: Boolean
       def identityProviderAdmin: Boolean
       def readAsAnyParty: Boolean
+      def executeAsAnyParty: Boolean
 
       protected def getRights: Seq[UserRight] =
         actAs.toSeq.map(x => UserRight.defaultInstance.withCanActAs(UserRight.CanActAs(x))) ++
           readAs.toSeq.map(x => UserRight.defaultInstance.withCanReadAs(UserRight.CanReadAs(x))) ++
+          executeAs.toSeq
+            .map(UserRight.CanExecuteAs.apply)
+            .map(UserRight.defaultInstance.withCanExecuteAs) ++
           (if (participantAdmin)
              Seq(UserRight.defaultInstance.withParticipantAdmin(UserRight.ParticipantAdmin()))
            else Seq()) ++
@@ -517,6 +522,11 @@ object LedgerApiCommands {
            else Seq()) ++
           (if (readAsAnyParty)
              Seq(UserRight.defaultInstance.withCanReadAsAnyParty(UserRight.CanReadAsAnyParty()))
+           else Seq()) ++
+          (if (executeAsAnyParty)
+             Seq(
+               UserRight.defaultInstance.withCanExecuteAsAnyParty(UserRight.CanExecuteAsAnyParty())
+             )
            else Seq())
     }
 
@@ -531,6 +541,8 @@ object LedgerApiCommands {
         annotations: Map[String, String],
         identityProviderId: String,
         readAsAnyParty: Boolean,
+        executeAs: Set[LfPartyId],
+        executeAsAnyParty: Boolean,
     ) extends BaseCommand[CreateUserRequest, CreateUserResponse, LedgerApiUser]
         with HasRights {
 
@@ -728,10 +740,12 @@ object LedgerApiCommands {
           id: String,
           actAs: Set[LfPartyId],
           readAs: Set[LfPartyId],
+          executeAs: Set[LfPartyId],
           participantAdmin: Boolean,
           identityProviderAdmin: Boolean,
           identityProviderId: String,
           readAsAnyParty: Boolean,
+          executeAsAnyParty: Boolean,
       ) extends BaseCommand[GrantUserRightsRequest, GrantUserRightsResponse, UserRights]
           with HasRights {
 
@@ -760,10 +774,12 @@ object LedgerApiCommands {
           id: String,
           actAs: Set[LfPartyId],
           readAs: Set[LfPartyId],
+          executeAs: Set[LfPartyId],
           participantAdmin: Boolean,
           identityProviderAdmin: Boolean,
           identityProviderId: String,
           readAsAnyParty: Boolean,
+          executeAsAnyParty: Boolean,
       ) extends BaseCommand[RevokeUserRightsRequest, RevokeUserRightsResponse, UserRights]
           with HasRights {
 
@@ -1625,7 +1641,8 @@ object LedgerApiCommands {
         minLedgerTimeAbs: Option[Instant],
         deduplicationPeriod: Option[DeduplicationPeriod],
         hashingSchemeVersion: HashingSchemeVersion,
-        transactionFormat: Option[TransactionFormat],
+        transactionShape: Option[TransactionShape],
+        includeCreatedEventBlob: Boolean,
     ) extends BaseCommand[
           ExecuteSubmissionAndWaitForTransactionRequest,
           ExecuteSubmissionAndWaitForTransactionResponse,
@@ -1633,7 +1650,31 @@ object LedgerApiCommands {
         ] {
 
       override protected def createRequest()
-          : Either[String, ExecuteSubmissionAndWaitForTransactionRequest] =
+          : Either[String, ExecuteSubmissionAndWaitForTransactionRequest] = {
+
+        val transactionFormat = transactionShape.map(transactionShape =>
+          TransactionFormat(
+            eventFormat = Some(
+              EventFormat(
+                filtersByParty = Map.empty,
+                filtersForAnyParty = Some(
+                  Filters(
+                    Seq(
+                      CumulativeFilter(
+                        CumulativeFilter.IdentifierFilter.WildcardFilter(
+                          WildcardFilter(includeCreatedEventBlob = includeCreatedEventBlob)
+                        )
+                      )
+                    )
+                  )
+                ),
+                verbose = true,
+              )
+            ),
+            transactionShape = transactionShape,
+          )
+        )
+
         ExecuteCommand(
           preparedTransaction = preparedTransaction,
           transactionSignatures = transactionSignatures,
@@ -1648,6 +1689,7 @@ object LedgerApiCommands {
               .withFieldConst(_.transactionFormat, transactionFormat)
               .transform
           )
+      }
 
       override protected def submitRequest(
           service: InteractiveSubmissionServiceStub,
@@ -2226,7 +2268,6 @@ object LedgerApiCommands {
       override protected def createRequest(): Either[String, GetEventsByContractIdRequest] = Right(
         GetEventsByContractIdRequest(
           contractId = contractId,
-          requestingParties = Seq.empty,
           eventFormat = Some(
             EventFormat(
               filtersByParty = requestingParties.map(_ -> Filters(Nil)).toMap,
