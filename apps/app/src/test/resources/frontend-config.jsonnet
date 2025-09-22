@@ -72,6 +72,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
   },
   scan: {
     scan: { url: 'http://localhost:5012/api/scan' },
+    tokenMetadata: { url: 'http://localhost:5012' },
   },
   sv1: {
     sv: { url: 'http://localhost:5114/api/sv' },

@@ -4,6 +4,10 @@ window.splice_config = {
       // URL of scan backend.
       url: "https://" + window.location.host + "/api/scan",
     },
+    tokenMetadata: {
+      // Same as scan, '/registry' is already included in the openapi definitions
+      url: "https://" + window.location.host,
+    },
   },
   pollInterval: "${SPLICE_APP_UI_POLL_INTERVAL}",
   spliceInstanceNames: {

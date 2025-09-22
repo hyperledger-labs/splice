@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 type ScanServicesConfig = {
   scan: z.infer<typeof serviceSchema>;
+  tokenMetadata: z.infer<typeof serviceSchema>;
 };
 
 type ScanConfig = {
@@ -24,6 +25,7 @@ type ScanConfig = {
 const configScheme = z.object({
   services: z.object({
     scan: serviceSchema,
+    tokenMetadata: serviceSchema,
   }),
   spliceInstanceNames: spliceInstanceNamesSchema,
   pollInterval: pollIntervalSchema,

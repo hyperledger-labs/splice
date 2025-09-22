@@ -29,6 +29,7 @@ import ScanValidatorLicenses from './routes/scanValidatorLicenses';
 import ValidatorFaucetsLeaderboard from './routes/validatorFaucetsLeaderboard';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
 import { useConfigPollInterval, useScanConfig } from './utils';
+import { TokenMetadataClientProvider } from './api/TokenMetadataClientContext';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useScanConfig();
@@ -46,10 +47,12 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   return (
     <ScanClientProvider url={config.services.scan.url}>
-      <QueryClientProvider client={queryClient}>
-        <ReactQueryDevtools initialIsOpen={false} />
-        <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
-      </QueryClientProvider>
+      <TokenMetadataClientProvider url={config.services.tokenMetadata.url}>
+        <QueryClientProvider client={queryClient}>
+          <ReactQueryDevtools initialIsOpen={false} />
+          <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
+        </QueryClientProvider>
+      </TokenMetadataClientProvider>
     </ScanClientProvider>
   );
 };
