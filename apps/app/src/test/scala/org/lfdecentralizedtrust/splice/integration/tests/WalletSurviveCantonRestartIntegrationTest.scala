@@ -80,7 +80,8 @@ class WalletSurviveCantonRestartIntegrationTest
             loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
               {
                 // Due to the circuit breaker kicking in, this might take a bit longer to succeed after some failures due to the disconnect
-                eventuallySucceeds(2.minutes) {
+                // Disable suppressErrors to avoid nested loggerFactory calls
+                eventuallySucceeds(2.minutes, suppressErrors = false) {
                   aliceWalletClient.tap(2)
                 }
                 aliceWalletClient.list()
