@@ -509,7 +509,7 @@ export function configureScanBigQuery(
     pubRepSlots
   );
   const dashboardsDataset = installDashboardsDataset();
-  installFunctions(dataset, dashboardsDataset, [stream]);
+  const functionsDataset = installFunctions(dataset, dashboardsDataset, [stream]);
   installScheduledTasks(dashboardsDataset, [functionsDataset, dataset]);
   return;
 }
