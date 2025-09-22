@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.util.{QualifiedName, TriggerTestUtil}
 import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
@@ -29,6 +29,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.sys.process.ProcessLogger
+import scala.util.Try
 import scala.util.control.NonFatal
 
 /** Runs `scripts/scan-txlog/scan_txlog.py`, to make sure that we have no transactions that would break it.
@@ -40,7 +41,7 @@ import scala.util.control.NonFatal
 class UpdateHistorySanityCheckPlugin(
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
-    protected val loggerFactory: NamedLoggerFactory,
+    protected val loggerFactory: SuppressingLogger,
 ) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
     with Matchers
     with Eventually
@@ -147,7 +148,7 @@ class UpdateHistorySanityCheckPlugin(
   private def checkScanTxLogScript(scan: ScanAppBackendReference)(implicit tc: TraceContext) = {
     val snapshotRecordTime = scan.forceAcsSnapshotNow()
     val amuletRules = scan.getAmuletRules()
-    val subtractHoldingFees: Boolean =
+    val amuletIncludesFees: Boolean =
       amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet
         .split("\\.")
         .toList match {
@@ -158,6 +159,10 @@ class UpdateHistorySanityCheckPlugin(
             s"Amulet package version is ${amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet}, which is not x.y.z"
           )
       }
+    // some tests have temporary participants, so the request won't always manage to resolve package support
+    val compareBalancesWithTotalSupply = loggerFactory.suppressWarningsAndErrors(
+      Try(scan.lookupInstrument("Amulet")).toOption.flatten.flatMap(_.totalSupply).isDefined
+    )
 
     val readLines = mutable.Buffer[String]()
     val errorProcessor = ProcessLogger(line => readLines.append(line))
@@ -181,7 +186,11 @@ class UpdateHistorySanityCheckPlugin(
             "--compare-acs-with-snapshot",
             snapshotRecordTime.toInstant.toString,
           ) ++ Option
-            .when(subtractHoldingFees)("--subtract-holding-fees-per-round")
+            .when(amuletIncludesFees)("--subtract-holding-fees-per-round")
+            .toList ++ Option
+            .when(compareBalancesWithTotalSupply && !amuletIncludesFees)(
+              "--compare-balances-with-total-supply"
+            )
             .toList ++ ignoredRootCreates.flatMap { templateId =>
             Seq("--ignore-root-create", QualifiedName(templateId).toString)
           } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
