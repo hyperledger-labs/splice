@@ -183,9 +183,14 @@ class UpdateHistorySanityCheckPlugin(
     }
 
     withClue(readLines) {
-      readLines.filter { log =>
+      val lines = readLines.filter { log =>
         log.contains("ERROR:") || log.contains("WARNING:")
-      } should be(empty)
+      }
+      if (lines.nonEmpty) {
+        logger.error(s"${this.getClass} contains errors: $lines, exiting test.")
+        sys.exit(1)
+      }
+      lines should be(empty)
       forExactly(1, readLines) { line =>
         line should include("Reached end of stream")
       }

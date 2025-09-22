@@ -854,6 +854,9 @@ class AcsSnapshotStoreTest
             2000L * n
           )
         )
+        val illegalDsoUnlocked = amulet(providerParty(42), 42, 42L, 0.42, dso = providerParty(42))
+        val illegalDsoLocked =
+          lockedAmulet(providerParty(42), 42, 42L, 0.42, dso = providerParty(42))
         val snapshotTimestamp = CantonTimestamp.Epoch.plusSeconds(100_000L)
 
         for {
@@ -875,6 +878,18 @@ class AcsSnapshotStoreTest
               Seq(PartyId.tryFromProtoPrimitive(amulet.payload.amulet.owner), dsoParty),
             )
           }
+          _ <- ingestCreate(
+            updateHistory,
+            illegalDsoLocked,
+            snapshotTimestamp.minusSeconds(2L),
+            Seq(PartyId.tryFromProtoPrimitive(illegalDsoUnlocked.payload.dso)),
+          )
+          _ <- ingestCreate(
+            updateHistory,
+            illegalDsoLocked,
+            snapshotTimestamp.minusSeconds(1L),
+            Seq(PartyId.tryFromProtoPrimitive(illegalDsoLocked.payload.amulet.dso)),
+          )
           _ <- store.insertNewSnapshot(
             None,
             DefaultMigrationId,

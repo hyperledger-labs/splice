@@ -2240,6 +2240,7 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -2398,6 +2399,7 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -4340,6 +4342,7 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -4498,6 +4501,7 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -5870,6 +5874,7 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -6028,6 +6033,7 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "INFO",
+        "logLevelStdout": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {

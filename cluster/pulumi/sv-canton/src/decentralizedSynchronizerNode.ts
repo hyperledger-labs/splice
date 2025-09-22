@@ -129,7 +129,7 @@ abstract class InStackDecentralizedSynchronizerNode
           },
           livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,
           additionalJvmOptions: getAdditionalJvmOptions(svConfig.sequencer?.additionalJvmOptions),
-          pvc: spliceConfig.configuration.persistentSequencerHeapDumps
+          pvc: spliceConfig.configuration.persistentHeapDumps
             ? {
                 size: '10Gi',
                 volumeStorageClass: 'standard-rwo',
