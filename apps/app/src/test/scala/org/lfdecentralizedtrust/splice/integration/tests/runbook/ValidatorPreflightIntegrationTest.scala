@@ -400,7 +400,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   "can dump participant identities of validator" in { _ =>
     eventuallySucceeds() {
-      validatorClient().dumpParticipantIdentities()
+      validatorClient(suppressErrors = false).dumpParticipantIdentities()
     }
   }
 
@@ -543,7 +543,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
         connectedEndpointSet should contain(svSequencerEndpoint.forgetNE.loneElement.toString)
       }
-  }
+  } e
 
 }
 
