@@ -543,7 +543,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
         connectedEndpointSet should contain(svSequencerEndpoint.forgetNE.loneElement.toString)
       }
-  } e
+  }
 
 }
 
