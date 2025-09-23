@@ -39,15 +39,11 @@ const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_
 
 export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
-  // TODO: decide how frequently we want to refetch this
   const dsoProposalsQuery = useListDsoRulesVoteRequests();
-  console.log('tesco dsoProposalsQuery.data', dsoProposalsQuery.data);
   const pendingConfigFields = useMemo(
     () => fetchConflictingFields(dsoProposalsQuery.data),
     [dsoProposalsQuery.data]
   );
-  console.log('tesco pendingConfigFields', pendingConfigFields);
-  // const pendingConfigFields = fetchConflictingFields(dsoProposalsQuery.data);
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const mutation = useProposalMutation();
@@ -131,12 +127,10 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       },
       onSubmit: ({ value: formData }) => {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
-        console.log('tesco changes', changes);
 
         const conflictingFieldNames = changes
           .map(c => c.fieldName)
           .filter(fieldName => pendingConfigFields.some(p => p.fieldName === fieldName));
-        console.log('tesco conflictingFieldNames', conflictingFieldNames);
 
         if (conflictingFieldNames.length > 0) {
           return `Cannot modify fields that have pending changes: ${conflictingFieldNames.join(', ')}`;

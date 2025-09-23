@@ -6,7 +6,7 @@ import type { ListDsoRulesVoteRequestsResponse } from '@lfdecentralizedtrust/sv-
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import App from '../../../App';
 import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
 import { SvConfigProvider } from '../../../utils';
@@ -61,18 +61,6 @@ const proposals: ListDsoRulesVoteRequestsResponse = {
 };
 
 describe('Pending Fields', () => {
-  // beforeAll(() => {
-  //   server.resetHandlers();
-  //   server.use(
-  //     rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
-  //       console.log('============= tesco from testtttt');
-  //       // const xx = { dso_rules_vote_requests: [] };
-  //       // return res(ctx.json<ListDsoRulesVoteRequestsResponse>(xx));
-  //       return res(ctx.json<ListDsoRulesVoteRequestsResponse>(proposals));
-  //     })
-  //   );
-  // });
-
   test('login and see the SV party ID', async () => {
     const user = userEvent.setup();
     render(
@@ -93,10 +81,8 @@ describe('Pending Fields', () => {
   });
 
   test('Pending confirmation fields should be disabled and pending info displayed', async () => {
-    console.log('tesco proposals is ', proposals);
     server.use(
       rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
-        console.log('============= tesco from test');
         return res(ctx.json<ListDsoRulesVoteRequestsResponse>(proposals));
       })
     );

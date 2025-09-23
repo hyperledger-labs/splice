@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Box, Divider, TextField as MuiTextField, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -51,9 +50,8 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
 
         <Box sx={{ width: 250 }}>
           <MuiTextField
-            // We choose empty string to represent fields that could be undefined because their values have not been set.
-            // value={field.state.value?.value ? field.state.value.value : ""}
             {...textFieldProps}
+            // We choose empty string to represent fields that could be undefined because their values have not been set.
             value={field.state.value?.value || ''}
             onBlur={field.handleBlur}
             onChange={e =>
@@ -62,18 +60,6 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
                 value: e.target.value,
               })
             }
-            // variant="outlined"
-            // size="small"
-            // color={field.state.meta.isDefaultValue ? "primary" : "secondary"}
-            // focused={!field.state.meta.isDefaultValue}
-            // autoComplete="off"
-            // inputProps={{
-            // 	sx: {
-            // 		textAlign: "right",
-            // 	},
-            // 	"data-testid": `config-field-${configChange.fieldName}`,
-            // }}
-            // disabled={pendingFieldInfo !== undefined}
           />
 
           {!field.state.meta.isDefaultValue && (
@@ -88,29 +74,6 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
           )}
 
           {pendingFieldInfo && <PendingConfigDisplay pendingFieldInfo={pendingFieldInfo} />}
-
-          {/* {pendingFieldInfo && ( */}
-          {/* 	<Typography */}
-          {/* 		variant="caption" */}
-          {/* 		color="text.secondary" */}
-          {/* 		sx={{ mt: 0.5, display: "block", textAlign: "center" }} */}
-          {/* 		data-testid={`config-pending-value-${configChange.fieldName}`} */}
-          {/* 	> */}
-          {/* 		Pending Configuration:{" "} */}
-          {/* 		<strong>{pendingFieldInfo.pendingValue}</strong> <br /> */}
-          {/* 		Effective Date:{" "} */}
-          {/* 		<strong> */}
-          {/* 			{pendingFieldInfo.effectiveDate === "Threshold" */}
-          {/* 				? "Threshold" */}
-          {/* 				: dayjs(pendingFieldInfo.effectiveDate).format( */}
-          {/* 						dateTimeFormatISO, */}
-          {/* 					)} */}
-
-          {/* 			{pendingFieldInfo.effectiveDate !== "Threshold" && */}
-          {/* 				dayjs(pendingFieldInfo.effectiveDate).fromNow()} */}
-          {/* 		</strong> */}
-          {/* 	</Typography> */}
-          {/* )} */}
         </Box>
       </Box>
       <Divider />
@@ -123,13 +86,6 @@ interface PendingConfigDisplayProps {
 }
 
 export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pendingFieldInfo }) => {
-  // const formatEffectiveDate = (date: string) => {
-  //   if (date === 'Threshold') return 'Threshold';
-  //   const formatted = dayjs(date).format(dateTimeFormatISO);
-  //   const relative = dayjs(date).fromNow();
-  //   return `${formatted} (${relative})`;
-  // };
-
   const atThreshold = pendingFieldInfo.effectiveDate === 'Threshold';
   return (
     <Typography
@@ -143,7 +99,6 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
       <strong>
         {atThreshold ? 'at Threshold' : dayjs(pendingFieldInfo.effectiveDate).fromNow()}
       </strong>
-      {/* Effective Date: <strong>{formatEffectiveDate(pendingFieldInfo.effectiveDate)}</strong> */}
     </Typography>
   );
 };

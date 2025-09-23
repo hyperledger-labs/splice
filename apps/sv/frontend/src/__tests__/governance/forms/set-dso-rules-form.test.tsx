@@ -273,16 +273,8 @@ describe('Set DSO Config Rules Form', () => {
     server.resetHandlers();
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
-        console.log('tesco ==create handler');
         return res(ctx.json({}));
       })
-
-      // rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
-      //   const data: ListDsoRulesVoteRequestsResponse = {
-      //     dso_rules_vote_requests: [],
-      //   };
-      //   return res(ctx.json<ListDsoRulesVoteRequestsResponse>(data));
-      // })
     );
 
     const user = userEvent.setup();
