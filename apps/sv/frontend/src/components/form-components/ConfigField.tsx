@@ -1,12 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Box, Divider, TextField as MuiTextField, Typography } from '@mui/material';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { useFieldContext } from '../../hooks/formContext';
-import { ConfigChange } from '../../utils/types';
+import type { ConfigChange, PendingConfigFieldInfo } from '../../utils/types';
+
+dayjs.extend(relativeTime);
 
 export interface ConfigFieldProps {
   configChange: ConfigChange;
+  pendingFieldInfo?: PendingConfigFieldInfo;
 }
 
 export type ConfigFieldState = {
@@ -15,8 +21,20 @@ export type ConfigFieldState = {
 };
 
 export const ConfigField: React.FC<ConfigFieldProps> = props => {
-  const { configChange } = props;
+  const { configChange, pendingFieldInfo } = props;
   const field = useFieldContext<ConfigFieldState>();
+  const textFieldProps = {
+    variant: 'outlined' as const,
+    size: 'small' as const,
+    color: field.state.meta.isDefaultValue ? ('primary' as const) : ('secondary' as const),
+    focused: !field.state.meta.isDefaultValue,
+    autoComplete: 'off' as const,
+    inputProps: {
+      sx: { textAlign: 'right' },
+      'data-testid': `config-field-${configChange.fieldName}`,
+    },
+    disabled: pendingFieldInfo !== undefined,
+  };
 
   return (
     <>
@@ -33,23 +51,29 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
 
         <Box sx={{ width: 250 }}>
           <MuiTextField
-            variant="outlined"
-            size="small"
             // We choose empty string to represent fields that could be undefined because their values have not been set.
-            value={field.state.value?.value ? field.state.value.value : ''}
+            // value={field.state.value?.value ? field.state.value.value : ""}
+            {...textFieldProps}
+            value={field.state.value?.value || ''}
             onBlur={field.handleBlur}
             onChange={e =>
-              field.handleChange({ fieldName: configChange.fieldName, value: e.target.value })
+              field.handleChange({
+                fieldName: configChange.fieldName,
+                value: e.target.value,
+              })
             }
-            color={field.state.meta.isDefaultValue ? 'primary' : 'secondary'}
-            focused={!field.state.meta.isDefaultValue}
-            autoComplete="off"
-            inputProps={{
-              sx: {
-                textAlign: 'right',
-              },
-              'data-testid': `config-field-${configChange.fieldName}`,
-            }}
+            // variant="outlined"
+            // size="small"
+            // color={field.state.meta.isDefaultValue ? "primary" : "secondary"}
+            // focused={!field.state.meta.isDefaultValue}
+            // autoComplete="off"
+            // inputProps={{
+            // 	sx: {
+            // 		textAlign: "right",
+            // 	},
+            // 	"data-testid": `config-field-${configChange.fieldName}`,
+            // }}
+            // disabled={pendingFieldInfo !== undefined}
           />
 
           {!field.state.meta.isDefaultValue && (
@@ -62,9 +86,64 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
               Current Configuration: {configChange.currentValue}
             </Typography>
           )}
+
+          {pendingFieldInfo && <PendingConfigDisplay pendingFieldInfo={pendingFieldInfo} />}
+
+          {/* {pendingFieldInfo && ( */}
+          {/* 	<Typography */}
+          {/* 		variant="caption" */}
+          {/* 		color="text.secondary" */}
+          {/* 		sx={{ mt: 0.5, display: "block", textAlign: "center" }} */}
+          {/* 		data-testid={`config-pending-value-${configChange.fieldName}`} */}
+          {/* 	> */}
+          {/* 		Pending Configuration:{" "} */}
+          {/* 		<strong>{pendingFieldInfo.pendingValue}</strong> <br /> */}
+          {/* 		Effective Date:{" "} */}
+          {/* 		<strong> */}
+          {/* 			{pendingFieldInfo.effectiveDate === "Threshold" */}
+          {/* 				? "Threshold" */}
+          {/* 				: dayjs(pendingFieldInfo.effectiveDate).format( */}
+          {/* 						dateTimeFormatISO, */}
+          {/* 					)} */}
+
+          {/* 			{pendingFieldInfo.effectiveDate !== "Threshold" && */}
+          {/* 				dayjs(pendingFieldInfo.effectiveDate).fromNow()} */}
+          {/* 		</strong> */}
+          {/* 	</Typography> */}
+          {/* )} */}
         </Box>
       </Box>
       <Divider />
     </>
+  );
+};
+
+interface PendingConfigDisplayProps {
+  pendingFieldInfo: PendingConfigFieldInfo;
+}
+
+export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pendingFieldInfo }) => {
+  // const formatEffectiveDate = (date: string) => {
+  //   if (date === 'Threshold') return 'Threshold';
+  //   const formatted = dayjs(date).format(dateTimeFormatISO);
+  //   const relative = dayjs(date).fromNow();
+  //   return `${formatted} (${relative})`;
+  // };
+
+  const atThreshold = pendingFieldInfo.effectiveDate === 'Threshold';
+  return (
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
+      data-testid={`config-pending-value-${pendingFieldInfo.fieldName}`}
+    >
+      Pending Configuration: <strong>{pendingFieldInfo.pendingValue}</strong> <br />
+      This proposal will go into effect{' '}
+      <strong>
+        {atThreshold ? 'at Threshold' : dayjs(pendingFieldInfo.effectiveDate).fromNow()}
+      </strong>
+      {/* Effective Date: <strong>{formatEffectiveDate(pendingFieldInfo.effectiveDate)}</strong> */}
+    </Typography>
   );
 };

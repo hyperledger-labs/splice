@@ -1,15 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import {
-  VoteRequest,
-  DsoRules_CloseVoteRequestResult,
-} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { List } from '@daml/types';
+import {
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
+import { useConfigPollInterval } from '../utils';
 
 export type ListVoteRequestResultParams = {
   actionName?: string;
@@ -19,14 +20,19 @@ export type ListVoteRequestResultParams = {
   effectiveTo?: string;
 };
 
-export const useListDsoRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest>[]> => {
+export const useListDsoRulesVoteRequests = (
+  refetchInterval?: number
+): UseQueryResult<Contract<VoteRequest>[]> => {
   const { listDsoRulesVoteRequests } = useSvAdminClient();
+  const defaultRefetchInterval = useConfigPollInterval();
+
   return useQuery({
     queryKey: ['listDsoRulesVoteRequests'],
     queryFn: async () => {
       const { dso_rules_vote_requests } = await listDsoRulesVoteRequests();
       return dso_rules_vote_requests.map(c => Contract.decodeOpenAPI(c, VoteRequest));
     },
+    refetchInterval: refetchInterval ?? defaultRefetchInterval,
   });
 };
 

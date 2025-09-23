@@ -1,18 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
-import userEvent from '@testing-library/user-event';
-import { SvConfigProvider } from '../../../utils';
-import App from '../../../App';
-import { svPartyId } from '../../mocks/constants';
-import { Wrapper } from '../../helpers';
-import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
-import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { server, svUrl } from '../../setup/setup';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import dayjs from 'dayjs';
 import { rest } from 'msw';
+import { describe, expect, test } from 'vitest';
+import App from '../../../App';
+import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
+import { SvConfigProvider } from '../../../utils';
+import { Wrapper } from '../../helpers';
+import { svPartyId } from '../../mocks/constants';
+import { server, svUrl } from '../../setup/setup';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -58,10 +58,10 @@ describe('Set DSO Config Rules Form', () => {
     expect(urlInput).toBeDefined();
     expect(urlInput.getAttribute('value')).toBe('');
 
-    const configLabels = screen.getAllByTestId('config-label', { exact: false });
+    const configLabels = screen.getAllByTestId(/config-label-/);
     expect(configLabels.length).toBeGreaterThan(15);
 
-    const configFields = screen.getAllByTestId('config-field', { exact: false });
+    const configFields = screen.getAllByTestId(/config-field-/);
     expect(configFields.length).toBeGreaterThan(15);
 
     expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
@@ -184,7 +184,7 @@ describe('Set DSO Config Rules Form', () => {
     expect(c2Input).toBeDefined();
     await user.type(c2Input, '9999');
 
-    const changes = screen.getAllByTestId('config-current-value', { exact: false });
+    const changes = screen.getAllByTestId(/config-current-value-/);
     expect(changes.length).toBe(2);
   });
 
@@ -270,10 +270,19 @@ describe('Set DSO Config Rules Form', () => {
   });
 
   test('should redirect to governance page after successful submission', async () => {
+    server.resetHandlers();
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        console.log('tesco ==create handler');
         return res(ctx.json({}));
       })
+
+      // rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+      //   const data: ListDsoRulesVoteRequestsResponse = {
+      //     dso_rules_vote_requests: [],
+      //   };
+      //   return res(ctx.json<ListDsoRulesVoteRequestsResponse>(data));
+      // })
     );
 
     const user = userEvent.setup();
@@ -309,11 +318,14 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(submitButton); // review proposal
     await user.click(submitButton); // submit proposal
 
-    waitFor(() => {
-      expect(screen.getByText('Action Required')).toBeDefined();
-      expect(screen.getByText('Inflight Votes')).toBeDefined();
-      expect(screen.getByText('Vote History')).toBeDefined();
-      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText('Action Required')).toBeDefined();
+        expect(screen.getByText('Inflight Votes')).toBeDefined();
+        expect(screen.getByText('Vote History')).toBeDefined();
+        expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+      },
+      { timeout: 2000 }
+    );
   });
 });
