@@ -128,12 +128,13 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       onSubmit: ({ value: formData }) => {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
 
-        const conflictingFieldNames = changes
-          .map(c => c.fieldName)
-          .filter(fieldName => pendingConfigFields.some(p => p.fieldName === fieldName));
+        const conflictingChanges = changes.filter(c =>
+          pendingConfigFields.some(p => p.fieldName === c.fieldName)
+        );
+        const names = conflictingChanges.map(c => c.label).join(', ');
 
-        if (conflictingFieldNames.length > 0) {
-          return `Cannot modify fields that have pending changes: ${conflictingFieldNames.join(', ')}`;
+        if (conflictingChanges.length > 0) {
+          return `Cannot modify fields that have pending changes (${names})`;
         }
       },
     },

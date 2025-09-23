@@ -32,7 +32,11 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
       sx: { textAlign: 'right' },
       'data-testid': `config-field-${configChange.fieldName}`,
     },
-    disabled: pendingFieldInfo !== undefined,
+    // We disable the field if it is pending and the value is the default value.
+    // The default value check is to handle the case where the user made a change
+    // to the field before it became a field with pending changes.
+    // This gives them the chance to revert that change.
+    disabled: pendingFieldInfo !== undefined && field.state.meta.isDefaultValue,
   };
 
   return (
