@@ -72,7 +72,9 @@ describe('Review Proposal Component', () => {
 
   test('should render review proposal component for sv reward weight', () => {
     const actionName = 'Update SV Reward Weight';
+    const title = 'SV Reward Weight';
     const svRewardWeightMember = 'Digital-Asset-Eng-2';
+    const currentWeight = '1000';
     const svRewardWeight = '99';
 
     render(
@@ -84,6 +86,7 @@ describe('Review Proposal Component', () => {
         effectiveDate={effectiveDate}
         formType="sv-reward-weight"
         svRewardWeightMember={svRewardWeightMember}
+        currentWeight={currentWeight}
         svRewardWeight={svRewardWeight}
         onEdit={() => {}}
         onSubmit={() => {}}
@@ -105,8 +108,9 @@ describe('Review Proposal Component', () => {
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
     expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
 
-    expect(screen.getByTestId('svRewardWeight-title').textContent).toBe('SV Reward Weight');
-    expect(screen.getByTestId('svRewardWeight-field').getAttribute('value')).toBe(svRewardWeight);
+    expect(screen.getByTestId('config-change-field-label').textContent).toBe(title);
+    expect(screen.getByTestId('config-change-current-value').textContent).toBe(currentWeight);
+    expect(screen.getByTestId('config-change-new-value').textContent).toBe(svRewardWeight);
   });
 
   test('should render review proposal component for feature application', () => {

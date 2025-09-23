@@ -81,6 +81,20 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
+  // TODO(#2257): remove this flag once the holding fees change has been rolled out to MainNet
+  def noHoldingFeesOnTransfers(dsoParty: PartyId, now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      Seq(dsoParty),
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      DarResources.amulet,
+      // This is when the AmuletRules transfer choice was changed to not charge holding fees
+      DarResources.amulet_0_1_14,
+    )
+  }
+
   def supportsExpectedDsoParty(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {

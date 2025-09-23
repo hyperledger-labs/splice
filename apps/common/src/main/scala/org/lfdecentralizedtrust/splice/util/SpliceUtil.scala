@@ -249,6 +249,18 @@ object SpliceUtil {
     ).asJava,
   )
 
+  // TODO(#2251): set the extra steps to the empty list once the config in the live system is using an empty list as well
+  val zeroTransferFee = new splice.fees.SteppedRate(
+    damlDecimal(0.0),
+    Seq(
+      // Note that we use multiple steps for the zeros, as the SV UI does not support setting the list to empty yet
+      // TODO(#2264): set to the empty list once the SV UI supports it
+      new Tuple2(damlDecimal(100.0), damlDecimal(0.0)),
+      new Tuple2(damlDecimal(1000.0), damlDecimal(0.0)),
+      new Tuple2(damlDecimal(1000000.0), damlDecimal(0.0)),
+    ).asJava,
+  )
+
   val defaultLockHolderFee = new splice.fees.FixedFee(damlDecimal(0.005))
 
   // These are dummy values only made use of by some unit tests.
@@ -271,7 +283,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
-      createFee: BigDecimal = defaultCreateFee.fee,
+      zeroTransferFees: Boolean = false,
       transferPreapprovalFee: Option[BigDecimal] = None,
   ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
     splice.amuletconfig.USD
@@ -287,7 +299,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor,
       initialPackageConfig,
       holdingFee,
-      createFee,
+      zeroTransferFees,
       transferPreapprovalFee,
     ),
     List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
@@ -349,14 +361,14 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
-      createFee: BigDecimal = defaultCreateFee.fee,
+      zeroTransferFees: Boolean = false,
       transferPreapprovalFee: Option[BigDecimal] = None,
       featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
       nextSynchronizerId: Option[SynchronizerId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
-      defaultTransferConfig(initialMaxNumInputs, holdingFee, createFee),
+      defaultTransferConfig(initialMaxNumInputs, holdingFee, zeroTransferFees = zeroTransferFees),
 
       // issuance curve
       defaultIssuanceCurve,
@@ -435,12 +447,12 @@ object SpliceUtil {
   def defaultTransferConfig(
       initialMaxNumInputs: Int,
       holdingFee: BigDecimal,
-      createFee: BigDecimal = defaultCreateFee.fee,
+      zeroTransferFees: Boolean = false,
   ): splice.amuletconfig.TransferConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.TransferConfig(
       // Fee to create a new amulet.
       // Set to the fixed part of the transfer fee.
-      new splice.fees.FixedFee(damlDecimal(createFee)),
+      if (zeroTransferFees) new splice.fees.FixedFee(damlDecimal(0)) else defaultCreateFee,
 
       // Fee for keeping a amulet around.
       // This is roughly equivalent to 1$/360 days but expressed as rounds
@@ -452,12 +464,12 @@ object SpliceUtil {
       ),
 
       // Fee for transferring some amount of amulet to a new owner.
-      defaultTransferFee,
+      if (zeroTransferFees) zeroTransferFee else defaultTransferFee,
 
       // Fee per lock holder.
       // Chosen to match the update fee to cover the cost of informing lock-holders about
       // actions on the locked amulet.
-      defaultLockHolderFee,
+      if (zeroTransferFees) new splice.fees.FixedFee(damlDecimal(0)) else defaultLockHolderFee,
 
       // Extra featured app reward amount, chosen to be equal to the domain fee cost of a single CC transfer
       damlDecimal(1.0),
@@ -511,9 +523,12 @@ object SpliceUtil {
   def currentAmount(
       amulet: Amulet,
       currentRound: Long,
-  ): java.math.BigDecimal = {
-    amulet.amount.initialAmount.subtract(holdingFee(amulet, currentRound))
-  }
+      deductHoldingFees: Boolean = true,
+  ): java.math.BigDecimal =
+    if (deductHoldingFees)
+      amulet.amount.initialAmount.subtract(holdingFee(amulet, currentRound))
+    else
+      amulet.amount.initialAmount
 
   def amuletExpiresAt(amulet: Amulet): Round = {
     val rounds = amulet.amount.initialAmount

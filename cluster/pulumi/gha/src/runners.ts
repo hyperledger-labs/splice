@@ -193,6 +193,10 @@ function installDockerRunnerScaleSet(
                     name: 'DOCKER_HOST',
                     value: 'unix:///var/run/docker.sock',
                   },
+                  {
+                    name: 'RUNNER_WAIT_FOR_DOCKER_IN_SECONDS',
+                    value: '120',
+                  },
                 ],
                 resources,
                 // required to mount the nix store inside the container from the NFS

@@ -11,12 +11,22 @@
   "eslint.workingDirectories": [
     "./cluster/pulumi/canton-network",
     "./cluster/pulumi/canton-network-gateway",
+    "./cluster/pulumi/circleci",
+    "./cluster/pulumi/cluster",
     "./cluster/pulumi/common",
+    "./cluster/pulumi/common-sv",
+    "./cluster/pulumi/common-validator",
+    "./cluster/pulumi/deployment",
     "./cluster/pulumi/gcp",
+    "./cluster/pulumi/gcp-project",
     "./cluster/pulumi/infra",
     "./cluster/pulumi/multi-validator",
+    "./cluster/pulumi/operator",
+    "./cluster/pulumi/splitwell",
+    "./cluster/pulumi/sv-canton",
     "./cluster/pulumi/sv-runbook",
-    "./cluster/pulumi/validator-runbook"
+    "./cluster/pulumi/validator-runbook",
+    "./cluster/pulumi/validator1"
   ],
   "python.formatting.provider": "none",
   "files.readonlyInclude": {

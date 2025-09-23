@@ -51,11 +51,15 @@ export interface StaticSvConfig {
   onboardingName: string;
   validatorWalletUser?: string;
   auth0ValidatorAppName: string;
+  auth0ValidatorAppClientId?: string;
   auth0SvAppName: string;
+  auth0SvAppClientId?: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
   scanBigQuery?: ScanBigQueryConfig;
+  svIdKeySecretName?: string;
+  cometBftGovernanceKeySecretName?: string;
 }
 
 export type SequencerPruningConfig = {
@@ -101,7 +105,6 @@ export const SvConfigSchema = z.object({
         .optional(),
       scan: z
         .object({
-          enableImportUpdatesBackfill: z.boolean().optional(),
           rateLimit: z
             .object({
               acs: z
@@ -136,13 +139,3 @@ export const svsConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
 // eslint-disable-next-line
 // @ts-ignore
 export const initialRound = SvConfigSchema.parse(clusterYamlConfig).initialRound;
-
-export const updateHistoryBackfillingValues = svsConfig?.scan?.enableImportUpdatesBackfill
-  ? {
-      updateHistoryBackfilling: {
-        enabled: true,
-        importUpdatesEnabled: true,
-        batchSize: 100,
-      },
-    }
-  : undefined;

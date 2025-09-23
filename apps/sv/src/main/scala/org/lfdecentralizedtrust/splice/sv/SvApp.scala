@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.http.v0.sv.SvResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
@@ -87,8 +87,10 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directive
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.time.Instant
 import java.util.Optional
@@ -419,7 +421,7 @@ class SvApp(
       }
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
-        svAutomation.connection,
+        svAutomation.connection(SpliceLedgerConnectionPriority.Low),
         loggerFactory,
       )
 
@@ -510,7 +512,8 @@ class SvApp(
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
 
-      initialRound <- svAutomation.connection
+      initialRound <- svAutomation
+        .connection(SpliceLedgerConnectionPriority.Low)
         .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
         .flatMap {
           case Some(round) => Future.successful(round)
@@ -571,6 +574,10 @@ class SvApp(
         timeouts,
         loggerFactory,
       )
+      httpRateLimiter = new HttpRateLimiter(
+        config.parameters.rateLimiting,
+        metrics.openTelemetryMetricsFactory,
+      )
 
       route = cors(
         CorsSettings(ac)
@@ -588,25 +595,41 @@ class SvApp(
       ) {
         withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {
-            HttpErrorHandler(loggerFactory)(traceContext) {
+            val errorHandler = new HttpErrorHandler(loggerFactory)
+            def buildOperation(service: String, operation: String) = {
+              metrics.httpServerMetrics
+                .withMetrics(service)(operation)
+                .tflatMap(_ => {
+                  httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
+                    config.parameters.customTimeouts.get(operation) match {
+                      case Some(customTimeout) =>
+                        withRequestTimeout(
+                          customTimeout.duration,
+                          errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
+                        )
+                      case None => Directive.Empty
+                    }
+                  }
+                })
+            }
+
+            errorHandler.directive(traceContext) {
               concat(
                 SvResource.routes(
                   handler,
                   operation =>
-                    metrics.httpServerMetrics
-                      .withMetrics("sv")(operation)
+                    buildOperation("sv", operation)
                       .tflatMap(_ => provide(traceContext)),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
                   operation =>
-                    metrics.httpServerMetrics
-                      .withMetrics("svAdmin")(operation)
+                    buildOperation("svAdmin", operation)
                       .tflatMap(_ =>
                         AdminAuthExtractor(
                           verifier,
                           svStore.key.svParty,
-                          svAutomation.connection,
+                          svAutomation.connection(SpliceLedgerConnectionPriority.Low),
                           loggerFactory,
                           "splice sv admin realm",
                         )(traceContext)(operation)
@@ -838,7 +861,8 @@ object SvApp {
                 _ <- retryProvider.retryForClientCalls(
                   "prepare_validator_onboarding",
                   "Create a validator onboarding contract with a secret",
-                  svStoreWithIngestion.connection
+                  svStoreWithIngestion
+                    .connection(SpliceLedgerConnectionPriority.Low)
                     .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
                     .withDedup(
                       commandId = SpliceLedgerConnection
@@ -882,7 +906,8 @@ object SvApp {
               desiredAmuletPrice.bigDecimal,
             )
           )
-          _ <- dsoStoreWithIngestion.connection
+          _ <- dsoStoreWithIngestion
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               actAs = Seq(dsoStore.key.svParty),
               readAs = Seq(dsoStore.key.dsoParty),
@@ -908,11 +933,13 @@ object SvApp {
       expiration: Json,
       effectiveTime: Optional[Instant],
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
       templateJsonDecoder: TemplateJsonDecoder,
-  ): Future[Either[String, Unit]] = {
+  ): Future[Either[String, splice.dsorules.VoteRequest.ContractId]] = {
     val decodedExpiration = templateJsonDecoder.decodeValue(
       RelTime.valueDecoder(),
       RelTime._packageId,
@@ -934,35 +961,43 @@ object SvApp {
           )
         case QueryResult(offset, None) =>
           for {
-            dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
-            reason = new Reason(reasonUrl, reasonDescription)
-            request = new DsoRules_RequestVote(
-              requester,
-              decodedAction,
-              reason,
-              java.util.Optional.of(decodedExpiration),
-              effectiveTime,
+            res <- retryProvider.retryForClientCalls(
+              "createVoteRequest",
+              "createVoteRequest",
+              for {
+                dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
+                reason = new Reason(reasonUrl, reasonDescription)
+                request = new DsoRules_RequestVote(
+                  requester,
+                  decodedAction,
+                  reason,
+                  java.util.Optional.of(decodedExpiration),
+                  effectiveTime,
+                )
+                cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
+                res <- dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
+                  .submit(
+                    actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
+                    readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
+                    cmd,
+                  )
+                  .withDedup(
+                    commandId = SpliceLedgerConnection.CommandId(
+                      "org.lfdecentralizedtrust.splice.sv.requestVote",
+                      Seq(
+                        dsoStoreWithIngestion.store.key.dsoParty,
+                        dsoStoreWithIngestion.store.key.svParty,
+                      ),
+                      action.toString,
+                    ),
+                    deduplicationOffset = offset,
+                  )
+                  .yieldResult()
+              } yield res,
+              logger,
             )
-            cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
-            _ <- dsoStoreWithIngestion.connection
-              .submit(
-                actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
-                readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
-                cmd,
-              )
-              .withDedup(
-                commandId = SpliceLedgerConnection.CommandId(
-                  "org.lfdecentralizedtrust.splice.sv.requestVote",
-                  Seq(
-                    dsoStoreWithIngestion.store.key.dsoParty,
-                    dsoStoreWithIngestion.store.key.svParty,
-                  ),
-                  action.toString,
-                ),
-                deduplicationOffset = offset,
-              )
-              .yieldUnit()
-          } yield Right(())
+          } yield Right(res.exerciseResult.voteRequest)
       }
   }
 
@@ -1001,7 +1036,8 @@ object SvApp {
                   ),
                 )
               )
-              res <- dsoStoreWithIngestion.connection
+              res <- dsoStoreWithIngestion
+                .connection(SpliceLedgerConnectionPriority.Low)
                 .submit(
                   actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
                   readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
@@ -1169,7 +1205,8 @@ object SvApp {
               )
 
               for {
-                _ <- dsoStoreWithIngestion.connection
+                _ <- dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
                   .submit(
                     actAs = Seq(svParty),
                     readAs = Seq(dsoParty),
@@ -1198,11 +1235,13 @@ object SvApp {
       // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
       // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
       // and then checks if it has a primary party already.
-      _ <- dsoStoreWithIngestion.connection.createUserWithPrimaryParty(
-        config.validatorLedgerApiUser,
-        svParty,
-        Seq(User.Right.ParticipantAdmin.INSTANCE),
-      )
+      _ <- dsoStoreWithIngestion
+        .connection(SpliceLedgerConnectionPriority.Low)
+        .createUserWithPrimaryParty(
+          config.validatorLedgerApiUser,
+          svParty,
+          Seq(User.Right.ParticipantAdmin.INSTANCE),
+        )
     } yield ()
   }
 }

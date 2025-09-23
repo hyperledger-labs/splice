@@ -23,7 +23,7 @@ import {
   commandScriptPath,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
-import { allFunctions } from './bigQuery_functions';
+import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -188,12 +188,34 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
+function installDashboardsDataset(): gcp.bigquery.Dataset {
+  const datasetName = 'dashboards';
+  const dataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  computedDataTable.toPulumi(
+    dataset,
+    // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
+    false
+  );
+
+  return dataset;
+}
+
 function installFunctions(
   scanDataset: gcp.bigquery.Dataset,
+  dashboardsDataset: gcp.bigquery.Dataset,
   dependsOn: pulumi.Resource[]
 ): gcp.bigquery.Dataset {
   const datasetName = 'functions';
-  const dataset = new gcp.bigquery.Dataset(datasetName, {
+  const functionsDataset = new gcp.bigquery.Dataset(datasetName, {
     datasetId: datasetName,
     friendlyName: `${datasetName} Dataset`,
     location: cloudsdkComputeRegion(),
@@ -206,18 +228,59 @@ function installFunctions(
   scanDataset.project.apply(project => {
     // We don't just run allFunctions.map() because we want to sequence the creation, since every function
     // might depend on those before it.
-    let lastResource: gcp.bigquery.Routine | undefined = undefined;
-    for (const f in allFunctions) {
-      lastResource = allFunctions[f].toPulumi(
+    let lastResource: pulumi.Resource | undefined = undefined;
+    for (const f in allScanFunctions) {
+      lastResource = allScanFunctions[f].toPulumi(
         project,
-        dataset,
+        functionsDataset,
+        functionsDataset,
         scanDataset,
-        lastResource ? [lastResource] : dependsOn
+        dashboardsDataset,
+        lastResource
+          ? [lastResource]
+          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
+      );
+    }
+
+    for (const f in allDashboardFunctions) {
+      lastResource = allDashboardFunctions[f].toPulumi(
+        project,
+        dashboardsDataset,
+        functionsDataset,
+        scanDataset,
+        dashboardsDataset,
+        lastResource
+          ? [lastResource]
+          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
       );
     }
   });
 
-  return dataset;
+  return functionsDataset;
+}
+
+function installScheduledTasks(
+  dashboardsDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): void {
+  pulumi
+    .all([dashboardsDataset.project, dashboardsDataset.datasetId])
+    .apply(([project, dataset]) => {
+      new gcp.bigquery.DataTransferConfig(
+        'scheduled_dashboard_update',
+        {
+          displayName: 'scheduled_dashboard_update',
+          dataSourceId: 'scheduled_query',
+          schedule: 'every day 13:00', // UTC
+          location: cloudsdkComputeRegion(),
+          serviceAccountName: `bigquery@${project}.iam.gserviceaccount.com`,
+          params: {
+            query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
+          },
+        },
+        { dependsOn: dependsOn }
+      );
+    });
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -445,6 +508,8 @@ export function configureScanBigQuery(
     dataset,
     pubRepSlots
   );
-  installFunctions(dataset, [stream]);
+  const dashboardsDataset = installDashboardsDataset();
+  const functionsDataset = installFunctions(dataset, dashboardsDataset, [stream]);
+  installScheduledTasks(dashboardsDataset, [functionsDataset, dataset]);
   return;
 }

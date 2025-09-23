@@ -229,11 +229,31 @@ final class DbMultiDomainAcsStore[TXE](
       .value
   }
 
-  def hasArchived(ids: Seq[ContractId[?]])(implicit
+  def containsArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
-  ): Future[Boolean] =
-    // TODO(#838): implement this as a single DB query
-    Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
+  ): Future[Boolean] = waitUntilAcsIngested {
+    if (ids.isEmpty) Future.successful(false)
+    else {
+      val contractIds = inClause(ids)
+      val expectedCount = ids.size
+      storage
+        .query(
+          (sql"""
+         select count(1)
+         from #$acsTableName acs
+         where acs.store_id = $acsStoreId
+         and acs.migration_id = $domainMigrationId
+         and acs.contract_id in """ ++ contractIds ++ sql"""
+         """).toActionBuilder
+            .as[Int]
+            .head,
+          "containsArchived",
+        )
+        .map { count =>
+          count != expectedCount
+        }
+    }
+  }
 
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,

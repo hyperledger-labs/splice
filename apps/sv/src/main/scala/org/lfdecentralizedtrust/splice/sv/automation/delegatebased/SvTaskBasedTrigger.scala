@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   SpliceLedgerConnection,
 }
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
@@ -127,7 +128,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
 object SvTaskBasedTrigger {
   case class Context(
       dsoStore: SvDsoStore,
-      connection: SpliceLedgerConnection,
+      connection: SpliceLedgerConnectionPriority => SpliceLedgerConnection,
       epoch: Long,
       delegatelessAutomationExpectedTaskDuration: Long,
       delegatelessAutomationExpiredRewardCouponBatchSize: Int,

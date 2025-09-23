@@ -61,6 +61,7 @@ class ScanAutomationService(
       retryProvider,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      config.parameters,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService.type =
@@ -89,7 +90,9 @@ class ScanAutomationService(
       snapshotStore,
       store.updateHistory,
       config.acsSnapshotPeriodHours,
-      config.updateHistoryBackfillEnabled,
+      // The acs snapshot trigger should not attempt to backfill snapshots unless the backfilling
+      // UpdateHistory is fully enabled and complete.
+      config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled,
       triggerContext,
     )
   )

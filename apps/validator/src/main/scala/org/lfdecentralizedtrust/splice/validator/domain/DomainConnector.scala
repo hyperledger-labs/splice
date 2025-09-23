@@ -110,7 +110,8 @@ class DomainConnector(
       alias,
       sequencerConnections,
       timeTracker = SynchronizerTimeTrackerConfig(
-        minObservationDuration = config.timeTrackerMinObservationDuration
+        minObservationDuration = config.timeTrackerMinObservationDuration,
+        observationLatency = config.timeTrackerObservationLatency,
       ),
     )
     logger.info(s"Ensuring domain $alias registered with config $domainConfig")

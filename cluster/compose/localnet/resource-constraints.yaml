@@ -7,12 +7,9 @@ services:
   postgres:
     mem_limit: 2g
   canton:
-    # We upload all DARs from the validator at once, which pulls up memory usage.
-    # Until we either do that sequentially in localNet, or we get unvetting and stop
-    # uploading all versions, we need to allocate more memory than otherwise needed.
-    mem_limit: 10g
+    mem_limit: 4g
     environment:
-      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx4096m"
+      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx2560m"
   splice:
     mem_limit: 3g
     environment:

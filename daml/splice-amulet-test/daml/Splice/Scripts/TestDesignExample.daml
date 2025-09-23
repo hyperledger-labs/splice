@@ -14,7 +14,6 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.Types
-import Splice.RelRound
 import Splice.Fees
 import Splice.Scripts.Util
 
@@ -84,7 +83,6 @@ test_designExample= do
   escrow <- submitUser arbiter.userId $ createCmd (Escrow app.dso arbiter.primaryParty alice.primaryParty)
 
   t0 <- getTime
-  (_, c0) <- getLatestOpenRound app
 
   let lockedAmuletAmount = 1000.25
   lockTo1 app alice arbiter.primaryParty lockedAmuletAmount (days 90)
@@ -103,7 +101,6 @@ test_designExample= do
   -- advance 40k rounds
   runNextIssuance app
   skipNRounds app 39_999
-  (_, c1) <- getLatestOpenRound app
 
   let refreshAmuletAmount = 5.0
   pay app alice alice.primaryParty refreshAmuletAmount
@@ -142,9 +139,7 @@ test_designExample= do
       transferredAmuletFee =
         transferConfig.createFee.fee
         + chargeSteppedRate transferConfig.transferFee arbiterPaymentAmount
-      holdingFees =
-        (chargeRatePerRound transferConfig.holdingFee (c2.round `subRound` c1.round)
-        + chargeRatePerRound transferConfig.holdingFee (c2.round `subRound` c0.round)) -- holding fees
+      holdingFees = 0.0 -- no holding fees charged on transfer
       inputAmuletHoldingFees = transferConfig.holdingFee.rate * 2.0 -- there are 2 input amulets
       outputAmuletHoldingFees = transferConfig.holdingFee.rate * 3.0  -- there are 2 output amulets + 1 amulet for the change
       outputFees = [lockedAmuletFee, transferredAmuletFee]

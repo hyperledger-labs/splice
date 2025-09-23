@@ -89,6 +89,7 @@ import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.jdk.OptionConverters.*
 import java.util.concurrent.TimeUnit
@@ -190,7 +191,8 @@ class SV1Initializer(
           manualConnect = false,
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
-            minObservationDuration = config.timeTrackerMinObservationDuration
+            minObservationDuration = config.timeTrackerMinObservationDuration,
+            observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
         overwriteExistingConnection =
@@ -216,6 +218,10 @@ class SV1Initializer(
             )
             .map(_.nonEmpty), {
             val packages = requiredDars(sv1Config.initialPackageConfig)
+            if (config.latestPackagesOnly)
+              logger.warn(
+                "latestPackagesOnly is enabled, only the latest versions of the initial packages will be uploaded and vetted"
+              )
             logger.info(
               s"Starting with initial package ${sv1Config.initialPackageConfig} and vetting ${packages
                   .map(_.resourcePath)}"
@@ -261,28 +267,29 @@ class SV1Initializer(
         participantAdminConnection,
         Some(localSynchronizerNode),
       )
+      connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       (_, decentralizedSynchronizer) <- (
-        SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
+        SetupUtil.ensureDsoPartyMetadataAnnotation(connection, config, dsoParty),
         svStore.domains.waitForDomainConnection(config.domains.global.alias),
       ).tupled
       _ <- SetupUtil.ensureSvNameMetadataAnnotation(
-        svAutomation.connection,
+        connection,
         config,
         sv1Config.name,
       )
       _ <- DomainMigrationInfo.saveToUserMetadata(
-        svAutomation.connection,
+        connection,
         config.ledgerApiUser,
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
-        svAutomation.connection,
+        connection,
         loggerFactory,
       )
       initialRound <- establishInitialRound(
-        svAutomation.connection,
+        connection,
         upgradesConfig,
         packageVersionSupport,
         svParty,
@@ -554,7 +561,7 @@ class SV1Initializer(
       packageResource.all
         .filter { darResource =>
           val required = PackageVersion.assertFromString(requiredVersion)
-          darResource.metadata.version <= required
+          darResource.metadata.version == required || !config.latestPackagesOnly && darResource.metadata.version < required
         }
         .map(UploadablePackage.fromResource)
     }
@@ -581,7 +588,7 @@ class SV1Initializer(
     private val svParty = dsoStore.key.svParty
     private val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
-      dsoStoreWithIngestion.connection,
+      dsoStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
       config.legacyMigrationId,
       clock = clock,
       retryProvider = retryProvider,
@@ -648,7 +655,7 @@ class SV1Initializer(
                   sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
                   sv1Config.initialPackageConfig.toPackageConfig,
                   sv1Config.initialHoldingFee,
-                  sv1Config.initialCreateFee,
+                  sv1Config.zeroTransferFees,
                   sv1Config.initialTransferPreapprovalFee,
                   sv1Config.initialFeaturedAppActivityMarkerAmount,
                 )
@@ -670,7 +677,8 @@ class SV1Initializer(
                       Seq(svParty),
                       clock.now,
                     )
-                  _ <- dsoStoreWithIngestion.connection
+                  _ <- dsoStoreWithIngestion
+                    .connection(SpliceLedgerConnectionPriority.Low)
                     .submit(
                       actAs = Seq(dsoParty),
                       readAs = Seq.empty,

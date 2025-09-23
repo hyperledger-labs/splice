@@ -20,11 +20,11 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
     "sv1" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV1"),
     "sv2" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV2"),
     "sv3" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV3"),
-    "sv4" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV4"),
+    "svda1" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SVDA1"),
     "sv1_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV1_VALIDATOR"),
     "sv2_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV2_VALIDATOR"),
     "sv3_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV3_VALIDATOR"),
-    "sv4_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV4_VALIDATOR"),
+    "svda1_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SVDA1_VALIDATOR"),
     "validator1" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_VALIDATOR1"),
     "splitwell_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SPLITWELL_VALIDATOR"),
   )

@@ -24,11 +24,14 @@ Canton Network Token Standard APIs (CIP-0056)
 Refer to the :ref:`Token Standard documentation section <token_standard>`.
 
 
+.. _featured_app_activity_markers_api:
+
 Featured App Activity Markers API (CIP-0047)
 --------------------------------------------
 
 * See the `text of the CIP-0047 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__
   for its background on its design and its specification.
+
 * See the reference docs below for the Daml interfaces that are part of the Featured App Activity Markers API;
   or `read the source code <https://github.com/hyperledger-labs/splice/blob/main/daml/splice-api-featured-app-v1/daml/Splice/Api/FeaturedAppRightV1.daml>`__.
 
@@ -36,6 +39,16 @@ Featured App Activity Markers API (CIP-0047)
       :maxdepth: 1
 
       ../api/splice-api-featured-app-v1/index
+
+* The utility package below provides templates that allow to delegate the usage of featured app rights
+  to other parties for the purpose of executing token standard actions.
+  Use these templates to earn app rewards on token standard operations, and to potentially share some of them with your users.
+
+   .. toctree::
+      :maxdepth: 1
+
+      ../api/splice-util-featured-app-proxies/index
+
 
 Additional Splice Daml APIs
 ---------------------------

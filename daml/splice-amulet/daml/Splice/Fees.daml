@@ -45,7 +45,7 @@ scaleRatePerRound : Decimal -> RatePerRound -> RatePerRound
 scaleRatePerRound s r = RatePerRound with rate = s * r.rate
 
 positiveRatePerRound : RatePerRound -> Bool
-positiveRatePerRound r = r.rate > 0.0
+positiveRatePerRound r = r.rate >= 0.0
 
 -- Fixed and variable rates
 ---------------------------
@@ -59,7 +59,7 @@ scaleFixedFee : Decimal -> FixedFee -> FixedFee
 scaleFixedFee s f = FixedFee with fee = s * f.fee
 
 positiveFixedFee : FixedFee -> Bool
-positiveFixedFee f = f.fee > 0.0
+positiveFixedFee f = f.fee >= 0.0
 
 -- | A rate defined as a piecewise linear function, e.g.,
 -- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
@@ -75,7 +75,6 @@ validSteppedRate : SteppedRate -> Bool
 validSteppedRate SteppedRate{initialRate, steps} =
   validRate initialRate &&
   all (\(step, rate) -> 0.0 < step && validRate rate) steps &&
-  not (null steps) &&
   strictlyAscending (map fst steps)
   where
     validRate : Decimal -> Bool
@@ -132,15 +131,6 @@ validExpiringAmount e =
   e.initialAmount > 0.0 &&
   e.ratePerRound.rate >= 0.0 &&
   e.createdAt >= Round 0
-
-actualAmount : Round -> ExpiringAmount -> Decimal
-actualAmount t e
-  | e.ratePerRound.rate <= 0.0 = error $ "Round rate must be positive: " <> show e.ratePerRound.rate
-  | t <= e.createdAt = e.initialAmount
-  | otherwise =
-      let roundsPassed = t `subRound` e.createdAt
-      in
-        max 0.0 (e.initialAmount - chargeRatePerRound e.ratePerRound roundsPassed)
 
 -- | Smart constructor for an expiring amount.
 expiringAmount : RatePerRound -> Decimal -> Round -> ExpiringAmount

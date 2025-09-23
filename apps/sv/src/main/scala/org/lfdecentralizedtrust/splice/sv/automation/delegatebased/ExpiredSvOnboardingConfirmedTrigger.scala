@@ -12,6 +12,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredSvOnboardingConfirmedTrigger.*
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 
@@ -45,7 +46,8 @@ class ExpiredSvOnboardingConfirmedTrigger(
           Optional.of(controller),
         )
       )
-      _ <- svTaskContext.connection
+      _ <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.Low)
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldUnit()

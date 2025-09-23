@@ -1431,7 +1431,9 @@ paths:
       x-jvm-package: scan
       operationId: "listTransactionHistory"
       description: |
-        **Deprecated**. Lists transactions, by default in ascending order, paged, from ledger begin or optionally starting after a provided event id.
+        **Deprecated with known bugs that will not be fixed, use /v2/updates instead**.
+
+        Lists transactions, by default in ascending order, paged, from ledger begin or optionally starting after a provided event id.
       requestBody:
         required: true
         content:
@@ -1550,6 +1552,68 @@ paths:
                 "$ref": "#/components/schemas/GetImportUpdatesResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/events:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getEventHistory"
+      description: |
+        Returns the event history in ascending order, paged, from ledger begin or optionally starting after a record time.
+        An event bears some combination of a transaction, a contract reassignment, and a verdict.
+        Events are ordered lexicographically by `(migration id, record time)`.
+        For a given migration id, each event has a unique record time.
+        The record time ranges of different migrations may overlap, i.e.,
+        it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
+        and there may be two updates with the same record time but different migration ids.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/EventHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/events/{update_id}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getEventById"
+      description: |
+        Returns the event with the given update_id.
+        An event bears some combination of a transaction, a contract reassignment, and a verdict.
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
 components:
   schemas:
@@ -3617,3 +3681,161 @@ components:
 
             To determine the progress of individual backfilling processes, inspect the corresponding metrics.
           type: boolean
+    EventHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The events returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of events returned for this request.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1000
+        daml_value_encoding:
+          $ref: "#/components/schemas/DamlValueEncoding"
+    EventHistoryResponse:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventHistoryItem"
+    EventHistoryItem:
+      type: object
+      description: |
+        An event history item may contain a transaction update, a verdict from a mediator, both, or a contract reassignment.
+        If an event pertains to a contract reassignment, there will be no verdict data.
+        If an event pertains to a wholly private transaction, there will only be verdict data.
+        If an event pertains to a transaction that is partially private, it may also bear verdict information for the private portions.
+        When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
+      properties:
+        update:
+          $ref: "#/components/schemas/UpdateHistoryItemV2"
+          nullable: true
+        verdict:
+          $ref: "#/components/schemas/EventHistoryVerdict"
+          nullable: true
+    EventHistoryVerdict:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - domain_id
+        - record_time
+        - finalization_time
+        - submitting_parties
+        - submitting_participant_uid
+        - verdict_result
+        - mediator_group
+        - transaction_views
+      properties:
+        update_id:
+          description: |
+            The ID of the transaction update associated with this verdict.
+          type: string
+        migration_id:
+          description: |
+            The migration id of the domain through which this event was sequenced.
+          type: integer
+          format: int64
+        domain_id:
+          description: |
+            The id of the domain through which this event was sequenced.
+          type: string
+        record_time:
+          description: |
+            The record_time of the transaction the verdict corresponds to.
+          type: string
+        finalization_time:
+          description: |
+            The finalization_time of the transaction the verdict corresponds to.
+          type: string
+        submitting_parties:
+          description: |
+            Parties on whose behalf the transaction was submitted.
+          type: array
+          items:
+            type: string
+        submitting_participant_uid:
+          description: |
+            UID of the submitting participant.
+          type: string
+        verdict_result:
+          description: |
+            Result of the verdict.
+          $ref: '#/components/schemas/VerdictResult'
+        mediator_group:
+          description: |
+            The mediator group which finalized this verdict.
+          type: integer
+          format: int32
+        transaction_views:
+          $ref: '#/components/schemas/TransactionViews'
+    TransactionViews:
+      type: object
+      required:
+        - views
+        - root_views
+      properties:
+        views:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionView'
+        root_views:
+          type: array
+          items:
+            type: integer
+            format: int32
+    TransactionView:
+      type: object
+      required:
+        - view_id
+        - informees
+        - confirming_parties
+        - sub_views
+      properties:
+        view_id:
+          type: integer
+          format: int32
+        informees:
+          type: array
+          items:
+            type: string
+        confirming_parties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Quorum'
+        sub_views:
+          type: array
+          items:
+            type: integer
+            format: int32
+    Quorum:
+      type: object
+      required:
+        - parties
+        - threshold
+      properties:
+        parties:
+          type: array
+          items:
+            type: string
+        threshold:
+          type: integer
+          format: int32
+    VerdictResult:
+      type: string
+      enum:
+        - VERDICT_RESULT_UNSPECIFIED
+        - VERDICT_RESULT_ACCEPTED
+        - VERDICT_RESULT_REJECTED
