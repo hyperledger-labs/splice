@@ -507,6 +507,9 @@ lazy val `token-standard-cli` =
     .dependsOn(
       `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
+      // all dependencies here for token-metadata are not "real" dependencies,
+      // but rather they prevent npm install from being executed concurrently and breaking everything
+      `splice-api-token-metadata-v1-daml`,
     )
     .settings(
       Headers.TsHeaderSettings,
@@ -521,8 +524,15 @@ lazy val `token-standard-cli` =
           (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
           false,
         ),
+        (
+          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
+          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
+          false,
+        ),
       ),
-      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value,
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {

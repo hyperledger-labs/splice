@@ -1601,15 +1601,13 @@ object BuildCommon {
     val cacheDir = streams.value.cacheDirectory / "npmInstall"
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
-        synchronized {
-          BuildUtil.runCommandWithRetries(
-            Seq(npmInstallScript.getAbsolutePath),
-            log,
-            None,
-            Some(npmRootDir.value),
-          )
-          Set(npmRootDir.value / "node_modules")
-        }
+        BuildUtil.runCommandWithRetries(
+          Seq(npmInstallScript.getAbsolutePath),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+        Set(npmRootDir.value / "node_modules")
       }
     val openApiPackageJsons = openApiPkgs.flatMap { case (_, baseDir, hasExternalSpec) =>
       Seq(baseDir / "external-openapi-ts-client" / "package.json").filter(_ => hasExternalSpec) ++
