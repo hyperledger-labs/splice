@@ -15,7 +15,7 @@ import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigF
 import {
   configFormDataToConfigChanges,
   createProposalActions,
-  fetchConflictingFields,
+  buildPendingConfigFields,
   getInitialExpiration,
 } from '../../utils/governance';
 import type { CommonProposalFormData, ConfigFormData } from '../../utils/types';
@@ -41,7 +41,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
   const dsoProposalsQuery = useListDsoRulesVoteRequests();
   const pendingConfigFields = useMemo(
-    () => fetchConflictingFields(dsoProposalsQuery.data),
+    () => buildPendingConfigFields(dsoProposalsQuery.data),
     [dsoProposalsQuery.data]
   );
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);

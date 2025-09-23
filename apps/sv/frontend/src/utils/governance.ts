@@ -201,7 +201,7 @@ export function getSvRewardWeight(svs: [string, SvInfo][], svPartyId: string): s
   return svInfo ? svInfo[1].svRewardWeight : '';
 }
 
-export function fetchConflictingFields(
+export function buildPendingConfigFields(
   proposals: Contract<VoteRequest>[] | undefined
 ): PendingConfigFieldInfo[] {
   if (!proposals?.length) {
