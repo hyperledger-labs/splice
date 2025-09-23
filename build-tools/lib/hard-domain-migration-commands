@@ -19,7 +19,7 @@ function subcmd_update_config() {
     migration_id="$2"
     shift 2
   else
-    _error "Usage: $0 $SCRIPTNAME migration_type migration_id [<version>] [<git_reference>]"
+    _error "Usage: $0 $SCRIPTNAME update_config <migration_type> <migration_id> [<version>] [<git_reference>]"
   fi
   local migration_config
   migration_config=$(cat <<EOF
@@ -36,7 +36,7 @@ EOF
   fi
   if [ "$#" -gt 0 ]; then
     if [ "$#" -gt 1 ]; then
-      _error "Usage: $0 $SCRIPTNAME migration_type migration_id [<version>] [<git_reference>]"
+      _error "Usage: $0 $SCRIPTNAME update_config <migration_type> <migration_id> [<version>] [<git_reference>]"
     fi
     git_reference="$1"
     shift
