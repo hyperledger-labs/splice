@@ -10,7 +10,7 @@ jobs:
   ts_cli_tests:
     runs-on: self-hosted-k8s-small
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
 
     steps:
 
