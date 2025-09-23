@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.`User-Agent`
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
@@ -798,6 +799,24 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         _.message should include("Too Many Requests")
       },
     )
+  }
+
+  "accept invalid user-agent headers" in { implicit env =>
+    import env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+
+    val invalidUserAgentHeader = `User-Agent`("OpenAPI-Generator/0.0.1/java")
+    val response = loggerFactory.assertLoggedWarningsAndErrorsSeq(
+      Http()
+        .singleRequest(
+          Get(
+            s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
+          ).withHeaders(invalidUserAgentHeader)
+        )
+        .futureValue,
+      forAll(_) { _.message shouldNot include("Illegal 'user-agent' header") },
+    )
+    response.status shouldBe StatusCodes.OK
   }
 
   def expectedSenderFee(amount: BigDecimal) = {
