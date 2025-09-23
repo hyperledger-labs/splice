@@ -210,8 +210,7 @@ class UpdateHistorySanityCheckPlugin(
         log.contains("ERROR:") || log.contains("WARNING:")
       }
       if (lines.nonEmpty) {
-        logger.error(s"${this.getClass} contains errors: $lines, exiting test.")
-        sys.exit(1)
+        sys.error(s"${this.getClass} contains errors: $lines, exiting test.")
       }
       lines should be(empty)
       forExactly(1, readLines) { line =>
