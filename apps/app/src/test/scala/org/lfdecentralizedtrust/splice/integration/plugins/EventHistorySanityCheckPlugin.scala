@@ -32,7 +32,9 @@ class EventHistorySanityCheckPlugin(
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
     val initializedScans = environment.scans.local.filter(_.is_initialized)
-    compareEventHistories(initializedScans)
+    if (initializedScans.nonEmpty) {
+      compareEventHistories(initializedScans)
+    }
   }
 
   @tailrec
