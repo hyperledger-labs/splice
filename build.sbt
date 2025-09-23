@@ -303,7 +303,7 @@ lazy val docs = project
   )
 
 // Shared token standard code
-lazy val `splice-api-token-metadata-v1-daml` =
+lazy val `splice-api-token-metadata-v1-daml`: Project =
   project
     .in(file("token-standard/splice-api-token-metadata-v1"))
     .enablePlugins(DamlPlugin)
@@ -324,7 +324,13 @@ lazy val `splice-api-token-metadata-v1-daml` =
           )
         },
       cleanFiles += { baseDirectory.value / "openapi-ts-client" },
-      npmInstallOpenApiDeps := Seq(),
+      npmInstallOpenApiDeps := Seq(
+        (
+          (Compile / compile).value,
+          (Compile / baseDirectory).value,
+          false,
+        )
+      ),
       npmInstallDeps := Seq(
         baseDirectory.value / "openapi-ts-client" / "package.json"
       ),
@@ -1140,7 +1146,7 @@ lazy val `apps-common-frontend` = {
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
-      npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
+      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value,
       npmInstallOpenApiDeps :=
         Seq(
           (
@@ -1360,7 +1366,6 @@ lazy val `apps-scan-frontend` = {
           false,
         )
       ),
-      npmInstallDeps := ((`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value),
     )
 }
 
