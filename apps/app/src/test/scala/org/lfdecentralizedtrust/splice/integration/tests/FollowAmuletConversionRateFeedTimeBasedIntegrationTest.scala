@@ -146,7 +146,7 @@ class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
         ) shouldBe BigDecimal(23.0)
       },
     )
-    // Advance past the feed rate limit
+    // Publish a conversion rate outside the configured bounds
     advanceTime(java.time.Duration.ofMinutes(6))
     val (feed3, _) = actAndCheck(
       "publish price of 200.0",
@@ -178,7 +178,7 @@ class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
         ) shouldBe BigDecimal(23.0)
       },
     )
-    // Advance past the feed rate limit
+    // Advance below the configured bound
     advanceTime(java.time.Duration.ofMinutes(6))
     actAndCheck(
       "publish price of 0.001", {
