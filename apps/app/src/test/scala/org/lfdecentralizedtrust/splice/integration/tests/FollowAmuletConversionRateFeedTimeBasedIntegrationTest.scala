@@ -125,6 +125,8 @@ class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
       },
     )(
       "SV does not update as cooldown has not passed",
+      // Note that the assertion here is imprecise, it could also be that the SV just hasn't ingested the feed update yet.
+      // We accept that imprecision.
       _ => {
         BigDecimal(
           sv1Backend.listAmuletPriceVotes().loneElement.payload.amuletPrice.toScala.value

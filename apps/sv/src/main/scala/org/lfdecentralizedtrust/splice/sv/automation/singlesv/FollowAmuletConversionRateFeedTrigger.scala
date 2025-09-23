@@ -63,6 +63,8 @@ class FollowAmuletConversionRateFeedTrigger(
                 .lookupAmuletPriceVoteByThisSv()
                 .map(
                   _.getOrElse(
+                    // This can happen after a hard migration or when reingesting from
+                    // ledger begin for other reasons so we don't make this INTERNAL.
                     throw Status.NOT_FOUND
                       .withDescription("No price vote for this SV found")
                       .asRuntimeException
@@ -72,10 +74,10 @@ class FollowAmuletConversionRateFeedTrigger(
               voteCooldown = dsoRules.contract.payload.config.voteCooldownTime.toScala
                 .fold(Duration.ofMinutes(1))(t => Duration.ofNanos(t.microseconds * 1000))
             } yield {
-              val earliestVoteDuration = CantonTimestamp
+              val earliestVoteTimestamp = CantonTimestamp
                 .tryFromInstant(existingVote.payload.lastUpdatedAt.plus(voteCooldown))
               if (
-                earliestVoteDuration < now && existingVote.payload.amuletPrice.toScala
+                earliestVoteTimestamp < now && existingVote.payload.amuletPrice.toScala
                   .map(BigDecimal(_)) != Some(feedRate)
               ) {
                 Seq(
