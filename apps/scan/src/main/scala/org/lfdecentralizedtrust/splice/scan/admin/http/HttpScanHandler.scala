@@ -2135,8 +2135,9 @@ class HttpScanHandler(
 
   override def featureSupport(respond: ScanResource.FeatureSupportResponse.type)()(
       extracted: TraceContext
-  ): Future[ScanResource.FeatureSupportResponse] = readFeatureSupport(
-  )(extracted, tracer).map(ScanResource.FeatureSupportResponseOK(_))
+  ): Future[ScanResource.FeatureSupportResponse] =
+    readFeatureSupport(store.key.dsoParty)(ec, extracted, tracer)
+      .map(ScanResource.FeatureSupportResponseOK(_))
 
   private def parseTimestamp(str: String): CantonTimestamp = {
     val timestamp = for {
