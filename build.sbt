@@ -324,6 +324,12 @@ lazy val `splice-api-token-metadata-v1-daml` =
           )
         },
       cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+      npmInstallOpenApiDeps := Seq(),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "openapi-ts-client" / "package.json"
+      ),
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value / "openapi-ts-client",
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -1354,6 +1360,7 @@ lazy val `apps-scan-frontend` = {
           false,
         )
       ),
+      npmInstallDeps := ((`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value),
     )
 }
 
