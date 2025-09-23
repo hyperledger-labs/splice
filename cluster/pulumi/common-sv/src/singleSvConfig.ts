@@ -10,6 +10,7 @@ const SvCometbftConfigSchema = z
   .object({
     nodeId: z.string().optional(),
     validatorKeyAddress: z.string().optional(),
+    // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
     snapshotName: z.string().optional(),
   })
@@ -49,6 +50,10 @@ const SvAppConfigSchema = z
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),
+    // defaults to {svName}-id if not set
+    svIdKeyGcpSecret: z.string().optional(),
+    // defaults to {svName}-cometbft-governance-key if not set
+    cometBftGovernanceKeyGcpSecret: z.string().optional(),
   })
   .strict();
 const ScanAppConfigSchema = z
