@@ -1133,12 +1133,12 @@ To do so, add the following to the :ref:`environment variables <helm_additional_
 This will automatically pick up the conversion rate from
 ``#splice-amulet-name-service:Splice.Ans.AmuletConversionRateFeed:AmuletConversionRateFeed``
 contracts published by the party ``publisher::namespace`` and set the
-SVs config to the latest rate from the publisher. If the published
+SV's config to the latest rate from the publisher. If the published
 rate falls outside of the accepted range, a warning is logged and no
-change to the SVs published conversion rate is made.
+change to the SV's published conversion rate is made.
 
 Note that SVs must wait ``voteCooldownTime`` (a governance parameter
-that defaults to 1min) between updates to their rate so updates made
+that defaults to 1min) between updates to their rate. Therefore updates made
 by the publisher will not propagate immediately.
 
 .. code::
