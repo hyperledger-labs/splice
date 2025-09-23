@@ -270,7 +270,6 @@ describe('Set DSO Config Rules Form', () => {
   });
 
   test('should redirect to governance page after successful submission', async () => {
-    server.resetHandlers();
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
         return res(ctx.json({}));
@@ -310,14 +309,11 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(submitButton); // review proposal
     await user.click(submitButton); // submit proposal
 
-    await waitFor(
-      () => {
-        expect(screen.getByText('Action Required')).toBeDefined();
-        expect(screen.getByText('Inflight Votes')).toBeDefined();
-        expect(screen.getByText('Vote History')).toBeDefined();
-        expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
-      },
-      { timeout: 2000 }
-    );
+    waitFor(() => {
+      expect(screen.getByText('Action Required')).toBeDefined();
+      expect(screen.getByText('Inflight Votes')).toBeDefined();
+      expect(screen.getByText('Vote History')).toBeDefined();
+      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    });
   });
 });
