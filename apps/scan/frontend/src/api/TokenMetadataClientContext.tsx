@@ -8,21 +8,21 @@ const TokenMetadataClientContext = React.createContext<openapi.DefaultApi | unde
 
 // Scan serves TokenMetadata
 export interface ScanConfigProps {
-  url: string;
+  scanUrl: string;
 }
 
 export const TokenMetadataClientProvider: React.FC<React.PropsWithChildren<ScanConfigProps>> = ({
-  url,
+  scanUrl,
   children,
 }) => {
   const client: openapi.DefaultApi | undefined = useMemo(() => {
     const configuration = openapi.createConfiguration({
-      baseServer: new openapi.ServerConfiguration(url, {}),
+      baseServer: new openapi.ServerConfiguration(scanUrl, {}),
       promiseMiddleware: [new OpenAPILoggingMiddleware('TokenMetadata')],
     });
 
     return new openapi.DefaultApi(configuration);
-  }, [url]);
+  }, [scanUrl]);
 
   return (
     <TokenMetadataClientContext.Provider value={client}>

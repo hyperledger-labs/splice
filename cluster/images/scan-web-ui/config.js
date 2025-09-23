@@ -2,10 +2,6 @@ window.splice_config = {
   services: {
     scan: {
       // URL of scan backend.
-      url: "https://" + window.location.host + "/api/scan",
-    },
-    tokenMetadata: {
-      // Same as scan, '/registry' is already included in the openapi definitions
       url: "https://" + window.location.host,
     },
   },

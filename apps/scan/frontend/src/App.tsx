@@ -46,8 +46,8 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   });
 
   return (
-    <ScanClientProvider url={config.services.scan.url}>
-      <TokenMetadataClientProvider url={config.services.tokenMetadata.url}>
+    <ScanClientProvider baseScanUrl={config.services.scan.url}>
+      <TokenMetadataClientProvider scanUrl={config.services.scan.url}>
         <QueryClientProvider client={queryClient}>
           <ReactQueryDevtools initialIsOpen={false} />
           <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
