@@ -40,6 +40,10 @@ Upcoming
 
     - Implement changes from CIP-78 CC Fee Removal.
 
+  - Docker images
+
+    - All UI images now use a non-root user.
+
 
 0.4.17
 ------
