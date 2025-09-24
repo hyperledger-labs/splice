@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -110,15 +112,42 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         },
       )
       clue("Compare direct scan reads to instrument metadata") {
-        val (roundNumber, effectiveAt) = sv1ScanBackend.getRoundOfLatestData()
-        val totalSupply = sv1ScanBackend.getTotalAmuletBalance(roundNumber)
+        val forcedSnapshotTime = sv1ScanBackend.forceAcsSnapshotNow()
+        // hope: this test won't have created more than Limit.MaxLimit contracts, so they all fit in a single response
+        val totalSupply = sv1ScanBackend
+          .getAcsSnapshotAt(forcedSnapshotTime, migrationId, partyIds = Some(Vector(dsoParty)))
+          .valueOrFail("Snapshot was just taken, so this has to exist")
+          .createdEvents
+          .map { createdEvent =>
+            if (createdEvent.templateId.endsWith("LockedAmulet")) {
+              BigDecimal(
+                LockedAmulet
+                  .jsonDecoder()
+                  .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+                  .amulet
+                  .amount
+                  .initialAmount
+              )
+            } else if (createdEvent.templateId.endsWith("Amulet")) {
+              BigDecimal(
+                Amulet
+                  .jsonDecoder()
+                  .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+                  .amount
+                  .initialAmount
+              )
+            } else {
+              BigDecimal(0)
+            }
+          }
+          .sum
         val instrument = sv1ScanBackend
           .lookupInstrument(amuletInstrument.id)
           .getOrElse(fail("instrument.totalSupply must be defined at this point"))
         (
           instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)),
           instrument.totalSupplyAsOf,
-        ) shouldBe (totalSupply, Some(effectiveAt.atOffset(ZoneOffset.UTC)))
+        ) shouldBe (Some(totalSupply), Some(forcedSnapshotTime.toInstant.atOffset(ZoneOffset.UTC)))
       }
     }
   }
