@@ -1,13 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { DsoRulesConfig } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { ConfigChange } from './types';
 import * as damlTypes from '@daml/types';
-import {
+import type {
   SynchronizerConfig,
   SynchronizerState,
 } from '@daml.js/splice-dso-governance/lib/Splice/DSO/DecentralizedSynchronizer/module';
+import type { DsoRulesConfig } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import type { ConfigChange } from './types';
 
 /**
  * Given a list of config changes, build and return a DsoRulesConfig.
@@ -26,10 +26,9 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
     return value ? value : fallbackValue;
   };
 
-  const synchronizerCount = changeMap
-    .keys()
-    .filter(key => key.match(/^decentralizedSynchronizer\d+$/))
-    .toArray().length;
+  const synchronizerCount = Array.from(changeMap.keys()).filter(key =>
+    key.match(/^decentralizedSynchronizer\d+$/)
+  ).length;
 
   let synchronizers = damlTypes.emptyMap<string, SynchronizerConfig>();
 

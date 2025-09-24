@@ -118,6 +118,7 @@ object DarResources {
   val dsoGovernance_0_1_17 = DarResource("splice-dso-governance-0.1.17.dar")
   val dsoGovernance_0_1_18 = DarResource("splice-dso-governance-0.1.18.dar")
   val dsoGovernance_0_1_19 = DarResource("splice-dso-governance-0.1.19.dar")
+  val dsoGovernance_0_1_20 = DarResource("splice-dso-governance-0.1.20.dar")
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
@@ -143,6 +144,7 @@ object DarResources {
       dsoGovernance_0_1_17,
       dsoGovernance_0_1_18,
       dsoGovernance_0_1_19,
+      dsoGovernance_0_1_20,
     ),
   )
 
@@ -161,6 +163,7 @@ object DarResources {
   val amuletNameService_0_1_12 = DarResource("splice-amulet-name-service-0.1.12.dar")
   val amuletNameService_0_1_13 = DarResource("splice-amulet-name-service-0.1.13.dar")
   val amuletNameService_0_1_14 = DarResource("splice-amulet-name-service-0.1.14.dar")
+  val amuletNameService_0_1_15 = DarResource("splice-amulet-name-service-0.1.15.dar")
   val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val amuletNameService = PackageResource(
     amuletNameService_current,
@@ -181,6 +184,7 @@ object DarResources {
       amuletNameService_0_1_12,
       amuletNameService_0_1_13,
       amuletNameService_0_1_14,
+      amuletNameService_0_1_15,
     ),
   )
 

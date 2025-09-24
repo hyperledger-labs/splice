@@ -136,10 +136,12 @@ class UpdateHistorySanityCheckPlugin(
         .take(minSize)
       val founderComparable = founderHistory
         .take(minSize)
-      val different = otherComparable.zipWithIndex.collect {
-        case (otherItem, idx) if founderComparable(idx) != otherItem =>
-          otherItem -> founderComparable(idx)
-      }
+      val different = otherComparable
+        .zip(founderComparable)
+        .collect {
+          case (otherItem, founderItem) if founderItem != otherItem =>
+            otherItem -> founderItem
+        }
 
       different should be(empty)
     }

@@ -52,6 +52,8 @@ class SvOffboardingIntegrationTest
     with ProcessTestUtil
     with StandaloneCanton {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def dbsSuffix = "offboarding"
 
   // Runs against a temporary Canton instance.

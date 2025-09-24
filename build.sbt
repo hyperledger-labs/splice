@@ -1141,6 +1141,9 @@ lazy val `apps-common-frontend` = {
       `apps-wallet`,
       `apps-splitwell`,
       `apps-validator`,
+      // token-standard-cli are not "real" dependencies,
+      // but rather they prevent npm install from being executed concurrently and breaking everything
+      `token-standard-cli`,
     )
     .settings(
       // daml typescript code generation settings:
@@ -1156,7 +1159,7 @@ lazy val `apps-common-frontend` = {
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
-      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value,
+      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value ++ (`token-standard-cli` / Compile / npmInstall).value,
       npmInstallOpenApiDeps :=
         Seq(
           (
