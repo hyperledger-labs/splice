@@ -19,8 +19,7 @@ Upcoming
       when their users engage in token standard workflows.
     - Implement Daml changes for `CIP-0079 - Demonstrate Third-Party Price Feed Integration for CC Listing <https://github.com/global-synchronizer-foundation/cips/pull/101/files>`__:
 
-       These Daml changes require an upgrade to the following Daml versions **before**
-       voting to set the transfer fees to zero:
+       These Daml changes require an upgrade to the following Daml versions:
 
        ================== =======
        name               version
