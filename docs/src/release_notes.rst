@@ -32,6 +32,15 @@ Upcoming
        walletPayments     0.1.14
        ================== =======
 
+  - Scan
+
+    - Performance bugfix for the ``/v0/wallet-balance`` endpoint, especially when requesting a balance for a party that does not exist, which previously would timeout.
+
+  - UIs
+
+    - Implement changes from CIP-78 CC Fee Removal.
+
+
 0.4.17
 ------
 

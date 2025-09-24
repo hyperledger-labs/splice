@@ -1897,6 +1897,8 @@ lazy val `apps-app`: Project =
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
       `splice-util-featured-app-proxies-daml` % "test",
+      // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run
+      `apps-common-frontend`,
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
