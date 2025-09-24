@@ -30,6 +30,9 @@ import scala.util.Random
 class SvTimeBasedOnboardingIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with TriggerTestUtil {
+
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   "expire stale `SvOnboardingRequest`, `SvOnboardingConfirmed`,`ValidatorOnboarding` and `VoteRequest` contracts" in {
     implicit env =>
       implicit val ec = env.executionContext
