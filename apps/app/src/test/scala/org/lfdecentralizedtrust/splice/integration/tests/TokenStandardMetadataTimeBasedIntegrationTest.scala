@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.util.{Codec, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 
-import java.time.ZoneOffset
+import java.time.{Duration, ZoneOffset}
 
 class TokenStandardMetadataTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -113,6 +113,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
       )
       clue("Compare direct scan reads to instrument metadata") {
         val forcedSnapshotTime = sv1ScanBackend.forceAcsSnapshotNow()
+        advanceTime(Duration.ofSeconds(1L)) // because the sanity plugin will run another snapshot
         // hope: this test won't have created more than Limit.MaxLimit contracts, so they all fit in a single response
         val totalSupply = sv1ScanBackend
           .getAcsSnapshotAt(forcedSnapshotTime, migrationId, partyIds = Some(Vector(dsoParty)))
@@ -147,7 +148,9 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         (
           instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)),
           instrument.totalSupplyAsOf,
-        ) shouldBe (Some(totalSupply), Some(forcedSnapshotTime.toInstant.atOffset(ZoneOffset.UTC)))
+        ) shouldBe (Some(totalSupply) -> Some(
+          forcedSnapshotTime.toInstant.atOffset(ZoneOffset.UTC)
+        ))
       }
     }
   }
