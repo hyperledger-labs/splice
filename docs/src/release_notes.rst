@@ -18,6 +18,10 @@ Upcoming
       the creation of featured app activity markers for wallet app providers
       when their users engage in token standard workflows.
 
+  - UIs
+
+    - Implement changes from CIP-78 CC Fee Removal.
+
 
 0.4.17
 ------
