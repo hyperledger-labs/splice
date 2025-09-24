@@ -31,7 +31,6 @@ export const FormControls: React.FC<FormControlsProps> = props => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        mt: 4,
         spacing: 4,
       }}
       data-testid="form-controls"
