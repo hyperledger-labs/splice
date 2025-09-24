@@ -1606,14 +1606,14 @@ object BuildCommon {
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         val i = id.getAndIncrement()
-        println(s"NPM INSTALL FOR ${npmRootDir.value} CALLED. ID $i")
+        println(s"Npm install called for ${npmRootDir.value}. Id: $i")
         BuildUtil.runCommandWithRetries(
           Seq(npmInstallScript.getAbsolutePath),
           log,
           None,
           Some(npmRootDir.value),
         )
-        println(s"NPM INSTALL FOR ${npmRootDir.value} FINISHED. ID $i")
+        println(s"Npm install completed for ${npmRootDir.value}. Id: $i")
         Set(npmRootDir.value / "node_modules")
       }
     val openApiPackageJsons = openApiPkgs.flatMap { case (_, baseDir, hasExternalSpec) =>
