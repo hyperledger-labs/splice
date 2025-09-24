@@ -1392,17 +1392,25 @@ class HttpScanHandler(
             snapshotStore.currentMigrationId,
             snapshotTime,
           )
-          // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
-          // this is, in principle, not a problem:
-          // - this will only be used in tests
-          // - wall clock tests must take manual snapshots anyway, because they can't wait
-          // - simtime tests will advanceTime(N.hours)
-          _ = logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
-          _ <- snapshotStore.insertNewSnapshot(
-            lastSnapshot,
-            snapshotStore.currentMigrationId,
-            snapshotTime,
-          )
+          _ <-
+            if (lastSnapshot.exists(_.snapshotRecordTime == snapshotTime)) {
+              logger.debug(
+                s"ACS snapshot at $snapshotTime already existed, likely to happen in simtime tests."
+              )
+              Future.successful(snapshotTime)
+            } else {
+              logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
+              // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
+              // this is, in principle, not a problem:
+              // - this will only be used in tests
+              // - wall clock tests must take manual snapshots anyway, because they can't wait
+              // - simtime tests will advanceTime(N.hours)
+              snapshotStore.insertNewSnapshot(
+                lastSnapshot,
+                snapshotStore.currentMigrationId,
+                snapshotTime,
+              )
+            }
         } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
           definitions.ForceAcsSnapshotResponse(
             snapshotTime.toInstant.atOffset(ZoneOffset.UTC),
