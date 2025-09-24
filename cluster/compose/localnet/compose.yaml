@@ -31,7 +31,7 @@ services:
   ### Common Services
   ###############################################################################################################
   postgres:
-    image: "postgres:${POSTGRES_VERSION}"
+    image: "mirror.gcr.io/postgres:${POSTGRES_VERSION}"
     container_name: postgres
     volumes:
       - postgres:/var/lib/postgresql/data
