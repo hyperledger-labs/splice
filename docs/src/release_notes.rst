@@ -17,6 +17,21 @@ Upcoming
       support for a ``WalletUserProxy``, which simplifies
       the creation of featured app activity markers for wallet app providers
       when their users engage in token standard workflows.
+    - Implement Daml changes for `CIP-0079 - Demonstrate Third-Party Price Feed Integration for CC Listing <https://github.com/global-synchronizer-foundation/cips/pull/101/files>`__:
+
+       These Daml changes require an upgrade to the following Daml versions **before**
+       voting to set the transfer fees to zero:
+
+       ================== =======
+       name               version
+       ================== =======
+       amulet             0.1.14
+       amuletNameService  0.1.15
+       dsoGovernance      0.1.20
+       validatorLifecycle 0.1.5
+       wallet             0.1.14
+       walletPayments     0.1.14
+       ================== =======
 
   - UIs
 

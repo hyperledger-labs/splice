@@ -30,7 +30,7 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
 };
 
 export const useFeatureSupport = (): UseQueryResult<{
-  my_feature: boolean;
+  noHoldingFeesOnTransfers: boolean;
 }> => {
   const { featureSupport } = useSvAdminClient();
   return useQuery({
@@ -38,7 +38,7 @@ export const useFeatureSupport = (): UseQueryResult<{
     queryFn: async () => {
       const resp = await featureSupport();
       return {
-        myFeature: resp.my_feature,
+        noHoldingFeesOnTransfers: resp.no_holding_fees_on_transfers,
       };
     },
   });

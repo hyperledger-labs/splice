@@ -15,6 +15,7 @@ import {
   ListActivityResponse,
   LookupEntryByPartyResponse,
   GetOpenAndIssuingMiningRoundsResponse,
+  FeatureSupportResponse,
 } from '@lfdecentralizedtrust/scan-openapi';
 
 import { config } from '../../setup/config';
@@ -26,6 +27,10 @@ const amuletNameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcron
 export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
   const scanUrl = `${baseScanUrl}/api/scan`;
   return [
+    rest.get(`${scanUrl}/v0/feature-support`, (_, res, ctx) => {
+      return res(ctx.json<FeatureSupportResponse>({ no_holding_fees_on_transfers: false }));
+    }),
+
     dsoInfoHandler(scanUrl),
     rest.get(`${scanUrl}/v0/dso-party-id`, (_, res, ctx) => {
       return res(

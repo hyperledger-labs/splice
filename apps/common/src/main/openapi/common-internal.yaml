@@ -370,7 +370,7 @@ components:
     FeatureSupportResponse:
       type: object
       required:
-        - my_feature
+        - no_holding_fees_on_transfers
       properties:
-        my_feature:
+        no_holding_fees_on_transfers:
           type: boolean
