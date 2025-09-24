@@ -840,7 +840,9 @@ const daily_unminted = new BQLogicalView(
 const all_data = new BQLogicalView(
   'all_data',
   `
-    SELECT *
+    SELECT
+      *,
+      DATE_SUB(DATE(computed.as_of_record_time), INTERVAL 1 DAY) AS up_to_date
     FROM
         \`$$DASHBOARDS_DATASET$$.dashboards-data\` computed
         JOIN \`$$DASHBOARDS_DATASET$$.monthly_burn\` monthly_burn
