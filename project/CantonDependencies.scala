@@ -43,7 +43,7 @@ object CantonDependencies {
 
   lazy val circe_version = "0.14.2"
 
-  lazy val scalatest_version = "3.2.11"
+  lazy val scalatest_version = "3.2.19"
   lazy val scalacheck_version = "1.15.4"
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
