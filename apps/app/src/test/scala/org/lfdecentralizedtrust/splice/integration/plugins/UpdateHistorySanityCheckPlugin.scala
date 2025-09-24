@@ -136,10 +136,12 @@ class UpdateHistorySanityCheckPlugin(
         .take(minSize)
       val founderComparable = founderHistory
         .take(minSize)
-      val different = otherComparable.zipWithIndex.collect {
-        case (otherItem, idx) if founderComparable(idx) != otherItem =>
-          otherItem -> founderComparable(idx)
-      }
+      val different = otherComparable
+        .zip(founderComparable)
+        .collect {
+          case (otherItem, founderItem) if founderItem != otherItem =>
+            otherItem -> founderItem
+        }
 
       different should be(empty)
     }
@@ -210,7 +212,9 @@ class UpdateHistorySanityCheckPlugin(
         log.contains("ERROR:") || log.contains("WARNING:")
       }
       if (lines.nonEmpty) {
-        logger.error(s"${this.getClass} contains errors: $lines, exiting test.")
+        val message = s"${this.getClass} contains errors: $lines, exiting test."
+        logger.error(message)
+        System.err.println(message)
         sys.exit(1)
       }
       lines should be(empty)
