@@ -65,7 +65,7 @@ const ScanAppConfigSchema = z
 const ValidatorAppConfigSchema = z
   .object({
     walletUser: z.string().optional(),
-    // TODO(tech-debt) inline env var into config.yaml
+    // TODO(#2389) inline env var into config.yaml
     sweep: z
       .object({
         fromEnv: z.string(),
