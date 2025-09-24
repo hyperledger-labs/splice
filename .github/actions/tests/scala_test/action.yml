@@ -299,7 +299,7 @@ runs:
         name: "logs-${{ inputs.test_suite_name }}-${{ inputs.runner_index }}"
 
     - name: Report Failures on Slack & Github
-      if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+      if: failure()
       uses: ./.github/actions/tests/failure_notifications
       with:
         job_subname: "${{ inputs.test_suite_name }} (${{ inputs.runner_index }})"
