@@ -913,6 +913,81 @@ final class ScanAggregator(
                   ct.cumulative_change_to_holding_fees_rate
       from        temp_cumulative_totals ct
       on conflict do nothing;
+      -- added for total_amulet_balance until TODO(#800) is fixed
+      -- this is effectively materializing the query workaround in DbScanStore to calculate total_amulet_balance
+      -- for the active_parties in this aggregation
+      insert into round_total_amulet_balance (
+        store_id,
+        closed_round,
+        total_amulet_balance
+      )
+      values (
+        $roundTotalsStoreId,
+        $lastClosedRound,
+        (
+          select  sum(
+            greatest(
+              0,
+              rpt.cumulative_change_to_initial_amount_as_of_round_zero -
+              rpt.cumulative_change_to_holding_fees_rate * ($lastClosedRound + 1)
+            )
+          ) as total_amulet_balance
+          from    round_party_totals rpt
+          join    active_parties ap
+          on      rpt.store_id = ap.store_id
+          and     rpt.closed_round = ap.closed_round
+          and     rpt.party = ap.party
+          where   rpt.store_id = $roundTotalsStoreId
+        )
+      )
+      on conflict do nothing;
+      -- calculate wallet_balances for all active parties
+      insert into wallet_balances (
+        store_id,
+        closed_round,
+        party,
+        amulet_balance
+      ) select
+        rpt.store_id,
+        $lastClosedRound,
+        rpt.party,
+        greatest(
+          0,
+          rpt.cumulative_change_to_initial_amount_as_of_round_zero -
+          rpt.cumulative_change_to_holding_fees_rate * ($lastClosedRound + 1)
+        ) as amulet_balance
+      from  round_party_totals rpt
+      join  active_parties ap
+      on    rpt.store_id = ap.store_id
+      and   rpt.closed_round = ap.closed_round
+      and   rpt.party = ap.party
+      where rpt.store_id = $roundTotalsStoreId
+      on conflict (store_id, party, closed_round)
+      do update set amulet_balance = excluded.amulet_balance;
+      -- calculate ranked table for parties, for getTopProvidersByAppRewards
+      insert into ranked_providers_by_app_rewards (
+          store_id,
+          closed_round,
+          party,
+          cumulative_app_rewards,
+          rank_nr
+      )
+      select
+          rpt.store_id,
+          $lastClosedRound, -- the calculated leaderboard for the last closed round
+          rpt.party,
+          max(rpt.cumulative_app_rewards),
+          rank() over (order by max(rpt.cumulative_app_rewards) desc) as rank_nr
+      from  round_party_totals rpt
+      join  active_parties ap
+      on    rpt.store_id = ap.store_id
+      and   rpt.closed_round = ap.closed_round
+      and   rpt.party = ap.party
+      where rpt.store_id = $roundTotalsStoreId
+      and   rpt.cumulative_app_rewards > 0
+      group by rpt.store_id, rpt.party
+      on conflict (store_id, party, closed_round)
+      do update set cumulative_app_rewards = excluded.cumulative_app_rewards, rank_nr = excluded.rank_nr;
     """.andThen(DBIOAction.successful(()))
     }
     logger.info(
