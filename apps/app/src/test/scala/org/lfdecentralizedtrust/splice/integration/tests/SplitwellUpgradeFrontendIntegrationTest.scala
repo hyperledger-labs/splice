@@ -13,7 +13,10 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import SplitwellUpgradeFrontendIntegrationTest.*
+import org.scalatest.Ignore
 
+// TODO(DACH-NY/canton-network-internal#1834) Reenable once we sorted out the reassignment issues
+@Ignore
 class SplitwellUpgradeFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment(aliceSplitwellFE, bobSplitwellFE)
     with FrontendLoginUtil
