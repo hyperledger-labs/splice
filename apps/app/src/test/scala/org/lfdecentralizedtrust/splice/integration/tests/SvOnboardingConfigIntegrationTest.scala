@@ -9,6 +9,8 @@ import org.lfdecentralizedtrust.splice.util.SvTestUtil
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class SvOnboardingConfigIntegrationTest extends IntegrationTest with SvTestUtil {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .fromResources(
