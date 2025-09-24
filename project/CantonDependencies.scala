@@ -157,7 +157,7 @@ object CantonDependencies {
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
   lazy val scalaz_core = "org.scalaz" %% "scalaz-core" % scalaz_version
   lazy val scalatestScalacheck =
-    "org.scalatestplus" %% "scalacheck-1-15" % (scalatest_version + ".0")
+    "org.scalatestplus" %% "scalacheck-1-18" % (scalatest_version + ".0")
   lazy val mockito_scala = "org.mockito" %% "mockito-scala" % mockito_scala_version
   lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % ("3.2.10.0")
 
