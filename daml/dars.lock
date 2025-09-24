@@ -20,6 +20,7 @@ splice-amulet-name-service 0.1.11 a644de6e8e76be14242711ba9cca25f68949f8e597f568
 splice-amulet-name-service 0.1.12 557a74491324790b5cf5a379f2481ab1cd2c8b75530858606a66c5c1a8b5e15c
 splice-amulet-name-service 0.1.13 0e8c7e1cb828336bb4d537f6c4ecd94128b94733eb2ae1f55b5962757d357b4b
 splice-amulet-name-service 0.1.14 6cb1318176e758c256c2e385f87b86c5060e80fb68a72e8ceb08ac5f9045fff2
+splice-amulet-name-service 0.1.15 d4724b90dce9fb08badbb367962d237710b3a603e4f57806a1b0af308cc70fdb
 splice-amulet-name-service 0.1.2 711a2974d65e6ebd149704da75f3f71234798687ab895b92f066c865dbdeeabb
 splice-amulet-name-service 0.1.3 beb4b85f3f0cf36dfb93fc917d3ac218ee5d41b6e70604720cb228d85e168ee0
 splice-amulet-name-service 0.1.4 053c7f4c2a77312e7d465a4fa7dc8cb298754ad12c0c987a7c401bd724e65efc
@@ -28,7 +29,7 @@ splice-amulet-name-service 0.1.6 a208aab2c4a248ab2eff352bd382f8b3bbadc92464123db
 splice-amulet-name-service 0.1.7 ba7806d9b2d593eac74a050161c54ae1325d170bf175cb66a9c1e5e5ffb88c3d
 splice-amulet-name-service 0.1.8 efeb3f9b2b92e55fac4ec2d6164f95407a01477240c7465e576df4e310f54bd3
 splice-amulet-name-service 0.1.9 f1b5915ad45ded616f43f83c735b7ee158b5eb58abe758a721e50eee19b3e531
-splice-amulet-name-service-test 0.1.15 9e6fc3774f7abdc03fffd8d1eb3bfd72a8aaaec9f8d0c934f11d8eb323d06f82
+splice-amulet-name-service-test 0.1.16 3130551cbf4e171ff184ef93b3ef1c0fccb6661f5487ed2fb2aa0f938d0ff73c
 splice-amulet-test 0.1.15 b11ee6b9c3ac354d0af3f91d070063ddfa5e7bd0dc2585fc4ad6687d4a10f808
 splice-api-featured-app-v1 1.0.0 7804375fe5e4c6d5afe067bd314c42fe0b7d005a1300019c73154dd939da4dda
 splice-api-token-allocation-instruction-v1 1.0.0 275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520
@@ -53,6 +54,7 @@ splice-dso-governance 0.1.17 a0ae8e3d9897f163b56e7299af0cae86313f0b1ff10264d1fa7
 splice-dso-governance 0.1.18 136484875714fcf24c24858e1d573ac756524eeb607c26999fca3311d6eea953
 splice-dso-governance 0.1.19 759d1cf002fc1225ac43a55d73f0058becce3e62cfb5485c197f2b69ed8d9d98
 splice-dso-governance 0.1.2 4206e127be8b111ac84bd7f98bd9dbf03ed489f1642b46ab31a46ee6d688e7e8
+splice-dso-governance 0.1.20 996a3b619d6b65ca7812881978c44c650cac119de78f5317d1f317658943001c
 splice-dso-governance 0.1.3 b0ae3cc03e418790305a3c15f761fe495572de5827f8d322fb8b96996b783c13
 splice-dso-governance 0.1.4 dc24fd18b4d151cd1e0ff6bfb7438bafb2f50fe076d0f16f50565e60b153a0be
 splice-dso-governance 0.1.5 9e3ca1d22ad495dfabf3d61acae3dc1a7718f527f02092280b58cf69edfdc84c
@@ -60,7 +62,7 @@ splice-dso-governance 0.1.6 4e7653cfbf7ca249de4507aca9cd3b91060e5489042a522c589d
 splice-dso-governance 0.1.7 d406eba1132d464605f4dae3edf8cf5ecbbb34bd8edef0e047e7e526d328718c
 splice-dso-governance 0.1.8 1790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948
 splice-dso-governance 0.1.9 9ee83bfd872f91e659b8a8439c5b4eaf240bcf6f19698f884d7d7993ab48c401
-splice-dso-governance-test 0.1.21 75d4104edb81da6e28f2a477bf9f82fb5726fd6a2a229dad13ebd58796608094
+splice-dso-governance-test 0.1.22 6f6af60bd30eba24732597fe0dca2d2dd435674134f2e8eac23a8a9836d5b996
 splice-token-standard-test 1.0.6 8dd3533c00681158ad4a26a28379bb7b85c07f75ea53cf8cf776803e173612bf
 splice-token-test-dummy-holding 0.0.1 1cd171c6c42ab46dc9cf12d80c6111369e00cea5cdf054924b4f26ce94b1ef5b
 splice-token-test-dummy-holding 0.0.2 4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d
