@@ -1,0 +1,20 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+
+pvc:
+  volumeStorageClass: standard-rwo
+
+metrics:
+  release: prometheus-grafana-monitoring
+  interval: 30s
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:

@@ -18,8 +18,8 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
-  installLoopback,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   installParticipant,
   splitwellDarPaths,
@@ -75,7 +75,6 @@ export async function installValidator1(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
-    'validator1',
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
     {

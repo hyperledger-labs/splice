@@ -105,6 +105,16 @@ class AcsJdbcTypesTest
         )
       } yield result should contain theSameElementsAs value
     }
+
+    "set and get int arrays" in {
+      val value = Seq(1, 2, 3)
+      for {
+        result <- storage.querySingle(
+          sql"select ${value}".as[Array[Int]].headOption,
+          "int array",
+        )
+      } yield result.toSeq should contain theSameElementsAs value
+    }
   }
 
   case class TestRow(

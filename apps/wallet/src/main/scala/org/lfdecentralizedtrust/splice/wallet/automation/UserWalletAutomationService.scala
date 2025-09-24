@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   UnassignTrigger,
 }
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -29,6 +29,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContext
 
@@ -52,6 +53,7 @@ class UserWalletAutomationService(
     dedupDuration: DedupDuration,
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
+    paramsConfig: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -66,25 +68,56 @@ class UserWalletAutomationService(
       retryProvider,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      paramsConfig,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService.type =
     UserWalletAutomationService
 
-  registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
   registerTrigger(
-    new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection)
+    new ExpireTransferOfferTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
   )
-  registerTrigger(new ExpireBuyTrafficRequestsTrigger(triggerContext, store, connection))
   registerTrigger(
-    new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection)
+    new ExpireAcceptedTransferOfferTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
+  registerTrigger(
+    new ExpireBuyTrafficRequestsTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
+  registerTrigger(
+    new ExpireAppPaymentRequestsTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
   )
   registerTrigger(new SubscriptionReadyForPaymentTrigger(triggerContext, store, treasury))
   registerTrigger(
-    new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
+    new AcceptedTransferOfferTrigger(
+      triggerContext,
+      store,
+      treasury,
+      connection(SpliceLedgerConnectionPriority.Medium),
+    )
   )
   registerTrigger(
-    new CompleteBuyTrafficRequestTrigger(triggerContext, store, treasury, connection)
+    new CompleteBuyTrafficRequestTrigger(
+      triggerContext,
+      store,
+      treasury,
+      connection(SpliceLedgerConnectionPriority.High),
+    )
   )
   if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
     registerTrigger(
@@ -105,7 +138,7 @@ class UserWalletAutomationService(
         new WalletPreapprovalSweepTrigger(
           triggerContext,
           store,
-          connection,
+          connection(SpliceLedgerConnectionPriority.Low),
           config,
           scanConnection,
           treasury,
@@ -118,9 +151,10 @@ class UserWalletAutomationService(
         new WalletTransferOfferSweepTrigger(
           triggerContext,
           store,
-          connection,
+          connection(SpliceLedgerConnectionPriority.Low),
           config,
           scanConnection,
+          packageVersionSupport,
         )
       )
     }
@@ -131,7 +165,7 @@ class UserWalletAutomationService(
       new AutoAcceptTransferOffersTrigger(
         triggerContext,
         store,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Low),
         config,
         scanConnection,
         validatorTopupConfigO,
@@ -140,7 +174,9 @@ class UserWalletAutomationService(
     )
   }
 
-  registerTrigger(new AmuletMetricsTrigger(triggerContext, store, scanConnection))
+  registerTrigger(
+    new AmuletMetricsTrigger(triggerContext, store, scanConnection, packageVersionSupport)
+  )
 
   if (txLogBackfillEnabled) {
     registerTrigger(

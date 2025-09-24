@@ -93,3 +93,48 @@ tests:
       - equal:
           path: metadata.name
           value: global-domain-6-sequencer-pvc
+  - it: "sets log-level environment variables correctly when only logLevel is provided"
+    set:
+      # Things we need just to pass the schema
+      sequencer:
+        driver:
+          type: cometbft
+      # Set log level for testing
+      logLevel: INFO
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOG_LEVEL_CANTON
+            value: INFO
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOG_LEVEL_STDOUT
+            value: INFO
+  - it: "sets log-level environment variables correctly when both logLevel and logLevelStdout are provided"
+    set:
+      # Things we need just to pass the schema
+      sequencer:
+        driver:
+          type: cometbft
+      # Set log levels for testing
+      logLevel: DEBUG
+      logLevelStdout: ERROR
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOG_LEVEL_CANTON
+            value: DEBUG
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOG_LEVEL_STDOUT
+            value: ERROR

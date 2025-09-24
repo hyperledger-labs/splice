@@ -20,6 +20,7 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
     | {
         formType: 'sv-reward-weight';
         svRewardWeightMember: string;
+        currentWeight: string;
         svRewardWeight: string;
       }
     | {
@@ -71,14 +72,19 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
       {formType === 'sv-reward-weight' && (
         <>
           <ProposalField
-            id="svRewardWeight"
-            title="SV Reward Weight"
-            value={props.svRewardWeight}
-          />
-          <ProposalField
             id="svRewardWeightMember"
             title="Member"
             value={props.svRewardWeightMember}
+          />
+          <ConfigValuesChanges
+            changes={[
+              {
+                label: 'SV Reward Weight',
+                fieldName: 'svRewardWeight',
+                currentValue: props.currentWeight,
+                newValue: props.svRewardWeight,
+              },
+            ]}
           />
         </>
       )}

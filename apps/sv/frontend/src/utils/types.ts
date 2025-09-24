@@ -48,6 +48,7 @@ export interface ConfigChange {
 
 export interface UpdateSvRewardWeightProposal {
   svToUpdate: string;
+  currentWeight: string;
   weightChange: string;
 }
 

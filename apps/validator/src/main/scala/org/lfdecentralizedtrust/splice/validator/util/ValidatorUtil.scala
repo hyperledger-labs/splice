@@ -26,6 +26,7 @@ import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -58,7 +59,8 @@ private[validator] object ValidatorUtil {
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case QueryResult(offset, None) =>
-            storeWithIngestion.connection
+            storeWithIngestion
+              .connection(SpliceLedgerConnectionPriority.Low)
               .submit(
                 actAs = Seq(validatorServiceParty, endUserParty),
                 readAs = Seq.empty,
@@ -103,16 +105,17 @@ private[validator] object ValidatorUtil {
       retryFor: RetryFor = RetryFor.ClientCalls,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
     val store = storeWithIngestion.store
+    val connection = storeWithIngestion.connection(SpliceLedgerConnectionPriority.Low)
     for {
       userPartyId <- knownParty match {
         case Some(party) =>
-          storeWithIngestion.connection.createUserWithPrimaryParty(
+          connection.createUserWithPrimaryParty(
             endUserName,
             party,
             Seq(),
           )
         case None =>
-          storeWithIngestion.connection.getOrAllocateParty(
+          connection.getOrAllocateParty(
             endUserName,
             Seq(),
             participantAdminConnection,
@@ -122,12 +125,12 @@ private[validator] object ValidatorUtil {
         RetryFor.ClientCalls,
         "onboard_grant_user_rights",
         s"Grant user rights for user $validatorUserName to act as $userPartyId",
-        storeWithIngestion.connection
+        connection
           .getUserActAs(
             validatorUserName
           )
           .map(_.contains(userPartyId)),
-        storeWithIngestion.connection.grantUserRights(
+        connection.grantUserRights(
           validatorUserName,
           Seq(userPartyId),
           Seq.empty,
@@ -152,7 +155,7 @@ private[validator] object ValidatorUtil {
         user = userPartyId,
         validator = store.key.validatorParty,
         dso = store.key.dsoParty,
-        connection = storeWithIngestion.connection,
+        connection = connection,
         lookupValidatorRightByParty =
           storeWithIngestion.store.lookupValidatorRightByPartyWithOffset,
         synchronizerId = synchronizerId,
@@ -289,7 +292,8 @@ private[validator] object ValidatorUtil {
                         )
                         .asRuntimeException()
                   }
-                  storeWithIngestion.connection
+                  storeWithIngestion
+                    .connection(SpliceLedgerConnectionPriority.Low)
                     .submit(
                       actAs = Seq(
                         store.key.validatorParty,

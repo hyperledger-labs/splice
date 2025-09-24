@@ -73,20 +73,20 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
 
       // ingestion can happen in-between the call `actual=listTransactions()` and the paginated ones,
       // so both need to be inside the same `eventually` block
-      clue("Paginated result should be equal to non-paginated result") {
-        val paginatedResult = Iterator
-          .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
-            val page = wallet.listTransactions(beginAfterId, pageSize = 2)
-            if (page.isEmpty)
-              None
-            else
-              Some(page -> Some(page.last.eventId))
-          })
-          .toSeq
-          .flatten
 
-        paginatedResult should contain theSameElementsInOrderAs actual
-      }
+      // Confirm that the paginated result is equal to the non-paginated result
+      val paginatedResult = Iterator
+        .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
+          val page = wallet.listTransactions(beginAfterId, pageSize = 2)
+          if (page.isEmpty)
+            None
+          else
+            Some(page -> Some(page.last.eventId))
+        })
+        .toSeq
+        .flatten
+
+      paginatedResult should contain theSameElementsInOrderAs actual
     }
   }
 

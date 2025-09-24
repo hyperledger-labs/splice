@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DeploySvRunbook, DeployValidatorRunbook } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
@@ -9,6 +9,7 @@ import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { upOperation, upStack } from './pulumiOperations';
+import { runAllValidatorsUp } from './validator-runbook/pulumiUp';
 
 const abortController = new PulumiAbortController();
 
@@ -24,11 +25,8 @@ async function runAllStacksUp() {
     const svRunbook = await stack('sv-runbook', 'sv-runbook', true, {});
     operations.push(upOperation(svRunbook, abortController));
   }
-  if (DeployValidatorRunbook) {
-    const validatorRunbook = await stack('validator-runbook', 'validator-runbook', true, {});
-    operations.push(upOperation(validatorRunbook, abortController));
-  }
-
+  const validators = runAllValidatorsUp(abortController);
+  operations = operations.concat(validators);
   const cantonStacks = runSvCantonForAllMigrations(
     'up',
     stack => {

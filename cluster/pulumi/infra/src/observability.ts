@@ -746,6 +746,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 (monitoringConfig.alerting.alerts.trafficWaste.kilobytes * 1024).toString()
               )
               .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_QUANTILE',
+                monitoringConfig.alerting.alerts.trafficWaste.quantile.toString()
+              )
+              .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
               )

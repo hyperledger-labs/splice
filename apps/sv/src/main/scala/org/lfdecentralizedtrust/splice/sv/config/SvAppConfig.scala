@@ -87,7 +87,7 @@ object SvOnboardingConfig {
       initialMaxNumInputs: Int = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      initialCreateFee: BigDecimal = SpliceUtil.defaultCreateFee.fee,
+      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -309,6 +309,10 @@ case class SvAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
+    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // it will never send a time proof.
+    timeTrackerObservationLatency: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(5),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
@@ -333,6 +337,8 @@ case class SvAppBackendConfig(
     // all validators submit the transaction at the same time
     // overloading the network.
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
+    // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
+    latestPackagesOnly: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

@@ -10,6 +10,13 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
 
   this: FrontendTestCommon =>
 
+  protected val coreSvIngressNames = Map(
+    "sv1" -> "sv-2",
+    "sv2" -> "sv-2-eng",
+    "sv3" -> "sv-3-eng",
+    "svda1" -> "sv-1",
+  );
+
   def testSvUi(
       svUiUrl: String,
       svUsername: String,
@@ -59,7 +66,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
         },
       )
 
-      clue("SVs 1-4 have placed a amulet price vote") {
+      clue("SVs 1-3 + DA-1 have placed a amulet price vote") {
         actAndCheck(
           "Opening amulet price tab",
           click on "navlink-amulet-price",
@@ -73,7 +80,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
                 e.text should fullyMatch regex priceR
               }
             }
-            clue(s"We see, via this SV's UI, that all others of SV1-4 have voted") {
+            clue(s"We see, via this SV's UI, that all others of SV1-3 + DA-1 have voted") {
               val votes = findAll(className("amulet-price-table-row"))
                 .map(row =>
                   (PartyId
@@ -112,7 +119,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
               val firstSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
               firstSecret should not be oldFirstSecret
               inside(firstSecret) { case Some(s) =>
-                s should have size 44
+                s should not be ""
               }
             },
           )
@@ -129,13 +136,13 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
 
   }
 
-  def withWebUiSv[A](i: Int)(f: WebDriverType => A): A = {
-    val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
+  def withWebUiSv[A](svName: String)(f: WebDriverType => A): A = {
+    val ingressName = coreSvIngressNames.get(svName).value
     val svUiUrl = s"https://sv.${ingressName}.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svUsername = s"admin@sv$i-dev.com";
+    val svUsername = s"admin@${svName}-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
 
-    withWebUiSv(s"sv$i", svUiUrl, svUsername, svPassword)(f)
+    withWebUiSv(svName, svUiUrl, svUsername, svPassword)(f)
   }
 
   def withWebUiSvRunbook[A](f: WebDriverType => A): A = {

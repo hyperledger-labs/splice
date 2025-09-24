@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -69,7 +70,8 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
           controller,
         )
       )
-      _ <- svTaskContext.connection
+      _ <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.Medium)
         .submit(
           Seq(store.key.svParty),
           Seq(store.key.dsoParty),

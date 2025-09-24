@@ -1,0 +1,122 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utility template for proxying token standard choices so that featured app markers
+-- are created when using extra parties for operating an app.
+--
+-- You can either use this template directly, or copy the code
+-- under a **different package name** and a **different module name**.
+--
+-- Note: use the `WalletUserProxy` if you are building a wallet app and want your users
+-- to create featured app markers for you.
+--
+module Splice.Util.FeaturedApp.DelegateProxy where
+
+import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.AllocationInstructionV1
+import Splice.Api.FeaturedAppRightV1
+
+-- | Generic argument to the proxy choices.
+data ProxyArg arg = ProxyArg with
+    choiceArg : arg -- ^ The argument to the choice that the delegate is exercising.
+    featuredAppRightCid : ContractId FeaturedAppRight -- ^ The featured app right contract of the provider.
+    beneficiaries : [AppRewardBeneficiary] -- ^ The beneficiaries for the activity marker.
+  deriving (Show, Eq)
+
+-- | Generic result of the proxy choices.
+data ProxyResult r = ProxyResult with
+    markerResult : FeaturedAppRight_CreateActivityMarkerResult
+    choiceResult : r
+
+-- | A proxy for a delegate to create featured app markers jointly with using token standard workflows.
+-- The delegate is given full control over the creation of the markers.
+--
+-- This is for example useful when using one or more parties for app operation purposes.
+-- Using this proxy allows the operational parties to properly attribute their activity to the featured app,
+-- which is represented by the app provider party.
+template DelegateProxy with
+    provider : Party -- ^ The app provider whose featured app right should be used
+    delegate : Party -- ^ The delegate interacting with the token standard workflow
+  where
+    signatory provider
+    observer delegate
+
+    nonconsuming choice DelegateProxy_TransferFactory_Transfer
+      : ProxyResult TransferInstructionResult
+      with
+        cid : ContractId TransferFactory
+        proxyArg : ProxyArg TransferFactory_Transfer
+      controller delegate
+      do
+        exerciseProxyChoice this cid proxyArg
+
+    nonconsuming choice DelegateProxy_TransferInstruction_Accept
+      : ProxyResult TransferInstructionResult
+      with
+        cid : ContractId TransferInstruction
+        proxyArg : ProxyArg TransferInstruction_Accept
+      controller delegate
+      do
+        exerciseProxyChoice this cid proxyArg
+
+    nonconsuming choice DelegateProxy_TransferInstruction_Reject
+      : ProxyResult TransferInstructionResult
+      with
+        cid : ContractId TransferInstruction
+        proxyArg : ProxyArg TransferInstruction_Reject
+      controller delegate
+      do
+        exerciseProxyChoice this cid proxyArg
+
+    nonconsuming choice DelegateProxy_TransferInstruction_Withdraw
+      : ProxyResult TransferInstructionResult
+      with
+        cid : ContractId TransferInstruction
+        proxyArg : ProxyArg TransferInstruction_Withdraw
+      controller delegate
+      do
+        exerciseProxyChoice this cid proxyArg
+
+    nonconsuming choice DelegateProxy_AllocationFactory_Allocate
+      : ProxyResult AllocationInstructionResult
+      with
+        cid : ContractId AllocationFactory
+        proxyArg : ProxyArg AllocationFactory_Allocate
+      controller delegate
+      do
+        exerciseProxyChoice this cid proxyArg
+
+    nonconsuming choice DelegateProxy_Allocation_Withdraw
+      : ProxyResult Allocation_WithdrawResult
+      with
+        cid : ContractId Allocation
+        proxyArg : ProxyArg Allocation_Withdraw
+      controller delegate
+      do
+        exerciseProxyChoice this cid proxyArg
+
+
+-- Utilities
+-------------
+
+-- | Shared code to execute the proxied choice.
+exerciseProxyChoice
+  : forall t ch r. HasExercise t ch r =>
+  DelegateProxy -> ContractId t -> ProxyArg ch -> Update (ProxyResult r)
+exerciseProxyChoice proxy cid proxyArg = do
+  let ProxyArg{..} = proxyArg
+  appRight <- fetch featuredAppRightCid
+  require "App right matches expected provider" ((view appRight).provider == proxy.provider)
+  -- create marker
+  markerResult <- exercise featuredAppRightCid FeaturedAppRight_CreateActivityMarker with
+    beneficiaries = proxyArg.beneficiaries
+  -- exercise proxied choice
+  choiceResult <- exercise cid choiceArg
+  pure ProxyResult with markerResult; choiceResult
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant

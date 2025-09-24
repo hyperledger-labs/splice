@@ -17,10 +17,10 @@ import {
   failOnAppVersionMismatch,
   imagePullSecret,
   installAuth0Secret,
-  installLoopback,
   installSpliceHelmChart,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   installParticipant,
   splitwellDarPaths,
@@ -62,7 +62,6 @@ export async function installSplitwell(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
-    'splitwell',
     decentralizedSynchronizerMigrationConfig.active.version,
     sharedPostgres,
     {

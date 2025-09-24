@@ -1,3 +1,4 @@
+# -*- shell-script -*-
 
 ###
 
@@ -18,7 +19,7 @@ function subcmd_pulumi() {
         _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
     fi
 
-    if [ ! -d "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}" ]; then
+    if [ ! -d "${PULUMI_STACKS_DIR}/${pulumi_project}" ]; then
         _error "Unknown Pulumi project: ${pulumi_project}"
     fi
 
@@ -163,6 +164,62 @@ function subcmd_ci_apply() {
     _info "Applying CI deployment: $(get-snapshot-version)"
 
     _cluster_apply "$@"
+}
+
+function _cluster_apply() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skip-infra)
+                skipInfra="yes"
+                shift
+                ;;
+            --sv1-only)
+                sv1Only="yes"
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+        esac
+    done
+
+    if [ -z "${skipInfra:-}" ]; then
+      _info "Applying Pulumi Cluster stack"
+      subcmd_pulumi cluster up --yes --skip-preview
+      _info "Applying Pulumi Infra Stack"
+      _infra_up
+    else
+        _info "Skipping infra deployment"
+    fi
+
+    _info "Applying Pulumi Stack"
+
+    subcmd_install_data_export_bucket_key
+
+    if [ -n "${sv1Only:-}" ]; then
+      _info "Applying SV1 only"
+      DSO_SIZE=1 \
+        SPLICE_DEPLOY_VALIDATOR1=false \
+        SPLICE_DEPLOY_SPLITWELL=false \
+        SPLICE_DEPLOY_SV_RUNBOOK=false \
+        SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
+        SPLICE_SKIP_EXTRA_SVS=true \
+        _pulumi_automation_run_up
+    else
+      _info "Applying all"
+      DISABLE_COMETBFT_STATE_SYNC=true \
+        SPLICE_DEPLOY_SV_RUNBOOK=false \
+        SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
+        _pulumi_automation_run_up
+    fi
+}
+
+function _pulumi_automation_run_up() {
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run up
+    else
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run up
+    fi
 }
 
 ###
@@ -319,6 +376,8 @@ function subcmd_apply_validator(){
     _prompt_to_confirm
     _cluster_must_exist
 
+    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
+
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
@@ -355,6 +414,8 @@ function subcmd_ci_apply_validator() {
     if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
        _info "Bootstrapping Validator from ${BOOTSTRAPPING_CONFIG}"
     fi
+
+    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
 
     _uses_pulumi_stack validator-runbook
 

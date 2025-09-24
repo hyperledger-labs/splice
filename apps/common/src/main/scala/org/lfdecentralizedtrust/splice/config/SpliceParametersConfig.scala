@@ -21,7 +21,7 @@ final case class SpliceParametersConfig(
     rateLimiting: RateLimitersConfig =
       RateLimitersConfig(SpliceRateLimitConfig(enabled = true, ratePerSecond = 200), Map.empty),
     // Configuration for the circuit breaker for ledger API command submissions.
-    commandCircuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
+    circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 

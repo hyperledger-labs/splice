@@ -8,6 +8,13 @@
 Automated Helm/Kubernetes Templating Tool
 =========================================
 
+.. warning::
+
+   This section features solutions shared by community members. 
+   While they haven’t been formally tested by the Splice maintainers, 
+   users are encouraged to verify the information independently. 
+   Contributions to enhance accuracy and completeness are always welcome.
+
 Managing deployments for Validator and Super Validator nodes using Kubernetes, Helm, and Git can be challenging,
 especially when keeping multiple environments (DevNet, TestNet, MainNet) in sync with evolving configuration files and values.
 Frequent version bumps, new variables, and hard migrations often require manual, error-prone updates to numerous ``values-*.yml`` files.

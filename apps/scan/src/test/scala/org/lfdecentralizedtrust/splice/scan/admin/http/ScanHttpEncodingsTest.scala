@@ -24,6 +24,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.mem
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{DamlValueEncoding, UpdateHistoryItem}
 import org.lfdecentralizedtrust.splice.store.{StoreTest, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue
 import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.matchers.should.Matchers
 
@@ -375,5 +377,221 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       value.rootEventIds should not be empty
       forAll(value.rootEventIds)(eventId => eventId should be(s"${tree.update.update.updateId}:0"))
     }
+  }
+
+  "encode verdict" in {
+    import io.circe.Json
+
+    val recordTs = CantonTimestamp.now()
+
+    val partyA = mkPartyId("Alice").toProtoPrimitive
+    val partyB = mkPartyId("Bob").toProtoPrimitive
+    val partyC = mkPartyId("Charlie").toProtoPrimitive
+
+    val verdictBase = DbScanVerdictStore.VerdictT(
+      rowId = 0L,
+      migrationId = 3L,
+      domainId = dummyDomain,
+      recordTime = recordTs,
+      finalizationTime = recordTs,
+      submittingParticipantUid = mkParticipantId("participant").toProtoPrimitive,
+      verdictResult = VerdictResultDbValue.Unspecified,
+      mediatorGroup = 7,
+      updateId = "update-xyz",
+      submittingParties = Seq(partyA, partyB),
+      transactionRootViews = Seq(0, 2),
+    )
+
+    val view0 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 0,
+      informees = Seq(partyC),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyA)),
+          "threshold" -> Json.fromInt(1),
+        )
+      ),
+      subViews = Seq(3),
+    )
+    val view1 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 1,
+      informees = Seq(partyB),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyB), Json.fromString(partyC)),
+          "threshold" -> Json.fromInt(2),
+        )
+      ),
+      subViews = Seq.empty,
+    )
+
+    val view2 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 2,
+      informees = Seq(partyA),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyA), Json.fromString(partyB)),
+          "threshold" -> Json.fromInt(2),
+        ),
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyC)),
+          "threshold" -> Json.fromInt(1),
+        ),
+      ),
+      subViews = Seq(1),
+    )
+
+    val view3 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 3,
+      informees = Seq(partyA, partyB),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyA), Json.fromString(partyC)),
+          "threshold" -> Json.fromInt(2),
+        )
+      ),
+      subViews = Seq(4, 5),
+    )
+
+    val view4 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 4,
+      informees = Seq(partyB),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyB)),
+          "threshold" -> Json.fromInt(1),
+        )
+      ),
+      subViews = Seq(6),
+    )
+    val view5 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 5,
+      informees = Seq(partyC),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(
+            Json.fromString(partyA),
+            Json.fromString(partyB),
+            Json.fromString(partyC),
+          ),
+          "threshold" -> Json.fromInt(3),
+        )
+      ),
+      subViews = Seq.empty,
+    )
+
+    val view6 = DbScanVerdictStore.TransactionViewT(
+      verdictRowId = 0L,
+      viewId = 6,
+      informees = Seq(partyA),
+      confirmingParties = Json.arr(
+        Json.obj(
+          "parties" -> Json.arr(Json.fromString(partyA)),
+          "threshold" -> Json.fromInt(1),
+        )
+      ),
+      subViews = Seq.empty,
+    )
+
+    val viewsIn = Seq(view2, view0, view1, view6, view4, view5, view3)
+
+    val encodedVerdict = ScanHttpEncodings.encodeVerdict(verdictBase, viewsIn)
+
+    encodedVerdict.updateId shouldBe verdictBase.updateId
+    encodedVerdict.migrationId shouldBe verdictBase.migrationId
+    encodedVerdict.domainId shouldBe dummyDomain.toString
+    encodedVerdict.recordTime should haveMicrosecondPrecision
+    encodedVerdict.finalizationTime should haveMicrosecondPrecision
+    encodedVerdict.submittingParties shouldBe verdictBase.submittingParties.toVector
+    encodedVerdict.submittingParticipantUid shouldBe verdictBase.submittingParticipantUid
+    encodedVerdict.mediatorGroup shouldBe verdictBase.mediatorGroup
+    encodedVerdict.verdictResult shouldBe httpApi.VerdictResult.VerdictResultUnspecified
+
+    encodedVerdict.transactionViews.rootViews shouldBe verdictBase.transactionRootViews.toVector
+
+    val views = encodedVerdict.transactionViews.views
+    views.map(_.viewId) shouldBe Vector(0, 1, 2, 3, 4, 5, 6)
+
+    inside(views(0)) { case v =>
+      v.viewId shouldBe 0
+      v.informees shouldBe Vector(partyC)
+      v.subViews shouldBe Vector(3)
+      v.confirmingParties shouldBe Vector(httpApi.Quorum(Vector(partyA), 1))
+    }
+
+    inside(views(1)) { case v =>
+      v.viewId shouldBe 1
+      v.informees shouldBe Vector(partyB)
+      v.subViews shouldBe Vector.empty
+      v.confirmingParties shouldBe Vector(
+        httpApi.Quorum(Vector(partyB, partyC), 2)
+      )
+    }
+
+    inside(views(2)) { case v =>
+      v.viewId shouldBe 2
+      v.informees shouldBe Vector(partyA)
+      v.subViews shouldBe Vector(1)
+      v.confirmingParties shouldBe Vector(
+        httpApi.Quorum(Vector(partyA, partyB), 2),
+        httpApi.Quorum(Vector(partyC), 1),
+      )
+    }
+
+    inside(views(3)) { case v =>
+      v.viewId shouldBe 3
+      v.informees shouldBe Vector(partyA, partyB)
+      v.subViews shouldBe Vector(4, 5)
+      v.confirmingParties shouldBe Vector(
+        httpApi.Quorum(Vector(partyA, partyC), 2)
+      )
+    }
+
+    inside(views(4)) { case v =>
+      v.viewId shouldBe 4
+      v.informees shouldBe Vector(partyB)
+      v.subViews shouldBe Vector(6)
+      v.confirmingParties shouldBe Vector(
+        httpApi.Quorum(Vector(partyB), 1)
+      )
+    }
+
+    inside(views(5)) { case v =>
+      v.viewId shouldBe 5
+      v.informees shouldBe Vector(partyC)
+      v.subViews shouldBe Vector.empty
+      v.confirmingParties shouldBe Vector(
+        httpApi.Quorum(Vector(partyA, partyB, partyC), 3)
+      )
+    }
+
+    inside(views(6)) { case v =>
+      v.viewId shouldBe 6
+      v.informees shouldBe Vector(partyA)
+      v.subViews shouldBe Vector.empty
+      v.confirmingParties shouldBe Vector(
+        httpApi.Quorum(Vector(partyA), 1)
+      )
+    }
+
+    val encodedAccepted =
+      ScanHttpEncodings.encodeVerdict(
+        verdictBase.copy(verdictResult = VerdictResultDbValue.Accepted),
+        viewsIn,
+      )
+    encodedAccepted.verdictResult shouldBe httpApi.VerdictResult.VerdictResultAccepted
+
+    val encodedRejected =
+      ScanHttpEncodings.encodeVerdict(
+        verdictBase.copy(verdictResult = VerdictResultDbValue.Rejected),
+        viewsIn,
+      )
+    encodedRejected.verdictResult shouldBe httpApi.VerdictResult.VerdictResultRejected
   }
 }

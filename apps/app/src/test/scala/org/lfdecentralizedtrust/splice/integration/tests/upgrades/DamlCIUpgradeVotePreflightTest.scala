@@ -20,7 +20,7 @@ class DamlCIUpgradeVotePreflightTest
       "sv1",
       "sv2",
       "sv3",
-      "sv4",
+      "svda1",
       "sv",
     )
     with SvUiPreflightIntegrationTestUtil
@@ -48,7 +48,7 @@ class DamlCIUpgradeVotePreflightTest
       val now = Instant.now()
 
       clue(s"sv1 create vote request") {
-        withWebUiSv(1) { implicit webDriver =>
+        withWebUiSv("sv1") { implicit webDriver =>
           click on "navlink-votes"
           val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
           dropDownAction.selectByValue("CRARC_SetConfig")
@@ -98,12 +98,14 @@ class DamlCIUpgradeVotePreflightTest
       }
 
       clue("Other svs vote in favor") {
-        val svsF = Seq(2, 3, 4).map(withWebUiSv[Unit]) :+ withWebUiSvRunbook[Unit]
+        val svsF = Seq("sv2", "sv3", "svda1").map(withWebUiSv[Unit]) :+ withWebUiSvRunbook[Unit]
         svsF.par.foreach { svF =>
           svF { implicit webDriver =>
-            click on "navlink-votes"
-            click on "tab-panel-action-needed"
-            click on className("vote-row-action")
+            eventuallySucceeds() {
+              click on "navlink-votes"
+              click on "tab-panel-action-needed"
+              click on className("vote-row-action")
+            }
             click on "cast-vote-button"
             click on "accept-vote-button"
             click on "save-vote-button"
@@ -113,7 +115,7 @@ class DamlCIUpgradeVotePreflightTest
       }
 
       clue("The request is displayed in the in progress section") {
-        withWebUiSv(1) { implicit webDriver =>
+        withWebUiSv("sv1") { implicit webDriver =>
           click on "navlink-votes"
           click on "tab-panel-in-progress"
 

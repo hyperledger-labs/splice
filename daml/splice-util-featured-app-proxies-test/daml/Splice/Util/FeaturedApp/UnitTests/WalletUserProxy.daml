@@ -1,0 +1,84 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Unit tests for the WalletUserProxy module.
+module Splice.Util.FeaturedApp.UnitTests.WalletUserProxy where
+
+import DA.Assert ((===))
+import DA.Optional
+
+import Splice.Api.FeaturedAppRightV1
+import Splice.Util.FeaturedApp.WalletUserProxy
+
+import Daml.Script
+
+providerParty : Party
+providerParty = fromSome $ partyFromText "provider"
+
+userParty : Party
+userParty = fromSome $ partyFromText "user"
+
+
+test_proxyBeneficiaries : Script ()
+test_proxyBeneficiaries = do
+    test
+      WalletUserProxy with
+        provider = providerParty
+        providerWeight = 1.0
+        userWeight = 0.0
+        extraBeneficiaries = []
+        optAllowList = None
+      [ AppRewardBeneficiary with beneficiary = providerParty; weight = 1.0
+      ]
+
+    test
+      WalletUserProxy with
+        provider = providerParty
+        providerWeight = 0.9
+        userWeight = 0.1
+        extraBeneficiaries = []
+        optAllowList = None
+      [ AppRewardBeneficiary with beneficiary = providerParty; weight = 0.9
+      , AppRewardBeneficiary with beneficiary = userParty; weight = 0.1
+      ]
+
+    test
+      WalletUserProxy with
+        provider = providerParty
+        providerWeight = 0.8
+        userWeight = 0.1
+        extraBeneficiaries = [AppRewardBeneficiary with beneficiary = fromSome $ partyFromText "extra1"; weight = 0.1]
+        optAllowList = None
+      [ AppRewardBeneficiary with beneficiary = providerParty; weight = 0.8
+      , AppRewardBeneficiary with beneficiary = userParty; weight = 0.1
+      , AppRewardBeneficiary with beneficiary = fromSome $ partyFromText "extra1"; weight = 0.1
+      ]
+
+    testInvalid WalletUserProxy with
+      provider = providerParty
+      providerWeight = -0.5
+      userWeight = 0.4
+      extraBeneficiaries = []
+      optAllowList = None
+
+    testInvalid WalletUserProxy with
+      provider = providerParty
+      providerWeight = 0.5
+      userWeight = -0.6
+      extraBeneficiaries = []
+      optAllowList = None
+
+    testInvalid WalletUserProxy with
+      provider = providerParty
+      providerWeight = 0.5
+      userWeight = 0.6
+      extraBeneficiaries = [AppRewardBeneficiary with beneficiary = fromSome $ partyFromText "extra1"; weight = -0.1]
+      optAllowList = None
+  where
+    test proxy expectedBeneficiaries = do
+      require "valid proxy" $ validProxy proxy
+      proxyBeneficiaries proxy userParty === expectedBeneficiaries
+
+    testInvalid proxy = do
+      require "invalid proxy" $ not (validProxy proxy)
+
