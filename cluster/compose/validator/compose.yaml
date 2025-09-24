@@ -10,7 +10,7 @@ networks:
 
 services:
   postgres-splice:
-    image: "mirror.gcr.io/postgres:${SPLICE_POSTGRES_VERSION}"
+    image: "${POSTGRES_IMAGE_REPO}postgres:${SPLICE_POSTGRES_VERSION}"
     environment:
       - POSTGRES_USER=${SPLICE_DB_USER}
       - POSTGRES_PASSWORD=${SPLICE_DB_PASSWORD}
