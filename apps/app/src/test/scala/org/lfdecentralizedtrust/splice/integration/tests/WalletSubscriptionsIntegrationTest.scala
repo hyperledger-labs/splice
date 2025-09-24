@@ -24,10 +24,6 @@ class WalletSubscriptionsIntegrationTest
       .withSequencerConnectionsFromScanDisabled()
 
   "A wallet" should {
-    "just fail" in {
-      fail("test failure, please remove")
-    }
-
     "fail to get a non-existent subscription request" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
