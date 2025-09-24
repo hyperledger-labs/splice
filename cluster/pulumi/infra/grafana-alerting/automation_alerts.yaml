@@ -490,7 +490,8 @@ groups:
               maxDataPoints: 43200
               refId: threshold
               type: math
-        noDataState: $NODATA
+        # Alert also reports noData when there is no contention.
+        noDataState: OK
         execErrState: Alerting
         for: 5m
         annotations:
