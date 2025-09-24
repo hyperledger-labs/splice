@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@google-cloud/storage": "^6.11.0",
-    "@kubernetes/client-node": "^0.18.1",
+    "@kubernetes/client-node": "^0.22.3",
     "@pulumi/command": "1.1.0",
     "@pulumi/gcp": "8.32.1",
     "@pulumi/kubernetes": "4.23.0",
@@ -36,6 +36,7 @@
     "@types/js-yaml": "^4.0.5",
     "@types/lodash": "^4.14.189",
     "@types/sinon": "^10.0.15",
+    "@types/ws": "^8.18.1",
     "sinon": "^15.0.4"
   }
 }

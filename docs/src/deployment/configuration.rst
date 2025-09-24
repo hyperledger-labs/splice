@@ -56,6 +56,8 @@ Note that this overwrites any bootstrap scripts baked into the
 container image. So if you added custom functionality there, you will
 need to replicate this in the overwrite.
 
+.. _helm_additional_env_vars:
+
 Helm charts support
 ^^^^^^^^^^^^^^^^^^^
 

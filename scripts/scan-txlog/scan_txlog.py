@@ -161,6 +161,9 @@ class TemplateQualifiedNames:
     dso_bootstrap = "Splice.DsoBootstrap:DsoBootstrap"
     amulet_rules = "Splice.AmuletRules:AmuletRules"
     unclaimed_reward = "Splice.Amulet:UnclaimedReward"
+    amulet_conversion_rate_feed = (
+        "Splice.Ans.AmuletConversionRateFeed:AmuletConversionRateFeed"
+    )
 
     all_tracked = set(
         [
@@ -2093,6 +2096,8 @@ class State:
         match event.template_id.qualified_name:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
+            case TemplateQualifiedNames.amulet_conversion_rate_feed:
+                pass
             case _:
                 self._fail(
                     transaction,
@@ -3879,6 +3884,8 @@ class State:
                 return self.handle_allocation_execute_transfer(transaction, event)
             case "Allocation_Withdraw":
                 return self.handle_allocation_withdraw(transaction, event)
+            case "AmuletConversionRateFeed_Update":
+                return HandleTransactionResult.empty()
             # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
             # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
             # no handling of `AllocationRequest` choices as they are not visible to the DSO party

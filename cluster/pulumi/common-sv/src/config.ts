@@ -58,6 +58,8 @@ export interface StaticSvConfig {
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
   scanBigQuery?: ScanBigQueryConfig;
+  svIdKeySecretName?: string;
+  cometBftGovernanceKeySecretName?: string;
 }
 
 export type SequencerPruningConfig = {

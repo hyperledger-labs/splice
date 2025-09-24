@@ -4,6 +4,6 @@ import { setupWorker, SetupWorker } from 'msw';
 
 import { buildScanMock } from './handlers/scan-api';
 
-const URL = 'http://localhost:5014/api/scan';
+const URL = 'http://localhost:5014';
 
 export const worker: SetupWorker = setupWorker(...buildScanMock(URL));
