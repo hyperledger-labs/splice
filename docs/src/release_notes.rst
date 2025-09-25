@@ -11,6 +11,9 @@ Release Notes
 Upcoming
 --------
 
+0.4.18
+------
+
   - Daml
 
     - release ``splice-util-featured-app-proxies-1.1.0`` with
