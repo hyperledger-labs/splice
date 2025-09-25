@@ -205,6 +205,12 @@ cluster:
 networkWide:
   maxVettingDelay: 1m
 validators:
+  validator-runbook:
+    participant:
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE
+      additionalJvmOptions: -Dparticipantoption
   extra-validator:
     namespace: validator
     partyHint: 'extra-validator'

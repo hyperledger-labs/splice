@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   DeployValidatorRunbook,
+  EnvVarConfigSchema,
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
+
+export const ParticipantConfigSchema = z.object({
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
+});
 
 export const ValidatorNodeConfigSchema = z.object({
   logging: z
@@ -22,6 +28,7 @@ export const ValidatorNodeConfigSchema = z.object({
       retention: z.string(),
     })
     .optional(),
+  participant: ParticipantConfigSchema.optional(),
 });
 export type ValidatorNodeConfig = z.infer<typeof ValidatorNodeConfigSchema>;
 export const ValidatorConfigSchema = z
