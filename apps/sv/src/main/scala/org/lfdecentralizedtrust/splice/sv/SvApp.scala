@@ -57,6 +57,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.util.JsonOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.{
   SvOnboardingToken,
   SvUtil,
@@ -80,6 +81,7 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.util.MonadUtil
 import io.circe.Json
+import io.circe.syntax.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -741,7 +743,7 @@ class SvApp(
     Future.traverse(config.expectedValidatorOnboardings)(c =>
       SvApp
         .prepareValidatorOnboarding(
-          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, c.secret),
+          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, c.secret, None),
           c.expiresIn,
           svStoreWithIngestion,
           decentralizedSynchronizer,
@@ -834,21 +836,32 @@ object SvApp {
       retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svStore = svStoreWithIngestion.store
-    val svParty = svStore.key.svParty
+    // If the secret contains partyHint, use it as a single source of truth
+    val (svParty, rawSecret, secretValue) = secret.partyHint match {
+      case Some(hint) =>
+        val sv = secret.sponsoringSv
+        (
+          sv,
+          secret.secret,
+          JsonOnboardingSecret(sv.toProtoPrimitive, secret.secret, hint).asJson.noSpaces,
+        )
+      case None => (svStore.key.svParty, secret.secret, secret.secret)
+    }
+
     val validatorOnboarding = new splice.validatoronboarding.ValidatorOnboarding(
       svParty.toProtoPrimitive,
-      secret.secret,
+      secretValue,
       (clock.now + expiresIn.toInternal).toInstant,
     ).create()
     for {
-      res <- svStore.lookupUsedSecretWithOffset(secret.secret).flatMap {
+      res <- svStore.lookupUsedSecretWithOffset(rawSecret).flatMap {
         case QueryResult(_, Some(usedSecret)) =>
           val validator = usedSecret.payload.validator
           Future.successful(
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
         case QueryResult(offset, None) =>
-          svStore.lookupValidatorOnboardingBySecretWithOffset(secret.secret).flatMap {
+          svStore.lookupValidatorOnboardingBySecretWithOffset(rawSecret).flatMap {
             case QueryResult(_, Some(_)) =>
               Future.successful(
                 Left("A validator onboarding contract with this secret already exists.")
@@ -866,7 +879,7 @@ object SvApp {
                         .CommandId(
                           "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
                           Seq(svParty),
-                          secret.secret, // not a leak as this gets hashed before it's used
+                          secretValue, // not a leak as this gets hashed before it's used
                         ),
                       deduplicationOffset = offset,
                     )

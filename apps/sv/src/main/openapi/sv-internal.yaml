@@ -633,6 +633,8 @@ components:
           description: |
             The contract storing the onboarding secret.
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        party_hint:
+          type: string
 
     PrepareValidatorOnboardingRequest:
       type: object
@@ -642,6 +644,8 @@ components:
         expires_in:
           type: integer
           minimum: 1
+        party_hint:
+          type: string
 
     PrepareValidatorOnboardingResponse:
       type: object
@@ -664,6 +668,8 @@ components:
         version:
           type: string
         contact_point:
+          type: string
+        party_hint:
           type: string
 
     CometBftNodeStatusOrErrorResponse:

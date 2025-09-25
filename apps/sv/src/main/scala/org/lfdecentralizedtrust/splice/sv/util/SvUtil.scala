@@ -317,7 +317,10 @@ object SvUtil {
     }
   }
 
-  def generateRandomOnboardingSecret(sv: PartyId): ValidatorOnboardingSecret = {
+  def generateRandomOnboardingSecret(
+      sv: PartyId,
+      partyHint: Option[String],
+  ): ValidatorOnboardingSecret = {
     val rng = new SecureRandom();
     // 256 bits of entropy
     val bytes = new Array[Byte](ValidatorOnboardingSecretLength)
@@ -326,6 +329,7 @@ object SvUtil {
     ValidatorOnboardingSecret(
       sv,
       secret,
+      partyHint,
     )
   }
 

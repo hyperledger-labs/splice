@@ -14,6 +14,7 @@ import JsonCodec.*
 final case class ValidatorOnboardingSecret(
     sponsoringSv: PartyId,
     secret: String,
+    partyHint: Option[String],
 ) {
   // We encode the secret as base64 instead of return a JSON object as they are often copy pasted in terminals
   // and this avoids the need to worry about string escaping.

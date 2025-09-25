@@ -10,6 +10,7 @@ import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 export type ValidatorOnboardingSecret = {
   encodedSecret: string;
   contract: Contract<ValidatorOnboarding>;
+  partyHint?: string;
 };
 
 export const useValidatorOnboardings = (): UseQueryResult<ValidatorOnboardingSecret[]> => {
@@ -21,6 +22,7 @@ export const useValidatorOnboardings = (): UseQueryResult<ValidatorOnboardingSec
       return ongoing_validator_onboardings.map(c => ({
         encodedSecret: c.encoded_secret,
         contract: Contract.decodeOpenAPI(c.contract, ValidatorOnboarding),
+        partyHint: c.party_hint,
       }));
     },
   });

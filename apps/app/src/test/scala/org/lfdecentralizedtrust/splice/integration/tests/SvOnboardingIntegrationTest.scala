@@ -107,9 +107,12 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     val svParty = sv.getDsoInfo().svParty
     val sv1Party = sv1Backend.getDsoInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
+
+    val name = "dummy" + env.environment.config.name.getOrElse("")
+
     val (secret, onboardingContract) = actAndCheck(
       "the sv operator prepares the onboarding", {
-        sv.prepareValidatorOnboarding(1.hour)
+        sv.prepareValidatorOnboarding(1.hour, Some(name))
       },
     )(
       "a validator onboarding contract is created",
@@ -129,7 +132,6 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         .value
     bobValidatorBackend.participantClient.synchronizers.connect_by_config(config)
     val candidate = clue("create a dummy party") {
-      val name = "dummy" + env.environment.config.name.getOrElse("")
       bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties
         .allocate(
           name
@@ -152,11 +154,24 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           ValidatorOnboardingSecret(
             sv1Party,
             onboardingContract.payload.candidateSecret,
+            None,
           ).toApiResponse,
           contactPoint,
         ),
         _.errorMessage should include(
           s"Secret is for SV $sv1Party but this SV is $svParty, validate your SV sponsor URL"
+        ),
+      )
+    }
+    clue("try to onboarding with a secret with wrong party hint") {
+      assertThrowsAndLogsCommandFailures(
+        sv.onboardValidator(
+          PartyId.fromProtoPrimitive("invalid-name-1", "partyId"),
+          onboardingContract.payload.candidateSecret,
+          contactPoint,
+        ),
+        _.errorMessage should include(
+          s"The onboarding secret entered does not match the secret issued for validatorPartyHint: $name"
         ),
       )
     }

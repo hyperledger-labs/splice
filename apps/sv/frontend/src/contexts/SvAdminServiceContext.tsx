@@ -70,7 +70,10 @@ export interface SvAdminClient {
     reasonUrl: string,
     reasonDescription: string
   ) => Promise<void>;
-  prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
+  prepareValidatorOnboarding: (
+    expiresIn: number,
+    partyHint: string
+  ) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: (limit: number, after?: number) => Promise<ListValidatorLicensesResponse>;
   listAmuletPriceVotes: () => Promise<ListAmuletPriceVotesResponse>;
@@ -170,9 +173,10 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         return await svAdminClient.castVote(request);
       },
       prepareValidatorOnboarding: async (
-        expires_in: number
+        expires_in: number,
+        party_hint: string
       ): Promise<PrepareValidatorOnboardingResponse> => {
-        const request: PrepareValidatorOnboardingRequest = { expires_in };
+        const request: PrepareValidatorOnboardingRequest = { expires_in, party_hint };
         return await svAdminClient.prepareValidatorOnboarding(request);
       },
       listOngoingValidatorOnboardings:

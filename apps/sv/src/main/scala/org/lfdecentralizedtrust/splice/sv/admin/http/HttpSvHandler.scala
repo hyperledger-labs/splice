@@ -14,7 +14,6 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.ByteString
-import io.circe.parser.*
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -37,16 +36,15 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
+import org.lfdecentralizedtrust.splice.sv.util.Secrets
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 
-import java.nio.charset.StandardCharsets
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.util.{Failure, Success, Try}
 
 class HttpSvHandler(
     svUserName: String,
@@ -79,23 +77,6 @@ class HttpSvHandler(
   override protected val votesStore: ActiveVotesStore = dsoStore
   override protected val workflowId: String = this.getClass.getSimpleName
 
-  private def decodeValidatorOnboardingSecret(secret: String): ValidatorOnboardingSecret =
-    // There are two ways to create secrets:
-    // 1. Through the UI/API endpoints. The actual secret (excluding the wrapper that adds the SV party id) is a base64 encoded string of length 30.
-    // 2. Through `expected-validator-onboardings`. In that case, the secret can be whatever the user chose so it must not be a base64 string.
-    // So for backwards compatibility we interpret a secret that is not base64 or does not decode to a JSON object
-    // as a legacy token without the wrapper including the SV party id.
-    Try(Base64.getDecoder.decode(secret)) match {
-      case Failure(_) =>
-        ValidatorOnboardingSecret(
-          svParty,
-          secret,
-        )
-      case Success(decoded) =>
-        decode[ValidatorOnboardingSecret](new String(decoded, StandardCharsets.UTF_8))
-          .getOrElse(ValidatorOnboardingSecret(svParty, secret))
-    }
-
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
   )(
@@ -105,7 +86,7 @@ class HttpSvHandler(
     withSpan(s"$workflowId.onboardValidator") { _ => _ =>
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
-          val secret = decodeValidatorOnboardingSecret(body.secret)
+          val secret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty);
           if (secret.sponsoringSv == svParty) {
             svStore.lookupValidatorOnboardingBySecret(secret.secret).flatMap {
               case None =>
@@ -122,32 +103,44 @@ class HttpSvHandler(
                 }
 
               case Some(vo) =>
-                // Check whether a validator license already exists for this party,
-                // because when recovering from an ACS snapshot "used secret" information will get lost.
-                dsoStore
-                  .lookupValidatorLicenseWithOffset(PartyId.tryFromProtoPrimitive(body.partyId))
-                  .flatMap {
-                    case QueryResult(_, Some(_)) =>
-                      // This validator is already onboarded - nothing to do
-                      Future.successful(v0.SvResource.OnboardValidatorResponseOK)
-                    case QueryResult(_, None) =>
-                      for {
-                        // We retry here because this mutates the AmuletRules and rounds contracts,
-                        // which can lead to races.
-                        _ <- retryProvider.retryForClientCalls(
-                          "onboard_validator",
-                          "onboard validator via DsoRules",
-                          onboardValidator(
-                            partyId,
-                            secret,
-                            vo,
-                            body.version,
-                            body.contactPoint,
-                          ),
-                          logger,
-                        )
-                      } yield v0.SvResource.OnboardValidatorResponseOK
-                  }
+                val secret =
+                  Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty);
+
+                if (secret.partyHint.exists(_ != partyId.uid.identifier.str)) {
+                  Future.failed(
+                    HttpErrorHandler.badRequest(
+                      s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${secret.partyHint
+                          .getOrElse("<missing>")}"
+                    )
+                  )
+                } else {
+                  // Check whether a validator license already exists for this party,
+                  // because when recovering from an ACS snapshot "used secret" information will get lost.
+                  dsoStore
+                    .lookupValidatorLicenseWithOffset(PartyId.tryFromProtoPrimitive(body.partyId))
+                    .flatMap {
+                      case QueryResult(_, Some(_)) =>
+                        // This validator is already onboarded - nothing to do
+                        Future.successful(v0.SvResource.OnboardValidatorResponseOK)
+                      case QueryResult(_, None) =>
+                        for {
+                          // We retry here because this mutates the AmuletRules and rounds contracts,
+                          // which can lead to races.
+                          _ <- retryProvider.retryForClientCalls(
+                            "onboard_validator",
+                            "onboard validator via DsoRules",
+                            onboardValidator(
+                              partyId,
+                              secret,
+                              vo,
+                              body.version,
+                              body.contactPoint,
+                            ),
+                            logger,
+                          )
+                        } yield v0.SvResource.OnboardValidatorResponseOK
+                    }
+                }
             }
           } else {
             Future.failed(
@@ -307,7 +300,7 @@ class HttpSvHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.devNetOnboardValidatorPrepare") { _ => _ =>
       if (isDevNet) {
-        val secret = generateRandomOnboardingSecret(svStore.key.svParty)
+        val secret = generateRandomOnboardingSecret(svStore.key.svParty, None)
         val expiresIn = NonNegativeFiniteDuration.ofHours(1)
         dsoStore
           .getDsoRules()
