@@ -309,11 +309,79 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(submitButton); // review proposal
     await user.click(submitButton); // submit proposal
 
-    waitFor(() => {
-      expect(screen.getByText('Action Required')).toBeDefined();
-      expect(screen.getByText('Inflight Votes')).toBeDefined();
-      expect(screen.getByText('Vote History')).toBeDefined();
-      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText('Action Required')).toBeDefined();
+      expect(screen.queryByText('Inflight Votes')).toBeDefined();
+      expect(screen.queryByText('Vote History')).toBeDefined();
+      expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
     });
+  });
+
+  test('should not render diffs if no changes to config values were made', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const jsonDiffs = screen.getByText('JSON Diffs');
+    expect(jsonDiffs).toBeDefined();
+
+    await user.click(jsonDiffs);
+    expect(screen.queryByText('No changes')).toBeDefined();
+
+    const reviewButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+
+    expect(jsonDiffs).toBeDefined();
+    await user.click(jsonDiffs);
+    expect(screen.queryByText('No changes')).toBeDefined();
+  });
+
+  test('should render diffs if changes to config values were made', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-voteCooldownTime');
+    await user.type(c2Input, '9999');
+
+    const jsonDiffs = screen.getByText('JSON Diffs');
+    expect(jsonDiffs).toBeDefined();
+
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+
+    const reviewButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+
+    expect(jsonDiffs).toBeDefined();
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
   });
 });
