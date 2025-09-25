@@ -54,12 +54,12 @@ object SynchronizerNodeInitializer {
       _ <- synchronizerNodeInitializer.sequencerInitializer.initializeWithNewIdentityIfNeeded(
         identifierConfig.sequencer,
         SequencerId.apply,
-        None, // Some(synchronizerId),
+        Some(synchronizerId),
       )
       _ <- synchronizerNodeInitializer.mediatorInitializer.initializeWithNewIdentityIfNeeded(
         identifierConfig.mediator,
         MediatorId.apply,
-        None, // Some(synchronizerId),
+        Some(synchronizerId),
       )
     } yield ()
   }

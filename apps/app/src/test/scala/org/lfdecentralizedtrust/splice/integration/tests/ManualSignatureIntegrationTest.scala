@@ -45,14 +45,11 @@ class ManualSignatureIntegrationTest
           .map(_.id)
           .distinct
         val signatures = otksForNs.flatMap(_.context.signedBy).distinct
-        println(s"otks ${otksForNs}")
-        println(latestKeys)
-        println(signatures)
         latestKeys.diff(signatures) shouldBe empty
       }
-
+      logger.info("1blab")
       sv1Backend.startSync()
-
+      logger.info("2blab")
       eventuallySucceeds(40.seconds) {
 
         val synchronizerId = sv1Backend.participantClientWithAdminToken.synchronizers.id_of(
@@ -62,13 +59,12 @@ class ManualSignatureIntegrationTest
         val otks = sv1Backend.participantClientWithAdminToken.topology.owner_to_key_mappings
           .list(store = Some(store), timeQuery = TimeQuery.Range(None, None))
 
-//        clue("keys are rotated for sv1's sequencer") {
-//          checkLatestKeysAreSigned(otks, sv1Backend.sequencerClient.namespace)
-//        }
-//        clue("keys are rotated for sv1's mediator") {
-//          checkLatestKeysAreSigned(otks, sv1Backend.mediatorClient.namespace)
-//        }
-        println(s"namespace ${sv1Backend.participantClient.namespace}")
+        clue("keys are rotated for sv1's sequencer") {
+          checkLatestKeysAreSigned(otks, sv1Backend.sequencerClient.namespace)
+        }
+        clue("keys are rotated for sv1's mediator") {
+          checkLatestKeysAreSigned(otks, sv1Backend.mediatorClient.namespace)
+        }
         clue("keys are rotated for sv1's participant") {
           checkLatestKeysAreSigned(otks, sv1Backend.participantClient.namespace)
         }

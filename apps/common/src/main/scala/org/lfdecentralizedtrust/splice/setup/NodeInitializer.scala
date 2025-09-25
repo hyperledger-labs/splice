@@ -136,10 +136,10 @@ class NodeInitializer(
               // rotate existing keys that are not signed
               _ <- synchronizerId match {
                 case Some(syncId) =>
-                  println("ENTERING")
+                  println(s"ENTERING ${idenfitierName}")
                   rotateOwnerToKeyMappingNotSignedByKeys(id, nodeIdentity, syncId)
                 case None =>
-                  println("NOT ENTERING")
+                  println(s"NOT ENTERING ${idenfitierName}")
                   Future.unit
               }
               // fixes previously initialized nodes with messed up keys
@@ -348,6 +348,7 @@ class NodeInitializer(
         case mapping: OwnerToKeyMapping if mapping.member == nodeIdentity(id) => true
         case _ => false
       })
+      _ = logger.info(s"otk ${ownerToKeyMappingTxHistory.map(_.transaction.mapping)}")
       allOtkSignatures = ownerToKeyMappingTxHistory
         .map(_.transaction)
         .flatMap(_.signatures)
@@ -377,7 +378,7 @@ class NodeInitializer(
             )
           case key => Future.successful(key)
         }
-        logger.info(s"rotated keys ${rotatedKeys}")
+        logger.info(s"rotated keys ${rotatedKeys} ${nodeIdentity(id)}")
         for {
           newKeys <- Future.sequence(rotatedKeys)
           _ <- connection.ensureOwnerToKeyMapping(
