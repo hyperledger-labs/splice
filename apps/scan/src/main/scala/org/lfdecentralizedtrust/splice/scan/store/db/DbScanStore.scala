@@ -610,7 +610,7 @@ class DbScanStore(
               from    round_total_amulet_balance
               where   store_id = $roundTotalsStoreId
               and     closed_round <= $asOfEndOfRound
-              order by close_round desc
+              order by closed_round desc
               limit 1;
               """.as[BigDecimal].headOption,
             "getTotalAmuletBalance",
@@ -661,9 +661,9 @@ class DbScanStore(
   ): Future[BigDecimal] = waitUntilAcsIngested {
     for {
       result <- ensureAggregated(asOfEndOfRound) { _ =>
-      // the wallet_balances is sparse and might not have an entry for the requested round
-      // which is why the first entry found <= asOfEndOfRound is used
-      storage.query(
+        // the wallet_balances is sparse and might not have an entry for the requested round
+        // which is why the first entry found <= asOfEndOfRound is used
+        storage.query(
           sql"""
              select   greatest(
                         0,
@@ -696,7 +696,7 @@ class DbScanStore(
               where    store_id = $roundTotalsStoreId
               and      closed_round = $asOfEndOfRound
               and      rank_nr <= $limit
-              order by rank_nr;
+              order by rank_nr, party;
             """.as[(PartyId, BigDecimal)],
           "getTopProvidersByAppRewards",
         )
