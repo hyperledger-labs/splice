@@ -599,11 +599,19 @@ class DbScanStore(
         result <- ensureAggregated(asOfEndOfRound) { _ =>
           storage.query(
             // TODO(#800) change to query from round_totals when amulet expiry works again
+            // the round_total_amulet_balance is sparse and might not have an entry for the requested round
+            // which is why the first entry found <= asOfEndOfRound is used
             sql"""
-              select  total_amulet_balance
+              select greatest(
+                   0,
+                   sum_cumulative_change_to_initial_amount_as_of_round_zero -
+                   sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
+                 )
               from    round_total_amulet_balance
               where   store_id = $roundTotalsStoreId
-              and     closed_round = $asOfEndOfRound;
+              and     closed_round <= $asOfEndOfRound
+              order by close_round desc
+              limit 1;
               """.as[BigDecimal].headOption,
             "getTotalAmuletBalance",
           )
@@ -653,13 +661,21 @@ class DbScanStore(
   ): Future[BigDecimal] = waitUntilAcsIngested {
     for {
       result <- ensureAggregated(asOfEndOfRound) { _ =>
-        storage.query(
+      // the wallet_balances is sparse and might not have an entry for the requested round
+      // which is why the first entry found <= asOfEndOfRound is used
+      storage.query(
           sql"""
-             select  amulet_balance
-             from    wallet_balances
-             where   store_id = $roundTotalsStoreId
-             and     party = $partyId
-             and     closed_round = $asOfEndOfRound;
+             select   greatest(
+                        0,
+                        cumulative_change_to_initial_amount_as_of_round_zero -
+                        cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
+                      ) as amulet_balance
+             from     wallet_balances
+             where    store_id = $roundTotalsStoreId
+             and      party = $partyId
+             and      closed_round <= $asOfEndOfRound
+             order by closed_round desc
+             limit 1;
            """.as[Option[BigDecimal]].headOption,
           "getWalletBalance",
         )

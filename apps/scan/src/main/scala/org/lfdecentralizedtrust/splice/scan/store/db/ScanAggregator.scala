@@ -749,7 +749,7 @@ final class ScanAggregator(
       sqlu"""
       create temp table active_parties_before on commit drop as
       select party,
-             (select max(closed_round) as last_closed_round from active_parties where store_id = $roundTotalsStoreId) as aggr_round,
+             (select max(closed_round) from active_parties where store_id = $roundTotalsStoreId) as aggr_round,
              closed_round as active_round
       from   active_parties
       where  store_id = $roundTotalsStoreId;
@@ -942,17 +942,13 @@ final class ScanAggregator(
       insert into round_total_amulet_balance (
         store_id,
         closed_round,
-        total_amulet_balance
+        sum_cumulative_change_to_initial_amount_as_of_round_zero,
+        sum_cumulative_change_to_holding_fees_rate
       )
       select   $roundTotalsStoreId,
                ap.aggr_round,
-               sum(
-                 greatest(
-                   0,
-                   rpt.cumulative_change_to_initial_amount_as_of_round_zero -
-                   rpt.cumulative_change_to_holding_fees_rate * (ap.aggr_round + 1)
-                 )
-               ) as total_amulet_balance
+               sum(rpt.cumulative_change_to_initial_amount_as_of_round_zero),
+               sum(rpt.cumulative_change_to_holding_fees_rate)
       from     round_party_totals rpt
       join     active_parties_for_aggr_rounds ap
       on       rpt.closed_round = ap.active_round
@@ -960,7 +956,8 @@ final class ScanAggregator(
       and      rpt.store_id = $roundTotalsStoreId
       group by ap.aggr_round
       on conflict (store_id, closed_round)
-      do update set total_amulet_balance = excluded.total_amulet_balance;
+      do update set sum_cumulative_change_to_initial_amount_as_of_round_zero = excluded.sum_cumulative_change_to_initial_amount_as_of_round_zero,
+        sum_cumulative_change_to_holding_fees_rate = excluded.sum_cumulative_change_to_holding_fees_rate;
 
       -- calculate wallet_balances for all active parties in the aggregated rounds
       -- this is needed for getWalletBalance
@@ -968,22 +965,21 @@ final class ScanAggregator(
         store_id,
         closed_round,
         party,
-        amulet_balance
+        cumulative_change_to_initial_amount_as_of_round_zero,
+        cumulative_change_to_holding_fees_rate
       ) select  $roundTotalsStoreId,
                 ap.aggr_round,
                 rpt.party,
-                greatest(
-                  0,
-                  rpt.cumulative_change_to_initial_amount_as_of_round_zero -
-                  rpt.cumulative_change_to_holding_fees_rate * (ap.aggr_round + 1)
-                ) as amulet_balance
+                rpt.cumulative_change_to_initial_amount_as_of_round_zero,
+                rpt.cumulative_change_to_holding_fees_rate
       from      round_party_totals rpt
       join      active_parties_for_aggr_rounds ap
       on        rpt.closed_round = ap.active_round
       and       rpt.party = ap.party
       and       rpt.store_id = $roundTotalsStoreId
       on conflict (store_id, party, closed_round)
-      do update set amulet_balance = excluded.amulet_balance;
+      do update set cumulative_change_to_initial_amount_as_of_round_zero = excluded.cumulative_change_to_initial_amount_as_of_round_zero,
+        cumulative_change_to_holding_fees_rate = excluded.cumulative_change_to_holding_fees_rate;
 
       -- calculate ranked table for parties, for getTopProvidersByAppRewards
       insert into ranked_providers_by_app_rewards (
