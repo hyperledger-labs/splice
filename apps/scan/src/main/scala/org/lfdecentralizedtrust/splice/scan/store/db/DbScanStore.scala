@@ -604,11 +604,11 @@ class DbScanStore(
               from    round_total_amulet_balance
               where   store_id = $roundTotalsStoreId
               and     closed_round = $asOfEndOfRound;
-              """.as[Option[BigDecimal]].headOption,
+              """.as[BigDecimal].headOption,
             "getTotalAmuletBalance",
           )
         }
-      } yield result.flatten.getOrElse(0)
+      } yield result.getOrElse(0)
     }
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
