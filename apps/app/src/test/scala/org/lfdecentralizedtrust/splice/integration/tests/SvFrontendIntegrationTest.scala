@@ -110,6 +110,10 @@ class SvFrontendIntegrationTest
           },
         )
 
+        inside(find(id("create-party-hint"))) { case Some(element) =>
+          element.underlying.sendKeys("splice-client-2")
+        }
+
         val (_, newSecret) = actAndCheck(
           "fill party hint and click on the button to create an onboarding secret", {
             inside(find(id("create-party-hint"))) { case Some(element) =>
