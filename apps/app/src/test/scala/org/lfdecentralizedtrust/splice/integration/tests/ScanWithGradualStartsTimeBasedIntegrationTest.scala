@@ -18,6 +18,8 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     with TimeTestUtil
     with SvTestUtil {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)

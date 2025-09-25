@@ -303,12 +303,39 @@ lazy val docs = project
   )
 
 // Shared token standard code
-lazy val `splice-api-token-metadata-v1-daml` =
+lazy val `splice-api-token-metadata-v1-daml`: Project =
   project
     .in(file("token-standard/splice-api-token-metadata-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val tokenMetadataOpenApiFile =
+            baseDirectory.value / "openapi/token-metadata-v1.yaml"
+
+          BuildCommon.TS.generateOpenApiClient(
+            unscopedNpmName = "token-metadata-openapi",
+            openApiSpec = "token-metadata-v1.yaml",
+            cacheFileDependencies = Set(tokenMetadataOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+      npmInstallOpenApiDeps := Seq(
+        (
+          (Compile / compile).value,
+          (Compile / baseDirectory).value,
+          false,
+        )
+      ),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "openapi-ts-client" / "package.json"
+      ),
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value / "openapi-ts-client",
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -480,6 +507,9 @@ lazy val `token-standard-cli` =
     .dependsOn(
       `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
+      // all dependencies here for token-metadata are not "real" dependencies,
+      // but rather they prevent npm install from being executed concurrently and breaking everything
+      `splice-api-token-metadata-v1-daml`,
     )
     .settings(
       Headers.TsHeaderSettings,
@@ -494,8 +524,15 @@ lazy val `token-standard-cli` =
           (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
           false,
         ),
+        (
+          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
+          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
+          false,
+        ),
       ),
-      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value,
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {
@@ -1104,6 +1141,9 @@ lazy val `apps-common-frontend` = {
       `apps-wallet`,
       `apps-splitwell`,
       `apps-validator`,
+      // token-standard-cli are not "real" dependencies,
+      // but rather they prevent npm install from being executed concurrently and breaking everything
+      `token-standard-cli`,
     )
     .settings(
       // daml typescript code generation settings:
@@ -1119,7 +1159,7 @@ lazy val `apps-common-frontend` = {
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
-      npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
+      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value ++ (`token-standard-cli` / Compile / npmInstall).value,
       npmInstallOpenApiDeps :=
         Seq(
           (
@@ -1332,6 +1372,13 @@ lazy val `apps-scan-frontend` = {
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "@lfdecentralizedtrust/splice-scan-frontend",
       sharedFrontendSettings,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
+          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
+          false,
+        )
+      ),
     )
 }
 
@@ -1850,6 +1897,8 @@ lazy val `apps-app`: Project =
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
       `splice-util-featured-app-proxies-daml` % "test",
+      // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run
+      `apps-common-frontend`,
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",

@@ -1,32 +1,43 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import dayjs from 'dayjs';
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { CommonProposalFormData, ConfigFormData } from '../../utils/types';
+import type {
+  ActionRequiringConfirmation,
+  DsoRules_ActionRequiringConfirmation,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
+  getDsoConfigToCompareWith,
+  useVotesHooks,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { Alert, Box, Typography } from '@mui/material';
+import dayjs from 'dayjs';
+import { useMemo, useState } from 'react';
+import { PrettyJsonDiff } from '../../../../../common/frontend/lib/components/PrettyJsonDiff';
+import { useDsoInfos } from '../../contexts/SvContext';
+import { useListDsoRulesVoteRequests } from '../../hooks';
+import { useAppForm } from '../../hooks/form';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
+import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
+import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigFromChanges';
+import {
+  buildPendingConfigFields,
   configFormDataToConfigChanges,
   createProposalActions,
   getInitialExpiration,
 } from '../../utils/governance';
-import { useDsoInfos } from '../../contexts/SvContext';
-import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
-import { useAppForm } from '../../hooks/form';
+import type { CommonProposalFormData, ConfigFormData } from '../../utils/types';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { JsonDiffAccordion } from '../governance/JsonDiffAccordion';
+import { ProposalSummary } from '../governance/ProposalSummary';
+import { FormLayout } from './FormLayout';
 import {
   validateEffectiveDate,
   validateExpiryEffectiveDate,
   validateSummary,
   validateUrl,
 } from './formValidators';
-import { FormLayout } from './FormLayout';
-import { Box, Typography } from '@mui/material';
-import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { useMemo, useState } from 'react';
-import { ProposalSummary } from '../governance/ProposalSummary';
-import { useProposalMutation } from '../../hooks/useProposalMutation';
-import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
-import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigFromChanges';
 
 export type SetDsoConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -37,6 +48,12 @@ const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_
 
 export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
+  const dsoProposalsQuery = useListDsoRulesVoteRequests();
+  const votesHooks = useVotesHooks();
+  const pendingConfigFields = useMemo(
+    () => buildPendingConfigFields(dsoProposalsQuery.data),
+    [dsoProposalsQuery.data]
+  );
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const mutation = useProposalMutation();
@@ -74,7 +91,10 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
         summary: '',
       },
       config: dsoConfigChanges.reduce((acc, field) => {
-        acc[field.fieldName] = { fieldName: field.fieldName, value: field.currentValue };
+        acc[field.fieldName] = {
+          fieldName: field.fieldName,
+          value: field.currentValue,
+        };
         return acc;
       }, {} as ConfigFormData),
     };
@@ -115,6 +135,18 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           effectiveDate: value.common.effectiveDate.effectiveDate,
         });
       },
+      onSubmit: ({ value: formData }) => {
+        const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
+
+        const conflictingChanges = changes.filter(c =>
+          pendingConfigFields.some(p => p.fieldName === c.fieldName)
+        );
+        const names = conflictingChanges.map(c => c.label).join(', ');
+
+        if (conflictingChanges.length > 0) {
+          return `Cannot modify fields that have pending changes (${names})`;
+        }
+      },
     },
   });
 
@@ -122,6 +154,31 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const dsoConfig = maybeConfig ? maybeConfig : null;
   // passing the config twice here because we initially have no changes
   const dsoConfigChanges = buildDsoConfigChanges(dsoConfig, dsoConfig, true);
+
+  const effectiveDateString = form.state.values.common.effectiveDate.effectiveDate;
+  const effectivity = effectiveDateString ? dayjs(effectiveDateString).toDate() : undefined;
+
+  const changes = configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges, false);
+  const changedFields = changes.filter(c => c.currentValue !== c.newValue);
+
+  const hasChangedFields = changedFields.length > 0;
+
+  const baseConfig = dsoConfig;
+  const newConfig = buildDsoRulesConfigFromChanges(changes);
+  const dsoAction: DsoRules_ActionRequiringConfirmation = {
+    tag: 'SRARC_SetConfig',
+    value: {
+      baseConfig: baseConfig,
+      newConfig: newConfig,
+    },
+  };
+  const dsoConfigToCompareWith = getDsoConfigToCompareWith(
+    effectivity,
+    undefined,
+    votesHooks,
+    dsoAction,
+    dsoInfoQuery
+  );
 
   return (
     <FormLayout form={form} id="set-dso-config-rules-form">
@@ -133,12 +190,18 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           expiryDate={form.state.values.common.expiryDate}
           effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
           formType="config-change"
-          configFormData={configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges)}
+          configFormData={changedFields}
           onEdit={() => setShowConfirmation(false)}
           onSubmit={() => {}}
         />
       ) : (
         <>
+          {pendingConfigFields.length > 0 && (
+            <Alert severity="info" color="warning" variant="outlined">
+              Some fields are disabled for editing due to pending votes.
+            </Alert>
+          )}
+
           <form.AppField name="common.action">
             {field => (
               <field.TextField
@@ -200,12 +263,34 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
 
             {dsoConfigChanges.map((change, index) => (
               <form.AppField name={`config.${change.fieldName}`} key={index}>
-                {field => <field.ConfigField configChange={change} key={index} />}
+                {field => (
+                  <field.ConfigField
+                    configChange={change}
+                    key={index}
+                    pendingFieldInfo={pendingConfigFields.find(
+                      f => f.fieldName === change.fieldName
+                    )}
+                  />
+                )}
               </form.AppField>
             ))}
           </Box>
         </>
       )}
+
+      <JsonDiffAccordion>
+        {dsoConfigToCompareWith[1] && hasChangedFields ? (
+          <PrettyJsonDiff
+            changes={{
+              newConfig: dsoAction.value.newConfig,
+              baseConfig: dsoAction.value.baseConfig || dsoConfigToCompareWith[1],
+              actualConfig: dsoConfigToCompareWith[1],
+            }}
+          />
+        ) : (
+          <Typography>No changes</Typography>
+        )}
+      </JsonDiffAccordion>
 
       <form.AppForm>
         <ProposalSubmissionError error={mutation.error} />

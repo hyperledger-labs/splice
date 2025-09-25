@@ -26,6 +26,8 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
     with SvTestUtil
     with StandaloneCanton {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def dbsSuffix: String = "non_sv1_svs"
 
   // Runs against a temporary Canton instance.

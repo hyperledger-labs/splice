@@ -2,7 +2,7 @@ window.splice_config = {
   services: {
     scan: {
       // URL of scan backend.
-      url: "https://" + window.location.host + "/api/scan",
+      url: "https://" + window.location.host,
     },
   },
   pollInterval: "${SPLICE_APP_UI_POLL_INTERVAL}",

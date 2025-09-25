@@ -1,18 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
-import userEvent from '@testing-library/user-event';
-import { SvConfigProvider } from '../../../utils';
-import App from '../../../App';
-import { svPartyId } from '../../mocks/constants';
-import { Wrapper } from '../../helpers';
-import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
-import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { server, svUrl } from '../../setup/setup';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import dayjs from 'dayjs';
 import { rest } from 'msw';
+import { describe, expect, test } from 'vitest';
+import App from '../../../App';
+import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
+import { SvConfigProvider } from '../../../utils';
+import { Wrapper } from '../../helpers';
+import { svPartyId } from '../../mocks/constants';
+import { server, svUrl } from '../../setup/setup';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -58,10 +58,10 @@ describe('Set DSO Config Rules Form', () => {
     expect(urlInput).toBeDefined();
     expect(urlInput.getAttribute('value')).toBe('');
 
-    const configLabels = screen.getAllByTestId('config-label', { exact: false });
+    const configLabels = screen.getAllByTestId(/config-label-/);
     expect(configLabels.length).toBeGreaterThan(15);
 
-    const configFields = screen.getAllByTestId('config-field', { exact: false });
+    const configFields = screen.getAllByTestId(/config-field-/);
     expect(configFields.length).toBeGreaterThan(15);
 
     expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
@@ -184,7 +184,7 @@ describe('Set DSO Config Rules Form', () => {
     expect(c2Input).toBeDefined();
     await user.type(c2Input, '9999');
 
-    const changes = screen.getAllByTestId('config-current-value', { exact: false });
+    const changes = screen.getAllByTestId(/config-current-value-/);
     expect(changes.length).toBe(2);
   });
 
@@ -309,11 +309,79 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(submitButton); // review proposal
     await user.click(submitButton); // submit proposal
 
-    waitFor(() => {
-      expect(screen.getByText('Action Required')).toBeDefined();
-      expect(screen.getByText('Inflight Votes')).toBeDefined();
-      expect(screen.getByText('Vote History')).toBeDefined();
-      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText('Action Required')).toBeDefined();
+      expect(screen.queryByText('Inflight Votes')).toBeDefined();
+      expect(screen.queryByText('Vote History')).toBeDefined();
+      expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
     });
+  });
+
+  test('should not render diffs if no changes to config values were made', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const jsonDiffs = screen.getByText('JSON Diffs');
+    expect(jsonDiffs).toBeDefined();
+
+    await user.click(jsonDiffs);
+    expect(screen.queryByText('No changes')).toBeDefined();
+
+    const reviewButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+
+    expect(jsonDiffs).toBeDefined();
+    await user.click(jsonDiffs);
+    expect(screen.queryByText('No changes')).toBeDefined();
+  });
+
+  test('should render diffs if changes to config values were made', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-voteCooldownTime');
+    await user.type(c2Input, '9999');
+
+    const jsonDiffs = screen.getByText('JSON Diffs');
+    expect(jsonDiffs).toBeDefined();
+
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+
+    const reviewButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+
+    expect(jsonDiffs).toBeDefined();
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
   });
 });

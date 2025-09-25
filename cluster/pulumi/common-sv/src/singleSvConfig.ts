@@ -10,6 +10,7 @@ const SvCometbftConfigSchema = z
   .object({
     nodeId: z.string().optional(),
     validatorKeyAddress: z.string().optional(),
+    // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
     snapshotName: z.string().optional(),
   })
@@ -40,15 +41,13 @@ const Auth0ConfigSchema = z
   .strict();
 const SvAppConfigSchema = z
   .object({
-    // TODO(tech-debt) inline env var into config.yaml
-    sweep: z
-      .object({
-        fromEnv: z.string(),
-      })
-      .optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),
+    // defaults to {svName}-id if not set
+    svIdKeyGcpSecret: z.string().optional(),
+    // defaults to {svName}-cometbft-governance-key if not set
+    cometBftGovernanceKeyGcpSecret: z.string().optional(),
   })
   .strict();
 const ScanAppConfigSchema = z
@@ -66,6 +65,12 @@ const ScanAppConfigSchema = z
 const ValidatorAppConfigSchema = z
   .object({
     walletUser: z.string().optional(),
+    // TODO(#2389) inline env var into config.yaml
+    sweep: z
+      .object({
+        fromEnv: z.string(),
+      })
+      .optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),

@@ -203,6 +203,14 @@ export async function initDumpConfig(): Promise<void> {
                 secretData: `{"nodePrivateKey": "${args.inputs.secret}-node-private-key", "validatorPrivateKey": "${args.inputs.secret}-validator-private-key"
                 , "validatorPublicKey": "${args.inputs.secret}-validator-public-key"}`,
               };
+            } else if (
+              args.inputs.secret.startsWith('sv') &&
+              args.inputs.secret.endsWith('-governance-key')
+            ) {
+              return {
+                ...args.inputs,
+                secretData: `{"public": "${args.inputs.secret}-public-key", "private": "${args.inputs.secret}-private-key"}`,
+              };
             } else if (args.inputs.secret.startsWith('grafana-keys')) {
               return {
                 ...args.inputs,

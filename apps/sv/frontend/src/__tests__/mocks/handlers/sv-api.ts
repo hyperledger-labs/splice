@@ -185,7 +185,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
 
   rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-    return res(ctx.json<FeatureSupportResponse>({ my_feature: false }));
+    return res(ctx.json<FeatureSupportResponse>({ no_holding_fees_on_transfers: false }));
   }),
 
   validatorLicensesHandler(svUrl),
