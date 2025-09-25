@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.traverse.*
+import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
@@ -83,6 +84,7 @@ final case class SequencerReaderConfig(
       SequencerReaderConfig.defaultPayloadBatchWindow,
     payloadFetchParallelism: Int = SequencerReaderConfig.defaultPayloadFetchParallelism,
     eventGenerationParallelism: Int = SequencerReaderConfig.defaultEventGenerationParallelism,
+    useRecipientsTableForReads: Boolean = SequencerReaderConfig.defaultUseRecipientsTableForReads,
 ) extends CustomCantonConfigValidation {
   override protected def doValidate(edition: CantonEdition): Seq[CantonConfigValidationError] =
     Option
@@ -107,6 +109,7 @@ object SequencerReaderConfig {
     config.NonNegativeFiniteDuration.ofMillis(5)
   val defaultPayloadFetchParallelism: Int = 2
   val defaultEventGenerationParallelism: Int = 4
+  val defaultUseRecipientsTableForReads: Boolean = false
 
   /** The default polling interval if [[SequencerReaderConfig.pollingInterval]] is unset despite
     * high availability being configured.
@@ -280,6 +283,10 @@ class SequencerReader(
       topologyClientMemberId: SequencerMemberId,
       override protected val loggerFactory: NamedLoggerFactory,
   ) extends NamedLogging {
+
+    private implicit val metricsContext: MetricsContext = MetricsContext(
+      "subscriber" -> member.toProtoPrimitive
+    )
 
     import SequencerReader.*
 
@@ -579,7 +586,6 @@ class SequencerReader(
                       ),
                     )
                   case payload: BytesPayload => payload.decodeBatchAndTrim(protocolVersion, member)
-                  case batch: FilteredBatch => Batch.trimForMember(batch.batch, member)
                 })
               )
             }
@@ -864,7 +870,8 @@ object SequencerReader {
         nextReadTimestamp = readEvents.nextTimestamp
           .getOrElse(nextReadTimestamp),
         // did we receive a full batch of events on this update
-        lastBatchWasFull = readEvents.events.sizeCompare(batchSize) == 0,
+        // the case > is there as events query can return more events than requested in multi-instance setups
+        lastBatchWasFull = readEvents.events.sizeCompare(batchSize) >= 0,
       )
 
     override protected def pretty: Pretty[ReadState] = prettyOfClass(

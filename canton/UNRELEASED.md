@@ -9,6 +9,41 @@ schedule, i.e. if you add an entry effective at or after the first
 header, prepend the new date header that corresponds to the
 Wednesday after your change.
 
+## until 2024-09-11 (Exclusive)
+- Added endpoints related to topology snapshots that are less memory intensive for the nodes exporting the topology snapshots:
+  - `TopologyManagerReadService.ExportTopologySnapshotV2`: generic topology snapshot export
+  - `TopologyManagerReadService.GenesisStateV2`: export genesis state for major upgrade 
+  - `TopologyManagerWriteService.ImportTopologySnapshotV2`: generic topology snapshot export
+  - `SequencerAdministrationService.OnboardingStateV2`: export sequencer snapshot for onboarding a new sequencer
+  - `SequencerInitializationService.InitializeSequencerFromGenesisStateV2`: initialize sequencer for a new synchronizer 
+  - `SequencerInitializationService.InitializeSequencerFromOnboardingStateV2`: initialize sequencer from an onboarding snapshot created by `SequencerAdministrationService.OnboardingStateV2`
+
+- Added indices that speeds up various topology related queries as well as the update of the `valid_until` column.
+- Add flag to disable the initial topology snapshot validation
+  ```
+  participants.participant1.topology.validate-initial-topology-snapshot = true // default value
+  mediators.mediator1.topology.validate-initial-topology-snapshot = true // default value
+  sequencers.sequencer1.topology.validate-initial-topology-snapshot = true // default value
+  ```
+
+## until 2025-09-04 (Exclusive)
+- Replace an unbounded timeout with a configurable timeout when waiting to observe the submitted topology tranactions.
+  Additionally, the delay between retries of the topology dispatching loop has been made configurable.
+  ```
+  participants.participant1.topology.topology-transaction-observation-timeout = 30s // default value
+  participants.participant1.topology.broadcast-retry-delay = 10s // default value
+
+  mediators.mediator1.topology.topology-transaction-observation-timeout = 30s // default value
+  mediators.mediator1.topology.broadcast-retry-delay = 10s // default value
+
+  sequencers.sequencer1.topology.topology-transaction-observation-timeout = 30s // default value
+  sequencers.sequencer1.topology.broadcast-retry-delay = 10s // default value
+  ```
+- Topology dispatching errors are now logged at WARN level (instead of ERROR).
+- Party allocation and tx generation is now supported on Ledger API.
+- BREAKING: minor breaking console change: the BaseResult.transactionHash type has been changed
+  from ByteString to TxHash. The Admin API itself remained unchanged.
+
 ## until 2025-08-25 (Exclusive)
 - The HTTP connection timeout is configurable in the Ledger JSON API via
   `canton.participants.<participant-id>.http-ledger-api.server.request-timeout=<duration>`. Configure this value to allow
