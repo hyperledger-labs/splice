@@ -37,5 +37,6 @@ create table ranked_providers_by_app_rewards
     primary key (store_id, party, closed_round)
 );
 
+-- for efficient retrieval of the getTopProvidersByAppRewards leaderboard for a given store and round
 create index idx_ranked_providers_by_app_rewards_store_round
     on ranked_providers_by_app_rewards (store_id, closed_round, rank_nr asc);
