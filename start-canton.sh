@@ -18,6 +18,7 @@ function usage() {
   echo "  -F               same as -f, but does not start cometBFT, but rather assumes it is already running"
   echo "  -e               start canton using the canton provided BFT sequencer"
   echo "  -m               collect metrics and send them to our CI prometheus instance"
+  echo "  -I               disable immediate log flushing, potentially dropping logs on crash"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
 
@@ -32,8 +33,9 @@ start_cometbft=0
 use_cometbft=0
 use_bft=0
 collect_metrics=0
+immediate_log_flushing=1
 
-args=$(getopt -o "hdDap:c:wsbtfFegm" -l "help" -- "$@")
+args=$(getopt -o "hdDap:c:wsbtfFegmI" -l "help" -- "$@")
 
 eval set -- "$args"
 
@@ -90,6 +92,9 @@ do
             ;;
         -m)
             collect_metrics=1
+            ;;
+        -I)
+            immediate_log_flushing=0
             ;;
         --)
             shift
@@ -206,12 +211,17 @@ tmux_cmd_canton() {
   windowName="$1" tokensFile="$2" participantsFile="$3" baseConfig="$4" confOverrides="$5" logFileHint="$6"
   mainLogFile="log/${logFileHint}.clog"
   consoleLogFile="log/${logFileHint}.out"
+  local log_flush_opts=""
+  if [[ $immediate_log_flushing -eq 0 ]]; then
+    log_flush_opts="--log-immediate-flush=false --kms-log-immediate-flush=false"
+  fi
   tmux_cmd "$windowName" \
     "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
      CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
       --log-level-canton=DEBUG \
+      $log_flush_opts \
       --log-encoder json \
       --log-file-name $mainLogFile \
       --bootstrap $bootstrapScriptPath \
