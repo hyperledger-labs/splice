@@ -140,7 +140,7 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
           <form.AppField name="common.expiryDate">
             {field => (
               <field.DateField
-                title="Vote Proposal Expiration"
+                title="Threshold Deadline"
                 description="This is the last day voters can vote on this proposal"
                 id="set-amulet-config-rules-expiry-date"
               />
