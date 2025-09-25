@@ -136,10 +136,8 @@ class NodeInitializer(
               // rotate existing keys that are not signed
               _ <- synchronizerId match {
                 case Some(syncId) =>
-                  println(s"ENTERING ${idenfitierName}")
                   rotateOwnerToKeyMappingNotSignedByKeys(id, nodeIdentity, syncId)
                 case None =>
-                  println(s"NOT ENTERING ${idenfitierName}")
                   Future.unit
               }
               // fixes previously initialized nodes with messed up keys
@@ -361,38 +359,38 @@ class NodeInitializer(
         .getOrElse(throw new IllegalStateException("ownerToKeyMappingHistory is empty."))
         .mapping match {
         case mapping: OwnerToKeyMapping =>
-          mapping.keys.filter {
-            case _: SigningPublicKey => true
-            case _ => false
-          }
+          mapping.keys.forgetNE
         case _ => throw new IllegalStateException("Latest transaction is not an OwnerToKeyMapping.")
       }
       (_, toRotate) = latestKeys.map(_.id).partition(allOtkSignatures.contains)
-      _ = if (toRotate.nonEmpty) {
-        logger.info(s"keyToRotate: ${toRotate}")
-        val rotatedKeys = latestKeys.map {
-          case key: SigningPublicKey if toRotate.contains(key.id) =>
-            connection.generateKeyPair(
-              key.keySpec.name,
-              key.usage,
+      _ <-
+        if (toRotate.nonEmpty) {
+          logger.info(s"keyToRotate: ${toRotate}")
+          val rotatedKeys = latestKeys.map {
+            case key: SigningPublicKey if toRotate.contains(key.id) =>
+              connection.generateKeyPair(
+                key.keySpec.name,
+                key.usage,
+              )
+            case key => Future.successful(key)
+          }
+          logger.info(s"rotated keys ${rotatedKeys} ${nodeIdentity(id)}")
+          for {
+            newKeys <- Future.sequence(rotatedKeys)
+            _ <- connection.ensureOwnerToKeyMapping(
+              member = nodeIdentity(id),
+              keys = NonEmpty.mk(
+                Seq,
+                newKeys.headOption.getOrElse(throw new IllegalStateException("newKeys is empty.")),
+                newKeys.drop(1)*
+              ),
+              retryFor = RetryFor.Automation,
             )
-          case key => Future.successful(key)
-        }
-        logger.info(s"rotated keys ${rotatedKeys} ${nodeIdentity(id)}")
-        for {
-          newKeys <- Future.sequence(rotatedKeys)
-          _ <- connection.ensureOwnerToKeyMapping(
-            member = nodeIdentity(id),
-            keys = NonEmpty.mk(
-              Seq,
-              newKeys.headOption.getOrElse(throw new IllegalStateException("newKeys is empty.")),
-              newKeys.drop(1)*
-            ),
-            retryFor = RetryFor.Automation,
+          } yield logger.info(
+            s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
           )
-        } yield logger.info(
-          s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
-        )
-      }
+        } else {
+          Future.unit
+        }
     } yield ()
 }
