@@ -20,7 +20,6 @@ IMAGE_TAG=$("${SPLICE_ROOT}/build-tools/get-snapshot-version")
 export IMAGE_TAG
 IMAGE_REPO=""
 export IMAGE_REPO
-export POSTGRES_IMAGE_REPO="mirror.gcr.io/"
 
 # the port will be assigned by docker
 TEST_PORT=""
