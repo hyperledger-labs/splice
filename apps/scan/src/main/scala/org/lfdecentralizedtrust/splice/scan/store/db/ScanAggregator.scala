@@ -1000,7 +1000,7 @@ final class ScanAggregator(
       and       rpt.party = ap.party
       and       rpt.store_id = $roundTotalsStoreId
       and       rpt.cumulative_app_rewards > 0
-      group by  rpt.party, ap.aggr_round
+      group by  ap.aggr_round, rpt.party
       on conflict (store_id, party, closed_round)
       do update set cumulative_app_rewards = excluded.cumulative_app_rewards, rank_nr = excluded.rank_nr;
     """.andThen(DBIOAction.successful(()))
