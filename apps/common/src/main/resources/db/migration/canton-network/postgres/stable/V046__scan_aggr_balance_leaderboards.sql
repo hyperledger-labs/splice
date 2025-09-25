@@ -5,9 +5,13 @@ create table round_total_amulet_balance
     -- the closed round
     closed_round         bigint not null,
     -- the total amulet balance as of closed_round
-    total_amulet_balance numeric,
+    sum_cumulative_change_to_initial_amount_as_of_round_zero numeric not null,
+    sum_cumulative_change_to_holding_fees_rate numeric not null,
     primary key (store_id, closed_round)
 );
+
+create index idx_round_total_amulet_balance_sid_cr_desc
+    on round_total_amulet_balance (store_id, closed_round desc);
 
 create table wallet_balances
 (
@@ -17,10 +21,13 @@ create table wallet_balances
     closed_round bigint not null,
     -- the party whose wallet balance is tracked
     party        text not null,
-    -- the amulet balance of the party's wallet as of closed_round
-    amulet_balance numeric,
+    cumulative_change_to_initial_amount_as_of_round_zero numeric not null,
+    cumulative_change_to_holding_fees_rate numeric not null,
     primary key (store_id, party, closed_round)
 );
+
+create index idx_wallet_balances_sid_p_cr_desc
+    on wallet_balances (store_id, party, closed_round desc);
 
 create table ranked_providers_by_app_rewards
 (
