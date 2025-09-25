@@ -76,6 +76,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
+import com.google.protobuf.ByteString
 import io.grpc.Context
 import spray.json.DeserializationException
 
@@ -103,6 +104,7 @@ private[console] object ParticipantCommands {
         expectedMainPackageId: String,
         requestHeaders: Map[String, String],
         logger: TracedLogger,
+        darDataO: Option[ByteString] = None,
     ): ConsoleCommandResult[String] =
       runner
         .adminCommand(
@@ -115,6 +117,7 @@ private[console] object ParticipantCommands {
               expectedMainPackageId,
               requestHeaders,
               logger,
+              darDataO,
             )
         )
         .flatMap {
@@ -1561,6 +1564,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
         requestHeaders: Map[String, String] = Map(),
+        darDataO: Option[ByteString] = None,
     ): String = {
       val res = consoleEnvironment.runE {
         for {

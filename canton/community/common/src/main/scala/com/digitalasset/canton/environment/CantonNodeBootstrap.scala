@@ -127,7 +127,7 @@ import com.digitalasset.canton.util.{
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 import com.digitalasset.canton.watchdog.WatchdogService
 import io.grpc.ServerServiceDefinition
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 
@@ -177,7 +177,7 @@ trait BaseMetrics {
   def grpcMetrics: GrpcServerMetrics
   def healthMetrics: HealthMetrics
   def storageMetrics: DbStorageMetrics
-  val declarativeApiMetrics: DeclarativeApiMetrics
+  def declarativeApiMetrics: DeclarativeApiMetrics
 
 }
 
@@ -560,7 +560,7 @@ abstract class CantonNodeBootstrapImpl[
           )
         )
         adminServerRegistry
-          .addServiceU(ProtoReflectionService.newInstance().bindService(), withLogging = false)
+          .addServiceU(ProtoReflectionServiceV1.newInstance().bindService(), withLogging = false)
         adminServerRegistry.addServiceU(
           ApiInfoServiceGrpc.bindService(
             new GrpcApiInfoService(CantonGrpcUtil.ApiName.AdminApi),
