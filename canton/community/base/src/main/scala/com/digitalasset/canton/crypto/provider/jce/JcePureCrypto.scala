@@ -403,7 +403,7 @@ class JcePureCrypto(
     } yield key
   }
 
-  override def signBytes(
+  override protected[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],

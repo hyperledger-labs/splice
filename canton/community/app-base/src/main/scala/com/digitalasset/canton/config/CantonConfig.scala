@@ -209,14 +209,12 @@ object ConsoleCommandTimeout {
     NonNegativeDuration.tryFromDuration(1.minute)
   val defaultPingTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds)
   val defaultTestingBongTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(1.minute)
-  val defaultRequestTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds)
 }
 
 /** Timeout settings configuration */
 final case class TimeoutSettings(
     console: ConsoleCommandTimeout = ConsoleCommandTimeout(),
     processing: ProcessingTimeout = ProcessingTimeout(),
-    requestTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(40.seconds),
 ) extends UniformCantonConfigValidation
 
 object TimeoutSettings {
@@ -386,19 +384,18 @@ object CantonFeatures {
   * @param features
   *   control which features are enabled
   */
-trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self: Self =>
-  def name: Option[String]
-  def portDescription: String
-  def sequencers: Map[InstanceName, SequencerNodeConfig]
-  def mediators: Map[InstanceName, MediatorNodeConfig]
-  def participants: Map[InstanceName, ParticipantNodeConfig]
-  def remoteSequencers: Map[InstanceName, RemoteSequencerConfig]
-  def remoteMediators: Map[InstanceName, RemoteMediatorConfig]
-  def remoteParticipants: Map[InstanceName, RemoteParticipantConfig]
-  def monitoring: MonitoringConfig
-  def parameters: CantonParameters
-  def features: CantonFeatures
-  def pekkoConfig: Option[Config]
+final case class CantonConfig(
+    sequencers: Map[InstanceName, SequencerNodeConfig] = Map.empty,
+    mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty,
+    participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty,
+    remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty,
+    remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty,
+    remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
+    monitoring: MonitoringConfig = MonitoringConfig(),
+    parameters: CantonParameters = CantonParameters(),
+    features: CantonFeatures = CantonFeatures(),
+) extends UniformCantonConfigValidation
+    with ConfigDefaults[DefaultPorts, CantonConfig] {
 
   def allNodes: Map[InstanceName, LocalNodeConfig] =
     (participants: Map[InstanceName, LocalNodeConfig]) ++ sequencers ++ mediators
@@ -440,6 +437,21 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
   def remoteParticipantsByString: Map[String, RemoteParticipantConfig] = remoteParticipants.map {
     case (n, c) =>
       n.unwrap -> c
+  }
+
+  /** dump config to string (without sensitive data) */
+  /** renders the config as a string (used for dumping config for diagnostic purposes) */
+  def dumpString: String = CantonConfig.makeConfidentialString(this)
+
+  /** run a validation on the current config and return possible warning messages */
+  def validate(edition: CantonEdition): Validated[NonEmpty[Seq[String]], Unit] = {
+    val validator = edition match {
+      case CommunityCantonEdition =>
+        CommunityConfigValidations
+      case EnterpriseCantonEdition =>
+        EnterpriseConfigValidations
+    }
+    validator.validate(this, edition)
   }
 
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
@@ -526,82 +538,6 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
       ),
     )
 
-  def dumpString: String
-
-  protected def nodePortsDescription(
-      nodeName: InstanceName,
-      portDescriptions: Seq[String],
-  ): String =
-    s"$nodeName:${portDescriptions.mkString(",")}"
-
-  protected def portDescriptionFromConfig[C](
-      config: C
-  )(apiNamesAndExtractors: Seq[(String, C => ServerConfig)]): Seq[String] = {
-    def server(name: String, config: ServerConfig): Option[String] =
-      Option(config).map(c => s"$name=${c.port}")
-    Option(config)
-      .map(config =>
-        apiNamesAndExtractors.map { case (name, extractor) =>
-          server(name, extractor(config))
-        }
-      )
-      .getOrElse(Seq.empty)
-      .flatMap(_.toList)
-  }
-}
-
-/** Root configuration parameters for a single Canton process.
-  *
-  * @param participants
-  *   All locally running participants that this Canton process can connect and operate on.
-  * @param remoteParticipants
-  *   All remotely running participants to which the console can connect and operate on.
-  * @param sequencers
-  *   All locally running sequencers that this Canton process can connect and operate on.
-  * @param remoteSequencers
-  *   All remotely running sequencers that this Canton process can connect and operate on.
-  * @param mediators
-  *   All locally running mediators that this Canton process can connect and operate on.
-  * @param remoteMediators
-  *   All remotely running mediators that this Canton process can connect and operate on.
-  * @param monitoring
-  *   determines how this Canton process can be monitored
-  * @param parameters
-  *   per-environment parameters to control enabled features and set testing parameters
-  * @param features
-  *   control which features are enabled
-  */
-final case class CantonConfig(
-    name: Option[String] = None,
-    sequencers: Map[InstanceName, SequencerNodeConfig] = Map.empty,
-    mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty,
-    participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty,
-    remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty,
-    remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty,
-    remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
-    monitoring: MonitoringConfig = MonitoringConfig(),
-    parameters: CantonParameters = CantonParameters(),
-    features: CantonFeatures = CantonFeatures(),
-    pekkoConfig: Option[Config] = None,
-) extends UniformCantonConfigValidation
-    with ConfigDefaults[DefaultPorts, CantonConfig]
-    with SharedCantonConfig[CantonConfig] {
-
-  /** dump config to string (without sensitive data) */
-  /** renders the config as a string (used for dumping config for diagnostic purposes) */
-  def dumpString: String = CantonConfig.makeConfidentialString(this)
-
-  /** run a validation on the current config and return possible warning messages */
-  def validate(edition: CantonEdition): Validated[NonEmpty[Seq[String]], Unit] = {
-    val validator = edition match {
-      case CommunityCantonEdition =>
-        CommunityConfigValidations
-      case EnterpriseCantonEdition =>
-        EnterpriseConfigValidations
-    }
-    validator.validate(this, edition)
-  }
-
   /** Produces a message in the structure
     * "da:admin-api=1,public-api=2;participant1:admin-api=3,ledger-api=4". Helpful for diagnosing
     * port already bound issues during tests. Allows any config value to be be null (can happen with
@@ -630,6 +566,27 @@ final case class CantonConfig(
       .mkString(";")
   }
 
+  protected def nodePortsDescription(
+      nodeName: InstanceName,
+      portDescriptions: Seq[String],
+  ): String =
+    s"$nodeName:${portDescriptions.mkString(",")}"
+
+  protected def portDescriptionFromConfig[C](
+      config: C
+  )(apiNamesAndExtractors: Seq[(String, C => ServerConfig)]): Seq[String] = {
+    def server(name: String, config: ServerConfig): Option[String] =
+      Option(config).map(c => s"$name=${c.port}")
+    Option(config)
+      .map(config =>
+        apiNamesAndExtractors.map { case (name, extractor) =>
+          server(name, extractor(config))
+        }
+      )
+      .getOrElse(Seq.empty)
+      .flatMap(_.toList)
+  }
+
   /** reduces the configuration into a single node configuration (used for external testing) */
   def asSingleNode(instanceName: InstanceName): CantonConfig =
     // based on the assumption that clashing instance names would clash in the console
@@ -655,11 +612,26 @@ final case class CantonConfig(
       .focus(_.mediators)
       .modify(mapWithDefaults)
   }
+
+  def mergeDynamicChanges(newConfig: CantonConfig): CantonConfig =
+    copy(participants =
+      participants
+        .map { case (name, config) =>
+          (name, config, newConfig.participants.get(name))
+        }
+        .map {
+          case (name, old, Some(newConfig)) =>
+            (name, old.copy(alphaDynamic = newConfig.alphaDynamic))
+          case (name, old, None) => (name, old)
+        }
+        .toMap
+    )
+
 }
 
 private[canton] object CantonNodeParameterConverter {
 
-  def general(parent: SharedCantonConfig[_], node: LocalNodeConfig): CantonNodeParameters.General =
+  def general(parent: CantonConfig, node: LocalNodeConfig): CantonNodeParameters.General =
     CantonNodeParameters.General.Impl(
       tracing = parent.monitoring.tracing,
       delayLoggingThreshold = parent.monitoring.logging.delayLoggingThreshold.toInternal,
@@ -677,10 +649,7 @@ private[canton] object CantonNodeParameterConverter {
       startupMemoryCheckConfig = parent.parameters.startupMemoryCheckConfig,
     )
 
-  def protocol(
-      parent: SharedCantonConfig[_],
-      config: ProtocolConfig,
-  ): CantonNodeParameters.Protocol =
+  def protocol(parent: CantonConfig, config: ProtocolConfig): CantonNodeParameters.Protocol =
     CantonNodeParameters.Protocol.Impl(
       sessionSigningKeys = config.sessionSigningKeys,
       alphaVersionSupport = parent.parameters.alphaVersionSupport || config.alphaVersionSupport,
@@ -691,8 +660,6 @@ private[canton] object CantonNodeParameterConverter {
 }
 
 object CantonConfig {
-  implicit val typesafeConfigValidator: CantonConfigValidator[Config] =
-    CantonConfigValidator.validateAll
   implicit val cantonConfigCantonConfigValidator: CantonConfigValidator[CantonConfig] =
     CantonConfigValidatorDerivation[CantonConfig]
 
@@ -1920,7 +1887,7 @@ object CantonConfig {
     * @return
     *   [[scala.Right]] [[com.typesafe.config.Config]] if parsing was successful.
     */
-  def parseAndMergeConfigs(
+  private def parseAndMergeConfigs(
       files: NonEmpty[Seq[File]]
   )(implicit elc: ErrorLoggingContext): Either[CantonConfigError, Config] = {
     val baseConfig = ConfigFactory.load()

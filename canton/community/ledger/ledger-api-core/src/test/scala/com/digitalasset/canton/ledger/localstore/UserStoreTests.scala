@@ -165,19 +165,6 @@ trait UserStoreTests extends UserStoreSpecBase { self: AsyncFreeSpec =>
       }
     }
 
-    "disallow re-creating an existing user concurrently" in {
-      testIt { tested =>
-        val user = newUser("user1")
-        for {
-          res <- Future.sequence(
-            Seq(tested.createUser(user, Set.empty), tested.createUser(user, Set.empty))
-          )
-        } yield {
-          res should contain(Left(UserExists(user.id)))
-        }
-      }
-    }
-
     "deny permission re-creating an existing user within another IDP" in {
       testIt { tested =>
         val user = newUser("user1")

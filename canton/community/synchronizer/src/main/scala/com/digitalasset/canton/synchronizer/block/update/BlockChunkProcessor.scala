@@ -346,7 +346,7 @@ final class BlockChunkProcessor(
       // block. This means that we will include these events in the ephemeral state of the previous block
       // when we re-read it from the database. But this doesn't matter given that all those events are idempotent.
       chunk.forgetNE.foldLeft[
-        (CantonTimestamp, Seq[(CantonTimestamp, Traced[LedgerBlockEvent])])
+        (CantonTimestamp, Seq[(CantonTimestamp, Traced[LedgerBlockEvent])]),
       ]((state.lastChunkTs, Seq.empty)) { case ((lastTs, events), event) =>
         event.value match {
           case send: Send =>

@@ -6,8 +6,8 @@
         "description": "Canton JSON log files written using logstash.",
         "json": true,
         "hide-extra": false,
-        "file-pattern": "(\\.clog.*)|(docker.*(canton|splice).*)",
-        "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 20 },"] ", { "field": "level" }, " - ", { "field": "logger_name" }, " (", { "field" : "trace-id", "default-value" : "" }, "-", { "field" : "span-name", "default-value" : "" }, "-", { "field" : "span-parent-id", "default-value" : "" }, "-", { "field" : "span-id", "default-value" : "" }, ") - ", { "field" : "message" },
+        "file-pattern": "\\.clog.*",
+        "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 20 },"] ", { "field": "level" }, " - ", { "field": "logger_name" }, " (", { "field" : "trace-id", "default-value" : "" }, ") - ", { "field" : "message" },
             " ",
             { "field" : "stack_trace", "default-value" : "" }
         ],
@@ -22,18 +22,6 @@
             "warning" : "WARN"
         },
         "opid-field" : "trace-id",
-        "opid": {
-          "subid": "span-id",
-          "sub-description": {
-            "span-name": {
-              "format": [
-                {
-                  "field": "span-name"
-                }
-              ]
-            }
-          }
-        },
         "value" : {
             "logger_name" : {
                 "kind" : "string",
@@ -52,18 +40,6 @@
             "trace-id" : {
                 "kind" : "string",
                 "identifier" : true
-            },
-            "span-id" : {
-              "kind" : "string",
-              "identifier" : true
-            },
-            "span-name" : {
-              "kind" : "string",
-              "identifier" : true
-            },
-            "span-parent-id" : {
-              "kind" : "string",
-              "identifier" : true
             },
             "thread_name" : {
                 "kind" : "string",
