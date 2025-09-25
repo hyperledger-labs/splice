@@ -126,5 +126,7 @@ GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
 Circuit breaker .* tripped after .* failures.*SpliceCircuitBreakerTest
 
+# flyway update
+cleanOnValidationError is deprecated and will be removed in a later release
 
 # Make sure to have a trailing newline
