@@ -62,6 +62,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
         for {
           _ <- debugPrintPgActivity()
           _ <- sql"""TRUNCATE
+                active_parties,
                 user_wallet_acs_store,
                 user_wallet_acs_interface_views,
                 user_wallet_txlog_store,
@@ -76,8 +77,10 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 incomplete_reassignments,
                 store_descriptors,
                 store_last_ingested_offsets,
+                ranked_providers_by_app_rewards,
                 round_totals,
                 round_party_totals,
+                round_total_amulet_balance,
                 update_history_descriptors,
                 update_history_last_ingested_offsets,
                 update_history_transactions,
@@ -86,6 +89,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 update_history_assignments,
                 update_history_unassignments,
                 update_history_backfilling,
+                wallet_balances,
                 acs_snapshot_data,
                 acs_snapshot,
                 scan_verdict_store,
