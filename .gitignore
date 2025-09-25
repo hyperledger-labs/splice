@@ -19,8 +19,6 @@ _build/
 **/metals.sbt
 **/.scala-build/*
 
-# We want to share run configurations
-!.idea/runConfigurations
 .vscode/*
 !.vscode/settings.json
 # Make sure test files are checkedin

@@ -28,6 +28,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
         },
         persistence: {
           enabled: true,
+          size: '20Gi',
         },
         ...infraAffinityAndTolerations,
       },

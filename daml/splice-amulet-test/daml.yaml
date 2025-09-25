@@ -6,7 +6,7 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-amulet-test
 source: daml
-version: 0.1.14
+version: 0.1.15
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -16,6 +16,8 @@ data-dependencies:
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
   - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
+  - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
+  - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
   - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
 build-options:
   - --ghc-option=-Wunused-binds

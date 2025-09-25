@@ -1,0 +1,190 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests showing how to use the `WalletUserProxy` in the context of
+-- an wallet to get featured app activity markers for token standard actions of the
+-- wallet users.
+--
+-- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
+-- The mechanism for getting the featured app activity markers is generic.
+--
+module Splice.Util.FeaturedApp.IntegrationTests.TestWalletUserProxy where
+
+import qualified Splice.Amulet
+import Splice.Util.FeaturedApp.WalletUserProxy
+
+import Splice.Api.FeaturedAppRightV1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Daml.Script
+
+import DA.Assert ((===))
+import DA.List (sortOn)
+import qualified DA.TextMap as TextMap
+import DA.Optional (isSome)
+import DA.Time
+
+import Splice.Amulet (AppRewardCoupon(..))
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+data WalletProviderData = WalletProviderData with
+  provider : Party
+  proxyCid : ContractId WalletUserProxy
+  featuredAppRightCid : ContractId FeaturedAppRight
+  extraDisclosuresForProxy : Disclosures'
+
+-- | Test that both offer and accept grant activity markers
+test_two_step_featured_app_markers : Script ()
+test_two_step_featured_app_markers = do
+  -- disable transfer fees to check that only the featured app activity markers will be there
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
+
+  -- setup Alice with 1000 Amulet tokens
+  alice <- allocatePartyExact "alice"
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+  aliceHoldingCids <- WalletClient.listHoldingCids alice registry.instrumentId
+
+  -- setup bob
+  bob <- allocatePartyExact "bob"
+
+  -- setup wallet provider with an allow-list for bob only
+  bobProvider <- setupWalletProvider registry "bobWalletProvider" (Some [bob])
+
+
+  -- create test transfer
+  now <- getTime
+  let transfer = Api.Token.TransferInstructionV1.Transfer with
+        sender = alice
+        receiver = bob
+        amount = 10.0
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids = aliceHoldingCids
+        meta = Metadata with
+          values = TextMap.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
+
+
+  -- alice's wallet frontend queries the transfer factory for the choice
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- simulate alice wanting to wrongly use bob's wallet provider proxy
+  -- to test that the allow list is enforced
+  submitWithDisclosuresMustFail' alice (bobProvider.extraDisclosuresForProxy <> enrichedChoice.disclosures) $ exerciseCmd
+    (bobProvider.proxyCid)
+    WalletUserProxy_TransferFactory_Transfer with
+      cid = enrichedChoice.factoryCid
+      proxyArg = ProxyArg with
+        user = alice
+        choiceArg = enrichedChoice.arg
+        featuredAppRightCid = bobProvider.featuredAppRightCid
+
+  -- alice's wallet frontend also gets the WalletProviderData from the wallet provider's backend
+  -- and creates a transaction that creates featured app activity markers for both alice and the wallet provider
+  result0 <- submitWithDisclosures' alice (aliceProvider.extraDisclosuresForProxy <> enrichedChoice.disclosures) $ exerciseCmd
+    (aliceProvider.proxyCid)
+    WalletUserProxy_TransferFactory_Transfer with
+      cid = enrichedChoice.factoryCid
+      proxyArg = ProxyArg with
+        user = alice
+        choiceArg = enrichedChoice.arg
+        featuredAppRightCid = aliceProvider.featuredAppRightCid
+  let result = result0.choiceResult
+  TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+
+  -- check that exactly two markers exist
+  expectActivityMarkers registry aliceProvider alice
+
+  -- bob queries the pending transfer through their wallet
+  aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
+  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrCid === aliceInstrCid
+
+  -- bob accepts the transfer using their wallet frontend
+  -- same story: query context
+  context <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid emptyMetadata
+
+  -- submit via proxy to create featured app markers
+  result0 <- submitWithDisclosures' bob (bobProvider.extraDisclosuresForProxy <> context.disclosures) $ exerciseCmd
+    (bobProvider.proxyCid)
+    WalletUserProxy_TransferInstruction_Accept with
+      cid = bobInstrCid
+      proxyArg = ProxyArg with
+        user = bob
+        choiceArg = TransferInstruction_Accept with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = bobProvider.featuredAppRightCid
+
+  -- sanity check: completion of the transfer
+  let result = result0.choiceResult
+  TransferInstructionResult_Completed _ <- pure result.output
+
+  -- check that exactly two markers exist
+  expectActivityMarkers registry bobProvider bob
+
+  -- sanity check: there are exactly four activity markers
+  activityMarkers <- query @Splice.Amulet.FeaturedAppActivityMarker registry.dso
+  length activityMarkers === 4
+
+  -- sanity check: no AppRewardCoupons are created at this time, as the activity markers have not yet been converted
+  [] <- query @AppRewardCoupon registry.dso
+
+  -- sanity check: check balances
+  WalletClient.checkBalanceApprox alice registry.instrumentId 990.0
+  WalletClient.checkBalance bob registry.instrumentId 10.0
+
+
+setupWalletProvider : AmuletRegistry.AmuletRegistry -> Text -> Optional [Party] -> Script WalletProviderData
+setupWalletProvider registry name optAllowList = do
+  -- Setup a wallet provider that is featured
+  walletProvider <- allocatePartyExact name
+  featuredAppRightCid <- AmuletRegistry.featureApp registry walletProvider
+  -- Setup the wallet provider's token standard proxy
+  proxyCid <- submit walletProvider $ createCmd WalletUserProxy with
+    provider = walletProvider
+    providerWeight = 0.9
+    userWeight = 0.1 -- Showcase direct reward sharing with the user using a 90%/10% split
+    extraBeneficiaries = []
+    optAllowList
+  -- query the disclosures that the wallet app needs to pass in
+  appRightD <- queryDisclosure' @Splice.Amulet.FeaturedAppRight walletProvider featuredAppRightCid
+  proxyD <- queryDisclosure' @WalletUserProxy walletProvider proxyCid
+  let extraDisclosuresForProxy = proxyD <> appRightD
+  pure WalletProviderData with
+    provider = walletProvider
+    proxyCid
+    featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+    extraDisclosuresForProxy
+
+
+expectActivityMarkers : AmuletRegistry.AmuletRegistry -> WalletProviderData -> Party -> Script ()
+expectActivityMarkers registry aliceProvider alice = do
+  activityMarkers <- sortOn (._2.weight) <$> query @Splice.Amulet.FeaturedAppActivityMarker aliceProvider.provider
+  let expectedMarkers =
+        [ Splice.Amulet.FeaturedAppActivityMarker with
+          dso = registry.dso
+          provider = aliceProvider.provider
+          beneficiary = alice
+          weight = 0.1
+        , Splice.Amulet.FeaturedAppActivityMarker with
+          dso = registry.dso
+          provider = aliceProvider.provider
+          beneficiary = aliceProvider.provider
+          weight = 0.9
+        ]
+  expectedMarkers === map (._2) activityMarkers

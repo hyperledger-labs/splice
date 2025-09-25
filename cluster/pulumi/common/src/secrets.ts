@@ -32,8 +32,8 @@ export type GrafanaKeys = {
   adminPassword: string;
 };
 
-export function svKeyFromSecret(sv: string): pulumi.Output<SvIdKey> {
-  const keyJson = getSecretVersionOutput({ secret: `${sv}-id` });
+export function svKeyFromSecret(secretName: string): pulumi.Output<SvIdKey> {
+  const keyJson = getSecretVersionOutput({ secret: secretName });
   return keyJson.apply(k => {
     const secretData = k.secretData;
     const parsed = JSON.parse(secretData);
@@ -58,9 +58,9 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
 }
 
 export function svCometBftGovernanceKeyFromSecret(
-  sv: string
+  secretName: string
 ): pulumi.Output<SvCometBftGovernanceKey> {
-  const keyJson = getSecretVersionOutput({ secret: `${sv}-cometbft-governance-key` });
+  const keyJson = getSecretVersionOutput({ secret: secretName });
   return keyJson.apply(k => {
     const secretData = k.secretData;
     const parsed = JSON.parse(secretData);

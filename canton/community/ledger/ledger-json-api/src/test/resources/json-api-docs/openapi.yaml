@@ -198,7 +198,13 @@ paths:
       - apiKeyAuth: []
   /v2/commands/completions:
     post:
-      description: Query completions list (blocking call)
+      description: |-
+        Query completions list (blocking call)
+        Notice: This endpoint should be used for small results set.
+        When number of results exceeded node configuration limit (`http-list-max-elements-limit`)
+        there will be an error (`413 Content Too Large`) returned.
+        Increasing this limit may lead to performance issues and high memory consumption.
+        Consider using websockets (asyncapi) for better efficiency with larger results.
       operationId: postV2CommandsCompletions
       parameters:
       - name: limit
@@ -683,7 +689,18 @@ paths:
       - apiKeyAuth: []
   /v2/state/active-contracts:
     post:
-      description: Query active contracts list (blocking call)
+      description: |-
+        Query active contracts list (blocking call).
+        Querying active contracts is an expensive operation and if possible should not be repeated often.
+        Consider querying active contracts initially (for a given offset)
+        and then repeatedly call one of `/v2/updates/...`endpoints  to get subsequent modifications.
+        You can also use websockets to get updates with better performance.
+
+        Notice: This endpoint should be used for small results set.
+        When number of results exceeded node configuration limit (`http-list-max-elements-limit`)
+        there will be an error (`413 Content Too Large`) returned.
+        Increasing this limit may lead to performance issues and high memory consumption.
+        Consider using websockets (asyncapi) for better efficiency with larger results.
       operationId: postV2StateActive-contracts
       parameters:
       - name: limit
@@ -826,7 +843,13 @@ paths:
       - apiKeyAuth: []
   /v2/updates:
     post:
-      description: Query updates list (blocking call)
+      description: |-
+        Query updates list (blocking call)
+        Notice: This endpoint should be used for small results set.
+        When number of results exceeded node configuration limit (`http-list-max-elements-limit`)
+        there will be an error (`413 Content Too Large`) returned.
+        Increasing this limit may lead to performance issues and high memory consumption.
+        Consider using websockets (asyncapi) for better efficiency with larger results.
       operationId: postV2Updates
       parameters:
       - name: limit
@@ -879,8 +902,13 @@ paths:
       - apiKeyAuth: []
   /v2/updates/flats:
     post:
-      description: 'Query flat transactions update list (blocking call, deprecated:
-        use v2/updates instead)'
+      description: |-
+        Query flat transactions update list (blocking call)
+        Notice: This endpoint should be used for small results set.
+        When number of results exceeded node configuration limit (`http-list-max-elements-limit`)
+        there will be an error (`413 Content Too Large`) returned.
+        Increasing this limit may lead to performance issues and high memory consumption.
+        Consider using websockets (asyncapi) for better efficiency with larger results.
       operationId: postV2UpdatesFlats
       parameters:
       - name: limit
@@ -933,8 +961,13 @@ paths:
       - apiKeyAuth: []
   /v2/updates/trees:
     post:
-      description: 'Query update transactions tree list (blocking call, deprecated:
-        use v2/updates instead)'
+      description: |-
+        Query update transactions tree list (blocking call)
+        Notice: This endpoint should be used for small results set.
+        When number of results exceeded node configuration limit (`http-list-max-elements-limit`)
+        there will be an error (`413 Content Too Large`) returned.
+        Increasing this limit may lead to performance issues and high memory consumption.
+        Consider using websockets (asyncapi) for better efficiency with larger results.
       operationId: postV2UpdatesTrees
       parameters:
       - name: limit
@@ -2029,6 +2062,33 @@ components:
       properties:
         party:
           type: string
+    CanExecuteAs:
+      title: CanExecuteAs
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/CanExecuteAs1'
+    CanExecuteAs1:
+      title: CanExecuteAs
+      type: object
+      required:
+      - party
+      properties:
+        party:
+          type: string
+    CanExecuteAsAnyParty:
+      title: CanExecuteAsAnyParty
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/CanExecuteAsAnyParty1'
+    CanExecuteAsAnyParty1:
+      title: CanExecuteAsAnyParty
+      type: object
     CanReadAs:
       title: CanReadAs
       type: object
@@ -4756,6 +4816,18 @@ components:
         properties:
           CanActAs:
             $ref: '#/components/schemas/CanActAs'
+      - type: object
+        required:
+        - CanExecuteAs
+        properties:
+          CanExecuteAs:
+            $ref: '#/components/schemas/CanExecuteAs'
+      - type: object
+        required:
+        - CanExecuteAsAnyParty
+        properties:
+          CanExecuteAsAnyParty:
+            $ref: '#/components/schemas/CanExecuteAsAnyParty'
       - type: object
         required:
         - CanReadAs

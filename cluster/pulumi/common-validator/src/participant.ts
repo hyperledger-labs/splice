@@ -26,7 +26,6 @@ export function installParticipant(
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
   auth0Config: Auth0Config,
-  nodeIdentifier: string,
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   customOptions?: SpliceCustomResourceOptions

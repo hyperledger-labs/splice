@@ -81,7 +81,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
       </Helmet>
       <AuthProvider authConf={config.auth}>
-        <ScanClientProvider url={config.services.scan.url}>
+        <ScanClientProvider baseScanUrl={config.services.scan.url}>
           <QueryClientProvider client={queryClient}>
             <ReactQueryDevtools initialIsOpen={false} />
             <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>

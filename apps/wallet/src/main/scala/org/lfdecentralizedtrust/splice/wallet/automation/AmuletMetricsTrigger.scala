@@ -11,6 +11,7 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -18,6 +19,7 @@ class AmuletMetricsTrigger(
     override protected val context: TriggerContext,
     userWalletStore: UserWalletStore,
     scanConnection: ScanConnection,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -34,9 +36,20 @@ class AmuletMetricsTrigger(
       tc: TraceContext
   ): Future[Boolean] =
     for {
+      noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
+        userWalletStore.key.dsoParty,
+        context.clock.now,
+      )
+      deductHoldingFees = !noHoldingFeesOnTransfers.supported
       round <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
-      (unlockedBalance, _) <- userWalletStore.getAmuletBalanceWithHoldingFees(round)
-      lockedBalance <- userWalletStore.getLockedAmuletBalance(round)
+      (unlockedBalance, _) <- userWalletStore.getAmuletBalanceWithHoldingFees(
+        round,
+        deductHoldingFees = deductHoldingFees,
+      )
+      lockedBalance <- userWalletStore.getLockedAmuletBalance(
+        round,
+        deductHoldingFees = deductHoldingFees,
+      )
       _ = amuletMetrics.unlockedAmuletGauge.updateValue(unlockedBalance.doubleValue)
       _ = amuletMetrics.lockedAmuletGauge.updateValue(lockedBalance.doubleValue)
     } yield false

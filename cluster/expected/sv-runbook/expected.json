@@ -476,6 +476,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
@@ -734,6 +735,7 @@
             "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
           }
         ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -774,6 +776,11 @@
             ],
             "name": "SV2",
             "publicKey": "PUBLIC_KEY_2==",
+            "rewardWeightBps": 150000
+          },
+          {
+            "name": "Digital-Asset-1",
+            "publicKey": "THIS_IS_THE_WRONG_KEY",
             "rewardWeightBps": 150000
           }
         ],
@@ -1085,6 +1092,7 @@
             "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
           }
         ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {

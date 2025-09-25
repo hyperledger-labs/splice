@@ -962,6 +962,14 @@ trait SvDsoStore
     multiDomainAcsStore
       .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
       .map(_.map(_.contract))
+
+  def lookupAmuletConversionRateFeed(
+      publisher: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.ContractId,
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
+  ]]]
+
 }
 
 object SvDsoStore {
@@ -1315,6 +1323,15 @@ object SvDsoStore {
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
+      },
+      mkFilter(splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          conversionRateFeedPublisher =
+            Some(PartyId.tryFromProtoPrimitive(contract.payload.publisher)),
+        )
       },
     )
 

@@ -56,7 +56,10 @@ class SqlIndexInitializationTriggerStoreTest
         indexNames <- listIndexNames()
         _ <- dumpIndexes()
       } yield {
-        indexNames should contain allElementsOf Seq("updt_hist_crea_hi_mi_ci_import_updates")
+        indexNames should contain allElementsOf Seq(
+          "updt_hist_crea_hi_mi_ci_import_updates",
+          "round_party_totals_sid_pid_cr",
+        )
       }
     }
 

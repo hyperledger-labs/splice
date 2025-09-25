@@ -11,13 +11,122 @@ Release Notes
 Upcoming
 --------
 
-- LocalNet
+  - Daml
 
-  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+    - release ``splice-util-featured-app-proxies-1.1.0`` with
+      support for a ``WalletUserProxy``, which simplifies
+      the creation of featured app activity markers for wallet app providers
+      when their users engage in token standard workflows.
+    - Implement Daml changes for `CIP-0079 - Demonstrate Third-Party Price Feed Integration for CC Listing <https://github.com/global-synchronizer-foundation/cips/pull/101/files>`__:
+
+       These Daml changes require an upgrade to the following Daml versions:
+
+       ================== =======
+       name               version
+       ================== =======
+       amulet             0.1.14
+       amuletNameService  0.1.15
+       dsoGovernance      0.1.20
+       validatorLifecycle 0.1.5
+       wallet             0.1.14
+       walletPayments     0.1.14
+       ================== =======
+
+  - Scan
+
+    - Performance bugfix for the ``/v0/wallet-balance`` endpoint, especially when requesting a balance for a party that does not exist, which previously would timeout.
+
+  - UIs
+
+    - Implement changes from CIP-78 CC Fee Removal.
+
+
+0.4.17
+------
+
+.. important::
+
+    **Action required from app devs:**
+
+    1. **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.14`` must recompile their Daml code
+       to link against ``splice-amulet >= 0.1.14``.
+
+       The reason being that earlier versions of the ``AmuletRules`` template
+       do not support setting the transfer fees to zero. Attempting to downgrade to them will raise a
+       ``PRECONDITION_FAILED`` error stating that the ``ensure`` clause evaluated to ``false``.
+
+       No change is required for apps that build against the :ref:`token_standard`
+       or :ref:`featured_app_activity_markers_api`.
+
+    2. **App devs whose app predicts holding fees on transfers** must adjust their code to
+       no longer expect any holding fees once this Daml change gets voted in.
+
+       The simplest option is to make your code independent of whether the change was voted in
+       by removing the prediction of holding fees. You can instead
+       extract the actual holding fees charged from the transfer transaction itself;
+       i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+       of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+       of the ``TransferResult``.
+
+- Daml
+
+  - Implement Daml changes for `CIP-0078 - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__:
+
+     - Change all Amulet transfers to not charge holding fees on inputs.
+     - Fix a bug in the ``ensure`` clause of ``AmuletRules`` that prevented
+       setting the Amulet transfer fees to zero.
+     - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
+       that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
+
+     These Daml changes require an upgrade to the following Daml versions **before**
+     voting to set the transfer fees to zero:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.14
+     amuletNameService  0.1.14
+     dsoGovernance      0.1.19
+     validatorLifecycle 0.1.5
+     wallet             0.1.14
+     walletPayments     0.1.14
+     ================== =======
+
+- Canton
+
+  - Add ``CanExecuteAs`` and ``CanExecuteAsAnyParty`` user rights that can be used for the
+    ``InteractiveSubmissionService/ExecuteSubmission`` endpoint. ``CanActAs`` permissions imply
+    ``CanExecuteAs`` so this is backwards compatible.
 
 - Validator
 
   - Expose ``/dso`` endpoint from scan proxy
+
+- Wallet
+
+  - Do not deduct holding fees from available balance if ``splice-amulet >= 0.1.14``
+    is configured in the ``AmuletConfig`` of the network.
+
+- Deployment
+
+  - Participant
+
+     - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
+  - Validator
+
+    - Allow disabling the deployment of ``ans-web-ui`` and ``wallet-web-ui`` in the ``splice-validator`` helm chart by setting
+      ``.ansWebUi.enabled`` and ``validatorWebUi.enabled`` to ``false``.
+      Thanks to Marcin Kocur for contributing this change in https://github.com/hyperledger-labs/splice/pull/2171
+
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+
+- Community docs
+
+  - Add :ref:`Keycloak Configuration Guide for Validators <keycloak_canton_validator_config_guide>`.
+    Thanks to mikeProDev for contributing this change in https://github.com/hyperledger-labs/splice/pull/2247
 
 0.4.16
 ------

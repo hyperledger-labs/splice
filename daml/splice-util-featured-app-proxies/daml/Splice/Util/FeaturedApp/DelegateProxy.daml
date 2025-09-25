@@ -7,11 +7,8 @@
 -- You can either use this template directly, or copy the code
 -- under a **different package name** and a **different module name**.
 --
--- Note: we do not recommend using the DelegateProxy as a solution for wallet providers
--- to create featured app markers on actions taken by their users. Code for that
--- kind of proxy is referenced from the issue below:
---
--- TODO(hyperledger-labs/splice#2197): polish the PoC of the wallet integrator proxy and include it in the proxies package
+-- Note: use the `WalletUserProxy` if you are building a wallet app and want your users
+-- to create featured app markers for you.
 --
 module Splice.Util.FeaturedApp.DelegateProxy where
 

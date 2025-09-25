@@ -12,16 +12,20 @@ export async function startDownOperationsForValidatorStacks(
   const allValidatorStacks = await validatorRunbookStack.workspace.listStacks({
     all: false,
   });
-  const allValidatorsForCluster = allValidatorStacks.filter(stack => {
-    stack.name.endsWith(ClusterBasename);
-  });
+  const allValidatorsForCluster = allValidatorStacks.filter(stack =>
+    stack.name.endsWith(ClusterBasename)
+  );
+  console.error(`Resetting validators ${JSON.stringify(allValidatorsForCluster)}`);
   return allValidatorsForCluster.map(stackSummary => {
     return {
       name: `down-${stackSummary.name}`,
-      // eslint-disable-next-line promise/prefer-await-to-then
-      promise: stack('validator-runbook', stackSummary.name, true, {}).then(stack =>
-        downStack(stack, abortController)
-      ),
+      promise: stack(
+        'validator-runbook',
+        stackSummary.name.slice(0, stackSummary.name.length - (ClusterBasename.length + 1)),
+        true,
+        {}
+        // eslint-disable-next-line promise/prefer-await-to-then
+      ).then(stack => downStack(stack, abortController)),
     };
   });
 }

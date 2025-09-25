@@ -9,14 +9,18 @@ import Typography from '@mui/material/Typography';
 import { useBalance } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { useWalletConfig } from '../utils/config';
+import { useFeatureSupport } from '../hooks/useFeatureSupport';
 
 const Hero: React.FC = () => {
   const config = useWalletConfig();
   const balanceQuery = useBalance();
   const amuletPriceQuery = useAmuletPrice();
+  const featureSupport = useFeatureSupport();
 
-  const isLoading = balanceQuery.isPending || amuletPriceQuery.isPending;
-  const isError = balanceQuery.isError || amuletPriceQuery.isError;
+  const isLoading =
+    balanceQuery.isPending || amuletPriceQuery.isPending || featureSupport.isLoading;
+  const isError = balanceQuery.isError || amuletPriceQuery.isError || featureSupport.isError;
+  console.log('Feature support data:', featureSupport.data);
 
   return (
     <Stack mt={4} mb={4} spacing={4} direction="row" justifyContent="space-between">
@@ -40,8 +44,9 @@ const Hero: React.FC = () => {
               />
             </Typography>
             <Typography variant="caption">
-              Reflects unlocked {config.spliceInstanceNames.amuletName}, rewards earned and holding
-              fees
+              {featureSupport.data?.noHoldingFeesOnTransfers
+                ? `Reflects unlocked ${config.spliceInstanceNames.amuletName} and rewards earned`
+                : `Reflects unlocked ${config.spliceInstanceNames.amuletName}, rewards earned and holding fees`}
             </Typography>
           </Box>
         )}

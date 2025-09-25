@@ -1538,6 +1538,36 @@ class DbSvDsoStore(
     listConfirmationsByActionConfirmer(expectedAction, confirmer)
   }
 
+  override def lookupAmuletConversionRateFeed(
+      publisher: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.ContractId,
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
+  ]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .querySingle(
+            selectFromAcsTable(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              where = sql"""
+                    template_id_qualified_name = ${QualifiedName(
+                  splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
+                and conversion_rate_feed_publisher = $publisher
+                  """,
+              orderLimit = sql" order by event_number desc limit 1",
+            ).headOption,
+            "lookupAmuletConversionRateFeed",
+          )
+          .value
+      } yield result.map(
+        contractFromRow(splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION)(_)
+      )
+    }
+
   override def close(): Unit = {
     dsoStoreMetrics.close()
     super.close()

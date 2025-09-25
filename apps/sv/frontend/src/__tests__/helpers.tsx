@@ -16,11 +16,13 @@ import { SvAdminClientProvider } from '../contexts/SvAdminServiceContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
-const queryClient = new QueryClient({
+const testQueryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchInterval: 500,
       structuralSharing: replaceEqualDeep,
+      retry: false,
+      gcTime: 0,
     },
   },
 });
@@ -32,7 +34,7 @@ const WrapperProviders: React.FC<{ children: React.ReactNode }> = ({ children })
   return (
     <ThemeProvider theme={theme}>
       <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
-        <QueryClientProvider client={queryClient}>
+        <QueryClientProvider client={testQueryClient}>
           <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
             <SvClientProvider url={config.services.sv.url}>
               <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>

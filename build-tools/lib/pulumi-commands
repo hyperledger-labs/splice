@@ -19,7 +19,7 @@ function subcmd_pulumi() {
         _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
     fi
 
-    if [ ! -d "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}" ]; then
+    if [ ! -d "${PULUMI_STACKS_DIR}/${pulumi_project}" ]; then
         _error "Unknown Pulumi project: ${pulumi_project}"
     fi
 

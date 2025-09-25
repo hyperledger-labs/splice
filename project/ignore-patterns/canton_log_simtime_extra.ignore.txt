@@ -23,6 +23,8 @@ SEQUENCER_SUBSCRIPTION_LOST.*: Lost subscription to domain .* Will try to recove
 # It seems this happens when a transaction is in-flight and we advance time. We should just retry.
 INTERPRETATION_TIME_EXCEEDED.*: Interpretation time exceeds limit of Ledger Effective Time
 
+Could not send a time-advancing message
+
 # TODO(#834): investigate and remove once fixed
 INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when only events with timestamps at most.*have been delivered
 

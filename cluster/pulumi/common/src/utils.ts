@@ -11,6 +11,7 @@ import { config, isDevNet, isMainNet } from './config';
 import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
 import { ClusterBasename, GcpProject, GcpRegion, GcpZone } from './config/gcpConfig';
+import { jmxOptions } from './jmx';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
@@ -275,3 +276,6 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
+
+export const getAdditionalJvmOptions = (extraOptions: string | undefined): string =>
+  `${jmxOptions()}${extraOptions ? ` ${extraOptions}` : ''}`;

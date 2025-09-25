@@ -6,6 +6,7 @@
     "migration",
     "persistence",
     "sequencerAddress",
+    "mediatorAddress",
     "participantAddress"
   ],
   "properties": {
@@ -142,6 +143,9 @@
       }
     },
     "participantAddress": {
+      "type": "string"
+    },
+    "mediatorAddress": {
       "type": "string"
     },
     "sequencerAddress": {

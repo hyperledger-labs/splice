@@ -1116,3 +1116,39 @@ At that point, data in different instances of the Scan app (hosted by different 
 This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
 
 .. todo:: update the above paragraph with an explanation of backfilling, and checking when it is complete
+
+Following an Amulet Conversion Rate Feed
+----------------------------------------
+
+Each SV can chose the amulet conversion rate they want to set in their
+SV UI. The conversion rate for each mining round is then chosen as the
+median of the conversion rate published by all SVs.
+
+Instead of manually updating the conversion rate through the SV UI, it
+is also possible to configure the SV app to follow the conversion rate
+feed provided by a given publisher.
+
+To do so, add the following to the :ref:`environment variables <helm_additional_env_vars>` of your SV app:
+
+This will automatically pick up the conversion rate from
+``#splice-amulet-name-service:Splice.Ans.AmuletConversionRateFeed:AmuletConversionRateFeed``
+contracts published by the party ``publisher::namespace`` and set the
+SV's config to the latest rate from the publisher. If the published
+rate falls outside of the accepted range, a warning is logged and no
+change to the SV's published conversion rate is made.
+
+Note that SVs must wait ``voteCooldownTime`` (a governance parameter
+that defaults to 1min) between updates to their rate. Therefore updates made
+by the publisher will not propagate immediately.
+
+.. code::
+
+  - name: ADDITIONAL_CONFIG_FOLLOW_AMULET_CONVERSION_RATE_FEED
+    value: |
+      canton.sv-apps.sv.follow-amulet-conversion-rate-feed {
+        publisher = "publisher::namespace"
+        accepted-range = {
+          min = 0.01
+          max = 100.0
+        }
+      }

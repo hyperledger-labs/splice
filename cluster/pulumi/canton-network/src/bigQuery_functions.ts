@@ -586,8 +586,8 @@ const coin_price = new BQScalarFunction(
   `
 );
 
-const all_stats = new BQTableFunction(
-  'all_stats',
+const all_dashboard_stats = new BQTableFunction(
+  'all_dashboard_stats',
   as_of_args,
   [
     new BQColumn('as_of_record_time', TIMESTAMP),
@@ -672,6 +672,67 @@ const all_stats = new BQTableFunction(
   `
 );
 
+const all_finance_stats = new BQTableFunction(
+  'all_finance_stats',
+  as_of_args,
+  [
+    new BQColumn('as_of_record_time', TIMESTAMP),
+    new BQColumn('migration_id', INT64),
+    new BQColumn('locked', BIGNUMERIC),
+    new BQColumn('unlocked', BIGNUMERIC),
+    new BQColumn('current_supply_total', BIGNUMERIC),
+    new BQColumn('unminted', BIGNUMERIC),
+    new BQColumn('total_mint_app_rewards', BIGNUMERIC),
+    new BQColumn('total_mint_validator_rewards', BIGNUMERIC),
+    new BQColumn('total_mint_sv_rewards', BIGNUMERIC),
+    new BQColumn('total_mint_unclaimed_activity_records', BIGNUMERIC),
+    new BQColumn('total_burn', BIGNUMERIC),
+    new BQColumn('num_amulet_holders', INT64),
+    new BQColumn('num_active_validators', INT64),
+  ],
+  `
+    SELECT
+      as_of_record_time,
+      migration_id,
+      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) as locked,
+      \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as unlocked,
+      \`$$FUNCTIONS_DATASET$$.locked\`(as_of_record_time, migration_id) + \`$$FUNCTIONS_DATASET$$.unlocked\`(as_of_record_time, migration_id) as current_supply_total,
+      \`$$FUNCTIONS_DATASET$$.unminted\`(as_of_record_time, migration_id) as unminted,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            NULL,
+            NULL,
+            as_of_record_time,
+            migration_id).appRewardAmount
+          AS total_mint_app_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            NULL,
+            NULL,
+            as_of_record_time,
+            migration_id).validatorRewardAmount
+          AS total_mint_validator_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            NULL,
+            NULL,
+            as_of_record_time, migration_id).svRewardAmount
+          AS total_mint_sv_rewards,
+      \`$$FUNCTIONS_DATASET$$.minted\`(
+            NULL,
+            NULL,
+            as_of_record_time,
+            migration_id).unclaimedActivityRecordAmount
+          AS total_mint_unclaimed_activity_records,
+      IFNULL(
+        \`$$FUNCTIONS_DATASET$$.burned\`(
+            NULL,
+            NULL,
+            as_of_record_time,
+            migration_id),
+        0) AS total_burn,
+      \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
+      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators
+  `
+);
+
 /**
  * Functions and procedures for the dashboards dataset: ones that are used to actually populate the data in the tables used by the dashboards.
  */
@@ -690,9 +751,9 @@ const all_days_since_genesis = new BQTableFunction(
           -- DATE(
           --   TIMESTAMP_MICROS((SELECT MIN(record_time) FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_exercises\`))
           --),
-          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 30 days until we confirm costs, and will
+          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 60 days until we confirm costs, and will
           -- backfill to genesis later.
-          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)),
+          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 DAY)),
           CURRENT_DATE
         )
       ) as day
@@ -741,7 +802,7 @@ const fill_all_stats = new BQProcedure(
       DELETE FROM \`$$DASHBOARDS_DATASET$$.dashboards-data\` WHERE as_of_record_time = t.as_of_record_time;
 
       INSERT INTO \`$$DASHBOARDS_DATASET$$.dashboards-data\`
-        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_stats\`(t.as_of_record_time, \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(t.as_of_record_time));
+        SELECT * FROM \`$$FUNCTIONS_DATASET$$.all_dashboard_stats\`(t.as_of_record_time, \`$$FUNCTIONS_DATASET$$.migration_id_at_time\`(t.as_of_record_time));
 
     END FOR;
   `
@@ -756,7 +817,8 @@ const monthly_burn = new BQLogicalView(
   `
     SELECT
         as_of_record_time as monthly_as_of_record_time,
-        SUM(daily_burn) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn
+        SUM(daily_burn) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn,
+        SUM(daily_burn * daily_avg_coin_price) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn_usd
       FROM
         \`$$DASHBOARDS_DATASET$$.dashboards-data\`
   `
@@ -778,7 +840,9 @@ const daily_unminted = new BQLogicalView(
 const all_data = new BQLogicalView(
   'all_data',
   `
-    SELECT *
+    SELECT
+      *,
+      DATE_SUB(DATE(computed.as_of_record_time), INTERVAL 1 DAY) AS up_to_date
     FROM
         \`$$DASHBOARDS_DATASET$$.dashboards-data\` computed
         JOIN \`$$DASHBOARDS_DATASET$$.monthly_burn\` monthly_burn
@@ -814,7 +878,8 @@ export const allScanFunctions = [
   average_tps,
   peak_tps,
   coin_price,
-  all_stats,
+  all_dashboard_stats,
+  all_finance_stats,
 ];
 
 export const computedDataTable = new BQTable('dashboards-data', [

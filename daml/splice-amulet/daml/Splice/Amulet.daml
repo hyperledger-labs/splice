@@ -24,13 +24,14 @@ import Splice.Types
 import Splice.Util
 
 data AmuletExpireSummary = AmuletExpireSummary with
-  owner : Party
-  round: Round -- ^ Round for which this expiry was registered.
-  changeToInitialAmountAsOfRoundZero : Decimal
-  -- The change to the total balance introduced by a amulet expiry, normalized to round zero, i.e.,
-  -- a amulet created in round 3 is treated as a amulet created in round 0 with a higher initial amount.
-  changeToHoldingFeesRate : Decimal
-    -- ^ The change of total holding fees introduced by a amulet expiry.
+    owner : Party
+    round: Round -- ^ Round for which this expiry was registered.
+    changeToInitialAmountAsOfRoundZero : Decimal
+    -- The change to the total balance introduced by a amulet expiry, normalized to round zero, i.e.,
+    -- a amulet created in round 3 is treated as a amulet created in round 0 with a higher initial amount.
+    changeToHoldingFeesRate : Decimal
+      -- ^ The change of total holding fees introduced by a amulet expiry.
+  deriving (Eq, Show)
 
 -- | Result of an operation that created a new amulet, e.g.,
 -- by minting a fresh amulet, or by unlocking a locked amulet.
@@ -38,6 +39,7 @@ data AmuletCreateSummary amuletContractId = AmuletCreateSummary with
     amulet : amuletContractId -- ^ The new amulet that was created
     amuletPrice : Decimal -- ^ The amulet price at the round the amulet was created
     round: Round -- ^ Round for which this amulet was created.
+  deriving (Eq, Show)
 
 data Amulet_ExpireResult = Amulet_ExpireResult with
   expireSum : AmuletExpireSummary

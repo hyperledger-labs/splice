@@ -8,10 +8,10 @@ import {
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  getAdditionalJvmOptions,
   getParticipantKmsHelmResources,
   InstalledHelmChart,
   installSpliceHelmChart,
-  jmxOptions,
   loadYamlFromFile,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
@@ -83,6 +83,7 @@ export function installSvParticipant(
         svConfig.participant?.additionalEnvVars || []
       ),
       logLevel: svConfig.logging?.cantonLogLevel,
+      logLevelStdout: svConfig.logging?.cantonStdoutLogLevel,
       participantAdminUserNameFrom,
       metrics: {
         enable: true,
@@ -90,7 +91,7 @@ export function installSvParticipant(
           id: migrationId,
         },
       },
-      additionalJvmOptions: jmxOptions(),
+      additionalJvmOptions: getAdditionalJvmOptions(svConfig.participant?.additionalJvmOptions),
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
       resources: svsConfig?.participant.resources,

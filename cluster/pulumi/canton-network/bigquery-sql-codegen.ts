@@ -10,7 +10,7 @@ import {
 
 if (process.argv.length != 7) {
   console.error(
-    'Usage: npm run bigquery-sql-codegen <project> <functions-dataset-name> <scan-dataset-name> <output-file>'
+    'Usage: npm run bigquery-sql-codegen <project> <functions-dataset-name> <scan-dataset-name> <dashboards-dataset-name> <output-file>'
   );
   process.exit(1);
 }

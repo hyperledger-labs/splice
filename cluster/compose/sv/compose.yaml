@@ -11,7 +11,7 @@ networks:
 
 services:
   postgres-splice-sv:
-    image: "postgres:${SPLICE_POSTGRES_VERSION}"
+    image: "${POSTGRES_IMAGE_REPO}postgres:${SPLICE_POSTGRES_VERSION}"
     environment:
       - POSTGRES_USER=${SPLICE_SV_DB_USER}
       - POSTGRES_PASSWORD=${SPLICE_SV_DB_PASSWORD}
@@ -175,6 +175,7 @@ services:
       - ADDITIONAL_CONFIG_MIGRATION_ID=canton.scan-apps.scan-app.domain-migration-id = 0
       - SPLICE_APP_SCAN_PARTICIPANT_ADDRESS=participant
       - SPLICE_APP_SCAN_SEQUENCER_ADDRESS=sequencer-mediator
+      - SPLICE_APP_SCAN_MEDIATOR_ADDRESS=sequencer-mediator
       - FAIL_ON_APP_VERSION_MISMATCH=true
       - SPLICE_APP_UI_NETWORK_NAME=${SPLICE_APP_UI_NETWORK_NAME}
       - SPLICE_APP_UI_NETWORK_FAVICON_URL=${SPLICE_APP_UI_NETWORK_FAVICON_URL}

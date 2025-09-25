@@ -6,7 +6,7 @@
         "description": "Canton JSON log files written using logstash.",
         "json": true,
         "hide-extra": false,
-        "file-pattern": "\\.clog.*",
+        "file-pattern": "(\\.clog.*)|(docker.*(canton|splice).*)",
         "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 20 },"] ", { "field": "level" }, " - ", { "field": "logger_name" }, " (", { "field" : "trace-id", "default-value" : "" }, "-", { "field" : "span-name", "default-value" : "" }, "-", { "field" : "span-parent-id", "default-value" : "" }, "-", { "field" : "span-id", "default-value" : "" }, ") - ", { "field" : "message" },
             " ",
             { "field" : "stack_trace", "default-value" : "" }

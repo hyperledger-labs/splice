@@ -6,6 +6,10 @@ imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 pvc:
   volumeStorageClass: standard-rwo
 
+metrics:
+  release: prometheus-grafana-monitoring
+  interval: 30s
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

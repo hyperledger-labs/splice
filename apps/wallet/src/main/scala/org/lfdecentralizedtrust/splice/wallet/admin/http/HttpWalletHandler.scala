@@ -589,13 +589,22 @@ class HttpWalletHandler(
     withSpan(s"$workflowId.getBalance") { _ => _ =>
       for {
         userStore <- getUserStore(user)
+        noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
+          userStore.key.dsoParty,
+          walletManager.clock.now,
+        )
+        deductHoldingFees = !noHoldingFeesOnTransfers.supported
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
           .map(_.payload.round.number)
         (unlockedQty, unlockedHoldingFees) <- userStore.getAmuletBalanceWithHoldingFees(
-          currentRound
+          currentRound,
+          deductHoldingFees = deductHoldingFees,
         )
-        lockedQty <- userStore.getLockedAmuletBalance(currentRound)
+        lockedQty <- userStore.getLockedAmuletBalance(
+          currentRound,
+          deductHoldingFees = deductHoldingFees,
+        )
       } yield {
         d0.GetBalanceResponse(
           currentRound,
@@ -1262,10 +1271,15 @@ class HttpWalletHandler(
           parties,
           now,
         )
+        noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
+          store.walletKey.dsoParty,
+          now,
+        )
       } yield WalletResource.FeatureSupportResponse.OK(
         d0.WalletFeatureSupportResponse(
           tokenStandard = tokenStandard.supported,
           transferPreapprovalDescription = preapprovalDescription.supported,
+          noHoldingFeesOnTransfers = noHoldingFeesOnTransfers.supported,
         )
       )
     }

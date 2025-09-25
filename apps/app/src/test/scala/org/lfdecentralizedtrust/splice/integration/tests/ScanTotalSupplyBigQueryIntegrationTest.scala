@@ -70,9 +70,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private val mintedUnclaimedsAmount = BigDecimal(0)
   private val mintedAmount =
     mintedAppRewardsAmount + mintedValidatorRewardsAmount + mintedSvRewardsAmount + mintedUnclaimedsAmount
-  private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
+  private val aliceValidatorMintedAmount = BigDecimal("26051.7503805176")
   private val lockedAmount = BigDecimal("5000")
-  private val burnedAmount = BigDecimal("60032.83108")
+  private val burnedAmount = BigDecimal("60010")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("570776.255709163")
   private val amuletHolders = 5
@@ -530,7 +530,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
     val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
     val sql =
-      s"SELECT * FROM `$project.$functionsDatasetName.all_stats`('$timestamp', 0);"
+      s"SELECT * FROM `$project.$functionsDatasetName.all_dashboard_stats`('$timestamp', 0);"
 
     logger.info(s"Querying all stats as of $timestamp")
 

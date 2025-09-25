@@ -26,7 +26,7 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit m
 
 case class SpliceRateLimitConfig(
     enabled: Boolean = true,
-    ratePerSecond: Long,
+    ratePerSecond: Double,
 )
 
 class SpliceRateLimiter(
@@ -37,7 +37,7 @@ class SpliceRateLimiter(
 ) {
 
   // noinspection UnstableApiUsage
-  private val rateLimiter = RateLimiter.create(config.ratePerSecond.toDouble)
+  private val rateLimiter = RateLimiter.create(config.ratePerSecond)
 
   def markRun(): Boolean = {
     if (config.enabled && Instant.now().isAfter(enforceAfter)) {

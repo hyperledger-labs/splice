@@ -75,3 +75,35 @@ spec:
     requests:
       storage: 10G
   storageClassName: {{ .Values.pvc.volumeStorageClass }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: party-allocator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
+spec:
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+  - name: metrics
+    port: 10013
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.metrics.interval }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}

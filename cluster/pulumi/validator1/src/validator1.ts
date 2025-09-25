@@ -75,7 +75,6 @@ export async function installValidator1(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
-    'validator1',
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
     {

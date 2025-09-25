@@ -19,8 +19,7 @@ function subcmd_update_config() {
     migration_id="$2"
     shift 2
   else
-    # TODO(#1062): remove the ignored parameter once the base version for migration tests is >= 0.4.2
-    _error "Usage: $0 $SCRIPTNAME migration_type migration_id [version] [<git_reference> [<ignored>]]"
+    _error "Usage: $0 $SCRIPTNAME update_config <migration_type> <migration_id> [<version>] [<git_reference>]"
   fi
   local migration_config
   migration_config=$(cat <<EOF
@@ -35,10 +34,9 @@ EOF
   )
     shift
   fi
-  # TODO(#1062): remove the ignored parameter once the base version for migration tests is >= 0.4.2
   if [ "$#" -gt 0 ]; then
-    if [ "$#" -lt 1 ]; then
-      _error "Usage: $0 $SCRIPTNAME migration_type migration_id [version] [<git_reference> [<ignored>]]"
+    if [ "$#" -gt 1 ]; then
+      _error "Usage: $0 $SCRIPTNAME update_config <migration_type> <migration_id> [<version>] [<git_reference>]"
     fi
     git_reference="$1"
     shift
@@ -57,7 +55,7 @@ subcommand_whitelist[update_active_version]='Upgrade the version of the active m
 function subcmd_update_active_version() {
     local cluster_directory
     if [ "$#" -ne 1 ]; then
-        _error "Usage: $0 $SCRIPTNAME [version]"
+        _error "Usage: $0 $SCRIPTNAME [<version>]"
     fi
     # yq doesn't like the version being unquoted so we quote it here
     _update_cluster_config "\"$1\"" "synchronizerMigration.active.version"

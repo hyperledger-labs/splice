@@ -400,7 +400,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   "can dump participant identities of validator" in { _ =>
     eventuallySucceeds() {
-      validatorClient().dumpParticipantIdentities()
+      validatorClient(suppressErrors = false).dumpParticipantIdentities()
     }
   }
 

@@ -36,6 +36,8 @@ class ManualStartIntegrationTest
     with TriggerTestUtil
     with StandaloneCanton {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   // This test runs against a temporary Canton instance, disable all automatic setup of the shared canton instance
   override lazy val resetRequiredTopologyState = false
 

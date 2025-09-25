@@ -87,7 +87,7 @@ object SvOnboardingConfig {
       initialMaxNumInputs: Int = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      initialCreateFee: BigDecimal = SpliceUtil.defaultCreateFee.fee,
+      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -339,6 +339,7 @@ case class SvAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
@@ -457,3 +458,15 @@ object SvCantonIdentifierConfig {
     )
   }
 }
+
+final case class AmuletConversionRateFeedConfig(
+    publisher: PartyId,
+    // If the publisher publishes a conversion rate outside of the range, no change in the SV's conversion rate vote is made
+    // and a warning is logged.
+    acceptedRange: RangeConfig,
+)
+
+final case class RangeConfig(
+    min: BigDecimal,
+    max: BigDecimal,
+)

@@ -33,7 +33,7 @@ export const ConfigSchema = z.object({
   synchronizerMigration: SynchronizerMigrationSchema.default({
     active: defaultActiveMigration,
   }),
-  persistentSequencerHeapDumps: z.boolean().default(false),
+  persistentHeapDumps: z.boolean().default(false),
   pulumiProjectConfig: z
     .object({
       default: PulumiProjectConfigSchema,

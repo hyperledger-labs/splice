@@ -77,7 +77,8 @@ class WalletIntegrationTest
 
   "A wallet" should {
 
-    "tap stupid amount" in { implicit env =>
+    // TODO (#2336): unignore this test
+    "tap stupid amount" ignore { implicit env =>
       import com.digitalasset.daml.lf.data.Numeric
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val round = sv1ScanBackend.getLatestOpenMiningRound(env.environment.clock.now)

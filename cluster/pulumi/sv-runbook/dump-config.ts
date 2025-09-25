@@ -24,11 +24,8 @@ async function main() {
       Promise.resolve('access_token'),
     getCfg: () => svRunbookAuth0Config,
   };
-  const svAppConfig = {
-    onboardingName: svRunbookConfig.onboardingName,
-    disableOnboardingParticipantPromotionDelay: false,
-    externalGovernanceKey: false,
-  };
+  const buildSvAppConfig = (await import('./src/config')).buildSvAppConfig;
+  const svAppConfig = buildSvAppConfig(false);
   const validatorAppConfig = {
     // sv runbook wallet user is always defined
     walletUserName: svRunbookConfig.validatorWalletUser!,

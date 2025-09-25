@@ -6,8 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.automation
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment
-import payment.PaymentAmount
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.ccToDollars
 import org.lfdecentralizedtrust.splice.wallet.config.WalletSweepConfig
@@ -26,11 +25,12 @@ class WalletTransferOfferSweepTrigger(
     connection: SpliceLedgerConnection,
     config: WalletSweepConfig,
     scanConnection: ScanConnection,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     mat: Materializer,
-) extends WalletSweepTrigger(context, store, config, scanConnection) {
+) extends WalletSweepTrigger(context, store, config, scanConnection, packageVersionSupport) {
 
   override protected def extraRetrieveTasksValidation()(implicit tc: TraceContext) = Future.unit
 
@@ -90,7 +90,7 @@ class WalletTransferOfferSweepTrigger(
           val cmd = install.exercise(
             _.exerciseWalletAppInstall_CreateTransferOffer(
               config.receiver.toProtoPrimitive,
-              new PaymentAmount(amountToSendAfterFeesCC, payment.Unit.AMULETUNIT),
+              new payment.PaymentAmount(amountToSendAfterFeesCC, payment.Unit.AMULETUNIT),
               s"Sweeping wallet funds to receiver ${config.receiver}.",
               Instant.now().plus(10, ChronoUnit.MINUTES),
               task.trackingId,

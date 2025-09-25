@@ -41,7 +41,6 @@ const NetworkInfo: React.FC = () => {
   const amuletName = config.spliceInstanceNames.amuletName;
   const getAmuletRulesQuery = useGetAmuletRules();
   const openRoundsQuery = useOpenRounds();
-  const featureSupport = useFeatureSupport();
 
   let openRoundsDisplay: JSX.Element;
   switch (openRoundsQuery.status) {
@@ -94,10 +93,6 @@ const NetworkInfo: React.FC = () => {
     `Fees burn ${amuletName}. Fees encourage active use of ${amuletName} and maintain positive pressure on the value of ${amuletName} by constraining the total supply over time.` +
     `The Super Validators mint ${amuletName} via smart contracts triggered by a consensus vote of 2/3 of the Super Validators.` +
     `Super Validators and Validators burn ${amuletName} to pay fees. Minting and burning takes place in fixed time cycles called rounds.`;
-
-  if (featureSupport.isLoading) {
-    return <Loading />;
-  }
 
   switch (getAmuletRulesQuery.status) {
     case 'pending':
@@ -194,39 +189,56 @@ const NextConfigUpdate: React.FC = () => {
   );
 };
 
-const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConfig }) => {
+const FeesTable: React.FC<{
+  amuletConfig: AmuletConfig<'USD'>;
+}> = ({ amuletConfig }) => {
+  const featureSupport = useFeatureSupport();
   const config = useScanConfig();
   const amuletName = config.spliceInstanceNames.amuletName;
+
+  if (featureSupport.isLoading) {
+    return <Loading />;
+  }
+  if (featureSupport.isError) {
+    return <ErrorDisplay message="Failed to fetch feature support info" />;
+  }
+  const holdingFeesDescription = featureSupport.data!.noHoldingFeesOnTransfers
+    ? `A fixed fee for maintaining each active ${amuletName} record, computed per round, but only charged if it surpasses the ${amuletName} amount.`
+    : `A fixed fee for maintaining each active ${amuletName} record, charged per round.`;
+
   return (
     <TableContainer>
       <Table>
         <TableBody>
           <FeeTableRow
             name="Base Transfer Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.createFee.fee)} USD`}
+            value={BigNumber(amuletConfig.transferConfig.createFee.fee)}
+            unit="USD"
             description="A fixed fee for each transfer."
           />
           <TransferFees transferFees={amuletConfig.transferConfig.transferFee} />
           <FeeTableRow
             name="Round Tick Duration"
-            value={`${microsecondsToMinutes(amuletConfig.tickDuration.microseconds)} Minutes`}
+            value={microsecondsToMinutes(amuletConfig.tickDuration.microseconds)}
+            unit="Minutes"
             description="The interval at which new rounds are opened."
           />
           <FeeTableRow
             name="Synchronizer Fee"
-            value={`${BigNumber(
-              amuletConfig.decentralizedSynchronizer.fees.extraTrafficPrice
-            )} $/MB`}
+            value={BigNumber(amuletConfig.decentralizedSynchronizer.fees.extraTrafficPrice)}
+            unit={'$/MB'}
             description="Cost of processing 1 MB of transactions through the Global Synchronizer"
           />
           <FeeTableRow
             name="Holding Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} USD/Round`}
-            description={`A fixed fee for maintaining each active ${amuletName} record, charged per round.`}
+            value={BigNumber(amuletConfig.transferConfig.holdingFee.rate)}
+            unit="USD/Round"
+            description={holdingFeesDescription}
           />
           <FeeTableRow
             name="Lock Holder Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.lockHolderFee.fee)} USD`}
+            value={BigNumber(amuletConfig.transferConfig.lockHolderFee.fee)}
+            unit="USD"
             description={`A fixed fee for extra lock holders on ${amuletName} records.`}
           />
         </TableBody>
@@ -235,11 +247,15 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
   );
 };
 
-const FeeTableRow: React.FC<{ name: string; description: string; value: string }> = ({
-  name,
-  description,
-  value,
-}) => {
+const FeeTableRow: React.FC<{
+  name: string;
+  description: string;
+  value: BigNumber;
+  unit: string;
+}> = ({ name, description, value, unit }) => {
+  if (value.eq(0)) {
+    return null;
+  }
   return (
     <TableRow className="fee-table-row">
       <TableCell>
@@ -254,51 +270,58 @@ const FeeTableRow: React.FC<{ name: string; description: string; value: string }
           fontWeight="bold"
           id={name.toLocaleLowerCase().replaceAll(' ', '-')}
         >
-          {value}
+          {value.toString()} {unit}
         </Typography>
       </TableCell>
     </TableRow>
   );
 };
 
-const toPercentFmt = (rate: string): string => `${BigNumber(rate).multipliedBy(100)}%`;
+const toPercent = (rate: string): BigNumber => BigNumber(rate).multipliedBy(100);
 
 const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees }) => {
   const config = useScanConfig();
   const amuletName = config.spliceInstanceNames.amuletName;
-  const transferFeeSteps = transferFees.steps.reduce<
-    { fee: string; range: string; last: boolean }[]
-  >(
-    (acc, current, index, array) => {
-      const nextStep = array[index + 1];
-      if (nextStep !== undefined) {
-        return [
-          ...acc,
-          {
-            fee: toPercentFmt(current._2),
-            range: `${BigNumber(current._1)} - ${BigNumber(nextStep._1)} USD`,
-            last: false,
-          },
-        ];
-      } else {
-        return [
-          ...acc,
-          {
-            fee: toPercentFmt(current._2),
-            range: `> ${BigNumber(current._1)} USD`,
-            last: true,
-          },
-        ];
-      }
-    },
-    [
-      {
-        fee: toPercentFmt(transferFees.initialRate),
-        range: `< ${BigNumber(transferFees.steps[0]._1)} USD`,
-        last: false,
+  const transferFeeSteps = transferFees.steps
+    .reduce<{ fee: BigNumber; range: string; last: boolean }[]>(
+      (acc, current, index, array) => {
+        const nextStep = array[index + 1];
+        if (nextStep !== undefined) {
+          return [
+            ...acc,
+            {
+              fee: toPercent(current._2),
+              range: `${BigNumber(current._1)} - ${BigNumber(nextStep._1)} USD`,
+              last: false,
+            },
+          ];
+        } else {
+          return [
+            ...acc,
+            {
+              fee: toPercent(current._2),
+              range: `> ${BigNumber(current._1)} USD`,
+              last: true,
+            },
+          ];
+        }
       },
-    ]
-  );
+      // the default for reduce is always called, and this blows up when fetching steps[0]._1 if there are no steps
+      transferFees.steps.length > 0
+        ? [
+            {
+              fee: toPercent(transferFees.initialRate),
+              range: `< ${BigNumber(transferFees.steps[0]._1)} USD`,
+              last: false,
+            },
+          ]
+        : []
+    )
+    .filter(step => !step.fee.eq(0));
+
+  if (transferFeeSteps.length === 0) {
+    return null;
+  }
 
   return (
     <TableRow>
@@ -324,7 +347,7 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
   );
 };
 
-const TransferFeeRow: React.FC<{ range: string; fee: string; last?: boolean }> = ({
+const TransferFeeRow: React.FC<{ range: string; fee: BigNumber; last?: boolean }> = ({
   range,
   fee,
   last,
@@ -336,7 +359,7 @@ const TransferFeeRow: React.FC<{ range: string; fee: string; last?: boolean }> =
       </TableCell>
       <TableCell align="right" sx={{ borderBottom: 'none' }}>
         <Typography variant="h6" fontWeight="bold">
-          {fee}
+          {fee.toString()}%
         </Typography>
       </TableCell>
     </TableRow>

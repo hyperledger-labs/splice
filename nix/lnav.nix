@@ -3,16 +3,16 @@
 # so we use the binary distribution that ships with a compatible pcre version.
 stdenv.mkDerivation rec {
   name = "lnav";
-  version = "0.12.0";
+  version = "0.13.2";
 
   src =
     if stdenv.isDarwin then
       fetchzip {
         url = "https://github.com/tstack/lnav/releases/download/v${version}/lnav-${version}-x86_64-macos.zip";
-        sha256 = "sha256-3+mpfqSu1KigrBrnVZ1s9/9da4tce7xQUgWcmdH9//k=";
+        sha256 = "sha256-xUGgn8hIgRV2UY+tZZdpixj/8k5FygYfiWlGlfQ6iiY=";
       } else fetchzip {
         url = "https://github.com/tstack/lnav/releases/download/v${version}/lnav-${version}-linux-musl-x86_64.zip";
-        sha256 = "sha256-dr1nkOCOyzLq6eP/s2lK2UvpWNe7WIo6v4QF+riVtEo=";
+        sha256 = "sha256-OP9s1Rbc/vKcQ/Tagsb84y8vHt3R0b0/Y79bqcX9G3k=";
       };
 
   installPhase = ''

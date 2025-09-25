@@ -222,8 +222,10 @@ The registry will return the relevant factory in the corresponding endpoint:
 * `AllocationFactory </app_dev/token_standard/openapi/allocation_instruction.html#post--registry-allocation-instruction-v1-allocation-factory>`_
 
 The response's payload will include three relevant fields:
+
 * ``factoryId``: the contract id of the factory
 * ``disclosedContracts``: must be provided to the exercise of the factory's choice for it to work
+* ``choiceContextData``: to be passed as ``context`` in the ``choiceArgument``.
 
 With this data, you can execute a choice on the factory. For external parties
 you must call the `prepare <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1553>`_

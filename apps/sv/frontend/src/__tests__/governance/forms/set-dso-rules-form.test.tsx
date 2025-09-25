@@ -1,18 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
-import userEvent from '@testing-library/user-event';
-import { SvConfigProvider } from '../../../utils';
-import App from '../../../App';
-import { svPartyId } from '../../mocks/constants';
-import { Wrapper } from '../../helpers';
-import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
-import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { server, svUrl } from '../../setup/setup';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import dayjs from 'dayjs';
 import { rest } from 'msw';
+import { describe, expect, test } from 'vitest';
+import App from '../../../App';
+import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
+import { SvConfigProvider } from '../../../utils';
+import { Wrapper } from '../../helpers';
+import { svPartyId } from '../../mocks/constants';
+import { server, svUrl } from '../../setup/setup';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -58,10 +58,10 @@ describe('Set DSO Config Rules Form', () => {
     expect(urlInput).toBeDefined();
     expect(urlInput.getAttribute('value')).toBe('');
 
-    const configLabels = screen.getAllByTestId('config-label', { exact: false });
+    const configLabels = screen.getAllByTestId(/config-label-/);
     expect(configLabels.length).toBeGreaterThan(15);
 
-    const configFields = screen.getAllByTestId('config-field', { exact: false });
+    const configFields = screen.getAllByTestId(/config-field-/);
     expect(configFields.length).toBeGreaterThan(15);
 
     expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
@@ -184,7 +184,7 @@ describe('Set DSO Config Rules Form', () => {
     expect(c2Input).toBeDefined();
     await user.type(c2Input, '9999');
 
-    const changes = screen.getAllByTestId('config-current-value', { exact: false });
+    const changes = screen.getAllByTestId(/config-current-value-/);
     expect(changes.length).toBe(2);
   });
 

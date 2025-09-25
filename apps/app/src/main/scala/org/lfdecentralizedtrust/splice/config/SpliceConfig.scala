@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
+  MediatorVerdictIngestionConfig,
   ScanSynchronizerConfig,
   CacheConfig as SpliceCacheConfig,
 }
@@ -443,6 +444,9 @@ object SpliceConfig {
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
+    implicit val mediatorVerdictIngestionConfigReader
+        : ConfigReader[MediatorVerdictIngestionConfig] =
+      deriveReader[MediatorVerdictIngestionConfig]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
@@ -567,6 +571,10 @@ object SpliceConfig {
       deriveReader[BeneficiaryConfig]
     implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
       deriveReader[SvParticipantClientConfig]
+    implicit val amuletConversionRateFeedConfig: ConfigReader[AmuletConversionRateFeedConfig] =
+      deriveReader[AmuletConversionRateFeedConfig]
+    implicit val rangeConfig: ConfigReader[RangeConfig] =
+      deriveReader[RangeConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -856,6 +864,9 @@ object SpliceConfig {
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
       deriveWriter[ScanCacheConfig]
+    implicit val mediatorVerdictIngestionConfigWriter
+        : ConfigWriter[MediatorVerdictIngestionConfig] =
+      deriveWriter[MediatorVerdictIngestionConfig]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 
@@ -964,6 +975,10 @@ object SpliceConfig {
       deriveWriter[BeneficiaryConfig]
     implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =
       deriveWriter[SvParticipantClientConfig]
+    implicit val amuletConversionRateFeedConfig: ConfigWriter[AmuletConversionRateFeedConfig] =
+      deriveWriter[AmuletConversionRateFeedConfig]
+    implicit val rangeConfig: ConfigWriter[RangeConfig] =
+      deriveWriter[RangeConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

@@ -42,7 +42,6 @@ import {
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
-import _ from 'lodash';
 
 import { installPartyAllocator } from './partyAllocator';
 import { validatorConfig } from './validatorConfig';
@@ -57,9 +56,6 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
   : undefined;
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
-
-const VALIDATOR_WALLET_USER_ID =
-  config.optionalEnv('VALIDATOR_WALLET_USER_ID') || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
@@ -98,7 +94,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfig,
     topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
     otherDeps: [],
-    nodeIdentifier: 'validator-runbook',
   });
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
@@ -133,7 +128,6 @@ type ValidatorDeploymentConfig = {
   otherDeps: CnInput<pulumi.Resource>[];
   loopback: pulumi.Resource[] | null;
   backupConfigSecret?: pulumi.Resource;
-  nodeIdentifier: string;
 };
 
 async function installValidator(
@@ -151,14 +145,9 @@ async function installValidator(
     topupConfig,
   } = validatorDeploymentConfig;
 
-  // TODO(DACH-NY/canton-network-node#14679): Remove the override once ciperiodic has been bumped to 0.2.0
-  const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
-  const postgresValues: ChartValues = _.merge(
-    loadYamlFromFile(
-      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
-    ),
-    { db: { volumeSize: postgresPvcSizeOverride } }
+  const postgresValues: ChartValues = loadYamlFromFile(
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
   );
   const postgres = new SplicePostgres(
     xns,
@@ -175,7 +164,6 @@ async function installValidator(
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
-    validatorDeploymentConfig.nodeIdentifier,
     activeVersion,
     postgres,
     {
@@ -207,7 +195,7 @@ async function installValidator(
   const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-      OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
+      OPERATOR_WALLET_USER_ID: validatorConfig.operatorWalletUserId,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
       YOUR_CONTACT_POINT: daContactPoint,
@@ -217,7 +205,7 @@ async function installValidator(
       {
         MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
-        YOUR_VALIDATOR_NODE_NAME: validatorDeploymentConfig.nodeIdentifier,
+        YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier || validatorConfig.partyHint,
       }
     ),
   };

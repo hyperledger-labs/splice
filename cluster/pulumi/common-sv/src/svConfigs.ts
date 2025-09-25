@@ -70,7 +70,11 @@ const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): Static
         publicKey: svCometBftSecrets.validatorPublicKey,
       },
     },
-    ...(config.svApp?.sweep ? { sweep: sweepConfigFromEnv(config.svApp.sweep.fromEnv) } : {}),
+    svIdKeySecretName: config.svApp?.svIdKeyGcpSecret,
+    cometBftGovernanceKeySecretName: config.svApp?.cometBftGovernanceKeyGcpSecret,
+    ...(config.validatorApp?.sweep
+      ? { sweep: sweepConfigFromEnv(config.validatorApp.sweep.fromEnv) }
+      : {}),
     ...(config.scanApp?.bigQuery
       ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } }
       : {}),
