@@ -1,4 +1,11 @@
 services:
+
+  chown-participant-bootstrapping-dump:
+    image: busybox:1.37.0
+    volumes:
+      - ${VALIDATOR_PARTICIPANT_IDENTITIES_DUMP}:/participant-bootstrapping-dump/identities.json
+    command: ["sh", "-c", "chown 1001:1001 /participant-bootstrapping-dump/identities.json"]
+
   validator:
     environment:
         - |
@@ -13,3 +20,7 @@ services:
             canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = "${SCAN_ADDRESS}"
     volumes:
       - ${VALIDATOR_PARTICIPANT_IDENTITIES_DUMP}:/participant-bootstrapping-dump/identities.json
+    depends_on:
+      chown-participant-bootstrapping-dump:
+        condition: service_completed_successfully
+
