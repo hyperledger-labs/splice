@@ -35,7 +35,7 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 }
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
-import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
+import org.lfdecentralizedtrust.splice.sv.util.Secrets
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 
 import java.util.Optional
@@ -156,17 +156,19 @@ class HttpSvAdminHandler(
         validatorOnboardings <- svStore.listValidatorOnboardings()
       } yield {
         definitions.ListOngoingValidatorOnboardingsResponse(
-          validatorOnboardings
-            .map(onboarding =>
-              definitions.ValidatorOnboarding(
-                ValidatorOnboardingSecret(
-                  svStore.key.svParty,
-                  onboarding.payload.candidateSecret,
-                ).toApiResponse,
-                onboarding.toHttp,
+          validatorOnboardings.map { onboarding =>
+            val secret = Secrets
+              .decodeValidatorOnboardingSecret(
+                onboarding.payload.candidateSecret,
+                dsoStore.key.svParty,
               )
+
+            definitions.ValidatorOnboarding(
+              secret.toApiResponse,
+              onboarding.toHttp,
+              secret.partyHint,
             )
-            .toVector
+          }.toVector
         )
       }
     }
@@ -189,7 +191,7 @@ class HttpSvAdminHandler(
   )(tuser: TracedUser): Future[v0.SvAdminResource.PrepareValidatorOnboardingResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.prepareValidatorOnboarding") { _ => _ =>
-      val secret = generateRandomOnboardingSecret(svStore.key.svParty)
+      val secret = generateRandomOnboardingSecret(svStore.key.svParty, body.partyHint)
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
       dsoStore
         .getDsoRules()

@@ -12,8 +12,12 @@ import { SvConfigProvider } from '../utils';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  dateTimeFormatISO,
+  getUTCWithOffset,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
+import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 
 const AppWithConfig = () => {
   return (
@@ -44,6 +48,64 @@ describe('SV user can', () => {
     render(<AppWithConfig />);
 
     await screen.findByText('You are on ScratchNet');
+  });
+
+  test('browse to the validator onboarding tab', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    expect(await screen.findByText('Validator Onboarding Secrets')).toBeDefined();
+  });
+
+  test('create a new validator secret with party hint', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    const partyHintInput = screen.getByTestId('create-party-hint');
+    await user.type(partyHintInput, 'wrong-input');
+
+    expect(screen.getByTestId('create-validator-onboarding-secret').hasAttribute('disabled')).toBe(
+      true
+    );
+
+    await user.clear(partyHintInput);
+    await user.type(partyHintInput, 'correct-input-123');
+
+    expect(screen.getByTestId('create-validator-onboarding-secret').hasAttribute('disabled')).toBe(
+      false
+    );
+  });
+
+  test('validator onboarding info has correct format', () => {
+    const validatorOnboardingInfo = onboardingInfo(
+      {
+        partyHint: 'splice-client-2',
+        secret: 'exampleSecret',
+        expiresAt: '2020-01-01 13:57',
+      },
+      'testnet'
+    );
+
+    expect(validatorOnboardingInfo).toBe(
+      `
+splice-client-2
+Network: testnet
+SPONSOR_SV_URL
+http://localhost:3000
+
+Secret
+exampleSecret
+
+Expiration
+2020-01-01 13:57 (${getUTCWithOffset()})
+    `.trim()
+    );
   });
 
   test('browse to the governance tab', async () => {
