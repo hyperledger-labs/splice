@@ -13,7 +13,7 @@ Upcoming
 
   - Docker images
 
-    - All UI images now use a non-root user.
+    - All app & UI images now use a non-root user.
 
 
 0.4.18
