@@ -120,6 +120,15 @@ class ParticipantAdminConnection(
       )(_.synchronizerId)
     )
 
+  def findSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+      traceContext: TraceContext
+  ): Future[Option[SynchronizerId]] =
+    listConnectedDomains().map(
+      _.find(
+        _.synchronizerAlias == synchronizerAlias
+      ).map(_.synchronizerId)
+    )
+
   /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
     *  but in some cases we want to check the domain id
     * without risking a full domain connection.

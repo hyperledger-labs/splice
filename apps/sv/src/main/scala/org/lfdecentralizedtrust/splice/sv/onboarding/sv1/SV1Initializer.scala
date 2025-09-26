@@ -144,6 +144,14 @@ class SV1Initializer(
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
       )
+      (namespace, synchronizerId) <-
+        if (config.skipSynchronizerInitialization) {
+          participantAdminConnection.getSynchronizerId(config.domains.global.alias).map { s =>
+            (s.namespace, s)
+          }
+        } else {
+          bootstrapDomain(localSynchronizerNode)
+        }
       _ <-
         if (!config.skipSynchronizerInitialization) {
           SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
@@ -152,20 +160,13 @@ class SV1Initializer(
             clock,
             loggerFactory,
             retryProvider,
+            synchronizerId,
           )
         } else {
           logger.info(
             "Skipping synchronizer node initialization because skipSynchronizerInitialization is enabled"
           )
           Future.unit
-        }
-      (namespace, synchronizerId) <-
-        if (config.skipSynchronizerInitialization) {
-          participantAdminConnection.getSynchronizerId(config.domains.global.alias).map { s =>
-            (s.namespace, s)
-          }
-        } else {
-          bootstrapDomain(localSynchronizerNode)
         }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       internalSequencerApi = localSynchronizerNode.sequencerInternalConfig

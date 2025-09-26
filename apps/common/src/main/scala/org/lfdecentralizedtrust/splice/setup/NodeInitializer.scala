@@ -3,14 +3,23 @@
 
 package org.lfdecentralizedtrust.splice.setup
 
-import cats.implicits.{showInterpolator}
+import cats.implicits.showInterpolator
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
-import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransaction,
+  TimeQuery,
+  TopologyStoreId,
+}
+import com.digitalasset.canton.topology.transaction.{
+  OwnerToKeyMapping,
+  TopologyChangeOp,
+  TopologyMapping,
+}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
@@ -103,6 +112,7 @@ class NodeInitializer(
   def initializeWithNewIdentityIfNeeded(
       idenfitierName: String,
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
+      synchronizerId: Option[SynchronizerId] = None,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Making sure canton node has an identity")
     for {
@@ -124,8 +134,17 @@ class NodeInitializer(
             logger.info(
               s"Node has identity $id, matching expected identifier $idenfitierName."
             )
-            // fixes previously initialized nodes with messed up keys
-            rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
+            for {
+              // rotate existing keys that are not signed
+              _ <- synchronizerId match {
+                case Some(syncId) =>
+                  rotateOwnerToKeyMappingNotSignedByKeys(id, nodeIdentity, syncId)
+                case None =>
+                  Future.unit
+              }
+              // fixes previously initialized nodes with messed up keys
+              _ <- rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
+            } yield ()
           } else {
             logger.error(
               s"Node has identity $id, but identifier $idenfitierName was expected."
@@ -313,4 +332,80 @@ class NodeInitializer(
       _ <- connection.importTopologySnapshot(authorizedStoreSnapshot, AuthorizedStore)
       _ = logger.info(s"AuthorizedStore snapshot is imported")
     } yield ()
+
+  private def rotateOwnerToKeyMappingNotSignedByKeys(
+      id: UniqueIdentifier,
+      nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
+      synchronizerId: SynchronizerId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+    for {
+      fullTxHistory <- connection.listAllTransactions(
+        store = TopologyStoreId.SynchronizerStore(synchronizerId),
+        timeQuery = TimeQuery.Range(None, None),
+        includeMappings = Set(OwnerToKeyMapping.code),
+      )
+      ownerToKeyMappingTxHistory = fullTxHistory.filter(_.transaction.mapping match {
+        case mapping: OwnerToKeyMapping if mapping.member == nodeIdentity(id) => true
+        case _ => false
+      })
+      _ <-
+        if (ownerToKeyMappingTxHistory.isEmpty) {
+          Future.unit
+        } else {
+          performKeyRotation(ownerToKeyMappingTxHistory, nodeIdentity(id))
+        }
+    } yield ()
+
+  private def performKeyRotation(
+      ownerToKeyMappingTxHistory: Seq[StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]],
+      member: Member,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    val allOtkSignatures = ownerToKeyMappingTxHistory
+      .map(_.transaction)
+      .flatMap(_.signatures)
+      .map(_.signedBy)
+      .distinct
+    val latestKeys = ownerToKeyMappingTxHistory
+      .map(_.transaction)
+      .sortBy(_.transaction.serial)
+      .lastOption
+      .getOrElse(throw new IllegalStateException("ownerToKeyMappingHistory is empty."))
+      .mapping match {
+      case mapping: OwnerToKeyMapping =>
+        mapping.keys.forgetNE
+      case _ => throw new IllegalStateException("Latest transaction is not an OwnerToKeyMapping.")
+    }
+    val (_, toRotate) = latestKeys.map(_.id).partition(allOtkSignatures.contains)
+    for {
+      _ <-
+        if (toRotate.nonEmpty) {
+          logger.info(s"keyToRotate: ${toRotate}")
+          val rotatedKeys = latestKeys.map {
+            case key: SigningPublicKey if toRotate.contains(key.id) =>
+              connection.generateKeyPair(
+                key.keySpec.name,
+                key.usage,
+              )
+            case key => Future.successful(key)
+          }
+          logger.info(s"rotated keys ${rotatedKeys} ${member}")
+          for {
+            newKeys <- Future.sequence(rotatedKeys)
+            _ <- connection.ensureOwnerToKeyMapping(
+              member = member,
+              keys = NonEmpty.mk(
+                Seq,
+                newKeys.headOption.getOrElse(throw new IllegalStateException("newKeys is empty.")),
+                newKeys.drop(1)*
+              ),
+              retryFor = RetryFor.Automation,
+            )
+          } yield logger.info(
+            s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
+          )
+        } else {
+          Future.unit
+        }
+    } yield ()
+  }
 }
