@@ -12,11 +12,12 @@ import { useFieldContext } from '../../hooks/formContext';
 export interface TextFieldProps {
   id: string;
   title: string;
+  subtitle?: string;
   muiTextFieldProps?: MuiTextFieldProps;
 }
 
 export const TextField: React.FC<TextFieldProps> = props => {
-  const { title, id, muiTextFieldProps } = props;
+  const { title, subtitle, id, muiTextFieldProps } = props;
   const field = useFieldContext<string>();
   return (
     <Box>
@@ -40,6 +41,11 @@ export const TextField: React.FC<TextFieldProps> = props => {
         inputProps={{ 'data-testid': id }}
         {...muiTextFieldProps}
       />
+      {subtitle && (
+        <Typography variant="body2" color="text.secondary" data-testid={`${id}-subtitle`} mt={1}>
+          {subtitle}
+        </Typography>
+      )}
     </Box>
   );
 };
