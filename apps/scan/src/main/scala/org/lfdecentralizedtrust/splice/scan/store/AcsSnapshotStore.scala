@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries, AdvisoryLockIds}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
@@ -158,7 +158,7 @@ class AcsSnapshotStore(
         join creates_to_insert on inserted_rows.create_id = creates_to_insert.row_id
         having min(inserted_rows.row_id) is not null;
              """).toActionBuilder.asUpdate
-      storage.update(withExclusiveSnapshotDataLock(statement), "insertNewSnapshot")
+      storage.queryAndUpdate(withExclusiveSnapshotDataLock(statement), "insertNewSnapshot")
     }.andThen { _ =>
       AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
     }
@@ -169,8 +169,12 @@ class AcsSnapshotStore(
     *  Note: The acs_snapshot_data table must not have interleaved rows from two different acs snapshots.
     *  In rare cases, it can happen that the application crashes while writing a snapshot, then
     *  restarts and starts writing a different snapshot while the previous statement is still running.
+    *
     *  The exclusive lock prevents this.
-    *  Once obtained, a lock is held for the remainder of the current transaction.
+    *  We use a transaction-scoped advisory lock, which is released when the transaction ends.
+    *  Regular locks (e.g. obtained via `LOCK TABLE ... IN EXCLUSIVE MODE`) would conflict with harmless
+    *  background operations like autovacuum or create index concurrently.
+    *
     *  In case the application crashes while holding the lock, the server should close the connection
     *  and abort the transaction as soon as it detects a disconnect.
     *  See [[com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig]] for our connection keepalive settings.
@@ -178,10 +182,16 @@ class AcsSnapshotStore(
     */
   private def withExclusiveSnapshotDataLock[T, E <: Effect](
       action: DBIOAction[T, NoStream, E]
-  ): DBIOAction[T, NoStream, E & Effect.Write & Effect.Transactional] =
+  ): DBIOAction[T, NoStream, Effect.Read & Effect.Transactional & E] =
     (for {
-      _ <- sqlu"LOCK TABLE acs_snapshot_data IN EXCLUSIVE MODE"
-      result <- action
+      lockResult <- sql"SELECT pg_try_advisory_xact_lock(${AdvisoryLockIds.acsSnapshotDataInsert})"
+        .as[Boolean]
+        .head
+      result <- lockResult match {
+        case true => action
+        // Lock conflicts should almost never happen. If they do, we fail immediately and rely on the trigger infrastructure to retry and log errors.
+        case false => DBIOAction.failed(new Exception("Failed to acquire exclusive lock"))
+      }
     } yield result).transactionally
 
   def deleteSnapshot(
