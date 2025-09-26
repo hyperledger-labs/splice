@@ -413,7 +413,7 @@ spec:
               done
         {{- if .Values.participantIdentitiesDumpImport }}
         - name: chown-participant-bootstrapping-dump
-          image: busybox: 1.37.0
+          image: busybox:1.37.0
           command: ["sh", "-c", "chown -R 1001:1001 /participant-bootstrapping-dump"]
           volumeMounts:
             - name: participant-bootstrapping-dump-volume
