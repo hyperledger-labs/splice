@@ -38,8 +38,6 @@ test = do
 
   delegate <- allocatePartyExact "delegate"
 
-  AmuletRegistry.createTransferPreapproval registry owner delegate  (now `addRelTime` days 90)
-
   delegationProposal <- submit owner $ createCmd MergeDelegationProposal with
     owner
     delegate

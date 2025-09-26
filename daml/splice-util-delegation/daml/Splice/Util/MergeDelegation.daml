@@ -39,7 +39,7 @@ template MergeDelegation
       do let transfer = choiceArg.transfer
          require ("Sender in choice argument " <> show transfer.sender <> " matches owner " <> show owner) (transfer.sender == owner)
          require ("Receiver in choice argument " <> show transfer.receiver <> " matches owner " <> show owner) (transfer.receiver == owner)
-         -- Note: This assumes you have preapprovals, if not you also need to accept the transfer instruction here.
+         -- Note: This does not depend on preapprovals at least for Amulet as self-transfers are treated specially.
          MergeDelegation_MergeResult <$> exercise cid choiceArg
 
     choice MergeDelegation_Reject : ()
