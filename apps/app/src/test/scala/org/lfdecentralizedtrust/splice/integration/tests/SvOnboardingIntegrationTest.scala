@@ -165,7 +165,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     }
     clue("try to onboarding with a secret with wrong party hint") {
       val partyId = PartyId
-        .fromProtoPrimitive("invalid-name-1", "partyId")
+        .fromProtoPrimitive("invalid-name-1::dummy", "partyId")
         .getOrElse(sys.error("Could not parse PartyId"))
 
       assertThrowsAndLogsCommandFailures(
