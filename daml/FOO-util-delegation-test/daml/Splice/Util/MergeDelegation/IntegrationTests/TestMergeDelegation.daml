@@ -3,8 +3,6 @@
 
 module Splice.Util.MergeDelegation.IntegrationTests.TestMergeDelegation where
 
-import qualified Splice.Amulet
-
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 import Splice.Util.MergeDelegation
@@ -12,6 +10,7 @@ import Splice.Util.MergeDelegation
 import Daml.Script
 
 import DA.Assert ((===))
+import qualified DA.Map as Map
 import qualified DA.TextMap as TextMap
 import DA.Time
 
@@ -60,11 +59,7 @@ test = do
           values = TextMap.fromList [("splice.lfdecentralizedtrust.org/reason", "merge")]
     extraArgs = emptyExtraArgs
 
-  -- When going over the ledger API, it is likely easier to use "readAs = [owner]" instead of passing in holdings through disclosure.
-  -- Just not supported in daml script tests
-  holdingDisclosures <- mapA (queryDisclosure' @Splice.Amulet.Amulet owner . coerceContractId) holdingCids
-
-  submitWithDisclosures' delegate (enrichedChoice.disclosures <> mconcat holdingDisclosures) $ exerciseCmd delegation MergeDelegation_Merge with
+  submit (actAs delegate <> readAs owner<> discloseMany (Map.values enrichedChoice.disclosures.disclosures)) $ exerciseCmd delegation MergeDelegation_Merge with
     cid = enrichedChoice.factoryCid
     choiceArg = enrichedChoice.arg
 
