@@ -29,7 +29,7 @@ export SPLICE_APP_UI_AMULET_NAME=""
 export SPLICE_APP_UI_AMULET_NAME_ACRONYM=""
 export SPLICE_APP_UI_NAME_SERVICE_NAME=""
 export SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM=""
-export VALIDATOR_PARTICIPANT_IDENTITIES_DUMP=""
+export VALIDATOR_PARTICIPANT_IDENTITIES_DUMP="v"
 export VALIDATOR_NEW_PARTICIPANT_IDENTIFIER=""
 
 # We include also compose-restore-from-id.yaml, so that if that was included in the start and created the init container,
