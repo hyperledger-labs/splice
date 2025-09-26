@@ -1,3 +1,4 @@
+-- | EXAMPLE for a merge delegation. Please copy into your own package.
 module Splice.Util.MergeDelegation where
 
 import Splice.Api.Token.TransferInstructionV1
