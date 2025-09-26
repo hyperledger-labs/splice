@@ -660,25 +660,36 @@ class DbScanStore(
       tc: TraceContext
   ): Future[BigDecimal] = waitUntilAcsIngested {
     for {
-      result <- ensureAggregated(asOfEndOfRound) { _ =>
-        // the wallet_balances is sparse and might not have an entry for the requested round
-        // which is why the first entry found <= asOfEndOfRound is used
-        storage.query(
-          sql"""
-             select   greatest(
-                        0,
-                        cumulative_change_to_initial_amount_as_of_round_zero -
-                        cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
-                      ) as amulet_balance
-             from     wallet_balances
-             where    store_id = $roundTotalsStoreId
-             and      party = $partyId
-             and      closed_round <= $asOfEndOfRound
-             order by closed_round desc
-             limit 1;
+      result <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        // if the asOfEndOrRound is the latest aggregated round, we can use the active_parties for a faster query.
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+             select  greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
+             from    round_party_totals rpt
+             join    active_parties ap
+             on      rpt.store_id = ap.store_id
+             and     rpt.party = ap.party
+             and     rpt.closed_round = ap.closed_round
+             where   rpt.store_id = $roundTotalsStoreId
+             and     rpt.party = $partyId;
            """.as[Option[BigDecimal]].headOption,
-          "getWalletBalance",
-        )
+            "getWalletBalanceForLastAggregatedRound",
+          )
+        } else {
+          storage.query(
+            sql"""
+            select   greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
+            from     round_party_totals
+            where    store_id = $roundTotalsStoreId
+            and      closed_round <= $asOfEndOfRound
+            and      party = $partyId
+            order by closed_round desc
+            limit    1;
+            """.as[Option[BigDecimal]].headOption,
+            "getWalletBalanceForEarlierRound",
+          )
+        }
       }
     } yield result.flatten.getOrElse(0)
   }
@@ -690,13 +701,21 @@ class DbScanStore(
       rows <- ensureAggregated(asOfEndOfRound) { _ =>
         storage.query(
           sql"""
-              select   party,
+              with ranked_providers_by_app_rewards as (
+                select   party as provider,
+                         max(cumulative_app_rewards) as cumulative_app_rewards,
+                         rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $roundTotalsStoreId
+                and      closed_round <= $asOfEndOfRound
+                and      cumulative_app_rewards > 0
+                group by party
+              )
+              select   provider,
                        cumulative_app_rewards
               from     ranked_providers_by_app_rewards
-              where    store_id = $roundTotalsStoreId
-              and      closed_round = $asOfEndOfRound
-              and      rank_nr <= $limit
-              order by rank_nr, party;
+              where    rank_nr <= $limit
+              order by rank_nr;
             """.as[(PartyId, BigDecimal)],
           "getTopProvidersByAppRewards",
         )
