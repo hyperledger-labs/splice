@@ -109,12 +109,11 @@ class SvFrontendIntegrationTest
           },
         )
 
-        inside(find(id("create-party-hint"))) { case Some(element) =>
-          element.underlying.sendKeys("splice-client-2")
-        }
-
         val (_, newSecret) = actAndCheck(
-          "click on the button to create an onboarding secret", {
+          "fill party hint and click on the button to create an onboarding secret", {
+            inside(find(id("create-party-hint"))) { case Some(element) =>
+              element.underlying.sendKeys("splice-client-2")
+            }
             click on "create-validator-onboarding-secret"
           },
         )(
@@ -129,7 +128,7 @@ class SvFrontendIntegrationTest
         )
 
         val licenseRows = getLicensesTableRows
-        val newValidatorParty = allocateRandomSvParty("validatorX")
+        val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
 
         actAndCheck(
           "onboard new validator using the secret",
