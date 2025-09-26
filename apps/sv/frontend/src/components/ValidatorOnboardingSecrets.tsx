@@ -5,12 +5,21 @@ import {
   DisableConditionally,
   Loading,
   SvClientProvider,
-  CopyableTypography,
 } from '@lfdecentralizedtrust/splice-common-frontend';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useMutation } from '@tanstack/react-query';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 
-import { Button, Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';
+import {
+  Button,
+  IconButton,
+  Stack,
+  Table,
+  TableContainer,
+  TableHead,
+  TextField,
+  Typography,
+} from '@mui/material';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
@@ -18,15 +27,25 @@ import TableRow from '@mui/material/TableRow';
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useValidatorOnboardings } from '../hooks/useValidatorOnboardings';
 import { useSvConfig } from '../utils';
+import { useNetworkInstanceName } from '../hooks';
+import dayjs from 'dayjs';
+import {
+  dateTimeFormatISO,
+  getUTCWithOffset,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
+
+const VALID_PARTY_ID_REGEX = /^[^-]+-[^-]+-\d+$/;
 
 const ValidatorOnboardingSecrets: React.FC = () => {
   const ONBOARDING_SECRET_EXPIRY_IN_SECOND = 172800; // We allow validator to be onboarded in 48 hours
   const { prepareValidatorOnboarding } = useSvAdminClient();
   const validatorOnboardingsQuery = useValidatorOnboardings();
 
+  const [partyHint, setPartyHint] = useState('');
+
   const prepareOnboardingMutation = useMutation({
-    mutationFn: () => {
-      return prepareValidatorOnboarding(ONBOARDING_SECRET_EXPIRY_IN_SECOND);
+    mutationFn: (partyHint: string) => {
+      return prepareValidatorOnboarding(ONBOARDING_SECRET_EXPIRY_IN_SECOND, partyHint);
     },
   });
 
@@ -38,7 +57,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
     return <p>Error, something went wrong while fetching onboarding secrets.</p>;
   }
 
-  const validatorOnboardings = validatorOnboardingsQuery.data.sort((a, b) => {
+  const validatorOnboardings = validatorOnboardingsQuery.data.toSorted((a, b) => {
     return (
       new Date(b.contract.payload.expiresAt).valueOf() -
       new Date(a.contract.payload.expiresAt).valueOf()
@@ -57,38 +76,70 @@ const ValidatorOnboardingSecrets: React.FC = () => {
         </Typography>
       )}
 
+      <Stack direction="column" mb={4} spacing={1}>
+        <Typography variant="h6">Party Hint</Typography>
+        <TextField
+          error={partyHint === '' || !VALID_PARTY_ID_REGEX.test(partyHint)}
+          autoComplete="off"
+          id="create-party-hint"
+          inputProps={{ 'data-testid': 'create-party-hint' }}
+          onChange={e => setPartyHint(e.target.value)}
+          value={partyHint}
+        />
+      </Stack>
+
       <DisableConditionally
-        conditions={[{ disabled: prepareOnboardingMutation.isPending, reason: 'Loading...' }]}
+        conditions={[
+          { disabled: prepareOnboardingMutation.isPending, reason: 'Loading...' },
+          { disabled: partyHint === '', reason: 'No Party Hint' },
+          {
+            disabled: !VALID_PARTY_ID_REGEX.test(partyHint),
+            reason: 'Party Hint is invalid',
+            severity: 'warning',
+          },
+        ]}
       >
         <Button
           id="create-validator-onboarding-secret"
+          data-testid="create-validator-onboarding-secret"
           variant="pill"
           fullWidth
           disabled={prepareOnboardingMutation.isPending}
           size="large"
-          onClick={() => prepareOnboardingMutation.mutate()}
+          onClick={() => {
+            prepareOnboardingMutation.mutate(partyHint);
+            setPartyHint('');
+          }}
         >
           Create a validator onboarding secret
         </Button>
       </DisableConditionally>
       <TableContainer>
-        <Table style={{ tableLayout: 'fixed' }} className="onboarding-secret-table">
-          <TableHead>
-            <TableRow>
-              <TableCell>Expires At</TableCell>
+        <Table
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'max-content minmax(0, 1fr) max-content max-content',
+            alignContent: 'center',
+          }}
+          className="onboarding-secret-table"
+        >
+          <TableHead sx={{ display: 'contents' }}>
+            <TableRow sx={{ display: 'contents' }}>
+              <TableCell>Party Hint</TableCell>
               <TableCell>Onboarding Secret</TableCell>
+              <TableCell>Expires At</TableCell>
+              <TableCell></TableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-            {validatorOnboardings.map(onboarding => {
-              return (
-                <OnboardingRow
-                  key={onboarding.encodedSecret}
-                  expiresAt={onboarding.contract.payload.expiresAt}
-                  secret={onboarding.encodedSecret}
-                />
-              );
-            })}
+          <TableBody sx={{ display: 'contents' }}>
+            {validatorOnboardings.map(onboarding => (
+              <OnboardingRow
+                key={onboarding.encodedSecret}
+                partyHint={onboarding.partyHint}
+                secret={onboarding.encodedSecret}
+                expiresAt={onboarding.contract.payload.expiresAt}
+              />
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
@@ -97,18 +148,70 @@ const ValidatorOnboardingSecrets: React.FC = () => {
 };
 
 interface OnboardingRowProps {
-  expiresAt: string;
+  partyHint?: string;
   secret: string;
+  expiresAt: string;
 }
 
-const OnboardingRow: React.FC<OnboardingRowProps> = ({ expiresAt, secret }) => {
+export const onboardingInfo = (
+  { partyHint, secret, expiresAt }: OnboardingRowProps,
+  instanceName?: string
+): string => {
+  let info = '';
+
+  if (partyHint) {
+    info += `${partyHint}\n`;
+  }
+
+  info += `Network: ${instanceName ?? 'localnet'}\n`;
+
+  info += 'SPONSOR_SV_URL\n';
+  info += window.location.origin;
+  info += '\n\n';
+
+  info += 'Secret\n';
+  info += secret;
+  info += '\n\n';
+
+  info += 'Expiration\n';
+  info += `${dayjs(expiresAt).format(dateTimeFormatISO)} (${getUTCWithOffset()})`;
+
+  return info;
+};
+
+const OnboardingRow: React.FC<OnboardingRowProps> = props => {
+  const networkInstanceName = useNetworkInstanceName();
+
+  const copyOnboardingInfo = useCallback(() => {
+    navigator.clipboard.writeText(onboardingInfo(props, networkInstanceName));
+  }, [props, networkInstanceName]);
+
   return (
-    <TableRow className="onboarding-secret-table-row">
-      <TableCell>
-        <DateDisplay datetime={expiresAt} />
+    <TableRow sx={{ display: 'contents' }} className="onboarding-secret-table-row">
+      <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
+        <Typography noWrap>{props.partyHint ?? '---'}</Typography>
+      </TableCell>
+      <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
+        <Typography
+          noWrap
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: '100%',
+          }}
+          className="onboarding-secret-table-secret"
+        >
+          {props.secret}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
+        <DateDisplay datetime={props.expiresAt} />
       </TableCell>
       <TableCell>
-        <CopyableTypography text={secret} className="onboarding-secret-table-secret" />
+        <IconButton onClick={copyOnboardingInfo}>
+          <ContentCopyIcon fontSize={'small'} />
+        </IconButton>
       </TableCell>
     </TableRow>
   );
