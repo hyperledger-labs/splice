@@ -330,7 +330,7 @@ spec:
             claimName: {{ .Values.pvc.volumeName }}
       {{- end }}
       {{- end }}
-      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
+      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) (.Values.participantIdentitiesDumpImport) ($requiresMigrationPvc) }}
       initContainers:
         {{- if .Values.persistence.enablePgInitContainer }}
         - name: {{ .Release.Name }}-init
