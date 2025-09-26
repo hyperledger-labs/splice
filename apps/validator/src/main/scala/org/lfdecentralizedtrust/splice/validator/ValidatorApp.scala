@@ -153,7 +153,7 @@ class ValidatorApp(
     (for {
       // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
       _ <- ensureVersionMatch(config.scanClient)
-      synchronizerId <- participantAdminConnection.getSynchronizerId(
+      synchronizerId <- participantAdminConnection.findSynchronizerId(
         config.domains.global.alias
       )
       _ <- appInitStep("Ensure participant is initialized with expected id") {

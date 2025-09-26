@@ -24,7 +24,7 @@ object ParticipantInitializer {
       dumpConfig: Option[ParticipantBootstrapDumpConfig],
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
-      synchronizerId: SynchronizerId,
+      synchronizerId: Option[SynchronizerId],
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -72,7 +72,7 @@ class ParticipantInitializer(
   private val nodeInitializer =
     new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
 
-  def ensureInitializedWithExpectedId(synchronizerId: SynchronizerId): Future[Unit] =
+  def ensureInitializedWithExpectedId(synchronizerId: Option[SynchronizerId]): Future[Unit] =
     dumpConfig match {
       case Some(c: ParticipantBootstrapDumpConfig.File) =>
         logger.info(s"Loading participant identities dump from file with config $c")
@@ -89,7 +89,7 @@ class ParticipantInitializer(
           _ <- nodeInitializer.initializeWithNewIdentityIfNeeded(
             identifierName,
             ParticipantId.apply,
-            Some(synchronizerId),
+            synchronizerId,
           )
           _ <- nodeInitializer.waitForNodeInitialized()
         } yield {

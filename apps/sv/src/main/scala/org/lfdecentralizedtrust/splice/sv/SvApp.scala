@@ -138,7 +138,7 @@ class SvApp(
       retryProvider,
     )
     (for {
-      synchronizerId <- participantAdminConnection.getSynchronizerId(config.domains.global.alias)
+      synchronizerId <- participantAdminConnection.findSynchronizerId(config.domains.global.alias)
       _ <-
         appInitStep("Ensure participant is initialized with expected id") {
           config.onboarding match {

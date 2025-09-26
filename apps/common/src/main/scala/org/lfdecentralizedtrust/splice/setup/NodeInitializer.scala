@@ -8,16 +8,18 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
-import com.digitalasset.canton.topology.{
-  Member,
-  Namespace,
-  NodeIdentity,
-  SynchronizerId,
-  UniqueIdentifier,
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransaction,
+  TimeQuery,
+  TopologyStoreId,
 }
+import com.digitalasset.canton.topology.transaction.{
+  OwnerToKeyMapping,
+  TopologyChangeOp,
+  TopologyMapping,
+}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
@@ -346,23 +348,35 @@ class NodeInitializer(
         case mapping: OwnerToKeyMapping if mapping.member == nodeIdentity(id) => true
         case _ => false
       })
-      _ = logger.info(s"otk ${ownerToKeyMappingTxHistory.map(_.transaction.mapping)}")
-      allOtkSignatures = ownerToKeyMappingTxHistory
-        .map(_.transaction)
-        .flatMap(_.signatures)
-        .map(_.signedBy)
-        .distinct
-      latestKeys = ownerToKeyMappingTxHistory
-        .map(_.transaction)
-        .sortBy(_.transaction.serial)
-        .lastOption
-        .getOrElse(throw new IllegalStateException("ownerToKeyMappingHistory is empty."))
-        .mapping match {
-        case mapping: OwnerToKeyMapping =>
-          mapping.keys.forgetNE
-        case _ => throw new IllegalStateException("Latest transaction is not an OwnerToKeyMapping.")
-      }
-      (_, toRotate) = latestKeys.map(_.id).partition(allOtkSignatures.contains)
+      _ <-
+        if (ownerToKeyMappingTxHistory.isEmpty) {
+          Future.unit
+        } else {
+          performKeyRotation(ownerToKeyMappingTxHistory, nodeIdentity(id))
+        }
+    } yield ()
+
+  private def performKeyRotation(
+      ownerToKeyMappingTxHistory: Seq[StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]],
+      member: Member,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    val allOtkSignatures = ownerToKeyMappingTxHistory
+      .map(_.transaction)
+      .flatMap(_.signatures)
+      .map(_.signedBy)
+      .distinct
+    val latestKeys = ownerToKeyMappingTxHistory
+      .map(_.transaction)
+      .sortBy(_.transaction.serial)
+      .lastOption
+      .getOrElse(throw new IllegalStateException("ownerToKeyMappingHistory is empty."))
+      .mapping match {
+      case mapping: OwnerToKeyMapping =>
+        mapping.keys.forgetNE
+      case _ => throw new IllegalStateException("Latest transaction is not an OwnerToKeyMapping.")
+    }
+    val (_, toRotate) = latestKeys.map(_.id).partition(allOtkSignatures.contains)
+    for {
       _ <-
         if (toRotate.nonEmpty) {
           logger.info(s"keyToRotate: ${toRotate}")
@@ -374,11 +388,11 @@ class NodeInitializer(
               )
             case key => Future.successful(key)
           }
-          logger.info(s"rotated keys ${rotatedKeys} ${nodeIdentity(id)}")
+          logger.info(s"rotated keys ${rotatedKeys} ${member}")
           for {
             newKeys <- Future.sequence(rotatedKeys)
             _ <- connection.ensureOwnerToKeyMapping(
-              member = nodeIdentity(id),
+              member = member,
               keys = NonEmpty.mk(
                 Seq,
                 newKeys.headOption.getOrElse(throw new IllegalStateException("newKeys is empty.")),
@@ -393,4 +407,5 @@ class NodeInitializer(
           Future.unit
         }
     } yield ()
+  }
 }
