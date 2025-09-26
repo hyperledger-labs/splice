@@ -958,51 +958,6 @@ final class ScanAggregator(
       on conflict (store_id, closed_round)
       do update set sum_cumulative_change_to_initial_amount_as_of_round_zero = excluded.sum_cumulative_change_to_initial_amount_as_of_round_zero,
         sum_cumulative_change_to_holding_fees_rate = excluded.sum_cumulative_change_to_holding_fees_rate;
-
-      -- calculate wallet_balances for all active parties in the aggregated rounds
-      -- this is needed for getWalletBalance
-      insert into wallet_balances (
-        store_id,
-        closed_round,
-        party,
-        cumulative_change_to_initial_amount_as_of_round_zero,
-        cumulative_change_to_holding_fees_rate
-      ) select  $roundTotalsStoreId,
-                ap.aggr_round,
-                rpt.party,
-                rpt.cumulative_change_to_initial_amount_as_of_round_zero,
-                rpt.cumulative_change_to_holding_fees_rate
-      from      round_party_totals rpt
-      join      active_parties_for_aggr_rounds ap
-      on        rpt.closed_round = ap.active_round
-      and       rpt.party = ap.party
-      and       rpt.store_id = $roundTotalsStoreId
-      on conflict (store_id, party, closed_round)
-      do update set cumulative_change_to_initial_amount_as_of_round_zero = excluded.cumulative_change_to_initial_amount_as_of_round_zero,
-        cumulative_change_to_holding_fees_rate = excluded.cumulative_change_to_holding_fees_rate;
-
-      -- calculate ranked table for parties, for getTopProvidersByAppRewards
-      insert into ranked_providers_by_app_rewards (
-        store_id,
-        closed_round,
-        party,
-        cumulative_app_rewards,
-        rank_nr
-      )
-      select    $roundTotalsStoreId,
-                ap.aggr_round, -- the calculated leaderboard for the aggregated round
-                rpt.party,
-                max(rpt.cumulative_app_rewards),
-                rank() over (partition by ap.aggr_round order by max(rpt.cumulative_app_rewards) desc) as rank_nr
-      from      round_party_totals rpt
-      join      active_parties_for_aggr_rounds ap
-      on        rpt.closed_round = ap.active_round
-      and       rpt.party = ap.party
-      and       rpt.store_id = $roundTotalsStoreId
-      and       rpt.cumulative_app_rewards > 0
-      group by  ap.aggr_round, rpt.party
-      on conflict (store_id, party, closed_round)
-      do update set cumulative_app_rewards = excluded.cumulative_app_rewards, rank_nr = excluded.rank_nr;
     """.andThen(DBIOAction.successful(()))
     }
     logger.info(
