@@ -644,7 +644,7 @@ function subcmd_restore_node {
   fi
   docker exec -i splice-validator-postgres-splice-1 psql -U cnadmin validator < "$validator_backup_file"
   docker exec -i splice-validator-postgres-splice-1 psql -U cnadmin participant-"$MIGRATION_ID" < "$participant_backup_file"
-  docker compose -f "${VALIDATOR_DIR}/compose.yaml" -f "${VALIDATOR_DIR}/compose-restore-from-id.yaml" down
+  docker compose -f "${VALIDATOR_DIR}/compose.yaml" down
 }
 
 subcommand_whitelist[identities_dump]='Fetch an identities dump from the validator'
