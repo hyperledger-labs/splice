@@ -16,7 +16,7 @@ data-dependencies:
   - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
-  - ../splice-util-delegation/.daml/dist/FOO-util-delegation-current.dar
+  - ../FOO-util-delegation/.daml/dist/FOO-util-delegation-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
