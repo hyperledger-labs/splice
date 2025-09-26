@@ -48,8 +48,8 @@ trait SvTestUtil extends TestCommon {
   def allocateRandomSvParty(name: String, id: Option[Int] = None)(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
-    val id = id.getOrElse((new scala.util.Random).nextInt()).toHexString
-    val partyIdHint = s"$name-$id"
+    val _id = id.getOrElse((new scala.util.Random).nextInt()).toHexString
+    val partyIdHint = s"$name-$_id"
     eventuallySucceeds() {
       try { sv1Backend.participantClient.ledger_api.parties.allocate(partyIdHint).party }
       catch {
