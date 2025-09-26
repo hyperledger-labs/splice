@@ -1,0 +1,67 @@
+module Splice.Util.MergeDelegation where
+
+import Splice.Api.Token.TransferInstructionV1
+
+template MergeDelegationProposal
+  with
+    owner : Party
+    delegate : Party
+  where
+    signatory owner
+    observer delegate
+
+    choice MergeDelegationProposal_Accept : MergeDelegationProposal_AcceptResult
+      controller delegate
+      do MergeDelegationProposal_AcceptResult <$> create MergeDelegation with
+           owner
+           delegate
+
+    choice MergeDelegationProposal_Reject : ()
+      controller delegate
+      do pure ()
+
+    choice MergeDelegationProposal_Withdraw : ()
+      controller owner
+      do pure ()
+
+template MergeDelegation
+  with
+    owner : Party
+    delegate : Party
+  where
+    signatory owner, delegate
+
+    nonconsuming choice MergeDelegation_Merge : MergeDelegation_MergeResult
+      with
+        cid : ContractId TransferFactory
+        choiceArg : TransferFactory_Transfer
+      controller delegate
+      do let transfer = choiceArg.transfer
+         require ("Sender in choice argument " <> show transfer.sender <> " matches owner " <> show owner) (transfer.sender == owner)
+         require ("Receiver in choice argument " <> show transfer.receiver <> " matches owner " <> show owner) (transfer.receiver == owner)
+         -- Note: This assumes you have preapprovals, if not you also need to accept the transfer instruction here.
+         MergeDelegation_MergeResult <$> exercise cid choiceArg
+
+    choice MergeDelegation_Reject : ()
+      controller delegate
+      do pure ()
+
+    choice MergeDelegation_Withdraw : ()
+      controller owner
+      do pure ()
+
+data MergeDelegationProposal_AcceptResult = MergeDelegationProposal_AcceptResult
+  with
+    mergeDelegationCid : ContractId MergeDelegation
+  deriving (Show, Eq)
+
+data MergeDelegation_MergeResult = MergeDelegation_MergeResult
+  with
+    result : TransferInstructionResult
+  deriving (Show, Eq)
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant

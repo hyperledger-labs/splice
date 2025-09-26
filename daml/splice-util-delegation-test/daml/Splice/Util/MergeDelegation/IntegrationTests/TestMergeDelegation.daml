@@ -1,0 +1,90 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests showing how to use the DelegateProxy in the context of
+-- an exchange integration to get featured app activity markers for
+-- deposits and withdrawals of an token standard token.
+-- See https://docs.digitalasset.com/integrate/devnet/exchange-integration/index.html more details.
+--
+-- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
+-- The mechanism for getting the featured app activity markers is generic.
+--
+module Splice.Util.MergeDelegation.IntegrationTests.TestMergeDelegation where
+
+import qualified Splice.Amulet
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Util.MergeDelegation
+
+import Daml.Script
+
+import DA.Assert ((===))
+import qualified DA.TextMap as TextMap
+import DA.Time
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+
+test : Script ()
+test = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  now <- getTime
+
+  owner <- allocatePartyExact "owner"
+
+  delegate <- allocatePartyExact "delegate"
+
+  AmuletRegistry.createTransferPreapproval registry owner delegate  (now `addRelTime` days 90)
+
+  delegationProposal <- submit owner $ createCmd MergeDelegationProposal with
+    owner
+    delegate
+
+  MergeDelegationProposal_AcceptResult delegation <- submit delegate $ exerciseCmd delegationProposal MergeDelegationProposal_Accept
+
+  AmuletRegistry.tapFaucet registry owner 42.0
+  AmuletRegistry.tapFaucet registry owner 23.0
+  AmuletRegistry.tapFaucet registry owner 15.0
+
+  WalletClient.checkBalance owner registry.instrumentId 80.0
+
+  holdingCids <- WalletClient.listHoldingCids owner registry.instrumentId
+  length holdingCids === 3
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = Api.Token.TransferInstructionV1.Transfer with
+        sender = owner
+        receiver = owner
+        amount = 40.0 -- NOTE: Once fees are zero you can set it to exactly the sum of the inputs.
+                      -- Until then, set it to roughly half. You will then merge all inputs into two outputs, one with the amount you specify and one with the remainder after fees.
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids = holdingCids
+        meta = Metadata with
+          values = TextMap.fromList [("splice.lfdecentralizedtrust.org/reason", "merge")]
+    extraArgs = emptyExtraArgs
+
+  -- When going over the ledger API, it is likely easier to use "readAs = [owner]" instead of passing in holdings through disclosure.
+  -- Just not supported in daml script tests
+  holdingDisclosures <- mapA (queryDisclosure' @Splice.Amulet.Amulet owner . coerceContractId) holdingCids
+
+  submitWithDisclosures' delegate (enrichedChoice.disclosures <> mconcat holdingDisclosures) $ exerciseCmd delegation MergeDelegation_Merge with
+    cid = enrichedChoice.factoryCid
+    choiceArg = enrichedChoice.arg
+
+  -- Once fees are gone, this is exactly 80.0. Until then fees are deducted.
+  WalletClient.checkBalanceApprox owner registry.instrumentId 80.0
+
+  holdingCids <- WalletClient.listHoldingCids owner registry.instrumentId
+  -- Once fees are gone and you set amount to exactly the sum of inputs this will only be one.
+  length holdingCids === 2
+
+
+  pure ()
+
