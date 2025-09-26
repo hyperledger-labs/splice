@@ -40,7 +40,10 @@ template MergeDelegation
          require ("Sender in choice argument " <> show transfer.sender <> " matches owner " <> show owner) (transfer.sender == owner)
          require ("Receiver in choice argument " <> show transfer.receiver <> " matches owner " <> show owner) (transfer.receiver == owner)
          -- Note: This does not depend on preapprovals at least for Amulet as self-transfers are treated specially.
-         MergeDelegation_MergeResult <$> exercise cid choiceArg
+         result <- exercise cid choiceArg
+         case result.output of
+           TransferInstructionResult_Completed _ -> pure (MergeDelegation_MergeResult result)
+           other -> abort ("Expected TransferInstructionResult_completed but got " <> show other)
 
     choice MergeDelegation_Reject : ()
       controller delegate
