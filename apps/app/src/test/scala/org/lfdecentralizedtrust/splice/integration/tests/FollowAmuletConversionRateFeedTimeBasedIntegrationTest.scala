@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import scala.jdk.OptionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmuletNameService_0_1_15
 class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil

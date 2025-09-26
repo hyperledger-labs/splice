@@ -7,13 +7,15 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.util.{Codec, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 
 import java.time.{Duration, ZoneOffset}
+import java.time.temporal.ChronoUnit
 
 class TokenStandardMetadataTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -142,15 +144,31 @@ class TokenStandardMetadataTimeBasedIntegrationTest
             }
           }
           .sum
+
         val instrument = sv1ScanBackend
           .lookupInstrument(amuletInstrument.id)
           .getOrElse(fail("instrument.totalSupply must be defined at this point"))
-        (
-          instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)),
-          instrument.totalSupplyAsOf,
-        ) shouldBe (Some(totalSupply) -> Some(
-          forcedSnapshotTime.toInstant.atOffset(ZoneOffset.UTC)
-        ))
+
+        val noHoldingFeesOnTransfers =
+          InitialPackageVersions.initialPackageVersion(DarResources.amulet) >= "0.1.14"
+
+        if (noHoldingFeesOnTransfers) {
+          instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)).value shouldBe totalSupply
+          instrument.totalSupplyAsOf.value shouldBe forcedSnapshotTime.toInstant.atOffset(
+            ZoneOffset.UTC
+          )
+        } else {
+          instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)).value should beAround(
+            totalSupply
+          )
+          instrument.totalSupplyAsOf.value should be <= forcedSnapshotTime.toInstant.atOffset(
+            ZoneOffset.UTC
+          )
+          instrument.totalSupplyAsOf.value.plus(
+            10,
+            ChronoUnit.MILLIS,
+          ) should be >= forcedSnapshotTime.toInstant.atOffset(ZoneOffset.UTC)
+        }
       }
     }
   }

@@ -13,3 +13,9 @@ LABEL org.opencontainers.image.base.name="splice-web-ui:${base_version}"
 COPY --from=splice app/splice-node/web-uis/wallet /usr/share/nginx/html/
 COPY config.js /tmpl/config.js.tmpl
 COPY --chmod=500 docker-entrypoint.sh /custom-docker-entrypoint.sh
+
+USER root
+RUN chown -R nginx:nginx /tmpl
+RUN chown nginx:nginx /custom-docker-entrypoint.sh
+RUN chown -R nginx:nginx /usr/share/nginx/html
+USER nginx

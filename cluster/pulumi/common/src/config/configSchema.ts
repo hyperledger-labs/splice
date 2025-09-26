@@ -56,3 +56,8 @@ export const K8sResourceSchema = z
     requests: SingleResourceSchema,
   })
   .optional();
+
+export const EnvVarConfigSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+});

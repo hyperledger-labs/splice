@@ -14,3 +14,8 @@ COPY --from=splice app/splice-node/web-uis/scan /usr/share/nginx/html/
 COPY config.js /tmpl/config.js.tmpl
 COPY --chmod=500 docker-entrypoint.sh /custom-docker-entrypoint.sh
 
+USER root
+RUN chown -R nginx:nginx /tmpl
+RUN chown nginx:nginx /custom-docker-entrypoint.sh
+RUN chown -R nginx:nginx /usr/share/nginx/html
+USER nginx

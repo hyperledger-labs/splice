@@ -11,7 +11,7 @@ networks:
 
 services:
   postgres-splice-sv:
-    image: "${POSTGRES_IMAGE_REPO}postgres:${SPLICE_POSTGRES_VERSION}"
+    image: "postgres:${SPLICE_POSTGRES_VERSION}"
     environment:
       - POSTGRES_USER=${SPLICE_SV_DB_USER}
       - POSTGRES_PASSWORD=${SPLICE_SV_DB_PASSWORD}

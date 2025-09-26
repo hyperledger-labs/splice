@@ -18,3 +18,5 @@ TOPOLOGY_UNAUTHORIZED_TRANSACTION
 
 # TODO(DACH-NY/canton-network-node#13610): Investigate flake and remove once fixed
 Sequencing result message timed out
+
+Could not send a time-advancing message

@@ -221,7 +221,7 @@ jobs:
       runs_on: self-hosted-docker-large
       test_names_file: 'test-full-class-names-local-net-based.log'
       parallelism: 1
-      test_name: docker-compose
+      test_name: local-net
       with_canton: false
       start_canton_options: ""
       commit_sha: ${{ inputs.commit_sha }}

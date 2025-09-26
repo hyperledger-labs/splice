@@ -303,12 +303,15 @@ object JsUserManagementCodecs {
     deriveRelaxedCodec
   implicit val canActAs: Codec[user_management_service.Right.CanActAs] = deriveRelaxedCodec
   implicit val canReadAs: Codec[user_management_service.Right.CanReadAs] = deriveRelaxedCodec
+  implicit val canExecuteAs: Codec[user_management_service.Right.CanExecuteAs] = deriveRelaxedCodec
   implicit val rightKindidentityProviderAdminRW
       : Codec[user_management_service.Right.Kind.IdentityProviderAdmin] =
     deriveRelaxedCodec
   implicit val identityProviderAdmin: Codec[user_management_service.Right.IdentityProviderAdmin] =
     deriveRelaxedCodec
   implicit val canReadAsAnyPartyRW: Codec[user_management_service.Right.CanReadAsAnyParty] =
+    deriveRelaxedCodec
+  implicit val canExecuteAsAnyPartyRW: Codec[user_management_service.Right.CanExecuteAsAnyParty] =
     deriveRelaxedCodec
   implicit val kindCanActAsRW: Codec[user_management_service.Right.Kind.CanActAs] =
     deriveRelaxedCodec
