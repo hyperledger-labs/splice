@@ -215,7 +215,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           <form.AppField name="common.expiryDate">
             {field => (
               <field.DateField
-                title="Vote Proposal Expiration"
+                title="Threshold Deadline"
                 description="This is the last day voters can vote on this proposal"
                 id="set-dso-config-rules-expiry-date"
               />

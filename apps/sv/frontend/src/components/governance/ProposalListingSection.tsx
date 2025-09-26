@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 import {
   Box,
   Typography,
@@ -25,14 +26,22 @@ interface ProposalListingSectionProps {
   sectionTitle: string;
   data: ProposalListingData[];
   uniqueId: string;
+  showThresholdDeadline?: boolean;
   showVoteStats?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
 }
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
-  const { sectionTitle, data, uniqueId, showVoteStats, showAcceptanceThreshold, showStatus } =
-    props;
+  const {
+    sectionTitle,
+    data,
+    uniqueId,
+    showThresholdDeadline,
+    showVoteStats,
+    showAcceptanceThreshold,
+    showStatus,
+  } = props;
 
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
@@ -49,9 +58,11 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ width: '25%' }}>Action</TableCell>
-                <TableCell sx={{ width: '15%' }}>Voting Closes At</TableCell>
-                <TableCell sx={{ width: '15%' }}>Takes Effect</TableCell>
+                <TableCell sx={{ width: '15%' }}>Action</TableCell>
+                {showThresholdDeadline && (
+                  <TableCell sx={{ width: '15%' }}>Threshold Deadline</TableCell>
+                )}
+                <TableCell sx={{ width: '15%' }}>Effect At</TableCell>
 
                 {showVoteStats && <TableCell sx={{ width: '20%' }}>Votes</TableCell>}
                 {showAcceptanceThreshold && (
@@ -70,7 +81,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                   actionName={vote.actionName}
                   contractId={vote.contractId}
                   uniqueId={uniqueId}
-                  votingCloses={vote.votingCloses}
+                  votingThresholdDeadline={vote.votingThresholdDeadline}
                   voteTakesEffect={vote.voteTakesEffect}
                   yourVote={vote.yourVote}
                   status={vote.status}
@@ -78,6 +89,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                   acceptanceThreshold={vote.acceptanceThreshold}
                   showVoteStats={showVoteStats}
                   showAcceptanceThreshold={showAcceptanceThreshold}
+                  showThresholdDeadline={showThresholdDeadline}
                   showStatus={showStatus}
                 />
               ))}
@@ -97,8 +109,9 @@ interface VoteRowProps {
   uniqueId: string;
   voteStats: Record<YourVoteStatus, number>;
   voteTakesEffect: string;
-  votingCloses: string;
+  votingThresholdDeadline: string;
   yourVote: YourVoteStatus;
+  showThresholdDeadline?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
   showVoteStats?: boolean;
@@ -113,8 +126,9 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     uniqueId,
     voteStats,
     voteTakesEffect,
-    votingCloses,
+    votingThresholdDeadline,
     yourVote,
+    showThresholdDeadline,
     showAcceptanceThreshold,
     showStatus,
     showVoteStats,
@@ -123,7 +137,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   return (
     <TableRow data-testid={`${uniqueId}-row`}>
       <TableCell data-testid={`${uniqueId}-row-action-name`}>{actionName}</TableCell>
-      <TableCell data-testid={`${uniqueId}-row-voting-closes`}>{votingCloses}</TableCell>
+      {showThresholdDeadline && (
+        <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
+          {votingThresholdDeadline}
+        </TableCell>
+      )}
       <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>{voteTakesEffect}</TableCell>
 
       {showVoteStats && (

@@ -119,7 +119,7 @@ export const Governance: React.FC = () => {
       return {
         contractId: v.payload.trackingCid || v.contractId,
         actionName: actionTagToTitle(amuletName)[getAction(v.payload.action) as SupportedActionTag],
-        votingCloses: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
+        votingThresholdDeadline: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect: effectiveAt,
         yourVote: computeYourVote(votes, svPartyId),
         status: 'In Progress',
@@ -146,7 +146,7 @@ export const Governance: React.FC = () => {
         contractId: vr.request.trackingCid,
         actionName:
           actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
-        votingCloses: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
+        votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect:
           (vr.outcome.tag === 'VRO_Accepted' &&
             dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
@@ -178,6 +178,7 @@ export const Governance: React.FC = () => {
         uniqueId="inflight-vote-requests"
         showVoteStats
         showAcceptanceThreshold
+        showThresholdDeadline
       />
 
       <ProposalListingSection

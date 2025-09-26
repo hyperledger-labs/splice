@@ -109,7 +109,7 @@ const ActionCard = (props: ActionCardProps) => {
           <Grid xs={2}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                VOTING CLOSES
+                THRESHOLD DEADLINE
               </Typography>
               <Typography
                 variant="body1"
