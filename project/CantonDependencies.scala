@@ -231,7 +231,7 @@ object CantonDependencies {
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
 
-  lazy val testcontainers_version = "1.15.3"
+  lazy val testcontainers_version = "1.19.7"
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
   lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
 
