@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.admin.api.client.data.topology.ListOwnerToKeyMappingResult
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.topology.Namespace
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -20,6 +21,20 @@ class ManualSignatureIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withManualStart
+      // .withTrafficTopupsDisabled
+      // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
+      .addConfigTransform((_, conf) =>
+        conf.copy(validatorApps =
+          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
+            _.map { aliceValidatorConfig =>
+              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+              aliceValidatorConfig.copy(
+                domains = withoutExtraDomains
+              )
+            }
+          }
+        )
+      )
       .withSequencerConnectionsFromScanDisabled()
   }
 
@@ -31,7 +46,6 @@ class ManualSignatureIntegrationTest
     ): Unit = {
       val otksForNs = otks
         .filter(_.item.member.namespace == namespace)
-      println(otksForNs)
       val latestKeys = otksForNs
         .maxBy(_.context.serial)
         .item
@@ -47,7 +61,10 @@ class ManualSignatureIntegrationTest
     }
 
     "rotate OTK keys that are not signed for SVs" in { implicit env =>
-      sv1Backend.startSync()
+      clue("sv1 starts") {
+        sv1Backend.startSync()
+      }
+
       eventuallySucceeds() {
         val synchronizerId = sv1Backend.participantClientWithAdminToken.synchronizers.id_of(
           sv1Backend.config.domains.global.alias
@@ -69,13 +86,19 @@ class ManualSignatureIntegrationTest
     }
 
     "rotate OTK keys that are not signed for validators" in { implicit env =>
+      clue("Initalize the DSO") {
+        initDsoWithSv1Only()
+      }
+
+      clue("Alice validator starts") {
+        aliceValidatorBackend.start()
+      }
+
       eventuallySucceeds() {
-        startAllSync(aliceValidatorBackend)
         val synchronizerId =
           aliceValidatorBackend.participantClientWithAdminToken.synchronizers.id_of(
             aliceValidatorBackend.config.domains.global.alias
           )
-        println(synchronizerId)
         val store = TopologyStoreId.Synchronizer(synchronizerId)
         val otks =
           aliceValidatorBackend.participantClientWithAdminToken.topology.owner_to_key_mappings
@@ -83,6 +106,12 @@ class ManualSignatureIntegrationTest
 
         clue("keys are rotated for alice validator's participant") {
           checkLatestKeysAreSigned(otks, aliceValidatorBackend.participantClient.namespace)
+        }
+      }
+
+      clue("Alice validator shuts down") {
+        eventuallySucceeds() {
+          aliceValidatorBackend.stop()
         }
       }
     }

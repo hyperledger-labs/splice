@@ -142,51 +142,59 @@ class ValidatorApp(
 
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
-  ): Future[Unit] = for {
-    // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
-    _ <- ensureVersionMatch(config.scanClient)
-    _ <- withParticipantAdminConnection { participantAdminConnection =>
-      for {
-        synchronizerId <- participantAdminConnection.getSynchronizerId(
-          config.domains.global.alias
-        )
-      } yield readRestoreDump match {
-        case Some(migrationDump) =>
-          logger.info(
-            "We're restoring from a migration dump, ensuring participant is initialized"
-          )
-          val nodeInitializer =
-            new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
-          nodeInitializer.initializeFromDumpAndWait(
-            migrationDump.participant
-          )
-        case None =>
-          UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
-            case Some(migrationId)
-                if !config.svValidator && migrationId < config.domainMigrationId =>
-              throw Status.INVALID_ARGUMENT
-                .withDescription(
-                  s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
+  ): Future[Unit] = {
+    val participantAdminConnection = new ParticipantAdminConnection(
+      config.participantClient.adminApi,
+      amuletAppParameters.loggingConfig.api,
+      loggerFactory,
+      metrics.grpcClientMetrics,
+      retryProvider,
+    )
+    (for {
+      // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
+      _ <- ensureVersionMatch(config.scanClient)
+      synchronizerId <- participantAdminConnection.getSynchronizerId(
+        config.domains.global.alias
+      )
+      _ <- appInitStep("Ensure participant is initialized with expected id") {
+        readRestoreDump match {
+          case Some(migrationDump) =>
+            logger.info(
+              "We're restoring from a migration dump, ensuring participant is initialized"
+            )
+            val nodeInitializer =
+              new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
+            nodeInitializer.initializeFromDumpAndWait(
+              migrationDump.participant
+            )
+          case _ =>
+            UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
+              case Some(migrationId)
+                  if !config.svValidator && migrationId < config.domainMigrationId =>
+                throw Status.INVALID_ARGUMENT
+                  .withDescription(
+                    s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
+                  )
+                  .asRuntimeException()
+              case _ =>
+                logger.info(
+                  "Ensuring participant is initialized"
                 )
-                .asRuntimeException()
-            case _ =>
-              logger.info(
-                "Ensuring participant is initialized"
-              )
-              val cantonIdentifierConfig =
-                ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
-              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-                cantonIdentifierConfig.participant,
-                participantAdminConnection,
-                config.participantBootstrappingDump,
-                loggerFactory,
-                retryProvider,
-                synchronizerId,
-              )
-          }
+                val cantonIdentifierConfig =
+                  ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
+                ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                  cantonIdentifierConfig.participant,
+                  participantAdminConnection,
+                  config.participantBootstrappingDump,
+                  loggerFactory,
+                  retryProvider,
+                  synchronizerId,
+                )
+            }
+        }
       }
-    }
-  } yield ()
+    } yield ()).andThen { case _ => participantAdminConnection.close() }
+  }
 
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
@@ -627,7 +635,7 @@ class ValidatorApp(
       metrics.grpcClientMetrics,
       retryProvider,
     )
-    f(participantAdminConnection).andThen { _ => participantAdminConnection.close() }
+    f(participantAdminConnection).andThen { case _ => participantAdminConnection.close() }
   }
 
   private def newTrafficBalanceService(
