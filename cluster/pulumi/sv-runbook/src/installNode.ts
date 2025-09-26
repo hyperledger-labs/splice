@@ -46,6 +46,7 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
+  getAdditionalJvmOptions,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { configForSv, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
@@ -324,6 +325,7 @@ async function installSvAndValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
+    additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -476,6 +478,7 @@ async function installSvAndValidator(
           ]),
       ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
+    additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
   };
 
   const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
