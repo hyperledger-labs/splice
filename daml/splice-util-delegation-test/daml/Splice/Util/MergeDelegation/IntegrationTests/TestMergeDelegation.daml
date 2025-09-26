@@ -1,14 +1,6 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Daml script tests showing how to use the DelegateProxy in the context of
--- an exchange integration to get featured app activity markers for
--- deposits and withdrawals of an token standard token.
--- See https://docs.digitalasset.com/integrate/devnet/exchange-integration/index.html more details.
---
--- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
--- The mechanism for getting the featured app activity markers is generic.
---
 module Splice.Util.MergeDelegation.IntegrationTests.TestMergeDelegation where
 
 import qualified Splice.Amulet
@@ -85,4 +77,3 @@ test = do
 
 
   pure ()
-
