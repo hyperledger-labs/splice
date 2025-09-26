@@ -124,7 +124,7 @@ export type ProposalListingStatus =
 export interface ProposalListingData {
   contractId: ContractId<VoteRequest>;
   actionName: string;
-  votingCloses: string;
+  votingThresholdDeadline: string;
   voteTakesEffect: string;
   yourVote: YourVoteStatus;
   status: ProposalListingStatus;

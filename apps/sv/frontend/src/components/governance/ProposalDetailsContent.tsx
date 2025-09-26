@@ -194,7 +194,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             <Box sx={{ py: 1 }}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Voting Expires At
+                Threshold Deadline
               </Typography>
               <Typography
                 variant="body1"
