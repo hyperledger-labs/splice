@@ -924,7 +924,7 @@ final class ScanAggregator(
       -- added for total_amulet_balance until TODO(#800) is fixed
       -- the active_parties_for_aggr_rounds contains for every party, the round it was active (active_round),
       -- when the round was aggregated (aggr_round).
-      -- this makes is possible to get the cumulative values per party and when that party was active,
+      -- Enables getting the cumulative values per party for when that party was active,
       -- for the aggregated round, from the round_party_totals table.
       create temp table active_parties_for_aggr_rounds on commit drop as
       select party, aggr_round as aggr_round, active_round from active_parties_before
@@ -932,7 +932,7 @@ final class ScanAggregator(
       -- all the parties that were active in the newly aggregated rounds
       select party, round as aggr_round, round as active_round from temp_cumulative_totals
       union
-      -- need to add the lastClosedRound as aggr_round, for parties that were not active but have been aggregated in that round
+      -- adding the lastClosedRound as aggr_round, for parties that were not active but have been aggregated in that round
       select party,
              $lastClosedRound as aggr_round,
              closed_round as active_round
