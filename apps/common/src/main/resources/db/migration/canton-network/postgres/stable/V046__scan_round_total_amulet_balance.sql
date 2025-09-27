@@ -1,11 +1,14 @@
+-- aggregation result table for total amulet balance changes per store and closed round
+-- this table only contains rows for rounds where the sums changed
 create table round_total_amulet_balance
 (
     -- the store id of the scan store for which the totals are calculated
     store_id             int not null,
-    -- the closed round
+    -- the closed round for which the sums are calculated.
     closed_round         bigint not null,
-    -- the total amulet balance as of closed_round
+    -- the sum of cumulative change_to_initial_amount_as_of_round_zero from round zero up to and including the round
     sum_cumulative_change_to_initial_amount_as_of_round_zero numeric not null,
+    -- the sum of cumulative change_to_holding_fees_rate from round zero up to and including the round
     sum_cumulative_change_to_holding_fees_rate numeric not null,
     primary key (store_id, closed_round)
 );
