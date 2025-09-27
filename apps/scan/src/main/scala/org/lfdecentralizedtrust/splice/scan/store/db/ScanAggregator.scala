@@ -747,6 +747,13 @@ final class ScanAggregator(
       */
     def aggregate(): DBIOAction[Unit, NoStream, Effect.Write] = {
       sqlu"""
+      create temp table active_parties_before on commit drop as
+      select party,
+             (select max(closed_round) from active_parties where store_id = $roundTotalsStoreId) as aggr_round,
+             closed_round as active_round
+      from   active_parties
+      where  store_id = $roundTotalsStoreId;
+
       create temp table temp_cumulative_totals on commit drop as
       with previously_aggregated as(
         select coalesce(max(closed_round), -1) as last_closed_round from round_party_totals where store_id = $roundTotalsStoreId
@@ -913,6 +920,44 @@ final class ScanAggregator(
                   ct.cumulative_change_to_holding_fees_rate
       from        temp_cumulative_totals ct
       on conflict do nothing;
+
+      -- added for total_amulet_balance until TODO(#800) is fixed
+      -- the active_parties_for_aggr_rounds contains for every party, the round it was active (active_round),
+      -- when the round was aggregated (aggr_round).
+      -- this makes is possible to get the cumulative values per party and when that party was active,
+      -- for the aggregated round, from the round_party_totals table.
+      create temp table active_parties_for_aggr_rounds on commit drop as
+      select party, aggr_round as aggr_round, active_round from active_parties_before
+      union
+      -- all the parties that were active in the newly aggregated rounds
+      select party, round as aggr_round, round as active_round from temp_cumulative_totals
+      union
+      -- need to add the lastClosedRound as aggr_round, for parties that were not active but have been aggregated in that round
+      select party,
+             $lastClosedRound as aggr_round,
+             closed_round as active_round
+      from   active_parties
+      where  store_id = $roundTotalsStoreId;
+
+      insert into round_total_amulet_balance (
+        store_id,
+        closed_round,
+        sum_cumulative_change_to_initial_amount_as_of_round_zero,
+        sum_cumulative_change_to_holding_fees_rate
+      )
+      select   $roundTotalsStoreId,
+               ap.aggr_round,
+               sum(rpt.cumulative_change_to_initial_amount_as_of_round_zero),
+               sum(rpt.cumulative_change_to_holding_fees_rate)
+      from     round_party_totals rpt
+      join     active_parties_for_aggr_rounds ap
+      on       rpt.closed_round = ap.active_round
+      and      rpt.party = ap.party
+      and      rpt.store_id = $roundTotalsStoreId
+      group by ap.aggr_round
+      on conflict (store_id, closed_round)
+      do update set sum_cumulative_change_to_initial_amount_as_of_round_zero = excluded.sum_cumulative_change_to_initial_amount_as_of_round_zero,
+        sum_cumulative_change_to_holding_fees_rate = excluded.sum_cumulative_change_to_holding_fees_rate;
     """.andThen(DBIOAction.successful(()))
     }
     logger.info(
