@@ -317,7 +317,20 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
+      {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
+      volumes:
+      {{- with .Values.participantIdentitiesDumpImport }}
+        - name: participant-bootstrapping-dump-volume
+          secret:
+            secretName: {{ .secretName }}
+      {{- end }}
+      {{- if $requiresMigrationPvc }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.volumeName }}
+      {{- end }}
+      {{- end }}
+      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) (.Values.participantIdentitiesDumpImport) ($requiresMigrationPvc) }}
       initContainers:
         {{- if .Values.persistence.enablePgInitContainer }}
         - name: {{ .Release.Name }}-init
@@ -345,19 +358,22 @@ spec:
         {{- if .Values.extraInitContainers }}
         {{ .Values.extraInitContainers | toYaml | nindent 8 }}
         {{- end }}
-      {{- end }}
-      {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
-      volumes:
-      {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-volume
-          secret:
-            secretName: {{ .secretName }}
-      {{- end }}
-      {{- if $requiresMigrationPvc }}
-        - name: domain-upgrade-dump-volume
-          persistentVolumeClaim:
-            claimName: {{ .Values.pvc.volumeName }}
-      {{- end }}
+        {{- if .Values.participantIdentitiesDumpImport }}
+        - name: chown-participant-bootstrapping-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /participant-bootstrapping-dump"]
+          volumeMounts:
+            - name: participant-bootstrapping-dump-volume
+              mountPath: /participant-bootstrapping-dump
+        {{- end }}
+        {{- if $requiresMigrationPvc }}
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
