@@ -13,7 +13,49 @@ Upcoming
 
   - Docker images
 
-    - All app & UI images now use a non-root user.
+    - All app & UI images now use a non-root user
+
+
+  - standard library:
+
+     - Introduction of New Alpha Primitives in DA.Crypto.Text Module
+       Causes Backward Incompatibility
+
+       This release adds two new alpha primitives to the
+       DA.Crypto.Text module:
+
+
+       - sha256 : BytesHex -> BytesHex: Computes the SHA-256 hash of
+         the given hexadecimal bytes.
+
+       - secp256k1WithEcdsaOnly : SignatureHex -> BytesHex ->
+         PublicKeyHex -> Bool: Verifies an ECDSA signature on the
+         secp256k1 curve, checking if the signature matches the
+         message and public key.
+
+       These changes update format of Daml archive, introducing a
+       breaking change that affects compatibility with prior versions
+       of the Daml SDK and Canton.
+
+       Compatibility Impacts:
+
+       Older Daml SDK Versions: Attempting to load a DAR file compiled
+       with this newer SDK (via data-dependencies or direct
+       dependencies) will fail. The error will resemble: damlc: user
+       error (Protobuf error: "UnknownEnum \"ExprSumBuiltin\" 71").
+
+       Older Canton Versions: Uploading a DAR file from this newer SDK
+       will result in a parsing failure, with an error similar to:
+       DAR_PARSE_ERROR(8,56a75493): Failed to parse the dar file
+       content.
+
+       Recommendations:
+
+       To avoid these issues, upgrade all relevant SDK and Canton
+       instances to this release or a compatible later version before
+       deploying new DAR files. If maintaining mixed environments is
+       necessary, compile DARs using the oldest compatible SDK
+       version.
 
 
 0.4.18
