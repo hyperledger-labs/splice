@@ -1,0 +1,16 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Description: Docker compose file for running Swagger UI with the allocation OpenAPI specification.
+# Usage: docker-compose up
+version: '3.7'
+
+services:
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    ports:
+      - "8080:8080"
+    environment:
+      SWAGGER_JSON: /spec/allocation.yaml
+    volumes:
+      - ./allocation.yaml:/spec/allocation.yaml

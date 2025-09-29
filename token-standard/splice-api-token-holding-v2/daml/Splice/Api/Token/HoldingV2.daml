@@ -1,0 +1,64 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Types and interfaces for retrieving an investor's holdings.
+module Splice.Api.Token.HoldingV2 where
+
+import DA.Time (RelTime)
+
+import Splice.Api.Token.MetadataV1
+
+-- | A globally unique identifier for instruments.
+data InstrumentId = InstrumentId
+  with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instrument.
+    id : Text
+      -- ^ The identifier used for the instrument by the instrument admin.
+      --
+      -- This identifier MUST be unique and unambiguous per instrument admin.
+  deriving (Eq, Ord, Show)
+
+-- | Details of a lock.
+data Lock = Lock
+  with
+    holders : [Party]
+      -- ^ Unique list of parties which are locking the contract.
+      -- (Represented as a list, as that has the better JSON encoding.)
+    expiresAt : Optional Time
+      -- ^ Absolute, inclusive deadline as of which the lock expires.
+    expiresAfter : Optional RelTime
+      -- ^ Duration after which the created lock expires. Measured relative
+      -- to the ledger time that the locked holding contract was created.
+      --
+      -- If both `expiresAt` and `expiresAfter` are set, the lock expires at
+      -- the earlier of the two times.
+    context : Optional Text
+      -- ^ Short, human-readable description of the context of the lock.
+      -- Used by wallets to enable users to understand the reason for the lock.
+      --
+      -- Note that the visibility of the content in this field might be wider
+      -- than the visibility of the contracts in the context. You should thus
+      -- carefully decide what information is safe to put in the lock context.
+  deriving (Eq, Ord, Show)
+
+-- | Holding interface.
+interface Holding where viewtype HoldingView
+
+-- | View for `Holding`.
+data HoldingView = HoldingView
+  with
+    owner : Party
+      -- ^ Owner of the holding.
+    instrumentId : InstrumentId
+      -- ^ Instrument being held.
+    amount : Decimal
+      -- ^ Size of the holding.
+    lock : Optional Lock
+      -- ^ Lock on the holding.
+      --
+      -- Registries SHOULD allow holdings with expired locks as inputs to
+      -- transfers to enable a combined unlocking + use choice.
+    meta : Metadata
+      -- ^ Metadata.
+  deriving (Eq, Show)
