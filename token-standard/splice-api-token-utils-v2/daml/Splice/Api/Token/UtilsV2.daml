@@ -1,0 +1,159 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Conversion functions and standard implementations used to
+-- implement the V1 interfaces from the V2 interfaces.
+module Splice.Api.Token.UtilsV2 where
+
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
+
+-- Holding
+----------
+
+-- Upcast
+instrumentId_v1_to_v2 : HoldingV1.InstrumentId -> HoldingV2.InstrumentId
+instrumentId_v1_to_v2 HoldingV1.InstrumentId{..} = HoldingV2.InstrumentId with ..
+
+lock_v1_to_v2 : HoldingV1.Lock -> HoldingV2.Lock
+lock_v1_to_v2 HoldingV1.Lock{..} = HoldingV2.Lock with ..
+
+holdingv1_to_v2 : HoldingV1.HoldingView -> HoldingV2.HoldingView
+holdingv1_to_v2 v1 = v2
+  where
+    v2 = HoldingV2.HoldingView with
+      owner = v1.owner
+      instrumentId = instrumentId_v1_to_v2 v1.instrumentId
+      amount = v1.amount
+      lock = fmap lock_v1_to_v2 v1.lock
+      meta = v1.meta
+
+-- Downcast
+instrumentId_v2_to_v1 : HoldingV2.InstrumentId -> HoldingV1.InstrumentId
+instrumentId_v2_to_v1 HoldingV2.InstrumentId{..} = HoldingV1.InstrumentId with ..
+
+lock_v2_to_v1 : HoldingV2.Lock -> HoldingV1.Lock
+lock_v2_to_v1 HoldingV2.Lock{..} = HoldingV1.Lock with ..
+
+holdingv2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
+holdingv2_to_v1 v2 = v1
+  where
+    v1 = HoldingV1.HoldingView with
+      owner = v2.owner
+      instrumentId = instrumentId_v2_to_v1 v2.instrumentId
+      amount = v2.amount
+      lock = fmap lock_v2_to_v1 v2.lock
+      meta = v2.meta
+
+-- Allocation
+-------------
+
+-- Upcast
+reference_v1_to_v2 : AllocationV1.Reference -> AllocationV2.Reference
+reference_v1_to_v2 AllocationV1.Reference{..} = AllocationV2.Reference with ..
+
+settlement_info_v1_to_v2 : AllocationV1.SettlementInfo -> AllocationV2.SettlementInfo
+settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
+  where
+    controllerOverride = case TextMap.lookup "canton.network/controllerOverride" meta.values of
+      None -> None
+      Some co -> None -- TODO: Parse controller override.
+    v2 = AllocationV2.SettlementInfo with
+      executor
+      settlementRef = reference_v1_to_v2 settlementRef
+      requestedAt
+      allocateBefore
+      settleBefore
+      meta
+      controllerOverride = None
+
+transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> AllocationV2.TransferLeg
+transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} = 
+  AllocationV2.TransferLeg with
+    instrumentId = instrumentId_v1_to_v2 instrumentId
+    ..
+
+allocation_specification_v1_to_v2 : AllocationV1.AllocationSpecification -> AllocationV2.AllocationSpecification
+allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} = 
+  AllocationV2.AllocationSpecification with
+    settlement = settlement_info_v1_to_v2 settlement
+    transferLegs = TextMap.fromList ((transferLegId, transfer_leg_v1_to_v2 transferLeg)::otherLegs)
+  where
+    otherLegs = case TextMap.lookup "canton.network/otherLegs" transferLeg.meta.values of
+      None -> []
+      Some ol -> [] -- TODO: Parse other legs.
+
+allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.AllocationView
+allocation_view_v1_to_v2 AllocationV1.AllocationView{..} = 
+  AllocationV2.AllocationView with
+    allocation = allocation_specification_v1_to_v2 allocation
+    holdingCids = map coerceInterfaceContractId holdingCids
+    meta
+    transferExtraAuth
+  where
+    transferExtraAuth = case TextMap.lookup "canton.network/transferExtraAuth" meta.values of
+      None -> []
+      Some ol -> [] -- TODO: Parse extra auth list.
+
+      
+-- Downcast
+reference_v2_to_v1 : AllocationV2.Reference -> AllocationV1.Reference
+reference_v2_to_v1 AllocationV2.Reference{..} = AllocationV1.Reference with ..
+
+settlement_info_v2_to_v1 : AllocationV2.SettlementInfo -> AllocationV1.SettlementInfo
+settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
+  where
+    meta' = Metadata with 
+      values = 
+        TextMap.insert "canton.network/version" "v2" $
+        TextMap.insert "canton.network/controllerOverride" (show controllerOverride) $
+        meta.values
+    v1 = AllocationV1.SettlementInfo with
+      executor
+      settlementRef = reference_v2_to_v1 settlementRef
+      requestedAt
+      allocateBefore
+      settleBefore
+      meta = meta'
+
+transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
+transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} = 
+  AllocationV1.TransferLeg with
+    instrumentId = instrumentId_v2_to_v1 instrumentId
+    ..
+
+allocation_specification_v2_to_v1 : AllocationV2.AllocationSpecification -> AllocationV1.AllocationSpecification
+allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} = 
+  AllocationV1.AllocationSpecification with
+    settlement = settlement_info_v2_to_v1 settlement
+    transferLegId
+    transferLeg = transfer_leg_v2_to_v1 transferLeg
+  where
+    (transferLegId, transferLeg')::other = if TextMap.size transferLegs > 0
+      then TextMap.toList transferLegs
+      else error "Cannot downcast an allocation specification without any legs."
+    meta = Metadata with 
+      values =
+        TextMap.insert "canton.network/version" "v2" $
+        TextMap.insert "canton.network/otherLegs" (show other) $
+        transferLeg'.meta.values
+    transferLeg = transferLeg' with meta
+
+allocation_view_v2_to_v1 : AllocationV2.AllocationView -> AllocationV1.AllocationView
+allocation_view_v2_to_v1 AllocationV2.AllocationView{..} = 
+  AllocationV1.AllocationView with
+    allocation = allocation_specification_v2_to_v1 allocation
+    holdingCids = map coerceInterfaceContractId holdingCids
+    meta = meta'
+  where
+    meta' = Metadata with
+      values =
+        TextMap.insert "canton.network/version" "v2" $
+        TextMap.insert "canton.network/transferExtraAuth" (show transferExtraAuth) $
+        meta.values
+

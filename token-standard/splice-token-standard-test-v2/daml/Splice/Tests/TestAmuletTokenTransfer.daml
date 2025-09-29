@@ -1,0 +1,498 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests showing that the token standard can be used to execute
+-- free-of-payment transfers of Amulet tokens; and how to do so.
+module Splice.Tests.TestAmuletTokenTransfer where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Daml.Script
+
+import DA.Action (unless)
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.List (sortOn)
+import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
+import DA.Optional (isSome)
+import DA.Time
+
+import Splice.Amulet (AppRewardCoupon(..))
+import Splice.Amulet.TokenApiUtils (createdInRoundMetaKey, ratePerRoundMetaKey, burnedMetaKey)
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+
+-- Shared test setup
+--------------------
+
+data TestSetup = TestSetup with
+  registry : AmuletRegistry.AmuletRegistry
+  alice : Party
+  aliceValidator : Party
+  bob : Party
+  now : Time
+  defaultTransfer : Api.Token.TransferInstructionV1.Transfer
+
+setupTest : Script TestSetup
+setupTest = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  alice <- allocatePartyExact "alice"
+  aliceValidator <- allocatePartyExact "alice-validator"
+  bob <- allocatePartyExact "bob"
+
+  -- Alice creates a transfer pre-approval. This contract can be used to execute an instant transfer
+  -- from Bob to Alice (it needs to be disclosed as part of transfer initiation).
+  now <- getTime
+  let expiresAt = (now `addRelTime` days 30)
+  AmuletRegistry.createTransferPreapproval registry alice aliceValidator expiresAt
+
+  -- feature the alice's validator party, to check that they get featured registry rewards
+  AmuletRegistry.featureApp registry aliceValidator
+
+  -- also feature alice and bob so that we can easily check that their self-transfers
+  -- do not result in featured app rewards
+  AmuletRegistry.featureApp registry alice
+  AmuletRegistry.featureApp registry bob
+
+  -- Bob taps coin to send to Alice.
+  AmuletRegistry.tapLockedAndUnlockedFunds registry bob 50.0
+
+  bobHoldings <- WalletClient.listHoldings bob registry.instrumentId
+  let bobHoldingCids = map fst bobHoldings
+  let actualBobHoldingViews = sortOn (.lock) $ map snd bobHoldings
+  let expectedBobHoldingViews = sortOn (.lock) $
+        [ HoldingView with
+            owner = bob
+            instrumentId = InstrumentId with id = "Amulet", admin = registry.dso
+            amount = 25.0
+            lock = None
+            meta = Metadata with
+
+              values = TextMap.fromList
+                [ (createdInRoundMetaKey, "1")
+                , (ratePerRoundMetaKey, "0.00004")
+                ]
+        , HoldingView with
+            owner = bob
+            instrumentId = InstrumentId with id = "Amulet", admin = registry.dso
+            amount = 25.0
+            lock = Some $ Lock with
+              expiresAt = Some now
+              expiresAfter = None
+              holders = [registry.dso]
+              context = Some "test expired lock"
+            meta = Metadata with
+              values = TextMap.fromList
+                [ (createdInRoundMetaKey, "1")
+                , (ratePerRoundMetaKey, "0.00004")
+                ]
+        ]
+  expectedBobHoldingViews === actualBobHoldingViews
+
+
+  -- Check initial balance setup
+  WalletClient.checkBalance alice registry.instrumentId 0.0
+  WalletClient.checkBalance bob registry.instrumentId 50.0
+
+  -- Define default transfer from Bob to Alice
+  let
+    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+      sender = bob
+      receiver = alice
+      amount = 10.0
+      instrumentId = registry.instrumentId
+      requestedAt = now
+      executeBefore = now `addRelTime` days 1
+      inputHoldingCids = bobHoldingCids
+      meta = Metadata with
+        values = TextMap.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
+
+  return TestSetup with ..
+
+
+setupTwoStepTransfer : Script (TestSetup, ContractId TransferInstruction)
+setupTwoStepTransfer = do
+  testSetup@TestSetup {..} <- setupTest
+
+  -- fund alice
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+  aliceHoldingCids <- WalletClient.listHoldings alice registry.instrumentId
+
+  WalletClient.checkBalance alice registry.instrumentId 1000.0
+  WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer with
+        sender = alice
+        receiver = bob  -- turn this around so that the transfer is a two-step one
+        inputHoldingCids = map fst aliceHoldingCids
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
+  Map.size enrichedChoice.disclosures.disclosures === 3
+
+  -- Trigger a two-step transfer
+  -- TODO(DACH-NY/canton-network-node#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
+  result <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+
+  -- check that the change is returned as expected
+  [senderChangeCid] <- pure result.senderChangeCids
+  Some senderChange <- queryInterfaceContractId @Holding alice senderChangeCid
+  senderChange.lock === None
+  WalletClient.checkHoldingApprox alice senderChangeCid (1000.0 - transfer.amount)
+  expectBurn result.meta
+  pure (testSetup, aliceInstrCid)
+
+assertNoFeaturedRewards : [Party] -> Script ()
+assertNoFeaturedRewards parties =
+  forA_ parties $ \party -> do
+    rewards <- query @AppRewardCoupon party
+    filter (._2.featured) rewards === []
+
+expectBurn : Metadata -> Script ()
+expectBurn meta =
+  unless (isSome $ TextMap.lookup burnedMetaKey meta.values) $
+    fail $ "Expected burned meta key to be present in " <> show meta
+
+
+-- Testing self and direct transfers
+------------------------------------
+
+test_happy_path_self : Script ()
+test_happy_path_self = script do
+  TestSetup {..} <- setupTest
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer with
+        sender = bob
+        receiver = bob
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
+  Map.size enrichedChoice.disclosures.disclosures === 3
+
+  WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
+
+  -- Trigger a self-transfer
+  result <- submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  -- check holdings and rewards
+  TransferInstructionResult_Completed [splitHoldingCid] <- pure result.output
+  WalletClient.checkHolding bob splitHoldingCid 10.0
+  [changeHoldingCid] <- pure result.senderChangeCids
+  WalletClient.checkHoldingApprox bob changeHoldingCid 40.0
+  expectBurn result.meta
+
+  assertNoFeaturedRewards [alice, bob]
+  pure ()
+
+test_happy_path_direct : Script ()
+test_happy_path_direct = script do
+  TestSetup {..} <- setupTest
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 4
+  Map.size enrichedChoice.disclosures.disclosures === 5
+
+  WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
+
+  -- Trigger an atomic, single-transaction transfer
+  result <- submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  TransferInstructionResult_Completed receiverHoldingCids <- pure result.output
+  case result.senderChangeCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox bob holdingCid 40.0
+    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  case receiverHoldingCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 10.0
+    cids -> abort ("Unexpected number of receiverHoldingCids: " <> show cids)
+  expectBurn result.meta
+
+  -- check balance
+  WalletClient.checkBalance alice registry.instrumentId 10.0
+  WalletClient.checkBalanceApprox bob registry.instrumentId 40.0
+
+  -- there is a featured registry reward for aliceValidator that created Alice's transfer preapproval
+  [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator
+  aliceValidatorCoupon.featured === True
+  aliceValidatorCoupon.amount === 2.16
+
+  assertNoFeaturedRewards [alice, bob]
+  pure ()
+
+
+-- Testing two-step transfers
+-----------------------------
+
+test_two_step_success : Script ()
+test_two_step_success = do
+  (TestSetup {..}, aliceInstrCid) <- setupTwoStepTransfer
+
+  -- check lock context
+  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
+  let expectedLock = Some $ Lock with
+        expiresAt = Some (defaultTransfer.executeBefore)
+        expiresAfter = None
+        holders = [registry.dso]
+        context = Some "transfer to 'bob'"
+  lockedHolding.lock === expectedLock
+
+  -- bob queries the pending transfer through their wallet
+  aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
+  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrCid === aliceInstrCid
+
+  -- bob accepts the transfer
+  context <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid emptyMetadata
+  result <- submitWithDisclosures' bob context.disclosures $ exerciseCmd bobInstrCid TransferInstruction_Accept with
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  TransferInstructionResult_Completed receiverHoldingCids <- pure result.output
+  case result.senderChangeCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 1.0
+    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  case receiverHoldingCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox bob holdingCid 10.0
+    cids -> abort ("Unexpected number of receiverHoldingCids: " <> show cids)
+  expectBurn result.meta
+
+  -- check balance
+  WalletClient.checkBalanceApprox alice registry.instrumentId 990.0
+  WalletClient.checkBalance bob registry.instrumentId 60.0
+
+  assertNoFeaturedRewards [alice, bob]
+
+test_two_step_withdraw : Script ()
+test_two_step_withdraw = do
+  (TestSetup {..}, aliceInstrCid0) <- setupTwoStepTransfer
+
+  -- alice queries the pending transfer through their wallet
+  [ lockedHolding ] <- WalletClient.listLockedHoldings alice registry.instrumentId
+  [(aliceInstrCid, aliceInstrView)] <- WalletClient.listTransferOffers alice registry.instrumentId
+  aliceInstrView.transfer.inputHoldingCids === [ lockedHolding._1 ]
+  aliceInstrCid0 === aliceInstrCid
+
+  -- alice rejects the transfer
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
+  result <- submitWithDisclosures' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+
+  case result.senderChangeCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 10.0
+    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  TransferInstructionResult_Failed === result.output
+
+  -- check balance
+  WalletClient.checkBalanceApprox alice registry.instrumentId 1000.0
+  WalletClient.checkBalance bob registry.instrumentId 50.0
+
+  assertNoFeaturedRewards [alice, bob]
+
+test_two_step_withdraw_locked_amulet_gone : Script ()
+test_two_step_withdraw_locked_amulet_gone  = do
+  (TestSetup {..}, aliceInstrCid0) <- setupTwoStepTransfer
+
+  -- alice queries the pending transfer through their wallet
+  [ lockedHolding ] <- WalletClient.listLockedHoldings alice registry.instrumentId
+  [(aliceInstrCid, aliceInstrView)] <- WalletClient.listTransferOffers alice registry.instrumentId
+  aliceInstrView.transfer.inputHoldingCids === [ lockedHolding._1 ]
+  aliceInstrCid0 === aliceInstrCid
+
+  -- pass time and unlock the amulet as the alice
+  let [lockedCid] = aliceInstrView.transfer.inputHoldingCids
+  setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
+  AmuletRegistry.expireLockAsOwner registry lockedCid
+
+  -- locked holdings are gone
+  lockedHoldings <- WalletClient.listLockedHoldings alice registry.instrumentId
+  lockedHoldings === []
+
+  -- withdraw fails if the time is too early
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
+  setTime (aliceInstrView.transfer.executeBefore `addRelTime` negate (days 1))
+  submitWithDisclosuresMustFail' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  -- move time back to the future (TM) so withdrawal can complete
+  setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
+
+  -- alice withdraws the transfer
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
+  result <- submitWithDisclosures' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  result.senderChangeCids === []
+  result.output === TransferInstructionResult_Failed
+
+  -- check balance
+  WalletClient.checkBalanceApprox alice registry.instrumentId 1000.0
+  WalletClient.checkBalance bob registry.instrumentId 50.0
+
+  assertNoFeaturedRewards [alice, bob]
+
+
+
+test_two_step_reject : Script ()
+test_two_step_reject = do
+  (TestSetup {..}, aliceInstrCid) <- setupTwoStepTransfer
+
+  -- bob queries the pending transfer through their wallet
+  aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
+  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrCid === aliceInstrCid
+
+  -- bob rejects the transfer
+  context <- RegistryApi.getTransferInstruction_RejectContext registry bobInstrCid emptyMetadata
+  result <- submitWithDisclosures' bob context.disclosures $ exerciseCmd bobInstrCid TransferInstruction_Reject with
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  case result.senderChangeCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 10.0
+    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  result.output === TransferInstructionResult_Failed
+
+  -- check balance
+  WalletClient.checkBalanceApprox alice registry.instrumentId 1000.0
+  WalletClient.checkBalance bob registry.instrumentId 50.0
+
+  assertNoFeaturedRewards [alice, bob]
+
+test_two_step_reject_locked_amulet_gone : Script ()
+test_two_step_reject_locked_amulet_gone  = do
+  (TestSetup {..}, aliceInstrCid) <- setupTwoStepTransfer
+
+  -- bob queries the pending transfer through their wallet
+  aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
+  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrCid === aliceInstrCid
+
+  -- pass time and unlock the amulet as the owner
+  let [lockedCid] = bobInstrView.transfer.inputHoldingCids
+  setTime (bobInstrView.transfer.executeBefore `addRelTime` days 1)
+  AmuletRegistry.expireLockAsOwner registry lockedCid
+
+  -- bob rejects the transfer
+  context <- RegistryApi.getTransferInstruction_RejectContext registry bobInstrCid emptyMetadata
+  result <- submitWithDisclosures' bob context.disclosures $ exerciseCmd bobInstrCid TransferInstruction_Reject with
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  result.senderChangeCids === []
+  result.output === TransferInstructionResult_Failed
+
+  -- check balance
+  WalletClient.checkBalanceApprox alice registry.instrumentId 1000.0
+  WalletClient.checkBalance bob registry.instrumentId 50.0
+
+  assertNoFeaturedRewards [alice, bob]
+
+
+-- Testing the shared validation logic for initiating transfers
+---------------------------------------------------------------
+
+test_no_holdings : Script ()
+test_no_holdings = script do
+  TestSetup {..} <- setupTest
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer with
+        inputHoldingCids = []
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- Show that the actual transfer choice fails
+  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  assertNoFeaturedRewards [alice, bob]
+  pure ()
+
+test_expired : Script ()
+test_expired = script do
+  TestSetup {..} <- setupTest
+
+  let transfer = defaultTransfer
+  setTime (transfer.executeBefore `addRelTime` days 1)
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- Show that the actual transfer choice fails
+  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  assertNoFeaturedRewards [alice, bob]
+  pure ()
+
+
+test_wrong_admin : Script ()
+test_wrong_admin = script do
+  TestSetup {..} <- setupTest
+
+  let transfer = defaultTransfer
+  setTime (transfer.executeBefore `addRelTime` days 1)
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = alice -- set the wrong admin
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- Show that the actual transfer choice fails
+  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  assertNoFeaturedRewards [alice, bob]
+  pure ()
+
+test_factory_PublicFetch : Script ()
+test_factory_PublicFetch = do
+  TestSetup {..} <- setupTest
+  -- we check that the public fetch choice works using a transfer factory's choice context
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = defaultTransfer
+    extraArgs = emptyExtraArgs
+  view <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid TransferFactory_PublicFetch
+    with
+      expectedAdmin = registry.dso
+      actor = alice
+  view === Api.Token.TransferInstructionV1.TransferFactoryView registry.dso emptyMetadata

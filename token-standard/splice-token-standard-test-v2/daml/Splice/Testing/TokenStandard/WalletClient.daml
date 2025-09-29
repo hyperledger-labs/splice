@@ -1,0 +1,140 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script test utilities for simulating the actions of wallet client
+-- based on the token standard.
+--
+-- NOTE: there are likely more functions that could/should be added to this module. PRs welcome.
+module Splice.Testing.TokenStandard.WalletClient
+  (
+    -- * Reading/checking holdings
+    listHoldings,
+    listHoldingCids,
+    listLockedHoldings,
+
+    checkHoldingWithAmountExists,
+    checkBalanceBounds,
+    checkBalance,
+    checkBalanceApprox,
+    checkHolding,
+    checkHoldingBounds,
+    checkHoldingApprox,
+
+    -- * Reading transfer instructions
+    listTransferOffers,
+
+    -- * Reading allocations
+    listRequestedAllocations,
+
+  ) where
+
+import DA.Action (unless)
+import DA.Optional (isSome)
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.AllocationRequestV1 qualified as AllocationRequestV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+
+import Splice.Api.Token.UtilsV2
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
+import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+
+import Daml.Script
+
+-- | List the hodlings of a party of a specific instrument.
+-- We always read as V1 and upcast as needed.
+listHoldings : Party -> HoldingV1.InstrumentId -> Script [(ContractId HoldingV1.Holding, HoldingV1.HoldingView)]
+listHoldings p instrumentId = do
+  holdings <- queryInterface @HoldingV1.Holding p
+  let instrumendHoldings = do
+        (cid, Some holding) <- holdings
+        guard (holding.instrumentId == instrumentId)
+        guard (holding.owner == p)
+        pure (cid, holding)
+  pure instrumendHoldings
+
+listLockedHoldings : Party -> HoldingV1.InstrumentId -> Script [(ContractId HoldingV1.Holding, HoldingV1.HoldingView)]
+listLockedHoldings p instrumentId =
+  filter (\(_, holding) -> isSome (holding.lock)) <$> listHoldings p instrumentId
+
+-- | List the cids of the hodlings of a party of a specific instrument.
+listHoldingCids : Party -> HoldingV1.InstrumentId -> Script [ContractId HoldingV1.Holding]
+listHoldingCids p instrumentId = (map fst) <$> listHoldings p instrumentId
+
+-- | Check that a holding with a specific amount exists for the given owner.
+checkHoldingWithAmountExists : Party -> HoldingV1.InstrumentId -> Decimal -> Script ()
+checkHoldingWithAmountExists p instrumentId amount = do
+  holdings <- map snd <$> listHoldings p instrumentId
+  unless (any (\holding -> holding.amount == amount) holdings) $
+    fail (show p <> " is missing holding of value " <> show amount <> " in " <> show holdings)
+
+-- | Check the bounds on a party's total balance of all holdings of the given instrument.
+checkBalanceBounds : Party -> HoldingV1.InstrumentId -> (Decimal, Decimal) -> Script ()
+checkBalanceBounds p instrumentId (lb, ub) = do
+  holdings <- listHoldings p instrumentId
+  let total = sum $ map (._2.amount) holdings
+  unless (total >= lb && total <= ub) $ fail $
+    "Wallet " <> show p <> ": balance of " <> show total <> " for " <> show instrumentId <>
+    " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
+
+-- | Check the exact value of on an individual holding's amount.
+checkHolding : Party -> ContractId HoldingV1.Holding -> Decimal -> Script ()
+checkHolding p holdingCid amount = checkHoldingBounds p holdingCid (amount, amount)
+
+-- | Check the bounds on an individual holding's amount.
+checkHoldingBounds : Party -> ContractId HoldingV1.Holding -> (Decimal, Decimal) -> Script ()
+checkHoldingBounds p holdingCid (lb, ub) = do
+  holdingO <- queryInterfaceContractId p holdingCid
+  debug holdingO
+  let holding = case holdingO of
+        None -> error $ "Holding " <> show holdingCid <> " was not found"
+        Some holding -> holding
+  unless (holding.amount >= lb && holding.amount <= ub) $ fail $
+    "Holding " <> show holding <>
+    " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
+
+-- | Check the approximate value (+/- 1.0) a party's total balance of all holdings of the given instrument.
+checkBalanceApprox : Party -> HoldingV1.InstrumentId -> Decimal -> Script ()
+checkBalanceApprox p instrumentId approximateBalance =
+  checkBalanceBounds p instrumentId (approximateBalance - 1.0, approximateBalance + 1.0)
+
+-- | Check the approximate (+/- 1.0) amount of an individual holding.
+checkHoldingApprox : Party -> ContractId HoldingV1.Holding -> Decimal -> Script ()
+checkHoldingApprox p holdingCid approximateAmount = checkHoldingBounds p holdingCid (approximateAmount - 1.0, approximateAmount + 1.0)
+
+-- | Check the exact value a party's total balance of all holdings of the given instrument.
+checkBalance : Party -> HoldingV1.InstrumentId -> Decimal -> Script ()
+checkBalance p instrumentId balance =
+  checkBalanceBounds p instrumentId (balance, balance)
+
+-- | List pending transfer offers (as sender or receiver)
+listTransferOffers : Party -> HoldingV1.InstrumentId -> Script [(ContractId TransferInstructionV1.TransferInstruction, TransferInstructionV1.TransferInstructionView)]
+listTransferOffers p instrumentId = do
+  instrs <- queryInterface @TransferInstructionV1.TransferInstruction p
+  let pendingOffers = do
+        (cid, Some instr) <- instrs
+        guard (instr.transfer.instrumentId == instrumentId)
+        guard (instr.status == TransferInstructionV1.TransferPendingReceiverAcceptance)
+        guard (p == instr.transfer.sender || p == instr.transfer.receiver)
+        pure (cid, instr)
+  pure pendingOffers
+
+-- | List all allocations requested from the owner for a specific instrument.
+-- Currently targeting V1.
+-- TODO: Make this sensible.
+listRequestedAllocations : Party -> HoldingV1.InstrumentId -> Script [AllocationV1.AllocationSpecification]
+listRequestedAllocations p instrumentId = do
+  reqs <- queryInterface @AllocationRequestV1.AllocationRequest p
+  trace reqs $ pure ()
+  let amuletAllocs = do
+        (_reqCid, Some req) <- reqs
+        (tfId, tf) <- TextMap.toList req.transferLegs
+        guard (tf.instrumentId == instrumentId)
+        guard (p == tf.sender)
+        pure AllocationV1.AllocationSpecification with
+          settlement = req.settlement
+          transferLegId = tfId
+          transferLeg = tf
+  pure amuletAllocs
