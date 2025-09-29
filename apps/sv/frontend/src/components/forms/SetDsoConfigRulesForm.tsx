@@ -35,6 +35,7 @@ import { FormLayout } from './FormLayout';
 import {
   validateEffectiveDate,
   validateExpiryEffectiveDate,
+  validateNextScheduledSynchronizerUpgrade,
   validateSummary,
   validateUrl,
 } from './formValidators';
@@ -129,11 +130,23 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
     },
 
     validators: {
-      onChange: ({ value }) => {
-        return validateExpiryEffectiveDate({
-          expiration: value.common.expiryDate,
-          effectiveDate: value.common.effectiveDate.effectiveDate,
+      onChange: ({ value: formData }) => {
+        const expiryError = validateExpiryEffectiveDate({
+          expiration: formData.common.expiryDate,
+          effectiveDate: formData.common.effectiveDate.effectiveDate,
         });
+
+        if (expiryError) return expiryError;
+
+        const syncUpgradeTime = formData.config.nextScheduledSynchronizerUpgradeTime.value;
+        const syncMigrationId = formData.config.nextScheduledSynchronizerUpgradeMigrationId.value;
+        const effectiveDate = formData.common.effectiveDate.effectiveDate;
+
+        return validateNextScheduledSynchronizerUpgrade(
+          syncUpgradeTime,
+          syncMigrationId,
+          effectiveDate
+        );
       },
       onSubmit: ({ value: formData }) => {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
@@ -270,6 +283,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
                     pendingFieldInfo={pendingConfigFields.find(
                       f => f.fieldName === change.fieldName
                     )}
+                    effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
                   />
                 )}
               </form.AppField>
