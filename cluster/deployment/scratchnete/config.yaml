@@ -19,6 +19,8 @@ svs:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
+    participant:
+      bftSequencerConnection: false
   sv-da-1:
     publicName: Digital-Asset-1
     subdomain: sv-1
