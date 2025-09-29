@@ -92,8 +92,10 @@ class ScanVerdictStoreIngestion(
           lastState: Unit,
           lastEmittedElement: Option[Seq[v30.Verdict]],
           lastFailure: Option[Throwable],
-      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] =
-        lastFailure.map(_ => delay -> ())
+      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
+        // always restart, even if the connection was closed normally (eg after a mediator restart)
+        Some(delay -> ())
+      }
     }
 
     PekkoUtil
