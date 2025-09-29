@@ -604,8 +604,8 @@ class DbScanStore(
             sql"""
               select greatest(
                    0,
-                   sum_cumulative_change_to_initial_amount_as_of_round_zero -
-                   sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
+                   coalesce(sum_cumulative_change_to_initial_amount_as_of_round_zero -
+                   sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1), 0)
                  )
               from    round_total_amulet_balance
               where   store_id = $roundTotalsStoreId
