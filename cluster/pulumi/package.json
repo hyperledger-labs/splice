@@ -4,7 +4,6 @@
     "main": "src/index.ts",
     "devDependencies": {
         "@trivago/prettier-plugin-sort-imports": "^4.3.0",
-        "@types/request": "^2.48.13",
         "@typescript-eslint/eslint-plugin": "^7.7.1",
         "@typescript-eslint/parser": "^7.7.1",
         "eslint": "8.57.0",
@@ -48,7 +47,7 @@
         "gha"
     ],
     "dependencies": {
-        "@google-cloud/sql": "^0.20.1",
+        "@google-cloud/sql": "^0.19.0",
         "commander": "^13.0.0"
     }
 }
