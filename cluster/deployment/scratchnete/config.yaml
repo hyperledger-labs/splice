@@ -39,7 +39,7 @@ synchronizerMigration:
     id: 0
     version: 0.4.19-snapshot.20250929.990.0.vfa489964
     releaseReference:
-      gitReference: "refs/heads/party-allocation-config"
+      gitReference: "refs/heads/cocreature/party-allocation-config"
       repoUrl: https://github.com/hyperledger-labs/splice
       pulumiStacksDir: "cluster/stacks/scratchnets"
       pulumiBaseDir: "cluster/pulumi"
@@ -49,7 +49,7 @@ synchronizerMigration:
       publicConfigsDir: "cluster/configs/configs"
 operatorDeployment:
   reference:
-    gitReference: "refs/heads/party-allocation-config"
+    gitReference: "refs/heads/cocreature/party-allocation-config"
     repoUrl: https://github.com/hyperledger-labs/splice
     pulumiStacksDir: "cluster/stacks/scratchnets"
     pulumiBaseDir: "cluster/pulumi"
