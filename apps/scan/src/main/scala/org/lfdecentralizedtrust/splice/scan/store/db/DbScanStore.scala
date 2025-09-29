@@ -603,16 +603,19 @@ class DbScanStore(
             // which is why the first entry found <= asOfEndOfRound is used
             sql"""
               select greatest(
-                   0,
-                   sum_cumulative_change_to_initial_amount_as_of_round_zero -
-                   sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
-                 )
+                0,
+                coalesce(
+                  sum_cumulative_change_to_initial_amount_as_of_round_zero -
+                  sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1),
+                  0
+                )
+              )
               from    round_total_amulet_balance
               where   store_id = $roundTotalsStoreId
               and     closed_round <= $asOfEndOfRound
               order by closed_round desc
               limit 1;
-              """.as[Option[BigDecimal]].head,
+              """.as[BigDecimal].headOption,
             "getTotalAmuletBalance",
           )
         }
