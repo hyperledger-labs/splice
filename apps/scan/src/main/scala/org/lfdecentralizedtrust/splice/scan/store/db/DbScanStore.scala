@@ -593,7 +593,7 @@ class DbScanStore(
 
   override def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
-  ): Future[BigDecimal] =
+  ): Future[Option[BigDecimal]] =
     waitUntilAcsIngested {
       for {
         result <- ensureAggregated(asOfEndOfRound) { _ =>
@@ -604,19 +604,19 @@ class DbScanStore(
             sql"""
               select greatest(
                    0,
-                   coalesce(sum_cumulative_change_to_initial_amount_as_of_round_zero -
-                   sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1), 0)
+                   sum_cumulative_change_to_initial_amount_as_of_round_zero -
+                   sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
                  )
               from    round_total_amulet_balance
               where   store_id = $roundTotalsStoreId
               and     closed_round <= $asOfEndOfRound
               order by closed_round desc
               limit 1;
-              """.as[BigDecimal].headOption,
+              """.as[Option[BigDecimal]].head,
             "getTotalAmuletBalance",
           )
         }
-      } yield result.getOrElse(0)
+      } yield result
     }
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
