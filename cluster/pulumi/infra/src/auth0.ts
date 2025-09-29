@@ -161,8 +161,8 @@ function svsOnlyAuth0(
 
 function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
   const auth0Domain = 'canton-network-mainnet.us.auth0.com';
-  const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
-  const auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
+  const auth0MgtClientId = config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET');
 
   const provider = new auth0.Provider('main', {
     domain: auth0Domain,
