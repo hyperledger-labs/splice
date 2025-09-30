@@ -27,6 +27,22 @@ Upcoming
         Thereby making the ``AmuletRules`` contract smaller and saving traffic for transactions using it.
         This is motivated by `CIP-0078 CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__ .
 
+  - Canton and SDK:
+
+     - Introduction of 2 new alpha primitives in ``DA.Crypto.Text`` Module
+       in SDK version ``3.3.0-snapshot.20250930.0``. Note: To make use
+       of the functionality added here, you must compile against SDK
+       version ``3.3.0-snapshot.20250930.0`` and newer and you must
+       first upgrade Canton to the version in Splice ``0.4.19`` before you can
+       upload those dars to your validator.
+
+       - sha256 : BytesHex -> BytesHex: Computes the SHA-256 hash of
+         the given hexadecimal bytes.
+
+       - secp256k1WithEcdsaOnly : SignatureHex -> BytesHex ->
+         PublicKeyHex -> Bool: Verifies an ECDSA signature on the
+         secp256k1 curve, checking if the signature matches the
+         message and public key.
 
 0.4.18
 ------
