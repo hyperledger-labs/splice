@@ -5,7 +5,14 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.google.protobuf.ByteString
+import io.circe.Json
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   AcsStoreId,
@@ -13,24 +20,12 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  Contract,
-  ContractWithState,
-  LegacyOffset,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
-import slick.jdbc.{GetResult, PositionedResult, SetParameter}
-import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import io.circe.Json
-import io.grpc.Status
-import slick.jdbc.canton.SQLActionBuilder
-import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
+import org.lfdecentralizedtrust.splice.util.*
 import scalaz.{@@, Tag}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.jdbc.canton.SQLActionBuilder
+import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 
 trait AcsQueries extends AcsJdbcTypes {
 
@@ -340,9 +335,11 @@ object AcsQueries {
         )
         .fold(
           _ =>
-            throw io.grpc.Status.NOT_FOUND
-              .withDescription("Contract not found.")
-              .asRuntimeException(),
+            throw Status.NOT_FOUND
+              .withDescription(
+                show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), contractId.contractId)}"
+              )
+              .asRuntimeException,
           identity,
         )
     }
