@@ -8,7 +8,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import io.circe.Json
@@ -20,8 +19,8 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
 }
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
 import scalaz.{@@, Tag}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -337,7 +336,7 @@ object AcsQueries {
           _ =>
             throw Status.NOT_FOUND
               .withDescription(
-                show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), contractId.contractId)}"
+                s"contract id not found: ${PrettyContractId(companionClass.typeId(companion), contractId.contractId)}"
               )
               .asRuntimeException,
           identity,
