@@ -11,7 +11,8 @@ import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
-import Splice.Api.Token.AllocationInstructionV1 as Api.Token.AllocationInstructionV1
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+import Splice.Api.Token.AllocationInstructionV2 as AllocationInstructionV2
 import Splice.Api.Token.UtilsV2
 
 
@@ -83,7 +84,14 @@ template ExternalPartyAmuletRules
       allocationFactory_allocateImpl self arg = amulet_allocationFactory_allocateImpl this self arg
       allocationFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @Api.Token.AllocationInstructionV1.AllocationFactory this)
+        pure (view $ toInterface @AllocationFactory this)
+
+    interface instance AllocationInstructionV1.AllocationFactory for ExternalPartyAmuletRules where
+      view = allocation_factory_view_v2_to_v1 (view (toInterface @AllocationFactory this))
+
+      AllocationInstructionV1.allocationFactory_allocateImpl = allocationFactory_v1_allocateImpl (toInterface @AllocationFactory this)
+      AllocationInstructionV1.allocationFactory_publicFetchImpl = allocationFactory_v1_publicFetchImpl (toInterface @AllocationFactory this)
+
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
@@ -367,7 +375,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
   -- == validate each field of the requested allocation
   let settlement = allocation.settlement
-  let transferLeg = allocation.transferLeg
+  let transferLegs = allocation.transferLegs
 
   -- settlement.executor: no check
   -- settlement.settlementRef: no check
@@ -378,15 +386,17 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   -- settlement.settleBefore:
   require "Allocation.settlement.allocateBefore <= Allocation.settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
 
-  -- transferLegId: no check
+  forA_ transferLegs (\transferLeg -> do
+      -- transferLegId: no check
 
-  -- transferLeg.sender: no check
-  -- transferLeg.receiver: nothing to check
-  -- transferLeg.amount
-  require "Transfer amount must be positive" (transferLeg.amount > 0.0)
-  -- transferLeg.instrumentId
-  require "Instrument-id must match the factory" (instrumentId_v1_to_v2 transferLeg.instrumentId == amuletInstrumentId dso)
-  -- transferLeg.meta: no check
+      -- transferLeg.sender: no check
+      -- transferLeg.receiver: nothing to check
+      -- transferLeg.amount
+      require "Transfer amount must be positive" (transferLeg.amount > 0.0)
+      -- transferLeg.instrumentId
+      require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
+      -- transferLeg.meta: no check
+    )
 
   -- requestedAt (of the allocation instruction itself):
   assertDeadlineExceeded "requestedAt" requestedAt
@@ -395,12 +405,12 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   require "At least one input holding must be provided" (not $ null inputHoldingCids)
 
   -- lock the funds
-  let twoStepTransfer = allocationToTwoStepTransfer (allocation_specification_v1_to_v2 arg.allocation)
+  let twoStepTransfer = allocationToTwoStepTransfer arg.allocation
   (lockedAmulet, senderChangeCids, meta) <-
     prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map coerceInterfaceContractId inputHoldingCids) paymentContext
   -- create the amulet allocation
   allocationCid <- toInterfaceContractId <$> create AmuletAllocation with
-    allocation = allocation_specification_v1_to_v2 arg.allocation
+    allocation = arg.allocation
     lockedAmulet
 
   -- finaly done: return the result
