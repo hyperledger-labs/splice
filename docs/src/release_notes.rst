@@ -33,7 +33,7 @@ Upcoming
        in SDK version ``3.3.0-snapshot.20250930.0``. Note: To make use
        of the functionality added here, you must compile against SDK
        version ``3.3.0-snapshot.20250930.0`` and newer and you must
-       first upgrade Canton to version ``0.4.19`` before you can
+       first upgrade Canton to the version in Splice ``0.4.19`` before you can
        upload those dars to your validator.
 
        - sha256 : BytesHex -> BytesHex: Computes the SHA-256 hash of
