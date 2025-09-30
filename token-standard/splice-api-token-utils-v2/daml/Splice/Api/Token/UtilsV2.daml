@@ -13,6 +13,8 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructionV2
 
 -- Holding
 ----------
@@ -210,3 +212,112 @@ allocation_v1_cancelImpl this self AllocationV1.Allocation_Cancel{..} = do
     (coerceInterfaceContractId @AllocationV2.Allocation self) 
     AllocationV2.Allocation_Cancel {..}
   return (allocation_cancel_result_v2_to_v1 resv2)
+
+
+-- AllocationInstruction
+------------------------
+
+-- Upcast
+allocation_instruction_view_v1_to_v2 : AllocationInstructionV1.AllocationInstructionView -> AllocationInstructionV2.AllocationInstructionView
+allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructionView{..} = 
+  AllocationInstructionV2.AllocationInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    allocation = allocation_specification_v1_to_v2 allocation
+    pendingActions
+    requestedAt
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta
+
+-- Downcast
+allocation_instruction_view_v2_to_v1 : AllocationInstructionV2.AllocationInstructionView -> AllocationInstructionV1.AllocationInstructionView
+allocation_instruction_view_v2_to_v1 AllocationInstructionV2.AllocationInstructionView{..} = 
+  AllocationInstructionV1.AllocationInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    allocation = allocation_specification_v2_to_v1 allocation
+    pendingActions
+    requestedAt
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta
+
+-- Choices
+
+allocation_instruction_result_output_v2_to_v1 : AllocationInstructionV2.AllocationInstructionResult_Output -> AllocationInstructionV1.AllocationInstructionResult_Output
+allocation_instruction_result_output_v2_to_v1 iro = 
+  case iro of
+    AllocationInstructionV2.AllocationInstructionResult_Pending cid -> 
+      AllocationInstructionV1.AllocationInstructionResult_Pending (coerceInterfaceContractId cid)
+    AllocationInstructionV2.AllocationInstructionResult_Completed cid -> 
+      AllocationInstructionV1.AllocationInstructionResult_Completed (coerceInterfaceContractId cid)
+    AllocationInstructionV2.AllocationInstructionResult_Failed -> 
+      AllocationInstructionV1.AllocationInstructionResult_Failed
+
+allocation_instruction_result_v2_to_v1 : AllocationInstructionV2.AllocationInstructionResult -> AllocationInstructionV1.AllocationInstructionResult
+allocation_instruction_result_v2_to_v1 AllocationInstructionV2.AllocationInstructionResult{..} = 
+  AllocationInstructionV1.AllocationInstructionResult with
+    output = allocation_instruction_result_output_v2_to_v1 output
+    senderChangeCids = map coerceInterfaceContractId senderChangeCids
+    meta
+
+allocationInstruction_v1_withdrawImpl : AllocationInstructionV2.AllocationInstruction -> ContractId AllocationInstructionV1.AllocationInstruction -> AllocationInstructionV1.AllocationInstruction_Withdraw -> Update AllocationInstructionV1.AllocationInstructionResult
+allocationInstruction_v1_withdrawImpl this self AllocationInstructionV1.AllocationInstruction_Withdraw{..} = do
+  resv2 <- AllocationInstructionV2.allocationInstruction_withdrawImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self) 
+    AllocationInstructionV2.AllocationInstruction_Withdraw {..}
+  return (allocation_instruction_result_v2_to_v1 resv2)
+
+
+allocationInstruction_v1_updateImpl : AllocationInstructionV2.AllocationInstruction -> ContractId AllocationInstructionV1.AllocationInstruction -> AllocationInstructionV1.AllocationInstruction_Update -> Update AllocationInstructionV1.AllocationInstructionResult
+allocationInstruction_v1_updateImpl this self AllocationInstructionV1.AllocationInstruction_Update{..} = do
+  resv2 <- AllocationInstructionV2.allocationInstruction_updateImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self) 
+    AllocationInstructionV2.AllocationInstruction_Update {..}
+  return (allocation_instruction_result_v2_to_v1 resv2)
+
+
+-- AllocationFactory
+---------------------
+
+-- Upcast
+allocation_factory_view_v1_to_v2 : AllocationInstructionV1.AllocationFactoryView -> AllocationInstructionV2.AllocationFactoryView
+allocation_factory_view_v1_to_v2 AllocationInstructionV1.AllocationFactoryView{..} = 
+  AllocationInstructionV2.AllocationFactoryView with
+    admin
+    meta
+
+-- Downcast
+allocation_factory_view_v2_to_v1 : AllocationInstructionV2.AllocationFactoryView -> AllocationInstructionV1.AllocationFactoryView
+allocation_factory_view_v2_to_v1 AllocationInstructionV2.AllocationFactoryView{..} = 
+  AllocationInstructionV1.AllocationFactoryView with
+    admin
+    meta
+
+-- Choices
+
+allocation_factory_allocate_v1_to_v2 : AllocationInstructionV1.AllocationFactory_Allocate -> AllocationInstructionV2.AllocationFactory_Allocate
+allocation_factory_allocate_v1_to_v2 AllocationInstructionV1.AllocationFactory_Allocate{..} =
+   AllocationInstructionV2.AllocationFactory_Allocate with
+     expectedAdmin
+     allocation = allocation_specification_v1_to_v2 allocation
+     requestedAt
+     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+     extraArgs
+
+allocationFactory_v1_allocateImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_Allocate -> Update AllocationInstructionV1.AllocationInstructionResult
+allocationFactory_v1_allocateImpl this self alloc = do
+  resv2 <- AllocationInstructionV2.allocationFactory_allocateImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self) 
+    (allocation_factory_allocate_v1_to_v2 alloc)
+  return (allocation_instruction_result_v2_to_v1 resv2)
+
+
+allocationFactory_v1_publicFetchImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_PublicFetch -> Update AllocationInstructionV1.AllocationFactoryView
+allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.AllocationFactory_PublicFetch{..} = do
+  resv2 <- AllocationInstructionV2.allocationFactory_publicFetchImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self) 
+    AllocationInstructionV2.AllocationFactory_PublicFetch {..}
+  return (allocation_factory_view_v2_to_v1 resv2)
+
