@@ -110,44 +110,44 @@ class SvFrontendIntegrationTest
           },
         )
 
-      // val (_, newSecret) = actAndCheck(
-      //   "fill party hint and click on the button to create an onboarding secret", {
-      //     inside(find(id("create-party-hint"))) { case Some(element) =>
-      //       element.underlying.sendKeys("splice-client-2")
-      //     }
-      //     click on "create-validator-onboarding-secret"
-      //   },
-      // )(
-      //   "a new secret row is added",
-      //   _ => {
-      //     val secrets = findAll(
-      //       className("onboarding-secret-table-secret")
-      //     ).toSeq
-      //     secrets should have size (rowSize + 1L)
-      //     secrets.head.text
-      //   },
-      // )
+        val (_, newSecret) = actAndCheck(
+          "fill party hint and click on the button to create an onboarding secret", {
+            inside(find(id("create-party-hint"))) { case Some(element) =>
+              element.underlying.sendKeys("splice-client-2")
+            }
+            clickCreateValidatorOnboardingSecretButtonOnceEnabled()
+          },
+        )(
+          "a new secret row is added",
+          _ => {
+            val secrets = findAll(
+              className("onboarding-secret-table-secret")
+            ).toSeq
+            secrets should have size (rowSize + 1L)
+            secrets.head.text
+          },
+        )
 
-      // val licenseRows = getLicensesTableRows
-      // val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
+        val licenseRows = getLicensesTableRows
+        val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
 
-      // actAndCheck(
-      //   "onboard new validator using the secret",
-      //   sv1Backend.onboardValidator(
-      //     newValidatorParty,
-      //     newSecret,
-      //     s"${newValidatorParty.uid.identifier}@example.com",
-      //   ),
-      // )(
-      //   "a new validator row is added",
-      //   _ => {
-      //     checkLastValidatorLicenseRow(
-      //       licenseRows.size.toLong,
-      //       sv1Backend.getDsoInfo().svParty,
-      //       newValidatorParty,
-      //     )
-      //   },
-      // )
+        actAndCheck(
+          "onboard new validator using the secret",
+          sv1Backend.onboardValidator(
+            newValidatorParty,
+            newSecret,
+            s"${newValidatorParty.uid.identifier}@example.com",
+          ),
+        )(
+          "a new validator row is added",
+          _ => {
+            checkLastValidatorLicenseRow(
+              licenseRows.size.toLong,
+              sv1Backend.getDsoInfo().svParty,
+              newValidatorParty,
+            )
+          },
+        )
       }
     }
 
