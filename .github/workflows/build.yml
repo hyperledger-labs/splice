@@ -161,7 +161,7 @@ jobs:
   scala_test_signatures:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-small
+      runs_on: self-hosted-k8s-medium
       test_names_file: 'test-full-class-names-signatures.log'
       start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-deprecated-keys.sc"
       parallelism: 1
