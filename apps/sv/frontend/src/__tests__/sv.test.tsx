@@ -4,11 +4,15 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
-import { ListDsoRulesVoteRequestsResponse } from '@lfdecentralizedtrust/sv-openapi';
+import {
+  CreateVoteRequest,
+  ListDsoRulesVoteRequestsResponse,
+} from '@lfdecentralizedtrust/sv-openapi';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
+import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
@@ -17,7 +21,7 @@ import {
   getUTCWithOffset,
 } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
-import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
+import { dsoInfo } from '@lfdecentralizedtrust/splice-common-test-handlers';
 
 const AppWithConfig = () => {
   return (
@@ -350,4 +354,63 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     expect(await screen.queryByText('encoded_secret')).toBeDefined();
     expect(await screen.queryByText('candidate_secret')).toBeNull();
   });
+});
+
+describe('SetAmuletRules', () => {
+  test(
+    'should not send the transfer fee steps that are set to 0',
+    async () => {
+      let calledCreate: (body: CreateVoteRequest) => void;
+      const createPromise: Promise<CreateVoteRequest> = new Promise(
+        resolve => (calledCreate = resolve)
+      );
+      server.use(
+        rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, async (req, res, ctx) => {
+          calledCreate(await req.json());
+          return res(ctx.json({}));
+        })
+      );
+
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      changeAction('CRARC_SetConfig');
+
+      const summaryInput = screen.getByTestId('create-reason-summary');
+      await user.type(summaryInput, 'summaryABC');
+
+      const urlInput = screen.getByTestId('create-reason-url');
+      await user.type(urlInput, 'https://vote-request.url');
+
+      const initialSteps =
+        dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue.transferConfig.transferFee
+          .steps;
+      expect(initialSteps.length).toBe(3); // Sanity check
+
+      // editting the second element (.1) of the transferFees
+      const input = screen.getByTestId('transferConfig.transferFee.steps.1._2-value');
+      await user.clear(input);
+      await user.type(input, '0');
+
+      const sendButton = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      await user.click(sendButton);
+      const proceedButton = screen.getByRole('button', { name: 'Proceed' });
+      await user.click(proceedButton);
+
+      const calledWithBody = await createPromise;
+      expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (calledWithBody.action as any).value.amuletRulesAction.value.newConfig.transferConfig
+          .transferFee.steps
+        // the second element is gone
+      ).toStrictEqual(initialSteps.filter((_, i) => i !== 1));
+    },
+    { timeout: 10000 }
+  );
 });
