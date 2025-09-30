@@ -3,6 +3,7 @@
 import { Optional } from '@daml/types';
 import { AmuletConfig, PackageConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import { Tuple2 } from '@daml.js/daml-prim-DA-Types-1.0.0/lib/DA/Types';
+import { Set as DamlSet } from '@daml.js/daml-stdlib-DA-Set-Types-1.0.0/lib/DA/Set/Types';
 import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types';
 import { IssuanceConfig } from '@daml.js/splice-amulet/lib/Splice/Issuance';
 import { Schedule } from '@daml.js/splice-amulet/lib/Splice/Schedule';
@@ -152,7 +153,8 @@ function buildTransferFeeStepsChanges(
 ) {
   return (
     before
-      ?.map((b, idx) => {
+      ?.map((b, i) => {
+        const idx = i + 1;
         const a = after?.[idx];
         return [
           {
@@ -289,6 +291,28 @@ function buildDecentralizedSynchronizerChanges(
 ) {
   if (!before && !after) return [];
 
+  const getRequiredSynchronizers = (synchronizers: DamlSet<string> | undefined) => {
+    if (!synchronizers) return [];
+
+    return synchronizers.map
+      .entriesArray()
+      .map(r => r[0])
+      .sort();
+  };
+
+  const beforeRequiredSynchronizers = getRequiredSynchronizers(before?.requiredSynchronizers);
+  const afterRequiredSynchronizers = getRequiredSynchronizers(after?.requiredSynchronizers);
+
+  const requiredSynchronizersChanges = afterRequiredSynchronizers.map(a => {
+    const idx = beforeRequiredSynchronizers.indexOf(a);
+    return {
+      fieldName: `decentralizedSynchronizerRequiredSynchronizers${idx + 1}`,
+      label: `Decentralized Synchronizer (Required Synchronizer ${idx + 1})`,
+      currentValue: afterRequiredSynchronizers[idx],
+      newValue: a,
+    };
+  });
+
   return [
     {
       fieldName: 'decentralizedSynchronizerActiveSynchronizer',
@@ -327,5 +351,6 @@ function buildDecentralizedSynchronizerChanges(
       currentValue: before?.fees.minTopupAmount || '',
       newValue: after?.fees.minTopupAmount || '',
     },
+    ...requiredSynchronizersChanges,
   ] as ConfigChange[];
 }
