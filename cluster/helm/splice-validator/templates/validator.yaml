@@ -365,6 +365,8 @@ spec:
           image: busybox:1.37.0
           command: ["sh", "-c", "cp -R /participant-bootstrapping-dump-secret/* /participant-bootstrapping-dump && chown -R 1001:1001 /participant-bootstrapping-dump"]
           volumeMounts:
+            - name: participant-bootstrapping-dump-secret
+              mountPath: /participant-bootstrapping-dump-secret
             - name: participant-bootstrapping-dump-volume
               mountPath: /participant-bootstrapping-dump
         {{- end }}
