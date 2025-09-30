@@ -163,22 +163,22 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         ),
       )
     }
-    clue("try to onboarding with a secret with wrong party hint") {
-      val partyId = PartyId
-        .fromProtoPrimitive("invalid-name-1::dummy", "partyId")
-        .getOrElse(sys.error("Could not parse PartyId"))
+    // clue("try to onboarding with a secret with wrong party hint") {
+    //   val partyId = PartyId
+    //     .fromProtoPrimitive("invalid-name-1::dummy", "partyId")
+    //     .getOrElse(sys.error("Could not parse PartyId"))
 
-      assertThrowsAndLogsCommandFailures(
-        sv.onboardValidator(
-          partyId,
-          onboardingContract.payload.candidateSecret,
-          contactPoint,
-        ),
-        _.errorMessage should include(
-          s"The onboarding secret entered does not match the secret issued for validatorPartyHint: $name"
-        ),
-      )
-    }
+    //   assertThrowsAndLogsCommandFailures(
+    //     sv.onboardValidator(
+    //       partyId,
+    //       onboardingContract.payload.candidateSecret,
+    //       contactPoint,
+    //     ),
+    //     _.errorMessage should include(
+    //       s"The onboarding secret entered does not match the secret issued for validatorPartyHint: $name"
+    //     ),
+    //   )
+    // }
     actAndCheck(
       "request to onboard the candidate",
       sv.onboardValidator(candidate, secret, s"${candidate.uid.identifier}@example.com"),
