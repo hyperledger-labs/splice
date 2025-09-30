@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
