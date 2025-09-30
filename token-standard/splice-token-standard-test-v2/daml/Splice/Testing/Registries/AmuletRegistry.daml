@@ -35,10 +35,11 @@ import DA.Time
 import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
-import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
+import Splice.Api.Token.HoldingV2 as Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationInstructionV1
 import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils

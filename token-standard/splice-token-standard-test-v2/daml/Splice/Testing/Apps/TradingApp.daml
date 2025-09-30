@@ -13,14 +13,15 @@ import DA.TextMap as TextMap
 import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
+import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV1
+import Splice.Api.Token.UtilsV2
 
 
 template OTCTradeProposal with
     venue : Party
     tradeCid : Optional (ContractId OTCTradeProposal) -- Tracking-id for the trade being proposed. Set to None for new trades.
-    transferLegs : TextMap Api.Token.AllocationV1.TransferLeg
+    transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
     approvers : [Party] -- ^ Parties that have approved the proposal
   where
     signatory approvers
@@ -66,21 +67,20 @@ template OTCTradeProposal with
           settleBefore
 
 tradeAllocations
-  : SettlementInfo -> TextMap Api.Token.AllocationV1.TransferLeg
+  : SettlementInfo -> TextMap Api.Token.AllocationV2.TransferLeg
   -> TextMap AllocationSpecification
 tradeAllocations settlementInfo transferLegs =
   TextMap.fromList $ do
     (transferLegId, transferLeg) <- TextMap.toList transferLegs
     let spec = AllocationSpecification with
           settlement = settlementInfo
-          transferLegId
-          transferLeg
+          transferLegs = TextMap.fromList [(transferLegId, transferLeg)]
     pure (transferLegId, spec)
 
 template OTCTrade
   with
     venue : Party
-    transferLegs : TextMap Api.Token.AllocationV1.TransferLeg
+    transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
     tradeCid : ContractId OTCTradeProposal
     createdAt : Time
     prepareUntil : Time
@@ -104,6 +104,7 @@ template OTCTrade
               allocateBefore = prepareUntil
               settleBefore
               meta = emptyMetadata
+              controllerOverride = None
         let expectedAllocations = tradeAllocations settlementInfo transferLegs
         let mergedMaps = zipTextMaps allocationsWithContext expectedAllocations
         forTextMapWithKey mergedMaps \legId (optAllocWithContext,  optExpectedAlloc) -> do
@@ -113,7 +114,7 @@ template OTCTrade
           instr <- fetch @Allocation allocCid
           let instrView = view @Allocation instr
           require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
-          exercise allocCid (Allocation_ExecuteTransfer extraArgs)
+          exercise allocCid (Allocation_ExecuteTransfer with extraArgs; extraAuth = None)
 
 
     -- NOTE: this choice is an approximation to what a real app would do.
@@ -134,6 +135,7 @@ template OTCTrade
               allocateBefore = prepareUntil
               settleBefore
               meta = emptyMetadata
+              controllerOverride = None
         let expectedAllocations = tradeAllocations settlementInfo transferLegs
         let mergedMaps = zipTextMaps allocationsWithContext expectedAllocations
           -- fetch and validate the allocation instruction
@@ -150,14 +152,15 @@ template OTCTrade
 
     interface instance AllocationRequest for OTCTrade where
       view = AllocationRequestView with
-        settlement = SettlementInfo with
+        settlement = settlement_info_v2_to_v1 $ SettlementInfo with
           executor = venue
           requestedAt = createdAt
           settlementRef = makeTradeRef tradeCid
           allocateBefore = prepareUntil
           settleBefore
           meta = emptyMetadata
-        transferLegs
+          controllerOverride = None
+        transferLegs = fmap transfer_leg_v2_to_v1 transferLegs
         meta = emptyMetadata
 
       allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
@@ -171,7 +174,7 @@ template OTCTrade
         pure ChoiceExecutionMetadata with meta = emptyMetadata
 
 
-tradingParties : TextMap Api.Token.AllocationV1.TransferLeg -> Set.Set Party
+tradingParties : TextMap Api.Token.AllocationV2.TransferLeg -> Set.Set Party
 tradingParties = F.foldl (\acc t -> Set.insert t.sender (Set.insert t.receiver acc)) Set.empty
 
 -- | Check whether a required condition is true. If it's not, abort the
@@ -180,8 +183,8 @@ require : CanAssert m => Text -> Bool -> m ()
 require msg invariant =
   assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
 
-makeTradeRef : ContractId OTCTradeProposal -> Api.Token.AllocationV1.Reference
-makeTradeRef tradeCid = Api.Token.AllocationV1.Reference with
+makeTradeRef : ContractId OTCTradeProposal -> Api.Token.AllocationV2.Reference
+makeTradeRef tradeCid = Api.Token.AllocationV2.Reference with
   id = "OTCTradeProposal" -- set to the name of the template to simplify debugging
   cid = Some (coerceContractId tradeCid)
 

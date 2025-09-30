@@ -23,7 +23,7 @@ import DA.Optional (optionalToList)
 import DA.Time
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils

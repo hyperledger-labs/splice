@@ -4,13 +4,18 @@
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
   allocationToTwoStepTransfer,
+  allocationSender,
 ) where
 
 import DA.Text as Text
+import DA.TextMap qualified as TextMap
+import DA.List (dedupSort)
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
-import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationV2
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
@@ -22,14 +27,18 @@ template AmuletAllocation
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
     allocation : AllocationSpecification
   where
-    signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
+    signatory allocationInstrumentAdmin allocation, allocationSender allocation
     observer allocation.settlement.executor
+
+    -- Only allow a single sender.
+    ensure all (\(_,tl) -> tl.sender == allocationSender allocation) (TextMap.toList allocation.transferLegs)
 
     interface instance Allocation for AmuletAllocation where
       view = AllocationView with
         allocation
         holdingCids = [toInterfaceContractId lockedAmulet]
         meta = emptyMetadata
+        transferExtraAuth = [allocationSender allocation]
 
       allocation_executeTransferImpl _self Allocation_ExecuteTransfer{..} = transferAmuletAllocation this extraArgs
 
@@ -47,9 +56,29 @@ template AmuletAllocation
             senderHoldingCids
             meta = emptyMetadata
 
-allocationInstrumentAdmin : AllocationSpecification -> Party
-allocationInstrumentAdmin AllocationSpecification{..} = transferLeg.instrumentId.admin
+      allocation_executeAuthorizeIncomingImpl = error "unimplemented"
 
+    interface instance AllocationV1.Allocation for AmuletAllocation where
+      view = allocation_view_v2_to_v1 (view (toInterface @Allocation this))
+
+      AllocationV1.allocation_executeTransferImpl = allocation_v1_executeTransferImpl (toInterface @Allocation this)
+      AllocationV1.allocation_withdrawImpl = allocation_v1_withdrawImpl (toInterface @Allocation this)
+      AllocationV1.allocation_cancelImpl = allocation_v1_cancelImpl (toInterface @Allocation this)
+
+allocationInstrumentAdmin : AllocationSpecification -> Party
+allocationInstrumentAdmin AllocationSpecification{..} =
+  let tl::_ = (TextMap.toList transferLegs)
+  in tl._2.instrumentId.admin
+
+-- Amulet only supports a single sender!
+allocationSender : AllocationSpecification -> Party
+allocationSender AllocationSpecification{..} =
+  let tl::_ = (TextMap.toList transferLegs)
+  in tl._2.sender
+
+allocationInstrumentReceivers : AllocationSpecification -> [Party]
+allocationInstrumentReceivers AllocationSpecification{..} =
+  dedupSort $ map ((.receiver) . snd) (TextMap.toList transferLegs)
 
 -- Allocation usage
 -------------------
@@ -57,17 +86,21 @@ allocationInstrumentAdmin AllocationSpecification{..} = transferLeg.instrumentId
 allocationToTwoStepTransfer : AllocationSpecification -> TwoStepTransfer
 allocationToTwoStepTransfer allocation =
   TwoStepTransfer with
-    dso = allocationInstrumentAdmin allocation
-    sender = allocation.transferLeg.sender
-    receiver = allocation.transferLeg.receiver
-    amount = allocation.transferLeg.amount
+    dso = transferLeg.instrumentId.admin
+    sender = transferLeg.sender
+    receiver = transferLeg.receiver
+    amount = transferLeg.amount
     provider = allocation.settlement.executor
     transferBefore = allocation.settlement.settleBefore
     transferBeforeDeadline = "allocation.settlement.settleBefore"
     allowFeaturing = True
     lockContext = Text.implode
       -- We don't show more context to avoid bloating the response here.
-      ["allocation for transfer leg ", show allocation.transferLegId, " to ", show allocation.transferLeg.receiver]
+      ["allocation for transfer leg ", show transferLegId, " to ", show transferLeg.receiver]
+  where
+    (transferLegId, transferLeg) = case TextMap.toList allocation.transferLegs of
+      [tl] -> tl
+      _ -> error "Only one leg supported" -- TODO.
 
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
