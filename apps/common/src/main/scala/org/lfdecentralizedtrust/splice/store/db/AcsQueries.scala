@@ -13,6 +13,7 @@ import com.google.protobuf.ByteString
 import io.circe.Json
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
+import org.lfdecentralizedtrust.splice.store.StoreErrors
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   AcsStoreId,
   SelectFromAcsTableResult,
@@ -315,7 +316,7 @@ object AcsQueries {
       createdEventBlob: Array[Byte],
       createdAt: Timestamp,
       contractExpiresAt: Option[Timestamp],
-  ) {
+  ) extends StoreErrors {
     def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
         companionClass: ContractCompanion[C, TCId, T],
         decoder: TemplateJsonDecoder,
@@ -334,11 +335,9 @@ object AcsQueries {
         )
         .fold(
           _ =>
-            throw Status.NOT_FOUND
-              .withDescription(
-                s"contract id not found: ${PrettyContractId(companionClass.typeId(companion), contractId.contractId)}"
-              )
-              .asRuntimeException,
+            throw contractIdNotFound(
+              PrettyContractId(companionClass.typeId(companion), contractId.contractId)
+            ),
           identity,
         )
     }
