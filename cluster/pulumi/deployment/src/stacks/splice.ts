@@ -6,7 +6,10 @@ import {
   config,
   DeploySvRunbook,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { deployedValidators } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import {
+  deployedValidators,
+  validatorRunbookStackName,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
@@ -29,7 +32,10 @@ export function getSpliceStacksFromMainReference(): StackFromRef[] {
     ret.push({ project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` });
   }
   deployedValidators.forEach(validator => {
-    ret.push({ project: 'validator-runbook', stack: `${validator}.${CLUSTER_BASENAME}` });
+    ret.push({
+      project: 'validator-runbook',
+      stack: `${validatorRunbookStackName(validator)}.${CLUSTER_BASENAME}`,
+    });
   });
   if (mustInstallValidator1) {
     ret.push({ project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` });
