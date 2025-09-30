@@ -115,7 +115,15 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
               inside(find(id("create-party-hint"))) { case Some(element) =>
                 element.underlying.sendKeys("splice-client-1")
               }
-              clickCreateValidatorOnboardingSecretButtonOnceEnabled()
+              clue("wait for the submit button to become clickable") {
+                eventually(5.seconds)(
+                  find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
+                )
+              }
+
+              clue("click the submit button") {
+                click on "create-validator-onboarding-secret"
+              }
             },
           )(
             s"We see that this SV has created an onboarding secret",

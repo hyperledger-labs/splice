@@ -42,16 +42,4 @@ trait SvFrontendTestUtil extends TestCommon {
       }
     }
   }
-
-  def clickCreateValidatorOnboardingSecretButtonOnceEnabled()(implicit webDriver: WebDriverType) = {
-    clue("wait for the submit button to become clickable") {
-      eventually(5.seconds)(
-        find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
-      )
-    }
-
-    clue("click the submit button") {
-      click on "create-validator-onboarding-secret"
-    }
-  }
 }
