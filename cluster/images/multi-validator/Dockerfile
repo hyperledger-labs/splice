@@ -9,3 +9,5 @@ ARG base_version
 LABEL org.opencontainers.image.base.name="splice-app:${base_version}"
 
 COPY app.conf pre-bootstrap.sh health-check.sh /app/
+
+RUN chown -R nonroot:nonroot /app
