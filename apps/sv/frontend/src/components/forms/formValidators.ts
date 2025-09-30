@@ -89,3 +89,30 @@ export const validateGrantRevokeFeaturedAppRight = (value: string): string | fal
   const result = grantRevokeFeaturedAppRightSchema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
+
+export const validateNextScheduledSynchronizerUpgrade = (
+  upgradeTime: string,
+  migrationId: string,
+  effectiveDate: string | undefined
+): string | false => {
+  const onlyOneIsProvided = (upgradeTime === '') !== (migrationId === '');
+  const bothEmpty = upgradeTime === '' && migrationId === '';
+
+  if (bothEmpty) {
+    return false;
+  }
+
+  if (onlyOneIsProvided) {
+    return 'Upgrade Time and Migration ID are required for a Scheduled Synchronizer Upgrade';
+  }
+
+  const upgradeTimeDate = dayjs.utc(upgradeTime);
+  const effectivity = dayjs(effectiveDate);
+
+  const upgradeTimeIsAfterEffectiveDate = upgradeTimeDate.isAfter(effectivity.add(1, 'hour'));
+  if (!upgradeTimeIsAfterEffectiveDate) {
+    return 'Upgrade Time must be at least 1 hour after the Effective Date';
+  }
+
+  return false;
+};
