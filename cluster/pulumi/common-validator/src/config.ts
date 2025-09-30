@@ -30,6 +30,12 @@ export const ValidatorNodeConfigSchema = z.object({
     .optional(),
   participant: ParticipantConfigSchema.optional(),
 });
+export const PartyAllocatorConfigSchema = z.object({
+  enable: z.boolean(),
+  parallelism: z.number().default(30),
+  maxParties: z.number().default(1000000),
+});
+export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
 export type ValidatorNodeConfig = z.infer<typeof ValidatorNodeConfigSchema>;
 export const ValidatorConfigSchema = z
   .object({
@@ -41,12 +47,7 @@ export const ValidatorConfigSchema = z
     migrateParty: z.boolean().default(false),
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),
-    partyAllocator: z
-      .object({
-        enable: z.boolean(),
-        parallelism: z.number
-      })
-      .default({ enable: false }),
+    partyAllocator: PartyAllocatorConfigSchema.default({ enable: false }),
   })
   .and(ValidatorNodeConfigSchema);
 
