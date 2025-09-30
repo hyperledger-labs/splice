@@ -34,7 +34,7 @@ abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
 final case class CircuitBreakerConfig(
-    maxFailures: Int = 20,
+    maxFailures: Int = 40,
     callTimeout: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
     resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
@@ -43,16 +43,17 @@ final case class CircuitBreakerConfig(
     randomFactor: Double = 0.2,
 )
 
+// TODO(hyperledger-labs/splice#2462) Revert back to defaults once we also reset failures after some time of inactivity
 final case class CircuitBreakersConfig(
     highPriority: CircuitBreakerConfig = CircuitBreakerConfig(
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
     ),
     mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
-      maxFailures = 10,
+      maxFailures = 20,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
     ),
     lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
-      maxFailures = 5,
+      maxFailures = 10,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),
     // Amulet expiry is different from essentially any other trigger run in the SV app in that for it to complete successfully
