@@ -174,6 +174,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
           ...values,
           imageRepo: DOCKER_REPO,
           ...appsAffinityAndTolerations,
+          ...imagePullPolicy,
         },
         timeout,
         maxHistory: HELM_MAX_HISTORY_SIZE,

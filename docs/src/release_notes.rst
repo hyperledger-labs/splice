@@ -11,6 +11,14 @@ Release Notes
 Upcoming
 --------
 
+  - Docker images
+
+    - All app & UI images now use a non-root user.
+
+
+0.4.18
+------
+
   - Daml
 
     - release ``splice-util-featured-app-proxies-1.1.0`` with
@@ -39,7 +47,6 @@ Upcoming
   - UIs
 
     - Implement changes from CIP-78 CC Fee Removal.
-
 
 0.4.17
 ------

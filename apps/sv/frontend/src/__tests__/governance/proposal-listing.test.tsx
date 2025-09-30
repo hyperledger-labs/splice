@@ -12,7 +12,7 @@ const inflightVoteRequests: ProposalListingData[] = [
   {
     actionName: 'Feature Application',
     contractId: '2abcde123456' as ContractId<VoteRequest>,
-    votingCloses: '2025-09-25 11:00',
+    votingThresholdDeadline: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'no-vote',
     status: 'In Progress',
@@ -22,7 +22,7 @@ const inflightVoteRequests: ProposalListingData[] = [
   {
     actionName: 'Set DSO Rules Configuration',
     contractId: 'bcde123456' as ContractId<VoteRequest>,
-    votingCloses: '2025-09-25 11:00',
+    votingThresholdDeadline: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'accepted',
     status: 'In Progress',
@@ -35,7 +35,7 @@ const voteHistory: ProposalListingData[] = [
   {
     actionName: 'Feature Application',
     contractId: '2abcde123456' as ContractId<VoteRequest>,
-    votingCloses: '2025-09-25 11:00',
+    votingThresholdDeadline: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'no-vote',
     status: 'Implemented',
@@ -45,7 +45,7 @@ const voteHistory: ProposalListingData[] = [
   {
     actionName: 'Set DSO Rules Configuration',
     contractId: '2bcde123456' as ContractId<VoteRequest>,
-    votingCloses: '2025-09-25 11:00',
+    votingThresholdDeadline: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'accepted',
     status: 'Rejected',
@@ -91,7 +91,7 @@ describe('Inflight Vote Requests', () => {
     const uniqueId = 'inflight-vote-request';
     const data = {
       actionName: 'Feature Application',
-      votingCloses: '2025-09-25 11:00',
+      votingThresholdDeadline: '2025-09-25 11:00',
       voteTakesEffect: '2025-09-26 11:00',
       yourVote: 'no-vote',
       status: 'In Progress',
@@ -107,6 +107,7 @@ describe('Inflight Vote Requests', () => {
           uniqueId={uniqueId}
           showVoteStats
           showAcceptanceThreshold
+          showThresholdDeadline
         />
       </MemoryRouter>
     );
@@ -117,8 +118,8 @@ describe('Inflight Vote Requests', () => {
     const action = screen.getByTestId(`${uniqueId}-row-action-name`);
     expect(action.textContent).toBe(data.actionName);
 
-    const votingCloses = screen.getByTestId(`${uniqueId}-row-voting-closes`);
-    expect(votingCloses.textContent).toBe(data.votingCloses);
+    const votingThresholdDeadline = screen.getByTestId(`${uniqueId}-row-voting-threshold-deadline`);
+    expect(votingThresholdDeadline.textContent).toBe(data.votingThresholdDeadline);
 
     const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
     expect(voteTakesEffect.textContent).toBe(data.voteTakesEffect);
@@ -140,7 +141,7 @@ describe('Inflight Vote Requests', () => {
     const uniqueId = 'inflight-vote-request';
     const data = {
       actionName: 'Feature Application',
-      votingCloses: '2025-09-25 11:00',
+      votingThresholdDeadline: '2025-09-25 11:00',
       voteTakesEffect: '2025-09-26 11:00',
       yourVote: 'accepted',
       status: 'In Progress',
@@ -170,7 +171,7 @@ describe('Inflight Vote Requests', () => {
     const uniqueId = 'inflight-vote-request';
     const data = {
       actionName: 'Feature Application',
-      votingCloses: '2025-09-25 11:00',
+      votingThresholdDeadline: '2025-09-25 11:00',
       voteTakesEffect: '2025-09-26 11:00',
       yourVote: 'rejected',
       status: 'In Progress',
@@ -246,7 +247,7 @@ describe('Vote history', () => {
     const uniqueId = 'vote-history';
     const data = {
       actionName: 'Feature Application',
-      votingCloses: '2024-09-25 11:00',
+      votingThresholdDeadline: '2024-09-25 11:00',
       voteTakesEffect: '2024-09-26 11:00',
       yourVote: 'no-vote',
       status: 'Implemented',
@@ -271,8 +272,8 @@ describe('Vote history', () => {
     const action = screen.getByTestId(`${uniqueId}-row-action-name`);
     expect(action.textContent).toBe(data.actionName);
 
-    const votingCloses = screen.getByTestId(`${uniqueId}-row-voting-closes`);
-    expect(votingCloses.textContent).toBe(data.votingCloses);
+    const votingCloses = screen.queryByTestId(`${uniqueId}-row-voting-threshold-deadline`);
+    expect(votingCloses).toBeNull();
 
     const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
     expect(voteTakesEffect.textContent).toBe(data.voteTakesEffect);

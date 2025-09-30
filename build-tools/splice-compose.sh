@@ -240,8 +240,6 @@ function subcmd_start {
     export IMAGE_REPO=""
   fi
 
-  export POSTGRES_IMAGE_REPO="mirror.gcr.io/"
-
   export IMAGE_TAG
 
   if [ $local_sv -eq 1 ]; then

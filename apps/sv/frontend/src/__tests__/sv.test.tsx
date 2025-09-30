@@ -180,7 +180,6 @@ describe('An SetConfig request', () => {
       await user.click(screen.getByText('Governance'));
 
       expect(await screen.findByText('Vote Requests')).toBeDefined();
-      expect(await screen.findByText('Governance')).toBeDefined();
 
       changeAction('CRARC_SetConfig');
 
@@ -202,8 +201,7 @@ describe('An SetConfig request', () => {
         'A Vote Request aiming to change similar fields already exists. ' +
           'You are therefore not allowed to modify the fields: transferConfig.createFee.fee'
       );
-
-      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      const button = screen.getByTestId('create-voterequest-submit-button');
       expect(button.getAttribute('disabled')).toBeDefined();
     }
   );
