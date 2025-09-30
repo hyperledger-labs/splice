@@ -87,6 +87,7 @@ case class AutomationConfig(
       */
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
+    ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName

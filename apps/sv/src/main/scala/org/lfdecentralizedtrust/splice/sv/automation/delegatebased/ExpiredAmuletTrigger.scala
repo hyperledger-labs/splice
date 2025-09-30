@@ -28,7 +28,7 @@ class ExpiredAmuletTrigger(
       splice.amulet.Amulet,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
-      svTaskContext.dsoStore.listExpiredAmulets,
+      svTaskContext.dsoStore.listExpiredAmulets(context.config.ignoredExpiredAmuletPartyIds),
       splice.amulet.Amulet.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
