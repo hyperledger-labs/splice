@@ -24,7 +24,7 @@ export function installPartyAllocator(
       validatorApiUrl: 'http://validator-app:5003',
       maxParties: 1000000,
       keysDirectory: '/keys',
-      parallelism: 5,
+      parallelism: 10,
     },
     activeVersion,
     { dependsOn }
