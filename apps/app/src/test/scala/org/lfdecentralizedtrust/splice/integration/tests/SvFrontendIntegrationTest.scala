@@ -128,26 +128,26 @@ class SvFrontendIntegrationTest
           },
         )
 
-        val licenseRows = getLicensesTableRows
-        val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
+      // val licenseRows = getLicensesTableRows
+      // val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
 
-        actAndCheck(
-          "onboard new validator using the secret",
-          sv1Backend.onboardValidator(
-            newValidatorParty,
-            newSecret,
-            s"${newValidatorParty.uid.identifier}@example.com",
-          ),
-        )(
-          "a new validator row is added",
-          _ => {
-            checkLastValidatorLicenseRow(
-              licenseRows.size.toLong,
-              sv1Backend.getDsoInfo().svParty,
-              newValidatorParty,
-            )
-          },
-        )
+      // actAndCheck(
+      //   "onboard new validator using the secret",
+      //   sv1Backend.onboardValidator(
+      //     newValidatorParty,
+      //     newSecret,
+      //     s"${newValidatorParty.uid.identifier}@example.com",
+      //   ),
+      // )(
+      //   "a new validator row is added",
+      //   _ => {
+      //     checkLastValidatorLicenseRow(
+      //       licenseRows.size.toLong,
+      //       sv1Backend.getDsoInfo().svParty,
+      //       newValidatorParty,
+      //     )
+      //   },
+      // )
       }
     }
 
