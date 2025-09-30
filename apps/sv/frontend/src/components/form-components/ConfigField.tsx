@@ -6,11 +6,13 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useFieldContext } from '../../hooks/formContext';
 import type { ConfigChange, PendingConfigFieldInfo } from '../../utils/types';
+import { nextScheduledSynchronizerUpgradeFormat } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 dayjs.extend(relativeTime);
 
 export interface ConfigFieldProps {
   configChange: ConfigChange;
+  effectiveDate?: string | undefined;
   pendingFieldInfo?: PendingConfigFieldInfo;
 }
 
@@ -20,7 +22,7 @@ export type ConfigFieldState = {
 };
 
 export const ConfigField: React.FC<ConfigFieldProps> = props => {
-  const { configChange, pendingFieldInfo } = props;
+  const { configChange, effectiveDate, pendingFieldInfo } = props;
   const field = useFieldContext<ConfigFieldState>();
   const textFieldProps = {
     variant: 'outlined' as const,
@@ -77,6 +79,13 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
             </Typography>
           )}
 
+          {field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeTime' && (
+            <NextScheduledSynchronizerUpgradeDisplay
+              effectiveDate={effectiveDate}
+              configChange={configChange}
+            />
+          )}
+
           {pendingFieldInfo && <PendingConfigDisplay pendingFieldInfo={pendingFieldInfo} />}
         </Box>
       </Box>
@@ -103,6 +112,32 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
       <strong>
         {atThreshold ? 'at Threshold' : dayjs(pendingFieldInfo.effectiveDate).fromNow()}
       </strong>
+    </Typography>
+  );
+};
+
+interface NextScheduledSynchronizerUpgradeDisplayProps {
+  effectiveDate: string | undefined;
+  configChange: ConfigChange;
+}
+
+export const NextScheduledSynchronizerUpgradeDisplay: React.FC<
+  NextScheduledSynchronizerUpgradeDisplayProps
+> = props => {
+  const { effectiveDate } = props;
+  const defaultMigrationTime = dayjs(effectiveDate)
+    .utc()
+    .add(1, 'hour')
+    .format(nextScheduledSynchronizerUpgradeFormat);
+
+  return (
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
+      data-testid={`next-scheduled-upgrade-time-default`}
+    >
+      {`Default: ${defaultMigrationTime}`}
     </Typography>
   );
 };

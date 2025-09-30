@@ -15,10 +15,16 @@ Upcoming
 
     - All app & UI images now use a non-root user.
 
-  - SV app UI
+  - SV
 
-      - When updating the AmuletRules config, the UI will omit any transfer fee steps with value zero from the payload
-        sent to the server. They will not be changeable after that either. This follows CIP-0078.
+    - Deployment
+
+      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps. This should avoid issues with cpu scheduling that might lead to performance degradations.
+
+    - UI
+
+        - When updating the AmuletRules config, the UI will omit any transfer fee steps with value zero from the payload
+          sent to the server. They will not be changeable after that either. This follows CIP-0078.
 
 
 0.4.18
