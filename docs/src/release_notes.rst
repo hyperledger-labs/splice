@@ -15,6 +15,11 @@ Upcoming
 
     - All app & UI images now use a non-root user.
 
+  - SV app UI
+
+      - When updating the AmuletRules config, the UI will omit any transfer fee steps with value zero from the payload
+        sent to the server. They will not be changeable after that either. This follows CIP-0078.
+
 
 0.4.18
 ------
