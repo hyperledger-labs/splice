@@ -15,6 +15,12 @@ Upcoming
 
     - All app & UI images now use a non-root user.
 
+  - SV
+
+    - Deployment
+
+      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps. This should avoid issues with cpu scheduling that might lead to performance degradations.
+
 
 0.4.18
 ------
