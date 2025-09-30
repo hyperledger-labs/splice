@@ -44,6 +44,7 @@ export const ValidatorConfigSchema = z
     partyAllocator: z
       .object({
         enable: z.boolean(),
+        parallelism: z.number
       })
       .default({ enable: false }),
   })
