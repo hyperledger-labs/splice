@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.util
 
 import com.digitalasset.canton.topology.PartyId
 import io.circe.parser.decode
+import io.circe.syntax.*
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import scala.util.Try
@@ -38,4 +39,19 @@ object Secrets {
       case s if s.startsWith("{") => decodeJsonSecret(s)
       case s => decodeBase64Secret(s)
     }).getOrElse(ValidatorOnboardingSecret(fallbackSv, secret, None))
+
+  def encodeValidatorOnboardingSecret(
+      secret: ValidatorOnboardingSecret
+  ): String = (
+    secret.partyHint match {
+      case None => secret.secret;
+      case Some(hint) =>
+        JsonOnboardingSecret(
+          secret.sponsoringSv.toProtoPrimitive,
+          secret.secret,
+          hint,
+        ).asJson.noSpaces
+    }
+  )
+
 }

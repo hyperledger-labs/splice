@@ -37,7 +37,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.Secrets
-import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
+import org.lfdecentralizedtrust.splice.sv.util.SvOnboardingToken
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 
@@ -86,11 +86,11 @@ class HttpSvHandler(
     withSpan(s"$workflowId.onboardValidator") { _ => _ =>
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
-          val secret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty);
-          if (secret.sponsoringSv == svParty) {
-            svStore.lookupValidatorOnboardingBySecret(secret.secret).flatMap {
+          val providedSecret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty);
+          if (providedSecret.sponsoringSv == svParty) {
+            svStore.lookupValidatorOnboardingBySecret(providedSecret.secret).flatMap {
               case None =>
-                svStore.lookupUsedSecret(secret.secret).flatMap {
+                svStore.lookupUsedSecret(providedSecret.secret).flatMap {
                   case Some(used) if used.payload.validator == body.partyId =>
                     // This validator is already onboarded with the same secret - nothing to do
                     Future.successful(v0.SvResource.OnboardValidatorResponseOK)
@@ -103,13 +103,13 @@ class HttpSvHandler(
                 }
 
               case Some(vo) =>
-                val secret =
+                val storedSecret =
                   Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty);
 
-                if (secret.partyHint.exists(_ != partyId.uid.identifier.str)) {
+                if (storedSecret.partyHint.exists(_ != partyId.uid.identifier.str)) {
                   Future.failed(
                     HttpErrorHandler.badRequest(
-                      s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${secret.partyHint
+                      s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${storedSecret.partyHint
                           .getOrElse("<missing>")}"
                     )
                   )
@@ -131,7 +131,7 @@ class HttpSvHandler(
                             "onboard validator via DsoRules",
                             onboardValidator(
                               partyId,
-                              secret,
+                              Secrets.encodeValidatorOnboardingSecret(storedSecret),
                               vo,
                               body.version,
                               body.contactPoint,
@@ -145,7 +145,7 @@ class HttpSvHandler(
           } else {
             Future.failed(
               HttpErrorHandler.badRequest(
-                s"Secret is for SV ${secret.sponsoringSv} but this SV is ${svParty}, validate your SV sponsor URL"
+                s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is ${svParty}, validate your SV sponsor URL"
               )
             )
           }
@@ -738,7 +738,7 @@ class HttpSvHandler(
 
   private def onboardValidator(
       candidateParty: PartyId,
-      secret: ValidatorOnboardingSecret,
+      secret: String,
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
       version: Option[String],
       contactPoint: Option[String],
@@ -756,7 +756,7 @@ class HttpSvHandler(
           )
         ),
         validatorOnboarding.exercise(
-          _.exerciseValidatorOnboarding_Match(secret.secret, candidateParty.toProtoPrimitive)
+          _.exerciseValidatorOnboarding_Match(secret, candidateParty.toProtoPrimitive)
         ),
       ) map (_.update)
       _ <- dsoStoreWithIngestion
