@@ -320,9 +320,11 @@ spec:
       {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-volume
+        - name: participant-bootstrapping-dump-secret
           secret:
             secretName: {{ .secretName }}
+        - name: participant-bootstrapping-dump-volume
+          emptyDir: {}
       {{- end }}
       {{- if $requiresMigrationPvc }}
         - name: domain-upgrade-dump-volume
@@ -361,7 +363,7 @@ spec:
         {{- if .Values.participantIdentitiesDumpImport }}
         - name: chown-participant-bootstrapping-dump
           image: busybox:1.37.0
-          command: ["sh", "-c", "chown -R 1001:1001 /participant-bootstrapping-dump"]
+          command: ["sh", "-c", "cp -R /participant-bootstrapping-dump-secret/* /participant-bootstrapping-dump && chown -R 1001:1001 /participant-bootstrapping-dump"]
           volumeMounts:
             - name: participant-bootstrapping-dump-volume
               mountPath: /participant-bootstrapping-dump

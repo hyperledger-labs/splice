@@ -424,7 +424,7 @@ spec:
         {{- if .Values.migration.attachPvc }}
         - name: chown-domain-upgrade-dump
           image: busybox:1.37.0
-          command: ["chown", "-R", "1001:1001", "/domain-upgrade-dump"]
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
           volumeMounts:
             - name: domain-upgrade-dump-volume
               mountPath: /domain-upgrade-dump
