@@ -105,7 +105,6 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           data-testid="create-validator-onboarding-secret"
           variant="pill"
           fullWidth
-          disabled={prepareOnboardingMutation.isPending}
           size="large"
           onClick={() => {
             prepareOnboardingMutation.mutate(partyHint);
