@@ -24,9 +24,8 @@ Upcoming
     - UI
 
       - When updating the ``AmuletRules`` config, the UI will omit any transfer fee steps with value zero from the ``AmuletRules`` config stored on-ledger.
-      Thereby making the ``AmuletRules`` contract smaller and saving
-      traffic for transactions using it. 
-      This is motivated by `CIP-0078 CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__ .
+        Thereby making the ``AmuletRules`` contract smaller and saving traffic for transactions using it.
+        This is motivated by `CIP-0078 CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__ .
 
 
 0.4.18
