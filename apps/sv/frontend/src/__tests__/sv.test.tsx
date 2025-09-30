@@ -14,7 +14,6 @@ import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 import { svPartyId, voteRequests } from './mocks/constants';
-import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
 import {
