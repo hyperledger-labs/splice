@@ -323,6 +323,24 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          localSynchronizerNode.traverse(lsn =>
+            SynchronizerNodeInitializer.rotateLocalCantonNodesOTKIfNeeded(
+              cantonIdentifierConfig,
+              lsn,
+              clock,
+              loggerFactory,
+              retryProvider,
+              decentralizedSynchronizerId,
+            )
+          )
+        } else {
+          logger.info(
+            "Skipping OTK keys rotation because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
       _ <- onboard(
         decentralizedSynchronizerId,
         dsoAutomation,

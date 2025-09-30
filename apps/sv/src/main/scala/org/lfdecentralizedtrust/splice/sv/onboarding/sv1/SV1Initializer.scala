@@ -167,6 +167,22 @@ class SV1Initializer(
         } else {
           bootstrapDomain(localSynchronizerNode)
         }
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          SynchronizerNodeInitializer.rotateLocalCantonNodesOTKIfNeeded(
+            cantonIdentifierConfig,
+            localSynchronizerNode,
+            clock,
+            loggerFactory,
+            retryProvider,
+            synchronizerId,
+          )
+        } else {
+          logger.info(
+            "Skipping OTK keys rotation because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(

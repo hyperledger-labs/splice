@@ -19,6 +19,7 @@ function usage() {
   echo "  -e               start canton using the canton provided BFT sequencer"
   echo "  -m               collect metrics and send them to our CI prometheus instance"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
+  echo "  -B <script>      path to a custom canton bootstrap script"
 }
 
 # default values
@@ -32,8 +33,9 @@ start_cometbft=0
 use_cometbft=0
 use_bft=0
 collect_metrics=0
+logFileHint=canton
 
-args=$(getopt -o "hdDap:c:wsbtfFegm" -l "help" -- "$@")
+args=$(getopt -o "hdDap:cB:wsbtfFegm" -l "help" -- "$@")
 
 eval set -- "$args"
 
@@ -90,6 +92,12 @@ do
             ;;
         -m)
             collect_metrics=1
+            ;;
+        -B)
+            bootstrapScriptPath="$2"
+            logFileHint=canton-signatures
+            shift
+            echo "using a custom canton bootstrap script: $bootstrapScriptPath"
             ;;
         --)
             shift
@@ -221,7 +229,7 @@ tmux_cmd_canton() {
 if [ $wallclocktime -eq 1 ]; then
   tmux_cmd_canton canton canton.tokens canton.participants \
     ./apps/app/src/test/resources/simple-topology-canton.conf \
-    "$config_overrides" canton
+    "$config_overrides" "$logFileHint"
 fi
 
 if [ $simtime -eq 1 ]; then

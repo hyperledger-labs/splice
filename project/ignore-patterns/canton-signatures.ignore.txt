@@ -1,0 +1,5 @@
+# Errors and warnings caused by the key rotation in ManualSignatureIntegrationTest
+.*could not verify client's signature.*
+.*used to generate signature is not a valid key.*
+.*Response message for request.* timed out.*
+

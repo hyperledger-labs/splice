@@ -158,6 +158,20 @@ jobs:
       daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
+  scala_test_signatures:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-small
+      test_names_file: 'test-full-class-names-signatures.log'
+      start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-deprecated-keys.sc"
+      parallelism: 1
+      test_name: signatures
+      with_gcp_creds: false
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
   scala_test_wall_clock_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:

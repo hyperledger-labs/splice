@@ -759,6 +759,16 @@ class ValidatorApp(
           .toJavaProto(DurationConversion.toProto(config.deduplicationDuration.asJavaApproximation))
       )
       synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+      cantonIdentifierConfig =
+        ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
+      _ <- ParticipantInitializer.ensureInitializedWithRotatedOTK(
+        cantonIdentifierConfig.participant,
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
