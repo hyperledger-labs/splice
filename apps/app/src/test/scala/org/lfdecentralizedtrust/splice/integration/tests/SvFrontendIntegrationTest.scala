@@ -112,27 +112,21 @@ class SvFrontendIntegrationTest
 
         val (_, newSecret) = actAndCheck(
           "fill party hint and click on the button to create an onboarding secret", {
-            clue(
-              "fill the party hint field", {
-                inside(find(id("create-party-hint"))) { case Some(element) =>
-                  element.underlying.sendKeys("splice-client-2")
-                }
-              },
-            )
+            clue("fill the party hint field") {
+              inside(find(id("create-party-hint"))) { case Some(element) =>
+                element.underlying.sendKeys("splice-client-2")
+              }
+            }
 
-            clue(
-              "wait for the submit button to become clickable", {
-                eventually()(
-                  find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
-                )
-              },
-            )
+            clue("wait for the submit button to become clickable") {
+              eventually()(
+                find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
+              )
+            }
 
-            clue(
-              "click the create validator onboarding secret button", {
-                click on "create-validator-onboarding-secret"
-              },
-            )
+            clue("click the create validator onboarding secret button") {
+              click on "create-validator-onboarding-secret"
+            }
           },
         )(
           "a new secret row is added",
