@@ -103,6 +103,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
           )(
             s"Creating an onboarding secret",
             _ => {
+              waitForQuery(id("create-party-hint")) should not be empty
               waitForQuery(id("create-validator-onboarding-secret"))
               waitForQuery(className("onboarding-secret-table"))
               val secretsItr = findAll(className("onboarding-secret-table-secret"))
@@ -110,8 +111,12 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
             },
           )
           actAndCheck(timeUntilSuccess = 2.minutes)(
-            "click",
-            click on "create-validator-onboarding-secret",
+            "fill party hint and generate new secret", {
+              inside(find(id("create-party-hint"))) { case Some(element) =>
+                element.underlying.sendKeys("splice-client-1")
+              }
+              click on "create-validator-onboarding-secret",
+            },
           )(
             s"We see that this SV has created an onboarding secret",
             _ => {

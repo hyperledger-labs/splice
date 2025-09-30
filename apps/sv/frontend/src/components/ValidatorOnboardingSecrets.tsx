@@ -82,6 +82,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           error={partyHint === '' || !VALID_PARTY_ID_REGEX.test(partyHint)}
           autoComplete="off"
           id="create-party-hint"
+          placeholder="<organization>-<function>-<enumerator>"
           inputProps={{ 'data-testid': 'create-party-hint' }}
           onChange={e => setPartyHint(e.target.value)}
           value={partyHint}
@@ -182,8 +183,18 @@ export const onboardingInfo = (
 const OnboardingRow: React.FC<OnboardingRowProps> = props => {
   const networkInstanceName = useNetworkInstanceName();
 
+  const copySecret = useCallback(() => {
+    navigator.clipboard.writeText(props.secret);
+  }, [props]);
+
   const copyOnboardingInfo = useCallback(() => {
-    navigator.clipboard.writeText(onboardingInfo(props, networkInstanceName));
+    const clipboardItemData = {
+      'text/rtf': new Blob([onboardingInfo(props, networkInstanceName)], { type: 'text/rtf' }),
+      'text/plain': onboardingInfo(props, networkInstanceName),
+    };
+    const clipboardItem = new ClipboardItem(clipboardItemData);
+
+    navigator.clipboard.write([clipboardItem]);
   }, [props, networkInstanceName]);
 
   return (
@@ -193,22 +204,22 @@ const OnboardingRow: React.FC<OnboardingRowProps> = props => {
       </TableCell>
       <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
         <Typography
-          noWrap
           sx={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: '100%',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
           }}
           className="onboarding-secret-table-secret"
         >
           {props.secret}
         </Typography>
+        <IconButton onClick={copySecret}>
+          <ContentCopyIcon fontSize={'small'} />
+        </IconButton>
       </TableCell>
       <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
         <DateDisplay datetime={props.expiresAt} />
       </TableCell>
-      <TableCell>
+      <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
         <IconButton onClick={copyOnboardingInfo}>
           <ContentCopyIcon fontSize={'small'} />
         </IconButton>

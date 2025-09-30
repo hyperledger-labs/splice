@@ -104,6 +104,7 @@ class SvFrontendIntegrationTest
           _ => {
             find(className("onboarding-secret-table")) should not be empty
             val rows = findAll(className("onboarding-secret-table-row")).toSeq
+            find(id("create-party-hint")) should not be empty
             find(id("create-validator-onboarding-secret")) should not be empty
             rows.size
           },
