@@ -103,7 +103,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
           )(
             s"Creating an onboarding secret",
             _ => {
-              waitForQuery(id("create-party-hint")) should not be empty
+              waitForQuery(id("create-party-hint"))
               waitForQuery(id("create-validator-onboarding-secret"))
               waitForQuery(className("onboarding-secret-table"))
               val secretsItr = findAll(className("onboarding-secret-table-secret"))
