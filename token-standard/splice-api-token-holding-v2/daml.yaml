@@ -15,5 +15,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceApiTokenHoldingV1
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceApiTokenHoldingV2
     output-directory: target/scala-2.13/src_managed/main/daml-codegen-java

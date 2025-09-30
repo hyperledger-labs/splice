@@ -8,6 +8,7 @@
 -- by an app.
 module Splice.Api.Token.AllocationV2 where
 
+import DA.List (dedupSort)
 import DA.TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -120,11 +121,18 @@ allocationControllers AllocationView{..} =
     (\override -> allocation.settlement.executor :: override)
     allocation.settlement.controllerOverride
 
--- | Convenience function all senders
-allocationSenders : AllocationView -> [Party]
-allocationSenders AllocationView{..} = map (._2.sender) (toList allocation.transferLegs)
+-- | Convenience function to get all senders
+allocationSenders : AllocationSpecification -> [Party]
+allocationSenders AllocationSpecification{..} = map (._2.sender) (toList transferLegs)
 
-
+-- | Convenience to get the allocation admin
+allocationAdmin : AllocationSpecification -> Party
+allocationAdmin AllocationSpecification{..} = admin
+  where
+    admins = dedupSort $ map (._2.instrumentId.admin) (toList transferLegs)
+    admin = case admins of
+      [a] -> a
+      _ -> error "Allocations must involve instruments from exactly one admin"
 
 -- | A contract representing an allocation of some amount of asset holdings to
 -- a specific leg of a settlement.
@@ -178,7 +186,7 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSenders (view this)
+    controller allocationSenders (view this).allocation
     do allocation_withdrawImpl this self arg
 
 -- AllocationTransferAuthorization

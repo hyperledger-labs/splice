@@ -23,11 +23,11 @@ dependencies:
   - daml-script
 data-dependencies:
   - ../splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
-  - ../splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
-  - ../splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
-  - ../splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
-  - ../splice-api-token-allocation-request-v1/.daml/dist/splice-api-token-allocation-request-v1-current.dar
-  - ../splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
+  - ../splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
+  - ../splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
+  - ../splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
+  - ../splice-api-token-allocation-request-v2/.daml/dist/splice-api-token-allocation-request-v2-current.dar
+  - ../splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
   - ../../daml/splice-util/.daml/dist/splice-util-current.dar
   - ../../daml/splice-amulet/.daml/dist/splice-amulet-current.dar
   - ../splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
@@ -42,5 +42,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceTokenTransferTest
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceTokenTransferTestV2
     output-directory: target/scala-2.13/src_managed/main/daml-codegen-java

@@ -1,0 +1,175 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Interfaces to enable wallets to instruct the registry to create allocations.
+module Splice.Api.Token.AllocationInstructionV2 where
+
+import DA.Map qualified as Map
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV2
+
+
+-- AllocationInstruction
+------------------------
+
+-- | View for `AllocationInstruction`.
+data AllocationInstructionView = AllocationInstructionView with
+    originalInstructionCid : Optional (ContractId AllocationInstruction)
+      -- ^ The contract id of the original allocation instruction contract.
+      -- Used by the wallet to track the lineage of allocation instructions through multiple steps.
+      --
+      -- Only set if the registry evolves the allocation instruction in multiple steps.
+    allocation : AllocationSpecification
+      -- ^ The allocation that this instruction should create.
+    pendingActions : Map.Map Party Text
+      -- ^ The pending actions to be taken by different actors to create the allocation.
+      --
+      -- ^ This field can by used to report on the progress of registry specific
+      -- workflows that are required to prepare the allocation.
+    requestedAt : Time
+      -- ^ The time at which the allocation was requested.
+    inputHoldingCids : [ContractId Holding]
+      -- ^ The holdings to be used to fund the allocation.
+      --
+      -- MAY be empty for registries that do not represent their holdings on-ledger.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation instruction, used for
+      -- extensibility; e.g., more detailed status information.
+  deriving (Show, Eq)
+
+-- | An interface for tracking the status of an allocation instruction,
+-- i.e., a request to a registry app to create an allocation.
+--
+-- Registries MAY evolve the allocation instruction in multiple steps. They SHOULD
+-- do so using only the choices on this interface, so that wallets can reliably
+-- parse the transaction history and determine whether the creation of the allocation ultimately
+-- succeeded or failed.
+interface AllocationInstruction where
+  viewtype AllocationInstructionView
+
+  allocationInstruction_withdrawImpl : ContractId AllocationInstruction -> AllocationInstruction_Withdraw -> Update AllocationInstructionResult
+  allocationInstruction_updateImpl : ContractId AllocationInstruction -> AllocationInstruction_Update -> Update AllocationInstructionResult
+
+  choice AllocationInstruction_Withdraw : AllocationInstructionResult
+    -- ^ Withdraw the allocation instruction as the sender.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller allocationSenders (view this).allocation
+    do allocationInstruction_withdrawImpl this self arg
+
+  choice AllocationInstruction_Update : AllocationInstructionResult
+    -- ^ Update the state of the allocation instruction. Used by the registry to
+    -- execute registry internal workflow steps that advance the state of the
+    -- allocation instruction. A reason may be communicated via the metadata.
+    with
+      extraActors : [Party]
+        -- ^ Extra actors authorizing the update. Implementations MUST check that
+        -- this field contains the expected actors for the specific update.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller allocationAdmin (view this).allocation, extraActors
+    do allocationInstruction_updateImpl this self arg
+
+
+-- AllocationFactory
+--------------------
+
+-- | View for `AllocationFactory`.
+data AllocationFactoryView = AllocationFactoryView with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instruments
+      -- for which this allocation factory can be used.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation factory, used for extensibility.
+  deriving (Show, Eq)
+
+-- | Contracts implementing `AllocationFactory` are retrieved from the registry app and are
+-- used by the wallet to create allocation instructions (or allocations directly).
+interface AllocationFactory where
+  viewtype AllocationFactoryView
+
+  allocationFactory_allocateImpl : ContractId AllocationFactory -> AllocationFactory_Allocate -> Update AllocationInstructionResult
+  allocationFactory_publicFetchImpl : ContractId AllocationFactory -> AllocationFactory_PublicFetch -> Update AllocationFactoryView
+
+  nonconsuming choice AllocationFactory_Allocate : AllocationInstructionResult
+    -- ^ Generic choice for the sender's wallet to request the allocation of
+    -- assets to a specific leg of a settlement. It depends on the registry
+    -- whether this results in the allocation being created directly
+    -- or in an allocation instruction being created instead.
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      allocation : AllocationSpecification
+        -- ^ The allocation which should be created.
+      requestedAt : Time
+        -- ^ The time at which the allocation was requested.
+      inputHoldingCids : [ContractId Holding]
+        -- ^ The holdings that SHOULD be used to fund the allocation.
+        --
+        -- MAY be empty for registries that do not represent their holdings on-ledger; or
+        -- for registries that support automatic selection of holdings for allocations.
+        --
+        -- If specified, then the successful allocation MUST archive all of these holdings, so
+        -- that the execution of the allocation conflicts with any other allocations
+        -- using these holdings. Thereby allowing that the sender can use
+        -- deliberate contention on holdings to prevent duplicate allocations.
+      extraArgs : ExtraArgs
+        -- ^ Additional choice arguments.
+    controller allocationSenders allocation
+    do allocationFactory_allocateImpl this self arg
+
+  nonconsuming choice AllocationFactory_PublicFetch : AllocationFactoryView
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      actor : Party
+    controller actor
+    do allocationFactory_publicFetchImpl this self arg
+
+
+-- Result type
+--------------
+
+-- | The result of instructing an allocation or advancing the state of an allocation instruction.
+data AllocationInstructionResult = AllocationInstructionResult with
+    output : AllocationInstructionResult_Output
+     -- ^ The output of the step.
+    senderChangeCids : [ContractId Holding]
+      -- ^ New holdings owned by the sender created to return "change". Can be used
+      -- by callers to batch creating or updating multiple allocation instructions
+      -- in a single Daml transaction.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., fees charged.
+  deriving (Show, Eq)
+
+-- | The output of instructing an allocation or advancing the state of an allocation instruction.
+data AllocationInstructionResult_Output
+  = AllocationInstructionResult_Pending
+      -- ^ Use this result to communicate that the creation of the allocation is pending further steps.
+      with
+        allocationInstructionCid : ContractId AllocationInstruction
+          -- ^ Contract id of the allocation instruction representing the pending state.
+  | AllocationInstructionResult_Completed
+      -- ^ Use this result to communicate that the allocation was created.
+      with
+        allocationCid : ContractId Allocation
+          -- ^ The newly created allocation.
+  | AllocationInstructionResult_Failed
+      -- ^ Use this result to communicate that the creation of the allocation did not succeed and
+      -- all holdings reserved for funding the allocation have been released.
+  deriving (Show, Eq)

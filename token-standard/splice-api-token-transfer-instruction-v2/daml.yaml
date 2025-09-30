@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
-name: splice-api-token-allocation-v2
+name: splice-api-token-transfer-instruction-v2
 version: 2.0.0
 source: daml
 dependencies:
@@ -16,5 +16,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceApiTokenAllocationV2
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceApiTokenTransferInstructionV2
     output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
