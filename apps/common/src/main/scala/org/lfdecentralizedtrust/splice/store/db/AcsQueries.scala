@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   SelectFromContractStateResult,
 }
 import org.lfdecentralizedtrust.splice.util.*
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import scalaz.{@@, Tag}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder

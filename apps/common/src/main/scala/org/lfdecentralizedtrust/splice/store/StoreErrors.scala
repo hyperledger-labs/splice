@@ -3,8 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.store
 
+import cats.implicits.showInterpolator
 import io.grpc.{Status, StatusRuntimeException}
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 trait StoreErrors {
   def roundNotAggregated(): StatusRuntimeException = {
@@ -16,7 +17,7 @@ trait StoreErrors {
   }
 
   def contractIdNotFound(cid: PrettyContractId) = {
-    Status.NOT_FOUND.withDescription(s"Contract id not found: $cid").asRuntimeException
+    Status.NOT_FOUND.withDescription(show"Contract id not found: ${cid}").asRuntimeException
   }
 
   def txLogIsOfWrongType(name: String) = {
