@@ -58,6 +58,14 @@ import Splice.Testing.TokenStandard.RegistryApi
 
 import Daml.Script
 
+-- Utils to keep V1 alive
+-------------------------
+
+-- | Shared definition of the instrument-id used for amulets.
+amuletInstrumentIdV1 : Party -> InstrumentId
+amuletInstrumentIdV1 dso =
+  InstrumentId with admin = dso; id = "Amulet"
+
 -- Registry representation
 --------------------------
 
@@ -118,7 +126,7 @@ initialize config = do
   dso <- allocateParty "dso-party"
   let registry = AmuletRegistry with
         dso
-        instrumentId = amuletInstrumentId dso
+        instrumentId = amuletInstrumentIdV1 dso
 
   let amuletConfig
         | config.noTransferFee = defaultAmuletConfig with

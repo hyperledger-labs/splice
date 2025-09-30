@@ -5,6 +5,7 @@
 -- implement the V1 interfaces from the V2 interfaces.
 module Splice.Api.Token.UtilsV2 where
 
+import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -40,8 +41,8 @@ instrumentId_v2_to_v1 HoldingV2.InstrumentId{..} = HoldingV1.InstrumentId with .
 lock_v2_to_v1 : HoldingV2.Lock -> HoldingV1.Lock
 lock_v2_to_v1 HoldingV2.Lock{..} = HoldingV1.Lock with ..
 
-holdingv2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
-holdingv2_to_v1 v2 = v1
+holding_v2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
+holding_v2_to_v1 v2 = v1
   where
     v1 = HoldingV1.HoldingView with
       owner = v2.owner
@@ -157,3 +158,55 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
         TextMap.insert "canton.network/transferExtraAuth" (show transferExtraAuth) $
         meta.values
 
+-- Choices
+
+allocation_execute_transfer_v1_to_v2 : AllocationV1.Allocation_ExecuteTransfer -> AllocationV2.Allocation_ExecuteTransfer
+allocation_execute_transfer_v1_to_v2 AllocationV1.Allocation_ExecuteTransfer{..} =
+  AllocationV2.Allocation_ExecuteTransfer with
+    extraAuth = None
+    ..
+
+allocation_transfer_result_v2_to_v1 : AllocationV2.Allocation_ExecuteTransferResult -> AllocationV1.Allocation_ExecuteTransferResult
+allocation_transfer_result_v2_to_v1 AllocationV2.Allocation_ExecuteTransferResult {..} =
+  AllocationV1.Allocation_ExecuteTransferResult with
+    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
+    receiverHoldingCids = map coerceInterfaceContractId receiverHoldingCids
+    meta
+
+allocation_v1_executeTransferImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_ExecuteTransfer -> Update AllocationV1.Allocation_ExecuteTransferResult
+allocation_v1_executeTransferImpl this self execv1 = do
+  resv2 <- AllocationV2.allocation_executeTransferImpl 
+    this
+    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    (allocation_execute_transfer_v1_to_v2 execv1)
+  return (allocation_transfer_result_v2_to_v1 resv2)
+
+
+allocation_withdraw_result_v2_to_v1 : AllocationV2.Allocation_WithdrawResult -> AllocationV1.Allocation_WithdrawResult
+allocation_withdraw_result_v2_to_v1 AllocationV2.Allocation_WithdrawResult {..} =
+  AllocationV1.Allocation_WithdrawResult with
+    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
+    meta
+
+allocation_v1_withdrawImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Withdraw -> Update AllocationV1.Allocation_WithdrawResult
+allocation_v1_withdrawImpl this self AllocationV1.Allocation_Withdraw{..} = do
+  resv2 <- AllocationV2.allocation_withdrawImpl 
+    this
+    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    AllocationV2.Allocation_Withdraw {..}
+  return (allocation_withdraw_result_v2_to_v1 resv2)
+
+
+allocation_cancel_result_v2_to_v1 : AllocationV2.Allocation_CancelResult -> AllocationV1.Allocation_CancelResult
+allocation_cancel_result_v2_to_v1 AllocationV2.Allocation_CancelResult {..} =
+  AllocationV1.Allocation_CancelResult with
+    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
+    meta
+
+allocation_v1_cancelImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Cancel -> Update AllocationV1.Allocation_CancelResult
+allocation_v1_cancelImpl this self AllocationV1.Allocation_Cancel{..} = do
+  resv2 <- AllocationV2.allocation_cancelImpl 
+   this
+    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    AllocationV2.Allocation_Cancel {..}
+  return (allocation_cancel_result_v2_to_v1 resv2)

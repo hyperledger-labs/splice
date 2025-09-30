@@ -12,6 +12,8 @@ import qualified DA.TextMap as TextMap
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationInstructionV1 as Api.Token.AllocationInstructionV1
+import Splice.Api.Token.UtilsV2
+
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Amulet.TwoStepTransfer
@@ -266,7 +268,7 @@ amulet_transferFactory_transferImpl this _self arg = do
   let expectedInstrumentId = amuletInstrumentId this.dso
   require
     ("Expected instrumentId " <> show expectedInstrumentId <> " matches actual instrumentId " <> show transfer.instrumentId)
-    (expectedInstrumentId == transfer.instrumentId)
+    (expectedInstrumentId == instrumentId_v1_to_v2 transfer.instrumentId) -- TODO - remove
   -- amount:
   require "Amount must be positive" (transfer.amount > 0.0)
   -- requestedAt:
@@ -284,8 +286,8 @@ amulet_transferFactory_transferImpl this _self arg = do
       | transfer.receiver == transfer.sender -> do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
-          result <- exercisePaymentTransfer dso paymentContext Transfer with
+          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext (map coerceInterfaceContractId transfer.inputHoldingCids)
+          result <- exercisePaymentTransfer paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
             inputs
@@ -298,7 +300,7 @@ amulet_transferFactory_transferImpl this _self arg = do
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
             senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
             output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
-              receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
+              receiverHoldingCids = map coerceInterfaceContractId $ createdAmuletToHolding <$> result.createdAmulets
             meta = copyOnlyBurnMeta result.meta
 
       | otherwise -> do
@@ -306,7 +308,7 @@ amulet_transferFactory_transferImpl this _self arg = do
           let twoStepTransfer = standardTransferToTwoStepTransfer arg.transfer
           let requestedAt = arg.transfer.requestedAt
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          (lockedAmulet, senderChangeCids, meta) <- prepareTwoStepTransfer twoStepTransfer requestedAt arg.transfer.inputHoldingCids paymentContext
+          (lockedAmulet, senderChangeCids, meta) <- prepareTwoStepTransfer twoStepTransfer requestedAt (map coerceInterfaceContractId arg.transfer.inputHoldingCids) paymentContext
           -- create the transfer instruction tracking this locked amulet
           transferInstructionCid <- toInterfaceContractId <$> create AmuletTransferInstruction with
             transfer = arg.transfer with
@@ -314,7 +316,7 @@ amulet_transferFactory_transferImpl this _self arg = do
             lockedAmulet
           -- return result
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
-            senderChangeCids
+            senderChangeCids = map coerceInterfaceContractId senderChangeCids
             output = Api.Token.TransferInstructionV1.TransferInstructionResult_Pending
               with
                 transferInstructionCid
@@ -324,7 +326,7 @@ amulet_transferFactory_transferImpl this _self arg = do
       -- use a payment context with featuring so the preapproval provider can be featured
       paymentContext <- paymentFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
-      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
+      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext (map coerceInterfaceContractId transfer.inputHoldingCids)
       result <- exercise preapprovalCid TransferPreapproval_Send
         with
           sender = transfer.sender
@@ -337,7 +339,7 @@ amulet_transferFactory_transferImpl this _self arg = do
       pure Api.Token.TransferInstructionV1.TransferInstructionResult with
         senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
         output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
-          receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
+          receiverHoldingCids = map coerceInterfaceContractId $ createdAmuletToHolding <$> result.result.createdAmulets
         meta = copyOnlyBurnMeta result.meta
 
 
@@ -383,7 +385,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   -- transferLeg.amount
   require "Transfer amount must be positive" (transferLeg.amount > 0.0)
   -- transferLeg.instrumentId
-  require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
+  require "Instrument-id must match the factory" (instrumentId_v1_to_v2 transferLeg.instrumentId == amuletInstrumentId dso)
   -- transferLeg.meta: no check
 
   -- requestedAt (of the allocation instruction itself):
@@ -393,17 +395,17 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   require "At least one input holding must be provided" (not $ null inputHoldingCids)
 
   -- lock the funds
-  let twoStepTransfer = allocationToTwoStepTransfer arg.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer (allocation_specification_v1_to_v2 arg.allocation)
   (lockedAmulet, senderChangeCids, meta) <-
-    prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
+    prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map coerceInterfaceContractId inputHoldingCids) paymentContext
   -- create the amulet allocation
   allocationCid <- toInterfaceContractId <$> create AmuletAllocation with
-    allocation = arg.allocation
+    allocation = allocation_specification_v1_to_v2 arg.allocation
     lockedAmulet
 
   -- finaly done: return the result
   pure AllocationInstructionResult with
-    senderChangeCids
+    senderChangeCids = map coerceInterfaceContractId senderChangeCids
     output = AllocationInstructionResult_Completed with allocationCid
     meta
 

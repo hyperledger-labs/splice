@@ -240,7 +240,7 @@ lazy val docs = project
           (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-burn-mint-v1-daml` / Compile / damlBuild).value
+          (`splice-api-token-burn-mint-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-utils-v2-daml` / Compile / damlBuild).value
       cacheDamlDocs(
         damlSources.toSet
@@ -487,7 +487,6 @@ lazy val `splice-api-token-utils-v2-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
           (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -755,6 +754,7 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-utils-v2-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)

@@ -64,9 +64,11 @@ executeTransferInstr instr extraArgs = do
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
-    senderChangeCids = senderHoldingCids
+    -- TODO! This will change once there's a transfer instruction v2
+    senderChangeCids = (map coerceInterfaceContractId senderHoldingCids)
     output = TransferInstructionResult_Completed with
-      receiverHoldingCids
+    -- TODO! This will change once there's a transfer instruction v2
+      receiverHoldingCids = (map coerceInterfaceContractId receiverHoldingCids)
     meta
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
@@ -74,6 +76,7 @@ abortAmuletTransferInstruction instr extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
-    senderChangeCids = senderHoldingCids
+    -- TODO! This will change once there's a transfer instruction v2
+    senderChangeCids = (map coerceInterfaceContractId senderHoldingCids)
     output = TransferInstructionResult_Failed
     meta = emptyMetadata

@@ -13,6 +13,8 @@ import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -111,13 +113,16 @@ template Amulet
             meta = Some (simpleHoldingTxMeta TxKind_ExpireDust None (Some amount.initialAmount))
             ..
 
-    interface instance Api.Token.HoldingV1.Holding for Amulet where
-      view = Api.Token.HoldingV1.HoldingView with
+    interface instance Api.Token.HoldingV2.Holding for Amulet where
+      view = Api.Token.HoldingV2.HoldingView with
         owner
         instrumentId = amuletInstrumentId dso
         amount = amount.initialAmount
         lock = None
         meta = amuletMetadata this
+
+    interface instance Api.Token.HoldingV1.Holding for Amulet where
+      view = holding_v2_to_v1 (view (toInterface @Api.Token.HoldingV2.Holding this))
 
 amuletMetadata : Amulet -> Api.Token.MetadataV1.Metadata
 amuletMetadata Amulet{..} =
@@ -133,18 +138,21 @@ template LockedAmulet
     lock : TimeLock
   where
     signatory lock.holders, signatory amulet
-
-    interface instance Api.Token.HoldingV1.Holding for LockedAmulet where
-      view = Api.Token.HoldingV1.HoldingView with
+    
+    interface instance Api.Token.HoldingV2.Holding for LockedAmulet where
+      view = Api.Token.HoldingV2.HoldingView with
         owner = amulet.owner
         instrumentId = amuletInstrumentId amulet.dso
         amount = amulet.amount.initialAmount
-        lock = Some Api.Token.HoldingV1.Lock with
+        lock = Some Api.Token.HoldingV2.Lock with
           holders = lock.holders
           expiresAt = Some lock.expiresAt
           expiresAfter = None
           context = lock.optContext
         meta = amuletMetadata amulet
+
+    interface instance Api.Token.HoldingV1.Holding for LockedAmulet where
+      view = holding_v2_to_v1 (view (toInterface @Api.Token.HoldingV2.Holding this))
 
     choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
       with

@@ -11,10 +11,12 @@ import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
-import qualified Splice.Api.Token.AllocationV1
+import qualified Splice.Api.Token.AllocationV2
 import qualified Splice.Api.Token.AllocationInstructionV1
 import qualified Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.UtilsV2
 import Splice.Amulet
+import Splice.AmuletAllocation (allocationSender)
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
 import Splice.AmuletRules
@@ -592,7 +594,7 @@ template WalletAppInstall
       controller validatorParty
       do let transfer = transferArg.transfer
          require ("sender " <> show transfer.sender <> " is endUserParty " <> show endUserParty) (transfer.sender == endUserParty)
-         require ("instrumentId " <> show transfer.instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (transfer.instrumentId == amuletInstrumentId dsoParty)
+         require ("instrumentId " <> show transfer.instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (instrumentId_v1_to_v2 transfer.instrumentId == amuletInstrumentId dsoParty)
          require ("expected admin " <> show transferArg.expectedAdmin <> " is dso " <> show dsoParty) (transferArg.expectedAdmin == dsoParty)
          exercise transferFactoryCid transferArg
 
@@ -638,16 +640,16 @@ template WalletAppInstall
          let sender = allocateArg.allocation.transferLeg.sender
          require ("sender " <> show sender <> " is endUserParty " <> show endUserParty) (sender == endUserParty)
          let legInstrumentId = allocateArg.allocation.transferLeg.instrumentId
-         require ("instrumentId " <> show legInstrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (legInstrumentId == amuletInstrumentId dsoParty)
+         require ("instrumentId " <> show legInstrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (instrumentId_v1_to_v2 legInstrumentId == amuletInstrumentId dsoParty)
          exercise allocationFactory allocateArg
 
-    nonconsuming choice WalletAppInstall_Allocation_Withdraw : Splice.Api.Token.AllocationV1.Allocation_WithdrawResult
+    nonconsuming choice WalletAppInstall_Allocation_Withdraw : Splice.Api.Token.AllocationV2.Allocation_WithdrawResult
       with
-        allocationCid : ContractId Splice.Api.Token.AllocationV1.Allocation
-        withdrawArg : Splice.Api.Token.AllocationV1.Allocation_Withdraw
+        allocationCid : ContractId Splice.Api.Token.AllocationV2.Allocation
+        withdrawArg : Splice.Api.Token.AllocationV2.Allocation_Withdraw
       controller validatorParty
       do allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
-         let sender = (view allocation).allocation.transferLeg.sender
+         let sender = allocationSender (view allocation).allocation
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise allocationCid withdrawArg
 

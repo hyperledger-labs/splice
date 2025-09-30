@@ -81,6 +81,8 @@ data AllocationSpecification = AllocationSpecification with
   deriving (Show, Eq)
 
 -- | View of a funded allocation of assets to a specific leg of a settlement.
+-- To be standards compliant, an allocation must have a non-zero number of
+-- transfer legs, all with an instrumentId with the same adminId.
 data AllocationView = AllocationView with
     allocation : AllocationSpecification
       -- ^ The settlement for whose execution the assets are being allocated.
@@ -124,7 +126,7 @@ allocationSenders AllocationView{..} = map (._2.sender) (toList allocation.trans
 
 
 
--- | A contract representing an allocation of some amount of aasset holdings to
+-- | A contract representing an allocation of some amount of asset holdings to
 -- a specific leg of a settlement.
 interface Allocation where
   viewtype AllocationView

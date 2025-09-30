@@ -19,7 +19,7 @@ import DA.Assert
 import DA.Optional (optionalToList)
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils

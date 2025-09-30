@@ -24,10 +24,11 @@ import DA.Time
 import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
-import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV1
 import Splice.Api.Token.AllocationInstructionV1
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils (burnedMetaKey)
@@ -75,7 +76,7 @@ setupOtcTrade  = do
   AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
   AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
 
-  let mkTransfer sender receiver amount = Api.Token.AllocationV1.TransferLeg with
+  let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
         sender
         receiver
         amount
@@ -123,7 +124,7 @@ setupOtcTrade  = do
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = alice
     allocation = aliceAlloc
-    inputHoldingCids
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
   submitWithDisclosuresMustFail' alice enrichedChoice.disclosures $
@@ -135,7 +136,7 @@ setupOtcTrade  = do
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
-    inputHoldingCids
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
   result <- submitWithDisclosures' alice enrichedChoice.disclosures $
@@ -162,7 +163,7 @@ setupOtcTrade  = do
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = bobAlloc
-    inputHoldingCids
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
   submitWithDisclosures' bob enrichedChoice.disclosures $
@@ -195,7 +196,7 @@ testDvP = script do
   passTime (hours 1)
 
   -- provider runs automation that completes the settlement
-  let otcTradeRef = (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
+  let otcTradeRef = reference_v1_to_v2 (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
   allocations <- appBackendListAllocations provider otcTradeRef
   TextMap.size allocations === 2
 
@@ -252,7 +253,7 @@ testDvP = script do
 
 testDvPCancel = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
-  let otcTradeRef = (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
+  let otcTradeRef = reference_v1_to_v2 (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
   allocations <- appBackendListAllocations provider otcTradeRef
 
   [(_, aliceLockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
@@ -318,7 +319,7 @@ appBackendListAllocations p ref = do
   let matchingAllocs = do
         (cid, Some fundedAllocation) <- allocs
         guard (fundedAllocation.allocation.settlement.settlementRef == ref)
-        pure (fundedAllocation.allocation.transferLegId, (cid, fundedAllocation))
+        map (\(transferLegId, _) -> (transferLegId, (cid, fundedAllocation))) (TextMap.toList fundedAllocation.allocation.transferLegs)
   pure $ TextMap.fromList matchingAllocs
 
 expectBurn : Metadata -> Script ()
