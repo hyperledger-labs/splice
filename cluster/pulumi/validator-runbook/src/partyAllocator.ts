@@ -22,7 +22,7 @@ export function installPartyAllocator(
       jsonLedgerApiUrl: `http://participant-${DecentralizedSynchronizerUpgradeConfig.active.id}:7575`,
       scanApiUrl: 'http://scan-app.sv-1:5012',
       validatorApiUrl: 'http://validator-app:5003',
-      maxParties: 10000,
+      maxParties: 1000000,
       keysDirectory: '/keys',
       parallelism: 5,
     },
