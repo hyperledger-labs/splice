@@ -8,4 +8,4 @@ FROM canton:${base_version}
 ARG base_version
 LABEL org.opencontainers.image.base.name="canton:${base_version}"
 
-COPY pre-bootstrap.sh app.conf /app/
+COPY --chown=nonroot:nonroot pre-bootstrap.sh app.conf /app/

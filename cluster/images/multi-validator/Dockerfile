@@ -8,4 +8,4 @@ FROM splice-app:${base_version}
 ARG base_version
 LABEL org.opencontainers.image.base.name="splice-app:${base_version}"
 
-COPY app.conf pre-bootstrap.sh health-check.sh /app/
+COPY --chown=nonroot:nonroot app.conf pre-bootstrap.sh health-check.sh /app/
