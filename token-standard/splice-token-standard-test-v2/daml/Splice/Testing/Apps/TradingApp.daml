@@ -14,7 +14,7 @@ import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
-import Splice.Api.Token.AllocationRequestV1
+import Splice.Api.Token.AllocationRequestV2
 import Splice.Api.Token.UtilsV2
 
 
@@ -152,7 +152,7 @@ template OTCTrade
 
     interface instance AllocationRequest for OTCTrade where
       view = AllocationRequestView with
-        settlement = settlement_info_v2_to_v1 $ SettlementInfo with
+        settlement = SettlementInfo with
           executor = venue
           requestedAt = createdAt
           settlementRef = makeTradeRef tradeCid
@@ -160,7 +160,7 @@ template OTCTrade
           settleBefore
           meta = emptyMetadata
           controllerOverride = None
-        transferLegs = fmap transfer_leg_v2_to_v1 transferLegs
+        transferLegs
         meta = emptyMetadata
 
       allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do

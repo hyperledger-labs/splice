@@ -7,7 +7,7 @@ module Splice.Tests.TestAmuletTokenTransfer where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
-import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2 as Api.Token.TransferInstructionV2
 import Splice.Api.Token.UtilsV2
 
 import Daml.Script
@@ -39,7 +39,7 @@ data TestSetup = TestSetup with
   aliceValidator : Party
   bob : Party
   now : Time
-  defaultTransfer : Api.Token.TransferInstructionV1.Transfer
+  defaultTransfer : Api.Token.TransferInstructionV2.Transfer
 
 setupTest : Script TestSetup
 setupTest = do
@@ -104,7 +104,7 @@ setupTest = do
 
   -- Define default transfer from Bob to Alice
   let
-    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+    defaultTransfer = Api.Token.TransferInstructionV2.Transfer with
       sender = bob
       receiver = alice
       amount = 10.0
@@ -496,4 +496,4 @@ test_factory_PublicFetch = do
     with
       expectedAdmin = registry.dso
       actor = alice
-  view === Api.Token.TransferInstructionV1.TransferFactoryView registry.dso emptyMetadata
+  view === Api.Token.TransferInstructionV2.TransferFactoryView registry.dso emptyMetadata
