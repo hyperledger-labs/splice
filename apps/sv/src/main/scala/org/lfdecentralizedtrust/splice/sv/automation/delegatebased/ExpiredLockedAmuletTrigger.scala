@@ -50,7 +50,7 @@ class ExpiredLockedAmuletTrigger(
       )
     )
     _ <- svTaskContext
-      .connection(SpliceLedgerConnectionPriority.Low)
+      .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
       .submit(
         Seq(store.key.svParty),
         Seq(store.key.dsoParty),

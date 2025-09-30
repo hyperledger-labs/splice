@@ -55,6 +55,14 @@ final case class CircuitBreakersConfig(
       maxFailures = 5,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),
+    // Amulet expiry is different from essentially any other trigger run in the SV app in that for it to complete successfully
+    // we need a confirmation from the node hosting the amulet owner. So in other words, if a node is down
+    // this will start failing. Therefore, we use a dedicated circuit breaker just for amulet expiry
+    // to avoid this causing issues for other triggers.
+    amuletExpiry: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 5,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
