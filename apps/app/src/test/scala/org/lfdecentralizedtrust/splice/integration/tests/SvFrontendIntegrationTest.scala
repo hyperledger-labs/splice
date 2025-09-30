@@ -116,15 +116,11 @@ class SvFrontendIntegrationTest
               element.underlying.sendKeys("splice-client-2")
             }
 
-            clue("wait for the submit button to become clickable") {
-              eventually(5.seconds)(
-                find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
-              )
-            }
+            eventually()(
+              find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
+            )
 
-            clue("click the submit button") {
-              click on "create-validator-onboarding-secret"
-            }
+            click on "create-validator-onboarding-secret"
           },
         )(
           "a new secret row is added",
