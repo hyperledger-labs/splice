@@ -43,7 +43,7 @@ final case class CircuitBreakerConfig(
     randomFactor: Double = 0.2,
 )
 
-// TODO(hyperledger-labs/splice#2462) Revert back to defaults once we also reset failures after some time of inactivity
+// TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
 final case class CircuitBreakersConfig(
     highPriority: CircuitBreakerConfig = CircuitBreakerConfig(
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
