@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
@@ -339,7 +340,10 @@ object AcsQueries {
           createdAt.toInstant,
         )
         .fold(
-          err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
+          _ =>
+            throw io.grpc.Status.NOT_FOUND
+              .withDescription("Contract not found.")
+              .asRuntimeException(),
           identity,
         )
     }
