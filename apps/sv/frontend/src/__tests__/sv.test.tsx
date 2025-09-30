@@ -345,8 +345,9 @@ describe('SetAmuletRules', () => {
 
       const calledWithBody = await createPromise;
       expect(
-        calledWithBody.action.value.amuletRulesAction.value.newConfig.transferConfig.transferFee
-          .steps
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (calledWithBody.action as any).value.amuletRulesAction.value.newConfig.transferConfig
+          .transferFee.steps
         // the second element is gone
       ).toStrictEqual(initialSteps.filter((_, i) => i !== 1));
     },
