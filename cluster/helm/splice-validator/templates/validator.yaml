@@ -363,7 +363,7 @@ spec:
         {{- if .Values.participantIdentitiesDumpImport }}
         - name: chown-participant-bootstrapping-dump
           image: busybox:1.37.0
-          command: ["sh", "-c", "cp -R /participant-bootstrapping-dump-secret/* /participant-bootstrapping-dump && chown -R 1001:1001 /participant-bootstrapping-dump"]
+          command: ["sh", "-c", "cp /participant-bootstrapping-dump-secret/content /participant-bootstrapping-dump/ && chown -R 1001:1001 /participant-bootstrapping-dump"]
           volumeMounts:
             - name: participant-bootstrapping-dump-secret
               mountPath: /participant-bootstrapping-dump-secret
