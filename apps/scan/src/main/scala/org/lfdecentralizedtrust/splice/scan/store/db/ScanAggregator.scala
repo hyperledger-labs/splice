@@ -950,8 +950,8 @@ final class ScanAggregator(
       )
       select   $roundTotalsStoreId,
                ap.aggr_round,
-               sum(rpt.cumulative_change_to_initial_amount_as_of_round_zero),
-               sum(rpt.cumulative_change_to_holding_fees_rate)
+               coalesce(sum(rpt.cumulative_change_to_initial_amount_as_of_round_zero), 0),
+               coalesce(sum(rpt.cumulative_change_to_holding_fees_rate), 0)
       from     round_party_totals rpt
       join     active_parties_for_aggr_rounds ap
       on       rpt.closed_round = ap.active_round
