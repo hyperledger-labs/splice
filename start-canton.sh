@@ -95,7 +95,7 @@ do
             ;;
         -B)
             bootstrapScriptPath="$2"
-            logFileHint=canton-signatures
+            logFileHint=canton-missing-signatures
             shift
             echo "using a custom canton bootstrap script: $bootstrapScriptPath"
             ;;

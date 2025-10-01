@@ -167,22 +167,6 @@ class SV1Initializer(
         } else {
           bootstrapDomain(localSynchronizerNode)
         }
-      _ <-
-        if (!config.skipSynchronizerInitialization) {
-          SynchronizerNodeInitializer.rotateLocalCantonNodesOTKIfNeeded(
-            cantonIdentifierConfig,
-            localSynchronizerNode,
-            clock,
-            loggerFactory,
-            retryProvider,
-            synchronizerId,
-          )
-        } else {
-          logger.info(
-            "Skipping OTK keys rotation because skipSynchronizerInitialization is enabled"
-          )
-          Future.unit
-        }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
@@ -212,6 +196,16 @@ class SV1Initializer(
         retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        Some(localSynchronizerNode),
+        clock,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
+      _ = logger.info("Synchronizer rotated OTK keys that were not signed")
       (dsoParty, svParty, _) <- (
         setupDsoParty(synchronizerId, initConnection, namespace),
         SetupUtil.setupSvParty(

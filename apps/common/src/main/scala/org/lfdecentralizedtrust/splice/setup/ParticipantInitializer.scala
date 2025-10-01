@@ -118,7 +118,7 @@ class ParticipantInitializer(
 
   def ensureInitializedWithRotatedOTK(synchronizerId: SynchronizerId): Future[Unit] =
     for {
-      _ <- nodeInitializer.rotateLocalCantonNodesOTKIfNeeded(
+      _ <- nodeInitializer.rotateCantonNodesOTKIfNeeded(
         identifierName,
         ParticipantId.apply,
         synchronizerId,

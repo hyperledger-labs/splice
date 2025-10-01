@@ -163,7 +163,7 @@ jobs:
     with:
       runs_on: self-hosted-k8s-medium
       test_names_file: 'test-full-class-names-signatures.log'
-      start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-deprecated-keys.sc"
+      start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-unsigned-keys.sc"
       parallelism: 1
       test_name: signatures
       with_gcp_creds: false

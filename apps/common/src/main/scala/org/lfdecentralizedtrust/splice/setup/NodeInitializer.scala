@@ -154,7 +154,7 @@ class NodeInitializer(
     } yield ()
   }
 
-  def rotateLocalCantonNodesOTKIfNeeded(
+  def rotateCantonNodesOTKIfNeeded(
       identifierName: String,
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
       synchronizerId: SynchronizerId,
@@ -347,39 +347,43 @@ class NodeInitializer(
       _ = logger.info(s"AuthorizedStore snapshot is imported")
     } yield ()
 
+  // This method rotates OwnerToKeyMapping signing public keys that are not signed
   private def rotateOwnerToKeyMappingNotSignedByKeys(
       id: UniqueIdentifier,
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
       synchronizerId: SynchronizerId,
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    val member = nodeIdentity(id)
     for {
-      fullTxHistory <- connection.listAllTransactions(
+      nsTxHistory <- connection.listAllTransactions(
         store = TopologyStoreId.SynchronizerStore(synchronizerId),
         timeQuery = TimeQuery.Range(None, None),
         includeMappings = Set(OwnerToKeyMapping.code),
+        filterNamespace = Some(member.namespace),
       )
-      ownerToKeyMappingTxHistory = fullTxHistory.filter(_.transaction.mapping match {
-        case mapping: OwnerToKeyMapping if mapping.member == nodeIdentity(id) => true
+      ownerToKeyMappings = nsTxHistory.filter(_.transaction.mapping match {
+        case mapping: OwnerToKeyMapping if mapping.member == member => true
         case _ => false
       })
       _ <-
-        if (ownerToKeyMappingTxHistory.isEmpty) {
+        if (ownerToKeyMappings.isEmpty) {
           Future.unit
         } else {
-          performKeyRotation(ownerToKeyMappingTxHistory, nodeIdentity(id))
+          performKeyRotation(ownerToKeyMappings, nodeIdentity(id))
         }
     } yield ()
+  }
 
   private def performKeyRotation(
-      ownerToKeyMappingTxHistory: Seq[StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]],
+      ownerToKeyMappings: Seq[StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]],
       member: Member,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
-    val allOtkSignatures = ownerToKeyMappingTxHistory
+    val allOtkSignatures = ownerToKeyMappings
       .map(_.transaction)
       .flatMap(_.signatures)
       .map(_.signedBy)
       .distinct
-    val latestKeys = ownerToKeyMappingTxHistory
+    val currentKeys = ownerToKeyMappings
       .map(_.transaction)
       .sortBy(_.transaction.serial)
       .lastOption
@@ -388,38 +392,37 @@ class NodeInitializer(
       case mapping: OwnerToKeyMapping =>
         mapping.keys.forgetNE
       case _ =>
-        throw new IllegalStateException("Latest transaction is not an OwnerToKeyMapping type.")
+        throw new IllegalStateException("Latest transaction is not of OwnerToKeyMapping type.")
     }
-    val (_, toRotate) = latestKeys.map(_.id).partition(allOtkSignatures.contains)
-    for {
-      _ <-
-        if (toRotate.nonEmpty) {
-          logger.info(s"The following keys with missing signature need to be rotated: $toRotate")
-          val rotatedKeys = latestKeys.map {
-            case key: SigningPublicKey if toRotate.contains(key.id) =>
-              connection.generateKeyPair(
-                key.keySpec.name,
-                key.usage,
-              )
-            case key => Future.successful(key)
-          }
-          for {
-            newKeys <- Future.sequence(rotatedKeys)
-            _ <- connection.ensureOwnerToKeyMapping(
-              member = member,
-              keys = NonEmpty.mk(
-                Seq,
-                newKeys.headOption.getOrElse(throw new IllegalStateException("newKeys is empty.")),
-                newKeys.drop(1)*
-              ),
-              retryFor = RetryFor.Automation,
+    val toRotate = currentKeys.map(_.id).filterNot(allOtkSignatures.contains)
+    if (toRotate.nonEmpty) {
+      logger.info(s"The following keys with missing signature need to be rotated: $toRotate")
+      for {
+        newKeys <- Future.traverse(currentKeys) {
+          case key: SigningPublicKey if toRotate.contains(key.id) =>
+            connection.generateKeyPair(
+              key.keySpec.name,
+              key.usage,
             )
-          } yield logger.info(
-            s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
-          )
-        } else {
-          Future.unit
+          case key => Future.successful(key)
         }
-    } yield ()
+        newKeysNE <- NonEmpty.from(newKeys) match {
+          case Some(ne) => Future.successful(ne)
+          case None =>
+            Future.failed(
+              new IllegalStateException("newKeys collection cannot be empty after rotation.")
+            )
+        }
+        _ <- connection.ensureOwnerToKeyMapping(
+          member = member,
+          keys = newKeysNE,
+          retryFor = RetryFor.Automation,
+        )
+      } yield logger.info(
+        s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
+      )
+    } else {
+      Future.unit
+    }
   }
 }

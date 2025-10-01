@@ -1854,7 +1854,7 @@ checkErrors := {
 
   splitAndCheckCantonLogFile("canton", usesSimtime = false)
   splitAndCheckCantonLogFile("canton-simtime", usesSimtime = true)
-  splitAndCheckCantonLogFile("canton-signatures", usesSimtime = false)
+  splitAndCheckCantonLogFile("canton-missing-signatures", usesSimtime = false)
   import better.files._
   val dir = File("log/")
   if (dir.exists())

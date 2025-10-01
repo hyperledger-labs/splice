@@ -60,7 +60,7 @@ object SynchronizerNodeInitializer {
     } yield ()
   }
 
-  def rotateLocalCantonNodesOTKIfNeeded(
+  def rotateCantonNodesOTKIfNeeded(
       identifierConfig: SvCantonIdentifierConfig,
       synchronizerNode: LocalSynchronizerNode,
       clock: Clock,
@@ -75,12 +75,12 @@ object SynchronizerNodeInitializer {
       retryProvider,
     )
     for {
-      _ <- synchronizerNodeInitializer.sequencerInitializer.rotateLocalCantonNodesOTKIfNeeded(
+      _ <- synchronizerNodeInitializer.sequencerInitializer.rotateCantonNodesOTKIfNeeded(
         identifierConfig.sequencer,
         SequencerId.apply,
         synchronizerId,
       )
-      _ <- synchronizerNodeInitializer.mediatorInitializer.rotateLocalCantonNodesOTKIfNeeded(
+      _ <- synchronizerNodeInitializer.mediatorInitializer.rotateCantonNodesOTKIfNeeded(
         identifierConfig.mediator,
         MediatorId.apply,
         synchronizerId,
