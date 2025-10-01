@@ -57,12 +57,11 @@ const ValidatorOnboardingSecrets: React.FC = () => {
     return <p>Error, something went wrong while fetching onboarding secrets.</p>;
   }
 
-  const validatorOnboardings = validatorOnboardingsQuery.data.toSorted((a, b) => {
-    return (
+  const validatorOnboardings = validatorOnboardingsQuery.data.toSorted(
+    (a, b) =>
       new Date(b.contract.payload.expiresAt).valueOf() -
       new Date(a.contract.payload.expiresAt).valueOf()
-    );
-  });
+  );
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
@@ -107,8 +106,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           fullWidth
           size="large"
           onClick={() => {
-            prepareOnboardingMutation.mutate(partyHint);
-            setPartyHint('');
+            prepareOnboardingMutation.mutateAsync(partyHint).then(() => setPartyHint(''));
           }}
         >
           Create a validator onboarding secret

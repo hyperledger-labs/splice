@@ -27,7 +27,7 @@ object Secrets {
     }
 
   // There are two ways to create secrets:
-  // 1. Through the UI/API endpoints. The actual secret (excluding the wrapper that adds the SV party id) is a base64 encoded string of length 30.
+  // 1. Through the UI/API endpoints. The actual secret (excluding the wrapper that adds the SV party id) is a base64 encoded string.
   // 2. Through `expected-validator-onboardings`. In that case, the secret can be whatever the user chose so it must not be a base64 string.
   // So for backwards compatibility we interpret a secret that is not base64 or does not decode to a JSON object
   // as a legacy token without the wrapper including the SV party id.
