@@ -31,6 +31,11 @@ To complete the reset, go through the following steps:
     b. Make a note of your desired amulet price in the SV UI.
     c. Make a note of all ongoing votes in the SV UI.
        Ongoing votes will be lost as part of the reset and need to be recreated manually after the reset.
+    d. Make a note of all featured apps:
+
+        curl -sSL --fail-with-body https://YOUR_SCAN_URL/api/scan/v0/featured-apps > featured.json
+
+       Featured app rights will be lost as part of the reset and need to be recreated manually after the reset.
 
 2.  Decommission your old node
 
@@ -91,8 +96,10 @@ To complete the reset, go through the following steps:
 
 7.  Other post-reset actions
 
-    a. Recreate votes for featured apps
-    b. Recreate votes that were ongoing at the time of the reset, see step 1.c.
-    c. Re-issue secrets
+    a. Recreate votes that were ongoing at the time of the reset, see step 1.c.
+    b. Re-issue onboarding secrets to validators you are sponsoring.
+    c. Recreate votes for featured apps when requested by validators.
+       The expectation is that validators reach out to their sponsor and the sponsor initiates the vote.
+       If necessary, consult the list of featured apps you backed up in step 1.d.
     d. Update your auto-sweeping configuration, as party ids change as part
        of the reset.
