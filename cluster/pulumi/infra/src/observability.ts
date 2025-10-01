@@ -13,6 +13,7 @@ import {
   COMETBFT_RETAIN_BLOCKS,
   commandScriptPath,
   ENABLE_COMETBFT_PRUNING,
+  ExactNamespace,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
@@ -22,6 +23,7 @@ import {
   SPLICE_ROOT,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
@@ -87,11 +89,12 @@ const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): pulumi.Resource {
+  const namespaceName = 'observability';
   const namespace = new k8s.core.v1.Namespace(
-    'observabilty',
+    namespaceName,
     {
       metadata: {
-        name: 'observability',
+        name: namespaceName,
         // istio really doesn't play well with prometheus
         // it seems to  modify the scraping calls from prometheus and change labels/include extra time series that make no sense
         labels: { 'istio-injection': 'disabled' },
@@ -99,10 +102,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     },
     { dependsOn }
   );
-  const namespaceName = namespace.metadata.name;
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
   const stackVersion = '75.9.0';
   const prometheusStackCrdVersion = '0.83.0';
+  const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
@@ -851,4 +854,8 @@ function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
       adminPassword: String(parsed.adminPassword),
     };
   });
+}
+
+function installPostgres(namespace: ExactNamespace): SplicePostgres {
+  return new SplicePostgres(namespace, 'grafana-pg', 'grafana-pg', 'grafana-pg-secret');
 }
