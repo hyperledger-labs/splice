@@ -37,6 +37,9 @@ To complete the reset, go through the following steps:
 
        Featured app rights will be lost as part of the reset and need to be recreated manually after the reset.
 
+    e. Make a note of the current round in the Scan UI.
+       The current round number affects the reward distribution.
+
 2.  Decommission your old node
 
     a. Uninstall all helm charts.
@@ -90,6 +93,10 @@ To complete the reset, go through the following steps:
 
     b. Check your desired coin price in the SV UI, and verify that it matches
        the value from before the reset (see step 1.b.)
+    c. Check the current round in the Scan UI, and verify that it matches the expected value.
+       This can either be the value from before the reset (see step 1.e.), or
+       a different value if the SV operators agreed on that, e.g., to match the minting curve
+       to a different network.
 
 6.  Take a backup of your node identities as they change as part of the
     reset.
