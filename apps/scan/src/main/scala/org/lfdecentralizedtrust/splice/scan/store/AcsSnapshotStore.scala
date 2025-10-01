@@ -175,10 +175,9 @@ class AcsSnapshotStore(
     *  Regular locks (e.g. obtained via `LOCK TABLE ... IN EXCLUSIVE MODE`) would conflict with harmless
     *  background operations like autovacuum or create index concurrently.
     *
-    *  In case the application crashes while holding the lock, the server should close the connection
+    *  In case the application crashes while holding the lock, the server _should_ close the connection
     *  and abort the transaction as soon as it detects a disconnect.
-    *  See [[com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig]] for our connection keepalive settings.
-    *  With default settings, the server should detect a dead connection within ~15sec.
+    *  TODO(#2488): Verify that the server indeed closes connections in a reasonable time.
     */
   private def withExclusiveSnapshotDataLock[T, E <: Effect](
       action: DBIOAction[T, NoStream, E]
