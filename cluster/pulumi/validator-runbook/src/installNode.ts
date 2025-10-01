@@ -297,7 +297,7 @@ async function installValidator(
     { dependsOn: dependsOn }
   );
   if (validatorConfig?.partyAllocator.enable) {
-    installPartyAllocator(xns, [validatorChart]);
+    installPartyAllocator(xns, validatorConfig.partyAllocator, [validatorChart]);
   }
   return validatorChart;
 }

@@ -206,6 +206,10 @@ networkWide:
   maxVettingDelay: 1m
 validators:
   validator-runbook:
+    partyAllocator:
+      enable: true
+      maxParties: 1234
+      parallelism: 321
     participant:
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME
