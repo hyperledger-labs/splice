@@ -7,7 +7,9 @@ module Splice.AmuletTransferInstruction (
 ) where
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
@@ -17,7 +19,7 @@ import Splice.Amulet.TwoStepTransfer
 template AmuletTransferInstruction
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for executing the transfer upon acceptance
-    transfer : Splice.Api.Token.TransferInstructionV1.Transfer
+    transfer : Splice.Api.Token.TransferInstructionV2.Transfer
   where
     signatory transfer.instrumentId.admin, transfer.sender
     observer transfer.receiver
@@ -41,11 +43,22 @@ template AmuletTransferInstruction
       transferInstruction_withdrawImpl _self arg = do
         abortAmuletTransferInstruction this arg.extraArgs
 
+    interface instance TransferInstructionV1.TransferInstruction for AmuletTransferInstruction where
+      view = transfer_instruction_view_v2_to_v1 (view (toInterface @TransferInstruction this))
+
+      TransferInstructionV1.transferInstruction_acceptImpl = transferInstruction_v1_acceptImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_rejectImpl = transferInstruction_v1_rejectImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_updateImpl = transferInstruction_v1_updateImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_withdrawImpl = transferInstruction_v1_withdrawImpl (toInterface @TransferInstruction this)
+
+
+
+
 
 -- Transfer instruction evolution
 ---------------------------------
 
-standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV1.Transfer-> TwoStepTransfer
+standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV2.Transfer-> TwoStepTransfer
 standardTransferToTwoStepTransfer transfer =
   TwoStepTransfer with
     dso = transfer.instrumentId.admin

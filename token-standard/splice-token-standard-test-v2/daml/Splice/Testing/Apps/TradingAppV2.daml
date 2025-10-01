@@ -4,7 +4,7 @@
 -- | An example of how to build an OTC trading app for multi-leg standard token trades.
 --
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
-module Splice.Testing.Apps.TradingApp where
+module Splice.Testing.Apps.TradingAppV2 where
 
 import DA.Foldable qualified as F
 import DA.Optional (fromOptional, fromSomeNote)
@@ -15,7 +15,6 @@ import DA.Traversable qualified as Traversable
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV2
-import Splice.Api.Token.UtilsV2
 
 
 template OTCTradeProposal with

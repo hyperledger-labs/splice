@@ -15,6 +15,8 @@ import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
 import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
 import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructionV2
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 
 -- Holding
 ----------
@@ -277,7 +279,7 @@ allocationInstruction_v1_updateImpl this self AllocationInstructionV1.Allocation
 
 
 -- AllocationFactory
----------------------
+--------------------
 
 -- Upcast
 allocation_factory_view_v1_to_v2 : AllocationInstructionV1.AllocationFactoryView -> AllocationInstructionV2.AllocationFactoryView
@@ -321,3 +323,153 @@ allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.Allocatio
     AllocationInstructionV2.AllocationFactory_PublicFetch {..}
   return (allocation_factory_view_v2_to_v1 resv2)
 
+
+-- TransferInstruction
+----------------------
+
+-- Upcast
+transfer_v1_to_v2 : TransferInstructionV1.Transfer -> TransferInstructionV2.Transfer
+transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
+  TransferInstructionV2.Transfer with
+    sender
+    receiver
+    amount
+    instrumentId = instrumentId_v1_to_v2 instrumentId
+    requestedAt
+    executeBefore
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta
+  
+transfer_instruction_status_v1_to_v2 : TransferInstructionV1.TransferInstructionStatus -> TransferInstructionV2.TransferInstructionStatus
+transfer_instruction_status_v1_to_v2 tis = case tis of
+  TransferInstructionV1.TransferPendingReceiverAcceptance -> 
+    TransferInstructionV2.TransferPendingReceiverAcceptance
+  TransferInstructionV1.TransferPendingInternalWorkflow pendingActions -> 
+    TransferInstructionV2.TransferPendingInternalWorkflow pendingActions
+
+transfer_instruction_view_v1_to_v2 : TransferInstructionV1.TransferInstructionView -> TransferInstructionV2.TransferInstructionView
+transfer_instruction_view_v1_to_v2 TransferInstructionV1.TransferInstructionView{..} =
+  TransferInstructionV2.TransferInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    transfer = transfer_v1_to_v2 transfer
+    status = transfer_instruction_status_v1_to_v2 status
+    meta
+  
+
+-- Downcast
+transfer_v2_to_v1 : TransferInstructionV2.Transfer -> TransferInstructionV1.Transfer
+transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
+  TransferInstructionV1.Transfer with
+    sender
+    receiver
+    amount
+    instrumentId = instrumentId_v2_to_v1 instrumentId
+    requestedAt
+    executeBefore
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta
+
+transfer_instruction_status_v2_to_v1 : TransferInstructionV2.TransferInstructionStatus -> TransferInstructionV1.TransferInstructionStatus
+transfer_instruction_status_v2_to_v1 tis = case tis of
+  TransferInstructionV2.TransferPendingReceiverAcceptance -> 
+    TransferInstructionV1.TransferPendingReceiverAcceptance
+  TransferInstructionV2.TransferPendingInternalWorkflow pendingActions -> 
+    TransferInstructionV1.TransferPendingInternalWorkflow pendingActions
+
+transfer_instruction_view_v2_to_v1 : TransferInstructionV2.TransferInstructionView -> TransferInstructionV1.TransferInstructionView
+transfer_instruction_view_v2_to_v1 TransferInstructionV2.TransferInstructionView{..} =
+  TransferInstructionV1.TransferInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    transfer = transfer_v2_to_v1 transfer
+    status = transfer_instruction_status_v2_to_v1 status
+    meta
+
+-- Choices
+
+transfer_instruction_result_output_v2_to_v1 : TransferInstructionV2.TransferInstructionResult_Output -> TransferInstructionV1.TransferInstructionResult_Output
+transfer_instruction_result_output_v2_to_v1 tiro = case tiro of
+  TransferInstructionV2.TransferInstructionResult_Pending with transferInstructionCid ->
+    TransferInstructionV1.TransferInstructionResult_Pending with
+      transferInstructionCid = (coerceInterfaceContractId transferInstructionCid)
+  TransferInstructionV2.TransferInstructionResult_Completed with receiverHoldingCids ->
+    TransferInstructionV1.TransferInstructionResult_Completed with
+      receiverHoldingCids = (map coerceInterfaceContractId receiverHoldingCids)
+  TransferInstructionV2.TransferInstructionResult_Failed  ->
+    TransferInstructionV1.TransferInstructionResult_Failed
+
+transfer_instruction_result_v2_to_v1 : TransferInstructionV2.TransferInstructionResult -> TransferInstructionV1.TransferInstructionResult
+transfer_instruction_result_v2_to_v1 TransferInstructionV2.TransferInstructionResult{..} =
+  TransferInstructionV1.TransferInstructionResult with
+    output = transfer_instruction_result_output_v2_to_v1 output
+    senderChangeCids = map coerceInterfaceContractId senderChangeCids
+    meta
+
+transferInstruction_v1_acceptImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Accept -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_acceptImpl this self TransferInstructionV1.TransferInstruction_Accept{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_acceptImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Accept{..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferInstruction_v1_rejectImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Reject -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_rejectImpl this self TransferInstructionV1.TransferInstruction_Reject{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_rejectImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Reject{..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferInstruction_v1_withdrawImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Withdraw -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_withdrawImpl this self TransferInstructionV1.TransferInstruction_Withdraw{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_withdrawImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Withdraw{..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferInstruction_v1_updateImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Update -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_updateImpl this self TransferInstructionV1.TransferInstruction_Update{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_updateImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Update{..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+-- TransferFactory
+------------------
+
+-- Updast
+transfer_factory_view_v1_to_v2 : TransferInstructionV1.TransferFactoryView -> TransferInstructionV2.TransferFactoryView
+transfer_factory_view_v1_to_v2 TransferInstructionV1.TransferFactoryView{..} =
+  TransferInstructionV2.TransferFactoryView with ..
+
+-- Downcast
+transfer_factory_view_v2_to_v1 : TransferInstructionV2.TransferFactoryView -> TransferInstructionV1.TransferFactoryView
+transfer_factory_view_v2_to_v1 TransferInstructionV2.TransferFactoryView{..} =
+  TransferInstructionV1.TransferFactoryView with ..
+
+-- Choices
+
+transfer_factory_transfer_v1_to_v2 : TransferInstructionV1.TransferFactory_Transfer -> TransferInstructionV2.TransferFactory_Transfer
+transfer_factory_transfer_v1_to_v2 TransferInstructionV1.TransferFactory_Transfer{..} =
+  TransferInstructionV2.TransferFactory_Transfer with
+    expectedAdmin
+    transfer = transfer_v1_to_v2 transfer
+    extraArgs
+
+transferFactory_v1_transferImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_Transfer -> Update TransferInstructionV1.TransferInstructionResult
+transferFactory_v1_transferImpl this self args = do
+  resv2 <- TransferInstructionV2.transferFactory_transferImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
+    (transfer_factory_transfer_v1_to_v2 args)
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferFactory_v1_publicFetchImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_PublicFetch -> Update TransferInstructionV1.TransferFactoryView
+transferFactory_v1_publicFetchImpl this self TransferInstructionV1.TransferFactory_PublicFetch{..} = do
+  resv2 <- TransferInstructionV2.transferFactory_publicFetchImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
+    TransferInstructionV2.TransferFactory_PublicFetch with ..
+  return (transfer_factory_view_v2_to_v1 resv2)

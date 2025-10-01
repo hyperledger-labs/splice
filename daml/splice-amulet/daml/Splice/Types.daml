@@ -6,7 +6,7 @@ module Splice.Types where
 
 import Splice.Api.Token.AllocationV2
 import Splice.Api.Token.HoldingV2
-import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2
 import Splice.Util (HasCheckedFetch(..))
 
 import DA.TextMap qualified as TextMap

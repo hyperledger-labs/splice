@@ -3,7 +3,7 @@
 
 -- | Daml script functions for initializing and using an amulet registry via the
 -- token standard and the amulet specific functions.
-module Splice.Testing.Registries.AmuletRegistry
+module Splice.Testing.Registries.AmuletRegistryV2
   (
     -- * Setup
     AmuletRegistryConfig(..)
@@ -39,7 +39,6 @@ import Splice.Api.Token.HoldingV2 as Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationInstructionV2
 import Splice.Api.Token.TransferInstructionV2
-import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -51,9 +50,9 @@ import Splice.ExternalPartyAmuletRules
 import Splice.Fees
 import Splice.Round
 
-import Splice.Testing.Utils
-import Splice.Testing.Registries.AmuletRegistry.Parameters
-import Splice.Testing.TokenStandard.RegistryApi
+import Splice.Testing.UtilsV2
+import Splice.Testing.Registries.AmuletRegistryV2.Parameters
+import Splice.Testing.TokenStandard.RegistryApiV2
 
 import Daml.Script
 
