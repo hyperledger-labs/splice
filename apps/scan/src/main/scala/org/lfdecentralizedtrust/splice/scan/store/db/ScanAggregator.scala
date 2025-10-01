@@ -960,9 +960,7 @@ final class ScanAggregator(
       and      rpt.party = ap.party
       and      rpt.store_id = $roundTotalsStoreId
       group by ap.aggr_round
-      on conflict (store_id, closed_round)
-      do update set sum_cumulative_change_to_initial_amount_as_of_round_zero = excluded.sum_cumulative_change_to_initial_amount_as_of_round_zero,
-        sum_cumulative_change_to_holding_fees_rate = excluded.sum_cumulative_change_to_holding_fees_rate;
+      on conflict do nothing;
     """.andThen(DBIOAction.successful(()))
     }
     logger.info(
