@@ -871,6 +871,143 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/wallet/minting-delegation-proposals:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listMintingDelegationProposals"
+      description: |
+        List all MintingDelegationProposal contracts where the user is the delegate.
+      parameters:
+        - name: "after"
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          description: Maximum number of elements to return, 1000 by default.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListMintingDelegationProposalsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegation-proposals/{contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptMintingDelegationProposal"
+      description: |
+        As the delegate, accept a MintingDelegationProposal, creating a MintingDelegation contract.
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AcceptMintingDelegationProposalResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegation-proposals/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectMintingDelegationProposal"
+      description: |
+        As the delegate, reject a MintingDelegationProposal.
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegations:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listMintingDelegations"
+      description: |
+        List all MintingDelegation contracts where the user is the delegate.
+      parameters:
+        - name: "after"
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          description: Maximum number of elements to return, 1000 by default.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListMintingDelegationsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegations/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectMintingDelegation"
+      description: |
+        As the delegate, reject/terminate a MintingDelegation contract.
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 
 components:
   schemas:
@@ -1612,3 +1749,44 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    ListMintingDelegationProposalsResponse:
+      type: object
+      required:
+        - proposals
+      properties:
+        proposals:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as URL query parameter `after`.
+            If absent or `null`, there are no more pages.
+
+    AcceptMintingDelegationProposalResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          type: string
+          description: Contract ID of the created MintingDelegation
+
+    ListMintingDelegationsResponse:
+      type: object
+      required:
+        - delegations
+      properties:
+        delegations:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as URL query parameter `after`.
+            If absent or `null`, there are no more pages.
