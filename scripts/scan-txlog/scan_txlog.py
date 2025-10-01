@@ -1444,7 +1444,8 @@ class TransferInputs:
 
         return (output, effective_inputs, total_cc, all_inputs)
 
-    def summary(self):
+    def summary(self, package_id):
+        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(package_id)
         output = []
         effective_inputs = []
         unfeatured_app_rewards = {}
@@ -1544,7 +1545,6 @@ class TransferInputs:
             output += ["amulets:"]
             for amulet in self.amulets:
                 amount = amulet.payload.get_amulet_amount()
-                subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(amulet.template_id.package_id)
                 effective = EffectiveAmount.from_amount_and_round(
                     amount, self.round_number, subtract_holding_fees_per_round
                 )
@@ -2421,7 +2421,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary()
+        ) = transfer_inputs.summary(event.template_id.package_id)
         output_amulets_cids = res.get_transfer_result_created_amulets()
         output_fees = res.get_transfer_result_output_fees()
         sender_change_amulet_cid = res.get_transfer_result_sender_change_amulet()
@@ -2631,7 +2631,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary()
+        ) = transfer_inputs.summary(event.template_id.package_id)
         amulet_paid = res.get_buy_member_traffic_result_amulet_paid()
         sender_change_cid = res.get_buy_member_traffic_result_sender_change_amulet()
         transfer_summary = res.get_buy_member_traffic_result_transfer_summary()
@@ -2843,7 +2843,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary()
+        ) = transfer_inputs.summary(event.template_id.package_id)
         sender_change_cid = transfer_result.get_transfer_result_sender_change_amulet()
         output_fees = transfer_result.get_transfer_result_output_fees()
         if sender_change_cid:
