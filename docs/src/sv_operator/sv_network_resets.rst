@@ -64,8 +64,8 @@ To complete the reset, go through the following steps:
        the other SV operators on what has been agreed upon.
     d. Founding node only: Set all helm chart values that affect network parameters,
        such that the verification steps listed below pass.
-    d. Install all helm charts.
-    e. Wait until your SV node is sending status reports.
+    e. Install all helm charts.
+    f. Wait until your SV node is sending status reports.
 
 5.  Verify that network parameters were preserved
 
@@ -96,7 +96,7 @@ To complete the reset, go through the following steps:
     b. Check your desired coin price in the SV UI, and verify that it matches
        the value from before the reset (see step 1.b.)
     c. Check the current round in the Scan UI, and verify that it matches the expected value.
-       This can either be the value from before the reset (see step 1.e.), or
+       This can either be roughly the same value as before the reset (see step 1.e.), or
        a different value if the SV operators agreed on that, e.g., to match the minting curve
        to a different network.
 
