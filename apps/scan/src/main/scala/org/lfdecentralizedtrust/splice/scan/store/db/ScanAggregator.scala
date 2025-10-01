@@ -934,7 +934,9 @@ final class ScanAggregator(
         -- all the parties that were active in the newly aggregated rounds
         select party, round as aggr_round, round as active_round from temp_cumulative_totals
         union
-        -- adding the lastClosedRound as aggr_round, for parties that were not active but have been aggregated in that round
+        -- adding the lastClosedRound as aggr_round, for all active_parties after this aggregation.
+        -- This ensures that the total_amulet_balance is calculated based on all parties that were active up to and including lastClosedRound,
+        -- even if they were not active in the newly aggregated rounds.
         select party,
                $lastClosedRound as aggr_round,
                closed_round as active_round
