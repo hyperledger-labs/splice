@@ -105,7 +105,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
   const stackVersion = '75.9.0';
   const prometheusStackCrdVersion = '0.83.0';
-  const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
+  // const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
@@ -857,5 +857,5 @@ function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
 }
 
 function installPostgres(namespace: ExactNamespace): SplicePostgres {
-  return new SplicePostgres(namespace, 'grafana-pg', 'grafana-pg', 'grafana-pg-secret');
+  return new SplicePostgres(namespace, 'grafana-postgres', 'grafana-postgres', 'grafana-pg-secret');
 }
