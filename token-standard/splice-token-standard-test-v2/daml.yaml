@@ -32,7 +32,6 @@ data-dependencies:
   - ../../daml/splice-amulet/.daml/dist/splice-amulet-current.dar
   - ../splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
   - ../splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
-  - ../splice-api-token-utils-v2/.daml/dist/splice-api-token-utils-v2-current.dar
 
 build-options:
   - --target=2.1

@@ -26,18 +26,17 @@ import Splice.Wallet.TransferPreapproval
 import Splice.Scripts.Wallet.TestSubscriptions
 import Splice.Fees
 import Splice.Scripts.Util
-import Splice.Testing.Utils
-import Splice.Testing.Registries.AmuletRegistry.Parameters
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
-import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.UtilsV2
+import Splice.Testing.Registries.AmuletRegistryV2.Parameters
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
 import qualified Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
-import qualified Splice.Api.Token.AllocationInstructionV1 as Api.Token.AllocationInstructionV1
-import Splice.Api.Token.TransferInstructionV1 (TransferFactory_Transfer(..))
-import qualified Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import qualified Splice.Api.Token.AllocationInstructionV2 as Api.Token.AllocationInstructionV2
+import Splice.Api.Token.TransferInstructionV2 (TransferFactory_Transfer(..))
+import qualified Splice.Api.Token.TransferInstructionV2 as Api.Token.TransferInstructionV2
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.UtilsV2
-import Splice.Testing.Apps.TradingApp
-import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+import Splice.Testing.Apps.TradingAppV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
 
 createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
@@ -1004,11 +1003,11 @@ testTokenStandardTransfer = script do
   now <- getTime
 
   let
-    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+    defaultTransfer = Api.Token.TransferInstructionV2.Transfer with
       sender = alice
       receiver = bob
       amount = 10.0
-      instrumentId = instrumentId_v2_to_v1 registry.instrumentId
+      instrumentId = registry.instrumentId
       requestedAt = now
       executeBefore = now `addRelTime` days 1
       inputHoldingCids = []
@@ -1027,60 +1026,60 @@ testTokenStandardTransfer = script do
   result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg = enrichedChoice.arg
-  Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change1 = result.senderChangeCids
 
   context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
   result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferInstruction_Withdraw with
     transferInstructionCid = aliceInstrCid
-    withdrawArg = Api.Token.TransferInstructionV1.TransferInstruction_Withdraw with
+    withdrawArg = Api.Token.TransferInstructionV2.TransferInstruction_Withdraw with
       extraArgs = ExtraArgs with
         context = context.choiceContext
         meta = emptyMetadata
 
-  Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Failed === result.output
   let change2 = result.senderChangeCids
 
   result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
-    transferArg = Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+    transferArg = Api.Token.TransferInstructionV2.TransferFactory_Transfer with
       expectedAdmin = registry.dso
       transfer = enrichedChoice.arg.transfer with
         inputHoldingCids = change1 ++ change2
       extraArgs = enrichedChoice.arg.extraArgs
 
-  Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change3 = result.senderChangeCids
 
   result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Reject with
     transferInstructionCid = aliceInstrCid
-    rejectArg = Api.Token.TransferInstructionV1.TransferInstruction_Reject with
+    rejectArg = Api.Token.TransferInstructionV2.TransferInstruction_Reject with
       extraArgs = ExtraArgs with
         context = context.choiceContext
         meta = emptyMetadata
 
-  Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Failed === result.output
   let change4 = result.senderChangeCids
 
   result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
-    transferArg =  Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+    transferArg =  Api.Token.TransferInstructionV2.TransferFactory_Transfer with
       expectedAdmin = registry.dso
       transfer = enrichedChoice.arg.transfer with
         inputHoldingCids = change3 ++ change4
       extraArgs = enrichedChoice.arg.extraArgs
 
-  Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   context <- RegistryApi.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
 
   result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Accept with
     transferInstructionCid = aliceInstrCid
-    acceptArg =  Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+    acceptArg =  Api.Token.TransferInstructionV2.TransferInstruction_Accept with
       extraArgs = ExtraArgs with
         context = context.choiceContext
         meta = emptyMetadata
 
-  Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ <- pure result.output
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Completed _ <- pure result.output
 
   pure ()
 
@@ -1127,7 +1126,7 @@ testTokenStandardAllocate = script do
 
   holdingCid <- AmuletRegistry.tapFaucet registry alice 200.0
 
-  enrichedChoice <- RegistryApi.getAllocationFactory registry Api.Token.AllocationInstructionV1.AllocationFactory_Allocate with
+  enrichedChoice <- RegistryApi.getAllocationFactory registry Api.Token.AllocationInstructionV2.AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
     inputHoldingCids = [coerceInterfaceContractId holdingCid]
@@ -1138,7 +1137,7 @@ testTokenStandardAllocate = script do
     allocationFactory = enrichedChoice.factoryCid
     allocateArg = enrichedChoice.arg
 
-  Api.Token.AllocationInstructionV1.AllocationInstructionResult_Completed allocationCid <- pure result.output
+  Api.Token.AllocationInstructionV2.AllocationInstructionResult_Completed allocationCid <- pure result.output
 
   context <- RegistryApi.getAllocation_WithdrawContext registry (coerceInterfaceContractId allocationCid) emptyMetadata
 

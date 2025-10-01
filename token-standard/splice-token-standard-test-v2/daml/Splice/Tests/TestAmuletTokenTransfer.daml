@@ -8,7 +8,6 @@ module Splice.Tests.TestAmuletTokenTransfer where
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 import Splice.Api.Token.TransferInstructionV2 as Api.Token.TransferInstructionV2
-import Splice.Api.Token.UtilsV2
 
 import Daml.Script
 
@@ -24,10 +23,10 @@ import DA.Time
 import Splice.Amulet (AppRewardCoupon(..))
 import Splice.Amulet.TokenApiUtils (createdInRoundMetaKey, ratePerRoundMetaKey, burnedMetaKey)
 
-import Splice.Testing.Utils
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
-import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
-import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+import Splice.Testing.UtilsV2
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
 
 
 -- Shared test setup
@@ -108,7 +107,7 @@ setupTest = do
       sender = bob
       receiver = alice
       amount = 10.0
-      instrumentId = instrumentId_v2_to_v1 registry.instrumentId
+      instrumentId = registry.instrumentId
       requestedAt = now
       executeBefore = now `addRelTime` days 1
       inputHoldingCids = map coerceInterfaceContractId bobHoldingCids

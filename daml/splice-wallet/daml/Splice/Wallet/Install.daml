@@ -12,9 +12,8 @@ import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
 import qualified Splice.Api.Token.AllocationV2
-import qualified Splice.Api.Token.AllocationInstructionV1
-import qualified Splice.Api.Token.TransferInstructionV1
-import Splice.Api.Token.UtilsV2
+import qualified Splice.Api.Token.AllocationInstructionV2
+import qualified Splice.Api.Token.TransferInstructionV2
 import Splice.Amulet
 import Splice.AmuletAllocation (allocationSender)
 import Splice.Amulet.TokenApiUtils
@@ -587,41 +586,41 @@ template WalletAppInstall
     -- This is a dedicated choice rather than going through AmuletOperation as it behaves a bit differently than all the other operations:
     -- 1. We cannot use rewards as inputs.
     -- 2. We can use expired locked amulets as inputs.
-    nonconsuming choice WalletAppInstall_TransferFactory_Transfer : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+    nonconsuming choice WalletAppInstall_TransferFactory_Transfer : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
       with
-        transferFactoryCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
-        transferArg : Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer
+        transferFactoryCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferFactory
+        transferArg : Splice.Api.Token.TransferInstructionV2.TransferFactory_Transfer
       controller validatorParty
       do let transfer = transferArg.transfer
          require ("sender " <> show transfer.sender <> " is endUserParty " <> show endUserParty) (transfer.sender == endUserParty)
-         require ("instrumentId " <> show transfer.instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (instrumentId_v1_to_v2 transfer.instrumentId == amuletInstrumentId dsoParty)
+         require ("instrumentId " <> show transfer.instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (transfer.instrumentId == amuletInstrumentId dsoParty)
          require ("expected admin " <> show transferArg.expectedAdmin <> " is dso " <> show dsoParty) (transferArg.expectedAdmin == dsoParty)
          exercise transferFactoryCid transferArg
 
-    nonconsuming choice WalletAppInstall_TransferInstruction_Accept : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+    nonconsuming choice WalletAppInstall_TransferInstruction_Accept : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
       with
-        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
-        acceptArg : Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
+        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction
+        acceptArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Accept
       controller validatorParty
       do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
          let receiver = (view instruction).transfer.receiver
          require ("receiver " <> show receiver <> " must match endUserParty " <> show endUserParty) (receiver == endUserParty)
          exercise transferInstructionCid acceptArg
 
-    nonconsuming choice WalletAppInstall_TransferInstruction_Reject : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+    nonconsuming choice WalletAppInstall_TransferInstruction_Reject : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
       with
-        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
-        rejectArg : Splice.Api.Token.TransferInstructionV1.TransferInstruction_Reject
+        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction
+        rejectArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Reject
       controller validatorParty
       do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
          let receiver = (view instruction).transfer.receiver
          require ("receiver " <> show receiver <> " must match endUserParty " <> show endUserParty) (receiver == endUserParty)
          exercise transferInstructionCid rejectArg
 
-    nonconsuming choice WalletAppInstall_TransferInstruction_Withdraw : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+    nonconsuming choice WalletAppInstall_TransferInstruction_Withdraw : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
       with
-        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
-        withdrawArg : Splice.Api.Token.TransferInstructionV1.TransferInstruction_Withdraw
+        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction
+        withdrawArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Withdraw
       controller validatorParty
       do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
          let sender = (view instruction).transfer.sender
@@ -631,16 +630,16 @@ template WalletAppInstall
     -- This is a dedicated choice rather than going through AmuletOperation as it behaves a bit differently than all the other operations:
     -- 1. We cannot use rewards as inputs.
     -- 2. We can use expired locked amulets as inputs.
-    nonconsuming choice WalletAppInstall_AllocationFactory_Allocate : Splice.Api.Token.AllocationInstructionV1.AllocationInstructionResult
+    nonconsuming choice WalletAppInstall_AllocationFactory_Allocate : Splice.Api.Token.AllocationInstructionV2.AllocationInstructionResult
       with
-        allocationFactory : ContractId Splice.Api.Token.AllocationInstructionV1.AllocationFactory
-        allocateArg : Splice.Api.Token.AllocationInstructionV1.AllocationFactory_Allocate
+        allocationFactory : ContractId Splice.Api.Token.AllocationInstructionV2.AllocationFactory
+        allocateArg : Splice.Api.Token.AllocationInstructionV2.AllocationFactory_Allocate
       controller validatorParty
       do require ("expected admin " <> show allocateArg.expectedAdmin <> " is dso " <> show dsoParty) (allocateArg.expectedAdmin == dsoParty)
-         let sender = allocateArg.allocation.transferLeg.sender
-         require ("sender " <> show sender <> " is endUserParty " <> show endUserParty) (sender == endUserParty)
-         let legInstrumentId = allocateArg.allocation.transferLeg.instrumentId
-         require ("instrumentId " <> show legInstrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (instrumentId_v1_to_v2 legInstrumentId == amuletInstrumentId dsoParty)
+         forA_ allocateArg.allocation.transferLegs (\Splice.Api.Token.AllocationV2.TransferLeg{sender; instrumentId} -> do
+              require ("sender " <> show sender <> " is endUserParty " <> show endUserParty) (sender == endUserParty)
+              require ("instrumentId " <> show instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (instrumentId == amuletInstrumentId dsoParty)
+            )
          exercise allocationFactory allocateArg
 
     nonconsuming choice WalletAppInstall_Allocation_Withdraw : Splice.Api.Token.AllocationV2.Allocation_WithdrawResult

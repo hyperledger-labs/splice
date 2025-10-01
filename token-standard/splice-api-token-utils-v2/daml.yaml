@@ -16,6 +16,9 @@ data-dependencies:
 - ../splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
 - ../splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
 - ../splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
+- ../splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
+- ../splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
+
 build-options:
   - --target=2.1
 codegen:

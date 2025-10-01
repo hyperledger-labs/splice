@@ -28,16 +28,15 @@ import Splice.Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV2
 import Splice.Api.Token.AllocationInstructionV2
-import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils (burnedMetaKey)
 
-import Splice.Testing.Apps.TradingApp hiding (require)
-import Splice.Testing.Utils
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
-import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
-import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+import Splice.Testing.Apps.TradingAppV2 hiding (require)
+import Splice.Testing.UtilsV2
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
 
 data AllocatedOTCTrade = AllocatedOTCTrade
   with
@@ -111,7 +110,8 @@ setupOtcTrade  = do
 
   -- Alice sees the allocation request in her wallet
   [aliceAlloc] <- WalletClient.listRequestedAllocations alice amuletId
-  aliceAlloc.transferLeg.amount === 100.0
+  let [(_, tl)] = TextMap.toList aliceAlloc.transferLegs
+  tl.amount === 100.0
 
   -- alice accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
@@ -156,7 +156,8 @@ setupOtcTrade  = do
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocations bob amuletId
-  bobAlloc.transferLeg.amount === 20.0
+  let [(_, tl)] = TextMap.toList bobAlloc.transferLegs
+  tl.amount === 20.0
 
   -- bob accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
@@ -173,7 +174,7 @@ setupOtcTrade  = do
     with
       expectedAdmin = registry.dso
       actor = alice
-  factoryView === Splice.Api.Token.AllocationInstructionV1.AllocationFactoryView registry.dso emptyMetadata
+  factoryView === AllocationFactoryView registry.dso emptyMetadata
   pure AllocatedOTCTrade with
     alice
     bob
@@ -196,7 +197,7 @@ testDvP = script do
   passTime (hours 1)
 
   -- provider runs automation that completes the settlement
-  let otcTradeRef = reference_v1_to_v2 (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
+  let otcTradeRef = (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
   allocations <- appBackendListAllocations provider otcTradeRef
   TextMap.size allocations === 2
 
@@ -253,7 +254,7 @@ testDvP = script do
 
 testDvPCancel = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
-  let otcTradeRef = reference_v1_to_v2 (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
+  let otcTradeRef = (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
   allocations <- appBackendListAllocations provider otcTradeRef
 
   [(_, aliceLockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId

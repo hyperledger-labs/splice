@@ -5,7 +5,7 @@
 -- based on the token standard.
 --
 -- NOTE: there are likely more functions that could/should be added to this module. PRs welcome.
-module Splice.Testing.TokenStandard.WalletClient
+module Splice.Testing.TokenStandard.WalletClientV2
   (
     -- * Reading/checking holdings
     listHoldings,
@@ -35,7 +35,6 @@ import DA.TextMap qualified as TextMap
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 import Splice.Api.Token.AllocationRequestV2 qualified as AllocationRequestV2
 
-import Splice.Api.Token.UtilsV2
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 
