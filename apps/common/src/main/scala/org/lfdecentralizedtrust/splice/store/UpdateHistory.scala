@@ -114,6 +114,17 @@ class UpdateHistory(
 
   private val state = new AtomicReference[State](State.empty())
 
+  def lastIngestedRecordTime: Option[CantonTimestamp] = state.get().lastIngestedRecordTime
+
+  private def advanceLastIngestedRecordTime(ts: CantonTimestamp): Unit = {
+    val _ = state.updateAndGet { s =>
+      s.lastIngestedRecordTime match {
+        case Some(curr) if ts < curr => s
+        case _ => s.copy(lastIngestedRecordTime = Some(ts))
+      }
+    }
+  }
+
   def historyId: Long =
     state
       .get()
@@ -370,7 +381,11 @@ class UpdateHistory(
           .map(_ => ())
           .transactionally
 
-        storage.queryAndUpdate(action, "ingestUpdate")
+        storage
+          .queryAndUpdate(action, "ingestUpdate")
+          .map { _ =>
+            recordTime.foreach(advanceLastIngestedRecordTime)
+          }
       }
 
       private def updateOffset(offset: Long): DBIOAction[?, NoStream, Effect.Write] =
@@ -2167,6 +2182,10 @@ class UpdateHistory(
           action.transactionally,
           "destinationHistory.insert",
         )
+        .map { nonEmpty =>
+          advanceLastIngestedRecordTime(nonEmpty.last.update.recordTime)
+          nonEmpty
+        }
     }
 
     override def markBackfillingComplete()(implicit
@@ -2234,12 +2253,14 @@ object UpdateHistory {
   case class State(
       historyId: Option[Long],
       corruptSnapshotsDeleted: Boolean,
+      lastIngestedRecordTime: Option[CantonTimestamp],
   ) {}
 
   object State {
     def empty(): State = State(
       historyId = None,
       corruptSnapshotsDeleted = false,
+      lastIngestedRecordTime = None,
     )
   }
 

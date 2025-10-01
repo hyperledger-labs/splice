@@ -57,6 +57,7 @@ import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.time.Instant
 import java.util.Base64
@@ -90,7 +91,7 @@ class HttpValidatorAdminHandler(
   private val workflowId = this.getClass.getSimpleName
   private val store = storeWithIngestion.store
   private val dumpGenerator = new DomainMigrationDumpGenerator(
-    storeWithIngestion.connection,
+    storeWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
     participantAdminConnection,
     retryProvider,
     loggerFactory,
@@ -442,12 +443,16 @@ class HttpValidatorAdminHandler(
               },
             logger,
           )
-          _ <- storeWithIngestion.connection.waitForPartyOnLedgerApi(partyId)
-          _ <- storeWithIngestion.connection.grantUserRights(
-            config.ledgerApiUser,
-            Seq(partyId),
-            Seq.empty,
-          )
+          _ <- storeWithIngestion
+            .connection(SpliceLedgerConnectionPriority.Medium)
+            .waitForPartyOnLedgerApi(partyId)
+          _ <- storeWithIngestion
+            .connection(SpliceLedgerConnectionPriority.Medium)
+            .grantUserRights(
+              config.ledgerApiUser,
+              Seq(partyId),
+              Seq.empty,
+            )
         } yield v0.ValidatorAdminResource.SubmitExternalPartyTopologyResponseOK(
           definitions.SubmitExternalPartyTopologyResponse(Codec.encode(partyId))
         )
@@ -608,7 +613,8 @@ class HttpValidatorAdminHandler(
                 .commands()
                 .asScala
                 .toSeq
-              storeWithIngestion.connection
+              storeWithIngestion
+                .connection(SpliceLedgerConnectionPriority.Medium)
                 .prepareSubmission(
                   Some(synchronizerId),
                   Seq(userParty),
@@ -655,7 +661,7 @@ class HttpValidatorAdminHandler(
       val userParty = PartyId.tryFromProtoPrimitive(body.submission.partyId)
       for {
         updateId <- ValidatorUtil.submitAsExternalParty(
-          storeWithIngestion.connection,
+          storeWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
           body.submission,
         )
         result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(userParty).flatMap {
@@ -713,7 +719,8 @@ class HttpValidatorAdminHandler(
           )
         )
       case QueryResult(_, Some(preapproval)) =>
-        storeWithIngestion.connection
+        storeWithIngestion
+          .connection(SpliceLedgerConnectionPriority.Medium)
           .submit(
             Seq(validatorParty),
             Seq(validatorParty),
@@ -799,13 +806,15 @@ class HttpValidatorAdminHandler(
           .commands()
           .asScala
           .toSeq
-        r <- storeWithIngestion.connection
+        r <- storeWithIngestion
+          .connection(SpliceLedgerConnectionPriority.Medium)
           .prepareSubmission(
             Some(synchronizerId),
             Seq(senderParty),
             Seq(senderParty),
             commands,
-            storeWithIngestion.connection
+            storeWithIngestion
+              .connection(SpliceLedgerConnectionPriority.Medium)
               .disclosedContracts(externalPartyAmuletRules),
             body.verboseHashing.getOrElse(false),
           )
@@ -849,7 +858,7 @@ class HttpValidatorAdminHandler(
     requireWalletEnabled { _ =>
       for {
         updateId <- ValidatorUtil.submitAsExternalParty(
-          storeWithIngestion.connection,
+          storeWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
           body.submission,
           waitForOffset = false,
         )

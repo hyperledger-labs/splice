@@ -17,7 +17,11 @@ import {
   validateUrl,
   validateWeight,
 } from './formValidators';
-import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import {
+  createProposalActions,
+  getInitialExpiration,
+  getSvRewardWeight,
+} from '../../utils/governance';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { CommonProposalFormData } from '../../utils/types';
 import { ProposalSummary } from '../governance/ProposalSummary';
@@ -101,6 +105,12 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
     },
   });
 
+  const selectedSv = svOptions.find(o => o.value === form.state.values.sv);
+
+  const currentWeight = useMemo(() => {
+    return getSvRewardWeight(svs, selectedSv?.value || '');
+  }, [svs, selectedSv]);
+
   return (
     <>
       <FormLayout form={form} id="update-sv-reward-weight-form">
@@ -112,6 +122,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
             expiryDate={form.state.values.expiryDate}
             effectiveDate={form.state.values.effectiveDate.effectiveDate}
             formType="sv-reward-weight"
+            currentWeight={currentWeight}
             svRewardWeightMember={form.state.values.sv}
             svRewardWeight={form.state.values.weight}
             onEdit={() => setShowConfirmation(false)}
@@ -138,7 +149,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
             >
               {field => (
                 <field.DateField
-                  title="Vote Proposal Expiration"
+                  title="Threshold Deadline"
                   description="This is the last day voters can vote on this proposal"
                   id="update-sv-reward-weight-expiry-date"
                 />
@@ -204,7 +215,13 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                 onChange: ({ value }) => validateWeight(value),
               }}
             >
-              {field => <field.TextField title="Weight" id="update-sv-reward-weight-weight" />}
+              {field => (
+                <field.TextField
+                  title="Weight"
+                  id="update-sv-reward-weight-weight"
+                  subtitle={selectedSv ? `Current Weight: ${currentWeight}` : undefined}
+                />
+              )}
             </form.AppField>
           </>
         )}

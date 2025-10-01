@@ -26,12 +26,29 @@ import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
 
+  // Changed to a non-default value (the default is 250ms) to see that we correctly modify it.
+  val observationLatency = NonNegativeFiniteDuration.ofMillis(500)
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       // We deliberately change amulet conversion rate votes quickly in this test
       .addConfigTransform((_, config) => ConfigTransforms.withNoVoteCooldown(config))
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_(
+          _.copy(
+            timeTrackerObservationLatency = observationLatency
+          )
+        )(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            timeTrackerObservationLatency = observationLatency
+          )
+        )(config)
+      )
       .withManualStart
 
   private val decentralizedSynchronizer = SynchronizerAlias.tryCreate("global")
@@ -52,9 +69,10 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             val synchronizerConfig = sv.participantClient.synchronizers
               .config(decentralizedSynchronizer)
               .value
-              .sequencerConnections
-            val connections: Seq[SequencerConnection] = synchronizerConfig.connections.forgetNE
-            synchronizerConfig.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+            synchronizerConfig.timeTracker.observationLatency shouldBe observationLatency
+            val sequencerConnections = synchronizerConfig.sequencerConnections
+            val connections: Seq[SequencerConnection] = sequencerConnections.connections.forgetNE
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
               PositiveInt.tryCreate(2),
               NonNegativeFiniteDuration.ofSeconds(10),
             )

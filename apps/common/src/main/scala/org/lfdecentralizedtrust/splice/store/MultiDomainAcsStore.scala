@@ -43,7 +43,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.circe.Json
-import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 
 import java.time.Instant
@@ -103,8 +102,8 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext
   ): Future[Option[ContractState]]
 
-  /** True if all contract ids point to known and non-archived contracts. They might be in-flight though. */
-  def hasArchived(ids: Seq[ContractId[?]])(implicit
+  /** True if the ids contains an id that has been archived. */
+  def containsArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
   ): Future[Boolean]
 
@@ -270,7 +269,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   def destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse]
 }
 
-object MultiDomainAcsStore {
+object MultiDomainAcsStore extends StoreErrors {
 
   sealed trait TxLogBackfillingState
   object TxLogBackfillingState {
@@ -843,11 +842,7 @@ object MultiDomainAcsStore {
   ): Future[A] =
     found.map { result =>
       result.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(
-            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
-          )
-          .asRuntimeException
+        throw contractIdNotFound(PrettyContractId(companionClass.typeId(companion), id))
       )
     }
 

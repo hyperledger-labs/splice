@@ -39,7 +39,7 @@ import {
   ExercisedEvent as LedgerApiExercisedEvent,
   JsGetEventsByContractIdResponse,
   JsTransaction,
-} from "canton-json-api-v2-openapi";
+} from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 
 export class TransactionParser {
   private readonly ledgerClient: LedgerJsonApi;

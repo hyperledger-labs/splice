@@ -7,11 +7,11 @@ function subcmd_disaster_recovery_test() {
   tmpdir=$(mktemp -d)
 
   local svIngressNames
-  # keys are node names with sv-
-  svIngressNames[1]=2
-  svIngressNames[2]=2-eng
-  svIngressNames[3]=3-eng
-  svIngressNames[4]=4-eng
+  svIngressNames['sv-1']='sv-2'
+  svIngressNames['sv-2']='sv-2-eng'
+  svIngressNames['sv-3']='sv-3-eng'
+  svIngressNames['sv-da-1']='sv-1'
+  svIngressNames['sv']='sv'
   local svIngressName
 
   _cluster_reset
@@ -32,14 +32,14 @@ function subcmd_disaster_recovery_test() {
   local taps tapsTokenNamespace
   declare -A taps
   declare -A tapsTokenNamespace
-  taps[sv-${svIngressNames[1]}]=42042042.0
-  tapsTokenNamespace[sv-${svIngressNames[1]}]=sv-1
-  taps[sv-${svIngressNames[2]}]=21021021.0
-  tapsTokenNamespace[sv-${svIngressNames[2]}]=sv-2
-  taps[sv-${svIngressNames[3]}]=63063063.0
-  tapsTokenNamespace[sv-${svIngressNames[3]}]=sv-3
-  taps[sv-${svIngressNames[4]}]=84084084.0
-  tapsTokenNamespace[sv-${svIngressNames[4]}]=sv-4
+  taps[sv-${svIngressNames['sv-1']}]=42042042.0
+  tapsTokenNamespace[sv-${svIngressNames['sv-1']}]=sv-1
+  taps[sv-${svIngressNames['sv-2']}]=21021021.0
+  tapsTokenNamespace[sv-${svIngressNames['sv-2']}]=sv-2
+  taps[sv-${svIngressNames['sv-3']}]=63063063.0
+  tapsTokenNamespace[sv-${svIngressNames['sv-3']}]=sv-3
+  taps[sv-${svIngressNames['sv-da-1']}]=84084084.0
+  tapsTokenNamespace[sv-${svIngressNames['sv-da-1']}]=sv-da-1
   taps[validator1]=105105105.0
   tapsTokenNamespace[validator1]=validator1
 
@@ -82,7 +82,7 @@ function subcmd_disaster_recovery_test() {
   _info "Finding agreed upon timestamp"
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
-    token=$(subcmd_get_token sv-"$sv" sv)
+    token=$(subcmd_get_token "$sv" sv)
     done=0
     acs_time=$(date "$sortableDateFormat")
     while [ $done == 0 ]; do
@@ -113,7 +113,7 @@ function subcmd_disaster_recovery_test() {
 
   _info "Scaling down cometbft"
   for sv in "${!svIngressNames[@]}"; do
-    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-cometbft
+    kubectl scale deployment -n "$sv" --replicas=0 global-domain-0-cometbft
   done
 
   # TODO(DACH-NY/canton-network-node#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
@@ -125,7 +125,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting data dumps"
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
-    token=$(subcmd_get_token sv-"$sv" sv)
+    token=$(subcmd_get_token "$sv" sv)
     data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
            -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
@@ -144,11 +144,11 @@ function subcmd_disaster_recovery_test() {
 
   _info "Scaling down sequencers and mediators"
   for sv in "${!svIngressNames[@]}"; do
-    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-sequencer global-domain-0-mediator
+    kubectl scale deployment -n "$sv" --replicas=0 global-domain-0-sequencer global-domain-0-mediator
   done
 
   for sv in "${!svIngressNames[@]}"; do
-    pod=$(kubectl get pod -n sv-"$sv" -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
+    pod=$(kubectl get pod -n "$sv" -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
 
     # Copy dump file to the pvc on the sv-app
     kubectl cp "$tmpdir/dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
@@ -219,6 +219,7 @@ function take_sv_disaster_recovery_dump() {
     svIngressNames['sv-2']='sv-2-eng'
     svIngressNames['sv-3']='sv-3-eng'
     svIngressNames['sv-4']='sv-4-eng'
+    svIngressNames['sv-da-1']='sv-1'
     svIngressNames['sv']='sv'
     local svIngressName=${svIngressNames[$namespace]}
 

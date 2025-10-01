@@ -122,6 +122,13 @@ class SingleScanConnection private[client] (
     }
   }
 
+  override def getDsoInfo()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[org.lfdecentralizedtrust.splice.http.v0.definitions.GetDsoInfoResponse] = {
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetDsoInfo(List()))
+  }
+
   override def getAmuletRulesWithState()(implicit
       ec: ExecutionContext,
       tc: TraceContext,

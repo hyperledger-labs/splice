@@ -11,6 +11,7 @@ import {
   installMigrationSpecificStacks,
 } from './stacks/migration';
 import { getSpliceStacksFromMainReference, installSpliceStacks } from './stacks/splice';
+import { installAllValidatorStacks } from './stacks/validators';
 
 if (!DecentralizedSynchronizerUpgradeConfig.active.releaseReference) {
   throw new Error('No release reference found for active migration');
@@ -36,3 +37,4 @@ const credentialsSecret = new core.v1.Secret('gke-credentials', {
 
 installSpliceStacks(mainStackReference, envRefs, namespace, credentialsSecret);
 installMigrationSpecificStacks(mainStackReference, envRefs, namespace, credentialsSecret);
+installAllValidatorStacks(mainStackReference, envRefs, namespace, credentialsSecret);

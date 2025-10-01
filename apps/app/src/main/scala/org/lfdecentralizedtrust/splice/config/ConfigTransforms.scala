@@ -196,7 +196,7 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      enableImportUpdateBackfilling(),
+      disableZeroFees(),
     )
   }
 
@@ -292,6 +292,9 @@ object ConfigTransforms {
         )
       )
     )
+
+  def disableZeroFees(): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
 
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
@@ -436,6 +439,8 @@ object ConfigTransforms {
           .modify(portTransform(bump, _))
           .focus(_.sequencerAdminClient)
           .modify(portTransform(bump, _))
+          .focus(_.mediatorAdminClient)
+          .modify(portTransform(bump, _))
           .focus(_.bftSequencers)
           .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
       ),
@@ -548,6 +553,8 @@ object ConfigTransforms {
           .modify(portTransform(bump, _))
           .focus(_.sequencerAdminClient)
           .modify(portTransform(bump, _))
+          .focus(_.mediatorAdminClient)
+          .modify(portTransform(bump, _))
       } else {
         config
       }
@@ -565,6 +572,8 @@ object ConfigTransforms {
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
           .focus(_.sequencerAdminClient.port)
+          .modify(setPortPrefix(range))
+          .focus(_.mediatorAdminClient.port)
           .modify(setPortPrefix(range))
           .focus(_.bftSequencers)
           .modify(_.map(_.focus(_.sequencerAdminClient.port).modify(setPortPrefix(range))))
@@ -875,11 +884,5 @@ object ConfigTransforms {
 
     rows.toMap
   }
-
-  def enableImportUpdateBackfilling(): ConfigTransform =
-    updateAllScanAppConfigs((_, config) =>
-      config
-        .copy(updateHistoryBackfillImportUpdatesEnabled = true)
-    )
 
 }

@@ -26,13 +26,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwel
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
-  SpliceLedgerClient,
-  SpliceLedgerConnection,
-  Node,
   DarResource,
   DarResources,
+  Node,
   ParticipantAdminConnection,
   RetryFor,
+  SpliceLedgerClient,
+  SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.http.v0.splitwell.SplitwellResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -43,6 +43,7 @@ import org.lfdecentralizedtrust.splice.splitwell.automation.SplitwellAutomationS
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellAppBackendConfig
 import org.lfdecentralizedtrust.splice.splitwell.metrics.SplitwellAppMetrics
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.util.HasHealth
 
@@ -136,6 +137,7 @@ class SplitwellApp(
       ledgerClient,
       scanConnection,
       retryProvider,
+      config.parameters,
       loggerFactory,
     )
     preferred <- appInitStep(s"Wait for preferred domain connection") {
@@ -205,7 +207,8 @@ class SplitwellApp(
       s"Wait for splitwell rules to be created for domain $domain",
       automation.store.lookupSplitwellRules(domain).flatMap {
         case QueryResult(offset, None) =>
-          automation.connection
+          automation
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(automation.store.key.providerParty),
               Seq.empty,

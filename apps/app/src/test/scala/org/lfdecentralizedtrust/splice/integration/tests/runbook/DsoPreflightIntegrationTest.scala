@@ -10,7 +10,7 @@ import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 
 import io.circe.parser.parse
 
-/** Preflight test that makes sure that *our* SVs (1-4) have initialized fine.
+/** Preflight test that makes sure that *our* SVs (1-3 + DA-1) have initialized fine.
   */
 class DsoPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv", "docs")
@@ -25,7 +25,7 @@ class DsoPreflightIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  "SVs 1-4 are online and reachable via their public HTTP API" in { implicit env =>
+  "SVs 1-3 + DA-1 are online and reachable via their public HTTP API" in { implicit env =>
     env.svs.remote.foreach(sv =>
       clue(s"Checking SV at ${sv.httpClientConfig.url}") {
         eventuallySucceeds(timeUntilSuccess = 2.minutes) {
@@ -35,9 +35,8 @@ class DsoPreflightIntegrationTest
     )
   }
 
-  "INFO endpoints of SVs 1-4 are reachable and return JSON Object" in { _ =>
-    for (i <- (1 to 4)) {
-      val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
+  "INFO endpoints of SVs 1-3 + DA-1 are reachable and return JSON Object" in { _ =>
+    for (ingressName <- coreSvIngressNames.values) {
       val infoUrl = s"https://info.${ingressName}.${sys.env("NETWORK_APPS_ADDRESS")}"
 
       val urls = Array(
@@ -66,16 +65,15 @@ class DsoPreflightIntegrationTest
     }
   }
 
-  "The Web UIs of SVs 1-4 are reachable and working as expected" in { env =>
+  "The Web UIs of SVs 1-3 + DA-1 are reachable and working as expected" in { env =>
     // we put many checks in one test case to reduce testing time (logging in is slow)
-    for (i <- (1 to 4)) {
-      val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
+    for ((svName, ingressName) <- coreSvIngressNames) {
       val svUiUrl = s"https://sv.${ingressName}.${sys.env("NETWORK_APPS_ADDRESS")}/";
       // hardcoded to save on four environment variables; we don't expect this to change often
-      val svUsername = s"admin@sv$i-dev.com";
+      val svUsername = s"admin@${svName}-dev.com";
       // our current practice is to use the same password for all SVs
       val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
-      val sv = env.svs.remote.find(sv => sv.name == s"sv$i").value
+      val sv = env.svs.remote.find(sv => sv.name == svName).value
       val svInfo = eventuallySucceeds() { sv.getDsoInfo() }
 
       val votedSvParties =

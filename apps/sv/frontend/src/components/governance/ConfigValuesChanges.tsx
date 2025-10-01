@@ -7,10 +7,12 @@ import { PartyId } from '@lfdecentralizedtrust/splice-common-frontend';
 
 interface ConfigValuesChangesProps {
   changes: ConfigChange[];
+  isSummaryView?: boolean;
 }
 
 export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => {
-  const { changes } = props;
+  const { changes, isSummaryView } = props;
+  const textColor = isSummaryView ? 'text.secondary' : 'text.primary';
 
   return (
     <Box
@@ -19,10 +21,10 @@ export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => 
       data-testid="proposal-details-config-changes-section"
     >
       <Typography
-        variant="subtitle2"
-        color="text.secondary"
+        variant={isSummaryView ? 'h5' : 'subtitle2'}
+        color={isSummaryView ? 'text.primary' : 'text.secondary'}
         gutterBottom
-        sx={{ mb: 2 }}
+        sx={{ mb: isSummaryView ? 2 : 4 }}
         data-testid="proposal-details-config-changes-section-title"
       >
         Proposed Changes
@@ -31,7 +33,7 @@ export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
         {changes.length === 0 && (
           <Box sx={{ py: 1 }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color={textColor}>
               No changes found.
             </Typography>
           </Box>
@@ -47,6 +49,7 @@ export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => 
               variant="body1"
               sx={{ minWidth: 200 }}
               data-testid="config-change-field-label"
+              color={textColor}
             >
               {change.label}
             </Typography>

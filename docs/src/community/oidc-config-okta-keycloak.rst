@@ -8,6 +8,13 @@
 Okta and Keycloak OIDC Configuration Guide
 ==========================================
 
+.. warning::
+
+   This section features solutions shared by community members. 
+   While they haven’t been formally tested by the Splice maintainers, 
+   users are encouraged to verify the information independently. 
+   Contributions to enhance accuracy and completeness are always welcome.
+
 To deploy a validator node, configure authentication using your preferred OIDC provider. 
 This section provides instructions for Okta and Keycloak. 
 For Auth0 instructions and more details on configuring authentication, see :ref:`Configuring Authentication <helm-validator-auth>`.

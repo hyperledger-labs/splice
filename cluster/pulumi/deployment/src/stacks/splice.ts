@@ -5,8 +5,11 @@ import {
   CLUSTER_BASENAME,
   config,
   DeploySvRunbook,
-  DeployValidatorRunbook,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  deployedValidators,
+  validatorRunbookStackName,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
@@ -23,22 +26,25 @@ import {
 export function getSpliceStacksFromMainReference(): StackFromRef[] {
   const ret: StackFromRef[] = [];
   if (DeploySvRunbook) {
-    ret.push({ project: 'sv-runbook', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'sv-runbook', stack: `sv-runbook.${CLUSTER_BASENAME}` });
   }
   if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
-    ret.push({ project: 'multi-validator', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` });
   }
-  if (DeployValidatorRunbook) {
-    ret.push({ project: 'validator-runbook', stack: CLUSTER_BASENAME });
-  }
+  deployedValidators.forEach(validator => {
+    ret.push({
+      project: 'validator-runbook',
+      stack: `${validatorRunbookStackName(validator)}.${CLUSTER_BASENAME}`,
+    });
+  });
   if (mustInstallValidator1) {
-    ret.push({ project: 'validator1', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` });
   }
   if (mustInstallSplitwell) {
-    ret.push({ project: 'splitwell', stack: CLUSTER_BASENAME });
+    ret.push({ project: 'splitwell', stack: `splitwell.${CLUSTER_BASENAME}` });
   }
-  ret.push({ project: 'infra', stack: CLUSTER_BASENAME });
-  ret.push({ project: 'canton-network', stack: CLUSTER_BASENAME });
+  ret.push({ project: 'infra', stack: `infra.${CLUSTER_BASENAME}` });
+  ret.push({ project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` });
   return ret;
 }
 
@@ -70,17 +76,6 @@ export function installSpliceStacks(
       gcpSecret,
       {},
       []
-    );
-  }
-  if (DeployValidatorRunbook) {
-    createStackCR(
-      'validator-runbook',
-      'validator-runbook',
-      namespace,
-      config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'),
-      reference,
-      envRefs,
-      gcpSecret
     );
   }
   if (mustInstallValidator1) {

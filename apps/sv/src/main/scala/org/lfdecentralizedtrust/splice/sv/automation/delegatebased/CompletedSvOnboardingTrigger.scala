@@ -19,6 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import CompletedSvOnboardingTrigger.*
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 
@@ -56,7 +57,8 @@ class CompletedSvOnboardingTrigger(
       )
       _ <- Future.sequence(
         cmds.map(cmd =>
-          svTaskContext.connection
+          svTaskContext
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(store.key.svParty),
               Seq(store.key.dsoParty),

@@ -16,6 +16,7 @@ import {
   ExactNamespace,
   failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
+  getAdditionalJvmOptions,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
@@ -30,7 +31,6 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
 import { Secret } from '@pulumi/kubernetes/core/v1';
 import { Output } from '@pulumi/pulumi';
 
@@ -70,6 +70,7 @@ type BasicValidatorConfig = {
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   additionalEnvVars?: k8s.types.input.core.v1.EnvVar[];
+  additionalJvmOptions?: string;
   participantAddress: Output<string> | string;
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
   sweep?: SweepConfig;
@@ -81,7 +82,7 @@ type BasicValidatorConfig = {
   logLevel?: LogLevel;
 };
 
-export type ValidatorConfig = BasicValidatorConfig & {
+export type ValidatorInstallConfig = BasicValidatorConfig & {
   svValidator: false;
   onboardingSecret: string;
   svSponsorAddress?: string;
@@ -113,7 +114,7 @@ type SvValidatorConfig = BasicValidatorConfig & {
 };
 
 export async function installValidatorApp(
-  baseConfig: ValidatorConfig | SvValidatorConfig
+  baseConfig: ValidatorInstallConfig | SvValidatorConfig
 ): Promise<pulumi.Resource> {
   const backupConfig = baseConfig.backupConfig
     ? {
@@ -219,7 +220,7 @@ export async function installValidatorApp(
         enable: true,
       },
       participantAddress: config.participantAddress,
-      additionalJvmOptions: jmxOptions(),
+      additionalJvmOptions: getAdditionalJvmOptions(config.additionalJvmOptions),
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       enablePostgresMetrics: true,
       auth: {

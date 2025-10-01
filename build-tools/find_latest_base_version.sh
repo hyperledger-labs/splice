@@ -5,6 +5,5 @@
 
 set -euo pipefail
 
-
 latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
 echo "release-line-${latest_release}"

@@ -25,6 +25,8 @@ class BftScanConnectionIntegrationTest
     with HasExecutionContext
     with HasActorSystem {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)

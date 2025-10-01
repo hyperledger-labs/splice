@@ -52,11 +52,15 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
     },
 
     onSubmit: async ({ value }) => {
-      castVoteMutation.mutate({
-        accepted: value.vote === 'accepted',
-        url: value.url,
-        reason: value.reason,
-      });
+      await castVoteMutation
+        .mutateAsync({
+          accepted: value.vote === 'accepted',
+          url: value.url,
+          reason: value.reason,
+        })
+        .catch(e => {
+          console.error(`Failed to submit vote`, e);
+        });
     },
   });
 

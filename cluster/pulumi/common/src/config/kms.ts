@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 
-import { GCP_PROJECT, GCP_ZONE } from '../utils';
+import { GcpProject, GcpZone } from './gcpConfig';
 
 export const KmsConfigSchema = z.object({
   type: z.string().default('gcp'),
-  locationId: z.string().default(GCP_ZONE!),
-  projectId: z.string().default(GCP_PROJECT),
+  locationId: z.string().default(GcpZone!),
+  projectId: z.string().default(GcpProject),
   // The keyring must already exist; create it manually if necessary.
   keyRingId: z.string(),
 });

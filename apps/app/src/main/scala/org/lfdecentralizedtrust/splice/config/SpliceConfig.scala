@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
+  MediatorVerdictIngestionConfig,
   ScanSynchronizerConfig,
   CacheConfig as SpliceCacheConfig,
 }
@@ -140,7 +141,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        validatorConfig.parameters.commandCircuitBreakerConfig,
+        validatorConfig.parameters.circuitBreakers,
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -178,7 +179,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        svConfig.parameters.commandCircuitBreakerConfig,
+        svConfig.parameters.circuitBreakers,
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -215,7 +216,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        scanConfig.parameters.commandCircuitBreakerConfig,
+        scanConfig.parameters.circuitBreakers,
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -252,7 +253,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
-        splitwellConfig.parameters.commandCircuitBreakerConfig,
+        splitwellConfig.parameters.circuitBreakers,
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -402,6 +403,8 @@ object SpliceConfig {
 
     implicit val circuitBreakerConfig: ConfigReader[CircuitBreakerConfig] =
       deriveReader[CircuitBreakerConfig]
+    implicit val circuitBreakersConfig: ConfigReader[CircuitBreakersConfig] =
+      deriveReader[CircuitBreakersConfig]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
@@ -441,6 +444,9 @@ object SpliceConfig {
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
+    implicit val mediatorVerdictIngestionConfigReader
+        : ConfigReader[MediatorVerdictIngestionConfig] =
+      deriveReader[MediatorVerdictIngestionConfig]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
@@ -565,6 +571,10 @@ object SpliceConfig {
       deriveReader[BeneficiaryConfig]
     implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
       deriveReader[SvParticipantClientConfig]
+    implicit val amuletConversionRateFeedConfig: ConfigReader[AmuletConversionRateFeedConfig] =
+      deriveReader[AmuletConversionRateFeedConfig]
+    implicit val rangeConfig: ConfigReader[RangeConfig] =
+      deriveReader[RangeConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -794,6 +804,8 @@ object SpliceConfig {
 
     implicit val circuitBreakerConfig: ConfigWriter[CircuitBreakerConfig] =
       deriveWriter[CircuitBreakerConfig]
+    implicit val circuitBreakersConfig: ConfigWriter[CircuitBreakersConfig] =
+      deriveWriter[CircuitBreakersConfig]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 
@@ -852,6 +864,9 @@ object SpliceConfig {
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
       deriveWriter[ScanCacheConfig]
+    implicit val mediatorVerdictIngestionConfigWriter
+        : ConfigWriter[MediatorVerdictIngestionConfig] =
+      deriveWriter[MediatorVerdictIngestionConfig]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 
@@ -953,13 +968,17 @@ object SpliceConfig {
     implicit val periodicBackupDumpConfigWriter: ConfigWriter[PeriodicBackupDumpConfig] =
       deriveWriter[PeriodicBackupDumpConfig]
     implicit val partyIdConfigWriter: ConfigWriter[PartyId] =
-      implicitly[ConfigWriter[String]].contramap(_.toString)
+      implicitly[ConfigWriter[String]].contramap(_.toProtoPrimitive)
     implicit val packageVersionConfigWriter: ConfigWriter[PackageVersion] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]
     implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =
       deriveWriter[SvParticipantClientConfig]
+    implicit val amuletConversionRateFeedConfig: ConfigWriter[AmuletConversionRateFeedConfig] =
+      deriveWriter[AmuletConversionRateFeedConfig]
+    implicit val rangeConfig: ConfigWriter[RangeConfig] =
+      deriveWriter[RangeConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

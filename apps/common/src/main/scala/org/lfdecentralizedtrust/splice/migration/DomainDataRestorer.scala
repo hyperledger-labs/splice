@@ -19,6 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
+    timeTrackerObservationLatency: NonNegativeFiniteDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -42,7 +43,8 @@ class DomainDataRestorer(
         manualConnect = true,
         initializeFromTrustedSynchronizer = true,
         timeTracker = SynchronizerTimeTrackerConfig(
-          minObservationDuration = timeTrackerMinObservationDuration
+          minObservationDuration = timeTrackerMinObservationDuration,
+          observationLatency = timeTrackerObservationLatency,
         ),
       )
       // We rely on the calls here being idempotent

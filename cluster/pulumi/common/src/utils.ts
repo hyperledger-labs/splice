@@ -10,6 +10,8 @@ import { load } from 'js-yaml';
 import { config, isDevNet, isMainNet } from './config';
 import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
+import { ClusterBasename, GcpProject, GcpRegion, GcpZone } from './config/gcpConfig';
+import { jmxOptions } from './jmx';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
@@ -18,7 +20,11 @@ export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY
 const MOCK_SPLICE_ROOT = config.optionalEnv('MOCK_SPLICE_ROOT');
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
 export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
-export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
+// backwards compatibility
+export const CLUSTER_BASENAME = ClusterBasename;
+export const GCP_PROJECT = GcpProject;
+export const GCP_REGION = GcpRegion;
+export const GCP_ZONE = GcpZone;
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');
 export const PRIVATE_CONFIGS_PATH = config.optionalEnv('PRIVATE_CONFIGS_PATH');
@@ -50,9 +56,6 @@ export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   }
 }
 
-export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
-export const GCP_REGION = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
-export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
 export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING', false);
@@ -273,3 +276,6 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
+
+export const getAdditionalJvmOptions = (extraOptions: string | undefined): string =>
+  `${jmxOptions()}${extraOptions ? ` ${extraOptions}` : ''}`;

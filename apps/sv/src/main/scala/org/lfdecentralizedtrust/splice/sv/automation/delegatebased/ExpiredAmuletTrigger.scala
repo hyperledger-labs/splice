@@ -12,6 +12,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredAmuletTrigger.*
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 
@@ -27,7 +28,7 @@ class ExpiredAmuletTrigger(
       splice.amulet.Amulet,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
-      svTaskContext.dsoStore.listExpiredAmulets,
+      svTaskContext.dsoStore.listExpiredAmulets(context.config.ignoredExpiredAmuletPartyIds),
       splice.amulet.Amulet.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
@@ -48,7 +49,8 @@ class ExpiredAmuletTrigger(
           Optional.of(controller),
         )
       )
-      _ <- svTaskContext.connection
+      _ <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
         .submit(
           Seq(store.key.svParty),
           Seq(store.key.dsoParty),

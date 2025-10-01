@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.{
   DarResource,
   DarResources,
@@ -35,6 +35,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -47,6 +48,7 @@ class SplitwellAutomationService(
     ledgerClient: SpliceLedgerClient,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
+    params: SpliceParametersConfig,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -62,6 +64,7 @@ class SplitwellAutomationService(
       store,
       ledgerClient,
       retryProvider,
+      params,
     ) {
 
   override def companion
@@ -72,7 +75,7 @@ class SplitwellAutomationService(
     new AcceptedAppPaymentRequestsTrigger(
       triggerContext,
       store,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
       scanConnection,
     )
   )
@@ -81,27 +84,31 @@ class SplitwellAutomationService(
     new SplitwellInstallRequestTrigger(
       triggerContext,
       store,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
     )
   )
 
   registerTrigger(
-    new UpgradeGroupTrigger(triggerContext, store, connection)
+    new UpgradeGroupTrigger(triggerContext, store, connection(SpliceLedgerConnectionPriority.Low))
   )
 
   registerTrigger(
-    new GroupRequestTrigger(triggerContext, store, connection)
+    new GroupRequestTrigger(triggerContext, store, connection(SpliceLedgerConnectionPriority.Low))
   )
 
   registerTrigger(
-    new TerminatedAppPaymentTrigger(triggerContext, store, connection)
+    new TerminatedAppPaymentTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
   )
 
   registerTrigger(
     new UnassignTrigger.Template(
       triggerContext,
       store,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
       scanConnection.getAmuletRulesDomain,
       store.key.providerParty,
       splitwellCodegen.TransferInProgress.COMPANION,
@@ -112,7 +119,7 @@ class SplitwellAutomationService(
     new AssignTrigger(
       triggerContext,
       store,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
       store.key.providerParty,
     )
   )
@@ -121,7 +128,7 @@ class SplitwellAutomationService(
     new TransferFollowTrigger(
       triggerContext,
       store,
-      connection,
+      connection(SpliceLedgerConnectionPriority.Low),
       store.key.providerParty,
       implicit tc =>
         (

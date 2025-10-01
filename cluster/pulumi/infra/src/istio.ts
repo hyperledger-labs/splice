@@ -3,9 +3,11 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
+import {
+  allSvsToDeploy,
+  coreSvsToDeploy,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigs';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
-import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
 
@@ -32,6 +34,9 @@ export const istioVersion = {
     wasm: 216,
   },
 };
+
+// dsoSize + number of extra SVs added via config.yaml
+const numCoreSvsToDeploy = coreSvsToDeploy.length;
 
 function configureIstioBase(
   ns: k8s.core.v1.Namespace,
@@ -212,7 +217,7 @@ function configureCometBFTGatewayService(
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
   const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
     migration => {
@@ -456,7 +461,7 @@ function configureGateway(
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
   const server = (migration: number, node: number) => ({
     // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
@@ -600,13 +605,10 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
                       hosts: [
                         // We could also have done `info.sv*.whatever` here but enumerating what we expect seems slightly more secure
                         ...new Set(
-                          [
-                            ...Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`),
-                            ...(DeploySvRunbook ? ['sv'] : []),
-                          ]
+                          allSvsToDeploy
                             .map(sv => [
-                              `info.${sv}.${getDnsNames().cantonDnsName}`,
-                              `info.${sv}.${getDnsNames().daDnsName}`,
+                              `info.${sv.ingressName}.${getDnsNames().cantonDnsName}`,
+                              `info.${sv.ingressName}.${getDnsNames().daDnsName}`,
                             ])
                             .flat()
                         ),

@@ -5,32 +5,27 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.google.protobuf.ByteString
+import io.circe.Json
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
+import org.lfdecentralizedtrust.splice.store.StoreErrors
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   AcsStoreId,
   SelectFromAcsTableResult,
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  Contract,
-  ContractWithState,
-  LegacyOffset,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
-import slick.jdbc.{GetResult, PositionedResult, SetParameter}
-import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import io.circe.Json
-import io.grpc.Status
-import slick.jdbc.canton.SQLActionBuilder
-import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import scalaz.{@@, Tag}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.jdbc.canton.SQLActionBuilder
+import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 
 trait AcsQueries extends AcsJdbcTypes {
 
@@ -321,7 +316,7 @@ object AcsQueries {
       createdEventBlob: Array[Byte],
       createdAt: Timestamp,
       contractExpiresAt: Option[Timestamp],
-  ) {
+  ) extends StoreErrors {
     def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
         companionClass: ContractCompanion[C, TCId, T],
         decoder: TemplateJsonDecoder,
@@ -339,7 +334,10 @@ object AcsQueries {
           createdAt.toInstant,
         )
         .fold(
-          err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
+          _ =>
+            throw contractIdNotFound(
+              PrettyContractId(companionClass.typeId(companion), contractId.contractId)
+            ),
           identity,
         )
     }

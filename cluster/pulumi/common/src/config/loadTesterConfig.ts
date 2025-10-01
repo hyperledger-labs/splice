@@ -9,6 +9,7 @@ export const LoadTesterAdaptiveScenarioConfigSchema = z.object({
   minVUs: z.number().default(0),
   enabled: z.boolean().default(false),
   scaleDownStep: z.number().default(5),
+  duration: z.string().default('2h'),
 });
 
 export const LoadTesterConfigSchema = z.object({

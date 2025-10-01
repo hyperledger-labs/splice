@@ -42,7 +42,6 @@ function docker_start() {
     $DOCKER_POSTGRES_IMAGE_NAME \
     postgres \
     -c max_connections=16000 \
-    -c log_statement=all \
     -c logging_collector=on \
     -c log_destination=csvlog \
     -c log_filename='postgresql.log' \

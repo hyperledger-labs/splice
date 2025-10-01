@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.util.{
   BackupDump,
   HasHealth,
   PackageVetting,
+  SpliceCircuitBreaker,
 }
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
@@ -100,6 +101,7 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -237,6 +239,7 @@ class ValidatorApp(
                     val decentralizedSynchronizerInitializer = new DomainDataRestorer(
                       participantAdminConnection,
                       config.timeTrackerMinObservationDuration,
+                      config.timeTrackerObservationLatency,
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
@@ -251,6 +254,11 @@ class ValidatorApp(
                     val readWriteConnection = ledgerClient.connection(
                       this.getClass.getSimpleName,
                       loggerFactory,
+                      SpliceCircuitBreaker(
+                        "restore",
+                        config.parameters.circuitBreakers.mediumPriority,
+                        logger,
+                      )(ac.scheduler, implicitly),
                     )
                     val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
                       readWriteConnection,
@@ -286,6 +294,7 @@ class ValidatorApp(
                   clock,
                   participantAdminConnection,
                   loggerFactory,
+                  config.latestPackagesOnly,
                 )
                 _ <- packageVetting.vetCurrentPackages(domainId, amuletRules)
               } yield ()
@@ -468,11 +477,13 @@ class ValidatorApp(
           RetryFor.WaitingOnInitDependency,
         )
       )
-      party <- storeWithIngestion.connection.getOrAllocateParty(
-        instance.serviceUser,
-        Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
-        participantAdminConnection,
-      )
+      party <- storeWithIngestion
+        .connection(SpliceLedgerConnectionPriority.Medium)
+        .getOrAllocateParty(
+          instance.serviceUser,
+          Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
+          participantAdminConnection,
+        )
       _ <- ValidatorUtil
         .onboard(
           instance.walletUser.getOrElse(instance.serviceUser),
@@ -768,6 +779,7 @@ class ValidatorApp(
             loggerFactory,
             domainMigrationInfo,
             participantId,
+            config.parameters,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,
@@ -792,6 +804,7 @@ class ValidatorApp(
             dedupDuration,
             txLogBackfillEnabled = config.txLogBackfillEnabled,
             txLogBackfillingBatchSize = config.txLogBackfillBatchSize,
+            config.parameters,
           )
           Some(walletManager)
         } else {
@@ -832,6 +845,8 @@ class ValidatorApp(
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,
+        config.parameters,
+        config.latestPackagesOnly,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
@@ -1067,7 +1082,7 @@ class ValidatorApp(
                           AdminAuthExtractor(
                             verifier,
                             validatorParty,
-                            automation.connection,
+                            automation.connection(SpliceLedgerConnectionPriority.Medium),
                             loggerFactory,
                             "splice validator operator realm",
                           )(traceContext)(operationId)

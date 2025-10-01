@@ -263,3 +263,103 @@ Upper bound
 The delivery of messages is clearly less expensive than their ordering and persistence,
 so the ``readVsWriteScalingFactor`` should be clearly below 100%.
 That said: There is no good reason to significantly overcharge for message delivery.
+
+
+.. _sv_ops_ignored_rewards_party_ids:
+
+Ignoring party IDs of stale validators in reward expiry automation
+------------------------------------------------------------------
+
+.. note::
+
+  This section describes a workaround that is expected to become unnecessary with improvements
+  packaged in Canton 3.4 (Splice > 0.4).
+
+Due to a current limitation, rewards expiry automation that is part of the SV app
+(more specifically the ``ExpireRewardCouponsTrigger``) can become faulty
+(log warnings or errors, fail to make progress on expiring rewards)
+when the following set of conditions applies:
+
+- There was a recent upgrade of core Daml packages, most notably ``amulet``.
+- Some validators have not upgraded to a sufficiently recent version of Splice and are therefore unable to apply the Daml upgrade locally
+  (and vet the new package versions).
+
+In a nutshell, the expiry automation will fail to expire rewards in such a scenario that are linked to parties hosted on an outdated validator.
+To resolve this issue, **each** SV operator is currently asked to follow the following steps on **each Daml upgrade** in the network
+(up until the fundamental limitations behind this issue have been resolved in Splice; expected with the upgrade to Canton 3.4):
+
+1. Shortly before the Daml upgrade becomes effective:
+   Each SV pauses their ``ExpireRewardCouponsTrigger`` trigger by extending ``.additionalEnvVars`` in ``sv-values.yaml`` in the following way:
+
+   .. code-block:: yaml
+
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_PAUSED_EXPIRY_TRIGGER
+          value: |
+            canton.sv-apps.sv.automation.paused-triggers += "org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpireRewardCouponsTrigger"
+
+2. Shortly after the Daml upgrade becomes effective:
+   One SV operator :ref:`constructs a party exclusion config <sv_ops_ignored_rewards_party_ids_determine>`,
+   confirms its correctness and shares it with the group of all operators.
+3. Each SV operator adopts the party exclusion config and resume the ``ExpireRewardCouponsTrigger`` trigger by reverting the change from step 1.
+   If ``.additionalEnvVars`` in ``sv-values.yaml`` was empty before step 1, it is now expected to look similar to the following:
+
+   .. code-block:: yaml
+
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_IGNORED_EXPIRY_PARTY_IDS
+          value: |
+            canton.sv-apps.sv {
+              automation.ignored-expired-rewards-party-ids = [ "party1::12345", "party2:57890" ]
+            }
+
+Updates to the party exclusion config are possible at future points in time,
+e.g., in case validators that were previously outdated eventually upgrade to a sufficiently recent Splice version.
+
+.. _sv_ops_ignored_rewards_party_ids_determine:
+
+Determining parties to ignore
++++++++++++++++++++++++++++++
+
+The process to determine the right parties to ignore is advanced and likely to involve some trial-and-error.
+It is sufficient for a single operator to perform this work and arrive at a suitable config.
+
+In the following we list complimentary approaches for building the list of parties.
+
+Prerequisite steps:
+
+1. Wait until the new Daml upgrade has already become effective.
+2. Pick a round that was open shortly after the Daml upgrade became effective (to aid database queries); we will denote this round as ``UPGRADE_ROUND`` in the following.
+3. Resume the expiry trigger (accepting that it will fail until you have completed the ignore list).
+4. Set ``delegatelessAutomationExpiredRewardCouponBatchSize: 1`` in your ``sv-values.yaml``.
+
+Based on that:
+
+- You can wait until the trigger fails, then investigate which parties are involved in the failing transaction and add these to the set of parties to ignore.
+- For a more quick feedback loop, you can attempt queries against the SV app (postgres) database.
+  For example, you can list receivers of rewards that were not expired since the Daml upgrade:
+
+  .. code-block:: sql
+
+      select distinct(reward_party) from dso_acs_store where reward_round < UPGRADE_ROUND;
+
+  Note however that this query overapproximates the set of parties to ignore, so you might need to remove some parties again later.
+
+- If one of the parties you want to ignore is an SV, you most likely want to ignore the beneficiary of that SV instead
+  (or even better - talk to the SV's operator to make sure their beneficiary upgrades to a more recent version).
+- Once you are confident in the set of parties to ignore, remove the ``delegatelessAutomationExpiredRewardCouponBatchSize`` override and confirm that the
+  trigger has a 100% success rate and does not log any warnings or errors.
+- If outdated validators eventually follow up on upgrading, their parties should be removed again from the ignore list to allow the
+  archival of expired rewards (both old and new) as well as to avoid blocking the archival of closed mining rounds.
+  The following database query shows expired rewards that were generated *after* the Daml upgrade,
+  which is an indicator that the hosting validator has upgraded and so these parties should not be ignored anymore:
+
+  .. code-block:: sql
+
+     select m.template_id_qualified_name, m.reward_party, min(m.reward_round) from (
+       select c.reward_party, c.reward_round, c.template_id_qualified_name from dso_acs_store c
+       join dso_acs_store r
+       on r.mining_round = c.reward_round
+       and r.mining_round > UPGRADE_ROUND
+       and r.template_id_qualified_name = 'Splice.Round:ClosedMiningRound'
+     ) as m group by (template_id_qualified_name, reward_party);

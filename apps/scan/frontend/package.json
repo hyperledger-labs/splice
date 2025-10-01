@@ -16,6 +16,7 @@
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@lfdecentralizedtrust/token-metadata-openapi": "file:../../../token-standard/splice-api-token-metadata-v1/openapi-ts-client",
     "@lfdecentralizedtrust/splice-common-frontend": "0.1.0",
     "@mui/icons-material": "5.11.9",
     "@mui/material": "^5.17.1",

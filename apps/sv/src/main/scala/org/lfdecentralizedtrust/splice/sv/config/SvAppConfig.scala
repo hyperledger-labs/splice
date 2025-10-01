@@ -87,7 +87,7 @@ object SvOnboardingConfig {
       initialMaxNumInputs: Int = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      initialCreateFee: BigDecimal = SpliceUtil.defaultCreateFee.fee,
+      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -307,6 +307,10 @@ case class SvAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
+    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // it will never send a time proof.
+    timeTrackerObservationLatency: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(5),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
@@ -330,7 +334,12 @@ case class SvAppBackendConfig(
     // distributed between 0 and the maximum delay) to ensure that not
     // all validators submit the transaction at the same time
     // overloading the network.
-    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
+    // 24h is chosen to be long enough to avoid a load spike (it's ~86k seconds so assuming it's 1 topology transaction/s on average for 86k validators)
+    // but short enough to allow for node downtime and other issues.
+    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
+    // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
+    latestPackagesOnly: Boolean = false,
+    followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
@@ -449,3 +458,15 @@ object SvCantonIdentifierConfig {
     )
   }
 }
+
+final case class AmuletConversionRateFeedConfig(
+    publisher: PartyId,
+    // If the publisher publishes a conversion rate outside of the range, no change in the SV's conversion rate vote is made
+    // and a warning is logged.
+    acceptedRange: RangeConfig,
+)
+
+final case class RangeConfig(
+    min: BigDecimal,
+    max: BigDecimal,
+)

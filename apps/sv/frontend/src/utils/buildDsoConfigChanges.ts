@@ -13,31 +13,34 @@ function buildSynchronizerMap(
   const currentSynchronizers = currentConfig?.synchronizers.entriesArray();
 
   const res = baseSynchronizers
-    ?.map(baseSynchronizer => {
+    ?.map((baseSynchronizer, index) => {
       const currentSynchronizer = currentSynchronizers?.find(c => c[0] === baseSynchronizer[0]);
+
+      // normalise the index displayed
+      const idx = index + 1;
       return [
         {
-          fieldName: 'decentralizedSynchronizer',
-          label: `Decentralized Synchronizer`,
+          fieldName: `decentralizedSynchronizer${idx}`,
+          label: `Decentralized Synchronizer ${idx}`,
           currentValue: baseSynchronizer[0] || '',
           newValue: currentSynchronizer?.[0] || '',
           isId: true,
         },
         {
-          fieldName: 'decentralizedSynchronizerState',
-          label: `Decentralized Synchronizer (state)`,
+          fieldName: `decentralizedSynchronizerState${idx}`,
+          label: `Decentralized Synchronizer (state) ${idx}`,
           currentValue: baseSynchronizer[1].state || '',
           newValue: currentSynchronizer?.[1].state || '',
         },
         {
-          fieldName: 'decentralizedSynchronizerCometBftGenesisJson',
-          label: `Decentralized Synchronizer (cometBftGenesisJson)`,
+          fieldName: `decentralizedSynchronizerCometBftGenesisJson${idx}`,
+          label: `Decentralized Synchronizer (cometBftGenesisJson)${idx}`,
           currentValue: baseSynchronizer[1].cometBftGenesisJson || '',
           newValue: currentSynchronizer?.[1].cometBftGenesisJson || '',
         },
         {
-          fieldName: 'decentralizedSynchronizerAcsCommitmentReconciliationInterval',
-          label: `Decentralized Synchronizer (ACS Commitment Reconciliation Interval)`,
+          fieldName: `decentralizedSynchronizerAcsCommitmentReconciliationInterval${idx}`,
+          label: `Decentralized Synchronizer (ACS Commitment Reconciliation Interval) ${idx}`,
           currentValue: baseSynchronizer[1].acsCommitmentReconciliationInterval || '',
           newValue: currentSynchronizer?.[1].acsCommitmentReconciliationInterval || '',
         },

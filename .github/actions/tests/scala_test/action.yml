@@ -302,6 +302,7 @@ runs:
       if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./.github/actions/tests/failure_notifications
       with:
+        job_subname: "${{ inputs.test_suite_name }} (${{ inputs.runner_index }})"
         workload_identity_provider: "${{ inputs.google_workload_identity_provider }}"
         service_account: "${{ inputs.failure_notifications_invoker_sa }}"
         notifications_url: "${{ inputs.failure_notifications_invoker_url }}"
