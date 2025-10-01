@@ -588,6 +588,131 @@ paths:
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
 
+  /v0/admin/minting-delegation-proposals:
+    get:
+      description: |
+        List all MintingDelegationProposal contracts where the delegate is the validator operator.
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "listMintingDelegationProposals"
+      security:
+        - adminAuth: []
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListMintingDelegationProposalsResponse"
+
+  /v0/admin/minting-delegation-proposals/{contract_id}/accept:
+    post:
+      description: |
+        Accept a MintingDelegationProposal contract as the delegate, creating a MintingDelegation contract.
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "acceptMintingDelegationProposal"
+      security:
+        - adminAuth: []
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AcceptMintingDelegationProposalResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/admin/minting-delegation-proposals/{contract_id}/reject:
+    post:
+      description: |
+        Reject a MintingDelegationProposal contract as the delegate.
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "rejectMintingDelegationProposal"
+      security:
+        - adminAuth: []
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/admin/minting-delegations:
+    get:
+      description: |
+        List all MintingDelegation contracts where the delegate is the validator operator.
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "listMintingDelegations"
+      security:
+        - adminAuth: []
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListMintingDelegationsResponse"
+
+  /v0/admin/minting-delegations/{contract_id}/reject:
+    post:
+      description: |
+        Reject/terminate a MintingDelegation contract as the delegate.
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "rejectMintingDelegation"
+      security:
+        - adminAuth: []
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/admin/minting-delegations/{contract_id}/renew:
+    post:
+      description: |
+        Renew a MintingDelegation contract as the delegate before it expires.
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "renewMintingDelegation"
+      security:
+        - adminAuth: []
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RenewMintingDelegationResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
 components:
   securitySchemes:
@@ -1169,3 +1294,39 @@ components:
       properties:
         update_id:
           type: string
+
+    ListMintingDelegationProposalsResponse:
+      type: object
+      required:
+        - contracts
+      properties:
+        contracts:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    AcceptMintingDelegationProposalResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+
+    ListMintingDelegationsResponse:
+      type: object
+      required:
+        - contracts
+      properties:
+        contracts:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    RenewMintingDelegationResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
