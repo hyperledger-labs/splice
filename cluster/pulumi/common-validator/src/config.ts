@@ -61,3 +61,6 @@ const allValidators = Object.keys(allValidatorsConfig);
 export const deployedValidators = DeployValidatorRunbook
   ? allValidators
   : allValidators.filter(validator => validator !== 'validator-runbook');
+
+export const validatorRunbookStackName = (name: string): string =>
+  name === 'validator-runbook' ? name : `validators.${name}`;

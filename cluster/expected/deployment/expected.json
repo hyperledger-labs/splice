@@ -977,6 +977,13 @@
             "toPath": "splice/cluster/pulumi/validator-runbook/Pulumi.validator-runbook.mock.yaml"
           },
           {
+            "fromPath": "cluster/stacks/prod/validator-runbook/Pulumi.validators.extra-validator.mock.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "splice/cluster/pulumi/validator-runbook/Pulumi.validators.extra-validator.mock.yaml"
+          },
+          {
             "fromPath": "cluster/stacks/prod/validator1/Pulumi.validator1.mock.yaml",
             "repository": {
               "name": "splice-node-active-base"
