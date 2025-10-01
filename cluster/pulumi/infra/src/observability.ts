@@ -100,12 +100,17 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
         labels: { 'istio-injection': 'disabled' },
       },
     },
-    { dependsOn }
+    {
+      dependsOn,
+      aliases: [
+        { name: 'observabilty' }, // Legacy typo
+      ],
+    }
   );
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
   const stackVersion = '75.9.0';
   const prometheusStackCrdVersion = '0.83.0';
-  // const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
+  const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
@@ -267,6 +272,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
         },
         grafana: {
           fullnameOverride: 'grafana',
+          envFromSecret: 'grafana-pg-secret',
           ingress: {
             enabled: false,
           },
@@ -369,6 +375,13 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
                   skip_verify: true,
                 }
               : undefined,
+            database: {
+              type: 'postgres',
+              host: pulumi.interpolate`${postgres.address}:5432`,
+              user: 'cnadmin',
+              password: '${postgresPassword}', // replaced from the secret
+              name: 'cantonnet',
+            },
           },
           deploymentStrategy: {
             // required for the pvc
@@ -493,6 +506,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
         'prometheus-node-exporter': {
           fullnameOverride: 'node-exporter',
         },
+        database: {},
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
@@ -857,5 +871,12 @@ function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
 }
 
 function installPostgres(namespace: ExactNamespace): SplicePostgres {
-  return new SplicePostgres(namespace, 'grafana-postgres', 'grafana-postgres', 'grafana-pg-secret');
+  return new SplicePostgres(
+    namespace,
+    'grafana-pg',
+    'grafana-pg',
+    'grafana-pg-secret',
+    { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
+    true // overrideDbSizeFromValues
+  );
 }
