@@ -15,7 +15,9 @@ and major upgrades (this corresponds to an upgrade from ``0.B.X`` to
 
 Minor upgrades can be done by each node independently and only require
 an upgrade of the docker-compose file or a ``helm upgrade`` for a
-kubernetes deployment. Make sure to read the :ref:`release_notes` to learn
+kubernetes deployment.
+You must not delete or uninstall any Postgres database, set migration IDs or secrets, or set the ``migrating`` flag for a minor upgrade; these steps are meant for major upgrades and will only cause problems here.
+Make sure to read the :ref:`release_notes` to learn
 about changes you may need to make as part of the upgrade.
 
 Note that for docker-compose you must update the full bundle including
