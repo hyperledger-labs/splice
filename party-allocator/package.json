@@ -1,0 +1,35 @@
+{
+  "name": "party-allocator",
+  "version": "1.0.0",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=build/bundle.js --sourcemap=inline --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "compile": "tsc",
+    "start": "node ./build/index.js",
+    "check": "npm run format:check && npm run lint:check",
+    "fix": "npm run format:fix && npm run lint:fix",
+    "format:check": "prettier --check -- src",
+    "format:fix": "prettier --write -- src",
+    "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
+    "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@lfdecentralizedtrust/canton-json-api-v2-openapi": "file:../token-standard/dependencies/canton-json-api-v2/openapi-ts-client",
+    "@lfdecentralizedtrust/transfer-instruction-openapi": "file:../token-standard/splice-api-token-transfer-instruction-v1/openapi-ts-client",
+    "@opentelemetry/exporter-prometheus": "^0.205.0",
+    "@opentelemetry/sdk-metrics": "^2.1.0",
+    "@types/node": "^24.3.1",
+    "@typescript-eslint/eslint-plugin": "^7.7.1",
+    "esbuild": "^0.25.9",
+    "eslint": "^8.57.1",
+    "p-limit": "^7.1.1",
+    "pino": "^9.9.5",
+    "prettier": "^3.6.2",
+    "typescript": "^5.7.3",
+    "zod": "^4.1.5"
+  },
+  "type": "module"
+}

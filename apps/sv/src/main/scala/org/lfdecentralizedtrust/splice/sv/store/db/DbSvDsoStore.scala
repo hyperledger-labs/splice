@@ -442,6 +442,7 @@ class DbSvDsoStore(
   override def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[AppRewardCoupon.ContractId]]] =
@@ -449,11 +450,13 @@ class DbSvDsoStore(
       AppRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredParties,
     )
 
   override def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[ValidatorRewardCoupon.ContractId]]] =
@@ -461,11 +464,13 @@ class DbSvDsoStore(
       ValidatorRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredParties,
     )
 
   override def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[ValidatorFaucetCoupon.ContractId]]] =
@@ -473,11 +478,13 @@ class DbSvDsoStore(
       ValidatorFaucetCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredParties,
     )
 
   override def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[RoundBatch[ValidatorLivenessActivityRecord.ContractId]]] =
@@ -485,33 +492,50 @@ class DbSvDsoStore(
       ValidatorLivenessActivityRecord.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredParties,
     )
 
   override def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit tc: TraceContext): Future[Seq[RoundBatch[SvRewardCoupon.ContractId]]] =
     listCouponsGroupedByRound(
       SvRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
+      ignoredParties,
     )
 
   private def listCouponsGroupedByRound[C, TCId <: ContractId[_]: ClassTag, T](
       companion: C,
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
   ): Future[Seq[SvDsoStore.RoundBatch[TCId]]] = {
     val templateId = companionClass.typeId(companion)
     val opName = s"list${templateId.getEntityName}GroupedByRound"
+    val partyFilter =
+      if (ignoredParties.nonEmpty)
+        companion match {
+          case SvRewardCoupon.COMPANION =>
+            // only SV reward coupons have a beneficiary field
+            (sql"and reward_party not in " ++ inClause(ignoredParties) ++
+              sql" and create_arguments ->> 'beneficiary' not in " ++ inClause(
+                ignoredParties
+              )).toActionBuilder
+          case _ =>
+            (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+        }
+      else sql""
     waitUntilAcsIngested {
       for {
         result <- storage
           .query(
-            sql"""
+            (sql"""
                 select reward_round, array_agg(contract_id)
                 from dso_acs_store
                 where store_id = $acsStoreId
@@ -520,21 +544,23 @@ class DbSvDsoStore(
                   and assigned_domain = $domain
                   and reward_party is not null -- otherwise index is not used
                   and reward_round is not null -- otherwise index is not used
+                  """ ++ partyFilter ++ sql"""
                 group by reward_round
                 order by reward_round asc
                 limit ${sqlLimit(totalCouponsLimit)}
-               """.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
+               """).toActionBuilder.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
             opName,
           )
-      } yield applyLimit(opName, totalCouponsLimit, result).map { case (round, batch) =>
-        RoundBatch(
-          round,
-          batch
-            .take(totalCouponsLimit.limit)
-            .map(cid => companionClass.toContractId(companion, cid.contractId))
-            .toSeq,
-        )
-      }
+      } yield applyLimit(opName, totalCouponsLimit, result)
+        .map { case (round, batch) =>
+          RoundBatch(
+            round,
+            batch
+              .take(totalCouponsLimit.limit)
+              .map(cid => companionClass.toContractId(companion, cid.contractId))
+              .toSeq,
+          )
+        }
     }
   }
 
@@ -823,10 +849,43 @@ class DbSvDsoStore(
       } yield limited.map(contractFromRow(SvOnboardingRequest.COMPANION)(_))
     }
 
-  override protected def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
-      companion: Template[Id, T]
-  )(amulet: T => Amulet): ListExpiredContracts[Id, T] = (_, limit) =>
-    implicit tc =>
+  override def listExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] = {
+    val filterClause = if (ignoredParties.nonEmpty) {
+      (sql" and create_arguments->>'owner' not in " ++ inClause(ignoredParties)).toActionBuilder
+    } else {
+      sql""
+    }
+    listExpiredRoundBased(splice.amulet.Amulet.COMPANION, filterClause)
+  }
+
+  override def listLockedExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet] = {
+    import slick.jdbc.*
+    import java.sql.JDBCType
+    // slick does not have builtin array conversions so we add an ad-hoc one here.
+    implicit val stringArraySetParameter: SetParameter[Array[String]] =
+      (strings: Array[String], pp: PositionedParameters) =>
+        pp.setObject(
+          pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
+          JDBCType.ARRAY.getVendorTypeNumber,
+        )
+    val filterClause = if (ignoredParties.nonEmpty) {
+      (sql" and create_arguments->'amulet'->>'owner' not in " ++ inClause(ignoredParties) ++
+        sql" and not (create_arguments->'lock'->'holders' ??| ${ignoredParties.map(_.toProtoPrimitive).toArray: Array[String]})").toActionBuilder
+    } else {
+      sql""
+    }
+    listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION, filterClause)
+  }
+
+  private def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
+      companion: Template[Id, T],
+      extraFilter: SQLActionBuilder,
+  ): ListExpiredContracts[Id, T] = (_, limit) =>
+    implicit tc => {
       waitUntilAcsIngested {
         for {
           synchronizerId <- getDsoRules().map(_.domain)
@@ -835,7 +894,7 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
+              where = (sql"""
                 template_id_qualified_name = ${QualifiedName(companion.getTemplateIdWithPackageId)}
                 and assigned_domain = $synchronizerId
                 and acs.amulet_round_of_expiry <= (
@@ -847,7 +906,7 @@ class DbSvDsoStore(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
                     and mining_round is not null
-                  order by mining_round desc limit 1)""",
+                  order by mining_round desc limit 1)""" ++ extraFilter).toActionBuilder,
               orderLimit = sql"""order by mining_round desc limit ${sqlLimit(limit)}""",
             ),
             "listExpiredRoundBased",
@@ -855,6 +914,7 @@ class DbSvDsoStore(
           assigned = rows.map(assignedContractFromRow(companion)(_))
         } yield assigned
       }
+    }
 
   override def listMemberTrafficContracts(
       memberId: Member,
@@ -1511,6 +1571,36 @@ class DbSvDsoStore(
     )
     listConfirmationsByActionConfirmer(expectedAction, confirmer)
   }
+
+  override def lookupAmuletConversionRateFeed(
+      publisher: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.ContractId,
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
+  ]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .querySingle(
+            selectFromAcsTable(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              where = sql"""
+                    template_id_qualified_name = ${QualifiedName(
+                  splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
+                and conversion_rate_feed_publisher = $publisher
+                  """,
+              orderLimit = sql" order by event_number desc limit 1",
+            ).headOption,
+            "lookupAmuletConversionRateFeed",
+          )
+          .value
+      } yield result.map(
+        contractFromRow(splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION)(_)
+      )
+    }
 
   override def close(): Unit = {
     dsoStoreMetrics.close()

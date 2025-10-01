@@ -57,7 +57,7 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an i
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
 # TODO(#833): investigate and decide if we want to remove it once fixed
-Late processing \(or clock skew\) of batch with counter.*after sequencing
+.*processing \(or clock skew\) of batch with .*after sequencing
 
 # Shows up during global domain migration test, when the domain is frozen
 ABORTED/SEQUENCER_OVERLOADED.*Submission rate exceeds rate limit of 0/s

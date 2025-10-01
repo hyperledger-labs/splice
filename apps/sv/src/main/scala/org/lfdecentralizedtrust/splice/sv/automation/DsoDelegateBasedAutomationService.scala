@@ -72,7 +72,12 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new GarbageCollectAmuletPriceVotesTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
-    registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
+    registerTrigger(
+      new ExpireRewardCouponsTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
 
     registerTrigger(new AnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsEntryTrigger(triggerContext, svTaskContext))

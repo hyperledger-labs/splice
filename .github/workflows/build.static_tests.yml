@@ -83,7 +83,7 @@ jobs:
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
-          cmd: "Test/compile lint printTests"
+          cmd: "Test/compile lint updateTestConfigForParallelRuns"
 
       - name: Verify no changes in SBT test files
         uses: ./.github/actions/nix/run_bash_command_in_nix

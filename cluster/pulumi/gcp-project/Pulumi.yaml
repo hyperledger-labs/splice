@@ -1,4 +1,0 @@
----
-name: gcp-project
-description: 'Provision a Google Cloud Platform project (new version of the old `gcp` project)'
-runtime: nodejs

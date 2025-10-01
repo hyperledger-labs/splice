@@ -25,7 +25,6 @@ import {
   validatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
-  installLoopback,
   imagePullSecret,
   CnInput,
   sequencerPruningConfig,
@@ -46,11 +45,12 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
+  getAdditionalJvmOptions,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
+  installSvLoopback,
   svsConfig,
-  updateHistoryBackfillingValues,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
@@ -102,20 +102,20 @@ export async function installNode(
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE: svNamespaceStr,
+      namespace: svNamespaceStr,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
-  const svKey = svKeyFromSecret('sv');
+  const svKey = svKeyFromSecret(svAppConfig.svIdKeyGcpSecret);
 
-  const cometBftGovernanceKey = svAppConfig.externalGovernanceKey
-    ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', ''))!
+  const cometBftGovernanceKey = svAppConfig.externalGovernanceKeyGcpSecret
+    ? svCometBftGovernanceKeyFromSecret(svAppConfig.externalGovernanceKeyGcpSecret)
     : undefined;
 
   const { sv, validator } = await installSvAndValidator(
@@ -296,6 +296,7 @@ async function installSvAndValidator(
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
+    // TODO(tech-debt): it's a bit confusing: we *only* approve from approved-sv-identities files here (so no "local" SV overrides)
     approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),
@@ -328,6 +329,7 @@ async function installSvAndValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
+    additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -389,7 +391,6 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
@@ -479,7 +480,9 @@ async function installSvAndValidator(
                 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
             },
           ]),
+      ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
+    additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
   };
 
   const cnsUiClientId = svNameSpaceAuth0Clients['cns'];

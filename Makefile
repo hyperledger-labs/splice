@@ -13,6 +13,8 @@ app-bundle := ${SPLICE_ROOT}/apps/app/target/release/splice-node.tar.gz
 
 load-tester := ${SPLICE_ROOT}/load-tester/dist
 
+party-allocator := ${SPLICE_ROOT}/party-allocator/build/bundle.js
+
 canton-amulet-dar := ${SPLICE_ROOT}/daml/splice-amulet/.daml/dist/splice-amulet-current.dar
 wallet-payments-dar := ${SPLICE_ROOT}/daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 
@@ -27,6 +29,21 @@ $(canton-amulet-dar) $(wallet-payments-dar) &:
 
 $(load-tester):
 	cd "${SPLICE_ROOT}/load-tester" && npm ci && npm run build
+
+$(party-allocator):
+	sbt --batch 'party-allocator/npmBuild'
+
+.PHONY: update-expected
+update-expected: cluster/pulumi/update-expected
+
+.PHONY: pulumi-clean
+pulumi-clean: cluster/pulumi/clean
+
+.PHONY: pulumi-build
+pulumi-build: cluster/pulumi/build
+
+.PHONY: pulumi-format
+pulumi-format: cluster/pulumi/format
 
 .PHONY: clean
 clean: cluster/clean

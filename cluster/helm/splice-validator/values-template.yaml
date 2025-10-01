@@ -75,3 +75,11 @@ service:
 # uiPollInterval:
 
 extraInitContainers: []
+
+# set if ans-web-ui should be deployed
+ansWebUi:
+  enabled: true
+
+# set if validator-web-ui should be deployed
+validatorWebUi:
+  enabled: true

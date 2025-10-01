@@ -33,7 +33,7 @@ export const CreateProposal: React.FC = () => {
       case 'SRARC_RevokeFeaturedAppRight':
         return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_RevokeFeaturedAppRight'} />;
       case 'SRARC_SetConfig':
-        return <SetDsoConfigRulesForm onSubmit={onSubmit} />;
+        return <SetDsoConfigRulesForm />;
       case 'CRARC_SetConfig':
         return <SetAmuletConfigRulesForm onSubmit={onSubmit} />;
     }

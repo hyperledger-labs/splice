@@ -21,6 +21,7 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
   override val topology: TopologyConfig = TopologyConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
+
   def participantClient: BaseParticipantClientConfig
   def automation: AutomationConfig
 
@@ -33,13 +34,38 @@ abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
 final case class CircuitBreakerConfig(
-    maxFailures: Int = 20,
+    // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
+    maxFailures: Int = 40,
     callTimeout: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
     resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
     exponentialBackoffFactor: Double = 2.0,
     randomFactor: Double = 0.2,
+)
+
+final case class CircuitBreakersConfig(
+    highPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
+    ),
+    mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
+      maxFailures = 20,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
+    ),
+    lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
+      maxFailures = 10,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
+    // Amulet expiry is different from essentially any other trigger run in the SV app in that for it to complete successfully
+    // we need a confirmation from the node hosting the amulet owner. So in other words, if a node is down
+    // this will start failing. Therefore, we use a dedicated circuit breaker just for amulet expiry
+    // to avoid this causing issues for other triggers.
+    amuletExpiry: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 5,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
@@ -59,7 +85,7 @@ case class SharedSpliceAppParameters(
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
-    commandCircuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
+    circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
     // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,

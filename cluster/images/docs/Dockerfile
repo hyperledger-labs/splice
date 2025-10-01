@@ -15,3 +15,9 @@ COPY --from=splice app/LICENSE .
 COPY script.js /tmpl/script.js.tmpl
 COPY --chmod=500 docker-entrypoint.sh /custom-docker-entrypoint.sh
 ENTRYPOINT ["/custom-docker-entrypoint.sh"]
+
+USER root
+RUN chown -R nginx:nginx /tmpl
+RUN chown nginx:nginx /custom-docker-entrypoint.sh
+RUN chown -R nginx:nginx /usr/share/nginx/html
+USER nginx

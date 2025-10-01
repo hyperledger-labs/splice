@@ -1371,6 +1371,62 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetEventHistory(
+      count: Int,
+      after: Option[(Long, String)],
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[
+        http.GetEventHistoryResponse,
+        Seq[definitions.EventHistoryItem],
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetEventHistoryResponse] = {
+      client.getEventHistory(
+        definitions.EventHistoryRequest(
+          after = after.map { case (migrationId, recordTime) =>
+            definitions.UpdateHistoryRequestAfter(migrationId, recordTime)
+          },
+          pageSize = count,
+          damlValueEncoding = Some(damlValueEncoding),
+        ),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetEventHistoryResponse.OK(response) =>
+        Right(response.events)
+    }
+  }
+
+  case class GetEventById(
+      updateId: String,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
+  ) extends InternalBaseCommand[
+        http.GetEventByIdResponse,
+        Option[definitions.EventHistoryItem],
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetEventByIdResponse] = {
+      client.getEventById(
+        updateId = updateId,
+        damlValueEncoding = damlValueEncoding,
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetEventByIdResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetEventByIdResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
   case class GetSpliceInstanceNames()
       extends InternalBaseCommand[
         http.GetSpliceInstanceNamesResponse,

@@ -123,7 +123,7 @@ test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
 
     [(_, round)] <- queryFilter @IssuingMiningRound app.dso (\r -> r.round == round1._2.round)
     let sv1Balance1 =
-            round.issuancePerSvRewardCoupon * sv1Weight - createFee - openRound.transferConfigUsd.holdingFee.rate
+            round.issuancePerSvRewardCoupon * sv1Weight - createFee
             + sv1Balance0
     checkBalance sv1 sv1Balance1
     checkBalance sv2 sv2Balance -- no balance change for SV2 as it did not collect round 1
@@ -268,7 +268,7 @@ test_SvRewards_With_InitialRound_In_SecondIssuanceCurve = do
 
     [(_, round)] <- queryFilter @IssuingMiningRound app.dso (\r -> r.round == round1._2.round)
     let sv1Balance1 =
-            round.issuancePerSvRewardCoupon * sv1Weight - createFee - openRound.transferConfigUsd.holdingFee.rate
+            round.issuancePerSvRewardCoupon * sv1Weight - createFee
             + sv1Balance0
     checkBalance sv1 sv1Balance1
     checkBalance sv2 sv2Balance -- no balance change for SV2 as it did not collect round 1

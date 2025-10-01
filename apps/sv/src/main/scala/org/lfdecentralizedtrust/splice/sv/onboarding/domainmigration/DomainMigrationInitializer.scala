@@ -64,6 +64,7 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.io.FileNotFoundException
 import java.nio.file.Path
@@ -109,6 +110,7 @@ class DomainMigrationInitializer(
   private val domainDataRestorer = new DomainDataRestorer(
     participantAdminConnection,
     config.timeTrackerMinObservationDuration,
+    config.timeTrackerObservationLatency,
     loggerFactory,
   )
 
@@ -176,14 +178,15 @@ class DomainMigrationInitializer(
         participantAdminConnection,
         Some(localSynchronizerNode),
       )
+      connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       _ <- SetupUtil
         .grantSvUserRightActAsDso(
-          svAutomation.connection,
+          connection,
           config.ledgerApiUser,
           svStore.key.dsoParty,
         )
       _ <- DomainMigrationInfo.saveToUserMetadata(
-        svAutomation.connection,
+        connection,
         config.ledgerApiUser,
         migrationInfo,
       )
@@ -197,7 +200,7 @@ class DomainMigrationInitializer(
       )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
-        svAutomation.connection,
+        connection,
         loggerFactory,
       )
       dsoAutomationService =
@@ -235,7 +238,7 @@ class DomainMigrationInitializer(
         skipTrafficReconciliationTriggers = true,
       )
       _ <- new ParticipantUsersDataRestorer(
-        svAutomation.connection,
+        connection,
         loggerFactory,
       ).restoreParticipantUsersData(migrationDump.participantUsers)
       _ <- establishInitialRound(

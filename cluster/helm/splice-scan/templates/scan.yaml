@@ -104,6 +104,8 @@ spec:
           value: {{ .Values.participantAddress | quote }}
         - name: SPLICE_APP_SCAN_SEQUENCER_ADDRESS
           value: {{ .Values.sequencerAddress | quote }}
+        - name: SPLICE_APP_SCAN_MEDIATOR_ADDRESS
+          value: {{ .Values.mediatorAddress | quote }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         - name: SPLICE_APP_UI_NETWORK_NAME

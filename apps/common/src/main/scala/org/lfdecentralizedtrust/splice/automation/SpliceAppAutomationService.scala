@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerClient,
@@ -19,6 +19,9 @@ import org.lfdecentralizedtrust.splice.store.{
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.Scheduler
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.util.SpliceCircuitBreaker
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,6 +36,7 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     override val store: Store,
     ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
+    parametersConfig: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -46,12 +50,49 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     )
     with AppStoreWithIngestion[Store] {
 
-  override val connection: SpliceLedgerConnection =
+  private implicit val scheduler: Scheduler = mat.system.scheduler
+
+  private val lowPriorityConnection =
+    createConnectionWithPriority(SpliceLedgerConnectionPriority.Low)
+  private val mediumPriorityConnection =
+    createConnectionWithPriority(SpliceLedgerConnectionPriority.Medium)
+  private val highPriorityConnection =
+    createConnectionWithPriority(SpliceLedgerConnectionPriority.High)
+  private val amuletExpiryConnection =
+    createConnectionWithPriority(SpliceLedgerConnectionPriority.AmuletExpiry)
+
+  private def createConnectionWithPriority(priority: SpliceLedgerConnectionPriority) = {
+    val (name, config) = priority match {
+      case SpliceLedgerConnectionPriority.High =>
+        "high" -> parametersConfig.circuitBreakers.highPriority
+      case SpliceLedgerConnectionPriority.Medium =>
+        "medium" -> parametersConfig.circuitBreakers.mediumPriority
+      case SpliceLedgerConnectionPriority.Low =>
+        "low" -> parametersConfig.circuitBreakers.lowPriority
+      case SpliceLedgerConnectionPriority.AmuletExpiry =>
+        "amulet-expiry" -> parametersConfig.circuitBreakers.amuletExpiry
+    }
     ledgerClient.connection(
       this.getClass.getSimpleName,
-      loggerFactory,
+      loggerFactory.append("connectionPriority", name),
+      SpliceCircuitBreaker(
+        s"$name-priority-connection",
+        config,
+        logger,
+      ),
       completionOffsetCallback,
     )
+  }
+
+  override def connection(
+      submissionPriority: SpliceLedgerConnectionPriority
+  ): SpliceLedgerConnection =
+    submissionPriority match {
+      case SpliceLedgerConnectionPriority.High => highPriorityConnection
+      case SpliceLedgerConnectionPriority.Medium => mediumPriorityConnection
+      case SpliceLedgerConnectionPriority.Low => lowPriorityConnection
+      case SpliceLedgerConnectionPriority.AmuletExpiry => amuletExpiryConnection
+    }
 
   private def completionOffsetCallback(offset: Long): Future[Unit] =
     store.multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)(TraceContext.empty)
@@ -60,7 +101,7 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     new UpdateIngestionService(
       store.getClass.getSimpleName,
       store.multiDomainAcsStore.ingestionSink,
-      connection,
+      connection(SpliceLedgerConnectionPriority.High),
       automationConfig,
       backoffClock = triggerContext.pollingClock,
       triggerContext.retryProvider,
@@ -72,7 +113,7 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     new UpdateIngestionService(
       store.updateHistory.getClass.getSimpleName,
       store.updateHistory.ingestionSink,
-      connection,
+      connection(SpliceLedgerConnectionPriority.High),
       automationConfig,
       backoffClock = triggerContext.pollingClock,
       triggerContext.retryProvider,
@@ -83,7 +124,7 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
   registerTrigger(
     new DomainIngestionService(
       store.domains.ingestionSink,
-      connection,
+      connection(SpliceLedgerConnectionPriority.High),
       // We want to always poll periodically and quickly even in simtime mode so we overwrite the clock.
       // The polling interval is governed by the domainIngestionPollingInterval config.
       triggerContext.copy(

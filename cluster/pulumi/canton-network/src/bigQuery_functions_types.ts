@@ -49,6 +49,30 @@ export class BQArray extends BQType {
   }
 }
 
+export class BQStruct extends BQType {
+  private readonly structTypes: { name: string; type: BQType }[];
+  public constructor(structTypes: { name: string; type: BQType }[]) {
+    super();
+    this.structTypes = structTypes;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public toPulumi(): any {
+    return {
+      typeKind: 'STRUCT',
+      structType: {
+        fields: this.structTypes.map(st => ({
+          name: st.name,
+          type: st.type.toPulumi(),
+        })),
+      },
+    };
+  }
+
+  public toSql(): string {
+    return `STRUCT<${this.structTypes.map(st => `${st.name} ${st.type.toSql()}`).join(', ')}>`;
+  }
+}
+
 export class BQFunctionArgument {
   private readonly name: string;
   private readonly type: BQType;
@@ -82,11 +106,42 @@ abstract class BQFunction {
   }
   public abstract toPulumi(
     project: string,
+    installInDataset: gcp.bigquery.Dataset,
     functionsDataset: gcp.bigquery.Dataset,
     scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset,
     dependsOn?: pulumi.Resource[]
-  ): gcp.bigquery.Routine;
-  public abstract toSql(project: string, functionsDataset: string, scanDataset: string): string;
+  ): pulumi.Resource;
+  public abstract toSql(
+    project: string,
+    installInDataset: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string;
+
+  protected replaceDatasets(
+    project: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string {
+    return this.definitionBody
+      .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${functionsDataset}`)
+      .replaceAll('$$SCAN_DATASET$$', `${project}.${scanDataset}`)
+      .replaceAll('$$DASHBOARDS_DATASET$$', `${project}.${dashboardsDataset}`);
+  }
+
+  protected replaceDatasetsPulumi(
+    project: string,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset
+  ): pulumi.Output<string> {
+    return pulumi
+      .all([functionsDataset.datasetId, scanDataset.datasetId, dashboardsDataset.datasetId])
+      .apply(([fd, sd, dd]) => this.replaceDatasets(project, fd, sd, dd));
+  }
 }
 
 export class BQScalarFunction extends BQFunction {
@@ -104,23 +159,24 @@ export class BQScalarFunction extends BQFunction {
 
   public toPulumi(
     project: string,
+    installInDataset: gcp.bigquery.Dataset,
     functionsDataset: gcp.bigquery.Dataset,
     scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset,
     dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Routine {
     return new gcp.bigquery.Routine(
       this.name,
       {
-        datasetId: functionsDataset.datasetId,
+        datasetId: installInDataset.datasetId,
         routineId: this.name,
         routineType: 'SCALAR_FUNCTION',
         language: 'SQL',
-        definitionBody: functionsDataset.datasetId.apply(fd =>
-          scanDataset.datasetId.apply(sd =>
-            this.definitionBody
-              .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
-              .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
-          )
+        definitionBody: this.replaceDatasetsPulumi(
+          project,
+          functionsDataset,
+          scanDataset,
+          dashboardsDataset
         ),
         arguments: this.arguments.map(arg => arg.toPulumi()),
         returnType: JSON.stringify(this.returnType.toPulumi()),
@@ -129,13 +185,17 @@ export class BQScalarFunction extends BQFunction {
     );
   }
 
-  public toSql(project: string, functionsDataset: string, scanDataset: string): string {
-    const body = this.definitionBody
-      .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${functionsDataset}`)
-      .replaceAll('$$SCAN_DATASET$$', `${project}.${scanDataset}`);
+  public toSql(
+    project: string,
+    installInDataset: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string {
+    const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
 
     return `
-      CREATE OR REPLACE FUNCTION ${functionsDataset}.${this.name}(
+      CREATE OR REPLACE FUNCTION ${installInDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
       RETURNS ${this.returnType.toSql()}
@@ -156,10 +216,10 @@ export class BQColumn {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public toPulumi(): any {
+  public toPulumi(simpleSqlTypes: boolean = false): any {
     return {
       name: this.name,
-      type: this.type.toPulumi(),
+      type: simpleSqlTypes ? this.type.toSql() : this.type.toPulumi(),
     };
   }
 
@@ -183,23 +243,24 @@ export class BQTableFunction extends BQFunction {
 
   public toPulumi(
     project: string,
+    installInDataset: gcp.bigquery.Dataset,
     functionsDataset: gcp.bigquery.Dataset,
     scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset,
     dependsOn?: pulumi.Resource[]
   ): gcp.bigquery.Routine {
     return new gcp.bigquery.Routine(
       this.name,
       {
-        datasetId: functionsDataset.datasetId,
+        datasetId: installInDataset.datasetId,
         routineId: this.name,
         routineType: 'TABLE_VALUED_FUNCTION',
         language: 'SQL',
-        definitionBody: functionsDataset.datasetId.apply(fd =>
-          scanDataset.datasetId.apply(sd =>
-            this.definitionBody
-              .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${fd}`)
-              .replaceAll('$$SCAN_DATASET$$', `${project}.${sd}`)
-          )
+        definitionBody: this.replaceDatasetsPulumi(
+          project,
+          functionsDataset,
+          scanDataset,
+          dashboardsDataset
         ),
         arguments: this.arguments.map(arg => arg.toPulumi()),
         returnTableType: JSON.stringify({
@@ -210,13 +271,17 @@ export class BQTableFunction extends BQFunction {
     );
   }
 
-  public toSql(project: string, functionsDataset: string, scanDataset: string): string {
-    const body = this.definitionBody
-      .replaceAll('$$FUNCTIONS_DATASET$$', `${project}.${functionsDataset}`)
-      .replaceAll('$$SCAN_DATASET$$', `${project}.${scanDataset}`);
+  public toSql(
+    project: string,
+    installInDataset: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string {
+    const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
 
     return `
-      CREATE OR REPLACE TABLE FUNCTION ${functionsDataset}.${this.name}(
+      CREATE OR REPLACE TABLE FUNCTION ${installInDataset}.${this.name}(
         ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
       )
       RETURNS TABLE<
@@ -224,6 +289,140 @@ export class BQTableFunction extends BQFunction {
       >
       AS (
       ${body}
+      );
+    `;
+  }
+}
+
+// While logical views are created as a Table in pulumi, we model them as a function, so that we can treat their query similarly to the function bodies.
+export class BQLogicalView extends BQFunction {
+  public constructor(name: string, definitionBody: string) {
+    super(name, [], definitionBody);
+  }
+
+  public toPulumi(
+    project: string,
+    installInDataset: gcp.bigquery.Dataset,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset,
+    dependsOn?: pulumi.Resource[]
+  ): gcp.bigquery.Table {
+    return new gcp.bigquery.Table(
+      this.name,
+      {
+        datasetId: installInDataset.datasetId,
+        tableId: this.name,
+        deletionProtection: false, // no point in deletion protection for a view, it doesn't hold data
+        view: {
+          query: this.replaceDatasetsPulumi(
+            project,
+            functionsDataset,
+            scanDataset,
+            dashboardsDataset
+          ),
+          useLegacySql: false,
+        },
+      },
+      { dependsOn }
+    );
+  }
+
+  public toSql(
+    project: string,
+    installInDataset: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string {
+    const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
+
+    return `
+      CREATE OR REPLACE VIEW ${installInDataset}.${this.name}
+      AS (
+      ${body}
+      );
+    `;
+  }
+}
+
+export class BQProcedure extends BQFunction {
+  public constructor(name: string, args: BQFunctionArgument[], definitionBody: string) {
+    super(name, args, definitionBody);
+  }
+
+  public toPulumi(
+    project: string,
+    installInDataset: gcp.bigquery.Dataset,
+    functionsDataset: gcp.bigquery.Dataset,
+    scanDataset: gcp.bigquery.Dataset,
+    dashboardsDataset: gcp.bigquery.Dataset,
+    dependsOn?: pulumi.Resource[]
+  ): gcp.bigquery.Routine {
+    return new gcp.bigquery.Routine(
+      this.name,
+      {
+        datasetId: installInDataset.datasetId,
+        routineId: this.name,
+        routineType: 'PROCEDURE',
+        language: 'SQL',
+        definitionBody: this.replaceDatasetsPulumi(
+          project,
+          functionsDataset,
+          scanDataset,
+          dashboardsDataset
+        ),
+        arguments: this.arguments.map(arg => arg.toPulumi()),
+      },
+      { dependsOn }
+    );
+  }
+
+  public toSql(
+    project: string,
+    installInDataset: string,
+    functionsDataset: string,
+    scanDataset: string,
+    dashboardsDataset: string
+  ): string {
+    const body = this.replaceDatasets(project, functionsDataset, scanDataset, dashboardsDataset);
+
+    return `
+      CREATE OR REPLACE PROCEDURE ${installInDataset}.${this.name}(
+        ${this.arguments.map(arg => arg.toSql()).join(',\n        ')}
+      )
+      BEGIN
+      ${body}
+      END;
+    `;
+  }
+}
+
+export class BQTable {
+  protected readonly name: string;
+  protected readonly columns: BQColumn[];
+
+  public constructor(name: string, columns: BQColumn[]) {
+    this.name = name;
+    this.columns = columns;
+  }
+
+  public toPulumi(
+    installInDataset: gcp.bigquery.Dataset,
+    deletionProtection: boolean
+  ): gcp.bigquery.Table {
+    return new gcp.bigquery.Table(this.name, {
+      datasetId: installInDataset.datasetId,
+      tableId: this.name,
+      deletionProtection,
+      schema: JSON.stringify(this.columns.map(col => col.toPulumi(true))),
+    });
+  }
+
+  public toSql(dataset: string): string {
+    return `
+      CREATE OR REPLACE TABLE \`${dataset}.${this.name}\` (
+        ${this.columns.map(col => col.toSql()).join(',\n        ')}
       );
     `;
   }

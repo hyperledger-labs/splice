@@ -203,7 +203,11 @@ spec:
 - name: LOG_LEVEL_CANTON
   value: {{ .logLevel }}
 - name: LOG_LEVEL_STDOUT
+{{- if .logLevelStdout }}
+  value: {{ .logLevelStdout }}
+{{- else }}
   value: {{ .logLevel }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}

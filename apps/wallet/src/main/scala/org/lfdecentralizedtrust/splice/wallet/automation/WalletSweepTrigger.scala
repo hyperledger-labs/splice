@@ -22,6 +22,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
@@ -32,6 +33,7 @@ abstract class WalletSweepTrigger(
     store: UserWalletStore,
     config: WalletSweepConfig,
     scanConnection: ScanConnection,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -62,7 +64,17 @@ abstract class WalletSweepTrigger(
       round <- scanConnection.getLatestOpenMiningRound()
       amuletPrice = round.payload.amuletPrice
       currentAmuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(CantonTimestamp.now())
-      balance <- store.getAmuletBalanceWithHoldingFees(round.payload.round.number).map(_._1)
+      noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
+        store.key.dsoParty,
+        context.clock.now,
+      )
+      deductHoldingFees = !noHoldingFeesOnTransfers.supported
+      balance <- store
+        .getAmuletBalanceWithHoldingFees(
+          round.payload.round.number,
+          deductHoldingFees = deductHoldingFees,
+        )
+        .map(_._1)
       balanceUsd = BigDecimal(ccToDollars(balance.bigDecimal, amuletPrice))
       outstandingBalanceUsd <- getOutstandingBalanceUsd(
         amuletPrice,
@@ -71,7 +83,7 @@ abstract class WalletSweepTrigger(
     } yield {
       if (balanceUsd - outstandingBalanceUsd > config.maxBalanceUsd.value) {
         val trackingId = UUID.randomUUID.toString
-        Seq(WalletSweepTrigger.Task(trackingId))
+        Seq(WalletSweepTrigger.Task(trackingId, deductHoldingFees = deductHoldingFees))
       } else {
         if (balanceUsd > config.maxBalanceUsd.value) {
           logger.info(
@@ -101,7 +113,12 @@ abstract class WalletSweepTrigger(
         .getLatestOpenMiningRound()
       amuletPrice = round.payload.amuletPrice
       currentAmuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(CantonTimestamp.now())
-      balance <- store.getAmuletBalanceWithHoldingFees(round.payload.round.number).map(_._1)
+      balance <- store
+        .getAmuletBalanceWithHoldingFees(
+          round.payload.round.number,
+          deductHoldingFees = task.deductHoldingFees,
+        )
+        .map(_._1)
       balanceUsd = BigDecimal(ccToDollars(balance.bigDecimal, amuletPrice))
       outstandingBalanceUsd <- getOutstandingBalanceUsd(amuletPrice, currentAmuletConfig)
       res <-
@@ -142,7 +159,12 @@ abstract class WalletSweepTrigger(
     for {
       round <- scanConnection
         .getLatestOpenMiningRound()
-      balance <- store.getAmuletBalanceWithHoldingFees(round.payload.round.number).map(_._1)
+      balance <- store
+        .getAmuletBalanceWithHoldingFees(
+          round.payload.round.number,
+          deductHoldingFees = task.deductHoldingFees,
+        )
+        .map(_._1)
       amuletPrice = round.payload.amuletPrice
     } yield {
       balance < dollarsToCC(config.maxBalanceUsd.value.bigDecimal, amuletPrice)
@@ -220,11 +242,13 @@ abstract class WalletSweepTrigger(
 
 object WalletSweepTrigger {
   final case class Task(
-      trackingId: String
+      trackingId: String,
+      deductHoldingFees: Boolean,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Task] =
       prettyOfClass[Task](
-        param("Tracking Id", _.trackingId.unquoted)
+        param("Tracking Id", _.trackingId.unquoted),
+        param("deductHoldingFees", _.deductHoldingFees),
       )
   }
 }

@@ -52,7 +52,6 @@ class DbMultiDomainAcsStoreTest
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
   "DbMultiDomainAcsStore" should {
-
     "allow creating & deleting same contract id in different stores" in {
       val store1 = mkStore(acsId = 1, txLogId = Some(1))
       val store1MigrationId1 = mkStore(acsId = 1, txLogId = Some(1), migrationId = 1L)
@@ -524,6 +523,29 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
+    "containsArchived should return true for archived contracts" in {
+      val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = 1L)
+      val coupon1 = c(1)
+      val coupon2 = c(2)
+      val coupon3 = c(3)
+      for {
+        _ <- initWithAcs()(store)
+        _ <- d1.create(coupon1)(store)
+        _ <- d1.create(coupon2)(store)
+        _ <- d1.create(coupon3)(store)
+        _ <- d1.archive(coupon1)(store)
+        _ <- d1.archive(coupon2)(store)
+        _ = store.containsArchived(Seq(coupon1.contractId)).futureValue shouldBe true
+        _ = store
+          .containsArchived(Seq(coupon1.contractId, coupon2.contractId))
+          .futureValue shouldBe true
+        _ = store
+          .containsArchived(Seq(coupon2.contractId, coupon3.contractId))
+          .futureValue shouldBe true
+        _ = store.containsArchived(Seq(coupon3.contractId)).futureValue shouldBe false
+        _ = store.containsArchived(Seq()).futureValue shouldBe false
+      } yield succeed
+    }
   }
 
   private def failedViewStatus(msg: String) = {

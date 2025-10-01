@@ -20,9 +20,9 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
+  coreSvsToDeploy,
   initialRound,
   StaticCometBftConfigWithNodeName,
-  svConfigs,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   SequencerPruningConfig,
@@ -34,7 +34,6 @@ import _ from 'lodash';
 import { InstalledSv, installSvNode } from './sv';
 
 interface DsoArgs {
-  dsoSize: number;
   auth0Client: Auth0Client;
   approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
@@ -77,16 +76,28 @@ export class Dso extends pulumi.ComponentResource {
     cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
     extraDependsOn: CnInput<pulumi.Resource>[] = []
   ) {
-    const defaultApprovedSvIdentities = approvedSvIdentities();
-
-    const identities = _.uniqBy(
+    const approvedSvIdentitiesFromFile = approvedSvIdentities();
+    const approvedSvIdentitiesFromConfigs = _.uniqBy(
       [
-        ...defaultApprovedSvIdentities,
         ...extraApprovedSvIdentities,
-        ...this.args.approvedSvIdentities,
+        ...this.args.approvedSvIdentities, // typically just runbook or no
       ],
       'name'
     );
+    const configuredPublicKeys = approvedSvIdentitiesFromConfigs.reduce(
+      (acc, identity) => ({ ...acc, [identity.name]: identity.publicKey }),
+      {} as Record<string, string | pulumi.Output<string>>
+    );
+
+    const identities = _.uniqBy(
+      [...approvedSvIdentitiesFromFile, ...approvedSvIdentitiesFromConfigs],
+      'name'
+      // We override public keys to the locally configured one,
+      // to support using real approved-sv-id-values files on CI clusters that don't have access to the real keys.
+    ).map(identity => ({
+      ...identity,
+      publicKey: configuredPublicKeys[identity.name] ?? identity.publicKey,
+    }));
 
     return installSvNode(
       {
@@ -125,30 +136,34 @@ export class Dso extends pulumi.ComponentResource {
   }
 
   private async installDso() {
-    const relevantSvConfs = svConfigs.slice(0, this.args.dsoSize);
+    const relevantSvConfs = coreSvsToDeploy;
     const [sv1Conf, ...restSvConfs] = relevantSvConfs;
 
     const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
+      const secretName = conf.svIdKeySecretName ?? conf.nodeName.replaceAll('-', '') + '-id';
       return {
         ...acc,
-        [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replace('-', '')),
+        [conf.onboardingName]: svKeyFromSecret(secretName),
       };
     }, {});
 
     const cometBftGovernanceKeys = relevantSvConfs
       .filter(conf => configForSv(conf.nodeName)?.participant?.kms)
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
+        const secretName =
+          conf.cometBftGovernanceKeySecretName ??
+          conf.nodeName.replaceAll('-', '') + '-cometbft-governance-key';
         return {
           ...acc,
-          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(conf.nodeName.replace('-', '')),
+          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(secretName),
         };
       }, {});
 
-    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(
+    const svIdentitiesFromConfigs: ApprovedSvIdentity[] = Object.entries(
       svIdKeys
     ).map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
       name: onboardingName,
-      publicKey: keys.publicKey,
+      publicKey: keys.publicKey, // we always use that one if we have it, overriding approved-sv-id-values-$CLUSTER.yaml
       rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
     }));
 
@@ -185,7 +200,7 @@ export class Dso extends pulumi.ComponentResource {
         sv1: sv1CometBftConf,
         peers: peerCometBftConfs,
       },
-      additionalSvIdentities,
+      svIdentitiesFromConfigs,
       this.args.expectedValidatorOnboardings,
       true,
       cometBftGovernanceKeys[sv1Conf.onboardingName]
@@ -218,7 +233,7 @@ export class Dso extends pulumi.ComponentResource {
         conf,
         onboarding,
         cometBft,
-        additionalSvIdentities,
+        svIdentitiesFromConfigs,
         [],
         false,
         cometBftGovernanceKeys[conf.onboardingName],

@@ -44,6 +44,21 @@ class HttpScanProxyHandler(
     }
   }
 
+  override def getDsoInfo(
+      respond: v0.ScanproxyResource.GetDsoInfoResponse.type
+  )()(tUser: TracedUser): Future[v0.ScanproxyResource.GetDsoInfoResponse] = {
+    implicit val TracedUser(_, traceContext) = tUser
+    withSpan(s"$workflowId.getDsoInfo") { implicit traceContext => _ =>
+      for {
+        dsoInfo <- scanConnection.getDsoInfo()
+      } yield {
+        respond.OK(
+          dsoInfo
+        )
+      }
+    }
+  }
+
   override def lookupFeaturedAppRight(
       respond: v0.ScanproxyResource.LookupFeaturedAppRightResponse.type
   )(

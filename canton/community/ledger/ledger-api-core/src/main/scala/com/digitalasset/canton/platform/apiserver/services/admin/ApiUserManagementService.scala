@@ -566,6 +566,14 @@ private[apiserver] final class ApiUserManagementService(
       case proto.Right(_: proto.Right.Kind.CanReadAsAnyParty) =>
         Right(UserRight.CanReadAsAnyParty)
 
+      // irrelevant for splice
+      case proto.Right(_: proto.Right.Kind.CanExecuteAsAnyParty) =>
+        ???
+
+      // irrelevant for splice
+      case proto.Right(proto.Right.Kind.CanExecuteAs(_)) =>
+        ???
+
       case proto.Right(proto.Right.Kind.Empty) =>
         Left(
           RequestValidationErrors.InvalidArgument

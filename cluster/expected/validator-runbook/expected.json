@@ -168,50 +168,6 @@
     "id": "",
     "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
-      "kind": "VirtualService",
-      "metadata": {
-        "name": "cometbft-loopback",
-        "namespace": "validator"
-      },
-      "spec": {
-        "exportTo": [
-          "."
-        ],
-        "gateways": [
-          "mesh"
-        ],
-        "hosts": [
-          "mock.global.canton.network.digitalasset.com"
-        ],
-        "tcp": [
-          {
-            "match": [
-              {
-                "gateways": [
-                  "mesh"
-                ]
-              }
-            ],
-            "route": [
-              {
-                "destination": {
-                  "host": "istio-ingress-cometbft.cluster-ingress.svc.cluster.local"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "name": "loopback-cometbft-validator",
-    "provider": "",
-    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "ServiceEntry",
       "metadata": {
         "name": "loopback",
@@ -239,56 +195,6 @@
             "name": "grpc-domain",
             "number": 5008,
             "protocol": "GRPC"
-          },
-          {
-            "name": "cometbft-0-0-p2p",
-            "number": 26006,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-0-1-p2p",
-            "number": 26016,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-1-0-p2p",
-            "number": 26106,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-1-1-p2p",
-            "number": 26116,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-2-0-p2p",
-            "number": 26206,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-2-1-p2p",
-            "number": 26216,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-3-0-p2p",
-            "number": 26306,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-3-1-p2p",
-            "number": 26316,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-4-0-p2p",
-            "number": 26406,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-4-1-p2p",
-            "number": 26416,
-            "protocol": "TCP"
           }
         ],
         "resolution": "DNS"
@@ -317,8 +223,6 @@
         ],
         "hosts": [
           "mock.global.canton.network.digitalasset.com",
-          "sv.mock.global.canton.network.digitalasset.com",
-          "*.sv.mock.global.canton.network.digitalasset.com",
           "validator.mock.global.canton.network.digitalasset.com",
           "*.validator.mock.global.canton.network.digitalasset.com",
           "validator1.mock.global.canton.network.digitalasset.com",
@@ -326,7 +230,11 @@
           "splitwell.mock.global.canton.network.digitalasset.com",
           "*.splitwell.mock.global.canton.network.digitalasset.com",
           "sv-2.mock.global.canton.network.digitalasset.com",
-          "*.sv-2.mock.global.canton.network.digitalasset.com"
+          "*.sv-2.mock.global.canton.network.digitalasset.com",
+          "sv-1.mock.global.canton.network.digitalasset.com",
+          "*.sv-1.mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com"
         ],
         "http": [
           {
@@ -355,8 +263,6 @@
                 ],
                 "sniHosts": [
                   "mock.global.canton.network.digitalasset.com",
-                  "sv.mock.global.canton.network.digitalasset.com",
-                  "*.sv.mock.global.canton.network.digitalasset.com",
                   "validator.mock.global.canton.network.digitalasset.com",
                   "*.validator.mock.global.canton.network.digitalasset.com",
                   "validator1.mock.global.canton.network.digitalasset.com",
@@ -364,7 +270,11 @@
                   "splitwell.mock.global.canton.network.digitalasset.com",
                   "*.splitwell.mock.global.canton.network.digitalasset.com",
                   "sv-2.mock.global.canton.network.digitalasset.com",
-                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                  "*.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sv-1.mock.global.canton.network.digitalasset.com",
+                  "*.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com"
                 ]
               }
             ],
@@ -505,7 +415,13 @@
       "namespace": "validator",
       "timeout": 600,
       "values": {
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME",
+            "value": "ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE"
+          }
+        ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -Dparticipantoption",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -575,6 +491,60 @@
       "version": "0.3.20"
     },
     "name": "validator-participant-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-party-allocator",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "party-allocator",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "jsonLedgerApiUrl": "http://participant-3:7575",
+        "keysDirectory": "/keys",
+        "maxParties": 1234,
+        "parallelism": 321,
+        "scanApiUrl": "http://scan-app.sv-1:5012",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "validatorApiUrl": "http://validator-app:5003"
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator-party-allocator",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

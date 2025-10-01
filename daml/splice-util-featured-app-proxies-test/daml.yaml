@@ -1,0 +1,37 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
+name: splice-util-featured-app-proxies-test
+description: |
+  Tests for the featured app proxies delivered as part of Splice.
+
+  Must be consumed by copying the source-code into the downstream project,
+  as Daml script code can currently not be shared via .dars across SDKs. The dependencies
+  are normal .dar files and can be shared by copying the .dars.
+  (TODO(#594): remove this limitation)
+source: daml
+version: 1.0.2
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
+  - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
+  - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
+  - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
+  - ../splice-util/.daml/dist/splice-util-current.dar
+  - ../splice-amulet/.daml/dist/splice-amulet-current.dar
+  - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+  - ../splice-util-featured-app-proxies/.daml/dist/splice-util-featured-app-proxies-current.dar
+build-options:
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches
+  - --target=2.1
+codegen:
+  java:
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceUtilFeaturedAppProxiesTest
+    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
+

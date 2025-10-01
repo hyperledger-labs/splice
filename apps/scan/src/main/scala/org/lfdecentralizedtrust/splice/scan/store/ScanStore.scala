@@ -172,12 +172,13 @@ trait ScanStore
 
   def lookupRoundOfLatestData()(implicit tc: TraceContext): Future[Option[(Long, Instant)]]
 
-  def ensureAggregated[T](asOfEndOfRound: Long)(f: => Future[T])(implicit
+  // ensures that data is aggregated at least up to and including asOfEndOfRound, passes the last round aggregated to f
+  def ensureAggregated[T](asOfEndOfRound: Long)(f: Long => Future[T])(implicit
       tc: TraceContext
   ): Future[T] = for {
     (lastRound, _) <- getRoundOfLatestData()
     result <-
-      if (lastRound >= asOfEndOfRound) f
+      if (lastRound >= asOfEndOfRound) f(lastRound)
       else Future.failed(roundNotAggregated())
   } yield result
 

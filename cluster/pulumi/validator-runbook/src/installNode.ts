@@ -20,7 +20,6 @@ import {
   fixedTokens,
   imagePullSecret,
   imagePullSecretByNamespaceName,
-  installLoopback,
   installSpliceRunbookHelmChart,
   installSpliceRunbookHelmChartByNamespaceName,
   installValidatorOnboardingSecret,
@@ -40,21 +39,12 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import {
-  installParticipant,
-  ValidatorNodeConfig,
-  ValidatorNodeConfigSchema,
-} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
-import _ from 'lodash';
 
-import { clusterSubConfig } from '../../common/src/config/configLoader';
-import {
-  VALIDATOR_MIGRATE_PARTY,
-  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
-  VALIDATOR_NEW_PARTICIPANT_ID,
-  VALIDATOR_PARTY_HINT,
-} from './utils';
+import { installPartyAllocator } from './partyAllocator';
+import { validatorConfig } from './validatorConfig';
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -67,9 +57,6 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
 
-const VALIDATOR_WALLET_USER_ID =
-  config.optionalEnv('VALIDATOR_WALLET_USER_ID') || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
-
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
     activeVersion.type === 'local'
@@ -77,18 +64,20 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
 
-  const xns = exactNamespace(RUNBOOK_NAMESPACE, true);
+  const xns = exactNamespace(validatorConfig.namespace, true);
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE,
+      namespace: validatorConfig.namespace,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,
     });
 
-  const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
+  const onboardingSecret = preApproveValidatorRunbook
+    ? validatorConfig.onboardingSecret
+    : undefined;
 
   const loopback = installLoopback(xns);
 
@@ -105,7 +94,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfig,
     topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
     otherDeps: [],
-    nodeIdentifier: 'validator-runbook',
   });
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
@@ -117,7 +105,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
-        svNamespace: RUNBOOK_NAMESPACE,
+        svNamespace: validatorConfig.namespace,
       },
       spliceDomainNames: {
         nameServiceDomain: ansDomainPrefix,
@@ -129,7 +117,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   );
 }
 
-type ValidatorConfig = {
+type ValidatorDeploymentConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
   onboardingSecret?: string;
@@ -140,14 +128,11 @@ type ValidatorConfig = {
   otherDeps: CnInput<pulumi.Resource>[];
   loopback: pulumi.Resource[] | null;
   backupConfigSecret?: pulumi.Resource;
-  nodeIdentifier: string;
 };
 
-export const validatorNodeConfig: ValidatorNodeConfig = ValidatorNodeConfigSchema.parse(
-  clusterSubConfig('validator')
-);
-
-async function installValidator(validatorConfig: ValidatorConfig): Promise<InstalledHelmChart> {
+async function installValidator(
+  validatorDeploymentConfig: ValidatorDeploymentConfig
+): Promise<InstalledHelmChart> {
   const {
     xns,
     onboardingSecret,
@@ -158,16 +143,11 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     backupConfigSecret,
     backupConfig,
     topupConfig,
-  } = validatorConfig;
+  } = validatorDeploymentConfig;
 
-  // TODO(DACH-NY/canton-network-node#14679): Remove the override once ciperiodic has been bumped to 0.2.0
-  const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
-  const postgresValues: ChartValues = _.merge(
-    loadYamlFromFile(
-      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
-    ),
-    { db: { volumeSize: postgresPvcSizeOverride } }
+  const postgresValues: ChartValues = loadYamlFromFile(
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
   );
   const postgres = new SplicePostgres(
     xns,
@@ -180,22 +160,14 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     supportsValidatorRunbookReset
   );
   const participantAddress = installParticipant(
-    validatorNodeConfig,
+    validatorConfig,
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
-    validatorConfig.nodeIdentifier,
     activeVersion,
     postgres,
     {
       dependsOn: imagePullDeps.concat([postgres]),
-      // aliases and ignore can be removed once base version > 0.2.1
-      aliases: [
-        {
-          name: 'participant',
-        },
-      ],
-      ignoreChanges: ['name'],
     }
   ).participantAddress;
 
@@ -223,7 +195,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
   const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-      OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
+      OPERATOR_WALLET_USER_ID: validatorConfig.operatorWalletUserId,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
       YOUR_CONTACT_POINT: daContactPoint,
@@ -233,13 +205,13 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
       {
         MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
-        YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier,
+        YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier || validatorConfig.partyHint,
       }
     ),
   };
 
   const newParticipantIdentifier =
-    VALIDATOR_NEW_PARTICIPANT_ID ||
+    validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
 
   const validatorValues: ChartValues = {
@@ -256,8 +228,8 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     participantAddress,
     participantIdentitiesDumpPeriodicBackup: backupConfig,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
-    validatorPartyHint: VALIDATOR_PARTY_HINT || 'digitalasset-testValidator-1',
-    migrateValidatorParty: VALIDATOR_MIGRATE_PARTY,
+    validatorPartyHint: validatorConfig.partyHint,
+    migrateValidatorParty: validatorConfig.migrateParty,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? {
           secretName: participantBootstrapDumpSecretName,
@@ -316,7 +288,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     )
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  return installSpliceRunbookHelmChart(
+  const validatorChart = installSpliceRunbookHelmChart(
     xns,
     'validator',
     'splice-validator',
@@ -324,4 +296,8 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     activeVersion,
     { dependsOn: dependsOn }
   );
+  if (validatorConfig?.partyAllocator.enable) {
+    installPartyAllocator(xns, validatorConfig.partyAllocator, [validatorChart]);
+  }
+  return validatorChart;
 }

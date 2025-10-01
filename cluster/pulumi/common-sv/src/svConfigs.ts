@@ -12,7 +12,8 @@ import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validato
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 import { StaticSvConfig } from './config';
-import { dsoSize } from './dsoConfig';
+import { dsoSize, skipExtraSvs } from './dsoConfig';
+import { configForSv, configuredExtraSvs } from './singleSvConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
@@ -37,9 +38,52 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
       svCometBftKeysFromSecret('sv15-cometbft-keys'),
       svCometBftKeysFromSecret('sv16-cometbft-keys'),
     ];
+
+// TODO(#1892): we can think about moving all of the values here to config.yaml ; it's a bit risky/expensive to test though
+const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): StaticSvConfig => {
+  const config = configForSv(nodeName);
+
+  const svCometBftSecretName = config.cometbft?.keysGcpSecret
+    ? config.cometbft.keysGcpSecret
+    : `${nodeName.replaceAll('-', '')}-cometbft-keys`;
+  const svCometBftSecrets = svCometBftKeysFromSecret(svCometBftSecretName);
+
+  return {
+    nodeName,
+    ingressName: config.subdomain!,
+    onboardingName: config.publicName!,
+    auth0ValidatorAppName: config.validatorApp?.auth0?.name
+      ? config.validatorApp.auth0.name
+      : `${nodeName}_validator`,
+    auth0ValidatorAppClientId: config.validatorApp?.auth0?.clientId,
+    auth0SvAppName: config.svApp?.auth0?.name ? config.svApp.auth0.name : nodeName,
+    auth0SvAppClientId: config.svApp?.auth0?.clientId,
+    validatorWalletUser: config.validatorApp?.walletUser,
+    cometBft: {
+      nodeIndex: cometBftNodeIndex,
+      id: config.cometbft!.nodeId!,
+      privateKey: svCometBftSecrets.nodePrivateKey,
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: config.cometbft!.validatorKeyAddress!,
+        privateKey: svCometBftSecrets.validatorPrivateKey,
+        publicKey: svCometBftSecrets.validatorPublicKey,
+      },
+    },
+    svIdKeySecretName: config.svApp?.svIdKeyGcpSecret,
+    cometBftGovernanceKeySecretName: config.svApp?.cometBftGovernanceKeyGcpSecret,
+    ...(config.validatorApp?.sweep
+      ? { sweep: sweepConfigFromEnv(config.validatorApp.sweep.fromEnv) }
+      : {}),
+    ...(config.scanApp?.bigQuery
+      ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } }
+      : {}),
+  };
+};
+
 // to generate new keys: https://cimain.network.canton.global/sv_operator/sv_helm.html#generating-your-cometbft-node-keys
 // TODO(DACH-NY/canton-network-internal#435): rotate the non-mainNet keys as they have been exposed in github (once mechanism is in place)
-export const svConfigs: StaticSvConfig[] = isMainNet
+export const standardSvConfigs: StaticSvConfig[] = isMainNet
   ? [
       {
         // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
@@ -378,7 +422,15 @@ export const svConfigs: StaticSvConfig[] = isMainNet
       },
     ];
 
-export const sv1Config: StaticSvConfig = svConfigs[0];
+// TODO(#1892): consider supporting overrides of hardcoded svs (in case we're keeping hardcoded svs at all)
+export const extraSvConfigs: StaticSvConfig[] = configuredExtraSvs.map((k, index) =>
+  // Note how we give the first extra SV the CometBFT node index of the first standard SV that we don't deploy.
+  fromSingleSvConfig(k, dsoSize + index + 1)
+);
+
+export const svConfigs = standardSvConfigs.concat(extraSvConfigs);
+
+export const sv1Config: StaticSvConfig = standardSvConfigs[0];
 
 export const svRunbookConfig: StaticSvConfig = {
   onboardingName: 'DA-Helm-Test-Node',
@@ -405,5 +457,10 @@ export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
   return asJson && JSON.parse(asJson);
 }
 
-export const coreSvsToDeploy = svConfigs.slice(0, dsoSize);
+// "core SVs" are deployed as part of the `canton-network` stack;
+// if config.yaml contains any SVs that don't match the standard sv-X pattern, we deploy them independently of DSO_SIZE
+export const coreSvsToDeploy: StaticSvConfig[] = standardSvConfigs
+  .slice(0, dsoSize)
+  .concat(skipExtraSvs ? [] : extraSvConfigs);
+
 export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);

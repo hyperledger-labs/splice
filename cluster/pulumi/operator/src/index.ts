@@ -12,7 +12,7 @@ import { installDeploymentStack } from './stacks/deployment';
 const deploymentStackReference = gitRepoForRef(
   'deployment',
   operatorDeploymentConfig.reference,
-  [{ project: 'deployment', stack: CLUSTER_BASENAME }],
+  [{ project: 'deployment', stack: `deployment.${CLUSTER_BASENAME}` }],
   false, // no notifications since this typically follows `main` and is too noisy
   [flux]
 );

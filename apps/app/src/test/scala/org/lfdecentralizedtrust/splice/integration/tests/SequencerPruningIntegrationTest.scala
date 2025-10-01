@@ -20,6 +20,8 @@ class SequencerPruningIntegrationTest
     with WalletTestUtil
     with ProcessTestUtil {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     super.environmentDefinition

@@ -67,6 +67,7 @@ monitoring:
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
+        quantile: 0.95
       # confirmation requests correspond to new ledger submissions;
       # we alert if the rate is higher than expected to spot potential overload situations
       confirmationRequests:
@@ -137,3 +138,9 @@ svs:
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true
+validators:
+  validator-runbook:
+    namespace: validator
+    nodeIdentifier: 'validator-runbook'
+    partyHint: 'digitalasset-testValidator-1'
+    onboardingSecret: 'validatorsecret'

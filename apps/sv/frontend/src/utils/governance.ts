@@ -1,31 +1,39 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
+import type {
   ActionRequiringConfirmation,
   AmuletRules_ActionRequiringConfirmation,
   DsoRules_ActionRequiringConfirmation,
+  DsoRules_SetConfig,
+  SvInfo,
   Vote,
+  VoteRequest,
   VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import dayjs, { Dayjs } from 'dayjs';
+import type { DsoInfo } from '@lfdecentralizedtrust/splice-common-frontend';
 import {
+  type Contract,
+  dateTimeFormatISO,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import dayjs, { type Dayjs } from 'dayjs';
+import type {
   AmuletRulesConfigProposal,
+  ConfigChange,
+  ConfigFormData,
   DsoRulesConfigProposal,
   FeatureAppProposal,
   OffBoardMemberProposal,
+  PendingConfigFieldInfo,
   Proposal,
+  ProposalListingStatus,
   SupportedActionTag,
   UnfeatureAppProposal,
   UpdateSvRewardWeightProposal,
-  ProposalListingStatus,
   YourVoteStatus,
-  ConfigFormData,
-  ConfigChange,
 } from '../utils/types';
-import { buildDsoConfigChanges } from './buildDsoConfigChanges';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
-import { DsoInfo } from '@lfdecentralizedtrust/splice-common-frontend';
+import { buildDsoConfigChanges } from './buildDsoConfigChanges';
 
 export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag, string> => ({
   CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
@@ -37,7 +45,10 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
 });
 
-export const createProposalActions: { name: string; value: SupportedActionTag }[] = [
+export const createProposalActions: {
+  name: string;
+  value: SupportedActionTag;
+}[] = [
   { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
   { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
   { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
@@ -67,7 +78,10 @@ export const getVoteResultStatus = (
   }
 };
 
-export function computeVoteStats(votes: Vote[]): { accepted: number; rejected: number } {
+export function computeVoteStats(votes: Vote[]): {
+  accepted: number;
+  rejected: number;
+} {
   return votes.reduce(
     (acc, vote) => ({
       accepted: acc.accepted + (vote.accept ? 1 : 0),
@@ -86,7 +100,7 @@ export function computeYourVote(votes: Vote[], svPartyId: string | undefined): Y
   return vote ? (vote.accept ? 'accepted' : 'rejected') : 'no-vote';
 }
 
-export function buildProposal(action: ActionRequiringConfirmation): Proposal {
+export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: DsoInfo): Proposal {
   if (action.tag === 'ARC_DsoRules') {
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
@@ -94,11 +108,17 @@ export function buildProposal(action: ActionRequiringConfirmation): Proposal {
         return {
           memberToOffboard: dsoAction.value.sv,
         } as OffBoardMemberProposal;
-      case 'SRARC_UpdateSvRewardWeight':
+      case 'SRARC_UpdateSvRewardWeight': {
+        const allSvInfos = dsoInfo?.dsoRules.payload.svs.entriesArray() || [];
+        const svPartyId = dsoInfo?.svPartyId || '';
+        const currentWeight = getSvRewardWeight(allSvInfos, svPartyId);
+
         return {
           svToUpdate: dsoAction.value.svParty,
+          currentWeight: currentWeight,
           weightChange: dsoAction.value.newRewardWeight,
         } as UpdateSvRewardWeightProposal;
+      }
       case 'SRARC_GrantFeaturedAppRight':
         return {
           provider: dsoAction.value.provider,
@@ -158,17 +178,53 @@ export function getInitialExpiration(dsoInfo: DsoInfo | undefined): Dayjs {
  **/
 export function configFormDataToConfigChanges(
   formData: ConfigFormData,
-  configChanges: ConfigChange[]
+  configChanges: ConfigChange[],
+  onlyChangedFields = true
 ): ConfigChange[] {
-  return configChanges
-    .map(change => {
-      const fieldState = formData[change.fieldName];
-      return {
-        fieldName: change.fieldName,
-        label: change.label,
-        currentValue: change.currentValue,
-        newValue: fieldState?.value || '',
-      } as ConfigChange;
+  const changes = configChanges.map(change => {
+    const fieldState = formData[change.fieldName];
+    return {
+      fieldName: change.fieldName,
+      label: change.label,
+      currentValue: change.currentValue,
+      newValue: fieldState?.value || '',
+    } as ConfigChange;
+  });
+
+  return onlyChangedFields
+    ? changes.filter(change => change.currentValue !== change.newValue)
+    : changes;
+}
+
+export function getSvRewardWeight(svs: [string, SvInfo][], svPartyId: string): string {
+  const svInfo = svs.find(sv => sv[0] === svPartyId);
+  return svInfo ? svInfo[1].svRewardWeight : '';
+}
+
+export function buildPendingConfigFields(
+  proposals: Contract<VoteRequest>[] | undefined
+): PendingConfigFieldInfo[] {
+  if (!proposals?.length) {
+    return [];
+  }
+
+  return proposals
+    .filter(proposal => {
+      const a = proposal.payload.action;
+      return a.tag === 'ARC_DsoRules' && a.value.dsoAction.tag === 'SRARC_SetConfig';
     })
-    .filter(change => change.currentValue !== change.newValue);
+    .flatMap(proposal => {
+      const dsoAction = (proposal.payload.action.value as ActionRequiringConfirmation.ARC_DsoRules)
+        .dsoAction.value as DsoRules_SetConfig;
+      const changes = buildDsoConfigChanges(dsoAction.baseConfig, dsoAction.newConfig);
+
+      return changes.map(change => ({
+        fieldName: change.fieldName,
+        pendingValue: change.newValue as string,
+        proposalCid: proposal.contractId,
+        effectiveDate: proposal.payload.targetEffectiveAt
+          ? dayjs(proposal.payload.targetEffectiveAt).format(dateTimeFormatISO)
+          : 'Threshold',
+      }));
+    });
 }

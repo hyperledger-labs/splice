@@ -11,6 +11,191 @@ Release Notes
 Upcoming
 --------
 
+  - Docker images
+
+    - All app & UI images now use a non-root user.
+
+  - SV
+
+    - Deployment
+
+      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps. This should avoid issues with cpu scheduling that might lead to performance degradations.
+
+    - UI
+
+      - When updating the ``AmuletRules`` config, the UI will omit any transfer fee steps with value zero from the ``AmuletRules`` config stored on-ledger.
+        Thereby making the ``AmuletRules`` contract smaller and saving traffic for transactions using it.
+        This is motivated by `CIP-0078 CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__ .
+
+  - Splice apps
+
+       - Removed the `ingest-from-participant-begin` and `ingest-update-history-from-participant-begin` from splice apps,
+         and the corresponding `disableIngestUpdateHistoryFromParticipantBegin` from helm charts.
+
+  - Canton and SDK:
+
+     - Introduction of 2 new alpha primitives in ``DA.Crypto.Text`` Module
+       in SDK version ``3.3.0-snapshot.20250930.0``. Note: To make use
+       of the functionality added here, you must compile against SDK
+       version ``3.3.0-snapshot.20250930.0`` and newer and you must
+       first upgrade Canton to the version in Splice ``0.4.19`` before you can
+       upload those dars to your validator.
+
+       - sha256 : BytesHex -> BytesHex: Computes the SHA-256 hash of
+         the given hexadecimal bytes.
+
+       - secp256k1WithEcdsaOnly : SignatureHex -> BytesHex ->
+         PublicKeyHex -> Bool: Verifies an ECDSA signature on the
+         secp256k1 curve, checking if the signature matches the
+         message and public key.
+
+0.4.18
+------
+
+  - Daml
+
+    - release ``splice-util-featured-app-proxies-1.1.0`` with
+      support for a ``WalletUserProxy``, which simplifies
+      the creation of featured app activity markers for wallet app providers
+      when their users engage in token standard workflows.
+    - Implement Daml changes for `CIP-0079 - Demonstrate Third-Party Price Feed Integration for CC Listing <https://github.com/global-synchronizer-foundation/cips/pull/101/files>`__:
+
+       These Daml changes require an upgrade to the following Daml versions:
+
+       ================== =======
+       name               version
+       ================== =======
+       amulet             0.1.14
+       amuletNameService  0.1.15
+       dsoGovernance      0.1.20
+       validatorLifecycle 0.1.5
+       wallet             0.1.14
+       walletPayments     0.1.14
+       ================== =======
+
+  - Scan
+
+    - Performance bugfix for the ``/v0/wallet-balance`` endpoint, especially when requesting a balance for a party that does not exist, which previously would timeout.
+
+  - UIs
+
+    - Implement changes from CIP-78 CC Fee Removal.
+
+0.4.17
+------
+
+.. important::
+
+    **Action required from app devs:**
+
+    1. **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.14`` must recompile their Daml code
+       to link against ``splice-amulet >= 0.1.14``.
+
+       The reason being that earlier versions of the ``AmuletRules`` template
+       do not support setting the transfer fees to zero. Attempting to downgrade to them will raise a
+       ``PRECONDITION_FAILED`` error stating that the ``ensure`` clause evaluated to ``false``.
+
+       No change is required for apps that build against the :ref:`token_standard`
+       or :ref:`featured_app_activity_markers_api`.
+
+    2. **App devs whose app predicts holding fees on transfers** must adjust their code to
+       no longer expect any holding fees once this Daml change gets voted in.
+
+       The simplest option is to make your code independent of whether the change was voted in
+       by removing the prediction of holding fees. You can instead
+       extract the actual holding fees charged from the transfer transaction itself;
+       i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+       of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+       of the ``TransferResult``.
+
+- Daml
+
+  - Implement Daml changes for `CIP-0078 - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__:
+
+     - Change all Amulet transfers to not charge holding fees on inputs.
+     - Fix a bug in the ``ensure`` clause of ``AmuletRules`` that prevented
+       setting the Amulet transfer fees to zero.
+     - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
+       that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
+
+     These Daml changes require an upgrade to the following Daml versions **before**
+     voting to set the transfer fees to zero:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.14
+     amuletNameService  0.1.14
+     dsoGovernance      0.1.19
+     validatorLifecycle 0.1.5
+     wallet             0.1.14
+     walletPayments     0.1.14
+     ================== =======
+
+- Canton
+
+  - Add ``CanExecuteAs`` and ``CanExecuteAsAnyParty`` user rights that can be used for the
+    ``InteractiveSubmissionService/ExecuteSubmission`` endpoint. ``CanActAs`` permissions imply
+    ``CanExecuteAs`` so this is backwards compatible.
+
+- Validator
+
+  - Expose ``/dso`` endpoint from scan proxy
+
+- Wallet
+
+  - Do not deduct holding fees from available balance if ``splice-amulet >= 0.1.14``
+    is configured in the ``AmuletConfig`` of the network.
+
+- Deployment
+
+  - Participant
+
+     - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
+  - Validator
+
+    - Allow disabling the deployment of ``ans-web-ui`` and ``wallet-web-ui`` in the ``splice-validator`` helm chart by setting
+      ``.ansWebUi.enabled`` and ``validatorWebUi.enabled`` to ``false``.
+      Thanks to Marcin Kocur for contributing this change in https://github.com/hyperledger-labs/splice/pull/2171
+
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+
+- Community docs
+
+  - Add :ref:`Keycloak Configuration Guide for Validators <keycloak_canton_validator_config_guide>`.
+    Thanks to mikeProDev for contributing this change in https://github.com/hyperledger-labs/splice/pull/2247
+
+0.4.16
+------
+
+- Daml
+
+  - Add the ``splice-util-featured-app-proxies``
+    :ref:`package <featured_app_activity_markers_api>` to simplify
+    the creation of featured app activity markers for token standard actions.
+    This is a utility package that is not uploaded by default to a validator node.
+    An example use-case for this package is an exchange that wants to
+    `earn app rewards on deposits and withdrawals <https://docs.digitalasset.com/integrate/devnet/exchange-integration/extensions.html>`__
+    of CN token standard tokens.
+
+- Docs
+
+  - SV
+
+    - Document process for :ref:`ignoring party IDs for reward expiry automation <sv_ops_ignored_rewards_party_ids>`
+      that is currently recommended after each Daml upgrade,
+      to reduce the impact of validators that are unable to complete
+      the Daml upgrade due to being on an outdated version of Splice.
+
+    - Make the filter for ignoring party ids for reward expiry automation also ignore beneficiaries for SV reward coupons so
+      that it is not required to ignore the SV if only one beneficiary has problems.
+
+0.4.15
+------
+
 - Canton
 
     - SV
@@ -20,6 +205,10 @@ Upcoming
 
         - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
           a prepared transaction can be used.
+        - Add an alpha version of ``com.daml.ledger.api.v2.admin.PartyManagementService/GenerateExternalPartyTopology`` and
+          ``com.daml.ledger.api.v2.admin.PartyManagementService/AllocateExternalParty``. These endpoints can be used instead of
+          the validator endpoints ``/v0/admin/external-party/topology/generate`` and ``/v0/admin/external-party/topology/submit``
+          and will eventually supersede them.
 
 - Docs
 
@@ -34,10 +223,13 @@ Upcoming
      - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
      - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
 
-  - Splice apps
+0.4.14
+------
 
-     - Removed the `ingest-from-participant-begin` and `ingest-update-history-from-participant-begin` from splice apps,
-       and the corresponding `disableIngestUpdateHistoryFromParticipantBegin` from helm charts.
+- SV app
+
+   - Add the option to ignore certain parties when running expiry on reward contracts. This can added to the app configuration. Example: ``canton.sv-apps.sv.automation.ignored-expired-rewards-party-ids = [ "test-party::1220b3eeb21b02e14945e419c5d9e986ce8102171c50e1444010ab054e11eba262c9" ]``
+
 
 0.4.13
 ------

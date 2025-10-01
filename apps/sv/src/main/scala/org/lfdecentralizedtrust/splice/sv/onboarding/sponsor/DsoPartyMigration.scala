@@ -14,15 +14,16 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.DsoPartyMigrationFailure
-import org.lfdecentralizedtrust.splice.sv.store.{SvSvStore, SvDsoStore}
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -75,7 +76,8 @@ class DsoPartyMigration(
       decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
     def submitDummyTransaction(): Future[Unit] =
-      svStoreWithIngestion.connection
+      svStoreWithIngestion
+        .connection(SpliceLedgerConnectionPriority.Low)
         .submit(
           Seq(svParty),
           Seq.empty,

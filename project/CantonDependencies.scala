@@ -43,7 +43,7 @@ object CantonDependencies {
 
   lazy val circe_version = "0.14.2"
 
-  lazy val scalatest_version = "3.2.11"
+  lazy val scalatest_version = "3.2.19"
   lazy val scalacheck_version = "1.15.4"
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
@@ -157,7 +157,7 @@ object CantonDependencies {
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
   lazy val scalaz_core = "org.scalaz" %% "scalaz-core" % scalaz_version
   lazy val scalatestScalacheck =
-    "org.scalatestplus" %% "scalacheck-1-15" % (scalatest_version + ".0")
+    "org.scalatestplus" %% "scalacheck-1-18" % (scalatest_version + ".0")
   lazy val mockito_scala = "org.mockito" %% "mockito-scala" % mockito_scala_version
   lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % ("3.2.10.0")
 
@@ -231,7 +231,7 @@ object CantonDependencies {
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
 
-  lazy val testcontainers_version = "1.15.1"
+  lazy val testcontainers_version = "1.15.3"
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
   lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
 

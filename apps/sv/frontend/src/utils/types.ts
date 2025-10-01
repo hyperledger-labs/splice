@@ -1,17 +1,17 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ContractId } from '@daml/types';
-import {
+import type { ContractId } from '@daml/types';
+import type {
   ActionRequiringConfirmation,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { ConfigFieldState } from '../components/form-components/ConfigField';
-import { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
-import { OffboardSvFormData } from '../components/forms/OffboardSvForm';
-import { GrantRevokeFeaturedAppFormData } from '../components/forms/GrantRevokeFeaturedAppForm';
-import { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
-import { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
+import type { ConfigFieldState } from '../components/form-components/ConfigField';
+import type { GrantRevokeFeaturedAppFormData } from '../components/forms/GrantRevokeFeaturedAppForm';
+import type { OffboardSvFormData } from '../components/forms/OffboardSvForm';
+import type { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
+import type { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
+import type { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
 
 export interface OffBoardMemberProposal {
   memberToOffboard: string;
@@ -35,11 +35,11 @@ export interface ConfigChange {
    */
   fieldName: string;
   /**
-   * A label that can displayed to the user
+   * A label that can be displayed to the user
    */
   label: string;
   currentValue: string;
-  newValue: string | number;
+  newValue: string;
   /**
    * If the field is an id, e.g a party id.
    */
@@ -48,6 +48,7 @@ export interface ConfigChange {
 
 export interface UpdateSvRewardWeightProposal {
   svToUpdate: string;
+  currentWeight: string;
   weightChange: string;
 }
 
@@ -87,7 +88,10 @@ export type ProposalDetails = {
   isVoteRequest?: boolean;
 } & {
   // Use types to enforce the right proposal params for the selected action.
-  [Tag in keyof ProposalActionMap]: { action: Tag; proposal: ProposalActionMap[Tag] };
+  [Tag in keyof ProposalActionMap]: {
+    action: Tag;
+    proposal: ProposalActionMap[Tag];
+  };
 }[keyof ProposalActionMap];
 
 export interface ProposalVotingInformation {
@@ -120,7 +124,7 @@ export type ProposalListingStatus =
 export interface ProposalListingData {
   contractId: ContractId<VoteRequest>;
   actionName: string;
-  votingCloses: string;
+  votingThresholdDeadline: string;
   voteTakesEffect: string;
   yourVote: YourVoteStatus;
   status: ProposalListingStatus;
@@ -179,3 +183,10 @@ export type NonConfigProposalFormData =
 export type ConfigProposalFormData = SetDsoConfigCompleteFormData | SetAmuletConfigCompleteFormData;
 
 export type ProposalFormData = NonConfigProposalFormData | ConfigProposalFormData;
+
+export interface PendingConfigFieldInfo {
+  fieldName: string;
+  pendingValue: string;
+  proposalCid: string;
+  effectiveDate: string;
+}

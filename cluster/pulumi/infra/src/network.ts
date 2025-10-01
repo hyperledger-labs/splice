@@ -14,6 +14,7 @@ import {
   isDevNet,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { svConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 import { gcpDnsProject } from './config';
 
@@ -180,31 +181,16 @@ function clusterCertificate(
   });
 
   const certDnsNames = dnsNames
-    .map(dnsName => [
-      `${dnsName}`,
-      `*.${dnsName}`,
-      `*.validator.${dnsName}`,
-      `*.validator1.${dnsName}`,
-      `*.splitwell.${dnsName}`,
-      `*.${dnsName}`,
-      `*.sv-2.${dnsName}`,
-      `*.sv-2-eng.${dnsName}`,
-      `*.sv-3-eng.${dnsName}`,
-      `*.sv-4-eng.${dnsName}`,
-      `*.sv-5-eng.${dnsName}`,
-      `*.sv-6-eng.${dnsName}`,
-      `*.sv-7-eng.${dnsName}`,
-      `*.sv-8-eng.${dnsName}`,
-      `*.sv-9-eng.${dnsName}`,
-      `*.sv-10-eng.${dnsName}`,
-      `*.sv-11-eng.${dnsName}`,
-      `*.sv-12-eng.${dnsName}`,
-      `*.sv-13-eng.${dnsName}`,
-      `*.sv-14-eng.${dnsName}`,
-      `*.sv-15-eng.${dnsName}`,
-      `*.sv-16-eng.${dnsName}`,
-      `*.sv.${dnsName}`,
-    ])
+    .map(dnsName =>
+      [
+        `${dnsName}`,
+        `*.${dnsName}`,
+        `*.validator.${dnsName}`,
+        `*.validator1.${dnsName}`,
+        `*.splitwell.${dnsName}`,
+        `*.sv.${dnsName}`,
+      ].concat(svConfigs.map(sv => `*.${sv.ingressName}.${dnsName}`))
+    )
     .flat();
 
   return new k8s.apiextensions.CustomResource(

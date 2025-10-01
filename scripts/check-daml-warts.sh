@@ -15,6 +15,8 @@ set -euo pipefail
 ignored_files=(
   'daml/splice-util/daml/Splice/Util.daml'
   'token-standard/examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml'
+  'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/DelegateProxy.daml'
+  'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/WalletUserProxy.daml'
   'canton/')
 
 command=('git' 'grep' '-n' -E '(exercise.*_Fetch|fetch|archive)\b' '--' '*.daml')
