@@ -43,7 +43,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       .withScanDisabledMiningRoundsCache()
       .withAmuletPrice(walletAmuletPrice)
 
-  override def walletAmuletPrice = SpliceUtil.damlDecimal(0.00001)
+  def coinPrice = BigDecimal(0.00001)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(coinPrice)
 
   override protected def runTokenStandardCliSanityCheck = false
 
@@ -60,12 +61,18 @@ class ScanTotalSupplyBigQueryIntegrationTest
     )
   }
   private val functionsDatasetName = s"functions_$uuid"
+  private val dashboardsDatasetName = s"dashboards_$uuid"
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("2587519.0258740704")
-  private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
+  private val mintedAppRewardsAmount = BigDecimal(0)
+  private val mintedValidatorRewardsAmount = BigDecimal("152207.0015220704")
+  private val mintedSvRewardsAmount = BigDecimal("2435312.024352")
+  private val mintedUnclaimedsAmount = BigDecimal(0)
+  private val mintedAmount =
+    mintedAppRewardsAmount + mintedValidatorRewardsAmount + mintedSvRewardsAmount + mintedUnclaimedsAmount
+  private val aliceValidatorMintedAmount = BigDecimal("26051.7503805176")
   private val lockedAmount = BigDecimal("5000")
-  private val burnedAmount = BigDecimal("60032.83108")
+  private val burnedAmount = BigDecimal("60010")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("570776.255709163")
   private val amuletHolders = 5
@@ -95,6 +102,17 @@ class ScanTotalSupplyBigQueryIntegrationTest
         .setDefaultTableLifetime(1.hour.toMillis)
         .build()
     bigquery.create(functionsDatasetInfo)
+
+    // Note that the dashboard tables are never actually populated in this test,
+    // but we do test creating them from the codegen'ed schemas, and creating the
+    // functions and procedures for populating them, so we get some sanity check
+    // on the queries for syntax and type errors.
+    val dashboardsDatasetInfo =
+      bq.DatasetInfo
+        .newBuilder(dashboardsDatasetName)
+        .setDefaultTableLifetime(1.hour.toMillis)
+        .build()
+    bigquery.create(dashboardsDatasetInfo)
   }
 
   private[this] def inferBQUser(): String = {
@@ -113,6 +131,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     // Delete the temporary BigQuery datasets after tests
     bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
     super.afterAll()
   }
 
@@ -480,7 +499,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val sqlFile = sqlDir.resolve("functions.sql")
 
     val ret = Process(
-      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${sqlFile.toAbsolutePath}",
+      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${dashboardsDatasetName} ${sqlFile.toAbsolutePath}",
       new File("cluster/pulumi/canton-network"),
     ).!
     if (ret != 0) {
@@ -511,7 +530,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
     val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
     val sql =
-      s"SELECT * FROM `$project.$functionsDatasetName.all_stats`('$timestamp', 0);"
+      s"SELECT * FROM `$project.$functionsDatasetName.all_dashboard_stats`('$timestamp', 0);"
 
     logger.info(s"Querying all stats as of $timestamp")
 
@@ -539,13 +558,18 @@ class ScanTotalSupplyBigQueryIntegrationTest
       unlocked: BigDecimal,
       currentSupplyTotal: BigDecimal,
       unminted: BigDecimal,
-      minted: BigDecimal,
-      allowedMint: BigDecimal,
+      mintedAppRewards: BigDecimal,
+      mintedValidatorRewards: BigDecimal,
+      mintedSvRewards: BigDecimal,
+      mintedUnclaimed: BigDecimal,
       burned: BigDecimal,
       numAmuletHolders: Long,
       numActiveValidators: Long,
       avgTps: Double,
       peakTps: Double,
+      minCoinPrice: BigDecimal,
+      maxCoinPrice: BigDecimal,
+      avgCoinPrice: BigDecimal,
   )
 
   private def parseQueryResults(result: bq.TableResult) = {
@@ -577,13 +601,18 @@ class ScanTotalSupplyBigQueryIntegrationTest
       unlocked = bd("unlocked"),
       currentSupplyTotal = bd("current_supply_total"),
       unminted = bd("unminted"),
-      minted = bd("minted"),
-      allowedMint = bd("allowed_mint"),
-      burned = bd("burned"),
+      mintedAppRewards = bd("daily_mint_app_rewards"),
+      mintedValidatorRewards = bd("daily_mint_validator_rewards"),
+      mintedSvRewards = bd("daily_mint_sv_rewards"),
+      mintedUnclaimed = bd("daily_mint_unclaimed_activity_records"),
+      burned = bd("daily_burn"),
       numAmuletHolders = int("num_amulet_holders"),
       numActiveValidators = int("num_active_validators"),
       avgTps = float("average_tps"),
       peakTps = float("peak_tps"),
+      minCoinPrice = bd("daily_min_coin_price"),
+      maxCoinPrice = bd("daily_max_coin_price"),
+      avgCoinPrice = bd("daily_avg_coin_price"),
     )
   }
 
@@ -592,15 +621,20 @@ class ScanTotalSupplyBigQueryIntegrationTest
     forEvery(
       Seq(
         // base metrics
-        ("minted", results.minted, mintedAmount),
+        ("minted_appRewards", results.mintedAppRewards, mintedAppRewardsAmount),
+        ("minted_validatorRewards", results.mintedValidatorRewards, mintedValidatorRewardsAmount),
+        ("minted_svRewards", results.mintedSvRewards, mintedSvRewardsAmount),
+        ("minted_unclaimed", results.mintedUnclaimed, mintedUnclaimedsAmount),
         ("locked", results.locked, lockedAmount),
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
-        ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
         ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
         ("num_active_validators", results.numActiveValidators, validators),
+        ("daily_min_coin_price", results.minCoinPrice, coinPrice),
+        ("daily_max_coin_price", results.maxCoinPrice, coinPrice),
+        ("daily_avg_coin_price", results.avgCoinPrice, coinPrice),
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue

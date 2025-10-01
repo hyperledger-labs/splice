@@ -7,7 +7,7 @@ import {
 } from "../apis/ledger-api-utils";
 import { InterfaceId } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
-import { JsGetActiveContractsResponse } from "canton-json-api-v2-openapi";
+import { JsGetActiveContractsResponse } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 
 export async function listContractsByInterface(
   interfaceId: InterfaceId,

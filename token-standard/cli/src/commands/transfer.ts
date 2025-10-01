@@ -1,12 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ExerciseCommand } from "canton-json-api-v2-openapi";
+import { ExerciseCommand } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 import dayjs from "dayjs";
 import {
   createConfiguration,
   ServerConfiguration,
   DefaultApi as TransferFactoryAPI,
-} from "transfer-instruction-openapi";
+} from "@lfdecentralizedtrust/transfer-instruction-openapi";
 import {
   createLedgerApiClient,
   filtersByParty,

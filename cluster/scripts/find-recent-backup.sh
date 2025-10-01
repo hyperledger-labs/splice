@@ -120,7 +120,7 @@ function main() {
   local internal=$3
 
   case "$namespace" in
-      sv-1|sv-2|sv-3|sv-4)
+      sv-1|sv-2|sv-3|sv-4|sv-da-1)
           is_sv=true
           full_instance="$namespace-cn-apps-pg"
           expected_components="cn-apps sequencer participant mediator"

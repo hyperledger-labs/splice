@@ -8,8 +8,8 @@ import {
   domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
+  getAdditionalJvmOptions,
   installSpliceHelmChart,
-  jmxOptions,
   loadYamlFromFile,
   LogLevel,
   sanitizedForPostgres,
@@ -71,6 +71,7 @@ abstract class InStackDecentralizedSynchronizerNode
         },
     version: CnChartVersion,
     logLevel?: LogLevel,
+    logLevelStdout?: LogLevel,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -94,6 +95,7 @@ abstract class InStackDecentralizedSynchronizerNode
         ...decentralizedSynchronizerValues,
         ...{
           logLevel: logLevel,
+          logLevelStdout: logLevelStdout,
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
             persistence: {
@@ -126,8 +128,8 @@ abstract class InStackDecentralizedSynchronizerNode
             },
           },
           livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,
-          additionalJvmOptions: jmxOptions(),
-          pvc: spliceConfig.configuration.persistentSequencerHeapDumps
+          additionalJvmOptions: getAdditionalJvmOptions(svConfig.sequencer?.additionalJvmOptions),
+          pvc: spliceConfig.configuration.persistentHeapDumps
             ? {
                 size: '10Gi',
                 volumeStorageClass: 'standard-rwo',
@@ -227,6 +229,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       },
       version,
       svConfig.logging?.cantonLogLevel,
+      svConfig.logging?.cantonStdoutLogLevel,
       imagePullServiceAccountName,
       opts
     );
@@ -246,7 +249,6 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     },
     active: boolean,
     version: CnChartVersion,
-    logLevel?: LogLevel,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -261,7 +263,8 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
         externalPort: 443,
       },
       version,
-      logLevel,
+      svConfig.logging?.cantonLogLevel,
+      svConfig.logging?.cantonStdoutLogLevel,
       imagePullServiceAccountName,
       opts
     );

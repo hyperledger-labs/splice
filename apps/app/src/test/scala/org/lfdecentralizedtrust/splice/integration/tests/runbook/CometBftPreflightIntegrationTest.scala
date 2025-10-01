@@ -5,7 +5,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import java.net.{InetSocketAddress, Socket}
 import scala.util.Using
 
-/** Preflight test that makes sure that the cometBFT nodes of *our* SVs (1-4) have initialized fine.
+/** Preflight test that makes sure that the cometBFT nodes of *our* SVs (1-3 + DA-1) have initialized fine.
   */
 class CometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
@@ -34,8 +34,8 @@ class CometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironm
   }
 
   "All svs have their CometBFT nodes set as validators" in { env =>
-    for (i <- 1 to 4) {
-      val sv = env.svs.remote.find(sv => sv.name == s"sv$i").value
+    for (svName <- Seq("sv1", "sv2", "sv3", "svda1")) {
+      val sv = env.svs.remote.find(sv => sv.name == svName).value
       eventuallySucceeds() {
         sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
       }

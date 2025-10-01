@@ -11,6 +11,7 @@ import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  ListOngoingValidatorOnboardingsResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
 } from '@lfdecentralizedtrust/sv-openapi';
@@ -21,6 +22,8 @@ import {
   voteResultsAmuletRules,
   voteResultsDsoRules,
 } from '../constants';
+import { ValidatorOnboarding } from '@daml.js/splice-validator-lifecycle/lib/Splice/ValidatorOnboarding/module';
+import { ContractId } from '@daml/types';
 
 export const buildSvMock = (svUrl: string): RestHandler[] => [
   rest.get(`${svUrl}/v0/admin/authorization`, (_, res, ctx) => {
@@ -182,8 +185,31 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
 
   rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-    return res(ctx.json<FeatureSupportResponse>({ my_feature: false }));
+    return res(ctx.json<FeatureSupportResponse>({ no_holding_fees_on_transfers: false }));
   }),
 
   validatorLicensesHandler(svUrl),
+  rest.get(`${svUrl}/v0/admin/validator/onboarding/ongoing`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListOngoingValidatorOnboardingsResponse>({
+        ongoing_validator_onboardings: [
+          {
+            encoded_secret: 'encoded_secret',
+            contract: {
+              template_id:
+                '455dd4533c2dd0131fb349c93d9d35f3670901d13efadb0aa9b975d35b41dbb2:Splice.ValidatorOnboarding:ValidatorOnboarding',
+              contract_id: 'validatorOnboardingCid' as ContractId<ValidatorOnboarding>,
+              payload: {
+                sv: 'svParty',
+                candidateSecret: 'candidate_secret',
+                expiresAt: '2024-08-05T13:44:35.878681Z',
+              },
+              created_event_blob: '',
+              created_at: '2024-08-05T13:44:35.878681Z',
+            },
+          },
+        ],
+      })
+    );
+  }),
 ];

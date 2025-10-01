@@ -516,7 +516,16 @@ class DbSvDsoStore(
     val opName = s"list${templateId.getEntityName}GroupedByRound"
     val partyFilter =
       if (ignoredParties.nonEmpty)
-        (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+        companion match {
+          case SvRewardCoupon.COMPANION =>
+            // only SV reward coupons have a beneficiary field
+            (sql"and reward_party not in " ++ inClause(ignoredParties) ++
+              sql" and create_arguments ->> 'beneficiary' not in " ++ inClause(
+                ignoredParties
+              )).toActionBuilder
+          case _ =>
+            (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+        }
       else sql""
     waitUntilAcsIngested {
       for {
@@ -821,10 +830,43 @@ class DbSvDsoStore(
       } yield limited.map(contractFromRow(SvOnboardingRequest.COMPANION)(_))
     }
 
-  override protected def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
-      companion: Template[Id, T]
-  )(amulet: T => Amulet): ListExpiredContracts[Id, T] = (_, limit) =>
-    implicit tc =>
+  override def listExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] = {
+    val filterClause = if (ignoredParties.nonEmpty) {
+      (sql" and create_arguments->>'owner' not in " ++ inClause(ignoredParties)).toActionBuilder
+    } else {
+      sql""
+    }
+    listExpiredRoundBased(splice.amulet.Amulet.COMPANION, filterClause)
+  }
+
+  override def listLockedExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet] = {
+    import slick.jdbc.*
+    import java.sql.JDBCType
+    // slick does not have builtin array conversions so we add an ad-hoc one here.
+    implicit val stringArraySetParameter: SetParameter[Array[String]] =
+      (strings: Array[String], pp: PositionedParameters) =>
+        pp.setObject(
+          pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
+          JDBCType.ARRAY.getVendorTypeNumber,
+        )
+    val filterClause = if (ignoredParties.nonEmpty) {
+      (sql" and create_arguments->'amulet'->>'owner' not in " ++ inClause(ignoredParties) ++
+        sql" and not (create_arguments->'lock'->'holders' ??| ${ignoredParties.map(_.toProtoPrimitive).toArray: Array[String]})").toActionBuilder
+    } else {
+      sql""
+    }
+    listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION, filterClause)
+  }
+
+  private def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
+      companion: Template[Id, T],
+      extraFilter: SQLActionBuilder,
+  ): ListExpiredContracts[Id, T] = (_, limit) =>
+    implicit tc => {
       waitUntilAcsIngested {
         for {
           synchronizerId <- getDsoRules().map(_.domain)
@@ -834,7 +876,7 @@ class DbSvDsoStore(
               acsStoreId,
               domainMigrationId,
               companion,
-              additionalWhere = sql"""
+              additionalWhere = (sql"""
                 and assigned_domain = $synchronizerId
                 and acs.amulet_round_of_expiry <= (
                   select mining_round - 2
@@ -846,7 +888,7 @@ class DbSvDsoStore(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
                     and mining_round is not null
-                  order by mining_round desc limit 1)""",
+                  order by mining_round desc limit 1)""" ++ extraFilter).toActionBuilder,
               orderLimit = sql"""order by mining_round desc limit ${sqlLimit(limit)}""",
             ),
             "listExpiredRoundBased",
@@ -854,6 +896,7 @@ class DbSvDsoStore(
           assigned = rows.map(assignedContractFromRow(companion)(_))
         } yield assigned
       }
+    }
 
   override def listMemberTrafficContracts(
       memberId: Member,
@@ -1461,6 +1504,34 @@ class DbSvDsoStore(
     )
     listConfirmationsByActionConfirmer(expectedAction, confirmer)
   }
+
+  override def lookupAmuletConversionRateFeed(
+      publisher: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.ContractId,
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
+  ]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .querySingle(
+            selectFromAcsTable(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION,
+              where = sql"""
+                    conversion_rate_feed_publisher = $publisher
+                  """,
+              orderLimit = sql" order by event_number desc limit 1",
+            ).headOption,
+            "lookupAmuletConversionRateFeed",
+          )
+          .value
+      } yield result.map(
+        contractFromRow(splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION)(_)
+      )
+    }
 
   override def close(): Unit = {
     dsoStoreMetrics.close()

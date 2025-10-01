@@ -190,6 +190,10 @@ case class ValidatorAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
+    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // it will never send a time proof.
+    timeTrackerObservationLatency: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(5),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
     participantPruningSchedule: Option[ParticipantPruningConfig] = None,
@@ -202,7 +206,11 @@ case class ValidatorAppBackendConfig(
     // distributed between 0 and the maximum delay) to ensure that not
     // all validators submit the transaction at the same time
     // overloading the network.
-    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
+    // 24h is chosen to be long enough to avoid a load spike (it's ~86k seconds so assuming it's 1 topology transaction/s on average for 86k validators)
+    // but short enough to allow for node downtime and other issues.
+    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
+    // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
+    latestPackagesOnly: Boolean = false,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

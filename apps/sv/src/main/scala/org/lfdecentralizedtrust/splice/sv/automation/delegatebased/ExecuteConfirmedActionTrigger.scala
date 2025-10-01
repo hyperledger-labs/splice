@@ -43,6 +43,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.StampedLockWithHandle
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -138,7 +139,8 @@ class ExecuteConfirmedActionTrigger(
                         )
                       )
                       res <- for {
-                        outcome <- svTaskContext.connection
+                        outcome <- svTaskContext
+                          .connection(SpliceLedgerConnectionPriority.High)
                           .submit(
                             Seq(store.key.svParty),
                             Seq(store.key.dsoParty),

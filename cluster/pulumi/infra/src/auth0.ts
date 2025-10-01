@@ -3,19 +3,22 @@
 import * as auth0 from '@pulumi/auth0';
 import * as pulumi from '@pulumi/pulumi';
 import {
-  Auth0ClusterConfig,
-  NamespaceToClientIdMapMap,
   ansDomainPrefix,
+  AudienceMap,
+  Auth0Config,
+  Auth0ClusterConfig,
+  ClientIdMap,
   config,
   isMainNet,
+  NamespaceToClientIdMapMap,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { standardSvConfigs, extraSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 function newUiApp(
   resourceName: string,
   name: string,
   description: string,
   urlPrefixes: string[],
-  // TODO(DACH-NY/canton-network-node#12169) Make ingressName the same as the namespace (and rename this argument back to namespace)
   ingressName: string,
   clusterBasename: string,
   clusterDnsNames: string[],
@@ -59,7 +62,160 @@ function newUiApp(
   return ret;
 }
 
-function spliceAuth0(clusterBasename: string, dnsNames: string[]) {
+interface BackendAuth0Params {
+  name: string;
+  clientId: string;
+}
+interface svAuth0Params {
+  namespace: string;
+  description: string;
+  ingressName: string;
+  // if these are not provided we rely on the client ID being added separately
+  svBackend?: BackendAuth0Params;
+  validatorBackend?: BackendAuth0Params;
+}
+interface ApiAudienceAuth0Params {
+  ledger: string;
+  sv: string;
+  validator: string;
+}
+function svsOnlyAuth0(
+  clusterBasename: string,
+  dnsNames: string[],
+  provider: auth0.Provider,
+  svs: svAuth0Params[],
+  auth0Domain: string,
+  auth0MgtClientId: string,
+  fixedTokenCacheName: string,
+  // only "same audiences for all" supported for now
+  apiAudiences?: ApiAudienceAuth0Params
+): pulumi.Output<Auth0Config> {
+  const svUis = svs.map(sv =>
+    newUiApp(
+      `${sv.namespace.replace(/-/g, '')}UiApp`,
+      `${sv.namespace.replace(/-/g, '').toUpperCase()} UI`,
+      `Used for the Wallet, ANS and SV UIs for ${sv.description}`,
+      ['wallet', ansDomainPrefix, 'sv'],
+      sv.ingressName,
+      clusterBasename,
+      dnsNames,
+      provider
+    ).id.apply(appId => ({ ns: sv.namespace, id: appId }))
+  );
+
+  const nsToUiToCLientIdOutput: pulumi.Output<NamespaceToClientIdMapMap> = pulumi
+    .all(svUis)
+    .apply(uis =>
+      uis.reduce(
+        (acc, ui) => ({
+          ...acc,
+          [ui.ns]: {
+            wallet: ui.id,
+            sv: ui.id,
+            cns: ui.id,
+          },
+        }),
+        {} as NamespaceToClientIdMapMap
+      )
+    );
+
+  const appToClientId: ClientIdMap = svs.reduce(
+    (acc, sv) => ({
+      ...acc,
+      ...(sv.svBackend ? { [sv.svBackend.name]: sv.svBackend.clientId } : {}),
+      ...(sv.validatorBackend ? { [sv.validatorBackend.name]: sv.validatorBackend.clientId } : {}),
+    }),
+    {}
+  );
+
+  return nsToUiToCLientIdOutput.apply(nsToUiToClientId => {
+    return {
+      appToClientId: appToClientId,
+
+      namespaceToUiToClientId: nsToUiToClientId,
+
+      appToApiAudience: apiAudiences
+        ? ({
+            participant: apiAudiences.ledger,
+            sv: apiAudiences.sv,
+            validator: apiAudiences.validator,
+          } as AudienceMap)
+        : {},
+
+      appToClientAudience: apiAudiences
+        ? ({
+            sv: apiAudiences.ledger,
+            validator: apiAudiences.ledger,
+          } as AudienceMap)
+        : {},
+
+      fixedTokenCacheName: fixedTokenCacheName,
+
+      auth0Domain: auth0Domain,
+      auth0MgtClientId: auth0MgtClientId,
+      // TODO(tech-debt) We don't seem to set this anywhere?
+      auth0MgtClientSecret: '',
+    };
+  });
+}
+
+function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
+  const auth0Domain = 'canton-network-mainnet.us.auth0.com';
+  const auth0MgtClientId = config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET');
+
+  const provider = new auth0.Provider('main', {
+    domain: auth0Domain,
+    clientId: auth0MgtClientId,
+    clientSecret: auth0MgtClientSecret,
+  });
+
+  // hardcoded sv1 will be removed once we switch DA-2 to KMS (and, likely, the sv-da-1 namespace)
+  const sv1 = {
+    namespace: 'sv-1',
+    description: 'sv-1 (Digital-Asset 2)',
+    ingressName: 'sv-2', // Ingress name of sv-1 is sv-2!
+    svBackend: {
+      name: 'sv',
+      clientId: 'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
+    },
+    validatorBackend: {
+      name: 'validator',
+      clientId: 'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
+    },
+  };
+
+  const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
+    namespace: sv.nodeName,
+    description: sv.onboardingName,
+    ingressName: sv.ingressName,
+    svBackend: {
+      name: sv.auth0SvAppName,
+      clientId: sv.auth0SvAppClientId!,
+    },
+    validatorBackend: {
+      name: sv.auth0ValidatorAppName,
+      clientId: sv.auth0ValidatorAppClientId!,
+    },
+  }));
+
+  return svsOnlyAuth0(
+    clusterBasename,
+    dnsNames,
+    provider,
+    [sv1, ...extraSvs],
+    auth0Domain,
+    auth0MgtClientId,
+    'DO_NOT_USE',
+    {
+      ledger: 'https://ledger_api.main.digitalasset.com',
+      sv: 'https://sv.main.digitalasset.com',
+      validator: 'https://validator.main.digitalasset.com',
+    }
+  );
+}
+
+function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Output<Auth0Config> {
   const auth0Domain = 'canton-network-dev.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
   const auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
@@ -69,6 +225,87 @@ function spliceAuth0(clusterBasename: string, dnsNames: string[]) {
     clientId: auth0MgtClientId,
     clientSecret: auth0MgtClientSecret,
   });
+
+  const standardSvs: svAuth0Params[] = standardSvConfigs.map(sv => ({
+    namespace: sv.nodeName,
+    description: sv.nodeName.replace(/-/g, '').toUpperCase(),
+    ingressName: sv.ingressName,
+    svBackend: sv.auth0SvAppClientId
+      ? {
+          name: sv.auth0SvAppName,
+          clientId: sv.auth0SvAppClientId,
+        }
+      : undefined,
+    validatorBackend: sv.auth0ValidatorAppClientId
+      ? {
+          name: sv.auth0ValidatorAppName,
+          clientId: sv.auth0ValidatorAppClientId,
+        }
+      : undefined,
+  }));
+  const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
+    namespace: sv.nodeName,
+    description: sv.onboardingName,
+    ingressName: sv.ingressName,
+    svBackend: {
+      name: sv.auth0SvAppName,
+      clientId: sv.auth0SvAppClientId!,
+    },
+    validatorBackend: {
+      name: sv.auth0ValidatorAppName,
+      clientId: sv.auth0ValidatorAppClientId!,
+    },
+  }));
+
+  const baseAuth0 = svsOnlyAuth0(
+    clusterBasename,
+    dnsNames,
+    provider,
+    [...standardSvs, ...extraSvs],
+    auth0Domain,
+    auth0MgtClientId,
+    'auth0-fixed-token-cache'
+  );
+
+  // hardcoded client IDs
+  // TODO(tech-debt) consider folding into main config or into `config.yaml`
+  const extraAppToClientIds: ClientIdMap = {
+    validator1: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
+    splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
+    splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
+    'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',
+    'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
+    'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
+    'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
+    'sv-5': 'RSgbsze3cGHipLxhPGtGy7fqtYgyefTb',
+    'sv-6': '3MO1BRMNqEiIntIM1YWwBRT1EPpKyGO6',
+    'sv-7': '4imYa3E6Q5JPdLjZxHatRDtV1Wurq7pK',
+    'sv-8': 'lQogWncLX7AIc2laUj8VVW6zwNJ169vR',
+    'sv-9': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
+    'sv-10': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
+    'sv-11': 'ndIxuns8kZoObE7qN6M3IbtKSZ7RRO9B',
+    'sv-12': 'qnYhBjBJ5LQu0pM5M6V8e3erQsadfew1',
+    'sv-13': 'IA7BOrFhKvQ5AP9g8DxSTmO6pVT0oed3',
+    'sv-14': 'cY4I4HCHgDj2mkxSSEwguFQGRFEjhnTq',
+    'sv-15': 'hwKLKN5TWpaPjzuY52ubNVIRF8Onnzgk',
+    'sv-16': '9pvoTvQIt2l1rzlNnaEZVsnNDFTOvt7W',
+    sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
+    sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
+    sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
+    sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
+    sv5_validator: 'TdcDPsIwSXVw4rZmGqxl6Ifkn4neeOzW',
+    sv6_validator: '4pUXGkvvybNyTeWXEBlesr9qcYCQh2sh',
+    sv7_validator: '2cfFl6z5huY4rVYvxOEja8MvDdplYCDW',
+    sv8_validator: 'JYvSRekV1E5EUZ2sJ494YyHXbxR3OHIR',
+    sv9_validator: 'BABNqQ3m5ROTGJTlTHVlIckS3cwJ0M0w',
+    sv10_validator: 'EKBJkDcOHosrnhLALfrQYG6Uc4Csqwbe',
+    sv11_validator: '8jpCSqSkLxdY8zdmJwm0XXRfxFnPNAhG',
+    sv12_validator: 'PEMwunsstamR1c5k3LdjVInTKlVTkeb6',
+    sv13_validator: 'eqssDmClrmtQFTgJ7XIP7RDdhcD6iGfx',
+    sv14_validator: 'luGkjf4AvM5PYhmi3X5rFmKLzxHTBlgz',
+    sv15_validator: 'gL9Iv3iUiPTtDvyEZ9b4wCcTvz3G6qys',
+    sv16_validator: '6ANtCorumVE8Ur7n1gJ8Gfvgv5pa96mZ',
+  };
 
   const validator1UiApp = newUiApp(
     'validator1UiApp',
@@ -90,78 +327,18 @@ function spliceAuth0(clusterBasename: string, dnsNames: string[]) {
     dnsNames,
     provider
   );
-  const svUiApps = [...Array(16).keys()].map(i => {
-    const sv = i + 1;
-    const uiApp = newUiApp(
-      `sv${sv}UiApp`,
-      `SV${sv} UI`,
-      `Used for the Wallet, ANS and SV UIs for SV${sv}`,
-      ['wallet', ansDomainPrefix, 'sv'],
-      // TODO(DACH-NY/canton-network-node#12169) Clean up this fun
-      sv == 1 ? 'sv-2' : `sv-${sv}-eng`,
-      clusterBasename,
-      dnsNames,
-      provider
-    );
-    return uiApp;
-  });
-
-  const constIds = {
-    appToClientId: {
-      validator1: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
-      splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
-      splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
-      'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',
-      'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
-      'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
-      'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
-      'sv-5': 'RSgbsze3cGHipLxhPGtGy7fqtYgyefTb',
-      'sv-6': '3MO1BRMNqEiIntIM1YWwBRT1EPpKyGO6',
-      'sv-7': '4imYa3E6Q5JPdLjZxHatRDtV1Wurq7pK',
-      'sv-8': 'lQogWncLX7AIc2laUj8VVW6zwNJ169vR',
-      'sv-9': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
-      'sv-10': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
-      'sv-11': 'ndIxuns8kZoObE7qN6M3IbtKSZ7RRO9B',
-      'sv-12': 'qnYhBjBJ5LQu0pM5M6V8e3erQsadfew1',
-      'sv-13': 'IA7BOrFhKvQ5AP9g8DxSTmO6pVT0oed3',
-      'sv-14': 'cY4I4HCHgDj2mkxSSEwguFQGRFEjhnTq',
-      'sv-15': 'hwKLKN5TWpaPjzuY52ubNVIRF8Onnzgk',
-      'sv-16': '9pvoTvQIt2l1rzlNnaEZVsnNDFTOvt7W',
-      sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
-      sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
-      sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
-      sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
-      sv5_validator: 'TdcDPsIwSXVw4rZmGqxl6Ifkn4neeOzW',
-      sv6_validator: '4pUXGkvvybNyTeWXEBlesr9qcYCQh2sh',
-      sv7_validator: '2cfFl6z5huY4rVYvxOEja8MvDdplYCDW',
-      sv8_validator: 'JYvSRekV1E5EUZ2sJ494YyHXbxR3OHIR',
-      sv9_validator: 'BABNqQ3m5ROTGJTlTHVlIckS3cwJ0M0w',
-      sv10_validator: 'EKBJkDcOHosrnhLALfrQYG6Uc4Csqwbe',
-      sv11_validator: '8jpCSqSkLxdY8zdmJwm0XXRfxFnPNAhG',
-      sv12_validator: 'PEMwunsstamR1c5k3LdjVInTKlVTkeb6',
-      sv13_validator: 'eqssDmClrmtQFTgJ7XIP7RDdhcD6iGfx',
-      sv14_validator: 'luGkjf4AvM5PYhmi3X5rFmKLzxHTBlgz',
-      sv15_validator: 'gL9Iv3iUiPTtDvyEZ9b4wCcTvz3G6qys',
-      sv16_validator: '6ANtCorumVE8Ur7n1gJ8Gfvgv5pa96mZ',
-    },
-
-    appToApiAudience: {},
-
-    appToClientAudience: {},
-
-    fixedTokenCacheName: 'auth0-fixed-token-cache',
-
-    auth0Domain: auth0Domain,
-    auth0MgtClientId: auth0MgtClientId,
-    auth0MgtClientSecret: '',
-  };
 
   return pulumi
-    .all([validator1UiApp.id, splitwellUiApp.id, svUiApps.map(uiApp => uiApp.id)])
-    .apply(([validator1UiId, splitwellUiId, svUiIds]) => {
-      return {
-        ...constIds,
+    .all([validator1UiApp.id, splitwellUiApp.id])
+    .apply(([validator1UiId, splitwellUiId]) =>
+      baseAuth0.apply(auth0Cfg => ({
+        ...auth0Cfg,
+        appToClientId: {
+          ...extraAppToClientIds,
+          ...auth0Cfg.appToClientId,
+        } as ClientIdMap,
         namespaceToUiToClientId: {
+          ...auth0Cfg.namespaceToUiToClientId,
           validator1: {
             wallet: validator1UiId,
             cns: validator1UiId,
@@ -172,20 +349,9 @@ function spliceAuth0(clusterBasename: string, dnsNames: string[]) {
             cns: splitwellUiId,
             splitwell: splitwellUiId,
           },
-          ...svUiIds.reduce(
-            (o, key, idx) => ({
-              ...o,
-              [`sv-${idx + 1}`]: {
-                wallet: key,
-                cns: key,
-                sv: key,
-              },
-            }),
-            {}
-          ),
-        },
-      };
-    });
+        } as NamespaceToClientIdMapMap,
+      }))
+    );
 }
 
 function svRunbookAuth0(
@@ -204,7 +370,7 @@ function svRunbookAuth0(
   svApiAudience: string,
   validatorApiAudience: string,
   fixedTokenCacheName: string
-) {
+): pulumi.Output<Auth0Config> {
   const provider = new auth0.Provider(auth0ProviderName, {
     domain: auth0Domain,
     clientId: auth0MgtClientId,
@@ -256,7 +422,7 @@ function svRunbookAuth0(
         appToClientId: {
           sv: svBackendClientId,
           validator: validatorBackendClientId,
-        },
+        } as ClientIdMap,
 
         namespaceToUiToClientId: nsToUiToClientId,
 
@@ -264,12 +430,12 @@ function svRunbookAuth0(
           participant: ledgerApiAudience,
           sv: svApiAudience,
           validator: validatorApiAudience,
-        },
+        } as AudienceMap,
 
         appToClientAudience: {
           sv: ledgerApiAudience,
           validator: ledgerApiAudience,
-        },
+        } as AudienceMap,
 
         fixedTokenCacheName: fixedTokenCacheName,
 
@@ -280,7 +446,10 @@ function svRunbookAuth0(
     });
 }
 
-function validatorRunbookAuth0(clusterBasename: string, dnsNames: string[]) {
+function validatorRunbookAuth0(
+  clusterBasename: string,
+  dnsNames: string[]
+): pulumi.Output<Auth0Config> {
   const auth0Domain = 'canton-network-validator-test.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
   const auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
@@ -318,23 +487,23 @@ function validatorRunbookAuth0(clusterBasename: string, dnsNames: string[]) {
     return {
       appToClientId: {
         validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
-      },
+      } as ClientIdMap,
 
       namespaceToUiToClientId: {
         validator: {
           wallet: walletUiAppId,
           cns: ansUiAppId,
         },
-      },
+      } as NamespaceToClientIdMapMap,
 
       appToApiAudience: {
         participant: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
         validator: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
-      },
+      } as AudienceMap,
 
       appToClientAudience: {
         validator: 'https://ledger_api.example.com',
-      },
+      } as AudienceMap,
 
       fixedTokenCacheName: 'auth0-fixed-token-cache-validator-test',
 
@@ -350,23 +519,7 @@ export function configureAuth0(
   dnsNames: string[]
 ): pulumi.Output<Auth0ClusterConfig> {
   if (isMainNet) {
-    const auth0Cfg = svRunbookAuth0(
-      clusterBasename,
-      dnsNames,
-      'main',
-      'canton-network-mainnet.us.auth0.com',
-      config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID'),
-      config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET'),
-      'sv-1 (Digital-Asset 2)',
-      'sv-1',
-      'sv-2', // Ingress name of sv-1 is sv-2!
-      'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
-      'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
-      'https://ledger_api.main.digitalasset.com',
-      'https://sv.main.digitalasset.com',
-      'https://validator.main.digitalasset.com',
-      'DO_NOT_USE'
-    );
+    const auth0Cfg = mainNetAuth0(clusterBasename, dnsNames);
     return auth0Cfg.apply(mainnetCfg => {
       const r: Auth0ClusterConfig = {
         mainnet: mainnetCfg,
@@ -374,7 +527,7 @@ export function configureAuth0(
       return r;
     });
   } else {
-    const spliceAuth0Cfg = spliceAuth0(clusterBasename, dnsNames);
+    const spliceAuth0Cfg = nonMainNetAuth0(clusterBasename, dnsNames);
     const svRunbookAuth0Cfg = svRunbookAuth0(
       clusterBasename,
       dnsNames,

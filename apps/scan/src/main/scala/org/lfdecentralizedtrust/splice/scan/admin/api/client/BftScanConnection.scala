@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AnsEntry,
+  GetDsoInfoResponse,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
@@ -160,6 +161,14 @@ class BftScanConnection(
   override def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     bftCall(
       _.getDsoPartyId()
+    )
+
+  override def getDsoInfo()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[GetDsoInfoResponse] =
+    bftCall(
+      _.getDsoInfo()
     )
 
   override protected def runGetAmuletRulesWithState(

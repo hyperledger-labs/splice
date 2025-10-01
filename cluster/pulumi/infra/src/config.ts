@@ -28,6 +28,7 @@ const MonitoringConfigSchema = z.object({
       trafficWaste: z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
+        quantile: z.number(),
       }),
       confirmationRequests: z.object({
         total: z.object({

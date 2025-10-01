@@ -26,6 +26,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -56,10 +57,17 @@ class SvSvAutomationService(
       retryProvider,
       config.ingestFromParticipantBegin,
       config.ingestUpdateHistoryFromParticipantBegin,
+      config.parameters,
     ) {
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
     SvSvAutomationService
-  registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
+  registerTrigger(
+    new ExpireValidatorOnboardingTrigger(
+      triggerContext,
+      svStore,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
 
   registerTrigger(
     SqlIndexInitializationTrigger(

@@ -1,6 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+{{ if .Values.ansWebUi.enabled }}
 {{- $ansWebUiLabel := "ans-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
@@ -101,3 +102,4 @@ spec:
     targetPort: http
     port: {{ .Values.service.ans.port }}
     protocol: TCP
+{{- end }}

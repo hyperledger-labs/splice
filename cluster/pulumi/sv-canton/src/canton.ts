@@ -127,7 +127,6 @@ export function installCantonComponents(
           },
           isActiveMigration,
           migrationInfo.version,
-          svConfig.logging?.cantonLogLevel,
           imagePullServiceAccountName,
           opts
         )

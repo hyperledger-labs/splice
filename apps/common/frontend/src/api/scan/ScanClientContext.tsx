@@ -7,13 +7,15 @@ import React, { useContext, useMemo } from 'react';
 const ScanClientContext = React.createContext<openapi.ScanApi | undefined>(undefined);
 
 export interface ScanProps {
-  url: string;
+  baseScanUrl: string;
 }
 
 export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = ({
-  url,
+  baseScanUrl,
   children,
 }) => {
+  // safety check
+  const url = baseScanUrl.endsWith('/api/scan') ? baseScanUrl : `${baseScanUrl}/api/scan`;
   const client: openapi.ScanApi | undefined = useMemo(() => {
     const configuration = openapi.createConfiguration({
       baseServer: new openapi.ServerConfiguration(url, {}),

@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
+import com.digitalasset.canton.resource.DbParameterUtils
 import com.digitalasset.canton.LfValue
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
@@ -126,6 +127,20 @@ trait AcsJdbcTypes {
       })
     }
 
+  protected implicit lazy val intArrayGetResult: GetResult[Array[Int]] = (r: PositionedResult) => {
+    val sqlArray = r.rs.getArray(r.skip.currentPos)
+    if (sqlArray == null) Array.emptyIntArray
+    else
+      sqlArray.getArray match {
+        case arr: Array[java.lang.Integer] => arr.map(_.intValue())
+        case arr: Array[Int] => arr
+        case x =>
+          throw new IllegalStateException(
+            s"Expected an array of integers, but got $x. Are you sure you selected an integer array column?"
+          )
+      }
+  }
+
   protected implicit lazy val stringArrayOptGetResult: GetResult[Option[Array[String]]] =
     (r: PositionedResult) => {
       Option(r.rs.getArray(r.skip.currentPos)).map {
@@ -145,6 +160,10 @@ trait AcsJdbcTypes {
 
   protected implicit lazy val stringSeqOptGetResult: GetResult[Option[Seq[String]]] =
     stringArrayOptGetResult.andThen(_.map(_.toSeq))
+
+  protected implicit lazy val intSeqSetParameter: SetParameter[Seq[Int]] =
+    (ints: Seq[Int], pp: PositionedParameters) =>
+      DbParameterUtils.setArrayIntOParameterDb(Some(ints.toArray), pp)
 
   private val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>
@@ -188,6 +207,9 @@ trait AcsJdbcTypes {
         )
       }
   }
+
+  protected implicit lazy val packageQualifiedNameSetParameter: SetParameter[PackageQualifiedName] =
+    SetParameter.SetString.contramap(_.toString)
 
   protected implicit lazy val qualifiedNameSetParameter: SetParameter[QualifiedName] =
     (v1: QualifiedName, v2: PositionedParameters) =>

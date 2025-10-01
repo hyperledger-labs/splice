@@ -1,0 +1,109 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: party-allocator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 8 }}
+    spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
+      containers:
+        - name: party-allocator
+          image: "{{ .Values.imageRepo }}/party-allocator:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).party_allocator) }}"
+          {{- with .Values.imagePullPolicy }}
+          imagePullPolicy: {{ . }}
+          {{- end }}
+          env:
+            {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 12}}
+            - name: JSON_LEDGER_API_URL
+              value: {{ .Values.jsonLedgerApiUrl | quote }}
+            - name: SCAN_API_URL
+              value: {{ .Values.scanApiUrl | quote }}
+            - name: VALIDATOR_API_URL
+              value: {{ .Values.validatorApiUrl | quote }}
+            - name: MAX_PARTIES
+              value: {{ .Values.maxParties | quote }}
+            - name: KEYS_DIRECTORY
+              value: {{ .Values.keysDirectory | quote }}
+            - name: PARALLELISM
+              value: {{ .Values.parallelism | quote }}
+          volumeMounts:
+            - name: party-allocator-keys-volume
+              mountPath: /keys
+      volumes:
+        - name: party-allocator-keys-volume
+          persistentVolumeClaim:
+            claimName: party-allocator-keys
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: party-allocator-keys
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10G
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: party-allocator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
+spec:
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+  - name: metrics
+    port: 10013
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.metrics.interval }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}

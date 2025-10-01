@@ -132,6 +132,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             {proposalDetails.action === 'SRARC_UpdateSvRewardWeight' && (
               <UpdateSvRewardWeightSection
                 svToUpdate={proposalDetails.proposal.svToUpdate}
+                currentWeight={proposalDetails.proposal.currentWeight}
                 weightChange={proposalDetails.proposal.weightChange}
               />
             )}
@@ -193,7 +194,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             <Box sx={{ py: 1 }}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Voting Expires At
+                Threshold Deadline
               </Typography>
               <Typography
                 variant="body1"
@@ -523,34 +524,42 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
 
 interface UpdateSvRewardWeightSectionProps {
   svToUpdate: string;
+  currentWeight: string;
   weightChange: string;
 }
 
 const UpdateSvRewardWeightSection = ({
   svToUpdate,
+  currentWeight,
   weightChange,
 }: UpdateSvRewardWeightSectionProps) => {
   return (
-    <Box
-      sx={{ py: 1 }}
-      id="proposal-details-update-sv-reward-weight-section"
-      data-testid="proposal-details-update-sv-reward-weight-section"
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-          Member
-        </Typography>
-        <Box sx={{ mb: 1 }}>
-          <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
+    <>
+      <Box
+        sx={{ py: 1 }}
+        id="proposal-details-update-sv-reward-weight-section"
+        data-testid="proposal-details-update-sv-reward-weight-section"
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Member
+          </Typography>
+          <Box sx={{ mb: 1 }}>
+            <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
+          </Box>
         </Box>
-
-        <DetailItem
-          label="Weight"
-          value={weightChange}
-          labelId="proposal-details-weight-label"
-          valueId="proposal-details-weight-value"
-        />
       </Box>
-    </Box>
+
+      <ConfigValuesChanges
+        changes={[
+          {
+            label: 'Weight',
+            fieldName: 'svRewardWeight',
+            currentValue: currentWeight,
+            newValue: weightChange,
+          },
+        ]}
+      />
+    </>
   );
 };

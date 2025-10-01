@@ -843,6 +843,171 @@ class AcsSnapshotStoreTest
         } yield succeed
       }
     }
+
+    "amulet balance computation" should {
+      "include the total balance of locked and unlocked amulets" in {
+        val unlocked = (1 to 5).map(n =>
+          amulet(providerParty(n), n, n.toLong, n) -> CantonTimestamp.Epoch.plusSeconds(1000L * n)
+        )
+        val locked = (1 to 5).map(n =>
+          lockedAmulet(providerParty(n), n * 2, n.toLong, n) -> CantonTimestamp.Epoch.plusSeconds(
+            2000L * n
+          )
+        )
+        val illegalDsoUnlocked = amulet(providerParty(42), 42, 42L, 0.42, dso = providerParty(42))
+        val illegalDsoLocked =
+          lockedAmulet(providerParty(42), 42, 42L, 0.42, dso = providerParty(42))
+        val snapshotTimestamp = CantonTimestamp.Epoch.plusSeconds(100_000L)
+
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- MonadUtil.sequentialTraverse(unlocked) { case (amulet, timestamp) =>
+            ingestCreate(
+              updateHistory,
+              amulet,
+              timestamp,
+              Seq(PartyId.tryFromProtoPrimitive(amulet.payload.owner), dsoParty),
+            )
+          }
+          _ <- MonadUtil.sequentialTraverse(locked) { case (amulet, timestamp) =>
+            ingestCreate(
+              updateHistory,
+              amulet,
+              timestamp,
+              Seq(PartyId.tryFromProtoPrimitive(amulet.payload.amulet.owner), dsoParty),
+            )
+          }
+          _ <- ingestCreate(
+            updateHistory,
+            illegalDsoLocked,
+            snapshotTimestamp.minusSeconds(2L),
+            Seq(PartyId.tryFromProtoPrimitive(illegalDsoUnlocked.payload.dso)),
+          )
+          _ <- ingestCreate(
+            updateHistory,
+            illegalDsoLocked,
+            snapshotTimestamp.minusSeconds(1L),
+            Seq(PartyId.tryFromProtoPrimitive(illegalDsoLocked.payload.amulet.dso)),
+          )
+          _ <- store.insertNewSnapshot(
+            None,
+            DefaultMigrationId,
+            snapshotTimestamp,
+          )
+          snapshotOpt <- store.lookupSnapshotBefore(domainMigrationId, snapshotTimestamp)
+        } yield {
+          val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
+          snapshot.unlockedAmuletBalance should be(
+            Some(unlocked.map(_._1.payload.amount.initialAmount).map(BigDecimal(_)).sum)
+          )
+          snapshot.lockedAmuletBalance should be(
+            Some(locked.map(_._1.payload.amulet.amount.initialAmount).map(BigDecimal(_)).sum)
+          )
+        }
+      }
+
+      "incrementally build balances" in {
+        val unlocked = (1 to 10).map(n =>
+          amulet(providerParty(n), n, n.toLong, n) -> CantonTimestamp.Epoch.plusSeconds(1000L * n)
+        )
+        val locked = (1 to 10).map(n =>
+          lockedAmulet(providerParty(n), n * 2, n.toLong, n) -> CantonTimestamp.Epoch.plusSeconds(
+            1000L * n
+          )
+        )
+
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- ingestCreate(
+            updateHistory,
+            unlocked.head._1,
+            unlocked.head._2,
+            Seq(PartyId.tryFromProtoPrimitive(unlocked.head._1.payload.owner), dsoParty),
+          )
+          _ <- ingestCreate(
+            updateHistory,
+            locked.head._1,
+            locked.head._2,
+            Seq(PartyId.tryFromProtoPrimitive(locked.head._1.payload.amulet.owner), dsoParty),
+          )
+          _ <- MonadUtil.sequentialTraverse(unlocked.zip(locked).sliding(2).toList) {
+            // per iteration:
+            // - archive the previous amulet (first in the sliding list)
+            // - create the next amulet (second in the sliding list)
+            // - take a snapshot
+            // - the balance should be that of the last amulet
+            case (archiveUnlocked, archiveLocked) +: (createUnlocked, createLocked) +: _ =>
+              for {
+                _ <- ingestCreate(
+                  updateHistory,
+                  createUnlocked._1,
+                  createUnlocked._2,
+                  Seq(PartyId.tryFromProtoPrimitive(createUnlocked._1.payload.owner), dsoParty),
+                )
+                _ <- ingestArchive(
+                  updateHistory,
+                  archiveUnlocked._1,
+                  archiveUnlocked._2.plusSeconds(1L),
+                )
+                _ <- ingestCreate(
+                  updateHistory,
+                  createLocked._1,
+                  createLocked._2,
+                  Seq(PartyId.tryFromProtoPrimitive(createLocked._1.payload.amulet.owner), dsoParty),
+                )
+                _ <- ingestArchive(
+                  updateHistory,
+                  archiveLocked._1,
+                  archiveLocked._2.plusSeconds(1L),
+                )
+                // ensure everything we just did is included
+                snapshotTimestamp = createUnlocked._2.plusSeconds(
+                  1L
+                )
+                _ <- store.insertNewSnapshot(
+                  None,
+                  DefaultMigrationId,
+                  snapshotTimestamp,
+                )
+                snapshotOpt <- store.lookupSnapshotBefore(domainMigrationId, snapshotTimestamp)
+              } yield {
+                val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
+                snapshot.unlockedAmuletBalance should be(
+                  Some(BigDecimal(createUnlocked._1.payload.amount.initialAmount))
+                )
+                snapshot.lockedAmuletBalance should be(
+                  Some(BigDecimal(createLocked._1.payload.amulet.amount.initialAmount))
+                )
+              }
+            case _ => fail("unreachable")
+          }
+          // for good measure, ingest more
+          _ <- ingestCreate(
+            updateHistory,
+            amulet(providerParty(123), 123L, 123L, 0.1),
+            CantonTimestamp.Epoch.plusSeconds(1000L * 123),
+            Seq(providerParty(123), dsoParty),
+          )
+          _ <- store.insertNewSnapshot(
+            None,
+            DefaultMigrationId,
+            CantonTimestamp.now(), // surely way after the Epoch
+          )
+          snapshotOpt <- store.lookupSnapshotBefore(domainMigrationId, CantonTimestamp.now())
+        } yield {
+          val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
+          snapshot.unlockedAmuletBalance should be(
+            Some(BigDecimal(unlocked.last._1.payload.amount.initialAmount) + 123)
+          )
+          // unchanged
+          snapshot.lockedAmuletBalance should be(
+            Some(BigDecimal(locked.last._1.payload.amulet.amount.initialAmount))
+          )
+        }
+      }
+    }
   }
 
   private def mkUpdateHistory(
@@ -867,6 +1032,7 @@ class AcsSnapshotStoreTest
 
   private def mkStore(
       updateHistory: UpdateHistory,
+      dsoPartyForStore: PartyId = dsoParty,
       migrationId: Long = DefaultMigrationId,
   ): AcsSnapshotStore = {
     new AcsSnapshotStore(
@@ -874,6 +1040,7 @@ class AcsSnapshotStoreTest
       // and the insert query is already complicated enough as-is, so I'm not gonna make it worse just for tests.
       storage.underlying,
       updateHistory,
+      dsoPartyForStore,
       migrationId,
       loggerFactory,
     )

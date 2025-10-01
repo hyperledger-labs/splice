@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
-import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -22,6 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.PageLimit
 
 import java.util.Optional
@@ -33,7 +33,6 @@ import scala.util.Random
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
-    ignoredExpiredRewardsPartyIds: Set[PartyId],
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -50,7 +49,7 @@ class ExpireRewardCouponsTrigger(
       .getExpiredCouponsInBatchesPerRoundAndCouponType(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
-        ignoredExpiredRewardsPartyIds,
+        context.config.ignoredExpiredRewardsPartyIds,
         PageLimit.tryCreate(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize),
       )
       // We select at most parallelism batches per round as  processing more than that would most likely just hit contention
@@ -180,7 +179,8 @@ class ExpireRewardCouponsTrigger(
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>
-          svTaskContext.connection
+          svTaskContext
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(store.key.svParty),
               Seq(store.key.dsoParty),

@@ -1434,10 +1434,13 @@ components:
       required:
         - token_standard
         - transfer_preapproval_description
+        - no_holding_fees_on_transfers
       properties:
         token_standard:
           type: boolean
         transfer_preapproval_description:
+          type: boolean
+        no_holding_fees_on_transfers:
           type: boolean
 
     AllocateAmuletRequest:

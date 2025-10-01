@@ -21,6 +21,15 @@ final case class ScanSynchronizerConfig(
     mediator: FullClientConfig,
 )
 
+final case class MediatorVerdictIngestionConfig(
+    /** Max verdicts items for DB insert batch. */
+    batchSize: Int = 50,
+    /** Max time window to wait for DB insert batch. */
+    batchMaxWait: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(1),
+    /** Delay before restart on stream failure. */
+    restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -30,7 +39,9 @@ case class ScanAppBackendConfig(
     svUser: String,
     override val participantClient: ParticipantClientConfig,
     sequencerAdminClient: FullClientConfig,
+    mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     isFirstSv: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
@@ -43,12 +54,11 @@ case class ScanAppBackendConfig(
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
-    updateHistoryBackfillImportUpdatesEnabled: Boolean = false,
+    updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
-    // TODO(#1164): Enable by default
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {

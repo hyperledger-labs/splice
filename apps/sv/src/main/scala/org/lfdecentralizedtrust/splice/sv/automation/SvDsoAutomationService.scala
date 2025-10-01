@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -81,6 +82,7 @@ class SvDsoAutomationService(
       retryProvider,
       config.ingestFromParticipantBegin,
       config.ingestUpdateHistoryFromParticipantBegin,
+      config.parameters,
     ) {
 
   override def companion
@@ -127,7 +129,13 @@ class SvDsoAutomationService(
   // Triggers that require namespace permissions and the existence of the DsoRules and AmuletRules contracts
   def registerPostOnboardingTriggers(): Unit = {
     registerTrigger(
-      new SvOnboardingRequestTrigger(triggerContext, dsoStore, svStore, config, connection)
+      new SvOnboardingRequestTrigger(
+        triggerContext,
+        dsoStore,
+        svStore,
+        config,
+        connection(SpliceLedgerConnectionPriority.High),
+      )
     )
     // Register optional BFT triggers
     cometBft.foreach { node =>
@@ -136,7 +144,7 @@ class SvDsoAutomationService(
           new PublishLocalCometBftNodeConfigTrigger(
             triggerContext,
             dsoStore,
-            connection,
+            connection(SpliceLedgerConnectionPriority.High),
             node,
           )
         )
@@ -209,7 +217,7 @@ class SvDsoAutomationService(
             config.domains.global.alias,
             synchronizerNode,
             dsoStore,
-            connection,
+            connection(SpliceLedgerConnectionPriority.High),
             participantAdminConnection,
             synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
@@ -281,18 +289,30 @@ class SvDsoAutomationService(
   }
 
   def registerPostUnlimitedTrafficTriggers(): Unit = {
-    registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, dsoStore, connection))
+    registerTrigger(
+      new SummarizingMiningRoundTrigger(
+        triggerContext,
+        dsoStore,
+        connection(SpliceLedgerConnectionPriority.Medium),
+      )
+    )
     registerTrigger(
       new ReceiveSvRewardCouponTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Medium),
         config.extraBeneficiaries,
       )
     )
     if (config.automation.enableClosedRoundArchival)
-      registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, dsoStore, connection))
+      registerTrigger(
+        new ArchiveClosedMiningRoundsTrigger(
+          triggerContext,
+          dsoStore,
+          connection(SpliceLedgerConnectionPriority.Low),
+        )
+      )
 
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
@@ -301,7 +321,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         spliceInstanceNamesConfig,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Medium),
       )
     )
     registerTrigger(
@@ -310,6 +330,7 @@ class SvDsoAutomationService(
         dsoStore,
         triggerContext,
         config.maxVettingDelay,
+        config.latestPackagesOnly,
       )
     )
 
@@ -319,7 +340,7 @@ class SvDsoAutomationService(
         config,
         triggerContext,
         dsoStore,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Medium),
         cometBft,
         localSynchronizerNode.map(_.mediatorAdminConnection),
         participantAdminConnection,
@@ -342,7 +363,7 @@ class SvDsoAutomationService(
       new TransferCommandCounterTrigger(
         triggerContext,
         dsoStore,
-        connection,
+        connection(SpliceLedgerConnectionPriority.Low),
       )
     )
 
@@ -351,9 +372,20 @@ class SvDsoAutomationService(
         new PublishScanConfigTrigger(
           triggerContext,
           dsoStore,
-          connection,
+          connection(SpliceLedgerConnectionPriority.Low),
           scan,
           upgradesConfig,
+        )
+      )
+    }
+
+    config.followAmuletConversionRateFeed.foreach { c =>
+      registerTrigger(
+        new FollowAmuletConversionRateFeedTrigger(
+          triggerContext,
+          dsoStore,
+          connection(SpliceLedgerConnectionPriority.Low),
+          c,
         )
       )
     }
@@ -482,5 +514,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
+      aTrigger[FollowAmuletConversionRateFeedTrigger],
     )
 }

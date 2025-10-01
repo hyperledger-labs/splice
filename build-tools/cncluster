@@ -1726,7 +1726,7 @@ function subcmd_backup_nodes() {
     internal_stack=$2
 
     if [ $# -eq 2 ]; then
-        nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
+        nodes="sv-1 sv-2 sv-3 sv-da-1 validator1 splitwell"
     else
         shift 2
         nodes="$*"
@@ -1734,7 +1734,7 @@ function subcmd_backup_nodes() {
 
     for node in $nodes; do
         case "$node" in
-            sv-1|sv-2|sv-3|sv-4)
+            sv-1|sv-2|sv-3|sv-4|sv-da-1)
                 _info "Backing up sv node $node"
                 SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
                 ;;
@@ -1794,7 +1794,7 @@ function subcmd_restore_node() {
     fi
 
     case "$node" in
-        sv-1|sv-2|sv-3|sv-4)
+        sv-1|sv-2|sv-3|sv-4|sv-da-1)
             if [ "$node" == "sv-1" ]; then
                 sv_name="Digital-Asset-2"
             else
@@ -2087,9 +2087,11 @@ function subcmd_dump_identities() {
     _cluster_must_exist
 
     all='{}'
-    for i in sv-1 sv-2 sv-3 sv-4; do
+    for i in sv-1 sv-2 sv-3 sv-da-1; do
         if [ "$i" == "sv-1" ]; then
             domain="sv-2"
+        elif [ "$i" == "sv-da-1" ]; then
+            domain="sv-1"
         else
             domain="$i-eng"
         fi
@@ -2155,13 +2157,12 @@ function subcmd_purge_unused_dbs() {
 subcommand_whitelist[set_operator_deployment_reference]="Set the git reference for the operator deployment in the cluster config file"
 function subcmd_set_operator_deployment_reference() {
 
-    # TODO(#1062): remove the ignored parameter once the base version for migration tests is >= 0.4.2
     if [ "$#" -lt 1 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> [<ignored>]"
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
-    if [ "$#" -gt 2 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> [<ignored>]"
+    if [ "$#" -gt 1 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
     deployment_config=$(cat <<EOF
