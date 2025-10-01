@@ -114,7 +114,7 @@ class SvFrontendIntegrationTest
           "fill the party hint field and click on the button to create an onboarding secret", {
             clue("fill party hint") {
               inside(find(id("create-party-hint"))) { case Some(element) =>
-                element.underlying.sendKeys("splice-client-10")
+                element.underlying.sendKeys("splice-client-2")
               }
             }
 
