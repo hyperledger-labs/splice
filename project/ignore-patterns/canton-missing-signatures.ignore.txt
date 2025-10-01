@@ -1,5 +1,10 @@
 # Errors and warnings caused by the key rotation in ManualSignatureIntegrationTest
+
+# ensureOwnerToKeyMapping does not wait an approximate time of 2 sequencing ordering latency
+# between the two transactions that rotates the keys. We are therefore getting the following warning.
+# Fine to ignore as the retry eventually ends.
 .*could not verify client's signature.*
+
 .*used to generate signature is not a valid key.*
 .*Response message for request.* timed out.*
 .*Now retrying operation 'request current time'.*
