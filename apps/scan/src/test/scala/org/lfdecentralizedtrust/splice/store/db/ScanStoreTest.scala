@@ -138,10 +138,11 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
+          // nothing occurs before the mint so there is no total amulet balance
+          store.getTotalAmuletBalance(1).futureValue shouldBe empty
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
-          store.getTotalAmuletBalance(2).futureValue shouldBe (amuletAmount - 3 * holdingFee)
-          store.getTotalAmuletBalance(3).futureValue shouldBe (amuletAmount - 4 * holdingFee)
+          store.getTotalAmuletBalance(2).futureValue.value shouldBe (amuletAmount - 3 * holdingFee)
+          store.getTotalAmuletBalance(3).futureValue.value shouldBe (amuletAmount - 4 * holdingFee)
         }
       }
 
@@ -179,13 +180,15 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue.value shouldBe (amuletRound1 - 1 * holdingFee)
           store
             .getTotalAmuletBalance(2)
-            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
           store
             .getTotalAmuletBalance(3)
-            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
@@ -226,13 +229,15 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue.value shouldBe (amuletRound1 - 1 * holdingFee)
           store
             .getTotalAmuletBalance(2)
-            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
           store
             .getTotalAmuletBalance(3)
-            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
@@ -253,10 +258,11 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
+          // nothing occurs before the mint so there is no total amulet balance calculated
+          store.getTotalAmuletBalance(1).futureValue shouldBe empty
           // The amulet is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
-          store.getTotalAmuletBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
-          store.getTotalAmuletBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
+          store.getTotalAmuletBalance(2).futureValue.value shouldBe (mintAmount - 1 * holdingFee)
+          store.getTotalAmuletBalance(3).futureValue.value shouldBe (mintAmount - 2 * holdingFee)
         }
       }
 
