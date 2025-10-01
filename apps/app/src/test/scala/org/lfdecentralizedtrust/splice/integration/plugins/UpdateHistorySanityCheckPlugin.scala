@@ -188,8 +188,6 @@ class UpdateHistorySanityCheckPlugin(
             "--compare-acs-with-snapshot",
             snapshotRecordTime.toInstant.toString,
           ) ++ Option
-            .when(amuletIncludesFees)("--subtract-holding-fees-per-round")
-            .toList ++ Option
             .when(compareBalancesWithTotalSupply && !amuletIncludesFees)(
               "--compare-balances-with-total-supply"
             )
