@@ -698,27 +698,27 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      rows <- ensureAggregated(asOfEndOfRound) { _ =>
-        storage.query(
-          sql"""
-              with ranked_providers_by_app_rewards as (
-                select   party as provider,
-                         max(cumulative_app_rewards) as cumulative_app_rewards,
-                         rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_app_rewards > 0
-                group by party
-              )
-              select   provider,
-                       cumulative_app_rewards
-              from     ranked_providers_by_app_rewards
-              where    rank_nr <= $limit
-              order by rank_nr;
+      rows <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select   rpt.party as provider,
+                       rpt.cumulative_app_rewards as cumulative_app_rewards
+              from     round_party_totals rpt
+              join     active_parties ap
+              on       rpt.store_id = ap.store_id
+              and      rpt.party = ap.party
+              and      rpt.closed_round = ap.closed_round
+              and      rpt.store_id = $roundTotalsStoreId
+              and      cumulative_app_rewards > 0
+              order by cumulative_app_rewards desc, rpt.party desc
+              limit $limit;
             """.as[(PartyId, BigDecimal)],
-          "getTopProvidersByAppRewards",
-        )
+            "getTopProvidersByAppRewards",
+          )
+        } else {
+          Future.successful(Seq())
+        }
       }
     } yield rows
   }
@@ -727,27 +727,27 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      rows <- ensureAggregated(asOfEndOfRound) { _ =>
-        storage.query(
-          sql"""
-              with ranked_validators_by_validator_rewards as (
-                select   party as validator,
-                         max(cumulative_validator_rewards) as cumulative_validator_rewards,
-                         rank() over (order by max(cumulative_validator_rewards) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_validator_rewards > 0
-                group by party
-              )
-              select   validator,
-                       cumulative_validator_rewards
-              from     ranked_validators_by_validator_rewards
-              where    rank_nr <= $limit
-              order by rank_nr;
-           """.as[(PartyId, BigDecimal)],
-          "getTopValidatorsByValidatorRewards",
-        )
+      rows <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select   rpt.party as validator,
+                       rpt.cumulative_validator_rewards as cumulative_validator_rewards
+              from     round_party_totals rpt
+              join     active_parties ap
+              on       rpt.store_id = ap.store_id
+              and      rpt.party = ap.party
+              and      rpt.closed_round = ap.closed_round
+              and      rpt.store_id = $roundTotalsStoreId
+              and      cumulative_validator_rewards > 0
+              order by cumulative_validator_rewards desc, rpt.party desc
+              limit $limit;
+            """.as[(PartyId, BigDecimal)],
+            "getTopValidatorsByValidatorRewards",
+          )
+        } else {
+          Future.successful(Seq())
+        }
       }
     } yield rows
   }
@@ -756,46 +756,42 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
     for {
-      rows <- ensureAggregated(asOfEndOfRound) { _ =>
-        // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
-        // max cumulatives for each party up to including asOfEndOfRound
-        // and separately get the last purchased round for each party in the leaderboard
-        storage.query(
-          sql"""
-              with ranked_validators_by_purchased_traffic as (
-                select   party as validator,
-                         max(cumulative_traffic_num_purchases) as cumulative_traffic_num_purchases,
-                         max(cumulative_traffic_purchased) as cumulative_traffic_purchased,
-                         max(cumulative_traffic_purchased_cc_spent) as cumulative_traffic_purchased_cc_spent,
-                         rank() over (order by max(cumulative_traffic_purchased) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_traffic_purchased > 0
-                group by party
-              ),
-              last_purchases as (
-                select   party as validator,
-                         max(closed_round) as last_purchased_in_round
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      traffic_purchased > 0
-                group by party
-              )
-              select    rv.validator,
-                        rv.cumulative_traffic_num_purchases,
-                        rv.cumulative_traffic_purchased,
-                        rv.cumulative_traffic_purchased_cc_spent,
-                        coalesce(lp.last_purchased_in_round, 0)
-              from      ranked_validators_by_purchased_traffic rv
-              left join last_purchases lp
-              on        rv.validator = lp.validator
-              where     rv.rank_nr <= $limit
-              order by  rv.rank_nr;
-           """.as[(PartyId, Long, Long, BigDecimal, Long)],
-          "getTopValidatorsByPurchasedTraffic",
-        )
+      rows <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select   rpt.party as validator,
+                       rpt.cumulative_traffic_num_purchases,
+                       rpt.cumulative_traffic_purchased,
+                       rpt.cumulative_traffic_purchased_cc_spent,
+                       coalesce(
+                         (
+                           select   closed_round as last_purchased_in_round
+                           from     round_party_totals
+                           where    store_id = rpt.store_id
+                           and      store_id = $roundTotalsStoreId
+                           and      party = rpt.party
+                           and      traffic_purchased > 0
+                           order by closed_round desc
+                           limit 1
+                         ),
+                         0
+                       ) as last_purchased_in_round
+              from     round_party_totals rpt
+              join     active_parties ap
+              on       rpt.store_id = ap.store_id
+              and      rpt.party = ap.party
+              and      rpt.closed_round = ap.closed_round
+              and      rpt.store_id = $roundTotalsStoreId
+              and      cumulative_traffic_purchased > 0
+              order by cumulative_traffic_purchased desc, rpt.party desc
+              limit $limit;
+            """.as[(PartyId, Long, Long, BigDecimal, Long)],
+            "getTopValidatorsByPurchasedTraffic",
+          )
+        } else {
+          Future.successful(Seq())
+        }
       }
     } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
   }
