@@ -240,7 +240,15 @@ object SqlIndexInitializationTrigger {
           on update_history_creates (history_id, migration_id, contract_id)
           where record_time = #${CantonTimestamp.MinValue.toMicros}
         """,
-      )
+      ),
+    IndexAction
+      .Create(
+        indexName = "round_party_totals_sid_pid_cr",
+        createAction = sqlu"""
+          create index concurrently if not exists round_party_totals_sid_pid_cr
+          on round_party_totals (store_id, party, closed_round desc)
+        """,
+      ),
   )
 
   sealed trait Task extends Product with Serializable with PrettyPrinting

@@ -108,6 +108,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     with StandaloneCanton
     with SplitwellTestUtil {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   private val initialRound = 481516L
 
   override def dbsSuffix = "domain_migration"

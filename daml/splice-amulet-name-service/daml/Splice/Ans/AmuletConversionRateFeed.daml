@@ -1,0 +1,78 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Templates to communicate amulet conversion rates.
+--
+-- This does not fit a narrow interpretation of "Amulet Name Service", but it fits
+-- very well if we widen the role of the ANS to serve as a store for
+-- public data of high-value to network participants. Evolving ANS in this direction
+-- is a long-standing plan.
+module Splice.Ans.AmuletConversionRateFeed where
+
+import DA.Assert
+import DA.Foldable
+import DA.Time
+import Splice.AmuletRules
+import Splice.Api.FeaturedAppRightV1 qualified as Api
+import Splice.Schedule
+import Splice.Types
+import Splice.Util
+
+data MarkerContext = MarkerContext
+  with
+    featuredAppRightCid : ContractId Api.FeaturedAppRight
+    beneficiaries : [Api.AppRewardBeneficiary]
+  deriving (Show, Eq)
+
+-- | Amulet conversion rate feed published by a given 'publisher'.
+-- Publisher must only create one feed per publisher.
+-- The feed can only be updated every 0.5 tickDuration as the SVs also only change the price on round boundaries
+-- and this avoids unnecessary load.
+template AmuletConversionRateFeed
+  with
+    publisher : Party
+    dso : Party
+    nextUpdateAfter : Optional Time -- ^ The earliest time after which the publisher is  allowed to update this feed.
+    amuletConversionRate : Decimal -- ^ conversion rate in USD/Amulet
+  where
+    signatory publisher
+    observer dso
+
+    choice AmuletConversionRateFeed_ArchiveAsDso : AmuletConversionRateFeed_ArchiveAsDsoResult
+      with
+        reason : Text
+      controller dso
+      do pure AmuletConversionRateFeed_ArchiveAsDsoResult
+
+    choice AmuletConversionRateFeed_Update : AmuletConversionRateFeed_UpdateResult
+      with
+        amuletConversionRate : Decimal
+        amuletRulesCid : ContractId AmuletRules
+        markerContextO : Optional MarkerContext
+        newNextUpdateAfter : Time -- ^ Must be set to at least now + 0.5 tickDuration
+      controller publisher
+      do amuletRules <- fetchPublicReferenceData (ForDso dso) amuletRulesCid (AmuletRules_Fetch publisher)
+         currentConfig <- getValueAsOfLedgerTime amuletRules.configSchedule
+         forA_ nextUpdateAfter $ assertDeadlineExceeded "nextUpdateAfter"
+         -- We use a rate limit of 0.5 ticks to avoid increasingly lagging behind rounds as your update will
+         -- always be slightly slower than the minimum rate limit.
+         -- we add one extra microseconds so now + 5 minutes is allowed and the caller does not need to add the microsecond
+         assertWithinDeadline "newNextUpdateAfter - 0.5 tickDuration" (newNextUpdateAfter `addRelTime` convertMicrosecondsToRelTime (- (convertRelTimeToMicroseconds currentConfig.tickDuration) / 2 + 1))
+         forA_ markerContextO $ \markerContext -> do
+           _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
+           exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
+             with
+               beneficiaries = markerContext.beneficiaries
+         cid <- create this with
+           amuletConversionRate
+           nextUpdateAfter = Some newNextUpdateAfter
+         pure AmuletConversionRateFeed_UpdateResult { cid }
+
+instance HasCheckedFetch Api.FeaturedAppRightView ForOwner where
+  contractGroupId Api.FeaturedAppRightView{..} = ForOwner{dso,owner = provider}
+
+data AmuletConversionRateFeed_ArchiveAsDsoResult = AmuletConversionRateFeed_ArchiveAsDsoResult
+
+data AmuletConversionRateFeed_UpdateResult = AmuletConversionRateFeed_UpdateResult
+  with
+    cid : ContractId AmuletConversionRateFeed

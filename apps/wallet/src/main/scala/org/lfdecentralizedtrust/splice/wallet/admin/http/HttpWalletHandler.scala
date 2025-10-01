@@ -1273,10 +1273,15 @@ class HttpWalletHandler(
           parties,
           now,
         )
+        noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
+          store.walletKey.dsoParty,
+          now,
+        )
       } yield WalletResource.FeatureSupportResponse.OK(
         d0.WalletFeatureSupportResponse(
           tokenStandard = tokenStandard.supported,
           transferPreapprovalDescription = preapprovalDescription.supported,
+          noHoldingFeesOnTransfers = noHoldingFeesOnTransfers.supported,
         )
       )
     }

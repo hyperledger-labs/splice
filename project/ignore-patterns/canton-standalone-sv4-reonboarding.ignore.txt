@@ -16,3 +16,5 @@ TOPOLOGY_UNAUTHORIZED_TRANSACTION
 SEQUENCER_SUBSCRIPTION_LOST
 
 Failed to send result to sequencer for request .*Unregistered recipients.* unregistered senders.*MED::sv4SvReonboarding
+
+Could not send a time-advancing message

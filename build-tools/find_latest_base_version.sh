@@ -5,7 +5,5 @@
 
 set -euo pipefail
 
-# TODO(DACH-NY/canton-network-internal#1735) revert back to LATEST_RELEASE once that is 0.4.18
-# latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
-# echo "release-line-${latest_release}"
-echo "release-line-0.4.18-snapshot.20250918.919.0.v461bbb85"
+latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
+echo "release-line-${latest_release}"

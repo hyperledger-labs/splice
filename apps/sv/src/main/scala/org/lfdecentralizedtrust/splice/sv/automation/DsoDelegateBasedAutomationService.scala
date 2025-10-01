@@ -76,7 +76,6 @@ class DsoDelegateBasedAutomationService(
       new ExpireRewardCouponsTrigger(
         triggerContext,
         svTaskContext,
-        config.automation.ignoredExpiredRewardsPartyIds,
       )
     )
 

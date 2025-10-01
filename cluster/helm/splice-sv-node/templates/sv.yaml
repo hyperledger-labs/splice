@@ -411,11 +411,31 @@ spec:
                 echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
+        {{- if .Values.participantIdentitiesDumpImport }}
+        - name: chown-participant-bootstrapping-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "cp /participant-bootstrapping-dump-secret/content /participant-bootstrapping-dump/ && chown -R 1001:1001 /participant-bootstrapping-dump"]
+          volumeMounts:
+            - name: participant-bootstrapping-dump-secret
+              mountPath: /participant-bootstrapping-dump-secret
+            - name: participant-bootstrapping-dump-volume
+              mountPath: /participant-bootstrapping-dump
+        {{- end }}
+        {{- if .Values.migration.attachPvc }}
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+        {{- end }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-volume
+        - name: participant-bootstrapping-dump-secret
           secret:
             secretName: {{ .secretName }}
+        - name: participant-bootstrapping-dump-volume
+          emptyDir: {}
       {{- end }}
       {{- if .Values.migration.attachPvc }}
         - name: domain-upgrade-dump-volume

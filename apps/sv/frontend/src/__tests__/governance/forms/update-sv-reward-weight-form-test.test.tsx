@@ -199,6 +199,34 @@ describe('Update SV Reward Weight Form', () => {
     );
   });
 
+  test('Current weight of selected SV is shown', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+
+    const validateCurrentWeightFor = async (sv: string, weight: string) => {
+      await waitFor(async () => {
+        fireEvent.mouseDown(selectInput);
+        const memberToSelect = screen.getByText(sv);
+        expect(memberToSelect).not.toBeNull();
+        await user.click(memberToSelect);
+        expect(await screen.findByText(`Current Weight: ${weight}`)).toBeDefined();
+      });
+    };
+
+    await validateCurrentWeightFor('Digital-Asset-2', '10');
+    await validateCurrentWeightFor('Digital-Asset-Eng-2', '12345');
+  });
+
   test('Weight must be a valid number', async () => {
     const user = userEvent.setup();
     render(

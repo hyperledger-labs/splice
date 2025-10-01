@@ -47,6 +47,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.plugins.{
+  EventHistorySanityCheckPlugin,
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
   TokenStandardCliSanityCheckPlugin,
@@ -178,6 +179,11 @@ object SpliceTests extends LazyLogging {
       )
     }
 
+    protected def runEventHistorySanityCheck: Boolean = true
+    if (runEventHistorySanityCheck) {
+      registerPlugin(new EventHistorySanityCheckPlugin(loggerFactory))
+    }
+
     protected def runTokenStandardCliSanityCheck: Boolean = true
     protected lazy val tokenStandardCliBehavior
         : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
@@ -232,6 +238,11 @@ object SpliceTests extends LazyLogging {
           loggerFactory,
         )
       )
+    }
+
+    protected def runEventHistorySanityCheck: Boolean = true
+    if (runEventHistorySanityCheck) {
+      registerPlugin(new EventHistorySanityCheckPlugin(loggerFactory))
     }
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong

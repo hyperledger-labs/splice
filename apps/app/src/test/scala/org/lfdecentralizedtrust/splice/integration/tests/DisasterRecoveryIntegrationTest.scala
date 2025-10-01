@@ -64,6 +64,8 @@ class DisasterRecoveryIntegrationTest
     with SvTestUtil
     with WalletTestUtil {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   override def dbsSuffix = "disaster_recovery"
 
   override def usesDbs: IndexedSeq[String] = {

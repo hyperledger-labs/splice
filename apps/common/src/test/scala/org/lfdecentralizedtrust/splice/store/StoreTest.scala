@@ -321,6 +321,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ratePerRound: BigDecimal,
       version: DarResource = DarResources.amulet_current,
       dso: PartyId = dsoParty,
+      holders: Seq[PartyId] = Seq.empty,
   ) = {
     val templateId = new Identifier(
       version.packageId,
@@ -331,7 +332,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val template = new amuletCodegen.LockedAmulet(
       amuletTemplate,
       new expiryCodegen.TimeLock(
-        java.util.List.of(),
+        holders.map(_.toProtoPrimitive).asJava,
         Instant.now().truncatedTo(ChronoUnit.MICROS),
         None.toJava,
       ),
