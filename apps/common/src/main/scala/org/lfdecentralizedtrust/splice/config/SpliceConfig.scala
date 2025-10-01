@@ -34,6 +34,7 @@ abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
 final case class CircuitBreakerConfig(
+    // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
     maxFailures: Int = 40,
     callTimeout: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
@@ -43,16 +44,17 @@ final case class CircuitBreakerConfig(
     randomFactor: Double = 0.2,
 )
 
-// TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
 final case class CircuitBreakersConfig(
     highPriority: CircuitBreakerConfig = CircuitBreakerConfig(
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
     ),
     mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
       maxFailures = 20,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
     ),
     lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
       maxFailures = 10,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),
