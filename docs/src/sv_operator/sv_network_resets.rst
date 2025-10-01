@@ -62,12 +62,14 @@ To complete the reset, go through the following steps:
     c. Set ``chainIdSuffix`` to the new value in ``cometbft-values.yaml`` and ``info-values.yaml``.
        Usually this will just increase by 1 on a network reset but double check with
        the other SV operators on what has been agreed upon.
+    d. Founding node only: Set all helm chart values that affect network parameters,
+       such that the verification steps listed below pass.
     d. Install all helm charts.
     e. Wait until your SV node is sending status reports.
 
 5.  Verify that network parameters were preserved
 
-    a. Confirm that the reset did not change any network parameters
+    a. Confirm that the reset did not change the dso rules
        by repeating step 1.a and comparing the result:
 
        .. code-block:: bash
