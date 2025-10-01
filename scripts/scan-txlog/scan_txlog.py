@@ -417,6 +417,18 @@ class DamlDecimal:
 class KnownPackageIds:
     amulet_0_1_0 = "48cac5ba4b6bf78df6c3a952ce05409a1d2ef39c05351074679adc0cf9cd1351"
     amulet_0_1_1 = "67bc95402ad7b08fcdff0ed478308d39c70baca2238c35c5d425a435a8a9e7f7"
+    amulet_0_1_2 = "1446ffdf23326cef2de97923df96618eb615792bea36cf1431f03639448f1645"
+    amulet_0_1_3 = "0d89016d5a90eb8bced48bbac99e81c57781b3a36094b8d48b8e4389851e19af"
+    amulet_0_1_4 = "a36ef8888fb44caae13d96341ce1fabd84fc9e2e7b209bbc3caabb48b6be1668"
+    amulet_0_1_5 = "b4867a47abbfa2d15482f22c9c50516f0af14036287f299342f5d336391e4997"
+    amulet_0_1_6 = "979ec710c3ae3a05cb44edf8461a9b4d7dd2053add95664f94fc89e5f18df80f"
+    amulet_0_1_7 = "4646d50cbdec6f088c98ae543da5c973d2d1be3363b9f32eb097d8fdc063ade7"
+    amulet_0_1_8 = "511bd3bf23fab4e5171edb22dceabe3061f7faf78a44f8af44f3b87f977c61f6"
+    amulet_0_1_9 = "a5b055492fb8f08b2e7bc0fc94da6da50c39c2e1d7f24cd5ea8db12fc87c1332"
+    amulet_0_1_10 = "17e51d96dbe9e41e7e5f621861419905206c12aeef77956c0a0da14714c1fa62"
+    amulet_0_1_11 = "9824927cdb455f833867b74c01cffcd8cb8cc5edd4d2273cea1329b708ef3ce5"
+    amulet_0_1_12 = "95a88ff9ffd509e097802ecf3bbd58c83a5dff408e439cca4e2105ebd2cd0760"
+    amulet_0_1_13 = "6e9fc50fb94e56751b49f09ba2dc84da53a9d7cff08115ebb4f6b7a12d0c990c"
 
     # Returns True if the package id of splice-amulet that the
     # AmuletRules_Transfer choice was exercised on
@@ -426,6 +438,25 @@ class KnownPackageIds:
         return package_id in [
             KnownPackageIds.amulet_0_1_0,
             KnownPackageIds.amulet_0_1_1,
+        ]
+
+    @staticmethod
+    def deducts_holding_fees(package_id):
+        return package_id in [
+            KnownPackageIds.amulet_0_1_0,
+            KnownPackageIds.amulet_0_1_1,
+            KnownPackageIds.amulet_0_1_2,
+            KnownPackageIds.amulet_0_1_3,
+            KnownPackageIds.amulet_0_1_4,
+            KnownPackageIds.amulet_0_1_5,
+            KnownPackageIds.amulet_0_1_6,
+            KnownPackageIds.amulet_0_1_7,
+            KnownPackageIds.amulet_0_1_8,
+            KnownPackageIds.amulet_0_1_9,
+            KnownPackageIds.amulet_0_1_10,
+            KnownPackageIds.amulet_0_1_11,
+            KnownPackageIds.amulet_0_1_12,
+            KnownPackageIds.amulet_0_1_13,
         ]
 
 
@@ -1413,7 +1444,8 @@ class TransferInputs:
 
         return (output, effective_inputs, total_cc, all_inputs)
 
-    def summary(self, subtract_holding_fees_per_round):
+    def summary(self, exercised_event):
+        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(exercised_event.template_id.package_id)
         output = []
         effective_inputs = []
         unfeatured_app_rewards = {}
@@ -2389,7 +2421,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
+        ) = transfer_inputs.summary(event)
         output_amulets_cids = res.get_transfer_result_created_amulets()
         output_fees = res.get_transfer_result_output_fees()
         sender_change_amulet_cid = res.get_transfer_result_sender_change_amulet()
@@ -2599,7 +2631,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
+        ) = transfer_inputs.summary(event)
         amulet_paid = res.get_buy_member_traffic_result_amulet_paid()
         sender_change_cid = res.get_buy_member_traffic_result_sender_change_amulet()
         transfer_summary = res.get_buy_member_traffic_result_transfer_summary()
@@ -2811,7 +2843,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
+        ) = transfer_inputs.summary(event)
         sender_change_cid = transfer_result.get_transfer_result_sender_change_amulet()
         output_fees = transfer_result.get_transfer_result_output_fees()
         if sender_change_cid:
@@ -4159,11 +4191,6 @@ def _parse_cli_args():
     parser.add_argument(
         "--compare-acs-with-snapshot",
         help="Compares the ACS at the end of the script with the ACS snapshot of the given record_time",
-    )
-    parser.add_argument(
-        "--subtract-holding-fees-per-round",
-        help="Before CIP 78, holding fees reduce the value of Amulets every round. After it, they do not. This flag enables the old behavior.",
-        action="store_true",
     )
     parser.add_argument(
         "--compare-balances-with-total-supply",

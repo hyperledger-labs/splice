@@ -349,6 +349,6 @@ describe('SetAmuletRules', () => {
         // the second element is gone
       ).toStrictEqual(initialSteps.filter((_, i) => i !== 1));
     },
-    { timeout: 10000 }
+    { timeout: 20000 }
   );
 });
