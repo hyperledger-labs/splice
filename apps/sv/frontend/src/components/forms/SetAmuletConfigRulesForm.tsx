@@ -24,6 +24,7 @@ import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { Box, Typography } from '@mui/material';
 import { ProposalSummary } from '../governance/ProposalSummary';
+import { buildAmuletRulesConfigFromChanges } from '../../utils/buildAmuletRulesConfigFromChanges';
 
 export type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -85,11 +86,35 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
 
   const form = useAppForm({
     defaultValues,
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value: formData }) => {
+      console.log('submit amulet config form data: ', formData);
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        console.log('submit amulet config form data: ', value);
+        if (!amuletConfig) {
+          throw new Error('Amulet Config is not defined');
+        }
+
+        const changes = configFormDataToConfigChanges(
+          formData.config,
+          allAmuletConfigChanges,
+          false
+        );
+        const baseConfig = amuletConfig;
+        const newConfig = buildAmuletRulesConfigFromChanges(changes);
+        const action: ActionRequiringConfirmation = {
+          tag: 'ARC_AmuletRules',
+          value: {
+            amuletRulesAction: {
+              tag: 'CRARC_SetConfig',
+              value: {
+                baseConfig: baseConfig,
+                newConfig: newConfig,
+              },
+            },
+          },
+        };
+        console.log('action for submission', action);
       }
     },
 
@@ -104,9 +129,9 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
   });
 
   const maybeConfig = dsoInfoQuery.data?.amuletRules.payload.configSchedule.initialValue;
-  const dsoConfig = maybeConfig ? maybeConfig : null;
+  const amuletConfig = maybeConfig ? maybeConfig : null;
   // passing the config twice here because we initially have no changes
-  const amuletConfigChanges = buildAmuletConfigChanges(dsoConfig, dsoConfig, true);
+  const allAmuletConfigChanges = buildAmuletConfigChanges(amuletConfig, amuletConfig, true);
 
   return (
     <FormLayout form={form} id="set-amulet-config-rules-form">
@@ -120,7 +145,7 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
           formType="config-change"
           configFormData={configFormDataToConfigChanges(
             form.state.values.config,
-            amuletConfigChanges
+            allAmuletConfigChanges
           )}
           onEdit={() => setShowConfirmation(false)}
           onSubmit={() => {}}
@@ -188,7 +213,7 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
               Configuration
             </Typography>
 
-            {amuletConfigChanges.map((change, index) => (
+            {allAmuletConfigChanges.map((change, index) => (
               <form.AppField name={`config.${change.fieldName}`} key={index}>
                 {field => <field.ConfigField configChange={change} key={index} />}
               </form.AppField>
