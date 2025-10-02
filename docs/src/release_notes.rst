@@ -17,10 +17,17 @@ Upcoming
 
   - Validator
 
-     - Add a trigger to export the metric ``validator_synchronizer_topology_num_parties``
-       that counts the number of parties allocated on the Global Synchronizer.
-       The trigger does not run by default. To enable it, add the following to your validator app config:
-       ``canton.validator-apps.<your-validator-name>.automation.topology-metrics-polling-interval = 5m``.
+     - Add a trigger to export these party metrics:
+
+        - ``validator_synchronizer_topology_num_parties``:
+          counts the number of parties allocated on the Global Synchronizer
+        - ``validator_synchronizer_topology_num_parties_per_participant``:
+          uses the label ``participant_id`` and
+          counts the number of parties hosted on the Global Synchronizer per participant.
+          Note that multi-hosted parties are counted for each participant they are hosted on.
+
+       The trigger does not run by default. See :ref:`enable_extra_metric_triggers`
+       for instructions on how to enable it.
 
   - SV
 
