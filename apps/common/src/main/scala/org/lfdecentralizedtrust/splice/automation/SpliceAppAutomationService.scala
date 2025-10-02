@@ -60,6 +60,8 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     createConnectionWithPriority(SpliceLedgerConnectionPriority.Medium)
   private val highPriorityConnection =
     createConnectionWithPriority(SpliceLedgerConnectionPriority.High)
+  private val amuletExpiryConnection =
+    createConnectionWithPriority(SpliceLedgerConnectionPriority.AmuletExpiry)
 
   private def createConnectionWithPriority(priority: SpliceLedgerConnectionPriority) = {
     val (name, config) = priority match {
@@ -69,6 +71,8 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
         "medium" -> parametersConfig.circuitBreakers.mediumPriority
       case SpliceLedgerConnectionPriority.Low =>
         "low" -> parametersConfig.circuitBreakers.lowPriority
+      case SpliceLedgerConnectionPriority.AmuletExpiry =>
+        "amulet-expiry" -> parametersConfig.circuitBreakers.amuletExpiry
     }
     ledgerClient.connection(
       this.getClass.getSimpleName,
@@ -89,6 +93,7 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       case SpliceLedgerConnectionPriority.High => highPriorityConnection
       case SpliceLedgerConnectionPriority.Medium => mediumPriorityConnection
       case SpliceLedgerConnectionPriority.Low => lowPriorityConnection
+      case SpliceLedgerConnectionPriority.AmuletExpiry => amuletExpiryConnection
     }
 
   private def completionOffsetCallback(offset: Long): Future[Unit] =

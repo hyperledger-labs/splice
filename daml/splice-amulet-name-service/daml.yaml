@@ -1,7 +1,7 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-amulet-name-service
 source: daml
-version: 0.1.14
+version: 0.1.15
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -9,9 +9,11 @@ data-dependencies:
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
+- ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
+  - -Wno-ledger-time-is-alpha
   - --target=2.1
 codegen:
   java:

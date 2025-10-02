@@ -40,7 +40,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.circe.Json
-import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 
 import java.time.Instant
@@ -267,7 +266,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   def destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse]
 }
 
-object MultiDomainAcsStore {
+object MultiDomainAcsStore extends StoreErrors {
 
   sealed trait TxLogBackfillingState
   object TxLogBackfillingState {
@@ -837,11 +836,7 @@ object MultiDomainAcsStore {
   ): Future[A] =
     found.map { result =>
       result.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(
-            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
-          )
-          .asRuntimeException
+        throw contractIdNotFound(PrettyContractId(companionClass.typeId(companion), id))
       )
     }
 

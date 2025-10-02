@@ -9,9 +9,9 @@ import {
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  getAdditionalJvmOptions,
   getParticipantKmsHelmResources,
   installSpliceHelmChart,
-  jmxOptions,
   loadYamlFromFile,
   sanitizedForPostgres,
   SPLICE_ROOT,
@@ -87,7 +87,12 @@ export function installParticipant(
           active: true,
         },
       },
-      additionalJvmOptions: jmxOptions(),
+      additionalJvmOptions: getAdditionalJvmOptions(
+        validatorConfig.participant?.additionalJvmOptions
+      ),
+      additionalEnvVars: (participantValuesWithSpecifiedAud.additionalEnvVars ?? []).concat(
+        validatorConfig.participant?.additionalEnvVars ?? []
+      ),
       enablePostgresMetrics: true,
       resources: {
         requests: {

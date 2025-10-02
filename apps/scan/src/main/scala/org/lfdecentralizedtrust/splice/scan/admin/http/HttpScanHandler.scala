@@ -33,13 +33,14 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
   DamlValueEncoding,
+  ErrorResponse,
+  EventHistoryRequest,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
   UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
-  EventHistoryRequest,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -49,7 +50,6 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
-
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -413,8 +413,15 @@ class HttpScanHandler(
             HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
           )
       } yield {
-        definitions.GetTotalAmuletBalanceResponse(
-          Codec.encode(total)
+        total.fold(
+          v0.ScanResource.GetTotalAmuletBalanceResponse
+            .NotFound(ErrorResponse(s"No total amulet balance found for round $asOfEndOfRound"))
+        )(total =>
+          v0.ScanResource.GetTotalAmuletBalanceResponse.OK(
+            definitions.GetTotalAmuletBalanceResponse(
+              Codec.encode(total)
+            )
+          )
         )
       }
     }
@@ -447,7 +454,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAmuletConfigForRound") { _ => _ =>
       store
         .getAmuletConfigForRound(round)
-        .map(cfg => {
+        .map { cfg =>
           val transferFee = cfg.transferFee.getOrElse(throw new RuntimeException("No transfer fee"))
           v0.ScanResource.GetAmuletConfigForRoundResponse.OK(
             definitions.GetAmuletConfigForRoundResponse(
@@ -464,7 +471,7 @@ class HttpScanHandler(
               ),
             )
           )
-        })
+        }
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
   }
@@ -1392,17 +1399,25 @@ class HttpScanHandler(
             snapshotStore.currentMigrationId,
             snapshotTime,
           )
-          // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
-          // this is, in principle, not a problem:
-          // - this will only be used in tests
-          // - wall clock tests must take manual snapshots anyway, because they can't wait
-          // - simtime tests will advanceTime(N.hours)
-          _ = logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
-          _ <- snapshotStore.insertNewSnapshot(
-            lastSnapshot,
-            snapshotStore.currentMigrationId,
-            snapshotTime,
-          )
+          _ <-
+            if (lastSnapshot.exists(_.snapshotRecordTime == snapshotTime)) {
+              logger.debug(
+                s"ACS snapshot at $snapshotTime already existed, likely to happen in simtime tests."
+              )
+              Future.successful(snapshotTime)
+            } else {
+              logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
+              // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
+              // this is, in principle, not a problem:
+              // - this will only be used in tests
+              // - wall clock tests must take manual snapshots anyway, because they can't wait
+              // - simtime tests will advanceTime(N.hours)
+              snapshotStore.insertNewSnapshot(
+                lastSnapshot,
+                snapshotStore.currentMigrationId,
+                snapshotTime,
+              )
+            }
         } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
           definitions.ForceAcsSnapshotResponse(
             snapshotTime.toInstant.atOffset(ZoneOffset.UTC),
@@ -2135,8 +2150,9 @@ class HttpScanHandler(
 
   override def featureSupport(respond: ScanResource.FeatureSupportResponse.type)()(
       extracted: TraceContext
-  ): Future[ScanResource.FeatureSupportResponse] = readFeatureSupport(
-  )(extracted, tracer).map(ScanResource.FeatureSupportResponseOK(_))
+  ): Future[ScanResource.FeatureSupportResponse] =
+    readFeatureSupport(store.key.dsoParty)(ec, extracted, tracer)
+      .map(ScanResource.FeatureSupportResponseOK(_))
 
   private def parseTimestamp(str: String): CantonTimestamp = {
     val timestamp = for {

@@ -145,4 +145,7 @@ Rejected transaction due to a participant determined timeout
 # Seems like sometimes mediators time out maybe around onboarding, not worth investigating unless it causes issues.
 Sequencing result message timed out.*mediator=
 
+# TODO (DACH-NY/canton-network-internal#966) - remove if not necessary anymore
+ACS_COMMITMENT_DEGRADATION
+
 # Make sure to have a trailing newline

@@ -9,9 +9,11 @@ import {
   InstalledHelmChart,
   installSpliceHelmChart,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { PartyAllocatorConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 
 export function installPartyAllocator(
   xns: ExactNamespace,
+  config: PartyAllocatorConfig,
   dependsOn: CnInput<pulumi.Resource>[]
 ): InstalledHelmChart {
   return installSpliceHelmChart(
@@ -22,9 +24,9 @@ export function installPartyAllocator(
       jsonLedgerApiUrl: `http://participant-${DecentralizedSynchronizerUpgradeConfig.active.id}:7575`,
       scanApiUrl: 'http://scan-app.sv-1:5012',
       validatorApiUrl: 'http://validator-app:5003',
-      maxParties: 10000,
+      maxParties: config.maxParties,
       keysDirectory: '/keys',
-      parallelism: 5,
+      parallelism: config.parallelism,
     },
     activeVersion,
     { dependsOn }

@@ -8,7 +8,7 @@ object Dependencies {
 
   lazy val scala_version = "2.13.16"
 
-  lazy val scalatest_version = "3.2.11"
+  lazy val scalatest_version = "3.2.19"
 
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
 

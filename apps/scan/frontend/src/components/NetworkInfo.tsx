@@ -41,7 +41,6 @@ const NetworkInfo: React.FC = () => {
   const amuletName = config.spliceInstanceNames.amuletName;
   const getAmuletRulesQuery = useGetAmuletRules();
   const openRoundsQuery = useOpenRounds();
-  const featureSupport = useFeatureSupport();
 
   let openRoundsDisplay: JSX.Element;
   switch (openRoundsQuery.status) {
@@ -94,10 +93,6 @@ const NetworkInfo: React.FC = () => {
     `Fees burn ${amuletName}. Fees encourage active use of ${amuletName} and maintain positive pressure on the value of ${amuletName} by constraining the total supply over time.` +
     `The Super Validators mint ${amuletName} via smart contracts triggered by a consensus vote of 2/3 of the Super Validators.` +
     `Super Validators and Validators burn ${amuletName} to pay fees. Minting and burning takes place in fixed time cycles called rounds.`;
-
-  if (featureSupport.isLoading) {
-    return <Loading />;
-  }
 
   switch (getAmuletRulesQuery.status) {
     case 'pending':
@@ -194,9 +189,23 @@ const NextConfigUpdate: React.FC = () => {
   );
 };
 
-const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConfig }) => {
+const FeesTable: React.FC<{
+  amuletConfig: AmuletConfig<'USD'>;
+}> = ({ amuletConfig }) => {
+  const featureSupport = useFeatureSupport();
   const config = useScanConfig();
   const amuletName = config.spliceInstanceNames.amuletName;
+
+  if (featureSupport.isLoading) {
+    return <Loading />;
+  }
+  if (featureSupport.isError) {
+    return <ErrorDisplay message="Failed to fetch feature support info" />;
+  }
+  const holdingFeesDescription = featureSupport.data!.noHoldingFeesOnTransfers
+    ? `A fixed fee for maintaining each active ${amuletName} record, computed per round, but only charged if it surpasses the ${amuletName} amount.`
+    : `A fixed fee for maintaining each active ${amuletName} record, charged per round.`;
+
   return (
     <TableContainer>
       <Table>
@@ -224,7 +233,7 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
             name="Holding Fee"
             value={BigNumber(amuletConfig.transferConfig.holdingFee.rate)}
             unit="USD/Round"
-            description={`A fixed fee for maintaining each active ${amuletName} record, charged per round.`}
+            description={holdingFeesDescription}
           />
           <FeeTableRow
             name="Lock Holder Fee"

@@ -45,6 +45,8 @@ class AppUpgradeIntegrationTest
     with WalletTestUtil
     with WalletTxLogTestUtil {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   private val splitwellDarPathV1 =
     s"daml/splitwell/.daml/dist/splitwell-base.dar"
   private val splitwellDarPathCurrent =

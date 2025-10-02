@@ -571,6 +571,10 @@ object SpliceConfig {
       deriveReader[BeneficiaryConfig]
     implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
       deriveReader[SvParticipantClientConfig]
+    implicit val amuletConversionRateFeedConfig: ConfigReader[AmuletConversionRateFeedConfig] =
+      deriveReader[AmuletConversionRateFeedConfig]
+    implicit val rangeConfig: ConfigReader[RangeConfig] =
+      deriveReader[RangeConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -971,6 +975,10 @@ object SpliceConfig {
       deriveWriter[BeneficiaryConfig]
     implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =
       deriveWriter[SvParticipantClientConfig]
+    implicit val amuletConversionRateFeedConfig: ConfigWriter[AmuletConversionRateFeedConfig] =
+      deriveWriter[AmuletConversionRateFeedConfig]
+    implicit val rangeConfig: ConfigWriter[RangeConfig] =
+      deriveWriter[RangeConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

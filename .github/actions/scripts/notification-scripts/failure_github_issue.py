@@ -25,10 +25,12 @@ class FailureGithubIssue():
     repo = Repo(search_parent_directories=True)
     commit_msg = repo.head.commit.summary
     commit_sha_short = GIT_SHA[:7]
+    job_descriptor = (f"{self.args.job_subname} in " if self.args.job_subname else '') + self.args.job_name
 
-    title = f"GHA Run {self.args.gha_run_id} : job {self.args.job_name} Failed :fire:"
+    title = f"GHA Run {self.args.gha_run_id} : job {job_descriptor} Failed :fire:"
     body = f"""
 [GitHub Actions Run]({job_url}).
+Job: {job_descriptor}
 Branch: [{self.args.branch}]({branch_url})
 Workflow: {self.args.gha_workflow_name}
 Commit: [{commit_sha_short}]({github_url}) {commit_msg}

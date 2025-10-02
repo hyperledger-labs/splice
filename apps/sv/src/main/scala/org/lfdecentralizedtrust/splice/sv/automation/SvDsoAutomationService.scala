@@ -378,6 +378,17 @@ class SvDsoAutomationService(
         )
       )
     }
+
+    config.followAmuletConversionRateFeed.foreach { c =>
+      registerTrigger(
+        new FollowAmuletConversionRateFeedTrigger(
+          triggerContext,
+          dsoStore,
+          connection(SpliceLedgerConnectionPriority.Low),
+          c,
+        )
+      )
+    }
   }
 
   private val localSequencerClientContext: Option[LocalSequencerClientContext] =
@@ -503,5 +514,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
+      aTrigger[FollowAmuletConversionRateFeedTrigger],
     )
 }
