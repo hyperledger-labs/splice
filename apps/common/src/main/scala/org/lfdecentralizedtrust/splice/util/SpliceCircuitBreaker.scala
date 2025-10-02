@@ -12,19 +12,30 @@ import com.digitalasset.base.error.ErrorCategory.{
   InvalidIndependentOfSystemState,
 }
 import com.digitalasset.base.error.utils.ErrorDetails
-import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.pattern.{CircuitBreaker, CircuitBreakerOpenException}
 import org.lfdecentralizedtrust.splice.config.CircuitBreakerConfig
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-class SpliceCircuitBreaker(name: String, underlying: CircuitBreaker)(implicit
-    ec: ExecutionContext
-) {
+class SpliceCircuitBreaker(
+    name: String,
+    config: CircuitBreakerConfig,
+    clock: Clock,
+    override val loggerFactory: NamedLoggerFactory,
+)(implicit
+    ec: ExecutionContext,
+    scheduler: Scheduler,
+) extends NamedLogging {
+
+  private val lastFailure: AtomicReference[Option[CantonTimestamp]] = new AtomicReference(None)
 
   private val errorCategoriesToIgnore: Set[ErrorCategory] = Set(
     InvalidIndependentOfSystemState,
@@ -34,7 +45,25 @@ class SpliceCircuitBreaker(name: String, underlying: CircuitBreaker)(implicit
     InvalidGivenCurrentSystemStateSeekAfterEnd,
   )
 
-  def withCircuitBreaker[T](body: => Future[T]): Future[T] = {
+  val underlying = new CircuitBreaker(
+    scheduler,
+    maxFailures = config.maxFailures,
+    callTimeout = config.callTimeout.underlying,
+    resetTimeout = config.resetTimeout.underlying,
+    maxResetTimeout = config.maxResetTimeout.underlying,
+    exponentialBackoffFactor = config.exponentialBackoffFactor,
+    randomFactor = config.randomFactor,
+  ).onOpen {
+    logger.warn(
+      s"Circuit breaker $name tripped after ${config.maxFailures} failures"
+    )(TraceContext.empty)
+  }.onHalfOpen {
+    logger.info(s"Circuit breaker $name moving to half-open state")(TraceContext.empty)
+  }.onClose {
+    logger.info(s"Circuit breaker $name moving to closed state")(TraceContext.empty)
+  }
+
+  def withCircuitBreaker[T](body: => Future[T])(implicit tc: TraceContext): Future[T] = {
     if (underlying.isClosed || underlying.isHalfOpen) {
       callAndMark(body)
     } else {
@@ -47,11 +76,27 @@ class SpliceCircuitBreaker(name: String, underlying: CircuitBreaker)(implicit
     }
   }
 
-  private def callAndMark[T](body: => Future[T]) = {
+  private def callAndMark[T](body: => Future[T])(implicit tc: TraceContext) = {
+    lastFailure.updateAndGet(_.filter { lastFailureTime =>
+      val elapsed = clock.now - lastFailureTime
+      if (elapsed.compareTo(config.resetFailuresAfter.asJava) >= 0) {
+        // Note: We only reset in callAndMark so this does not apply if the circuit breaker is already open.
+        // This is deliberate, in that case we want to wait for resetTimeout not resetFailuresAfter.
+        logger.info(
+          s"Resetting circuit breaker as last failure was $elapsed ago which is more than ${config.resetFailuresAfter}"
+        )
+        underlying.succeed()
+        false
+      } else {
+        true
+      }
+    })
+
     body.andThen {
       case Failure(exception) =>
         if (!isFailureIgnored(exception)) {
           underlying.fail()
+          lastFailure.set(Some(clock.now))
         }
       case Success(_) => underlying.succeed()
     }
@@ -86,26 +131,13 @@ object SpliceCircuitBreaker {
   def apply(
       name: String,
       config: CircuitBreakerConfig,
-      logger: TracedLogger,
+      clock: Clock,
+      loggerFactory: NamedLoggerFactory,
   )(implicit scheduler: Scheduler, ec: ExecutionContext): SpliceCircuitBreaker =
     new SpliceCircuitBreaker(
       name,
-      new CircuitBreaker(
-        scheduler,
-        maxFailures = config.maxFailures,
-        callTimeout = config.callTimeout.underlying,
-        resetTimeout = config.resetTimeout.underlying,
-        maxResetTimeout = config.maxResetTimeout.underlying,
-        exponentialBackoffFactor = config.exponentialBackoffFactor,
-        randomFactor = config.randomFactor,
-      ).onOpen {
-        logger.warn(
-          s"Circuit breaker $name tripped after ${config.maxFailures} failures"
-        )(TraceContext.empty)
-      }.onHalfOpen {
-        logger.info(s"Circuit breaker $name moving to half-open state")(TraceContext.empty)
-      }.onClose {
-        logger.info(s"Circuit breaker $name moving to closed state")(TraceContext.empty)
-      },
+      config,
+      clock,
+      loggerFactory,
     )
 }

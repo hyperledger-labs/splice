@@ -42,6 +42,8 @@ final case class CircuitBreakerConfig(
     maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
     exponentialBackoffFactor: Double = 2.0,
     randomFactor: Double = 0.2,
+    // If the last failure was more than resetFailuresAfter ago, reset the failures to 0.
+    resetFailuresAfter: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(15),
 )
 
 final case class CircuitBreakersConfig(

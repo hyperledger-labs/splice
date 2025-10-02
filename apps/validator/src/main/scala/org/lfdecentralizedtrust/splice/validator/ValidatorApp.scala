@@ -257,7 +257,8 @@ class ValidatorApp(
                       SpliceCircuitBreaker(
                         "restore",
                         config.parameters.circuitBreakers.mediumPriority,
-                        logger,
+                        clock,
+                        loggerFactory,
                       )(ac.scheduler, implicitly),
                     )
                     val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
