@@ -15,6 +15,13 @@ Upcoming
 
     - All app & UI images now use a non-root user.
 
+  - Validator
+
+     - Add a trigger to export the metric ``validator_synchronizer_topology_num_parties``
+       that counts the number of parties allocated on the Global Synchronizer.
+       The trigger does not run by default. To enable it, add the following to your validator app config:
+       ``canton.validator-apps.<your-validator-name>.automation.topology-metrics-polling-interval = 5m``.
+
   - SV
 
     - Deployment

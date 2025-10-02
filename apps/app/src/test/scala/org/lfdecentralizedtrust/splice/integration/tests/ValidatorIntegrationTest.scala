@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
@@ -21,6 +22,7 @@ import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
@@ -70,6 +72,13 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
             )
           })
       })
+      // The topology metrics trigger is disabled by default.
+      // Enable it here to check that it starts and runs without errors
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllAutomationConfigs(
+          _.copy(topologyMetricsPollingInterval = Some(NonNegativeFiniteDuration.ofSeconds(1)))
+        )(config)
+      )
 
   "start and restart cleanly" in { implicit env =>
     initDsoWithSv1Only()
