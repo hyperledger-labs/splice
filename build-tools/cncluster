@@ -1346,15 +1346,14 @@ function _unlock() {
 }
 
 function _check_stateful_sets() {
-    # Checks if any StatefulSets EXCEPT those with a prometheus image (which are part of the infra stack)
+    # Checks if any StatefulSets EXCEPT those in the observability namespace (which are part of the infra stack)
     # are currently deployed
     # grep exits with return code 1 if it finds no matches so we account for that
-    query_result=$(kubectl get StatefulSets -A -o json 2> /dev/null | jq '.items[].spec.template.spec.containers[].image' | grep -v postgres | { grep -v prometheus || test $? = 1; })
-    echo "$query_result"
+    kubectl get statefulset -A -o json | jq '.items[] | select(.metadata.namespace != "observability" and .metadata.namespace != "gmp-system")'
 }
 
 function _check_reset_and_unlock() {
-    s=$(_check_stateful_sets)
+    s="$(_check_stateful_sets)"
 
     if [ -n "$s" ]; then
         echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"
