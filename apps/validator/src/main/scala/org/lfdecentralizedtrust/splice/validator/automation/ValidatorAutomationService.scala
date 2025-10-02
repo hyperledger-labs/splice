@@ -42,7 +42,6 @@ import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
@@ -78,7 +77,6 @@ class ValidatorAutomationService(
     maxVettingDelay: NonNegativeFiniteDuration,
     params: SpliceParametersConfig,
     latestPackagesOnly: Boolean,
-    metrics: ValidatorAppMetrics,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -106,7 +104,6 @@ class ValidatorAutomationService(
         triggerContext
           .focus(_.config.pollingInterval)
           .replace(topologyPollingInterval),
-        metrics,
         scanConnection,
         participantAdminConnection,
       )
