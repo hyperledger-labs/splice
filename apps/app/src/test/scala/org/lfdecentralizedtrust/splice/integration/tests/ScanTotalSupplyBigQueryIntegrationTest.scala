@@ -550,7 +550,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     parseDashboardResults(runTableSqlQuery(sql))
   }
 
-  private def runTableSqlQuery(sql: String)(implicit env: FixtureParam): TableResult = {
+  private def runTableSqlQuery(sql: String): TableResult = {
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
