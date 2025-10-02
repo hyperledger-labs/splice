@@ -21,26 +21,94 @@ redeploy your node.
 
 To complete the reset, go through the following steps:
 
-1. Take a backup of the DSO configuration (replace YOUR_SCAN_URL with your own scan e.g. |gsf_scan_url|)::
+1.  Backup information to be preserved across the reset
 
-    curl -sSL --fail-with-body https://YOUR_SCAN_URL/api/scan/v0/dso > backup.json
+    a. Take a backup of the DSO configuration (replace YOUR_SCAN_URL with your own scan e.g. |gsf_scan_url|)::
 
-   The backup allows you to verify that the SV weights and package versions do not change as part of the reset.
-2. Check your desired coin price in the SV UI.
-3. Uninstall all helm charts.
-4. Delete all PVCs, docker volumes and databases (including databases
-   in Amazon AWS, GCP CloudSQL or similar).
-5. Find the new ``chainIdSuffix`` for cometbft. Usually this will just increase by 1 on a network
-   reset but double check with the other SV operators on what has been agreed upon.
-6. Redeploy your node with migration id 0, the new ``chainIdSuffix``, and ``initialAmuletPrice``
-   in the SV helm values. Note that this requires changes in the helm values of all charts.
-7. Take a backup of your node identities as they change as part of the
-   reset.
-8. Verify that the SV weights (after all SVs rejoined after the reset) and package versions did not change by querying scan again after the reset.
-9. Verify that your coin price vote has been set as desired.
+        curl -sSL --fail-with-body https://YOUR_SCAN_URL/api/scan/v0/dso > backup.json
 
-.. code-block:: bash
+       The backup allows you to verify that the SV weights and package versions do not change as part of the reset.
+    b. Make a note of your desired amulet price in the SV UI.
+    c. Make a note of all ongoing votes in the SV UI.
+       Ongoing votes will be lost as part of the reset and need to be recreated manually after the reset.
+    d. Make a note of all featured apps:
 
-    curl -sSL --fail-with-body https://YOUR_SCAN_URL/api/scan/v0/dso > current_state.json
-    diff -C2 <(jq '.dso_rules.contract.payload.svs.[] | [.[1].name, .[1].svRewardWeight]' < backup.json) <(jq '.dso_rules.contract.payload.svs.[] | [.[1].name, .[1].svRewardWeight]' < current_state.json)
-    diff <(jq '.amulet_rules.contract.payload.configSchedule.initialValue.packageConfig' < backup.json) <(jq '.amulet_rules.contract.payload.configSchedule.initialValue.packageConfig' < current_state.json)
+        curl -sSL --fail-with-body https://YOUR_SCAN_URL/api/scan/v0/featured-apps > featured.json
+
+       Featured app rights will be lost as part of the reset and need to be recreated manually after the reset.
+
+    e. Make a note of the current round in the Scan UI.
+       The current round number affects the reward distribution.
+
+2.  Decommission your old node
+
+    a. Uninstall all helm charts.
+    b. Delete all PVCs, docker volumes and databases (including databases
+       in Amazon AWS, GCP CloudSQL or similar).
+
+4.  Deploy your new node
+
+    a. Set the migration id to 0 in helm chart values. The migration id appears in all helm charts,
+       both as its own value, e.g.::
+
+           migration:
+             id: "MIGRATION_ID"
+
+       and as part of various values, e.g.::
+
+           sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
+
+    b. Set ``initialAmuletPrice`` to your desired price in ``sv-values.yaml`` (see step 1.b).
+    c. Set ``chainIdSuffix`` to the new value in ``cometbft-values.yaml`` and ``info-values.yaml``.
+       Usually this will just increase by 1 on a network reset but double check with
+       the other SV operators on what has been agreed upon.
+    d. Founding node only: Set all helm chart values that affect network parameters,
+       such that the verification steps listed below pass.
+    e. Install all helm charts.
+    f. Wait until your SV node is sending status reports.
+
+5.  Verify that network parameters were preserved
+
+    a. Confirm that the reset did not change the dso rules
+       by repeating step 1.a and comparing the result:
+
+       .. code-block:: bash
+
+           curl -sSL --fail-with-body https://YOUR_SCAN_URL/api/scan/v0/dso > current_state.json
+
+       The reset should preserve SV reward weights, i.e., the following diff should be empty:
+
+       .. code-block:: bash
+
+           jq '.dso_rules.contract.payload.svs.[] | [.[1].name, .[1].svRewardWeight]' backup.json > weights_backup.json
+           jq '.dso_rules.contract.payload.svs.[] | [.[1].name, .[1].svRewardWeight]' current_state.json > weights_current.json
+           diff -C2 weights_backup.json weights_current.json
+
+       The reset should also preserve the amulet rules modulo cryptographic keys, i.e., the following diff should
+       only show changes to the dso and synchronizer namespaces:
+
+       .. code-block:: bash
+
+           jq '.amulet_rules.contract.payload' backup.json > amulet_backup.json
+           jq '.amulet_rules.contract.payload' current_state.json > amulet_current.json
+           diff amulet_backup.json amulet_current.json
+
+    b. Check your desired coin price in the SV UI, and verify that it matches
+       the value from before the reset (see step 1.b.)
+    c. Check the current round in the Scan UI, and verify that it matches the expected value.
+       This can either be roughly the same value as before the reset (see step 1.e.), or
+       a different value if the SV operators agreed on that, e.g., to match the minting curve
+       to a different network.
+
+6.  Take a backup of your node identities as they change as part of the
+    reset.
+
+7.  Other post-reset actions
+
+    a. Recreate votes that were ongoing at the time of the reset, see step 1.c.
+    b. Re-issue onboarding secrets to validators you are sponsoring.
+    c. Recreate votes for featured apps when requested by validators.
+       The expectation is that validators reach out to their sponsor and the sponsor initiates the vote.
+       If necessary, consult the list of featured apps you backed up in step 1.d.
+    d. Update your auto-sweeping configuration, as party ids change as part
+       of the reset.
