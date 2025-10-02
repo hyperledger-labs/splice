@@ -187,7 +187,7 @@ async function setupPreapproval(
     [],
     command2,
   );
-  await client.retry("getPreapproval", () => getPreapproval(client, partyId));
+  await client.retry("getPreapproval", () => getPreapproval(client, partyId), config.preapprovalRetries, config.preapprovalRetryDelayMs);
 }
 
 function pubKeyPath(index: number) {
