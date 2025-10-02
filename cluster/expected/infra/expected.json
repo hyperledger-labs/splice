@@ -597,6 +597,28 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "grafana-pg-secret",
+        "namespace": "observability"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-observability-grafana-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "Gateway",
       "metadata": {
@@ -2409,6 +2431,80 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "observability-grafana-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "observability-grafana-pg",
+    "provider": "",
+    "type": "canton:network:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "grafana-pg",
+      "namespace": "observability",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "db": {
+          "volumeSize": "20Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "grafana-pg-secret"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "observability-grafana-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "kube-prometheus-stack",
       "compat": "true",
       "maxHistory": 10,
@@ -2513,6 +2609,7 @@
         "coreDns": {
           "enabled": false
         },
+        "database": {},
         "defaultRules": {
           "create": true
         },
@@ -2609,8 +2706,16 @@
           "deploymentStrategy": {
             "type": "Recreate"
           },
+          "envFromSecret": "grafana-pg-secret",
           "fullnameOverride": "grafana",
           "grafana.ini": {
+            "database": {
+              "host": "grafana-pg.observability.svc.cluster.local:5432",
+              "name": "cantonnet",
+              "password": "${postgresPassword}",
+              "type": "postgres",
+              "user": "cnadmin"
+            },
             "date_formats": {
               "default_timezone": "UTC"
             },
@@ -2982,7 +3087,7 @@
         "name": "observability"
       }
     },
-    "name": "observabilty",
+    "name": "observability",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
   },

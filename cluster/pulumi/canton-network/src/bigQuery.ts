@@ -14,7 +14,7 @@ import {
   Postgres,
   CloudPostgres,
   generatePassword,
-  privateNetwork,
+  privateNetworkId,
   protectCloudSql,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
@@ -367,7 +367,7 @@ function installPrivateConnectivityConfiguration(
       privateConnectionId: privateConnectionName,
       displayName: privateConnectionName,
       location: cloudsdkComputeRegion(),
-      vpcPeeringConfig: { subnet: pickDatastreamPeeringCidr(), vpc: privateNetwork.id },
+      vpcPeeringConfig: { subnet: pickDatastreamPeeringCidr(), vpc: privateNetworkId },
       labels: {
         cluster: CLUSTER_BASENAME,
       },
@@ -450,7 +450,7 @@ function createPublicationAndReplicationSlots(
   const schemaName = dbName;
   const path = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
   const scriptArgs = pulumi.interpolate`\\
-      --private-network-project="${privateNetwork.project}" \\
+      --private-network-project="${gcp.organizations.getProjectOutput({})}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
       --tables-to-replicate-length="${tablesToReplicate.length}" \\

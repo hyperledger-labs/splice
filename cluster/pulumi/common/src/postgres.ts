@@ -21,10 +21,7 @@ const cloudSqlEnterprisePlus = spliceConfig.pulumiProjectConfig.cloudSql.enterpr
 const project = gcp.organizations.getProjectOutput({});
 
 // use existing default network (needs to have a private vpc connection)
-export const privateNetwork = gcp.compute.Network.get(
-  'default',
-  pulumi.interpolate`projects/${project.name}/global/networks/default`
-);
+export const privateNetworkId = pulumi.interpolate`projects/${project.name}/global/networks/default`;
 
 export function generatePassword(
   name: string,
@@ -120,7 +117,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             : undefined),
           ipConfiguration: {
             ipv4Enabled: false,
-            privateNetwork: privateNetwork.id,
+            privateNetwork: privateNetworkId,
             enablePrivatePathForGoogleCloudServices: true,
           },
           userLabels: opts.migrationId
