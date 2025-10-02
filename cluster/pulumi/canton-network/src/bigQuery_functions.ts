@@ -592,16 +592,16 @@ const latest_round = new BQScalarFunction(
   as_of_args,
   INT64,
   `
-SELECT
-    JSON_VALUE(c.create_arguments, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1,0], 'int64'))
-  FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
-      WHERE template_id_entity_name = 'SummarizingMiningRound'
-      AND c.template_id_module_name = 'Splice.Round'
-      AND package_name = 'splice-amulet'
-      AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(
-        as_of_record_time, migration_id,
-        c.record_time, c.migration_id)
-      ORDER BY c.record_time DESC LIMIT 1;
+    (SELECT
+        CAST(JSON_VALUE(c.create_arguments, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1,0], 'int64')) AS INT64)
+      FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
+          WHERE template_id_entity_name = 'SummarizingMiningRound'
+          AND c.template_id_module_name = 'Splice.Round'
+          AND package_name = 'splice-amulet'
+          AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(
+            as_of_record_time, migration_id,
+            c.record_time, c.migration_id)
+          ORDER BY c.record_time DESC LIMIT 1)
   `
 );
 
