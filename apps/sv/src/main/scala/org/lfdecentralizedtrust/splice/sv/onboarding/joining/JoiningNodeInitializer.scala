@@ -69,7 +69,13 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.transaction.{
+  HostingParticipant,
+  ParticipantPermission,
+  PartyToParticipant,
+  TopologyMapping,
+}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -78,7 +84,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.security.interfaces.ECPrivateKey
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
@@ -457,6 +463,49 @@ class JoiningNodeInitializer(
     } yield {
       ()
     }
+  }
+
+  // We can only reconnect the domains if it already hosts the dsoParty or doesn't have an active proposal to host it
+  def canProceedWithDomainReconnect(
+      participantAdminConnection: ParticipantAdminConnection
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
+    val initConnection = ledgerClient.readOnlyConnection(
+      this.getClass.getSimpleName,
+      loggerFactory,
+    )
+    for {
+      dsoParty <- getDsoPartyId(initConnection)
+      hostDsoParty <- retryProvider.getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
+        "has_dso_party",
+        "Checks if the dso party exists on SV onboarding",
+        for {
+          partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant()
+        } yield partyToParticipantMapping.exists(_.mapping.partyId == dsoParty),
+        logger,
+      )
+      hasActiveProposalToHostDsoParty <- retryProvider.getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
+        "has_active_proposal_to_host_dso_party",
+        "Checks if there is an active proposal to host the dso party",
+        for {
+          participantId <- participantAdminConnection.getParticipantId()
+          activePartyToParticipantProposals <- participantAdminConnection
+            .listAllTransactions(
+              store = AuthorizedStore,
+              proposals = true,
+              includeMappings = Set(TopologyMapping.Code.PartyToParticipant),
+              filterNamespace = Some(participantId.namespace),
+            )
+        } yield activePartyToParticipantProposals.exists(
+          _.mapping match {
+            case m: PartyToParticipant => m.partyId == dsoParty
+            case _ => false
+          }
+        ),
+        logger,
+      )
+    } yield hostDsoParty || !hasActiveProposalToHostDsoParty
   }
 
   private def waitForSvParticipantToHaveSubmissionRights(
@@ -888,7 +937,7 @@ class JoiningNodeInitializer(
     }
   }
 
-  private def getDsoPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
+  def getDsoPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
     dsoPartyFromMetadata <- connection.lookupDsoPartyFromUserMetadata(config.ledgerApiUser)
     dsoParty <- dsoPartyFromMetadata
       .fold(
