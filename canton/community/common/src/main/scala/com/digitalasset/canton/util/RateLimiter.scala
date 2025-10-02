@@ -65,10 +65,4 @@ class RateLimiter(
     currentState_.updateAndGet(_.update(now)).approvedLastTask
   }
 
-  /** Returns how far we are from hitting the rate limit at the current moment in time. */
-  final def getCurrentAllowance: Double = {
-    val now = nanoTime
-    currentState_.get().getCurrentTaskAllowance(now)
-  }
-
 }

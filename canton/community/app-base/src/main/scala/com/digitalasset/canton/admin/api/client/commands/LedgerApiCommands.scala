@@ -154,6 +154,7 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdatesResponse,
   UpdateServiceGrpc,
 }
+import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.admin.api.client
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
@@ -175,9 +176,9 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.{
-  IdentityProviderConfig as ApiIdentityProviderConfig,
   IdentityProviderId,
   JwksUrl,
+  IdentityProviderConfig as ApiIdentityProviderConfig,
 }
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
