@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.19
+------
 
   - Sequencer
 
@@ -24,9 +24,9 @@ Upcoming
      - Add a trigger to export these party metrics:
 
         - ``validator_synchronizer_topology_num_parties``:
-          counts the number of parties allocated on the Global Synchronizer
+          Counts the number of parties allocated on the Global Synchronizer
         - ``validator_synchronizer_topology_num_parties_per_participant``:
-          uses the label ``participant_id`` and
+          Uses the label ``participant_id`` and
           counts the number of parties hosted on the Global Synchronizer per participant.
           Note that multi-hosted parties are counted for each participant they are hosted on.
 
@@ -37,7 +37,8 @@ Upcoming
 
     - Deployment
 
-      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps. This should avoid issues with cpu scheduling that might lead to performance degradations.
+      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps.
+        This should avoid issues with cpu scheduling that might lead to performance degradations.
 
     - UI
 
