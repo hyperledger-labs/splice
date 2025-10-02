@@ -476,8 +476,17 @@ class JoiningNodeInitializer(
         "has_dso_party",
         "Checks if the dso party exists on SV onboarding",
         for {
-          partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant()
-        } yield partyToParticipantMapping.exists(_.mapping.partyId == dsoParty),
+          participantId <- participantAdminConnection.getParticipantId()
+          synchronizerId <- participantAdminConnection.getSynchronizerId(
+            config.domains.global.alias
+          )
+          partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
+            store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
+            filterParty = dsoParty.filterString,
+            filterParticipant = participantId.filterString,
+            topologyTransactionType = TopologyTransactionType.AuthorizedState,
+          )
+        } yield partyToParticipantMapping.nonEmpty,
         logger,
       )
       hasActiveProposalToHostDsoParty <- retryProvider.getValueWithRetries(
@@ -490,18 +499,13 @@ class JoiningNodeInitializer(
             config.domains.global.alias
           )
           activePartyToParticipantProposals <- participantAdminConnection
-            .listAllTransactions(
-              store = TopologyStoreId.SynchronizerStore(synchronizerId),
-              proposals = true,
-              includeMappings = Set(TopologyMapping.Code.PartyToParticipant),
-              filterNamespace = Some(participantId.namespace),
+            .listPartyToParticipant(
+              store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
+              filterParty = dsoParty.filterString,
+              filterParticipant = participantId.filterString,
+              topologyTransactionType = TopologyTransactionType.AllProposals,
             )
-        } yield activePartyToParticipantProposals.exists(
-          _.mapping match {
-            case m: PartyToParticipant => m.partyId == dsoParty
-            case _ => false
-          }
-        ),
+        } yield activePartyToParticipantProposals.nonEmpty,
         logger,
       )
     } yield hostDsoParty || !hasActiveProposalToHostDsoParty
