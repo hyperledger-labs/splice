@@ -642,6 +642,13 @@
       "namespace": "validator",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME",
+            "value": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME"
+          }
+        ],
+        "additionalJvmOptions": "-Dparticipantoption",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
