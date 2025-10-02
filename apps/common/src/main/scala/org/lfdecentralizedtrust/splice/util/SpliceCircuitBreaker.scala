@@ -77,20 +77,21 @@ class SpliceCircuitBreaker(
   }
 
   private def callAndMark[T](body: => Future[T])(implicit tc: TraceContext) = {
-    lastFailure.updateAndGet(_.filter { lastFailureTime =>
-      val elapsed = clock.now - lastFailureTime
-      if (elapsed.compareTo(config.resetFailuresAfter.asJava) >= 0) {
-        // Note: We only reset in callAndMark so this does not apply if the circuit breaker is already open.
-        // This is deliberate, in that case we want to wait for resetTimeout not resetFailuresAfter.
-        logger.info(
-          s"Resetting circuit breaker as last failure was $elapsed ago which is more than ${config.resetFailuresAfter}"
-        )
-        underlying.succeed()
-        false
-      } else {
-        true
-      }
-    })
+    // Only run this when the circuit breaker is closed, otherwise rely on the pekko circuit breaker to handle reopening.
+    if (underlying.isClosed) {
+      lastFailure.updateAndGet(_.filter { lastFailureTime =>
+        val elapsed = clock.now - lastFailureTime
+        if (elapsed.compareTo(config.resetFailuresAfter.asJava) >= 0) {
+          logger.info(
+            s"Resetting circuit breaker as last failure was $elapsed ago which is more than ${config.resetFailuresAfter}"
+          )
+          underlying.succeed()
+          false
+        } else {
+          true
+        }
+      })
+    }
 
     body.andThen {
       case Failure(exception) =>
