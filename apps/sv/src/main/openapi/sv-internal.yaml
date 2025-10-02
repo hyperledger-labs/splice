@@ -634,6 +634,9 @@ components:
             The contract storing the onboarding secret.
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         party_hint:
+          description: |
+            Human-readable alias of the validator party, decoded from the stored secret and 
+            exposed for UI display in the ListOngoingValidatorOnboardingsResponse endpoint.
           type: string
 
     PrepareValidatorOnboardingRequest:
@@ -645,6 +648,9 @@ components:
           type: integer
           minimum: 1
         party_hint:
+          description: |
+            Optional alias for the validator party. If provided, it is persisted in the 
+            onboarding secret and stored in the database as the expected party identifier.
           type: string
 
     PrepareValidatorOnboardingResponse:
@@ -670,6 +676,9 @@ components:
         contact_point:
           type: string
         party_hint:
+          description: |
+            Alias of the validator party. Must match the persisted value in the 
+            onboarding secret created by PrepareValidatorOnboardingRequest endpoint.
           type: string
 
     CometBftNodeStatusOrErrorResponse:
