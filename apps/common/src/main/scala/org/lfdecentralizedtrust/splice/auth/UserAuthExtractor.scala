@@ -36,8 +36,10 @@ final class UserAuthExtractor(
         ).flatMap {
           case Success(Some(user)) if !user.isDeactivated =>
             provide(UserAuthExtractor.UserRequest(user.getId, traceContext))
+          case Success(Some(user)) if user.isDeactivated =>
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, "User is deactivated")
           case _ =>
-            rejectWithAuthorizationFailure(authenticatedUser, operationId)
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
         }
       }
   }

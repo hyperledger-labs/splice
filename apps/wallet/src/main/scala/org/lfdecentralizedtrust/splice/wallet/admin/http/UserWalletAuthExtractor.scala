@@ -56,10 +56,14 @@ final class UserWalletAuthExtractor(
                 )
               )
             } else {
-              rejectWithAuthorizationFailure(authenticatedUser, operationId)
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                "User not authorized for wallet party",
+              )
             }
           case _ =>
-            rejectWithAuthorizationFailure(authenticatedUser, operationId)
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
         }
       }
   }
@@ -68,8 +72,9 @@ final class UserWalletAuthExtractor(
       authenticatedUser: String,
       operationId: String,
   ): StandardRoute = {
-    // This is the old behavior in HttpWalletHandler, consider directly returning a 404 instead
-    // At this point the user is authenticated, it's fine to reveal to them that they haven't onboarded yet
+    // This is the old behavior in HttpWalletHandler, consider directly returning a 404 instead.
+    // At this point, the user is authenticated. It's fine to reveal to them that they haven't onboarded yet,
+    // especially since there is an endpoint for checking their onboarding status.
     throw Status.NOT_FOUND
       .withDescription(
         show"No wallet found for user ${authenticatedUser.singleQuoted} for operation '$operationId'"

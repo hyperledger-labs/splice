@@ -58,8 +58,12 @@ abstract class AuthExtractor(
   protected final def rejectWithAuthorizationFailure(
       authenticatedUser: String,
       operationId: String,
+      reason: String,
   ): StandardRoute = {
-    logger.warn(s"Authorization Failed for $authenticatedUser for operation '$operationId'")
+    // Reason is logged at WARN level, but not returned to the client, to avoid leaking information
+    logger.warn(
+      s"Authorization Failed for $authenticatedUser for operation '$operationId'. Reason: $reason"
+    )
     reject(AuthorizationFailedRejection)
   }
 

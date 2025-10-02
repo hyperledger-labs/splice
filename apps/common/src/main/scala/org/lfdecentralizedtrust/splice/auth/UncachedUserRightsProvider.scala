@@ -16,7 +16,6 @@ class UncachedUserRightsProvider(
   override def listUserRights(userId: String): Future[Set[User.Right]] =
     connection.listUserRights(userId)
   override def getUser(userName: String): Future[Option[User]] = {
-    // TODO:
     connection.getUser(userName).map(Some(_))
   }
 }

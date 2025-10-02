@@ -296,7 +296,6 @@ class HttpWalletHandler(
       request: d0.ListTransactionsRequest
   )(tuser: WalletUserRequest): Future[r0.ListTransactionsResponse] = {
     implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
-    // TODO: withSpan is used inconsistently: some methods use it, some don't. some use implicit traceContext, some don't.
     withSpan(s"$workflowId.listTransactions") { implicit traceContext => _ =>
       val beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
       for {
