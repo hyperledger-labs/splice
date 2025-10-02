@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.sv.admin.http
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
-import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
@@ -61,6 +60,7 @@ import io.circe.syntax.EncoderOps
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.auth.AdminAuthExtractor.AdminUserRequest
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.migration.ParticipantUsersDataExporter
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
@@ -93,7 +93,7 @@ class HttpSvAdminHandler(
     templateJsonDecoder: TemplateJsonDecoder,
     mat: Materializer,
     httpClient: HttpClient,
-) extends v0.SvAdminHandler[TracedUser]
+) extends v0.SvAdminHandler[AdminUserRequest]
     with FlagCloseableAsync
     with HttpVotesHandler
     with HttpValidatorLicensesHandler
@@ -149,8 +149,10 @@ class HttpSvAdminHandler(
 
   def listOngoingValidatorOnboardings(
       respond: v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )()(
+      tuser: AdminUserRequest
+  ): Future[v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.listOngoingValidatorOnboardings") { _ => _ =>
       for {
         validatorOnboardings <- svStore.listValidatorOnboardings()
@@ -177,7 +179,7 @@ class HttpSvAdminHandler(
   override def listValidatorLicenses(
       respond: SvAdminResource.ListValidatorLicensesResponse.type
   )(after: Option[Long], limit: Option[Int])(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[SvAdminResource.ListValidatorLicensesResponse] = {
     this
       .listValidatorLicenses(after, limit)(tuser.traceContext, ec)
@@ -188,8 +190,8 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.PrepareValidatorOnboardingResponse.type
   )(
       body: definitions.PrepareValidatorOnboardingRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.PrepareValidatorOnboardingResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.PrepareValidatorOnboardingResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.prepareValidatorOnboarding") { _ => _ =>
       val secret = generateRandomOnboardingSecret(svStore.key.svParty, body.partyHint)
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
@@ -220,8 +222,8 @@ class HttpSvAdminHandler(
 
   def listAmuletPriceVotes(
       respond: v0.SvAdminResource.ListAmuletPriceVotesResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListAmuletPriceVotesResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )()(tuser: AdminUserRequest): Future[v0.SvAdminResource.ListAmuletPriceVotesResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
       for {
         amuletPriceVotes <- dsoStore.listAmuletPriceVotes()
@@ -234,9 +236,9 @@ class HttpSvAdminHandler(
   }
 
   def listOpenMiningRounds(respond: v0.SvAdminResource.ListOpenMiningRoundsResponse.type)()(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.SvAdminResource.ListOpenMiningRoundsResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.listOpenMiningRounds") { _ => _ =>
       for {
         openMiningRoundTriple <- dsoStore.lookupOpenMiningRoundTriple()
@@ -255,8 +257,8 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.UpdateAmuletPriceVoteResponse.type
   )(
       body: definitions.UpdateAmuletPriceVoteRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.UpdateAmuletPriceVoteResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.UpdateAmuletPriceVoteResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.updateAmuletPriceVote") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
         "updateAmuletPriceVote",
@@ -282,8 +284,8 @@ class HttpSvAdminHandler(
   def isAuthorized(
       respond: v0.SvAdminResource.IsAuthorizedResponse.type
   )(
-  )(tuser: TracedUser): Future[v0.SvAdminResource.IsAuthorizedResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.IsAuthorizedResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.isAuthorized") { _ => _ =>
       Future.successful(v0.SvAdminResource.IsAuthorizedResponseOK)
     }
@@ -291,8 +293,8 @@ class HttpSvAdminHandler(
 
   def createVoteRequest(respond: v0.SvAdminResource.CreateVoteRequestResponse.type)(
       body: definitions.CreateVoteRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateVoteRequestResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.CreateVoteRequestResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.createVoteRequest") { _ => _ =>
       SvApp
         .createVoteRequest(
@@ -318,7 +320,7 @@ class HttpSvAdminHandler(
 
   override def listDsoRulesVoteRequests(
       respond: v0.SvAdminResource.ListDsoRulesVoteRequestsResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListDsoRulesVoteRequestsResponse] = {
+  )()(tuser: AdminUserRequest): Future[v0.SvAdminResource.ListDsoRulesVoteRequestsResponse] = {
     this
       .listDsoRulesVoteRequests(tuser.traceContext, ec)
       .map(v0.SvAdminResource.ListDsoRulesVoteRequestsResponse.OK)
@@ -328,8 +330,8 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.ListVoteRequestResultsResponse.type
   )(
       body: definitions.ListVoteResultsRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestResultsResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.ListVoteRequestResultsResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.listDsoRulesVoteResults") { _ => _ =>
       for {
         scanConnection <- scanConnectionF
@@ -367,8 +369,8 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.LookupDsoRulesVoteRequestResponse.type
   )(
       voteRequestContractId: String
-  )(tuser: TracedUser): Future[v0.SvAdminResource.LookupDsoRulesVoteRequestResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.LookupDsoRulesVoteRequestResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     this
       .lookupDsoRulesVoteRequest(voteRequestContractId)
       .map(v0.SvAdminResource.LookupDsoRulesVoteRequestResponse.OK)
@@ -376,8 +378,8 @@ class HttpSvAdminHandler(
 
   override def castVote(respond: SvAdminResource.CastVoteResponse.type)(
       body: definitions.CastVoteRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.CastVoteResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.CastVoteResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.castVote") { _ => _ =>
       SvApp
         .castVote(
@@ -400,8 +402,8 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.ListVoteRequestsByTrackingCidResponse.type
   )(
       body: definitions.BatchListVotesByVoteRequestsRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestsByTrackingCidResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.SvAdminResource.ListVoteRequestsByTrackingCidResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
     this
       .listVoteRequestsByTrackingCid(body)
       .map(v0.SvAdminResource.ListVoteRequestsByTrackingCidResponse.OK)
@@ -409,10 +411,10 @@ class HttpSvAdminHandler(
 
   override def getCometBftNodeDebugDump(
       respond: v0.SvAdminResource.GetCometBftNodeDebugDumpResponse.type
-  )()(tuser: TracedUser): Future[
+  )()(tuser: AdminUserRequest): Future[
     v0.SvAdminResource.GetCometBftNodeDebugDumpResponse
   ] = {
-    implicit val TracedUser(_, traceContext) = tuser
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getCometBftNodeDebugDump") { _ => _ =>
       withClientOrNotFound(respond.NotFound) { client =>
         client
@@ -433,10 +435,10 @@ class HttpSvAdminHandler(
 
   override def getSequencerNodeStatus(
       respond: v0.SvAdminResource.GetSequencerNodeStatusResponse.type
-  )()(tuser: TracedUser): Future[
+  )()(tuser: AdminUserRequest): Future[
     v0.SvAdminResource.GetSequencerNodeStatusResponse
   ] = {
-    implicit val TracedUser(_, traceContext) = tuser
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
       withSequencerConnectionOrNotFound(respond.NotFound)(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
@@ -446,10 +448,10 @@ class HttpSvAdminHandler(
 
   override def getMediatorNodeStatus(
       respond: v0.SvAdminResource.GetMediatorNodeStatusResponse.type
-  )()(tuser: TracedUser): Future[
+  )()(tuser: AdminUserRequest): Future[
     v0.SvAdminResource.GetMediatorNodeStatusResponse
   ] = {
-    implicit val TracedUser(_, traceContext) = tuser
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
       withMediatorConnectionOrNotFound(respond.NotFound)(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
@@ -460,9 +462,9 @@ class HttpSvAdminHandler(
   override def pauseDecentralizedSynchronizer(
       respond: v0.SvAdminResource.PauseDecentralizedSynchronizerResponse.type
   )()(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.SvAdminResource.PauseDecentralizedSynchronizerResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.pauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
@@ -477,9 +479,9 @@ class HttpSvAdminHandler(
   override def unpauseDecentralizedSynchronizer(
       respond: v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponse.type
   )()(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
+    implicit val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.unpauseDecentralizedSynchronizer") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
@@ -493,8 +495,8 @@ class HttpSvAdminHandler(
 
   override def getDomainMigrationDump(
       respond: v0.SvAdminResource.GetDomainMigrationDumpResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetDomainMigrationDumpResponse] = {
-    val TracedUser(_, traceContext) = tuser
+  )()(tuser: AdminUserRequest): Future[v0.SvAdminResource.GetDomainMigrationDumpResponse] = {
+    val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getDomainMigrationDump") { implicit tc => _ =>
       localSynchronizerNode match {
         case Some(synchronizerNode) =>
@@ -539,9 +541,9 @@ class HttpSvAdminHandler(
       migrationId: Option[Long],
       force: Option[Boolean],
   )(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
-    val TracedUser(_, traceContext) = tuser
+    val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
       for {
         participantUsersData <- new ParticipantUsersDataExporter(
@@ -571,8 +573,10 @@ class HttpSvAdminHandler(
 
   override def getSynchronizerNodeIdentitiesDump(
       respond: v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse] = {
-    val TracedUser(_, traceContext) = tuser
+  )()(
+      tuser: AdminUserRequest
+  ): Future[v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse] = {
+    val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getSynchronizerNodeIdentitiesDump") { implicit tc => _ =>
       localSynchronizerNode match {
         case Some(synchronizerNode) =>
@@ -629,7 +633,7 @@ class HttpSvAdminHandler(
       respond: SvAdminResource.TriggerDomainMigrationDumpResponse.type
   )(
       request: TriggerDomainMigrationDumpRequest
-  )(extracted: TracedUser): Future[SvAdminResource.TriggerDomainMigrationDumpResponse] = {
+  )(extracted: AdminUserRequest): Future[SvAdminResource.TriggerDomainMigrationDumpResponse] = {
     withSpan(s"$workflowId.triggerDomainMigrationDump") { implicit tc => _ =>
       localSynchronizerNode match {
         case Some(synchronizerNode) =>
@@ -673,7 +677,7 @@ class HttpSvAdminHandler(
   }
 
   override def featureSupport(respond: SvAdminResource.FeatureSupportResponse.type)()(
-      extracted: TracedUser
+      extracted: AdminUserRequest
   ): Future[SvAdminResource.FeatureSupportResponse] = {
     readFeatureSupport(dsoStore.key.dsoParty)(
       ec,

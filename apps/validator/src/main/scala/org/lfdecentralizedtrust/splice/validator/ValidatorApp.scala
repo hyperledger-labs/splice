@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
+import org.lfdecentralizedtrust.splice.http.v0.status.wallet.WalletResource as StatusWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
@@ -71,6 +72,7 @@ import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
+  HttpStatusWalletHandler,
   HttpWalletHandler,
   UserWalletAuthExtractor,
 }
@@ -896,8 +898,9 @@ class ValidatorApp(
         ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       }
 
-      // TODO: Create a UncachedUserRightsProvider, and clean it up at shutdown
-      userRightsProvider = ???
+      userRightsProvider = new UncachedUserRightsProvider(
+        automation.connection(SpliceLedgerConnectionPriority.Low)
+      )
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
@@ -943,33 +946,53 @@ class ValidatorApp(
         )
 
       walletInternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpWalletHandler(
+        (
+          new HttpWalletHandler(
+            walletManager,
+            scanConnection,
+            loggerFactory,
+            retryProvider,
+            validatorTopupConfig,
+            dedupDuration,
+            packageVersionSupport,
+          ),
           walletManager,
-          scanConnection,
-          loggerFactory,
-          retryProvider,
-          validatorTopupConfig,
-          dedupDuration,
-          packageVersionSupport,
         )
       )
 
       walletExternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpExternalWalletHandler(
+        (
+          new HttpExternalWalletHandler(
+            walletManager,
+            loggerFactory,
+            retryProvider,
+            participantAdminConnection,
+            config.domainMigrationId,
+          ),
           walletManager,
-          loggerFactory,
-          retryProvider,
-          participantAdminConnection,
-          config.domainMigrationId,
+        )
+      )
+
+      walletStatusHandler = walletManagerOpt.map(walletManager =>
+        (
+          new HttpStatusWalletHandler(
+            walletManager,
+            loggerFactory,
+            packageVersionSupport,
+          ),
+          walletManager,
         )
       )
 
       ansExternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpExternalAnsHandler(
+        (
+          new HttpExternalAnsHandler(
+            walletManager,
+            scanConnection,
+            loggerFactory,
+            retryProvider,
+          ),
           walletManager,
-          scanConnection,
-          loggerFactory,
-          retryProvider,
         )
       )
 
@@ -1136,7 +1159,7 @@ class ValidatorApp(
                         .withMetrics("public")(operation)
                         .tflatMap { _ => provide(()) },
                   ),
-                ) ++ walletInternalHandler.toList.map { walletHandler =>
+                ) ++ walletInternalHandler.toList.map { case (walletHandler, walletManager) =>
                   InternalWalletResource.routes(
                     walletHandler,
                     operation =>
@@ -1145,7 +1168,7 @@ class ValidatorApp(
                         .tflatMap { _ =>
                           UserWalletAuthExtractor(
                             verifier,
-                            walletManagerOpt.get,
+                            walletManager,
                             userRightsProvider,
                             loggerFactory,
                             "splice wallet realm",
@@ -1154,7 +1177,7 @@ class ValidatorApp(
                           )(operation)
                         },
                   )
-                } ++ walletExternalHandler.toList.map { walletHandler =>
+                } ++ walletExternalHandler.toList.map { case (walletHandler, walletManager) =>
                   ExternalWalletResource.routes(
                     walletHandler,
                     operation =>
@@ -1163,7 +1186,7 @@ class ValidatorApp(
                         .tflatMap { _ =>
                           UserWalletAuthExtractor(
                             verifier,
-                            walletManagerOpt.get,
+                            walletManager,
                             userRightsProvider,
                             loggerFactory,
                             "splice wallet realm",
@@ -1172,7 +1195,24 @@ class ValidatorApp(
                           )(operation)
                         },
                   )
-                } ++ ansExternalHandler.toList.map { ansHandler =>
+                } ++ walletStatusHandler.toList.map { case (walletHandler, walletManager) =>
+                  StatusWalletResource.routes(
+                    walletHandler,
+                    operation =>
+                      metrics.httpServerMetrics
+                        .withMetrics("walletStatus")(operation)
+                        .tflatMap { _ =>
+                          UserAuthExtractor(
+                            verifier,
+                            userRightsProvider,
+                            loggerFactory,
+                            "splice wallet realm",
+                          )(
+                            traceContext
+                          )(operation)
+                        },
+                  )
+                } ++ ansExternalHandler.toList.map { case (ansHandler, walletManager) =>
                   AnsResource.routes(
                     ansHandler,
                     operation =>
@@ -1181,7 +1221,7 @@ class ValidatorApp(
                         .tflatMap { _ =>
                           UserWalletAuthExtractor(
                             verifier,
-                            walletManagerOpt.get,
+                            walletManager,
                             userRightsProvider,
                             loggerFactory,
                             "splice ans realm",

@@ -73,8 +73,10 @@ abstract class AuthExtractor(
 
   protected final def canActAs(rights: Set[User.Right], party: PartyId): Boolean = {
     val partyAsString = party.toProtoPrimitive
-    rights.exists { case actAs: User.Right.CanActAs =>
-      actAs.party == partyAsString
+    rights.exists {
+      case actAs: User.Right.CanActAs =>
+        actAs.party == partyAsString
+      case _ => false
     }
   }
 
@@ -86,12 +88,15 @@ abstract class AuthExtractor(
         actAs.party == partyAsString
       case actAs: User.Right.CanReadAs =>
         actAs.party == partyAsString
+      case _ => false
     }
   }
 
   protected final def isParticipantAdmin(rights: Set[User.Right]): Boolean = {
-    rights.exists { case _: User.Right.ParticipantAdmin =>
-      true
+    rights.exists {
+      case _: User.Right.ParticipantAdmin =>
+        true
+      case _ => false
     }
   }
 }

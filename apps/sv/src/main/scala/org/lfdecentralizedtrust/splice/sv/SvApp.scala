@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.auth.{
   AuthConfig,
   HMACVerifier,
   RSAVerifier,
+  UncachedUserRightsProvider,
 }
 import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
@@ -498,6 +499,10 @@ class SvApp(
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection)
       _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
+      userRightsProvider = new UncachedUserRightsProvider(
+        svAutomation.connection(SpliceLedgerConnectionPriority.Low)
+      )
+
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
@@ -628,7 +633,7 @@ class SvApp(
                         AdminAuthExtractor(
                           verifier,
                           svStore.key.svParty,
-                          svAutomation.connection(SpliceLedgerConnectionPriority.Low),
+                          userRightsProvider,
                           loggerFactory,
                           "splice sv admin realm",
                         )(traceContext)(operation)

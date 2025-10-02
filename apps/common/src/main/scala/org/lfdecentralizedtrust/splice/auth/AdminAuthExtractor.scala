@@ -10,7 +10,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.Optional
 import scala.util.Success
 
 /** Auth extractor for APIs that perform administrative actions on the participant

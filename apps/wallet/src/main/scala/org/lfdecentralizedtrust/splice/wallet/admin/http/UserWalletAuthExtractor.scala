@@ -11,7 +11,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.ShowStringSyntax
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.auth.{AuthExtractor, SignatureVerifier, UserRightsProvider}
-import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletService}
 
 import scala.util.Success

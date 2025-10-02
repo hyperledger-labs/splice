@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
-import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource as r0
 import org.lfdecentralizedtrust.splice.http.v0.{external, definitions as d0}
