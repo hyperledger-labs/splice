@@ -78,6 +78,7 @@ import com.daml.ledger.api.v2.event_query_service.{
   GetEventsByContractIdRequest,
   GetEventsByContractIdResponse,
 }
+import com.daml.ledger.api.v2.interactive.interactive_submission_service as iss
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc.InteractiveSubmissionServiceStub
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionRequest,
@@ -154,6 +155,7 @@ import com.daml.ledger.api.v2.update_service.{
   UpdateServiceGrpc,
 }
 import com.daml.ledger.api.v2.value.Identifier
+import com.digitalasset.canton.admin.api.client
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
@@ -170,8 +172,8 @@ import com.digitalasset.canton.admin.api.client.data.{
   TemplateId,
   UserRights,
 }
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.Signature
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.{
   IdentityProviderId,
@@ -185,7 +187,8 @@ import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
 import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
 import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPartyId}
@@ -193,6 +196,7 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.*
 import io.grpc.stub.StreamObserver
+import io.scalaland.chimney.dsl.*
 
 import java.time.Instant
 import java.util.UUID
@@ -236,6 +240,94 @@ object LedgerApiCommands {
           response: AllocatePartyResponse
       ): Either[String, PartyDetails] =
         response.partyDetails.toRight("Party could not be created")
+    }
+
+    final case class GenerateExternalPartyTopology(
+        synchronizerId: SynchronizerId,
+        partyHint: String,
+        publicKey: SigningPublicKey,
+        localParticipantObservationOnly: Boolean,
+        otherConfirmingParticipantIds: Seq[ParticipantId],
+        confirmationThreshold: NonNegativeInt,
+        observingParticipantIds: Seq[ParticipantId],
+    ) extends BaseCommand[
+          GenerateExternalPartyTopologyRequest,
+          GenerateExternalPartyTopologyResponse,
+          client.data.parties.GenerateExternalPartyTopology,
+        ] {
+
+      import com.digitalasset.canton.crypto.LedgerApiCryptoConversions.*
+      import com.daml.ledger.api.v2
+
+      override protected def submitRequest(
+          service: PartyManagementServiceStub,
+          request: GenerateExternalPartyTopologyRequest,
+      ): Future[GenerateExternalPartyTopologyResponse] =
+        service.generateExternalPartyTopology(request)
+
+      override protected def createRequest(): Either[String, GenerateExternalPartyTopologyRequest] =
+        Right(
+          GenerateExternalPartyTopologyRequest(
+            synchronizer = synchronizerId.toProtoPrimitive,
+            partyHint = partyHint,
+            publicKey = Some(
+              publicKey.toProtoV30
+                .into[v2.crypto.SigningPublicKey]
+                .withFieldRenamed(_.publicKey, _.keyData)
+                .transform
+            ),
+            localParticipantObservationOnly = localParticipantObservationOnly,
+            otherConfirmingParticipantUids =
+              otherConfirmingParticipantIds.map(_.uid.toProtoPrimitive),
+            confirmationThreshold = confirmationThreshold.value,
+            observingParticipantUids = observingParticipantIds.map(_.uid.toProtoPrimitive),
+          )
+        )
+
+      override protected def handleResponse(
+          response: GenerateExternalPartyTopologyResponse
+      ): Either[
+        String,
+        client.data.parties.GenerateExternalPartyTopology,
+      ] =
+        client.data.parties.GenerateExternalPartyTopology
+          .fromProto(response)
+          .leftMap(_.message)
+    }
+
+    final case class AllocateExternalParty(
+        synchronizerId: SynchronizerId,
+        transactions: Seq[(GenericTopologyTransaction, Seq[Signature])],
+        multiHashSignatures: Seq[Signature],
+    ) extends BaseCommand[
+          AllocateExternalPartyRequest,
+          AllocateExternalPartyResponse,
+          AllocateExternalPartyResponse,
+        ] {
+      override protected def createRequest(): Either[String, AllocateExternalPartyRequest] =
+        Right(
+          AllocateExternalPartyRequest(
+            synchronizer = synchronizerId.toProtoPrimitive,
+            onboardingTransactions = transactions.map { case (transaction, signatures) =>
+              AllocateExternalPartyRequest.SignedTransaction(
+                transaction.getCryptographicEvidence,
+                signatures.map(_.toProtoV30.transformInto[iss.Signature]),
+              )
+            },
+            multiHashSignatures =
+              multiHashSignatures.map(_.toProtoV30.transformInto[iss.Signature]),
+            identityProviderId = "",
+          )
+        )
+      override protected def submitRequest(
+          service: PartyManagementServiceStub,
+          request: AllocateExternalPartyRequest,
+      ): Future[AllocateExternalPartyResponse] =
+        service.allocateExternalParty(request)
+      override protected def handleResponse(
+          response: AllocateExternalPartyResponse
+      ): Either[String, AllocateExternalPartyResponse] =
+        Right(response)
     }
 
     final case class Update(
@@ -354,6 +446,7 @@ object LedgerApiCommands {
       ): Either[String, Unit] = Either.unit
 
     }
+
   }
 
   object PackageManagementService {
@@ -1556,6 +1649,7 @@ object LedgerApiCommands {
         packageIdSelectionPreference: Seq[LfPackageId],
         verboseHashing: Boolean,
         prefetchContractKeys: Seq[PrefetchContractKey],
+        maxRecordTime: Option[CantonTimestamp],
     ) extends BaseCommand[
           PrepareSubmissionRequest,
           PrepareSubmissionResponse,
@@ -1579,6 +1673,7 @@ object LedgerApiCommands {
             packageIdSelectionPreference = packageIdSelectionPreference,
             verboseHashing = verboseHashing,
             prefetchContractKeys = prefetchContractKeys,
+            maxRecordTime = maxRecordTime.map(_.toProtoTimestamp),
           )
         )
 
@@ -1997,7 +2092,7 @@ object LedgerApiCommands {
         Right(response.offset)
     }
 
-    final case class GetConnectedSynchronizers(partyId: LfPartyId)
+    final case class GetConnectedSynchronizers(partyId: Option[LfPartyId])
         extends BaseCommand[
           GetConnectedSynchronizersRequest,
           GetConnectedSynchronizersResponse,
@@ -2005,7 +2100,7 @@ object LedgerApiCommands {
         ] {
 
       override protected def createRequest(): Either[String, GetConnectedSynchronizersRequest] =
-        Right(GetConnectedSynchronizersRequest(partyId.toString, participantId = ""))
+        Right(GetConnectedSynchronizersRequest(partyId.getOrElse(""), participantId = ""))
 
       override protected def submitRequest(
           service: StateServiceStub,
