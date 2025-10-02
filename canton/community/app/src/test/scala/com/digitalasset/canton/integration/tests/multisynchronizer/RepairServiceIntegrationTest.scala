@@ -200,7 +200,7 @@ abstract class RepairServiceIntegrationTest
               .toSeq
             participant1.ledger_api.javaapi.commands.submit(Seq(payer), archiveCmd)
           },
-          expectedLogs *,
+          expectedLogs*
         )
       }
     }

@@ -621,6 +621,71 @@ trait MessageDispatcherTest {
       }
     }
 
+    List(
+      DisabledTransferTestData(
+        "in",
+        TransferInViewType,
+        EncryptedView(TransferInViewType)(
+          Encrypted.fromByteString[CompressedView[FullTransferInTree]](ByteString.EMPTY).value
+        ),
+      ),
+      DisabledTransferTestData(
+        "out",
+        TransferOutViewType,
+        EncryptedView(TransferOutViewType)(
+          Encrypted.fromByteString[CompressedView[FullTransferOutTree]](ByteString.EMPTY).value
+        ),
+      ),
+    ).foreach { case DisabledTransferTestData(inOut, viewType, transferView) =>
+      s"transfer $inOut requests" should {
+        "not be let through if UCK is enabled" in {
+          val sut = mk(initRc = RequestCounter(-12), uck = Some(true))
+          val encryptedTransferViewMessage =
+            EncryptedViewMessageV0(
+              None,
+              ViewHash(TestHash.digest(9002)),
+              Map.empty,
+              transferView,
+              domainId,
+            )
+          val rootHashMessage =
+            RootHashMessage(
+              rootHash(1),
+              domainId,
+              testedProtocolVersion,
+              viewType,
+              SerializedRootHashMessagePayload.empty,
+            )
+          val event = mkDeliver(
+            Batch.of[ProtocolMessage](
+              testedProtocolVersion,
+              encryptedTransferViewMessage -> Recipients.cc(participantId),
+              rootHashMessage -> Recipients.cc(participantId, mediatorId),
+            ),
+            SequencerCounter(11),
+            CantonTimestamp.ofEpochSecond(11),
+          )
+
+          val error = loggerFactory
+            .assertLogs(
+              sut.messageDispatcher.handleAll(signAndTrace(event)).failed,
+              loggerFactory.checkLogsInternalError[IllegalArgumentException](
+                _.getMessage should include(
+                  "Domain transfers are not supported with unique contract keys"
+                )
+              ),
+              _.errorMessage should include("event processing failed."),
+            )
+            .futureValue
+
+          error shouldBe a[IllegalArgumentException]
+          error.getMessage should include(
+            "Domain transfers are not supported with unique contract keys"
+          )
+        }
+      }
+    }
+
     "topology transactions" should {
       "be passed to the identity processor" in {
         val sut = mk()

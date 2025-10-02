@@ -32,6 +32,7 @@ import io.opentelemetry.instrumentation.runtimemetrics.java8.*
 import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder
 import io.opentelemetry.sdk.metrics.`export`.{MetricExporter, MetricReader, PeriodicMetricReader}
 import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
+import org.slf4j.helpers.NOPLogger
 
 import java.io.File
 import java.util.concurrent.ScheduledExecutorService
@@ -233,8 +234,8 @@ final case class MetricsRegistry(
               .registered()
               .map(_.name.toString())
               .toSet,
-            onlyLogMissingHistograms =
-              if (testingSupportAdhocMetrics) Some(logger.underlying) else None,
+            // TODO(#13956) - port this in a smarter way to canton
+            onlyLogMissingHistograms = Some(NOPLogger.NOP_LOGGER),
             globalMetricsContext = extraContext,
           ),
           baseFilter,

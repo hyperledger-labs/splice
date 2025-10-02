@@ -5,10 +5,14 @@ package com.digitalasset.canton.integration.plugins
 
 import com.daml.http.test.SimpleHttpServer
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.CantonConfig
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.sun.net.httpserver.HttpServer
 
-class UseJWKSServer(jwks: String) extends EnvironmentSetupPlugin with BaseTest {
+class UseJWKSServer(jwks: String)
+    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+    with BaseTest {
 
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
   private[integration] var server: HttpServer = _

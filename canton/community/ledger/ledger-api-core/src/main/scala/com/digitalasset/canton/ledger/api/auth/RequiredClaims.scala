@@ -23,9 +23,9 @@ object RequiredClaims {
       readAs: Set[String],
       userIdL: Lens[Req, String],
   ): List[RequiredClaim[Req]] =
-    RequiredClaim.MatchUserId(userIdL)
-      :: actAs.view.map(RequiredClaim.ActAs[Req]).toList
-      ::: readAs.view.map(RequiredClaim.ReadAs[Req]).toList
+    RequiredClaim.MatchUserId(userIdL) ::
+      actAs.view.map(RequiredClaim.ActAs[Req]).toList :::
+      readAs.view.map(RequiredClaim.ReadAs[Req]).toList
 
   def readAsForAllParties[Req](parties: Iterable[String]): List[RequiredClaim[Req]] =
     parties.view.map(RequiredClaim.ReadAs[Req]).toList
@@ -34,8 +34,8 @@ object RequiredClaims {
     transactionFormat.eventFormat.toList.flatMap(RequiredClaims.eventFormatClaims[Req])
 
   def eventFormatClaims[Req](eventFormat: EventFormat): List[RequiredClaim[Req]] =
-    readAsForAllParties[Req](eventFormat.filtersByParty.keys)
-      ::: eventFormat.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
+    readAsForAllParties[Req](eventFormat.filtersByParty.keys) :::
+      eventFormat.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
 
   def updateFormatClaims[Req](updateFormat: UpdateFormat): List[RequiredClaim[Req]] =
     List(
@@ -55,8 +55,9 @@ object RequiredClaims {
 
   @nowarn("cat=deprecation")
   def transactionFilterClaims[Req](transactionFilter: TransactionFilter): List[RequiredClaim[Req]] =
-    readAsForAllParties[Req](transactionFilter.filtersByParty.keys)
-      ::: transactionFilter.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
+    readAsForAllParties[Req](
+      transactionFilter.filtersByParty.keys
+    ) ::: transactionFilter.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
 
   def idpAdminClaimsAndMatchingRequestIdpId[Req](
       identityProviderIdL: Lens[Req, String],
