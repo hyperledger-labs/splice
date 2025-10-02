@@ -218,6 +218,11 @@ trait AcsJdbcTypes {
   protected implicit val qualifiedNameGetResult: GetResult[QualifiedName] =
     GetResult.GetString.andThen { s => QualifiedName.assertFromString(s) }
 
+  protected implicit val packageQualifiedNameGetResult: GetResult[PackageQualifiedName] =
+    implicitly[GetResult[(QualifiedName, String)]].andThen { case (qualifiedName, packageName) =>
+      PackageQualifiedName(packageName, qualifiedName)
+    }
+
   protected implicit lazy val qualifiedNameJdbcType: JdbcType[QualifiedName] =
     MappedColumnType.base[QualifiedName, String](
       { _.toString }, {

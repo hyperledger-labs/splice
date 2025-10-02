@@ -40,7 +40,7 @@ class DbExternalPartyWalletStore(
       acsTableName = WalletTables.externalPartyAcsTableName,
       interfaceViewsTableNameOpt = None,
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbExternalPartyWalletStore",
         party = key.externalParty,
         participant = participantId,
