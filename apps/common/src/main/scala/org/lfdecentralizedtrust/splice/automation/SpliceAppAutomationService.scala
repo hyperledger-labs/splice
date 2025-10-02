@@ -80,7 +80,8 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       SpliceCircuitBreaker(
         s"$name-priority-connection",
         config,
-        logger,
+        clock,
+        loggerFactory,
       ),
       completionOffsetCallback,
     )
