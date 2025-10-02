@@ -22,10 +22,9 @@ import scala.util.{Failure, Random, Success, Try}
 trait DatabaseDeadlockTest
     extends BaseTestWordSpec
     with BeforeAndAfterAll
-    with HasExecutionContext {
-  this: DbTest =>
+    with HasExecutionContext
+    with DbTest.DisableDbStorageIdempotency {
 
-  lazy val rawStorage: DbStorage = storage.underlying
   import rawStorage.api.*
 
   val batchSize = 100
