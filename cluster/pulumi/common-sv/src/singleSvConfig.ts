@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { KmsConfigSchema, LogLevelSchema } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { merge } from 'lodash';
 import util from 'node:util';
@@ -62,7 +63,7 @@ const ScanAppConfigSchema = z
     additionalJvmOptions: z.string().optional(),
   })
   .strict();
-const ValidatorAppConfigSchema = z
+const SvValidatorAppConfigSchema = z
   .object({
     walletUser: z.string().optional(),
     // TODO(#2389) inline env var into config.yaml
@@ -71,11 +72,9 @@ const ValidatorAppConfigSchema = z
         fromEnv: z.string(),
       })
       .optional(),
-    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-    additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),
   })
-  .strict();
+  .and(ValidatorAppConfigSchema);
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 // things here are declared optional even when they aren't, to allow partial overrides of defaults
@@ -88,7 +87,7 @@ const SingleSvConfigSchema = z
     sequencer: SvSequencerConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
-    validatorApp: ValidatorAppConfigSchema.optional(),
+    validatorApp: SvValidatorAppConfigSchema.optional(),
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,
