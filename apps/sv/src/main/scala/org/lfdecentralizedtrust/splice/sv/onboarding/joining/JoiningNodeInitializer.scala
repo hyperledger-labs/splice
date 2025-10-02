@@ -937,7 +937,7 @@ class JoiningNodeInitializer(
     }
   }
 
-  def getDsoPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
+  private def getDsoPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
     dsoPartyFromMetadata <- connection.lookupDsoPartyFromUserMetadata(config.ledgerApiUser)
     dsoParty <- dsoPartyFromMetadata
       .fold(
