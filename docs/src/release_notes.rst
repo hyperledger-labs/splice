@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+  - Sequencer
+
+    - Fix a regression introduced in 0.4.18 that made topology transactions significantly more expensive to process.
+
   - Docker images
 
     - All app & UI images now use a non-root user.
