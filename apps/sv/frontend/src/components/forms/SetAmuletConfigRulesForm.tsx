@@ -25,6 +25,8 @@ import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { Box, Typography } from '@mui/material';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { buildAmuletRulesConfigFromChanges } from '../../utils/buildAmuletRulesConfigFromChanges';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 
 export type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -33,15 +35,9 @@ export type SetAmuletConfigCompleteFormData = {
 
 const createProposalAction = createProposalActions.find(a => a.value === 'CRARC_SetConfig');
 
-export interface SetAmuletConfigRulesFormProps {
-  onSubmit: (
-    data: SetAmuletConfigCompleteFormData,
-    action: ActionRequiringConfirmation
-  ) => Promise<void>;
-}
-
-export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> = _ => {
+export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
+  const mutation = useProposalMutation();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -87,7 +83,6 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
   const form = useAppForm({
     defaultValues,
     onSubmit: async ({ value: formData }) => {
-      console.log('submit amulet config form data: ', formData);
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
@@ -114,7 +109,9 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
             },
           },
         };
-        console.log('action for submission', action);
+        await mutation.mutateAsync({ formData, action }).catch(e => {
+          console.error(`Failed to submit proposal`, e);
+        });
       }
     },
 
@@ -223,6 +220,7 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
       )}
 
       <form.AppForm>
+        <ProposalSubmissionError error={mutation.error} />
         <form.FormErrors />
         <form.FormControls
           showConfirmation={showConfirmation}
