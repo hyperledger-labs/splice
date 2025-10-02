@@ -8,14 +8,14 @@ import org.apache.pekko.http.scaladsl.server.Directives.{onComplete, provide}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 /** Auth extractor for APIs that are only available for authenticated users,
   * but otherwise do not require special authorization.
   *
   * Authentication: request must have a valid JWT token authenticating the user
   *
-  * Authorization: user must be active
+  * Authorization: user must exist and be active
   */
 final class UserAuthExtractor(
     verifier: SignatureVerifier,
@@ -34,12 +34,16 @@ final class UserAuthExtractor(
         onComplete(
           rightsProvider.getUser(authenticatedUser)
         ).flatMap {
-          case Success(Some(user)) if !user.isDeactivated =>
-            provide(UserAuthExtractor.UserRequest(user.getId, traceContext))
-          case Success(Some(user)) if user.isDeactivated =>
-            rejectWithAuthorizationFailure(authenticatedUser, operationId, "User is deactivated")
-          case _ =>
+          case Success(Some(user)) =>
+            if (user.isDeactivated) {
+              rejectWithAuthorizationFailure(authenticatedUser, operationId, "User is deactivated")
+            } else {
+              provide(UserAuthExtractor.UserRequest(user.getId, traceContext))
+            }
+          case Success(None) =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
+          case Failure(exception) =>
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, exception.getMessage)
         }
       }
   }

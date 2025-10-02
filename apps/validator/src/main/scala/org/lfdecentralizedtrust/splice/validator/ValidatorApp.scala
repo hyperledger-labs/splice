@@ -1202,9 +1202,8 @@ class ValidatorApp(
                       metrics.httpServerMetrics
                         .withMetrics("walletStatus")(operation)
                         .tflatMap { _ =>
-                          UserAuthExtractor(
+                          AuthenticationOnlyAuthExtractor(
                             verifier,
-                            userRightsProvider,
                             loggerFactory,
                             "splice wallet realm",
                           )(

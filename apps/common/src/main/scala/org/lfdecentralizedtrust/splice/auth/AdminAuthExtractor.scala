@@ -49,14 +49,16 @@ final class AdminAuthExtractor(
             authenticatedUser
           )
         ).flatMap {
-          case Success((Some(user), rights)) if isAuthorizedAsAdmin(user, rights) =>
-            provide(AdminAuthExtractor.AdminUserRequest(traceContext))
-          case Success((Some(_), _)) =>
-            rejectWithAuthorizationFailure(
-              authenticatedUser,
-              operationId,
-              "User not authorized to act as admin",
-            )
+          case Success((Some(user), rights)) =>
+            if (isAuthorizedAsAdmin(user, rights)) {
+              provide(AdminAuthExtractor.AdminUserRequest(traceContext))
+            } else {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                "User not authorized to act as admin",
+              )
+            }
           case _ =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
         }

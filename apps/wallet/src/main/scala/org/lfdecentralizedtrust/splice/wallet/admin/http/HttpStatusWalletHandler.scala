@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.auth.UserAuthExtractor.UserRequest
+import org.lfdecentralizedtrust.splice.auth.AuthenticationOnlyAuthExtractor.AuthenticatedRequest
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -24,14 +24,14 @@ class HttpStatusWalletHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends status.wallet.WalletHandler[UserRequest]
+) extends status.wallet.WalletHandler[AuthenticatedRequest]
     with HttpWalletHandlerUtil {
   protected val workflowId = this.getClass.getSimpleName
 
   override def userStatus(respond: r0.UserStatusResponse.type)()(
-      tuser: UserRequest
+      tuser: AuthenticatedRequest
   ): Future[r0.UserStatusResponse] = {
-    implicit val UserRequest(user, traceContext) = tuser
+    implicit val AuthenticatedRequest(user, traceContext) = tuser
     withSpan(s"$workflowId.userStatus") { implicit traceContext => _ =>
       for {
         optWallet <- walletManager.lookupUserWallet(user)
@@ -57,9 +57,9 @@ class HttpStatusWalletHandler(
   }
 
   override def featureSupport(respond: r0.FeatureSupportResponse.type)()(
-      tuser: UserRequest
+      tuser: AuthenticatedRequest
   ): Future[r0.FeatureSupportResponse] = {
-    implicit val UserRequest(user, traceContext) = tuser
+    implicit val AuthenticatedRequest(user, traceContext) = tuser
     withSpan(s"$workflowId.featureSupport") { _ => _ =>
       val parties = Seq(store.walletKey.dsoParty)
       val now = CantonTimestamp.now()
