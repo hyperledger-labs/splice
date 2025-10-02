@@ -69,7 +69,6 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   ParticipantPermission,
@@ -125,6 +124,11 @@ class JoiningNodeInitializer(
     )
   )
 
+  private val initConnection = ledgerClient.readOnlyConnection(
+    this.getClass.getSimpleName,
+    loggerFactory,
+  )
+
   def joinDsoAndOnboardNodes(): Future[
     (
         SynchronizerId,
@@ -135,10 +139,6 @@ class JoiningNodeInitializer(
         SvDsoAutomationService,
     )
   ] = {
-    val initConnection = ledgerClient.readOnlyConnection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-    )
     // We need to connect to the domain here because otherwise we create a circular dependency
     // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
     // before establishing a domain connection, but allocating the SV party requires a domain connection.
@@ -469,10 +469,6 @@ class JoiningNodeInitializer(
   def canProceedWithDomainReconnect(
       participantAdminConnection: ParticipantAdminConnection
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
-    val initConnection = ledgerClient.readOnlyConnection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-    )
     for {
       dsoParty <- getDsoPartyId(initConnection)
       hostDsoParty <- retryProvider.getValueWithRetries(
@@ -490,9 +486,12 @@ class JoiningNodeInitializer(
         "Checks if there is an active proposal to host the dso party",
         for {
           participantId <- participantAdminConnection.getParticipantId()
+          synchronizerId <- participantAdminConnection.getSynchronizerId(
+            config.domains.global.alias
+          )
           activePartyToParticipantProposals <- participantAdminConnection
             .listAllTransactions(
-              store = AuthorizedStore,
+              store = TopologyStoreId.SynchronizerStore(synchronizerId),
               proposals = true,
               includeMappings = Set(TopologyMapping.Code.PartyToParticipant),
               filterNamespace = Some(participantId.namespace),
