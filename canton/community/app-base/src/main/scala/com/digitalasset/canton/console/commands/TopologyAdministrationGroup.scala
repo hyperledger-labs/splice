@@ -178,9 +178,7 @@ class TopologyAdministrationGroup(
     )
 
   private def getIdCommand(): ConsoleCommandResult[UniqueIdentifier] =
-    adminCommand(TopologyAdminCommands.Init.GetId()).flatMap { r =>
-      ConsoleCommandResult.fromEither(r.uniqueIdentifier.toRight("Node is not initialized"))
-    }
+    adminCommand(TopologyAdminCommands.Init.GetId())
 
   // small cache to avoid repetitive calls to fetchId (as the id is immutable once set)
   private val idCache =

@@ -3,10 +3,7 @@
 
 package com.digitalasset.canton.integration
 
-import com.daml.metrics.Timed
-import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
-import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
@@ -55,24 +52,20 @@ import scala.jdk.CollectionConverters.*
   * All integration tests must be located in package [[com.digitalasset.canton.integration.tests]]
   * or a subpackage thereof. This is required to correctly compute unit test coverage.
   */
-trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
+private[integration] trait BaseIntegrationTest
     extends FixtureAnyWordSpec
     with BaseTest
     with RepeatableTestSuiteTest
-    with ProtocolVersionChecksFixtureAnyWordSpec
-    with IntegrationTestMetrics {
-  this: EnvironmentSetup[C, E] =>
+    with ProtocolVersionChecksFixtureAnyWordSpec {
+  this: EnvironmentSetup =>
 
-  type FixtureParam = TestConsoleEnvironment[C, E]
+  type FixtureParam = TestConsoleEnvironment
 
   override protected def withFixture(test: OneArgTest): Outcome = {
     val integrationTestPackage = "com.digitalasset.canton.integration.tests"
-    val integrationTestPackageSplice = "org.lfdecentralizedtrust.splice.integration.tests"
-    getClass.getName should (startWith(
+    getClass.getName should startWith(
       integrationTestPackage
-    ) or startWith(
-      integrationTestPackageSplice
-    )) withClue s"\nAll integration tests must be located in $integrationTestPackage, $integrationTestPackageSplice or a subpackage thereof."
+    ) withClue s"\nAll integration tests must be located in $integrationTestPackage or a subpackage thereof."
 
     super[RepeatableTestSuiteTest].withFixture(new TestWithSetup(test))
   }
@@ -90,7 +83,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      }*
+      } *,
     )
 
   /** Version of [[com.digitalasset.canton.logging.SuppressingLogger.assertThrowsAndLogs]] that is
@@ -108,7 +101,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      }*
+      } *,
     )
 
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]] But
@@ -139,23 +132,10 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
     override val pos: Option[Position] = test.pos
 
     override def apply(): Outcome = {
-      val metrics = testInfrastructureTestMetrics(test.name)
-      val environment = Timed.value(
-        metrics.testProvideEnvironment,
-        provideEnvironment(test.name),
-      )
-      val testOutcome = {
-        try
-          Timed.value(
-            metrics.testExecution,
-            test.toNoArgTest(environment)(),
-          )
-        finally
-          Timed.value(
-            metrics.testFinished,
-            testFinished(test.name, environment),
-          )
-      }
+      val environment = provideEnvironment
+      val testOutcome =
+        try test.toNoArgTest(environment)()
+        finally testFinished(environment)
       testOutcome
     }
   }

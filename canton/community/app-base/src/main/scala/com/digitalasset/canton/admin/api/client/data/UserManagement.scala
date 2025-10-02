@@ -69,14 +69,9 @@ object UserRights {
         acc.copy(actAs = acc.actAs + PartyId.tryFromProtoPrimitive(value.party))
       case (acc, Kind.CanReadAs(value)) =>
         acc.copy(readAs = acc.readAs + PartyId.tryFromProtoPrimitive(value.party))
-      // irrelevant for splice
-      case (acc, Kind.CanExecuteAs(_)) =>
-        ???
       case (acc, Kind.IdentityProviderAdmin(_)) =>
         acc.copy(identityProviderAdmin = true)
       case (acc, Kind.CanReadAsAnyParty(_)) => acc.copy(readAsAnyParty = true)
-      // irrelevant for splice
-      case (acc, Kind.CanExecuteAsAnyParty(_)) => ???
     })
 }
 

@@ -207,10 +207,6 @@ object UserManagementClient {
       Some(UserRight.CanReadAs(Ref.Party.assertFromString(x.party)))
     case proto.Right(proto.Right.Kind.CanReadAsAnyParty(_)) =>
       Some(UserRight.CanReadAsAnyParty)
-    // irrelevant for splice
-    case proto.Right(proto.Right.Kind.CanExecuteAsAnyParty(_)) => ???
-    // irrelevant for splice
-    case proto.Right(proto.Right.Kind.CanExecuteAs(_)) => ???
     case proto.Right(proto.Right.Kind.Empty) =>
       None // The server sent a right of a kind that this client doesn't know about.
   }
