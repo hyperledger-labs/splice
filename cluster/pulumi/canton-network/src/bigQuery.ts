@@ -444,13 +444,14 @@ needs the 'Cloud SQL Editor' IAM role in the relevant GCP project
 function createPublicationAndReplicationSlots(
   postgres: CloudPostgres,
   replicatorUser: gcp.sql.User,
-  scan: InstalledHelmChart
+  scan: InstalledHelmChart,
+  project: string
 ) {
   const dbName = scanAppDatabaseName(postgres);
   const schemaName = dbName;
   const path = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
   const scriptArgs = pulumi.interpolate`\\
-      --private-network-project="${gcp.organizations.getProjectOutput({})}" \\
+      --private-network-project="${project}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
       --tables-to-replicate-length="${tablesToReplicate.length}" \\
