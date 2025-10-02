@@ -512,7 +512,7 @@ abstract class TopologyAdminConnection(
       forceChanges = ForceFlags.none,
     )
 
-  def listOwnerToKeyMapping(member: Member)(implicit
+  def listOwnerToKeyMapping(member: Member, timeQuery: TimeQuery = TimeQuery.HeadState)(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[OwnerToKeyMapping]]] =
     runCmd(
@@ -520,7 +520,7 @@ abstract class TopologyAdminConnection(
         BaseQuery(
           store = AuthorizedStore,
           proposals = false,
-          timeQuery = TimeQuery.HeadState,
+          timeQuery = timeQuery,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,

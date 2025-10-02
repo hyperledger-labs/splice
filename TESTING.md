@@ -23,6 +23,7 @@
     - [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
     - [Testing App Upgrades](#testing-app-upgrades)
+    - [Testing from a custom canton instance]
   - [Deployment Tests](#deployment-tests)
 - [CI Without Approval](#ci-without-approval)
 
@@ -402,6 +403,10 @@ PRs/commits that include `[breaking]` in their commit message, or that bump the 
 
 The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
 one-by-one to the current commit's version.
+
+### Testing from a custom canton instance
+
+If you need a custom canton instance to run your test, use `./start-canton.sh -B scripts/bootstrap/<your-script>`.
 
 ## Deployment Tests
 
