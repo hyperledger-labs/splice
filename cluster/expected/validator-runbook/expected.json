@@ -524,6 +524,8 @@
           "keyDirectory": "/keys",
           "maxParties": 1234,
           "parallelism": 321,
+          "preapprovalRetries": 9876,
+          "preapprovalRetryDelayMs": 42,
           "scanApiUrl": "http://scan-app.sv-1:5012",
           "token": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}",
           "userId": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}",

@@ -22,8 +22,8 @@ export function installPartyAllocator(
     'splice-party-allocator',
     {
       config: {
-        token: "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}",
-        userId: "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}",
+        token: '${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}',
+        userId: '${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}',
         jsonLedgerApiUrl: `http://participant-${DecentralizedSynchronizerUpgradeConfig.active.id}:7575`,
         scanApiUrl: 'http://scan-app.sv-1:5012',
         validatorApiUrl: 'http://validator-app:5003',
@@ -32,7 +32,7 @@ export function installPartyAllocator(
         parallelism: config.parallelism,
         preapprovalRetries: config.preapprovalRetries,
         preapprovalRetryDelayMs: config.preapprovalRetryDelayMs,
-      }
+      },
     },
     activeVersion,
     { dependsOn }
