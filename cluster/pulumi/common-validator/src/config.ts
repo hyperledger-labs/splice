@@ -40,6 +40,8 @@ export const PartyAllocatorConfigSchema = z.object({
   enable: z.boolean(),
   parallelism: z.number().default(30),
   maxParties: z.number().default(1000000),
+  preapprovalRetries: z.number().default(120),
+  preapprovalRetryDelayMs: z.number().default(1000),
 });
 export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
 
