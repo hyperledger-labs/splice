@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "build/index.js",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=build/bundle.js --sourcemap=inline --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
-    "compile": "tsc",
+    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=build/bundle.js --sourcemap=inline --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "compile": "tsc --noEmit",
     "start": "node ./build/index.js",
     "check": "npm run format:check && npm run lint:check",
     "fix": "npm run format:fix && npm run lint:fix",
