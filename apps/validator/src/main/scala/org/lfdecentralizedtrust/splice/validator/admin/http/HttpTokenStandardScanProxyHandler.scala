@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.auth.UserAuthExtractor.UserRequest
+import org.lfdecentralizedtrust.splice.auth.AuthenticationOnlyAuthExtractor.AuthenticatedRequest
 import org.lfdecentralizedtrust.tokenstandard.{
   allocation,
   allocationinstruction,
@@ -23,10 +23,10 @@ class HttpTokenStandardScanProxyHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends allocation.v1.Handler[UserRequest]
-    with allocationinstruction.v1.Handler[UserRequest]
-    with metadata.v1.Handler[UserRequest]
-    with transferinstruction.v1.Handler[UserRequest]
+) extends allocation.v1.Handler[AuthenticatedRequest]
+    with allocationinstruction.v1.Handler[AuthenticatedRequest]
+    with metadata.v1.Handler[AuthenticatedRequest]
+    with transferinstruction.v1.Handler[AuthenticatedRequest]
     with Spanning
     with NamedLogging {
 
@@ -34,8 +34,10 @@ class HttpTokenStandardScanProxyHandler(
 
   def getInstrument(
       respond: metadata.v1.Resource.GetInstrumentResponse.type
-  )(instrumentId: String)(user: UserRequest): Future[metadata.v1.Resource.GetInstrumentResponse] = {
-    implicit val UserRequest(_, tc) = user
+  )(
+      instrumentId: String
+  )(user: AuthenticatedRequest): Future[metadata.v1.Resource.GetInstrumentResponse] = {
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getInstrument") { implicit tc => _ =>
       scanConnection.lookupInstrument(instrumentId).map { instrumentO =>
         instrumentO.fold(
@@ -51,8 +53,8 @@ class HttpTokenStandardScanProxyHandler(
 
   def getRegistryInfo(
       respond: metadata.v1.Resource.GetRegistryInfoResponse.type
-  )()(user: UserRequest): Future[metadata.v1.Resource.GetRegistryInfoResponse] = {
-    implicit val UserRequest(_, tc) = user
+  )()(user: AuthenticatedRequest): Future[metadata.v1.Resource.GetRegistryInfoResponse] = {
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getRegistryInfo") { implicit tc => _ =>
       scanConnection.getRegistryInfo().map(metadata.v1.Resource.GetRegistryInfoResponse.OK(_))
     }
@@ -61,9 +63,9 @@ class HttpTokenStandardScanProxyHandler(
   def listInstruments(
       respond: metadata.v1.Resource.ListInstrumentsResponse.type
   )(pageSize: Option[Int], pageToken: Option[String])(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[metadata.v1.Resource.ListInstrumentsResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.listInstruments") { implicit tc => _ =>
       scanConnection
         .listInstruments(pageSize, pageToken)
@@ -77,9 +79,9 @@ class HttpTokenStandardScanProxyHandler(
   def getAllocationFactory(
       respond: allocationinstruction.v1.Resource.GetAllocationFactoryResponse.type
   )(body: allocationinstruction.v1.definitions.GetFactoryRequest)(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[allocationinstruction.v1.Resource.GetAllocationFactoryResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getAllocationFactory") { implicit tc => _ =>
       scanConnection
         .getAllocationFactoryRaw(
@@ -92,9 +94,9 @@ class HttpTokenStandardScanProxyHandler(
   def getAllocationCancelContext(
       respond: allocation.v1.Resource.GetAllocationCancelContextResponse.type
   )(allocationId: String, body: allocation.v1.definitions.GetChoiceContextRequest)(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[allocation.v1.Resource.GetAllocationCancelContextResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getAllocationCancelContext") { implicit tc => _ =>
       scanConnection
         .getAllocationCancelContextRaw(
@@ -108,9 +110,9 @@ class HttpTokenStandardScanProxyHandler(
   def getAllocationTransferContext(
       respond: allocation.v1.Resource.GetAllocationTransferContextResponse.type
   )(allocationId: String, body: allocation.v1.definitions.GetChoiceContextRequest)(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[allocation.v1.Resource.GetAllocationTransferContextResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getAllocationTransferContext") { implicit tc => _ =>
       scanConnection
         .getAllocationTransferContextRaw(
@@ -124,9 +126,9 @@ class HttpTokenStandardScanProxyHandler(
   def getAllocationWithdrawContext(
       respond: allocation.v1.Resource.GetAllocationWithdrawContextResponse.type
   )(allocationId: String, body: allocation.v1.definitions.GetChoiceContextRequest)(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[allocation.v1.Resource.GetAllocationWithdrawContextResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getAllocationWithdrawContext") { implicit tc => _ =>
       scanConnection
         .getAllocationWithdrawContextRaw(
@@ -139,8 +141,10 @@ class HttpTokenStandardScanProxyHandler(
 
   def getTransferFactory(respond: transferinstruction.v1.Resource.GetTransferFactoryResponse.type)(
       body: transferinstruction.v1.definitions.GetFactoryRequest
-  )(user: UserRequest): Future[transferinstruction.v1.Resource.GetTransferFactoryResponse] = {
-    implicit val UserRequest(_, tc) = user
+  )(
+      user: AuthenticatedRequest
+  ): Future[transferinstruction.v1.Resource.GetTransferFactoryResponse] = {
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getTransferFactory") { implicit tc => _ =>
       scanConnection
         .getTransferFactoryRaw(
@@ -156,9 +160,9 @@ class HttpTokenStandardScanProxyHandler(
       transferInstructionId: String,
       body: transferinstruction.v1.definitions.GetChoiceContextRequest,
   )(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[transferinstruction.v1.Resource.GetTransferInstructionAcceptContextResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getTransferInstructionAcceptContext") { implicit tc => _ =>
       scanConnection
         .getTransferInstructionAcceptContextRaw(
@@ -175,9 +179,9 @@ class HttpTokenStandardScanProxyHandler(
       transferInstructionId: String,
       body: transferinstruction.v1.definitions.GetChoiceContextRequest,
   )(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[transferinstruction.v1.Resource.GetTransferInstructionRejectContextResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getTransferInstructionRejectContext") { implicit tc => _ =>
       scanConnection
         .getTransferInstructionRejectContextRaw(
@@ -194,9 +198,9 @@ class HttpTokenStandardScanProxyHandler(
       transferInstructionId: String,
       body: transferinstruction.v1.definitions.GetChoiceContextRequest,
   )(
-      user: UserRequest
+      user: AuthenticatedRequest
   ): Future[transferinstruction.v1.Resource.GetTransferInstructionWithdrawContextResponse] = {
-    implicit val UserRequest(_, tc) = user
+    implicit val AuthenticatedRequest(_, tc) = user
     withSpan(s"$workflowId.getTransferInstructionWithdrawContext") { implicit tc => _ =>
       scanConnection
         .getTransferInstructionWithdrawContextRaw(

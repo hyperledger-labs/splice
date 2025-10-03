@@ -1049,9 +1049,8 @@ class ValidatorApp(
                     scanProxyHandler,
                     operation =>
                       metrics.httpServerMetrics.withMetrics("scanProxy")(operation).tflatMap { _ =>
-                        UserAuthExtractor(
+                        AuthenticationOnlyAuthExtractor(
                           verifier,
-                          userRightsProvider,
                           loggerFactory,
                           "splice scan proxy realm",
                         )(
@@ -1067,9 +1066,8 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardMetadata")(operation)
                             .tflatMap { _ =>
-                              UserAuthExtractor(
+                              AuthenticationOnlyAuthExtractor(
                                 verifier,
-                                userRightsProvider,
                                 loggerFactory,
                                 "splice scan proxy realm",
                               )(
@@ -1086,9 +1084,8 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardTransfer")(operation)
                             .tflatMap { _ =>
-                              UserAuthExtractor(
+                              AuthenticationOnlyAuthExtractor(
                                 verifier,
-                                userRightsProvider,
                                 loggerFactory,
                                 "splice scan proxy realm",
                               )(
@@ -1104,9 +1101,8 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardAllocationInstruction")(operation)
                             .tflatMap { _ =>
-                              UserAuthExtractor(
+                              AuthenticationOnlyAuthExtractor(
                                 verifier,
-                                userRightsProvider,
                                 loggerFactory,
                                 "splice scan proxy realm",
                               )(
@@ -1122,9 +1118,8 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardAllocation")(operation)
                             .tflatMap { _ =>
-                              UserAuthExtractor(
+                              AuthenticationOnlyAuthExtractor(
                                 verifier,
-                                userRightsProvider,
                                 loggerFactory,
                                 "splice scan proxy realm",
                               )(
