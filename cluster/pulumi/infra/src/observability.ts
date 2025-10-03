@@ -765,24 +765,6 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES',
-                (monitoringConfig.alerting.alerts.trafficWaste.kilobytes * 1024).toString()
-              )
-              .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_QUANTILE',
-                monitoringConfig.alerting.alerts.trafficWaste.quantile.toString()
-              )
-              .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
-              )
-              .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
-                monitoringConfig.alerting.alerts.svNames
-                  .map(p => `,member!~"PAR::${p}::.*"`)
-                  .join('')
-              )
-              .replaceAll(
                 '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
               )
