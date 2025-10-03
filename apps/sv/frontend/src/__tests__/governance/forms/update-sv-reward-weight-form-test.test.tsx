@@ -308,6 +308,54 @@ describe('Update SV Reward Weight Form', () => {
     expect(screen.getByText(/Service Unavailable/)).toBeDefined();
   });
 
+  test('show the correct weights for selected sv in summary page', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput).toBeDefined();
+    await user.type(weightInput, '1000');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+    await user.click(submitButton); //review proposal
+
+    waitFor(() => {
+      expect(screen.getByTestId('config-change-current-value').textContent).toBe('12345');
+      expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
+    });
+  });
+
   test('should redirect to governance page after successful submission', async () => {
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {

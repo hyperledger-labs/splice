@@ -110,11 +110,11 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
         } as OffBoardMemberProposal;
       case 'SRARC_UpdateSvRewardWeight': {
         const allSvInfos = dsoInfo?.dsoRules.payload.svs.entriesArray() || [];
-        const svPartyId = dsoInfo?.svPartyId || '';
-        const currentWeight = getSvRewardWeight(allSvInfos, svPartyId);
+        const svToUpdate = dsoAction.value.svParty;
+        const currentWeight = getSvRewardWeight(allSvInfos, svToUpdate);
 
         return {
-          svToUpdate: dsoAction.value.svParty,
+          svToUpdate: svToUpdate,
           currentWeight: currentWeight,
           weightChange: dsoAction.value.newRewardWeight,
         } as UpdateSvRewardWeightProposal;
