@@ -60,7 +60,6 @@ final case class SequencerAlias private (protected val str: String255)
 
 object SequencerAlias extends LengthLimitedStringWrapperCompanion[String255, SequencerAlias] {
   val Default = SequencerAlias.tryCreate("DefaultSequencer")
-
   override protected def companion: String255.type = String255
   override def instanceName: String = "SequencerAlias"
   override protected def factoryMethodWrapper(str: String255): SequencerAlias = SequencerAlias(str)

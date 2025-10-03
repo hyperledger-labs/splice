@@ -83,7 +83,7 @@ trait InstanceReference
   @inline final override def uid: UniqueIdentifier = id.uid
 
   val name: String
-  protected val instanceType: String
+  protected[canton] val instanceType: String
 
   protected[canton] def executionContext: ExecutionContext
 
@@ -150,7 +150,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
   val name: String
   val consoleEnvironment: ConsoleEnvironment
-  protected[console] val nodes: Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]
+  private[console] val nodes: Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]
 
   @Help.Summary("Database related operations")
   @Help.Group("Database")
@@ -212,7 +212,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     private def filterByNodeAndAttribute(
         attributes: Map[String, String]
     )(value: MetricValue): Boolean =
-      value.attributes.get("node_name").contains(name) && attributes.forall { case (k, v) =>
+      value.attributes.get("node").contains(name) && attributes.forall { case (k, v) =>
         value.attributes.get(k).contains(v)
       }
 
@@ -357,7 +357,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     else
       NodeNotStarted.ErrorCanton(this)
 
-  override def adminCommand[Result](
+  override protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
@@ -375,7 +375,7 @@ trait RemoteInstanceReference extends InstanceReference {
 
   def config: NodeConfig
 
-  override def adminCommand[Result](
+  override protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(
@@ -417,13 +417,13 @@ class ExternalLedgerApiClient(
   override val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("client", name)
 
-  override def ledgerApiCommand[Result](
+  override protected[console] def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcLedgerCommandRunner
       .runCommand("sourceLedger", command, FullClientConfig(hostname, port, tls), token)
 
-  override def optionallyAwait[Tx](
+  override protected def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       txSynchronizerId: String,
@@ -657,7 +657,7 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
   def config: RemoteParticipantConfig =
     consoleEnvironment.environment.config.remoteParticipantsByString(name)
 
-  override def ledgerApiCommand[Result](
+  override protected[console] def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcLedgerCommandRunner.runCommand(
@@ -714,7 +714,7 @@ class LocalParticipantReference(
     case ClockConfig.RemoteClock(_) => None
   }
 
-  override protected[console] val nodes = consoleEnvironment.environment.participants
+  override private[console] val nodes = consoleEnvironment.environment.participants
 
   @Help.Summary("Return participant config")
   def config: ParticipantNodeConfig =
@@ -741,7 +741,7 @@ class LocalParticipantReference(
   @Help.Group("Commitments")
   override def commitments: LocalCommitmentsAdministrationGroup = commitments_
 
-  override def ledgerApiCommand[Result](
+  override protected[console] def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
@@ -1256,7 +1256,7 @@ class LocalSequencerReference(
   override lazy val sequencerConnection: GrpcSequencerConnection =
     config.publicApi.clientConfig.asSequencerConnection()
 
-  val nodes: SequencerNodes =
+  private[console] val nodes: SequencerNodes =
     consoleEnvironment.environment.sequencers
 
   override protected[console] def runningNode: Option[SequencerNodeBootstrap] =
@@ -1390,7 +1390,7 @@ class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: S
   override def config: MediatorNodeConfig =
     consoleEnvironment.environment.config.mediatorsByString(name)
 
-  val nodes: MediatorNodes = consoleEnvironment.environment.mediators
+  private[console] val nodes: MediatorNodes = consoleEnvironment.environment.mediators
 
   override protected[console] def runningNode: Option[MediatorNodeBootstrap] =
     nodes.getRunning(name)

@@ -244,7 +244,7 @@ final case class DynamicSynchronizerParameters(
   // https://docs.google.com/document/d/1tpPbzv2s6bjbekVGBn6X5VZuw0oOTHek5c30CBo4UkI/edit#bookmark=id.1dzc6dxxlpca
   // Originally the validation was done on ledgerTimeRecordTimeTolerance, but was moved to preparationTimeRecordTimeTolerance
   // instead when the parameter was introduced
-  def compatibleWithNewPreparationTimeRecordTimeTolerance(
+  private[canton] def compatibleWithNewPreparationTimeRecordTimeTolerance(
       newPreparationTimeRecordTimeTolerance: NonNegativeFiniteDuration
   ): Boolean =
     // If false, a new request may receive the same submission time as a previous request and the previous

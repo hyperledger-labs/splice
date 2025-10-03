@@ -104,7 +104,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
         loggerFactory
           .assertLogs(
             testInstance.authenticateInputContractsInternal(inputContracts).value,
-            expectedLog.toList*
+            expectedLog.toList *,
           )
           .map(_ shouldBe expectedResult)
       }

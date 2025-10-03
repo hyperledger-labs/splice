@@ -162,9 +162,12 @@ class InitialTopologySnapshotValidator(
                      |result  : $retainedTransaction""".stripMargin)
                 }
                 (
-                  retainedTransaction,
-                  minIndex,
+                  (
+                    retainedTransaction,
+                    minIndex,
+                  ),
                 )
+
               }
               .toList
             // return the merged and the rejected transactions.

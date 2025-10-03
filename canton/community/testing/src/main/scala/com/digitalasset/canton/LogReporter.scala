@@ -37,12 +37,7 @@ class LogReporter extends Reporter {
     case event: TestSucceeded =>
       logger.info(s"Test succeeded: '${event.suiteName}/${event.testName}'")
     case event: TestFailed =>
-      val locationMsg = event.location.map(l => s", location: $l").getOrElse("")
-      val msg =
-        s"Test failed: '${event.suiteName}/${event.testName}', message: ${event.message}$locationMsg"
-      event.throwable
-        .map(cause => logger.warn(msg, cause))
-        .getOrElse(logger.warn(msg))
+      warnWithThrowable(s"Test failed: '${event.suiteName}/${event.testName}'", event.throwable)
     case event: TestCanceled =>
       logger.info(s"Test canceled: '${event.suiteName}/${event.testName}'")
     case event: TestIgnored => logger.info(s"Test ignored: '${event.suiteName}/${event.testName}'")
