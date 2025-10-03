@@ -132,14 +132,6 @@ message Right {
     string party = 1;
   }
 
-  message CanExecuteAs {
-    // The right to prepare and execute submissions as this party.
-    // This right does not entitle the user to perform any reads.
-    // If reading is required, a separate ReadAs right must be added.
-    // Right to execute as a party is also implicitly contained in the CanActAs right.
-    string party = 1;
-  }
-
   // The right to administer the identity provider that the user is assigned to.
   // It means, being able to manage users and parties that are also assigned
   // to the same identity provider.
