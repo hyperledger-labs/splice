@@ -200,7 +200,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
+          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; party-allocator/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all Splice DARs here, just in case
