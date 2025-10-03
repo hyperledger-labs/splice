@@ -3069,7 +3069,7 @@
           ]
         }
       },
-      "version": "75.9.0"
+      "version": "77.12.1"
     },
     "name": "observability-metrics",
     "provider": "",
@@ -4219,9 +4219,9 @@
     "id": "",
     "inputs": {
       "addPreviousOutputInEnv": true,
-      "create": "bash SPLICE_ROOT/cluster/pulumi/infra/prometheus-crd-update.sh 0.83.0"
+      "create": "bash SPLICE_ROOT/cluster/pulumi/infra/prometheus-crd-update.sh 0.85.0"
     },
-    "name": "update-prometheus-crd-0.83.0",
+    "name": "update-prometheus-crd-0.85.0",
     "provider": "",
     "type": "command:local:Command"
   },
