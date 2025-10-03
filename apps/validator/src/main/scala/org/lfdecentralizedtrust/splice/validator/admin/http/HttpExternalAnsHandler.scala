@@ -37,12 +37,12 @@ class HttpExternalAnsHandler(
       body: d0.CreateAnsEntryRequest
   )(tuser: WalletUserRequest): Future[r0.CreateAnsEntryResponse] = {
     implicit val WalletUserRequest(user, endUserWallet, traceContext) = tuser
+    val partyId = endUserWallet.store.key.endUserParty
     withSpan(s"$workflowId.createAnsEntry") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
         "createAnsEntry",
         "create ANS entry",
         for {
-          partyId <- endUserWallet.connection.getPrimaryParty(user)
           ansRules <- scanConnection.getAnsRules()
           ansRulesCt = ansRules.toAssignedContract.getOrElse(
             throw Status.Code.FAILED_PRECONDITION.toStatus
