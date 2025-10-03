@@ -94,7 +94,7 @@ Wednesday after your change.
 - Added new limits for the number of open streams. This allows to limit the number of
   open streams on the API
   ```
-  canton.sequencers.sequencer.parameters.sequencer-api-limits = {
+  canton.sequencers.sequencer.parameters.public-api.stream.limits = {
     "com.digitalasset.canton.sequencer.api.v30.SequencerService/DownloadTopologyStateForInit" : 10,
     "com.digitalasset.canton.sequencer.api.v30.SequencerService/SubscribeV2" : 1000,
   }
