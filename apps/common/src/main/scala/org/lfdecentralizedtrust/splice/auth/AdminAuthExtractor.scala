@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
-import com.daml.ledger.javaapi.data.User
 import org.apache.pekko.http.scaladsl.server.Directive1
 import org.apache.pekko.http.scaladsl.server.Directives.{onComplete, provide}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -29,16 +28,6 @@ final class AdminAuthExtractor(
     traceContext: TraceContext
 ) extends AuthExtractor(verifier, loggerFactory, realm)(traceContext) {
 
-  private def isAuthorizedAsAdmin(
-      user: User,
-      rights: Set[User.Right],
-  ): Boolean = {
-    !user.isDeactivated &&
-    hasPrimaryParty(user, adminParty) &&
-    canActAs(rights, adminParty) &&
-    isParticipantAdmin(rights)
-  }
-
   def directiveForOperationId(
       operationId: String
   ): Directive1[AdminAuthExtractor.AdminUserRequest] = {
@@ -50,14 +39,32 @@ final class AdminAuthExtractor(
           )
         ).flatMap {
           case Success((Some(user), rights)) =>
-            if (isAuthorizedAsAdmin(user, rights)) {
-              provide(AdminAuthExtractor.AdminUserRequest(traceContext))
-            } else {
+            if (user.isDeactivated) {
               rejectWithAuthorizationFailure(
                 authenticatedUser,
                 operationId,
-                "User not authorized to act as admin",
+                "User is deactivated",
               )
+            } else if (!hasPrimaryParty(user, adminParty)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"Primary party of user ${user.getPrimaryParty} is not equal to the operator party ${adminParty}",
+              )
+            } else if (!canActAs(rights, adminParty)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"User may not act as the operator party ${adminParty}",
+              )
+            } else if (!isParticipantAdmin(rights)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"User is not a participant administrator",
+              )
+            } else {
+              provide(AdminAuthExtractor.AdminUserRequest(traceContext))
             }
           case _ =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")

@@ -13,7 +13,7 @@ import io.grpc.Status
 import org.lfdecentralizedtrust.splice.auth.{AuthExtractor, SignatureVerifier, UserRightsProvider}
 import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletService}
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 /** Auth extractor for APIs that perform wallet operations on behalf of the user
   *
@@ -45,9 +45,27 @@ final class UserWalletAuthExtractor(
         ).flatMap {
           case Success((_, None)) =>
             rejectWithWalletNotFoundFailure(authenticatedUser, operationId)
+          case Success(((None, _), _)) =>
+            rejectWithAuthorizationFailure(
+              authenticatedUser,
+              operationId,
+              "User not found",
+            )
           case Success(((Some(user), rights), Some(wallet))) =>
             val walletParty = wallet.store.key.endUserParty
-            if (!user.isDeactivated && canActAs(rights, walletParty)) {
+            if (user.isDeactivated) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                "User is deactivated",
+              )
+            } else if (!canActAs(rights, walletParty)) {
+              rejectWithAuthorizationFailure(
+                authenticatedUser,
+                operationId,
+                s"User may not act as wallet party ${walletParty}",
+              )
+            } else {
               provide(
                 UserWalletAuthExtractor.WalletUserRequest(
                   authenticatedUser,
@@ -55,15 +73,9 @@ final class UserWalletAuthExtractor(
                   traceContext,
                 )
               )
-            } else {
-              rejectWithAuthorizationFailure(
-                authenticatedUser,
-                operationId,
-                "User not authorized for wallet party",
-              )
             }
-          case _ =>
-            rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
+          case Failure(exception) =>
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, exception.getMessage)
         }
       }
   }
