@@ -4,22 +4,17 @@
 import { useSearchParams } from 'react-router-dom';
 import { createProposalActions } from '../utils/governance';
 import { SelectAction } from '../components/forms/SelectAction';
-import { ProposalFormData, SupportedActionTag } from '../utils/types';
+import { SupportedActionTag } from '../utils/types';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
 import { OffboardSvForm } from '../components/forms/OffboardSvForm';
 import { GrantRevokeFeaturedAppForm } from '../components/forms/GrantRevokeFeaturedAppForm';
 import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm';
 import { SetAmuletConfigRulesForm } from '../components/forms/SetAmuletConfigRulesForm';
-import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
   const action = searchParams.get('action');
   const selectedAction = createProposalActions.find(a => a.value === action);
-
-  const onSubmit = async (_formData: ProposalFormData, _action: ActionRequiringConfirmation) => {
-    await Promise.resolve();
-  };
 
   if (selectedAction) {
     const a = selectedAction.value as SupportedActionTag;
@@ -35,7 +30,7 @@ export const CreateProposal: React.FC = () => {
       case 'SRARC_SetConfig':
         return <SetDsoConfigRulesForm />;
       case 'CRARC_SetConfig':
-        return <SetAmuletConfigRulesForm onSubmit={onSubmit} />;
+        return <SetAmuletConfigRulesForm />;
     }
   } else {
     return <SelectAction />;
