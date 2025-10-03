@@ -123,6 +123,12 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
         defaultRules: {
           // enable recording rules for all the k8s metrics
           create: true,
+          disabled: {
+            // The timeout is not configurable, and we have currently jobs that are expected to run for more than
+            // the 12 hr timeout, so we disable the alert. There is an alert if the job fails, so the only risk is
+            // a job that never completes.
+            KubeJobNotCompleted: true,
+          },
         },
         kubeControllerManager: {
           enabled: false,

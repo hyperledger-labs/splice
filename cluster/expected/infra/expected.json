@@ -2430,7 +2430,10 @@
           "enabled": false
         },
         "defaultRules": {
-          "create": true
+          "create": true,
+          "disabled": {
+            "KubeJobNotCompleted": true
+          }
         },
         "fullnameOverride": "prometheus",
         "grafana": {
