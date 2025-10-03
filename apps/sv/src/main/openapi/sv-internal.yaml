@@ -72,6 +72,22 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListValidatorLicensesResponse"
+  /v0/admin/validator/licenses/grant:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "grantValidatorLicense"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GrantValidatorLicenseRequest"
+      responses:
+        "200":
+          description: ok
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/admin/domain/cometbft/status:
     get:
       tags: [sv]
@@ -1131,3 +1147,11 @@ components:
           $ref: "#/components/schemas/DomainDataSnapshot"
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
+
+    GrantValidatorLicenseRequest:
+      type: object
+      required:
+        - party_id
+      properties:
+        party_id:
+          type: string
