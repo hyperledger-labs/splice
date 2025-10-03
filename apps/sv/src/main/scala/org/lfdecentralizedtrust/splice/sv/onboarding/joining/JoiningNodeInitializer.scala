@@ -162,10 +162,10 @@ class JoiningNodeInitializer(
           )
         ),
       ).tupled
-      // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
-      // reconnect all domains at the beginning of SV initialization just in case, but
+      // It is possible that the participant left disconnected to domains due to a failure in the last SV startup.
+      // Reconnect all domains at the beginning of SV initialization in case, but
       // only if we already host the dso party or if we don't see a proposal to host it.
-      decentralizedSynchronizerId <- proceedWithAllDomainReconnect(dsoPartyId)
+      decentralizedSynchronizerId <- proceedWithReconnectAllDomains(dsoPartyId)
       svParty <- SetupUtil.setupSvParty(
         initConnection,
         config,
@@ -459,7 +459,8 @@ class JoiningNodeInitializer(
   // We can only reconnect the domains if the participant:
   // - already hosts the dsoParty or
   // - is not in the process to host it
-  private def proceedWithAllDomainReconnect(
+  // if not we risk reconnecting while the party was authorized but the acs was not imported yet thus breaking the participant
+  private def proceedWithReconnectAllDomains(
       dsoParty: PartyId
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[SynchronizerId] = {
     retryProvider.retry(
@@ -472,12 +473,16 @@ class JoiningNodeInitializer(
             config.domains.global.alias
           )
         participantId <- participantAdminConnection.getParticipantId()
+        // Check if the participant hosts the DSO party. If so,
+        // the dsoParty is hosted on the participant we can proceed to all domains reconnect
         dsoPartyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
           store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
           filterParty = dsoParty.filterString,
           filterParticipant = participantId.filterString,
           topologyTransactionType = TopologyTransactionType.AuthorizedState,
         )
+        // Check if he participant has a proposal for hosting the DSO party. If so,
+        // we are in the middle of an DSO party migration so don't reconnect to the domain.
         activeDsoPartyToParticipantProposals <- participantAdminConnection
           .listPartyToParticipant(
             store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
@@ -487,14 +492,19 @@ class JoiningNodeInitializer(
           )
         _ <-
           if (
-            dsoPartyToParticipantMapping.nonEmpty || activeDsoPartyToParticipantProposals.isEmpty
+            dsoPartyToParticipantMapping.nonEmpty ^ activeDsoPartyToParticipantProposals.isEmpty
           ) {
             logger.info("Reconnecting all domains.")
             participantAdminConnection.reconnectAllDomains()
           } else {
             Future.unit
           }
-      } yield decentralizedSynchronizerId,
+      } yield {
+        logger.info(
+          s"Participant hosts dsoParty: ${dsoPartyToParticipantMapping.nonEmpty} and has proposals to host dsoParty ${activeDsoPartyToParticipantProposals.nonEmpty}"
+        )
+        decentralizedSynchronizerId
+      },
       logger,
     )
   }
