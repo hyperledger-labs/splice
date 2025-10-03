@@ -226,7 +226,7 @@ runs:
           export CIRCLE_SHA1="${{ github.sha }}"
           /usr/bin/sudo mkdir -p ~/.docker/buildx
           /usr/bin/sudo /usr/bin/chown $(whoami):docker ~/.docker/buildx
-          make docker-build -j
+          make docker-build
         cmd_retry_count: 5 # Retry in case of dependency download errors
         additional_nix_args: "--keep DOCKER_CERT_PATH --keep DOCKER_HOST --keep DOCKER_MACHINE_NAME --keep DOCKER_TLS_VERIFY --keep PULUMI_VERSION --keep NO_PROXY --keep CIRCLE_REPOSITORY_URL --keep CIRCLE_SHA1"
 
