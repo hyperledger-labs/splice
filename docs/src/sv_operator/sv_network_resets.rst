@@ -106,7 +106,7 @@ To complete the reset, go through the following steps:
 7.  Other post-reset actions
 
     a. Recreate votes that were ongoing at the time of the reset, see step 1.c.
-    b. Re-issue onboarding secrets to validators you are sponsoring.
+    b. Re-issue onboarding secrets to validators you are sponsoring (TestNet only, on DevNet they can self-issue secrets).
     c. Recreate votes for featured apps when requested by validators.
        The expectation is that validators reach out to their sponsor and the sponsor initiates the vote.
        If necessary, consult the list of featured apps you backed up in step 1.d.
