@@ -30,8 +30,6 @@ class ExternalPartyWalletAutomationService(
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -46,8 +44,6 @@ class ExternalPartyWalletAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
     ) {
   override def companion

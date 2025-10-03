@@ -38,8 +38,6 @@ class ScanAutomationService(
     store: ScanStore,
     storage: Storage,
     snapshotStore: AcsSnapshotStore,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     svParty: PartyId,
     svName: String,
     upgradesConfig: UpgradesConfig,
@@ -59,8 +57,6 @@ class ScanAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       config.parameters,
     ) {
   override def companion
