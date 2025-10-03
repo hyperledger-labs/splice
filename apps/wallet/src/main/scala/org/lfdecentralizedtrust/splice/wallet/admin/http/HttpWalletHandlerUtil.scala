@@ -29,12 +29,11 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
 
   protected def listContracts[TCid <: ContractId[T], T <: Template, ResponseT](
       templateCompanion: Contract.Companion.Template[TCid, T],
-      user: String,
+      userStore: UserWalletStore,
       mkResponse: Vector[d0.Contract] => ResponseT,
   )(implicit ec: ExecutionContext, traceContext: TraceContext, tracer: Tracer): Future[ResponseT] =
     withSpan(s"$workflowId.listContracts") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
         contracts <- userStore.multiDomainAcsStore.listContracts(
           templateCompanion
         )
@@ -43,12 +42,11 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
 
   protected def listContractsWithState[TCid <: ContractId[T], T <: Template, ResponseT](
       templateCompanion: Contract.Companion.Template[TCid, T],
-      user: String,
+      userStore: UserWalletStore,
       mkResponse: Vector[d0.ContractWithState] => ResponseT,
   )(implicit ec: ExecutionContext, traceContext: TraceContext, tracer: Tracer): Future[ResponseT] =
     withSpan(s"$workflowId.listContractsWithState") { _ => _ =>
       for {
-        userStore <- getUserStore(user)
         contracts <- userStore.multiDomainAcsStore.listContracts(
           templateCompanion
         )
@@ -88,15 +86,14 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
           UserWalletStore,
       ) => Future[Update[Response]]
   )(
-      user: String,
+      userWallet: UserWalletService,
       dedup: Option[(CommandId, DedupConfig)] = None,
       disclosedContracts: SpliceLedgerConnection => DisclosedContracts = _ => DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Response] = {
+    val userStore = userWallet.store
+    val userParty = userStore.key.endUserParty
     for {
-      userWallet <- getUserWallet(user)
-      userStore = userWallet.store
-      userParty = userStore.key.endUserParty
       // TODO (#998) pick install based on disclosed contracts' domain IDs
       install <- userStore.getInstall()
       unadornedUpdate <- getUpdate(install.contractId, userStore)

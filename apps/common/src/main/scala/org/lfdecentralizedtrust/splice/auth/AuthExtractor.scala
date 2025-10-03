@@ -3,31 +3,29 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
-import org.apache.pekko.http.scaladsl.server.Directive1
-import org.apache.pekko.http.scaladsl.server.Directives.authenticateOAuth2
+import com.daml.ledger.javaapi.data.User
+import org.apache.pekko.http.scaladsl.server.{
+  AuthorizationFailedRejection,
+  Directive1,
+  StandardRoute,
+}
+import org.apache.pekko.http.scaladsl.server.Directives.{authenticateOAuth2, reject}
 import org.apache.pekko.http.scaladsl.server.directives.Credentials
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-object AuthExtractor {
-  final case class TracedUser(user: String, traceContext: TraceContext)
-  def apply(
-      verifier: SignatureVerifier,
-      loggerFactory: NamedLoggerFactory,
-      realm: String,
-  )(implicit traceContext: TraceContext): String => Directive1[TracedUser] = {
-    new AuthExtractor(verifier, loggerFactory, realm).directiveForOperationId
-  }
-}
+import java.util.Optional
 
-class AuthExtractor(
+abstract class AuthExtractor(
     verifier: SignatureVerifier,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
 )(implicit
     traceContext: TraceContext
 ) extends NamedLogging {
-  def directiveForOperationId(operationId: String): Directive1[AuthExtractor.TracedUser] = {
+
+  protected final def authenticateLedgerApiUser(operationId: String): Directive1[String] = {
     authenticateOAuth2(
       realm,
       credentials =>
@@ -54,6 +52,55 @@ class AuthExtractor(
             }
           case Credentials.Missing => None
         },
-    ).map(user => AuthExtractor.TracedUser(user, traceContext))
+    )
+  }
+
+  protected final def rejectWithAuthorizationFailure(
+      authenticatedUser: String,
+      operationId: String,
+      reason: String,
+  ): StandardRoute = {
+    // Reason is logged at WARN level, but not returned to the client, to avoid leaking information
+    logger.warn(
+      s"Authorization Failed for $authenticatedUser for operation '$operationId'. Reason: $reason"
+    )
+    reject(AuthorizationFailedRejection)
+  }
+
+  protected final def hasPrimaryParty(
+      user: User,
+      party: PartyId,
+  ): Boolean = {
+    val partyAsString = party.toProtoPrimitive
+    user.getPrimaryParty.equals(Optional.of(partyAsString))
+  }
+
+  protected final def canActAs(rights: Set[User.Right], party: PartyId): Boolean = {
+    val partyAsString = party.toProtoPrimitive
+    rights.exists {
+      case actAs: User.Right.CanActAs =>
+        actAs.party == partyAsString
+      case _ => false
+    }
+  }
+
+  protected final def canReadAs(rights: Set[User.Right], party: PartyId): Boolean = {
+    val partyAsString = party.toProtoPrimitive
+    rights.exists {
+      // ActAs rights imply ReadAs rights
+      case actAs: User.Right.CanActAs =>
+        actAs.party == partyAsString
+      case actAs: User.Right.CanReadAs =>
+        actAs.party == partyAsString
+      case _ => false
+    }
+  }
+
+  protected final def isParticipantAdmin(rights: Set[User.Right]): Boolean = {
+    rights.exists {
+      case _: User.Right.ParticipantAdmin =>
+        true
+      case _ => false
+    }
   }
 }
