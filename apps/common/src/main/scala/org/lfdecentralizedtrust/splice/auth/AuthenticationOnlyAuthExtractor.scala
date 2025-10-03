@@ -8,7 +8,6 @@ import org.apache.pekko.http.scaladsl.server.Directives.provide
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 
-
 /** Auth extractor for APIs that are only available for authenticated users,
   * but otherwise do not require special authorization.
   *

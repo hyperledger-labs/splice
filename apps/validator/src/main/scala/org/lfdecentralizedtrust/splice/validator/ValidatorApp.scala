@@ -1034,9 +1034,8 @@ class ValidatorApp(
                     handler,
                     operation =>
                       metrics.httpServerMetrics.withMetrics("validator")(operation).tflatMap { _ =>
-                        UserAuthExtractor(
+                        AuthenticationOnlyAuthExtractor(
                           verifier,
-                          userRightsProvider,
                           loggerFactory,
                           "splice validator realm",
                         )(

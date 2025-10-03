@@ -10,12 +10,12 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.util.{Failure, Success}
 
-/** Auth extractor for APIs that are only available for authenticated users,
-  * but otherwise do not require special authorization.
+/** Auth extractor for APIs that are only available for authenticated users
+  * that represent an active user on the participant.
   *
   * Authentication: request must have a valid JWT token authenticating the user
   *
-  * Authorization: user must exist and be active
+  * Authorization: user must exist on the participant and be active
   */
 final class UserAuthExtractor(
     verifier: SignatureVerifier,
