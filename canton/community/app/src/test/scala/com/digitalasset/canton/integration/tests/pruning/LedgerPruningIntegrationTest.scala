@@ -4,10 +4,11 @@
 package com.digitalasset.canton.integration.tests.pruning
 
 import com.digitalasset.canton.BigDecimalImplicits.*
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{CantonConfig, DbConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.cycle
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*
@@ -42,7 +43,7 @@ import scala.jdk.CollectionConverters.*
 @nowarn("msg=match may not be exhaustive")
 abstract class LedgerPruningIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasCycleUtils
     with HasProgrammableSequencer {
 
@@ -104,7 +105,7 @@ abstract class LedgerPruningIntegrationTest
   }
 
   def acsContracts(p: LocalParticipantReference, templateIdO: Option[String] = None)(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[LfContractInst] = {
     val all: Seq[LfContractInst] =
       p.testing.pcs_search(env.daName, activeSet = true).map(_._2.contractInstance)
@@ -116,12 +117,12 @@ abstract class LedgerPruningIntegrationTest
   }
 
   def acsCount(p: LocalParticipantReference)(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Int =
     acsContracts(p).size
 
   def pcsCount(p: LocalParticipantReference)(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Int =
     p.testing.pcs_search(env.daName).size
 

@@ -5,8 +5,9 @@ package com.digitalasset.canton.integration.tests.examples
 
 import better.files.*
 import com.digitalasset.canton.ConsoleScriptRunner
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{
   BaseIntegrationTest,
   ConfigTransform,
@@ -59,7 +60,7 @@ abstract class ExampleIntegrationTest(configPaths: File*)
 trait HasConsoleScriptRunner { this: NamedLogging =>
   import org.scalatest.EitherValues.*
 
-  def runScript(scriptPath: File)(implicit env: Environment): Unit =
+  def runScript(scriptPath: File)(implicit env: CantonEnvironment): Unit =
     ConsoleScriptRunner.run(env, scriptPath.toJava, logger = logger).value.discard
 }
 

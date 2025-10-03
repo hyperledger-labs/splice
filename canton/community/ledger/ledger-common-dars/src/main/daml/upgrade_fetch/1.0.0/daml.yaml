@@ -1,7 +1,7 @@
-sdk-version: 3.3.0-snapshot.20250926.13852.1.v4f3223e3
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: upgrade-fetch-tests
 source: .
 version: 1.0.0
-dependencies: 
+dependencies:
 - daml-prim
 - daml-stdlib

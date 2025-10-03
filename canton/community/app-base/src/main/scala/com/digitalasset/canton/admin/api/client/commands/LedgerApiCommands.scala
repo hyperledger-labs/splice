@@ -37,13 +37,13 @@ import com.daml.ledger.api.v2.admin.user_management_service.{
   ListUsersResponse,
   RevokeUserRightsRequest,
   RevokeUserRightsResponse,
-  Right as UserRight,
   UpdateUserIdentityProviderIdRequest,
   UpdateUserIdentityProviderIdResponse,
   UpdateUserRequest,
   UpdateUserResponse,
   User,
   UserManagementServiceGrpc,
+  Right as UserRight,
 }
 import com.daml.ledger.api.v2.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub
 import com.daml.ledger.api.v2.command_completion_service.{
@@ -135,6 +135,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
   EventFormat,
   Filters,
+  InterfaceFilter,
   TemplateFilter,
   TransactionFilter,
   TransactionFormat,
@@ -153,6 +154,7 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdatesResponse,
   UpdateServiceGrpc,
 }
+import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.admin.api.client
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
@@ -174,9 +176,9 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.{
-  IdentityProviderConfig as ApiIdentityProviderConfig,
   IdentityProviderId,
   JwksUrl,
+  IdentityProviderConfig as ApiIdentityProviderConfig,
 }
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -2133,6 +2135,7 @@ object LedgerApiCommands {
         parties: Set[LfPartyId],
         limit: PositiveInt,
         templateFilter: Seq[TemplateId] = Seq.empty,
+        interfaceFilter: Seq[Identifier] = Seq.empty,
         activeAtOffset: Long,
         verbose: Boolean = true,
         timeout: FiniteDuration,
@@ -2147,12 +2150,22 @@ object LedgerApiCommands {
 
       override protected def createRequest(): Either[String, GetActiveContractsRequest] = {
         val filter =
-          if (templateFilter.nonEmpty) {
+          if (templateFilter.nonEmpty || interfaceFilter.nonEmpty) {
             Filters(
               templateFilter.map(tId =>
                 CumulativeFilter(
                   IdentifierFilter.TemplateFilter(
                     TemplateFilter(Some(tId.toIdentifier), includeCreatedEventBlob)
+                  )
+                )
+              ) ++ interfaceFilter.map(id =>
+                CumulativeFilter(
+                  IdentifierFilter.InterfaceFilter(
+                    InterfaceFilter(
+                      Some(id),
+                      includeCreatedEventBlob = includeCreatedEventBlob,
+                      includeInterfaceView = true,
+                    )
                   )
                 )
               )

@@ -103,7 +103,8 @@ class DeclarativeParticipantApi(
   ): Either[String, ParticipantId] =
     for {
       _ <- createDarDirectoryIfNecessary(config.fetchedDarDirectory, config.dars)
-      uid <- queryAdminApi(TopologyAdminCommands.Init.GetId())
+      result <- queryAdminApi(TopologyAdminCommands.Init.GetId())
+      uid <- result.uniqueIdentifier.toRight("Node is not initialized")
     } yield ParticipantId(uid)
 
   override protected def sync(config: DeclarativeParticipantConfig, context: ParticipantId)(implicit
@@ -769,6 +770,7 @@ class DeclarativeParticipantApi(
             expectedMainPackageId = "",
             requestHeaders = Map.empty,
             logger,
+            None,
           )
         ).map(_ => ())
       },

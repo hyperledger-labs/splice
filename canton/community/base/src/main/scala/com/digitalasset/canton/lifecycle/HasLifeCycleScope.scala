@@ -49,8 +49,7 @@ sealed trait HasLifeCycleScope extends Any {
     * For without either of the bounds, [[scala.Any]] or [[scala.Nothing]] would be valid
     * refinements.
     */
-  type ContextLifeCycleScopeDiscriminator >: ContextLifeCycleScopeDiscriminatorLower
-    <: ContextLifeCycleScopeDiscriminatorUpper
+  type ContextLifeCycleScopeDiscriminator >: ContextLifeCycleScopeDiscriminatorLower <: ContextLifeCycleScopeDiscriminatorUpper
 
   /** The discriminator for an individual instance's own [[LifeCycleScope]]. It is deliberately left
     * unspecified so that scalac cannot derive type equalities for the discriminator across
@@ -65,8 +64,7 @@ sealed trait HasLifeCycleScope extends Any {
     * For without either of the bounds, [[scala.Any]] or [[scala.Nothing]] would be valid
     * refinements.
     */
-  protected type OwnLifeCycleScopeDiscriminator >: OwnLifeCycleScopeDiscriminatorLower
-    <: OwnLifeCycleScopeDiscriminatorUpper
+  protected type OwnLifeCycleScopeDiscriminator >: OwnLifeCycleScopeDiscriminatorLower <: OwnLifeCycleScopeDiscriminatorUpper
 
   /** Converts a [[ContextLifeCycleScope]] from this instance into a [[ContextLifeCycleScope]] of
     * another instance of [[HasLifeCycleScope]], possibly adding this [[HasLifeCycleScope]]'s
