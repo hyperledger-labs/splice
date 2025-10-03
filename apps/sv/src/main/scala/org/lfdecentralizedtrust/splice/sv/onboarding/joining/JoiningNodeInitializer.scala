@@ -492,7 +492,7 @@ class JoiningNodeInitializer(
           )
         _ <-
           if (
-            dsoPartyToParticipantMapping.nonEmpty ^ activeDsoPartyToParticipantProposals.isEmpty
+            dsoPartyToParticipantMapping.nonEmpty || activeDsoPartyToParticipantProposals.isEmpty
           ) {
             logger.info("Reconnecting all domains.")
             participantAdminConnection.reconnectAllDomains()
