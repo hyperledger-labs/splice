@@ -28,7 +28,7 @@ Setup
         tar xzvf |version|\_splice-node.tar.gz
 
    The extracted docker compose files defining LocalNet are located in
-   ``splice-node/cluster/compose/localnet``.
+   ``splice-node/docker-compose/localnet``.
 
 2. Export these two environment variables used in the later commands:
 
@@ -39,7 +39,7 @@ Setup
 
       .. parsed-literal::
 
-         export LOCALNET_DIR=$PWD/splice-node/cluster/compose/localnet
+         export LOCALNET_DIR=$PWD/splice-node/docker-compose/localnet
          |image_tag_set_plain|
 
 
