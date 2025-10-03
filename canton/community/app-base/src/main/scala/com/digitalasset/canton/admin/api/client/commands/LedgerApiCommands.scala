@@ -593,13 +593,18 @@ object LedgerApiCommands {
     trait HasRights {
       def actAs: Set[LfPartyId]
       def readAs: Set[LfPartyId]
+      def executeAs: Set[LfPartyId]
       def participantAdmin: Boolean
       def identityProviderAdmin: Boolean
       def readAsAnyParty: Boolean
+      def executeAsAnyParty: Boolean
 
       protected def getRights: Seq[UserRight] =
         actAs.toSeq.map(x => UserRight.defaultInstance.withCanActAs(UserRight.CanActAs(x))) ++
           readAs.toSeq.map(x => UserRight.defaultInstance.withCanReadAs(UserRight.CanReadAs(x))) ++
+          executeAs.toSeq
+            .map(UserRight.CanExecuteAs.apply)
+            .map(UserRight.defaultInstance.withCanExecuteAs) ++
           (if (participantAdmin)
              Seq(UserRight.defaultInstance.withParticipantAdmin(UserRight.ParticipantAdmin()))
            else Seq()) ++
@@ -611,6 +616,11 @@ object LedgerApiCommands {
            else Seq()) ++
           (if (readAsAnyParty)
              Seq(UserRight.defaultInstance.withCanReadAsAnyParty(UserRight.CanReadAsAnyParty()))
+           else Seq()) ++
+          (if (executeAsAnyParty)
+             Seq(
+               UserRight.defaultInstance.withCanExecuteAsAnyParty(UserRight.CanExecuteAsAnyParty())
+             )
            else Seq())
     }
 
@@ -625,6 +635,8 @@ object LedgerApiCommands {
         annotations: Map[String, String],
         identityProviderId: String,
         readAsAnyParty: Boolean,
+        executeAs: Set[LfPartyId],
+        executeAsAnyParty: Boolean,
     ) extends BaseCommand[CreateUserRequest, CreateUserResponse, LedgerApiUser]
         with HasRights {
 
@@ -822,10 +834,12 @@ object LedgerApiCommands {
           id: String,
           actAs: Set[LfPartyId],
           readAs: Set[LfPartyId],
+          executeAs: Set[LfPartyId],
           participantAdmin: Boolean,
           identityProviderAdmin: Boolean,
           identityProviderId: String,
           readAsAnyParty: Boolean,
+          executeAsAnyParty: Boolean,
       ) extends BaseCommand[GrantUserRightsRequest, GrantUserRightsResponse, UserRights]
           with HasRights {
 
@@ -854,10 +868,12 @@ object LedgerApiCommands {
           id: String,
           actAs: Set[LfPartyId],
           readAs: Set[LfPartyId],
+          executeAs: Set[LfPartyId],
           participantAdmin: Boolean,
           identityProviderAdmin: Boolean,
           identityProviderId: String,
           readAsAnyParty: Boolean,
+          executeAsAnyParty: Boolean,
       ) extends BaseCommand[RevokeUserRightsRequest, RevokeUserRightsResponse, UserRights]
           with HasRights {
 
