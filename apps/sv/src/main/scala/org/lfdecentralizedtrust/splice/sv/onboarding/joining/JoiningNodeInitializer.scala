@@ -472,7 +472,7 @@ class JoiningNodeInitializer(
         "Checks if the dso party exists on SV onboarding",
         for {
           participantId <- participantAdminConnection.getParticipantId()
-          synchronizerId <- participantAdminConnection.getSynchronizerId(
+          synchronizerId <- participantAdminConnection.getSynchronizerIdWithoutConnecting(
             config.domains.global.alias
           )
           partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
