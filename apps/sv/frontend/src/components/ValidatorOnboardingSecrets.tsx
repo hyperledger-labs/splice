@@ -185,13 +185,7 @@ const OnboardingRow: React.FC<OnboardingRowProps> = props => {
   }, [props]);
 
   const copyOnboardingInfo = useCallback(() => {
-    const clipboardItemData = {
-      'text/rtf': new Blob([onboardingInfo(props, networkInstanceName)], { type: 'text/rtf' }),
-      'text/plain': onboardingInfo(props, networkInstanceName),
-    };
-    const clipboardItem = new ClipboardItem(clipboardItemData);
-
-    navigator.clipboard.write([clipboardItem]);
+    navigator.clipboard.writeText(onboardingInfo(props, networkInstanceName));
   }, [props, networkInstanceName]);
 
   return (
