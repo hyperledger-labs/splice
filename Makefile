@@ -25,7 +25,7 @@ $(app-bundle): $(canton-amulet-dar) $(wallet-payments-dar)
 	sbt --client --batch bundle
 
 $(canton-amulet-dar) $(wallet-payments-dar) &:
-	sbt --client --batch 'splice-amulet-daml'/damlBuild 'splice-wallet-payments-daml'/damlBuild
+	sbt --batch 'splice-amulet-daml'/damlBuild 'splice-wallet-payments-daml'/damlBuild
 
 $(load-tester):
 	cd "${SPLICE_ROOT}/load-tester" && npm ci && npm run build
