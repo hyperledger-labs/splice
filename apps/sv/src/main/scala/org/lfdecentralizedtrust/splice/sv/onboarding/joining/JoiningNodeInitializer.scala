@@ -113,11 +113,6 @@ class JoiningNodeInitializer(
     )
   )
 
-  private val initConnection = ledgerClient.readOnlyConnection(
-    this.getClass.getSimpleName,
-    loggerFactory,
-  )
-
   def joinDsoAndOnboardNodes(): Future[
     (
         SynchronizerId,
@@ -128,6 +123,10 @@ class JoiningNodeInitializer(
         SvDsoAutomationService,
     )
   ] = {
+    val initConnection = ledgerClient.readOnlyConnection(
+      this.getClass.getSimpleName,
+      loggerFactory,
+    )
     // We need to connect to the domain here because otherwise we create a circular dependency
     // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
     // before establishing a domain connection, but allocating the SV party requires a domain connection.
@@ -469,17 +468,17 @@ class JoiningNodeInitializer(
       "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
       for {
         decentralizedSynchronizerId <- participantAdminConnection
-          .getSynchronizerId(
+          .getSynchronizerIdWithoutConnecting(
             config.domains.global.alias
           )
         participantId <- participantAdminConnection.getParticipantId()
-        partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
+        dsoPartyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
           store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
           filterParty = dsoParty.filterString,
           filterParticipant = participantId.filterString,
           topologyTransactionType = TopologyTransactionType.AuthorizedState,
         )
-        activePartyToParticipantProposals <- participantAdminConnection
+        activeDsoPartyToParticipantProposals <- participantAdminConnection
           .listPartyToParticipant(
             store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
             filterParty = dsoParty.filterString,
@@ -487,7 +486,9 @@ class JoiningNodeInitializer(
             topologyTransactionType = TopologyTransactionType.AllProposals,
           )
         _ <-
-          if (partyToParticipantMapping.nonEmpty || activePartyToParticipantProposals.isEmpty) {
+          if (
+            dsoPartyToParticipantMapping.nonEmpty || activeDsoPartyToParticipantProposals.isEmpty
+          ) {
             logger.info("Reconnecting all domains.")
             participantAdminConnection.reconnectAllDomains()
           } else {

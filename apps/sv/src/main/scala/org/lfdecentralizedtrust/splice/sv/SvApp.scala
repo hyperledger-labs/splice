@@ -361,8 +361,8 @@ class SvApp(
               loggerFactory,
               retryProvider,
             )
-            initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
             res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
+              val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
               initializer.joinDsoAndOnboardNodes()
             }
           } yield res
