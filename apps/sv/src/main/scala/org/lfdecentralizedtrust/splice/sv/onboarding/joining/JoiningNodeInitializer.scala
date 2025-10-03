@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
-import org.apache.pekko.stream.Materializer
 import cats.implicits.{
   catsSyntaxOptionId,
   catsSyntaxTuple2Semigroupal,
@@ -12,6 +11,22 @@ import cats.implicits.{
   toTraverseOps,
 }
 import cats.syntax.foldable.*
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
@@ -22,18 +37,19 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
-import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
   ReconcileSequencerLimitWithMemberTrafficTrigger,
   SvPackageVettingTrigger,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -49,33 +65,11 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
   OnboardedAfterDelay,
   Onboarding,
 }
-import org.lfdecentralizedtrust.splice.sv.onboarding.{
-  DsoPartyHosting,
-  NodeInitializerUtil,
-  SetupUtil,
-  SynchronizerNodeInitializer,
-  SynchronizerNodeReconciler,
-}
+import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -169,7 +163,10 @@ class JoiningNodeInitializer(
           )
         ),
       ).tupled
-      decentralizedSynchronizerId <- connectToDomainUnlessMigratingDsoParty(dsoPartyId)
+      // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
+      // reconnect all domains at the beginning of SV initialization just in case, but
+      // only if we already host the dso party or if we don't see a proposal to host it.
+      decentralizedSynchronizerId <- proceedWithAllDomainReconnect(dsoPartyId)
       svParty <- SetupUtil.setupSvParty(
         initConnection,
         config,
@@ -460,50 +457,45 @@ class JoiningNodeInitializer(
     }
   }
 
-  // We can only reconnect the domains if it already hosts the dsoParty or doesn't have an active proposal to host it
-  def canProceedWithDomainReconnect(
-      participantAdminConnection: ParticipantAdminConnection
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
-    for {
-      dsoParty <- getDsoPartyId(initConnection)
-      hostDsoParty <- retryProvider.getValueWithRetries(
-        RetryFor.WaitingOnInitDependency,
-        "has_dso_party",
-        "Checks if the dso party exists on SV onboarding",
-        for {
-          participantId <- participantAdminConnection.getParticipantId()
-          synchronizerId <- participantAdminConnection.getSynchronizerIdWithoutConnecting(
+  // We can only reconnect the domains if the participant:
+  // - already hosts the dsoParty or
+  // - is not in the process to host it
+  private def proceedWithAllDomainReconnect(
+      dsoParty: PartyId
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[SynchronizerId] = {
+    retryProvider.retry(
+      RetryFor.ClientCalls,
+      "reconnect_all_domains",
+      "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
+      for {
+        decentralizedSynchronizerId <- participantAdminConnection
+          .getSynchronizerId(
             config.domains.global.alias
           )
-          partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
+        participantId <- participantAdminConnection.getParticipantId()
+        partyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
+          store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+          filterParty = dsoParty.filterString,
+          filterParticipant = participantId.filterString,
+          topologyTransactionType = TopologyTransactionType.AuthorizedState,
+        )
+        activePartyToParticipantProposals <- participantAdminConnection
+          .listPartyToParticipant(
+            store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
             filterParty = dsoParty.filterString,
             filterParticipant = participantId.filterString,
-            topologyTransactionType = TopologyTransactionType.AuthorizedState,
+            topologyTransactionType = TopologyTransactionType.AllProposals,
           )
-        } yield partyToParticipantMapping.nonEmpty,
-        logger,
-      )
-      hasActiveProposalToHostDsoParty <- retryProvider.getValueWithRetries(
-        RetryFor.WaitingOnInitDependency,
-        "has_active_proposal_to_host_dso_party",
-        "Checks if there is an active proposal to host the dso party",
-        for {
-          participantId <- participantAdminConnection.getParticipantId()
-          synchronizerId <- participantAdminConnection.getSynchronizerId(
-            config.domains.global.alias
-          )
-          activePartyToParticipantProposals <- participantAdminConnection
-            .listPartyToParticipant(
-              store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
-              filterParty = dsoParty.filterString,
-              filterParticipant = participantId.filterString,
-              topologyTransactionType = TopologyTransactionType.AllProposals,
-            )
-        } yield activePartyToParticipantProposals.nonEmpty,
-        logger,
-      )
-    } yield hostDsoParty || !hasActiveProposalToHostDsoParty
+        _ <-
+          if (partyToParticipantMapping.nonEmpty || activePartyToParticipantProposals.isEmpty) {
+            logger.info("Reconnecting all domains.")
+            participantAdminConnection.reconnectAllDomains()
+          } else {
+            Future.unit
+          }
+      } yield decentralizedSynchronizerId,
+      logger,
+    )
   }
 
   private def waitForSvParticipantToHaveSubmissionRights(
@@ -997,39 +989,6 @@ class JoiningNodeInitializer(
       logger,
     )
   }
-
-  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[SynchronizerId] =
-    retryProvider.retry(
-      RetryFor.ClientCalls,
-      "connect_domain",
-      "Connect to global domain if not migrating party",
-      for {
-        decentralizedSynchronizerId <- participantAdminConnection
-          .getSynchronizerIdWithoutConnecting(
-            config.domains.global.alias
-          )
-        participantId <- participantAdminConnection.getParticipantId()
-        // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
-        // we are in the middle of an DSO party migration so don't reconnect to the domain.
-        proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
-          filterParty = dsoPartyId.filterString,
-          filterParticipant = participantId.filterString,
-          topologyTransactionType = TopologyTransactionType.ProposalSignedByOwnKey,
-        )
-        _ <-
-          if (proposals.nonEmpty) {
-            logger.info(
-              "Participant is in process of hosting the DSO party, not reconnecting to domain to avoid inconsistent ACS"
-            )
-            Future.unit
-          } else {
-            logger.info("Reconnecting to global domain")
-            participantAdminConnection.connectDomain(config.domains.global.alias)
-          }
-      } yield decentralizedSynchronizerId,
-      logger,
-    )
 }
 
 object JoiningNodeInitializer {}

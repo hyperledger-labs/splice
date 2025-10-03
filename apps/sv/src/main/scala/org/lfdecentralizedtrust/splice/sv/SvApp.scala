@@ -362,25 +362,6 @@ class SvApp(
               retryProvider,
             )
             initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
-            // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
-            // reconnect all domains at the beginning of SV initialization just in case, but
-            // only if we already host the dso party or if we don't see a proposal to host it.
-            _ <- appInitStep("Reconnect all domains") {
-              initializer.canProceedWithDomainReconnect(participantAdminConnection).flatMap {
-                canProceed =>
-                  if (canProceed) {
-                    retryProvider.retry(
-                      RetryFor.WaitingOnInitDependency,
-                      "reconnect_domains",
-                      "Reconnect all domains",
-                      participantAdminConnection.reconnectAllDomains(),
-                      logger,
-                    )
-                  } else {
-                    Future.unit
-                  }
-              }
-            }
             res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
               initializer.joinDsoAndOnboardNodes()
             }
