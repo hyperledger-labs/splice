@@ -22,16 +22,16 @@ wallet-payments-dar := ${SPLICE_ROOT}/daml/splice-wallet-payments/.daml/dist/spl
 build: $(app-bundle) $(load-tester) cluster/build ## Build the Splice app bundle and ensure cluster scripts are ready to run.
 
 $(app-bundle): $(canton-amulet-dar) $(wallet-payments-dar)
-	sbt --batch bundle
+	sbt --client --batch bundle
 
 $(canton-amulet-dar) $(wallet-payments-dar) &:
-	sbt --batch 'splice-amulet-daml'/damlBuild 'splice-wallet-payments-daml'/damlBuild
+	sbt --client --batch 'splice-amulet-daml'/damlBuild 'splice-wallet-payments-daml'/damlBuild
 
 $(load-tester):
 	cd "${SPLICE_ROOT}/load-tester" && npm ci && npm run build
 
 $(party-allocator):
-	sbt --batch 'party-allocator/npmBuild'
+	sbt --client --batch 'party-allocator/npmBuild'
 
 .PHONY: update-expected
 update-expected: cluster/pulumi/update-expected
@@ -52,13 +52,13 @@ clean: cluster/clean
 
 .PHONY: clean-all
 clean-all: clean ## Completely clean all local build state, including model codegen.
-	sbt --batch clean-splice
+	sbt --client --batch clean-splice
 	find . -type d -name ".daml" -exec rm -rf {} +
 	find . -type d -name "target" -exec rm -rf {} +
 
 .PHONY: format
 format:	cluster/format ## Automatically reformat and apply scalaFix to source code
-	sbt --batch formatFix
+	sbt --client --batch formatFix
 
 .PHONY: help
 help:	## Show list of available make targets
