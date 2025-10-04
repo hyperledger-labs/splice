@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - Deployment
+
+    - Fix a bug where the setting the affinity for the ``splice-cometbft`` and ``splice-global-domain`` helm charts would remove the anti affinity for the ``cometbft`` and the ``sequencer`` deployment. This ensures that if multiple SVs are run on the same nodes, not more than one ``cometbft`` pod can be deployed on the same node and that no more than one ``sequencer`` pod can be deployed to the same node (a ``cometbft`` pod can still share a node with a ``sequencer`` pod).
+
 0.4.19
 ------
 

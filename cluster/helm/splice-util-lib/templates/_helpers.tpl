@@ -241,3 +241,24 @@ app: {{ .app }}
 {{- end }}
 {{- end -}}
 {{- end -}}
+
+{{- define "splice-util-lib.affinity" -}}
+{{- if or .enableAntiAffinity .affinity }}
+affinity:
+  {{- with .affinity }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- if .enableAntiAffinity }}
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: splice-component
+              operator: In
+              values:
+                - {{ .app }}
+        topologyKey: kubernetes.io/hostname
+        namespaceSelector: { } # search in all namespaces
+  {{- end }}
+{{- end }}
+{{- end -}}
