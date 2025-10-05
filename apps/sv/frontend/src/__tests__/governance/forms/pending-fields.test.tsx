@@ -14,6 +14,7 @@ import { Wrapper } from '../../helpers';
 import { svPartyId } from '../../mocks/constants';
 import { server, svUrl } from '../../setup/setup';
 import dayjs from 'dayjs';
+import { SetAmuletConfigRulesForm } from '../../../components/forms/SetAmuletConfigRulesForm';
 
 const today = dayjs();
 const proposals: ListDsoRulesVoteRequestsResponse = {
@@ -60,7 +61,7 @@ const proposals: ListDsoRulesVoteRequestsResponse = {
   ],
 };
 
-describe('Pending Fields', () => {
+describe('DSO Pending Fields', () => {
   test('login and see the SV party ID', async () => {
     const user = userEvent.setup();
     render(
@@ -79,8 +80,10 @@ describe('Pending Fields', () => {
 
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
+});
 
-  test('Pending confirmation fields should be disabled and pending info displayed', async () => {
+describe('Pending Fields', () => {
+  test('DSO Pending fields should be disabled and pending info displayed', async () => {
     server.use(
       rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
         return res(ctx.json<ListDsoRulesVoteRequestsResponse>(proposals));
@@ -130,5 +133,25 @@ describe('Pending Fields', () => {
     expect(trafficThresholdPendingValueDisplay).toHaveTextContent(
       /This proposal will go into effect at Threshold/
     );
+  });
+
+  test('Amulet Pending fields validation', async () => {
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    await waitFor(
+      () => {
+        expect(
+          screen.queryByText('Some fields are disabled for editing due to pending votes.')
+        ).not.toBeNull();
+      },
+      { timeout: 5000 }
+    );
+
+    const pendingLabels = screen.queryAllByTestId(/^config-pending-value-/);
+    expect(pendingLabels.length).toBe(7);
   });
 });
