@@ -21,7 +21,7 @@ import Loading from './Loading';
 import Login from './Login';
 import LoginFailed from './LoginFailed';
 import PartyId from './PartyId';
-import { computeDiff } from './PrettyJsonDiff';
+import { computeDiff, PrettyJsonDiff } from './PrettyJsonDiff';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
 import { updateIdFromEventId, UpdateId } from './UpdateId';
@@ -64,6 +64,7 @@ export {
   Login,
   LoginFailed,
   PartyId,
+  PrettyJsonDiff,
   RateDisplay,
   TitledTable,
   TransferButton,
