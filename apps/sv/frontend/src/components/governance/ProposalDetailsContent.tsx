@@ -37,14 +37,10 @@ const now = () => dayjs();
 export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = props => {
   const { contractId, proposalDetails, votingInformation, votes, currentSvPartyId } = props;
 
-  const hasExpired = dayjs(votingInformation.votingCloses).isBefore(now());
   const isEffective =
     votingInformation.voteTakesEffect && dayjs(votingInformation.voteTakesEffect).isBefore(now());
   const isClosed =
-    !proposalDetails.isVoteRequest ||
-    hasExpired ||
-    isEffective ||
-    votingInformation.status === 'Rejected';
+    !proposalDetails.isVoteRequest || isEffective || votingInformation.status === 'Rejected';
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
 
@@ -201,14 +197,14 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                 data-testid="proposal-details-voting-closes-duration"
                 gutterBottom
               >
-                {dayjs(votingInformation.votingCloses).fromNow()}
+                {dayjs(votingInformation.votingThresholdDeadline).fromNow()}
               </Typography>
               <Typography
                 variant="body2"
                 color="text.secondary"
                 data-testid="proposal-details-voting-closes-value"
               >
-                {votingInformation.votingCloses}
+                {votingInformation.votingThresholdDeadline}
               </Typography>
             </Box>
             <Divider sx={{ my: 1 }} />
