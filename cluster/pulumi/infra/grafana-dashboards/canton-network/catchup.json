@@ -66,7 +66,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 2,
+              "type": "log"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -137,7 +138,100 @@
           "range": true,
           "refId": "A",
           "useBackend": false
+        }
+      ],
+      "title": "Sequencer Client Delay",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Catchup speed of the sequencer in the last 5min",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 2,
+              "type": "log"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
@@ -157,7 +251,7 @@
           "useBackend": false
         }
       ],
-      "title": "Sequencer Client Delay",
+      "title": "Sequencer Catchup Speed",
       "type": "timeseries"
     },
     {
@@ -192,7 +286,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 2,
+              "type": "log"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -226,7 +321,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 23
       },
       "id": 3,
       "options": {
@@ -255,7 +350,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "time() - max by (namespace) (daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"}/1e6)",
+          "expr": "time() - max by (namespace) ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"} != 0) /1e6)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -300,7 +395,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 2,
+              "type": "log"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -334,7 +430,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 23
       },
       "id": 2,
       "options": {
@@ -363,7 +459,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "time() - max by (namespace, job) (daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"}/1e6)",
+          "expr": "time() - max by (namespace, job) ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"} != 0)/1e6)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -382,7 +478,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 31
       },
       "id": 10,
       "panels": [],
@@ -456,7 +552,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 32
       },
       "id": 11,
       "options": {
@@ -564,7 +660,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 39
       },
       "id": 7,
       "options": {
@@ -672,7 +768,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 46
       },
       "id": 6,
       "options": {
@@ -777,7 +873,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 52
       },
       "id": 8,
       "options": {
@@ -879,7 +975,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 52
       },
       "id": 4,
       "options": {
@@ -981,7 +1077,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 60
       },
       "id": 5,
       "options": {
@@ -1050,7 +1146,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 60
       },
       "id": 15,
       "options": {
@@ -1154,7 +1250,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 68
       },
       "id": 17,
       "options": {
@@ -1276,5 +1372,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 1
+  "version": 2
 }
