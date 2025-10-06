@@ -17,6 +17,13 @@ Upcoming
 
     - Set ``-Dscala.concurrent.context.minThreads=8`` in the ``defaultJvmOptions`` for all the helm charts that deploy scala apps. This should ensure that the internal execution contexts spawn 8 threads to handle processing. The previous behavior would spawn up to number of available processors, which can be up to the number of CPUs on the actual node if no CPU limit is set. This should avoid overloading the nodes during heavy processing.
 
+  - SV
+
+    - Add support for including a validator party hint in onboarding secrets. Validators are now required to onboard with the party hint defined by the SV.
+    
+    - The SV UI provides a way to copy formatted message for easily sharing onboarding details with validator operators.
+  
+
 0.4.19
 ------
 
