@@ -19,9 +19,11 @@ Upcoming
 
   - SV
 
-    - Add support for including a validator party hint in onboarding secrets. Validators are now required to onboard with the party hint defined by the SV.
-    
-    - The SV UI provides a way to copy formatted message for easily sharing onboarding details with validator operators.
+    - UI
+      
+      - Add the ability to specify a validator party hint when generating onboarding secrets.
+      
+      - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
   
 
 0.4.19
