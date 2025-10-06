@@ -317,4 +317,41 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
       expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
     });
   });
+
+  test('should render diffs if changes to config values were made', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
+    await user.type(c2Input, '9.99');
+
+    const jsonDiffs = screen.getByText('JSON Diffs');
+    expect(jsonDiffs).toBeDefined();
+
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+
+    const reviewButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+
+    expect(jsonDiffs).toBeDefined();
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+  });
 });

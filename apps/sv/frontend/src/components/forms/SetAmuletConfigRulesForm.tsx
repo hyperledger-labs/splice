@@ -1,7 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import {
+  ActionRequiringConfirmation,
+  AmuletRules_ActionRequiringConfirmation,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
   buildAmuletRulesPendingConfigFields,
   configFormDataToConfigChanges,
@@ -29,6 +32,12 @@ import { buildAmuletRulesConfigFromChanges } from '../../utils/buildAmuletRulesC
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 import { useListDsoRulesVoteRequests } from '../../hooks';
+import {
+  getAmuletConfigToCompareWith,
+  PrettyJsonDiff,
+  useVotesHooks,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { JsonDiffAccordion } from '../governance/JsonDiffAccordion';
 
 export type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -41,6 +50,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
   const mutation = useProposalMutation();
   const dsoProposalsQuery = useListDsoRulesVoteRequests();
+  const votesHooks = useVotesHooks();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -149,6 +159,35 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
   // passing the config twice here because we initially have no changes
   const allAmuletConfigChanges = buildAmuletConfigChanges(amuletConfig, amuletConfig, true);
 
+  const effectiveDateString = form.state.values.common.effectiveDate.effectiveDate;
+  const effectivity = effectiveDateString ? dayjs(effectiveDateString).toDate() : undefined;
+
+  const changes = configFormDataToConfigChanges(
+    form.state.values.config,
+    allAmuletConfigChanges,
+    false
+  );
+  const changedFields = changes.filter(c => c.currentValue !== c.newValue);
+  const hasChangedFields = changedFields.length > 0;
+
+  const baseConfig = amuletConfig;
+  const newConfig = buildAmuletRulesConfigFromChanges(changes);
+  const dsoAction: AmuletRules_ActionRequiringConfirmation = {
+    tag: 'CRARC_SetConfig',
+    value: {
+      baseConfig: baseConfig!,
+      newConfig: newConfig,
+    },
+  };
+
+  const amuletConfigToCompareWith = getAmuletConfigToCompareWith(
+    effectivity,
+    undefined,
+    votesHooks,
+    dsoAction,
+    dsoInfoQuery
+  );
+
   return (
     <FormLayout form={form} id="set-amulet-config-rules-form">
       {showConfirmation ? (
@@ -251,6 +290,20 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
           </Box>
         </>
       )}
+
+      <JsonDiffAccordion>
+        {amuletConfigToCompareWith && amuletConfigToCompareWith[1] && hasChangedFields ? (
+          <PrettyJsonDiff
+            changes={{
+              newConfig: dsoAction.value.newConfig,
+              baseConfig: dsoAction.value.baseConfig || amuletConfigToCompareWith[1],
+              actualConfig: amuletConfigToCompareWith[1],
+            }}
+          />
+        ) : (
+          <Typography>No changes</Typography>
+        )}
+      </JsonDiffAccordion>
 
       <form.AppForm>
         <ProposalSubmissionError error={mutation.error} />
