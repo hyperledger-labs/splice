@@ -285,6 +285,38 @@
   },
   {
     "custom": true,
+    "id": "validator1/participant-3",
+    "inputs": {},
+    "name": "read-sv-app-release",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "validator1/validator-validator1",
+    "inputs": {},
+    "name": "read-sv-app-release",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "validator1/cluster-ingress-validator1",
+    "inputs": {},
+    "name": "read-sv-app-release",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "validator1/splitwell-web-ui",
+    "inputs": {},
+    "name": "read-sv-app-release",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",

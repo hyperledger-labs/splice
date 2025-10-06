@@ -3,13 +3,14 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
+import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
 import { CnChartVersion } from './artifacts';
 import { config, imagePullPolicy } from './config';
 import { spliceConfig } from './config/config';
-import { activeVersion } from './domainMigration';
+import { activeVersion, allowDowngrade } from './domainMigration';
 import { SplicePlaceholderResource } from './pulumiUtilResources';
 import {
   ChartValues,
@@ -79,13 +80,27 @@ function installSpliceHelmChartByNamespaceName(
   if (spliceConfig.pulumiProjectConfig.installDataOnly) {
     return new SplicePlaceholderResource(name);
   } else {
+    const newVersion = versionStringWithPossibleOverride(version, nsLogicalName, chartName);
+    const releaseId = pulumi.interpolate`${nsMetadataName}/${name}`;
+    const deployedRelease = k8s.helm.v3.Release.get('read-sv-app-release', releaseId);
+    if (newVersion && allowDowngrade) {
+      deployedRelease.version.apply(appVersion => {
+        if (semver.lte(newVersion, appVersion)) {
+          console.error(
+            `Illegal downgrading: ${newVersion} has to be bigger than ${appVersion}. Set allowDowngrade flag to proceed with downgrading.`
+          );
+          process.exit(1);
+        }
+      });
+      process.exit(1);
+    }
     return new k8s.helm.v3.Release(
       includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
       {
         name,
         namespace: nsMetadataName,
         chart: chartPath(chartName, version),
-        version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
+        version: newVersion,
         values: {
           ...cnChartValues(version, chartName, values),
           ...affinityAndTolerations,

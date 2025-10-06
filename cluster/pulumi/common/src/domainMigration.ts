@@ -73,3 +73,4 @@ export const DecentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMi
   new DecentralizedSynchronizerMigrationConfig(spliceConfig.configuration);
 
 export const activeVersion = DecentralizedSynchronizerUpgradeConfig.active.version;
+export const allowDowngrade = DecentralizedSynchronizerUpgradeConfig.active.allowDowngrade;

@@ -44,6 +44,7 @@ export const MigrationInfoSchema = z
       .lt(10, 'Migration id must be less than or equal to 10 as we use in the cometbft ports.')
       .gte(0),
     version: migrationVersion,
+    allowDowngrade: z.boolean().default(false),
     releaseReference: GitReferenceSchema.optional(),
     sequencer: z
       .object({
