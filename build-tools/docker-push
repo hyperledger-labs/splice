@@ -104,6 +104,6 @@ if [ -z "$pushed" ]; then
   exit 1
 fi
 
-_info "Successfully pushed Docker image ${imageReference} (with ID ${imageId}). Updating push state: ${targetPushState}"
+_info "Successfully pushed Docker image ${imageReference} (with ID ${imageId})"
 
 echo "${targetPushState}" > target/docker.push
