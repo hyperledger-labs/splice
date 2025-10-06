@@ -472,6 +472,8 @@ private[environment] class LedgerClient(
       v1User.Right.defaultInstance.withCanActAs(v1User.Right.CanActAs(as.party))
     case as: Right.CanReadAs =>
       v1User.Right.defaultInstance.withCanReadAs(v1User.Right.CanReadAs(as.party))
+    case as: Right.CanExecuteAs =>
+      v1User.Right.defaultInstance.withCanExecuteAs(v1User.Right.CanExecuteAs(as.party))
     case _: Right.IdentityProviderAdmin =>
       v1User.Right.defaultInstance.withIdentityProviderAdmin(
         v1User.Right.IdentityProviderAdmin()
@@ -480,6 +482,8 @@ private[environment] class LedgerClient(
       v1User.Right.defaultInstance.withParticipantAdmin(v1User.Right.ParticipantAdmin())
     case _: Right.CanReadAsAnyParty =>
       v1User.Right.defaultInstance.withCanReadAsAnyParty(v1User.Right.CanReadAsAnyParty())
+    case _: Right.CanExecuteAsAnyParty =>
+      v1User.Right.defaultInstance.withCanExecuteAsAnyParty(v1User.Right.CanExecuteAsAnyParty())
     case unsupported => throw new IllegalArgumentException(s"unsupported right: $unsupported")
 
   }
