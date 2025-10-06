@@ -128,9 +128,9 @@ function _retry_until_success() {
         exit 1
     fi
 
-    # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # with 5 second sleep + 1 second kubectl timeout, this is roughly 15 minutes
     # See also max_wait which caps the overall wait time
-    local -i -r max_retries=$((100))
+    local -i -r max_retries=$((150))
     local -i num_retries=0
     local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
     local -i -r start_time=$(date +%s)
