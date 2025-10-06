@@ -618,7 +618,36 @@ describe('Proposal Details > Votes & Voting', () => {
     expect(noVoteContent.every(v => v === 'Awaiting Response')).toBe(true);
   });
 
-  test('should render Awaiting Response status badge when voting threshold has not been reached', async () => {
+  test('show Awaiting Response status when voting threshold has passed but proposal is not effective', async () => {
+    const user = userEvent.setup();
+    const votingInformation = {
+      requester: 'sv1',
+      requesterIsYou: true,
+      votingThresholdDeadline: '2025-01-01 13:00',
+      voteTakesEffect: '2029-01-02 13:00',
+      status: 'In Progress',
+    } as ProposalVotingInformation;
+
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
+          contractId={voteRequest.contractId}
+          proposalDetails={voteRequest.proposalDetails}
+          votingInformation={votingInformation}
+          votes={votesData}
+        />
+      </Wrapper>
+    );
+
+    const noVoteVotesTab = screen.getByTestId('no-vote-votes-tab');
+
+    await user.click(noVoteVotesTab);
+    const noVoteContent = screen.getByTestId('proposal-details-vote-status-value').textContent;
+    expect(noVoteContent).toBe('Awaiting Response');
+  });
+
+  test('show Awaiting Response status when voting threshold has not been reached', async () => {
     const user = userEvent.setup();
     const votingInformation = {
       requester: 'sv1',
