@@ -89,7 +89,10 @@ final case class ParticipantUser(
       case readAs: User.Right.CanReadAs =>
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanReadAs, Some(readAs.party))
       case executeAs: User.Right.CanExecuteAs =>
-        http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanExecuteAs, Some(executeAs.party))
+        http.ParticipantUserRight(
+          http.ParticipantUserRight.Kind.CanExecuteAs,
+          Some(executeAs.party),
+        )
       case _: User.Right.IdentityProviderAdmin =>
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.IdentityProviderAdmin)
       case _: User.Right.ParticipantAdmin =>
