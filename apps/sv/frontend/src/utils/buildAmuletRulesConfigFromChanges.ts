@@ -51,7 +51,7 @@ export function buildAmuletRulesConfigFromChanges(
 
   const numRequiredSynchronizers = getArrayCount('decentralizedSynchronizerRequiredSynchronizers');
   const requiredSynchronizers: string[] = [];
-  for (let i = 0; i < numRequiredSynchronizers; i++) {
+  for (let i = 1; i <= numRequiredSynchronizers; i++) {
     requiredSynchronizers.push(getValue(`decentralizedSynchronizerRequiredSynchronizers${i}`));
   }
   const requiredSynchronizersSet = lsToSet(requiredSynchronizers);

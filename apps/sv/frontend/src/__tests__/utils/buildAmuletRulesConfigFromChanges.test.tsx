@@ -135,13 +135,13 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         newValue: 'sync2',
       },
       {
-        fieldName: 'decentralizedSynchronizerRequiredSynchronizers0',
+        fieldName: 'decentralizedSynchronizerRequiredSynchronizers1',
         label: 'Required Synchronizer 1',
         currentValue: 'sync1',
         newValue: 'sync1',
       },
       {
-        fieldName: 'decentralizedSynchronizerRequiredSynchronizers1',
+        fieldName: 'decentralizedSynchronizerRequiredSynchronizers2',
         label: 'Required Synchronizer 2',
         currentValue: 'sync2',
         newValue: 'sync2',

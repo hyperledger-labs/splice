@@ -108,7 +108,7 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
       data-testid={`config-pending-value-${pendingFieldInfo.fieldName}`}
     >
       Pending Configuration: <strong>{pendingFieldInfo.pendingValue}</strong> <br />
-      This proposal will go into effect{' '}
+      This pending configuration will go into effect{' '}
       <strong>
         {atThreshold ? 'at Threshold' : dayjs(pendingFieldInfo.effectiveDate).fromNow()}
       </strong>

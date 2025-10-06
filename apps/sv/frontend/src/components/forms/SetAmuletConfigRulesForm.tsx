@@ -3,6 +3,7 @@
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
+  buildAmuletRulesPendingConfigFields,
   configFormDataToConfigChanges,
   createProposalActions,
   getInitialExpiration,
@@ -22,11 +23,12 @@ import {
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { Box, Typography } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { buildAmuletRulesConfigFromChanges } from '../../utils/buildAmuletRulesConfigFromChanges';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { useListDsoRulesVoteRequests } from '../../hooks';
 
 export type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -38,9 +40,14 @@ const createProposalAction = createProposalActions.find(a => a.value === 'CRARC_
 export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
   const mutation = useProposalMutation();
+  const dsoProposalsQuery = useListDsoRulesVoteRequests();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const pendingConfigFields = useMemo(
+    () => buildAmuletRulesPendingConfigFields(dsoProposalsQuery.data),
+    [dsoProposalsQuery.data]
+  );
 
   const defaultValues = useMemo((): SetAmuletConfigCompleteFormData => {
     if (!dsoInfoQuery.data) {
@@ -122,6 +129,18 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
           effectiveDate: value.common.effectiveDate.effectiveDate,
         });
       },
+      onSubmit: ({ value: formData }) => {
+        const changes = configFormDataToConfigChanges(formData.config, allAmuletConfigChanges);
+
+        const conflictingChanges = changes.filter(c =>
+          pendingConfigFields.some(p => p.fieldName === c.fieldName)
+        );
+        const names = conflictingChanges.map(c => c.label).join(', ');
+
+        if (conflictingChanges.length > 0) {
+          return `Cannot modify fields that have pending changes (${names})`;
+        }
+      },
     },
   });
 
@@ -149,6 +168,12 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
         />
       ) : (
         <>
+          {pendingConfigFields.length > 0 && (
+            <Alert severity="info" color="warning" variant="outlined">
+              Some fields are disabled for editing due to pending votes.
+            </Alert>
+          )}
+
           <form.AppField name="common.action">
             {field => (
               <field.TextField
@@ -212,7 +237,15 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
 
             {allAmuletConfigChanges.map((change, index) => (
               <form.AppField name={`config.${change.fieldName}`} key={index}>
-                {field => <field.ConfigField configChange={change} key={index} />}
+                {field => (
+                  <field.ConfigField
+                    configChange={change}
+                    key={index}
+                    pendingFieldInfo={pendingConfigFields.find(
+                      f => f.fieldName === change.fieldName
+                    )}
+                  />
+                )}
               </form.AppField>
             ))}
           </Box>
