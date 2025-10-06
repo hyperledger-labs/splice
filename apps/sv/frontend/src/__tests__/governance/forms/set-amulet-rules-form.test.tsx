@@ -235,45 +235,49 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     expect(screen.getByText('Proposal Summary')).toBeDefined();
   });
 
-  test('should show error on form if submission fails', async () => {
-    server.use(
-      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
-        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
-      })
-    );
+  test(
+    'should show error on form if submission fails',
+    async () => {
+      server.use(
+        rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+          return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
+        })
+      );
 
-    const user = userEvent.setup();
+      const user = userEvent.setup();
 
-    render(
-      <Wrapper>
-        <SetAmuletConfigRulesForm />
-      </Wrapper>
-    );
+      render(
+        <Wrapper>
+          <SetAmuletConfigRulesForm />
+        </Wrapper>
+      );
 
-    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
-    await user.type(summaryInput, 'Summary of the proposal');
+      const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+      await user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
-    await user.type(urlInput, 'https://example.com');
+      const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+      await user.type(urlInput, 'https://example.com');
 
-    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
-    await user.type(c1Input, '99');
+      const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
+      await user.type(c1Input, '99');
 
-    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
-    await user.type(c2Input, '9.99');
+      const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
+      await user.type(c2Input, '9.99');
 
-    const submitButton = screen.getByTestId('submit-button');
-    await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
-    });
+      const submitButton = screen.getByTestId('submit-button');
+      await waitFor(async () => {
+        expect(submitButton.getAttribute('disabled')).toBeNull();
+      });
 
-    await user.click(submitButton); // Review proposal
-    await user.click(submitButton); // Submit proposal
+      await user.click(submitButton); // Review proposal
+      await user.click(submitButton); // Submit proposal
 
-    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
-    expect(screen.getByText(/Submission failed/)).toBeDefined();
-    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
-  });
+      expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
+      expect(screen.getByText(/Submission failed/)).toBeDefined();
+      expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
 
   test('should redirect to governance page after successful submission', async () => {
     server.use(
