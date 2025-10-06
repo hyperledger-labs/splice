@@ -88,12 +88,16 @@ final case class ParticipantUser(
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanActAs, Some(actAs.party))
       case readAs: User.Right.CanReadAs =>
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanReadAs, Some(readAs.party))
+      case executeAs: User.Right.CanExecuteAs =>
+        http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanExecuteAs, Some(executeAs.party))
       case _: User.Right.IdentityProviderAdmin =>
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.IdentityProviderAdmin)
       case _: User.Right.ParticipantAdmin =>
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.ParticipantAdmin)
       case _: User.Right.CanReadAsAnyParty =>
         http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanReadAsAnyParty)
+      case _: User.Right.CanExecuteAsAnyParty =>
+        http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanExecuteAsAnyParty)
       case _ => throw new IllegalArgumentException("Unsupported user right")
     }.toVector,
     isDeactivated,
@@ -123,12 +127,16 @@ object ParticipantUser {
         new User.Right.CanActAs(party)
       case http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanReadAs, Some(party)) =>
         new User.Right.CanReadAs(party)
+      case http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanExecuteAs, Some(party)) =>
+        new User.Right.CanExecuteAs(party)
       case http.ParticipantUserRight(http.ParticipantUserRight.Kind.ParticipantAdmin, None) =>
         User.Right.ParticipantAdmin.INSTANCE
       case http.ParticipantUserRight(http.ParticipantUserRight.Kind.IdentityProviderAdmin, None) =>
         User.Right.IdentityProviderAdmin.INSTANCE
       case http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanReadAsAnyParty, None) =>
         User.Right.CanReadAsAnyParty.INSTANCE
+      case http.ParticipantUserRight(http.ParticipantUserRight.Kind.CanExecuteAsAnyParty, None) =>
+        User.Right.CanExecuteAsAnyParty.INSTANCE
       case _ => throw new IllegalArgumentException("Unsupported or invalid user right")
     },
     response.isDeactivated,
