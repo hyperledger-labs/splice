@@ -269,7 +269,9 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         {
           val responseForInvalidUser = makeRequest("wrong_user")
           responseForInvalidUser.status should be(StatusCodes.Forbidden)
-          responseForInvalidUser.entity.getContentType().toString should be("application/json")
+          responseForInvalidUser.entity.getContentType().toString should be(
+            "text/plain; charset=UTF-8"
+          )
         },
         _.warningMessage should include(
           "Authorization Failed"
