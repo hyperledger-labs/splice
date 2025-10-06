@@ -118,7 +118,9 @@ describe('Pending Fields', () => {
     );
     expect(acsPendingValueDisplay).toBeDefined();
     expect(acsPendingValueDisplay).toHaveTextContent('Pending Configuration: 2100');
-    expect(acsPendingValueDisplay).toHaveTextContent(/This proposal will go into effect in 4 days/);
+    expect(acsPendingValueDisplay).toHaveTextContent(
+      /This pending configuration will go into effect in 4 days/
+    );
 
     const trafficThresholdPendingFieldInput = await screen.findByTestId(
       'config-field-numMemberTrafficContractsThreshold'
@@ -131,7 +133,7 @@ describe('Pending Fields', () => {
     expect(trafficThresholdPendingValueDisplay).toBeDefined();
     expect(trafficThresholdPendingValueDisplay).toHaveTextContent('Pending Configuration: 100');
     expect(trafficThresholdPendingValueDisplay).toHaveTextContent(
-      /This proposal will go into effect at Threshold/
+      /This pending configuration will go into effect at Threshold/
     );
   });
 
