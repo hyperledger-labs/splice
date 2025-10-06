@@ -88,6 +88,7 @@ class BftScanConnectionIntegrationTest
     )
 
     aliceValidatorBackend.startSync()
+    onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
     val fakeCid = new TransferInstruction.ContractId("00" + s"01" * 31 + "42")
 
