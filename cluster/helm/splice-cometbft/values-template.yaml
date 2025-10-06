@@ -85,7 +85,7 @@ metrics:
   interval: 30s
 #  labels:
 #    - key: "migration_active"
-#      value: "true"
+#      value: "true"a
 
 # k8s affinity for all deployed pods (optional)
 # affinity:
