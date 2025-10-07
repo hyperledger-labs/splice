@@ -73,11 +73,11 @@ export function createCloudArmorPolicy(
 
   // Step 2: Add predefined WAF rules
   if (args.predefinedWafRules && args.predefinedWafRules.length > 0) {
-    addPredefinedWafRules(securityPolicy, args.predefinedWafRules, project, ruleOpts);
+    addPredefinedWafRules(/*securityPolicy, args.predefinedWafRules, project, ruleOpts*/);
   }
 
   // Step 3: Add IP whitelisting rules
-  addIpWhitelistRules(securityPolicy, project, ruleOpts);
+  addIpWhitelistRules(/*securityPolicy, project, ruleOpts*/);
 
   // Step 4: Add throttling/banning rules for specific API endpoints
   if (args.apiThrottles && args.apiThrottles.length > 0) {
@@ -93,23 +93,25 @@ export function createCloudArmorPolicy(
 /**
  * Adds predefined WAF rules to a security policy
  */
-function addPredefinedWafRules(
+function addPredefinedWafRules(): void {
+  /*
   securityPolicy: gcp.compute.SecurityPolicy,
   rules: PredefinedWafRule[],
   project?: string,
   opts?: pulumi.ResourceOptions
-): void {
+     */
   // TODO (DACH-NY/canton-network-internal#406) implement
 }
 
 /**
  * Adds IP whitelisting rules to a security policy
  */
-function addIpWhitelistRules(
+function addIpWhitelistRules(): void {
+  /*
   securityPolicy: gcp.compute.SecurityPolicy,
   project?: string,
   opts?: pulumi.ResourceOptions
-): void {
+     */
   // TODO (DACH-NY/canton-network-internal#1250) implement
 }
 
