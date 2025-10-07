@@ -256,7 +256,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               onChange: ({ value }) => validateSummary(value),
             }}
           >
-            {field => <field.TextArea title="Proposal Summary" id="set-dso-config-rules-summary" />}
+            {field => <field.ProposalSummaryField id="set-dso-config-rules-summary" />}
           </form.AppField>
 
           <form.AppField

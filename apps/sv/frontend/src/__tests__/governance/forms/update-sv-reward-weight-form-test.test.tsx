@@ -13,6 +13,7 @@ import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-
 import dayjs from 'dayjs';
 import { server, svUrl } from '../../setup/setup';
 import { rest } from 'msw';
+import { PROPOSAL_SUMMARY_SUBTITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -53,6 +54,10 @@ describe('Update SV Reward Weight Form', () => {
     const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
+
+    const summarySubtitle = screen.getByTestId('update-sv-reward-weight-summary-subtitle');
+    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
     const urlInput = screen.getByTestId('update-sv-reward-weight-url');
     expect(urlInput).toBeDefined();
