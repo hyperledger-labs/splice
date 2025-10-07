@@ -1,6 +1,5 @@
 // Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 
@@ -18,8 +17,8 @@ export interface ApiEndpoint {
 }
 
 export interface ThrottleConfig {
-  rate: number;  // Requests per minute
-  interval: number;  // Interval in seconds
+  rate: number; // Requests per minute
+  interval: number; // Interval in seconds
 }
 
 export interface CloudArmorConfig {
@@ -100,7 +99,7 @@ function addPredefinedWafRules(
   project?: string,
   opts?: pulumi.ResourceOptions
 ): void {
-    // TODO (DACH-NY/canton-network-internal#406) implement
+  // TODO (DACH-NY/canton-network-internal#406) implement
 }
 
 /**
@@ -130,7 +129,9 @@ function addThrottleAndBanRules(
     throttleRuleCounter = priority + RULE_SPACING;
 
     if (priority >= THROTTLE_BAN_RULE_MAX) {
-      throw new Error(`Throttle rule priority ${priority} exceeds maximum ${THROTTLE_BAN_RULE_MAX}`);
+      throw new Error(
+        `Throttle rule priority ${priority} exceeds maximum ${THROTTLE_BAN_RULE_MAX}`
+      );
     }
 
     const { endpoint, throttle, action } = apiConfig;
@@ -154,14 +155,17 @@ function addThrottleAndBanRules(
             expression: matchExpr,
           },
         },
-        rateLimitOptions: action === 'throttle' ? {
-          rateLimitThreshold: {
-            count: throttle.rate,
-            intervalSec: throttle.interval,
-          },
-          conformAction: 'allow',
-          exceedAction: 'deny',
-        } : undefined,
+        rateLimitOptions:
+          action === 'throttle'
+            ? {
+                rateLimitThreshold: {
+                  count: throttle.rate,
+                  intervalSec: throttle.interval,
+                },
+                conformAction: 'allow',
+                exceedAction: 'deny',
+              }
+            : undefined,
       },
       opts
     );
