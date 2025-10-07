@@ -13,3 +13,17 @@ validator1:
     maxDuration: "5m"
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
+initialRound: 44000
+synchronizerMigration:
+  active:
+    id: 0
+    version: 0.4.17
+    releaseReference:
+      gitReference: "refs/heads/release-line-0.4.17"
+      repoUrl: https://github.com/DACH-NY/canton-network-internal
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "splice/cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "splice"
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
