@@ -20,7 +20,7 @@ function ledgerApiAudience(
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): pulumi.Output<string> {
-  if (!clusterProdLike) {
+  if (clusterProdLike) {
     // On prod clusters, we create a ledger API per SV namespace
     const auth0Api = new auth0.ResourceServer(
       `LedgerApi${svNamespaces.replace(/-/g, '')}`,
@@ -58,7 +58,7 @@ function svAppAudience(
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): pulumi.Output<string> {
-  if (!clusterProdLike) {
+  if (clusterProdLike) {
     // On prod clusters, we create a SV App API per SV namespace
     const auth0Api = new auth0.ResourceServer(
       `SvAppApi${svNamespaces.replace(/-/g, '')}`,
@@ -82,7 +82,7 @@ function validatorAppAudience(
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): pulumi.Output<string> {
-  if (!clusterProdLike) {
+  if (clusterProdLike) {
     // On prod clusters, we create a Validator App API per SV namespace
     const auth0Api = new auth0.ResourceServer(
       `ValidatorAppApi${svNamespaces.replace(/-/g, '')}`,
