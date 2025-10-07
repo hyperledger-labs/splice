@@ -59,7 +59,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           .futureValue
         responseForInvalidUser.status should be(StatusCodes.Forbidden)
         responseForInvalidUser.entity.getContentType().toString should be(
-          "text/plain; charset=UTF-8"
+          "application/json"
         )
       },
       _.warningMessage should include(

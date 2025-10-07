@@ -9,7 +9,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 /** Auth extractor for APIs that perform administrative actions on the participant
   *
@@ -66,8 +66,10 @@ final class AdminAuthExtractor(
             } else {
               provide(AdminAuthExtractor.AdminUserRequest(traceContext))
             }
-          case _ =>
+          case Success((None, _)) =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
+          case Failure(exception) =>
+            rejectWithAuthorizationFailure(authenticatedUser, operationId, exception.getMessage)
         }
       }
   }

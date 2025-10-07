@@ -4,16 +4,17 @@
 package org.lfdecentralizedtrust.splice.auth
 
 import com.daml.ledger.javaapi.data.User
-import org.apache.pekko.http.scaladsl.server.{
-  AuthorizationFailedRejection,
-  Directive1,
-  StandardRoute,
-}
-import org.apache.pekko.http.scaladsl.server.Directives.{authenticateOAuth2, reject}
+import org.apache.pekko.http.scaladsl.model.{HttpEntity, HttpResponse, MediaTypes, StatusCodes}
+import org.apache.pekko.http.scaladsl.server.{Directive1, StandardRoute}
+import org.apache.pekko.http.scaladsl.server.Directives.{authenticateOAuth2, complete}
 import org.apache.pekko.http.scaladsl.server.directives.Credentials
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Printer
+import io.circe.syntax.EncoderOps
+import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 
 import java.util.Optional
 
@@ -64,7 +65,27 @@ abstract class AuthExtractor(
     logger.warn(
       s"Authorization Failed for $authenticatedUser for operation '$operationId'. Reason: $reason"
     )
-    reject(AuthorizationFailedRejection)
+
+    // Note: we do not use `reject(AuthorizationFailedRejection)` because that one does not include the
+    // CORS headers that we add when we construct the routes in the app.
+    val contentType = MediaTypes.`application/json`
+    val errorResponse =
+      ErrorResponse(
+        s"Authorization Failed for $authenticatedUser"
+      )
+    val responseEntity = HttpEntity(
+      contentType = contentType,
+      ByteString(
+        Printer.noSpaces
+          .printToByteBuffer(errorResponse.asJson, contentType.charset.nioCharset())
+      ),
+    )
+    complete(
+      HttpResponse(
+        StatusCodes.Forbidden,
+        entity = responseEntity,
+      )
+    )
   }
 
   protected final def hasPrimaryParty(

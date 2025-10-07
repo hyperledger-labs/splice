@@ -276,7 +276,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
           val response = makeRequest(userId)
           response.status should be(StatusCodes.Forbidden)
           response.entity.getContentType().toString should be(
-            "text/plain; charset=UTF-8"
+            "application/json"
           )
         },
         _.warningMessage should include(
