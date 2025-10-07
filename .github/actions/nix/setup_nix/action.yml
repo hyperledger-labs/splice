@@ -81,18 +81,18 @@ runs:
         set -euxo pipefail
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
-        if [ -f "/cache/nix/$cache_key/cached" ]; then
-          echo "Restoring nix cache (key $cache_key)"
+        #if [ -f "/cache/nix/$cache_key/cached" ]; then
+        #  echo "Restoring nix cache (key $cache_key)"
           # we use rsync here because it's simply faster to install
-          rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
-          rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
-          rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
-          sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
-        else
+        #  rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
+        #  rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
+        #  rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
+        #  sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+        #else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix"
-        fi
+        #fi
     - name: Setup Nix
       shell: bash
       run: |
