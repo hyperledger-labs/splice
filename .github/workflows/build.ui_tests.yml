@@ -28,7 +28,6 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@v4
-        if: inputs.commit_sha != ''
         with:
           ref: ${{ inputs.commit_sha }}
 
