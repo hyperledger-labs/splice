@@ -254,9 +254,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
               onChange: ({ value }) => validateSummary(value),
             }}
           >
-            {field => (
-              <field.TextArea title="Proposal Summary" id="set-amulet-config-rules-summary" />
-            )}
+            {field => <field.ProposalSummaryField id="set-amulet-config-rules-summary" />}
           </form.AppField>
 
           <form.AppField
