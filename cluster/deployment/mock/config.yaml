@@ -130,6 +130,11 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomSequencerJvmFlag"
+    mediator:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomSequencerJvmFlag"
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
