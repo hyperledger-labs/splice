@@ -151,23 +151,21 @@ function addThrottleAndBanRules(
         project,
         description: `${action === 'throttle' ? 'Throttle' : 'Ban'} rule for ${endpoint.name} API endpoint`,
         priority: priority,
-        action: action === 'ban' ? 'deny' : 'throttle',
+        action: action === 'ban' ? 'rate_based_ban' : 'throttle',
         match: {
           expr: {
             expression: matchExpr,
           },
         },
         rateLimitOptions:
-          action === 'throttle'
-            ? {
+            {
                 rateLimitThreshold: {
                   count: throttle.rate,
                   intervalSec: throttle.interval,
                 },
                 conformAction: 'allow',
                 exceedAction: 'deny',
-              }
-            : undefined,
+              },
       },
       opts
     );
