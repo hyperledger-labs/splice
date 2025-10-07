@@ -345,6 +345,10 @@ function configureGatewayService(
           maxUnavailable: 1,
         },
         service: {
+          // TODO (DACH-NY/canton-network-internal#2081) will this work, partly work, do nothing, or just break things?
+          annotations: {
+            'cloud.google.com/l4-rbs': 'enabled',
+          },
           loadBalancerIP: ingressIp,
           loadBalancerSourceRanges: externalIPRangesInLB,
           // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
