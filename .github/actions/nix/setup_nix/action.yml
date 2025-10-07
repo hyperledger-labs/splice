@@ -149,7 +149,7 @@ runs:
           fi
           nix develop path:nix#${target} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
           echo "Garbage collecting to reduce cache size"
-          nix-store --gc
+          # nix-store --gc
         fi
 
     - name: Invoke nix before saving cache
