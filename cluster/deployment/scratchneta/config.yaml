@@ -14,6 +14,13 @@ validator1:
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
 initialRound: 44000
+svs:
+  sv-1:
+    svApp:
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_NONZERO_FEES
+          value: |
+            canton.sv-apps.sv.onboarding.zero-transfer-fees = false
 synchronizerMigration:
   active:
     id: 0
