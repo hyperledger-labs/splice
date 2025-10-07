@@ -126,7 +126,7 @@ runs:
             max-jobs = 16
         EOF
           fi
-          sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.31.2/install) --no-daemon
+          sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.28.5/install) --no-daemon
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
           if [[ "${{ inputs.oss_only }}" == true ]]; then
