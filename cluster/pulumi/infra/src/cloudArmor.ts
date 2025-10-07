@@ -5,8 +5,6 @@ import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 
 // Rule number ranges
-const PREDEFINED_WAF_RULE_MIN = 1;
-const PREDEFINED_WAF_RULE_MAX = 10000;
 const THROTTLE_BAN_RULE_MIN = 100000000;
 const THROTTLE_BAN_RULE_MAX = 200000000;
 const DEFAULT_DENY_RULE_NUMBER = 2147483647;
@@ -28,16 +26,7 @@ export interface CloudArmorConfig {
   name: string;
   project?: string;
   description?: string;
-  predefinedWafRules?: PredefinedWafRule[];
   apiThrottles?: ApiThrottleConfig[];
-}
-
-export interface PredefinedWafRule {
-  name: string;
-  action: 'allow' | 'deny' | 'throttle';
-  priority?: number;
-  preview?: boolean;
-  sensitivityLevel?: 'off' | 'low' | 'medium' | 'high';
 }
 
 export interface ApiThrottleConfig {
@@ -69,37 +58,7 @@ export class CloudArmorPolicy extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    // Step 2: Add predefined WAF rules
-    let ruleCounter = PREDEFINED_WAF_RULE_MIN;
-    if (args.predefinedWafRules && args.predefinedWafRules.length > 0) {
-      args.predefinedWafRules.forEach(rule => {
-        const priority = rule.priority || ruleCounter;
-        ruleCounter = priority + RULE_SPACING;
-
-        if (priority >= PREDEFINED_WAF_RULE_MAX) {
-          throw new Error(`Predefined WAF rule priority ${priority} exceeds maximum ${PREDEFINED_WAF_RULE_MAX}`);
-        }
-
-        const ruleName = `waf-${rule.name}`;
-        new gcp.compute.SecurityPolicyRule(
-          ruleName,
-          {
-            securityPolicy: this.securityPolicy.name,
-            project,
-            description: `Predefined WAF rule: ${rule.name}`,
-            priority: priority,
-            action: rule.action,
-            preview: rule.preview || false,
-            match: {
-              expr: {
-                expression: `evaluatePreconfiguredWaf('${rule.name}', {'sensitivity': '${rule.sensitivityLevel || 'medium'}'})`
-              }
-            },
-          },
-          { parent: this }
-        );
-      });
-    }
+    // TODO (DACH-NY/canton-network-internal#406) Step 2: Add predefined WAF rules
 
     // TODO (DACH-NY/canton-network-internal#1250) Step 3: Add IP whitelisting rules
 
