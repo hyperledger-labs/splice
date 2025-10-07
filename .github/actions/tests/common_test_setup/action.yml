@@ -64,7 +64,7 @@ runs:
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
-        cache_version: 666613
+        cache_version: 666614
         should_save: ${{ inputs.save_nix_cache }}
         should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         oss_only: ${{ inputs.oss_only }}
@@ -76,4 +76,4 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 666613
+        cache_version: 666614
