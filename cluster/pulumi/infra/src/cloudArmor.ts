@@ -70,21 +70,23 @@ export function createCloudArmorPolicy(
     opts
   );
 
+  const ruleOpts = { ...opts, parent: securityPolicy };
+
   // Step 2: Add predefined WAF rules
   if (args.predefinedWafRules && args.predefinedWafRules.length > 0) {
-    addPredefinedWafRules(securityPolicy, args.predefinedWafRules, project, opts);
+    addPredefinedWafRules(securityPolicy, args.predefinedWafRules, project, ruleOpts);
   }
 
   // Step 3: Add IP whitelisting rules
-  addIpWhitelistRules(securityPolicy, project, opts);
+  addIpWhitelistRules(securityPolicy, project, ruleOpts);
 
   // Step 4: Add throttling/banning rules for specific API endpoints
   if (args.apiThrottles && args.apiThrottles.length > 0) {
-    addThrottleAndBanRules(securityPolicy, args.apiThrottles, project, opts);
+    addThrottleAndBanRules(securityPolicy, args.apiThrottles, project, ruleOpts);
   }
 
   // Step 5: Add default deny rule
-  addDefaultDenyRule(securityPolicy, project, opts);
+  addDefaultDenyRule(securityPolicy, project, ruleOpts);
 
   return securityPolicy;
 }
