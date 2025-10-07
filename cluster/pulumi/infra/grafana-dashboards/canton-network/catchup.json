@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 277,
+  "id": 380,
   "links": [],
   "panels": [
     {
@@ -350,7 +350,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "time() - max by (namespace) ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"} != 0) /1e6)",
+          "expr": "max by (namespace) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"}) - ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"} > 0) / 1e6))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -459,7 +459,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "time() - max by (namespace, job) ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"} != 0)/1e6)",
+          "expr": "max by (namespace, job) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"}) - ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"}  > 0) / 1e6)) ",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1235,7 +1235,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -1266,7 +1267,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1311,9 +1312,7 @@
       },
       {
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -1372,5 +1371,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 2
+  "version": 4
 }
