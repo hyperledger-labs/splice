@@ -3,15 +3,10 @@
 
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import _ from 'lodash';
-
-import { loadIPRanges } from './config';
 
 // Rule number ranges
 const PREDEFINED_WAF_RULE_MIN = 1;
 const PREDEFINED_WAF_RULE_MAX = 10000;
-const IP_WHITELIST_RULE_MIN = 10000;
-const IP_WHITELIST_RULE_MAX = 100000000;
 const THROTTLE_BAN_RULE_MIN = 100000000;
 const THROTTLE_BAN_RULE_MAX = 200000000;
 const DEFAULT_DENY_RULE_NUMBER = 2147483647;
@@ -106,40 +101,7 @@ export class CloudArmorPolicy extends pulumi.ComponentResource {
       });
     }
 
-    // Step 3: Add IP whitelisting rules
-    const ipRanges = loadIPRanges();
-
-    // IP ranges from loadIPRanges may exceed the limit of a single rule
-    // Split into chunks of 100 IPs
-    const chunkSize = 100;
-    const ipChunks = _.chunk(ipRanges, chunkSize);
-
-    let ipRuleCounter = IP_WHITELIST_RULE_MIN;
-    ipChunks.forEach((ipChunk, index) => {
-      const priority = ipRuleCounter;
-      ipRuleCounter += RULE_SPACING;
-
-      if (priority >= IP_WHITELIST_RULE_MAX) {
-        throw new Error(`IP whitelist rule priority ${priority} exceeds maximum ${IP_WHITELIST_RULE_MAX}`);
-      }
-
-      new gcp.compute.SecurityPolicyRule(
-        `ip-whitelist-${index}`,
-        {
-          securityPolicy: this.securityPolicy.name,
-          project,
-          description: `Allow traffic from whitelisted IP ranges (chunk ${index + 1})`,
-          priority: priority,
-          action: 'allow',
-          match: {
-            config: {
-              srcIpRanges: ipChunk,
-            },
-          },
-        },
-        { parent: this }
-      );
-    });
+    // TODO (DACH-NY/canton-network-internal#1250) Step 3: Add IP whitelisting rules
 
     // Step 4: Add throttling/banning rules for specific API endpoints
     let throttleRuleCounter = THROTTLE_BAN_RULE_MIN;
