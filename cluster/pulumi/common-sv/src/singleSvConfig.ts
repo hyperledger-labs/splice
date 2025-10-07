@@ -20,6 +20,12 @@ const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
 });
+const SvMediatorConfigSchema = z
+  .object({
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
+  })
+  .strict();
 const SvSequencerConfigSchema = z
   .object({
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
@@ -85,6 +91,7 @@ const SingleSvConfigSchema = z
     cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
+    mediator: SvMediatorConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
     validatorApp: SvValidatorAppConfigSchema.optional(),

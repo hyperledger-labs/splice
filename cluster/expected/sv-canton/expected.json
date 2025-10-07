@@ -1730,6 +1730,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
@@ -1824,6 +1830,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
@@ -3832,6 +3844,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
@@ -3926,6 +3944,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
@@ -5438,6 +5462,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_3",
             "port": 5432,
@@ -5532,6 +5562,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_4",
             "port": 5432,
