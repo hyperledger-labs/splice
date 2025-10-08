@@ -13,7 +13,7 @@ import {
   NamespaceToClientIdMapMap,
   clusterProdLike,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { standardSvConfigs, extraSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { standardSvConfigs, extraSvConfigs, dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 function ledgerApiAudience(
   svNamespaces: string,
@@ -383,31 +383,11 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     namespace: sv.nodeName,
     description: sv.nodeName.replace(/-/g, '').toUpperCase(),
     ingressName: sv.ingressName,
-    svBackend: sv.auth0SvAppClientId
-      ? {
-          name: sv.auth0SvAppName,
-          clientId: sv.auth0SvAppClientId,
-        }
-      : undefined,
-    validatorBackend: sv.auth0ValidatorAppClientId
-      ? {
-          name: sv.auth0ValidatorAppName,
-          clientId: sv.auth0ValidatorAppClientId,
-        }
-      : undefined,
-  }));
+  })).slice(0, dsoSize);
   const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
     ingressName: sv.ingressName,
-    svBackend: {
-      name: sv.auth0SvAppName,
-      clientId: sv.auth0SvAppClientId!,
-    },
-    validatorBackend: {
-      name: sv.auth0ValidatorAppName,
-      clientId: sv.auth0ValidatorAppClientId!,
-    },
   }));
 
   const baseAuth0 = svsOnlyAuth0(
