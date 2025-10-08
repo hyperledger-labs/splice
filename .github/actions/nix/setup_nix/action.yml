@@ -127,6 +127,7 @@ runs:
             max-jobs = 16
         EOF
           fi
+          mkdir -p /nix/store
           sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.14.1/install) --no-daemon
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
