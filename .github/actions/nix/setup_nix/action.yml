@@ -42,6 +42,7 @@ runs:
         git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
+        echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
         if [ "${{ inputs.oss_only }}" == true ]; then
           echo "Using OSS only dependencies"
           echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
