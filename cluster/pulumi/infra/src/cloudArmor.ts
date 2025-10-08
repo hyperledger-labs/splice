@@ -150,7 +150,7 @@ function addThrottleAndBanRules(
       ruleName,
       {
         securityPolicy: securityPolicy.name,
-        description: `${action === 'throttle' ? 'Throttle' : 'Ban'} rule for ${endpoint.name} API endpoint`,
+        description: `${action === 'throttle' ? 'Throttle' : 'Ban'} rule${throttle.perIp ? ' per-IP' : ''} for ${endpoint.name} API endpoint`,
         priority: priority,
         action: action === 'ban' ? 'rate_based_ban' : 'throttle',
         match: {
