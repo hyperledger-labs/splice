@@ -477,7 +477,6 @@
         },
         "participantAddress": "participant-3",
         "persistence": {
-          "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
@@ -646,61 +645,53 @@
     "inputs": {},
     "name": "sv-apps-pg",
     "provider": "",
-    "type": "canton:network:postgres"
+    "type": "canton:cloud:postgres"
   },
   {
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "apps-pg",
-      "namespace": "sv",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "europe-west6",
+      "settings": {
+        "activationPolicy": "ALWAYS",
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
         },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "db": {
-          "volumeSize": "48Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "persistence": {
-          "secretName": "apps-pg-secret"
-        },
-        "tolerations": [
+        "databaseFlags": [
           {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
+            "name": "temp_file_limit",
+            "value": "2147483647"
           }
-        ]
-      },
-      "version": "0.3.20"
+        ],
+        "deletionProtectionEnabled": false,
+        "edition": "ENTERPRISE",
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "europe-west6-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "mock"
+        }
+      }
     },
     "name": "sv-apps-pg",
     "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -825,7 +816,6 @@
         "onboardingName": "DA-Helm-Test-Node",
         "participantAddress": "participant-3",
         "persistence": {
-          "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
@@ -854,6 +844,16 @@
     "name": "sv-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "sv-db-apps-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
   },
   {
     "custom": true,
@@ -1071,6 +1071,20 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-apps-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
@@ -1136,7 +1150,6 @@
           }
         },
         "persistence": {
-          "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },

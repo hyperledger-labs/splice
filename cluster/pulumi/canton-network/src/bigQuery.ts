@@ -15,7 +15,6 @@ import {
   CloudPostgres,
   generatePassword,
   privateNetworkId,
-  protectCloudSql,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   ExactNamespace,
@@ -23,6 +22,7 @@ import {
   commandScriptPath,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
+import { spliceConfig } from '../../common/src/config/config';
 import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
@@ -406,7 +406,7 @@ function installReplicatorPassword(postgres: CloudPostgres): PostgresPassword {
   const secretName = `${postgres.namespace.logicalName}-${replicatorUserName}-passwd`;
   const password = generatePassword(`${postgres.instanceName}-${replicatorUserName}-passwd`, {
     parent: postgres,
-    protect: protectCloudSql,
+    protect: spliceConfig.pulumiProjectConfig.cloudSql.protected,
   }).result;
   return {
     contents: password,
@@ -430,7 +430,7 @@ function createPostgresReplicatorUser(
       parent: postgres,
       deletedWith: postgres.databaseInstance,
       retainOnDelete: true,
-      protect: protectCloudSql,
+      protect: spliceConfig.pulumiProjectConfig.cloudSql.protected,
       dependsOn: [postgres.databaseInstance, password.secret],
     }
   );
