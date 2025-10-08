@@ -27,7 +27,7 @@ function ledgerApiAudience(
       {
         name: `Ledger API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://ledger_api.${svNamespaces}.${clusterBasename}.canton.network`,
-        allowOfflineAccess: true,
+        allowOfflineAccess: true, // FIXME: create an issue to review whether we need this here and in docs (seems like we don't any more, was for ANS UI in the past, now it's only splitwell)
       },
       { provider: auth0DomainProvider }
     );
@@ -257,9 +257,11 @@ function svsOnlyAuth0(
     );
 
   const appToClientId: ClientIdMap = svs.reduce((acc, sv) => {
+    // Create auth0 APIs if needed, and obtain the audiences
     const ledgerApiAud = ledgerApiAudience(sv.namespace, clusterBasename, provider);
     const svAppAud = svAppAudience(sv.namespace, clusterBasename, provider);
     const validatorAppAud = validatorAppAudience(sv.namespace, clusterBasename, provider);
+    // Create M2M apps
     const svApp = newM2MApp(
       `${sv.namespace.replace(/-/g, '')}SvBackendApp`,
       `${sv.namespace.replace(/-/g, '').toUpperCase()} SV Backend`,
@@ -278,13 +280,20 @@ function svsOnlyAuth0(
       validatorAppAud,
       provider
     );
+    // Currently, for no good reason, we have sv-1 vs sv1_validator naming inconsistency.
+    // To make things worse, the sv-da-1 namespace is even more special and has sv-da-1 vs sv-da-1_validator.
+    // Then mainnet DA-2 is even worse, as we use "sv" and "validator"
+    // FIXME: decide whether to clean this up, or leave as-is for now and open a tech-debt ticket to clean up later.
+    const svAppName = isMainNet && sv.namespace == 'sv-1' ? 'sv' : sv.namespace;
     const validatorAppName =
       sv.namespace == 'sv-da-1'
         ? 'sv-da-1_validator'
-        : sv.namespace.replace('-', '') + '_validator';
+        : isMainNet
+          ? 'validator'
+          : sv.namespace.replace('-', '') + '_validator';
     return {
       ...acc,
-      ...{ [sv.namespace]: svApp.clientId, [validatorAppName]: validatorApp.clientId }, // FIXME: consider cleaning up that naming inconsistency of sv-1 vs sv1_validator, and the special case of sv-da-1 above
+      ...{ [svAppName]: svApp.clientId, [validatorAppName]: validatorApp.clientId },
     };
   }, {});
 
@@ -331,32 +340,16 @@ function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Outpu
   });
 
   // hardcoded sv1 will be removed once we switch DA-2 to KMS (and, likely, the sv-da-1 namespace)
-  const sv1 = {
+  const sv1: svAuth0Params = {
     namespace: 'sv-1',
     description: 'sv-1 (Digital-Asset 2)',
     ingressName: 'sv-2', // Ingress name of sv-1 is sv-2!
-    svBackend: {
-      name: 'sv',
-      clientId: 'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
-    },
-    validatorBackend: {
-      name: 'validator',
-      clientId: 'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
-    },
   };
 
   const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
     ingressName: sv.ingressName,
-    svBackend: {
-      name: sv.auth0SvAppName,
-      clientId: sv.auth0SvAppClientId!,
-    },
-    validatorBackend: {
-      name: sv.auth0ValidatorAppName,
-      clientId: sv.auth0ValidatorAppClientId!,
-    },
   }));
 
   return svsOnlyAuth0(
@@ -433,38 +426,6 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     validator1: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
     splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
     splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
-    // 'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',
-    // 'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
-    // 'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
-    // 'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
-    // 'sv-5': 'RSgbsze3cGHipLxhPGtGy7fqtYgyefTb',
-    // 'sv-6': '3MO1BRMNqEiIntIM1YWwBRT1EPpKyGO6',
-    // 'sv-7': '4imYa3E6Q5JPdLjZxHatRDtV1Wurq7pK',
-    // 'sv-8': 'lQogWncLX7AIc2laUj8VVW6zwNJ169vR',
-    // 'sv-9': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
-    // 'sv-10': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
-    // 'sv-11': 'ndIxuns8kZoObE7qN6M3IbtKSZ7RRO9B',
-    // 'sv-12': 'qnYhBjBJ5LQu0pM5M6V8e3erQsadfew1',
-    // 'sv-13': 'IA7BOrFhKvQ5AP9g8DxSTmO6pVT0oed3',
-    // 'sv-14': 'cY4I4HCHgDj2mkxSSEwguFQGRFEjhnTq',
-    // 'sv-15': 'hwKLKN5TWpaPjzuY52ubNVIRF8Onnzgk',
-    // 'sv-16': '9pvoTvQIt2l1rzlNnaEZVsnNDFTOvt7W',
-    // sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
-    // sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
-    // sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
-    // sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
-    // sv5_validator: 'TdcDPsIwSXVw4rZmGqxl6Ifkn4neeOzW',
-    // sv6_validator: '4pUXGkvvybNyTeWXEBlesr9qcYCQh2sh',
-    // sv7_validator: '2cfFl6z5huY4rVYvxOEja8MvDdplYCDW',
-    // sv8_validator: 'JYvSRekV1E5EUZ2sJ494YyHXbxR3OHIR',
-    // sv9_validator: 'BABNqQ3m5ROTGJTlTHVlIckS3cwJ0M0w',
-    // sv10_validator: 'EKBJkDcOHosrnhLALfrQYG6Uc4Csqwbe',
-    // sv11_validator: '8jpCSqSkLxdY8zdmJwm0XXRfxFnPNAhG',
-    // sv12_validator: 'PEMwunsstamR1c5k3LdjVInTKlVTkeb6',
-    // sv13_validator: 'eqssDmClrmtQFTgJ7XIP7RDdhcD6iGfx',
-    // sv14_validator: 'luGkjf4AvM5PYhmi3X5rFmKLzxHTBlgz',
-    // sv15_validator: 'gL9Iv3iUiPTtDvyEZ9b4wCcTvz3G6qys',
-    // sv16_validator: '6ANtCorumVE8Ur7n1gJ8Gfvgv5pa96mZ',
   };
 
   const validator1UiApp = newUiApp(
