@@ -13,7 +13,11 @@ import {
   NamespaceToClientIdMapMap,
   clusterProdLike,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { standardSvConfigs, extraSvConfigs, dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  standardSvConfigs,
+  extraSvConfigs,
+  dsoSize,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 function ledgerApiAudience(
   svNamespaces: string,
@@ -27,7 +31,7 @@ function ledgerApiAudience(
       {
         name: `Ledger API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://ledger_api.${svNamespaces}.${clusterBasename}.canton.network`,
-        allowOfflineAccess: true, // FIXME: create an issue to review whether we need this here and in docs (seems like we don't any more, was for ANS UI in the past, now it's only splitwell)
+        allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
       },
       { provider: auth0DomainProvider }
     );
@@ -65,7 +69,7 @@ function svAppAudience(
       {
         name: `SV App API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://sv.${svNamespaces}.${clusterBasename}.canton.network/api`,
-        allowOfflineAccess: true,
+        allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
       },
       { provider: auth0DomainProvider }
     );
@@ -89,7 +93,7 @@ function validatorAppAudience(
       {
         name: `Validator App API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://validator.${svNamespaces}.${clusterBasename}.canton.network/api`,
-        allowOfflineAccess: true,
+        allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
       },
       { provider: auth0DomainProvider }
     );
@@ -283,7 +287,7 @@ function svsOnlyAuth0(
     // Currently, for no good reason, we have sv-1 vs sv1_validator naming inconsistency.
     // To make things worse, the sv-da-1 namespace is even more special and has sv-da-1 vs sv-da-1_validator.
     // Then mainnet DA-2 is even worse, as we use "sv" and "validator"
-    // FIXME: decide whether to clean this up, or leave as-is for now and open a tech-debt ticket to clean up later.
+    // TODO(DACH-NY/canton-internal#2110): clean this up
     const svAppName = isMainNet && sv.namespace == 'sv-1' ? 'sv' : sv.namespace;
     const validatorAppName =
       sv.namespace == 'sv-da-1'
@@ -379,11 +383,13 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     clientSecret: auth0MgtClientSecret,
   });
 
-  const standardSvs: svAuth0Params[] = standardSvConfigs.map(sv => ({
-    namespace: sv.nodeName,
-    description: sv.nodeName.replace(/-/g, '').toUpperCase(),
-    ingressName: sv.ingressName,
-  })).slice(0, dsoSize);
+  const standardSvs: svAuth0Params[] = standardSvConfigs
+    .map(sv => ({
+      namespace: sv.nodeName,
+      description: sv.nodeName.replace(/-/g, '').toUpperCase(),
+      ingressName: sv.ingressName,
+    }))
+    .slice(0, dsoSize);
   const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
