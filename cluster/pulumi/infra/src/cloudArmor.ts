@@ -44,7 +44,6 @@ export interface ApiThrottleConfig {
   endpoint: ApiEndpoint;
   throttle: ThrottleConfig;
   action: 'throttle' | 'ban';
-  priority?: number;
 }
 
 /**
@@ -80,19 +79,19 @@ export function configureCloudArmorPolicy(
 
   // Step 2: Add predefined WAF rules
   if (cac.predefinedWafRules && cac.predefinedWafRules.length > 0) {
-    addPredefinedWafRules(/*securityPolicy, args.predefinedWafRules, ruleOpts*/);
+    addPredefinedWafRules(/*securityPolicy, args.predefinedWafRules, cac.allRulesPreviewOnly, ruleOpts*/);
   }
 
   // Step 3: Add IP whitelisting rules
-  addIpWhitelistRules(/*securityPolicy, ruleOpts*/);
+  addIpWhitelistRules(/*securityPolicy, cac.allRulesPreviewOnly, ruleOpts*/);
 
   // Step 4: Add throttling/banning rules for specific API endpoints
   if (cac.apiThrottles && cac.apiThrottles.length > 0) {
-    addThrottleAndBanRules(securityPolicy, cac.apiThrottles, ruleOpts);
+    addThrottleAndBanRules(securityPolicy, cac.apiThrottles, cac.allRulesPreviewOnly, ruleOpts);
   }
 
   // Step 5: Add default deny rule
-  addDefaultDenyRule(securityPolicy, ruleOpts);
+  addDefaultDenyRule(securityPolicy, cac.allRulesPreviewOnly, ruleOpts);
 
   return securityPolicy;
 }
@@ -104,6 +103,7 @@ function addPredefinedWafRules(): void {
   /*
   securityPolicy: gcp.compute.SecurityPolicy,
   rules: PredefinedWafRule[],
+  preview: boolean,
   opts: pulumi.ResourceOptions
      */
   // TODO (DACH-NY/canton-network-internal#406) implement
@@ -115,6 +115,7 @@ function addPredefinedWafRules(): void {
 function addIpWhitelistRules(): void {
   /*
   securityPolicy: gcp.compute.SecurityPolicy,
+  preview: boolean,
   opts: pulumi.ResourceOptions
      */
   // TODO (DACH-NY/canton-network-internal#1250) implement
@@ -126,12 +127,13 @@ function addIpWhitelistRules(): void {
 function addThrottleAndBanRules(
   securityPolicy: gcp.compute.SecurityPolicy,
   apiThrottles: ApiThrottleConfig[],
+  preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
   let throttleRuleCounter = THROTTLE_BAN_RULE_MIN;
 
   apiThrottles.forEach(apiConfig => {
-    const priority = apiConfig.priority || throttleRuleCounter;
+    const priority = throttleRuleCounter;
     throttleRuleCounter = priority + RULE_SPACING;
 
     if (priority >= THROTTLE_BAN_RULE_MAX) {
@@ -153,7 +155,8 @@ function addThrottleAndBanRules(
       {
         securityPolicy: securityPolicy.name,
         description: `${action === 'throttle' ? 'Throttle' : 'Ban'} rule${throttle.perIp ? ' per-IP' : ''} for ${endpoint.name} API endpoint`,
-        priority: priority,
+        priority,
+          preview,
         action: action === 'ban' ? 'rate_based_ban' : 'throttle',
         match: {
           expr: {
@@ -190,6 +193,7 @@ function addThrottleAndBanRules(
  */
 function addDefaultDenyRule(
   securityPolicy: gcp.compute.SecurityPolicy,
+  preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
   new gcp.compute.SecurityPolicyRule(
@@ -198,6 +202,7 @@ function addDefaultDenyRule(
       securityPolicy: securityPolicy.name,
       description: 'Default rule to deny all other traffic',
       priority: DEFAULT_DENY_RULE_NUMBER,
+        preview,
       action: 'deny',
       match: {
         config: {
