@@ -35,6 +35,8 @@ runs:
           target="default"
         fi
 
+        echo "Running command with nix version $(nix --version)"
+
         # Attempt to build the nix env with retries to work around transient download failures
         echo "building nix env"
         MAX_RETRY_NIX_ENV=5
