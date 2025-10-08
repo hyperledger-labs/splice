@@ -88,7 +88,7 @@ runs:
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
           rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
-          sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+          # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
         else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
