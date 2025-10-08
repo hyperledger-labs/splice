@@ -130,12 +130,7 @@ function addThrottleAndBanRules(
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
-  let throttleRuleCounter = THROTTLE_BAN_RULE_MIN;
-
-  apiThrottles.forEach(apiConfig => {
-    const priority = throttleRuleCounter;
-    throttleRuleCounter = priority + RULE_SPACING;
-
+  apiThrottles.reduce((priority, apiConfig) => {
     if (priority >= THROTTLE_BAN_RULE_MAX) {
       throw new Error(
         `Throttle rule priority ${priority} exceeds maximum ${THROTTLE_BAN_RULE_MAX}`
@@ -185,7 +180,8 @@ function addThrottleAndBanRules(
       },
       opts
     );
-  });
+    return priority + RULE_SPACING;
+  }, THROTTLE_BAN_RULE_MIN);
 }
 
 /**
