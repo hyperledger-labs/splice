@@ -75,6 +75,7 @@ export async function installValidator1(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
+    validator1Config?.disableAuth,
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
     {
@@ -117,6 +118,7 @@ export async function installValidator1(
     nodeIdentifier: 'validator1',
     participantPruningConfig,
     deduplicationDuration: validator1Config?.deduplicationDuration,
+    disableAuth: validator1Config?.disableAuth,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

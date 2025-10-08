@@ -26,6 +26,7 @@ export function installParticipant(
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
   auth0Config: Auth0Config,
+  disableAuth?: boolean,
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   customOptions?: SpliceCustomResourceOptions
@@ -102,6 +103,7 @@ export function installParticipant(
           memory: '8Gi',
         },
       },
+      disableAuth: disableAuth || false,
     },
     version,
     {

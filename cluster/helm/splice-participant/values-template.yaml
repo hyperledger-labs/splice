@@ -44,3 +44,5 @@ persistence:
 # tolerations:
 
 extraInitContainers: []
+
+disableAuth: false

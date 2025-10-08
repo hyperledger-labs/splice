@@ -283,8 +283,6 @@ spec:
           value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
         {{- end }}
         {{- if .Values.disableAuth }}
-        - name: SPLICE_APP_VALIDATOR_WALLET_USER_NAME
-          value: administrator
         - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
           value: ledger-api-user
         - name: ADDITIONAL_CONFIG_DISABLE_AUTH

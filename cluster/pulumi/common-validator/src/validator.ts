@@ -79,6 +79,7 @@ type BasicValidatorConfig = {
   dependencies: CnInput<pulumi.Resource>[];
   participantPruningConfig?: ParticipantPruningConfig;
   deduplicationDuration?: string;
+  disableAuth?: boolean;
   logLevel?: LogLevel;
 };
 
@@ -235,6 +236,7 @@ export async function installValidatorApp(
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
       maxVettingDelay: networkWideConfig?.maxVettingDelay,
+      disableAuth: baseConfig.disableAuth || false,
       logLevel: config.logLevel,
       resources: baseConfig.svValidator
         ? {

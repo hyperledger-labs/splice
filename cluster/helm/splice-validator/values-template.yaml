@@ -83,3 +83,5 @@ ansWebUi:
 # set if validator-web-ui should be deployed
 validatorWebUi:
   enabled: true
+
+disableAuth: false
