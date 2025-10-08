@@ -59,7 +59,7 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
 
         <ProposalField
           id="expiryDate"
-          title="Expiry Date"
+          title="Threshold Deadline"
           subtitle="This is the last day voters can vote on this proposal"
           value={expiryDate}
         />
