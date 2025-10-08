@@ -26,4 +26,4 @@ export * from './pruning';
 export * from './config/loadTesterConfig';
 export * from './config/networkWideConfig';
 export * from './ratelimit';
-export * from './config';
+export * from './config/config';

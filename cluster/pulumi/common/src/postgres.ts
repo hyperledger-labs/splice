@@ -8,7 +8,7 @@ import { Resource } from '@pulumi/pulumi';
 
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, CloudSqlConfig, config } from './config';
-import { spliceConfig } from './config';
+import { spliceConfig } from './config/config';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
