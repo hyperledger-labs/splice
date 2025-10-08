@@ -132,7 +132,6 @@ runs:
         EOF
           fi
           mkdir -p /nix/store
-          env
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
