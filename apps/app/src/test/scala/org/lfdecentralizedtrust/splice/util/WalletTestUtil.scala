@@ -1310,7 +1310,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   }
 
   /** @param partyWalletClient the wallet in which to create the transfer preapproval
-    * @param checkValidator a validator to use to check that the preapproval was created and ingested by all Scans
+    * @param checkValidator a validator to use to check that the preapproval was created and ingested by enough Scans
     */
   def createTransferPreapprovalEnsuringItExists(
       partyWalletClient: WalletAppClientReference,
