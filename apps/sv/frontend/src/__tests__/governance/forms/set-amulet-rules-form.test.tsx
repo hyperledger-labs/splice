@@ -13,6 +13,7 @@ import { SetAmuletConfigRulesForm } from '../../../components/forms/SetAmuletCon
 import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { server, svUrl } from '../../setup/setup';
+import { PROPOSAL_SUMMARY_SUBTITLE, PROPOSAL_SUMMARY_TITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -53,6 +54,10 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
+
+    const summarySubtitle = screen.getByTestId('set-amulet-config-rules-summary-subtitle');
+    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
     const urlInput = screen.getByTestId('set-amulet-config-rules-url');
     expect(urlInput).toBeDefined();
@@ -232,7 +237,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText('Proposal Summary')).toBeDefined();
+    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
   });
 
   test(
