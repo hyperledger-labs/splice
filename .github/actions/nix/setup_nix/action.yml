@@ -189,7 +189,7 @@ runs:
 
           #requires to preserve read only during clone
           sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
-          sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
+          # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
         fi
