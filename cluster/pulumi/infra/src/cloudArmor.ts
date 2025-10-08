@@ -155,15 +155,24 @@ function addThrottleAndBanRules(
             expression: matchExpr,
           },
         },
-        rateLimitOptions:
-            {
-                rateLimitThreshold: {
+        rateLimitOptions: {
+          // ban point is banThreshold + ratelimit count; consider splitting up rather than doubling
+          ...(action === 'ban'
+            ? {
+                banDurationSec: 600,
+                banThreshold: {
                   count: throttle.rate,
                   intervalSec: throttle.interval,
                 },
-                conformAction: 'allow',
-                exceedAction: 'deny',
-              },
+              }
+            : {}),
+          rateLimitThreshold: {
+            count: throttle.rate,
+            intervalSec: throttle.interval,
+          },
+          conformAction: 'allow',
+          exceedAction: 'deny(429)',
+        },
       },
       opts
     );
