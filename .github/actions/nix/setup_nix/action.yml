@@ -171,9 +171,6 @@ runs:
         chown -R $(whoami):$(whoami) ~
         cat /tmp/nix-cache-key
         if [ ! -f "/cache/nix/$cache_key/cached" ]; then
-          echo "Garbage collecting to reduce cache size"
-          nix-store --gc
-
           echo "Saving nix"
 
           sudo -v ; curl https://rclone.org/install.sh | sudo bash
@@ -181,6 +178,9 @@ runs:
           echo "sourcing nix profile"
           export USER=$(whoami)
           . ~/.nix-profile/etc/profile.d/nix.sh
+
+          echo "Garbage collecting to reduce cache size"
+          nix-store --gc
 
           nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
 
