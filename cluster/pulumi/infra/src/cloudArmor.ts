@@ -151,7 +151,7 @@ function addThrottleAndBanRules(
         securityPolicy: securityPolicy.name,
         description: `${action === 'throttle' ? 'Throttle' : 'Ban'} rule${throttle.perIp ? ' per-IP' : ''} for ${endpoint.name} API endpoint`,
         priority,
-          preview,
+        preview,
         action: action === 'ban' ? 'rate_based_ban' : 'throttle',
         match: {
           expr: {
@@ -198,7 +198,7 @@ function addDefaultDenyRule(
       securityPolicy: securityPolicy.name,
       description: 'Default rule to deny all other traffic',
       priority: DEFAULT_DENY_RULE_NUMBER,
-        preview,
+      preview,
       action: 'deny',
       match: {
         config: {
