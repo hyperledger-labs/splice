@@ -138,7 +138,7 @@ function addThrottleAndBanRules(
     }
 
     const { endpoint, throttle, action } = apiConfig;
-    const ruleName = `${action}-${endpoint.name}`;
+    const ruleName = `${action}${throttle.perIp ? '-per-ip' : ''}-${endpoint.name}`;
 
     // Build the expression for path and hostname matching
     const pathExpr = `request.path.matches('${endpoint.path}')`;
