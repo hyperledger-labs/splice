@@ -57,6 +57,12 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         - name: SPLICE_APP_UI_POLL_INTERVAL
           value: {{ .Values.uiPollInterval | quote }}
+        {{- if .Values.disableAuth }}
+        - name: SPLICE_APP_UI_UNSAFE
+          value: "true"
+        - name: SPLICE_APP_UI_UNSAFE_SECRET
+          value: "unsafe"
+        {{- end }}
         image: "{{ .Values.imageRepo }}/wallet-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).wallet_web_ui) }}"
         {{- with .Values.imagePullPolicy }}
         imagePullPolicy: {{ . }}

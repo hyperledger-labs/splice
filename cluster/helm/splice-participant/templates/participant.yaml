@@ -73,6 +73,13 @@ spec:
               }
             }
         {{- end }}
+        {{- if .Values.disableAuth }}
+        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
+          value: ledger-api-user
+        - name: ADDITIONAL_CONFIG_DISABLE_AUTH
+          value: |
+            canton.participants.participant.ledger-api.auth-services=[]
+        {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
         ports:

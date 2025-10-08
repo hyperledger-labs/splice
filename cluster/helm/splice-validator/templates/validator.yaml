@@ -282,6 +282,28 @@ spec:
         - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
           value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
         {{- end }}
+        {{- if .Values.disableAuth }}
+        - name: SPLICE_APP_VALIDATOR_WALLET_USER_NAME
+          value: administrator
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          value: ledger-api-user
+        - name: ADDITIONAL_CONFIG_DISABLE_AUTH
+          value: |
+            canton.validator-apps.validator_backend {
+              auth=""
+            }
+            canton.validator-apps.validator_backend {
+              auth={
+                algorithm = "hs-256-unsafe"
+                audience = {{ .Values.auth.audience | quote }}
+                secret = "unsafe"
+              }
+            }
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
+              type="none"
+            }
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http
