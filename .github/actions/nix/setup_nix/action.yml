@@ -152,8 +152,6 @@ runs:
             target="default"
           fi
           nix develop path:nix#${target} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
-          echo "Garbage collecting to reduce cache size"
-          # nix-store --gc
         fi
 
     - name: Invoke nix before saving cache
@@ -173,6 +171,9 @@ runs:
         chown -R $(whoami):$(whoami) ~
         cat /tmp/nix-cache-key
         if [ ! -f "/cache/nix/$cache_key/cached" ]; then
+          echo "Garbage collecting to reduce cache size"
+          nix-store --gc
+
           echo "Saving nix"
 
           sudo -v ; curl https://rclone.org/install.sh | sudo bash
