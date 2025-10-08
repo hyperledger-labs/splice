@@ -7,28 +7,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-        "namespace": "validator1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-validator1-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "postgresPassword": ""
         }
       },
@@ -163,6 +141,8 @@
           "*.splitwell.mock.global.canton.network.digitalasset.com",
           "sv-2.mock.global.canton.network.digitalasset.com",
           "*.sv-2.mock.global.canton.network.digitalasset.com",
+          "sv-2-eng.mock.global.canton.network.digitalasset.com",
+          "*.sv-2-eng.mock.global.canton.network.digitalasset.com",
           "sv-1.mock.global.canton.network.digitalasset.com",
           "*.sv-1.mock.global.canton.network.digitalasset.com",
           "sv.mock.global.canton.network.digitalasset.com",
@@ -203,6 +183,8 @@
                   "*.splitwell.mock.global.canton.network.digitalasset.com",
                   "sv-2.mock.global.canton.network.digitalasset.com",
                   "*.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sv-2-eng.mock.global.canton.network.digitalasset.com",
+                  "*.sv-2-eng.mock.global.canton.network.digitalasset.com",
                   "sv-1.mock.global.canton.network.digitalasset.com",
                   "*.sv-1.mock.global.canton.network.digitalasset.com",
                   "sv.mock.global.canton.network.digitalasset.com",
@@ -919,18 +901,6 @@
           }
         },
         "participantAddress": "participant-3",
-        "participantIdentitiesDumpPeriodicBackup": {
-          "backupInterval": "10m",
-          "location": {
-            "bucket": {
-              "bucketName": "da-cn-data-dumps",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-devnet",
-              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
-            },
-            "prefix": "mock/validator1"
-          }
-        },
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
@@ -961,7 +931,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 45000
+          "targetThroughput": 1000000
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "digitalasset-validator1-1",
