@@ -20,6 +20,7 @@ export interface ApiEndpoint {
 }
 
 export interface ThrottleConfig {
+  perIp: boolean;
   rate: number; // Requests per minute
   interval: number; // Interval in seconds
 }
@@ -166,12 +167,13 @@ function addThrottleAndBanRules(
                 },
               }
             : {}),
+          enforceOnKey: throttle.perIp ? 'IP' : 'ALL',
           rateLimitThreshold: {
             count: throttle.rate,
             intervalSec: throttle.interval,
           },
           conformAction: 'allow',
-          exceedAction: 'deny(429)',
+          exceedAction: 'deny(429)', // 429 Too Many Requests
         },
       },
       opts
