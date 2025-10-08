@@ -26,7 +26,8 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as v0}
+import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource as r0
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
@@ -45,7 +46,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class HttpSvHandler(
+class HttpSvPublicHandler(
     svUserName: String,
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
@@ -63,7 +64,7 @@ class HttpSvHandler(
 )(implicit
     ec: ExecutionContext,
     protected val tracer: Tracer,
-) extends v0.SvHandler[TraceContext]
+) extends v0.SvPublicHandler[TraceContext]
     with Spanning
     with NamedLogging
     with HttpVotesHandler {
@@ -76,12 +77,18 @@ class HttpSvHandler(
   override protected val votesStore: ActiveVotesStore = dsoStore
   override protected val workflowId: String = this.getClass.getSimpleName
 
-  def onboardValidator(
-      respond: v0.SvResource.OnboardValidatorResponse.type
+  /** Intended use: Other validators call this endpoint to onboard themselves,
+    * passing their onboarding secret in the request payload.
+    *
+    * Protection: The onboarding secret is unguessable and single-use.
+    * Note that we are still spending some resources on verifying the secret.
+    */
+  override def onboardValidator(
+      respond: r0.OnboardValidatorResponse.type
   )(
       body: definitions.OnboardValidatorRequest
-  )(extracted: TraceContext): Future[v0.SvResource.OnboardValidatorResponse] = {
-    implicit val tc = extracted
+  )(extracted: TraceContext): Future[r0.OnboardValidatorResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardValidator") { _ => _ =>
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
@@ -92,7 +99,7 @@ class HttpSvHandler(
                 svStore.lookupUsedSecret(providedSecret.secret).flatMap {
                   case Some(used) if used.payload.validator == body.partyId =>
                     // This validator is already onboarded with the same secret - nothing to do
-                    Future.successful(v0.SvResource.OnboardValidatorResponseOK)
+                    Future.successful(r0.OnboardValidatorResponseOK)
                   case Some(_) =>
                     Future.failed(
                       HttpErrorHandler
@@ -120,7 +127,7 @@ class HttpSvHandler(
                     .flatMap {
                       case QueryResult(_, Some(_)) =>
                         // This validator is already onboarded - nothing to do
-                        Future.successful(v0.SvResource.OnboardValidatorResponseOK)
+                        Future.successful(r0.OnboardValidatorResponseOK)
                       case QueryResult(_, None) =>
                         for {
                           // We retry here because this mutates the AmuletRules and rounds contracts,
@@ -137,7 +144,7 @@ class HttpSvHandler(
                             ),
                             logger,
                           )
-                        } yield v0.SvResource.OnboardValidatorResponseOK
+                        } yield r0.OnboardValidatorResponseOK
                     }
                 }
             }
@@ -154,12 +161,16 @@ class HttpSvHandler(
     }
   }
 
+  /** Intended use: Used by other SV operators
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
   def startSvOnboarding(
-      respond: v0.SvResource.StartSvOnboardingResponse.type
+      respond: r0.StartSvOnboardingResponse.type
   )(
       body: definitions.StartSvOnboardingRequest
-  )(extracted: TraceContext): Future[v0.SvResource.StartSvOnboardingResponse] = {
-    implicit val tc = extracted
+  )(extracted: TraceContext): Future[r0.StartSvOnboardingResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.startSvOnboarding") { _ => _ =>
       SvOnboardingToken.verifyAndDecode(body.token) match {
         case Left(error) =>
@@ -229,7 +240,7 @@ class HttpSvHandler(
                             )
                           )
                         case Right(_) =>
-                          Future.successful(v0.SvResource.StartSvOnboardingResponseOK)
+                          Future.successful(r0.StartSvOnboardingResponseOK)
                       }
                 }
           } yield res
@@ -237,12 +248,16 @@ class HttpSvHandler(
     }
   }
 
-  def getSvOnboardingStatus(
-      respond: v0.SvResource.GetSvOnboardingStatusResponse.type
+  /** Intended use: Used by other SV operators
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
+  override def getSvOnboardingStatus(
+      respond: r0.GetSvOnboardingStatusResponse.type
   )(
       svPartyOrName: String
-  )(extracted: TraceContext): Future[v0.SvResource.GetSvOnboardingStatusResponse] = {
-    implicit val tc = extracted
+  )(extracted: TraceContext): Future[r0.GetSvOnboardingStatusResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.getSvOnboardingStatus") { _ => _ =>
       Codec.decode(Codec.Party)(svPartyOrName) match {
         case Left(error) =>
@@ -293,10 +308,16 @@ class HttpSvHandler(
     }
   }
 
-  def devNetOnboardValidatorPrepare(
-      respond: v0.SvResource.DevNetOnboardValidatorPrepareResponse.type
-  )()(extracted: TraceContext): Future[v0.SvResource.DevNetOnboardValidatorPrepareResponse] = {
-    implicit val tc = extracted
+  /** Intended use: Used by other validators to get a free onboarding secret
+    *
+    * Protection: Rate limiting, endpoint only used for DevNet
+    */
+  override def devNetOnboardValidatorPrepare(
+      respond: r0.DevNetOnboardValidatorPrepareResponse.type
+  )()(
+      extracted: TraceContext
+  ): Future[r0.DevNetOnboardValidatorPrepareResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.devNetOnboardValidatorPrepare") { _ => _ =>
       if (isDevNet) {
         val secret = generateRandomOnboardingSecret(svStore.key.svParty, None)
@@ -322,7 +343,7 @@ class HttpSvHandler(
               )
             case Right(()) =>
               Future.successful(
-                v0.SvResource.DevNetOnboardValidatorPrepareResponseOK(secret.toApiResponse)
+                r0.DevNetOnboardValidatorPrepareResponseOK(secret.toApiResponse)
               )
           }
       } else {
@@ -335,10 +356,15 @@ class HttpSvHandler(
     }
   }
 
-  def getDsoInfo(
-      respond: v0.SvResource.GetDsoInfoResponse.type
-  )()(extracted: TraceContext): Future[v0.SvResource.GetDsoInfoResponse] = {
-    implicit val tc = extracted
+  /** Intended use: The SV app UI.
+    *
+    * Protection: None for backwards compatibility reasons
+    * TODO(DACH-NY/canton-network-internal#2106): Move to HttpSvOperatorHandler
+    */
+  override def getDsoInfo(
+      respond: r0.GetDsoInfoResponse.type
+  )()(extracted: TraceContext): Future[r0.GetDsoInfoResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.getDsoInfo") { _ => _ =>
       for {
         latestOpenMiningRound <- dsoStore.getLatestActiveOpenMiningRound()
@@ -359,12 +385,16 @@ class HttpSvHandler(
     }
   }
 
-  def getCometBftNodeStatus(
-      respond: v0.SvResource.GetCometBftNodeStatusResponse.type
+  /** Intended use: Interacting with CometBFT node monitoring/debugging/testing purposes
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
+  override def getCometBftNodeStatus(
+      respond: r0.GetCometBftNodeStatusResponse.type
   )()(extracted: TraceContext): Future[
-    v0.SvResource.GetCometBftNodeStatusResponse
+    r0.GetCometBftNodeStatusResponse
   ] = {
-    implicit val tc = extracted
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.getCometBftNodeStatus") { _ => _ =>
       withClientOrNotFound(respond.NotFound) {
         _.nodeStatus()
@@ -381,18 +411,22 @@ class HttpSvHandler(
     }
   }
 
+  /** Intended use: Interacting with CometBFT node monitoring/debugging/testing purposes
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
   override def cometBftJsonRpcRequest(
-      respond: v0.SvResource.CometBftJsonRpcRequestResponse.type
+      respond: r0.CometBftJsonRpcRequestResponse.type
   )(
       body: definitions.CometBftJsonRpcRequest
-  )(extracted: TraceContext): Future[v0.SvResource.CometBftJsonRpcRequestResponse] = {
-    implicit val tc = extracted
+  )(extracted: TraceContext): Future[r0.CometBftJsonRpcRequestResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.cometBftJsonRpcRequest") { _ => _ =>
       withClientOrNotFound(respond.NotFound) { client =>
         client
           .jsonRpcCall(body.id, body.method.value, body.params.getOrElse(Map.empty))
           .map(res =>
-            v0.SvResource.CometBftJsonRpcRequestResponse.OK(
+            r0.CometBftJsonRpcRequestResponse.OK(
               definitions.CometBftJsonRpcResponse(
                 res.jsonrpc,
                 res.id,
@@ -404,12 +438,46 @@ class HttpSvHandler(
     }
   }
 
-  def onboardSvPartyMigrationAuthorize(
-      respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
+  /** Intended use: Interacting with CometBFT node monitoring/debugging/testing purposes
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
+  override def getCometBftNodeDebugDump(
+      respond: r0.GetCometBftNodeDebugDumpResponse.type
+  )()(extracted: TraceContext): Future[
+    r0.GetCometBftNodeDebugDumpResponse
+  ] = {
+    implicit val traceContext: TraceContext = extracted
+    withSpan(s"$workflowId.getCometBftNodeDebugDump") { _ => _ =>
+      withClientOrNotFound(respond.NotFound) { client =>
+        client
+          .nodeDebugDump()
+          .map(response =>
+            definitions.CometBftNodeDumpOrErrorResponse(
+              definitions.CometBftNodeDumpResponse(
+                status = response.status,
+                networkInfo = response.networkInfo,
+                abciInfo = response.abciInfo,
+                validators = response.validators,
+              )
+            )
+          )
+      }
+    }
+  }
+
+  /** Intended use: Used by other SV operators
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
+  override def onboardSvPartyMigrationAuthorize(
+      respond: r0.OnboardSvPartyMigrationAuthorizeResponse.type
   )(
       body: definitions.OnboardSvPartyMigrationAuthorizeRequest
-  )(extracted: TraceContext): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
-    implicit val tc = extracted
+  )(
+      extracted: TraceContext
+  ): Future[r0.OnboardSvPartyMigrationAuthorizeResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardSvPartyMigrationAuthorize") { _ => _ =>
       (for {
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
@@ -445,7 +513,7 @@ class HttpSvHandler(
 
   private def authorizeParticipantForHostingDsoParty(
       participantId: ParticipantId
-  )(implicit tc: TraceContext): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
+  )(implicit tc: TraceContext): Future[r0.OnboardSvPartyMigrationAuthorizeResponse] = {
     dsoPartyMigration
       .authorizeParticipantForHostingDsoParty(
         participantId
@@ -456,7 +524,7 @@ class HttpSvHandler(
                 .RequiredProposalNotFound(
                   partyToParticipantSerial
                 ) =>
-            v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseBadRequest(
+            r0.OnboardSvPartyMigrationAuthorizeResponseBadRequest(
               definitions.ProposalNotFoundErrorResponse(
                 proposalNotFound = definitions.ProposalNotFoundErrorResponse.ProposalNotFound(
                   BigInt(partyToParticipantSerial.value)
@@ -467,7 +535,7 @@ class HttpSvHandler(
         { acsBytes =>
           // TODO(M3-57) consider if a more space-efficient encoding is necessary
           val encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
-          v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
+          r0.OnboardSvPartyMigrationAuthorizeResponseOK(
             definitions.OnboardSvPartyMigrationAuthorizeResponse(
               encoded
             )
@@ -476,12 +544,16 @@ class HttpSvHandler(
       )
   }
 
-  def onboardSvSequencer(
-      respond: v0.SvResource.OnboardSvSequencerResponse.type
+  /** Intended use: Used by other SV operators
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
+  override def onboardSvSequencer(
+      respond: r0.OnboardSvSequencerResponse.type
   )(
       body: definitions.OnboardSvSequencerRequest
-  )(extracted: TraceContext): Future[v0.SvResource.OnboardSvSequencerResponse] = {
-    implicit val tc = extracted
+  )(extracted: TraceContext): Future[r0.OnboardSvSequencerResponse] = {
+    implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
       (for {
         sequencerId <- Codec.decode(Codec.Sequencer)(body.sequencerId)
@@ -493,7 +565,7 @@ class HttpSvHandler(
       }).fold(
         errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
         _.map(onboardingState =>
-          v0.SvResource.OnboardSvSequencerResponseOK(
+          r0.OnboardSvSequencerResponseOK(
             definitions.OnboardSvSequencerResponse(
               Base64.getEncoder.encodeToString(onboardingState.toByteArray)
             )

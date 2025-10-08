@@ -88,7 +88,9 @@ class BftScanConnectionIntegrationTest
     )
 
     aliceValidatorBackend.startSync()
-    onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    val walletUserToken =
+      OAuth2BearerToken(aliceValidatorWalletClient.token.valueOrFail("No token found"))
 
     val fakeCid = new TransferInstruction.ContractId("00" + s"01" * 31 + "42")
 
@@ -113,11 +115,7 @@ class BftScanConnectionIntegrationTest
       .getTransferInstructionAcceptContext(
         fakeCid.contractId,
         GetChoiceContextRequest(None),
-        List(
-          Authorization(
-            OAuth2BearerToken(aliceValidatorBackend.token.valueOrFail("No token found"))
-          )
-        ),
+        List(Authorization(walletUserToken)),
       )
       .value
       .futureValue
@@ -139,11 +137,7 @@ class BftScanConnectionIntegrationTest
       walletClient
         .acceptTokenStandardTransfer(
           fakeCid.contractId,
-          List(
-            Authorization(
-              OAuth2BearerToken(aliceValidatorBackend.token.valueOrFail("No token found"))
-            )
-          ),
+          List(Authorization(walletUserToken)),
         )
         .value
         .futureValue

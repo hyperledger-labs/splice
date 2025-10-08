@@ -14,9 +14,13 @@ import com.digitalasset.canton.tracing.TraceContext
   * Useful for endpoints that serve "public" data, but where we still want to
   * know the identity of the caller (e.g. for rate limiting or auditing purposes).
   *
-  * Authentication: request must have a valid JWT token authenticating the user
+  * ==Authentication==
   *
-  * Authorization: none(!)
+  *  - request must have a valid JWT token authenticating the user
+  *
+  * ==Authorization==
+  *
+  *  - none, doesn't even check if the user exists on the participant
   */
 final class AuthenticationOnlyAuthExtractor(
     verifier: SignatureVerifier,

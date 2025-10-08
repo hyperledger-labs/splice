@@ -13,10 +13,16 @@ import scala.util.{Failure, Success}
 
 /** Auth extractor for APIs that perform administrative actions on the participant
   *
-  * Authentication: request must have a valid JWT token authenticating the user
+  * ==Authentication==
   *
-  * Authorization: user must be active, have actAs rights for the validator/sv app operator party,
-  *                and have ParticipantAdmin rights
+  *  - request must have a valid JWT token authenticating the user
+  *
+  * ==Authorization==
+  *
+  *  - user must exist on the participant and be active
+  *  - primary party must be set for the user and equal to the app operator party
+  *  - user must have actAs rights for the app operator party
+  *  - user must have ParticipantAdmin rights
   */
 final class AdminAuthExtractor(
     verifier: SignatureVerifier,
