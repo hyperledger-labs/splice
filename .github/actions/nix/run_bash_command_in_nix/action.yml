@@ -48,6 +48,7 @@ runs:
           fi
           nix develop \
             path:nix#$target \
+            --verbose \
             --ignore-environment \
             --keep USER \
             --keep HOME \
@@ -142,6 +143,7 @@ runs:
         # Run the command for real within the nix environment
         nix develop \
           path:nix#$target \
+          --verbose \
           --ignore-environment \
           --keep USER \
           --keep HOME \
