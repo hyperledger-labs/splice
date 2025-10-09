@@ -438,34 +438,6 @@ class HttpSvPublicHandler(
     }
   }
 
-  /** Intended use: Interacting with CometBFT node monitoring/debugging/testing purposes
-    *
-    * Protection: Endpoint is protected by IP allowlisting
-    */
-  override def getCometBftNodeDebugDump(
-      respond: r0.GetCometBftNodeDebugDumpResponse.type
-  )()(extracted: TraceContext): Future[
-    r0.GetCometBftNodeDebugDumpResponse
-  ] = {
-    implicit val traceContext: TraceContext = extracted
-    withSpan(s"$workflowId.getCometBftNodeDebugDump") { _ => _ =>
-      withClientOrNotFound(respond.NotFound) { client =>
-        client
-          .nodeDebugDump()
-          .map(response =>
-            definitions.CometBftNodeDumpOrErrorResponse(
-              definitions.CometBftNodeDumpResponse(
-                status = response.status,
-                networkInfo = response.networkInfo,
-                abciInfo = response.abciInfo,
-                validators = response.validators,
-              )
-            )
-          )
-      }
-    }
-  }
-
   /** Intended use: Used by other SV operators
     *
     * Protection: Endpoint is protected by IP allowlisting

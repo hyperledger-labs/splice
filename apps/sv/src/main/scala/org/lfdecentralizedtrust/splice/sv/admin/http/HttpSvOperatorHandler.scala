@@ -35,6 +35,7 @@ import org.lfdecentralizedtrust.splice.http.{
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStore, AppStoreWithIngestion}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -52,6 +53,7 @@ class HttpSvOperatorHandler(
     clock: Clock,
     localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
+    cometBftClient: Option[CometBftClient],
     override protected val packageVersionSupport: PackageVersionSupport,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -428,6 +430,40 @@ class HttpSvOperatorHandler(
     )
       .map(r0.FeatureSupportResponseOK(_))
   }
+
+  override def getCometBftNodeDebugDump(
+      respond: r0.GetCometBftNodeDebugDumpResponse.type
+  )()(extracted: ActAsKnownUserRequest): Future[
+    r0.GetCometBftNodeDebugDumpResponse
+  ] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.getCometBftNodeDebugDump") { _ => _ =>
+      withClientOrNotFound(respond.NotFound) { client =>
+        client
+          .nodeDebugDump()
+          .map(response =>
+            definitions.CometBftNodeDumpOrErrorResponse(
+              definitions.CometBftNodeDumpResponse(
+                status = response.status,
+                networkInfo = response.networkInfo,
+                abciInfo = response.abciInfo,
+                validators = response.validators,
+              )
+            )
+          )
+      }
+    }
+  }
+
+  private def withClientOrNotFound[T](
+      notFound: definitions.ErrorResponse => T
+  )(call: CometBftClient => Future[T]) = cometBftClient
+    .fold {
+      notFound(definitions.ErrorResponse("CometBFT is not configured."))
+        .pure[Future]
+    } {
+      call
+    }
 
   private def withSequencerConnectionOrNotFound[T](
       notFound: definitions.ErrorResponse => T

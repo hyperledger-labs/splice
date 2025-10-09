@@ -551,6 +551,7 @@ class SvApp(
         clock,
         localSynchronizerNode,
         retryProvider,
+        cometBftClient,
         packageVersionSupport,
         timeouts,
         loggerFactory,

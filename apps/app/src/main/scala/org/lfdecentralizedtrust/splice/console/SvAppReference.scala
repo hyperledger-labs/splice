@@ -99,7 +99,7 @@ abstract class SvAppReference(
   @Help.Summary("Get the CometBFT node dump")
   def cometBftNodeDebugDump(): definitions.CometBftNodeDumpResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvPublicAppClient.GetCometBftNodeDump())
+      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
     }
 
   @Help.Summary("Make a CometBFT Json RPC request")
@@ -385,7 +385,7 @@ class SvAppBackendReference(
   @Help.Summary("Get the CometBFT node debug dump")
   def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvPublicAppClient.GetCometBftNodeDump())
+      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
     }
 
   @Help.Summary("Get the sequencer node status")

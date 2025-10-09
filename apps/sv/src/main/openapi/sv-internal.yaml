@@ -119,7 +119,7 @@ paths:
   /v0/admin/domain/cometbft/debug:
     get:
       tags: [sv]
-      x-jvm-package: sv_public
+      x-jvm-package: sv_operator
       operationId: "getCometBftNodeDebugDump"
       responses:
         "200":

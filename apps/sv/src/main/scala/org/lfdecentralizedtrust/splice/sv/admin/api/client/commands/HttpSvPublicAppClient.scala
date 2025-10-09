@@ -424,35 +424,4 @@ object HttpSvPublicAppClient {
     }
   }
 
-  case class GetCometBftNodeDump()
-      extends BaseCommandPublic[
-        http.GetCometBftNodeDebugDumpResponse,
-        definitions.CometBftNodeDumpResponse,
-      ] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCometBftNodeDebugDumpResponse] =
-      client.getCometBftNodeDebugDump(
-        headers = headers
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ): PartialFunction[
-      http.GetCometBftNodeDebugDumpResponse,
-      Either[String, definitions.CometBftNodeDumpResponse],
-    ] = {
-      case http.GetCometBftNodeDebugDumpResponse.OK(
-            definitions.CometBftNodeDumpOrErrorResponse.members.CometBftNodeDumpResponse(response)
-          ) =>
-        Right(response)
-      case http.GetCometBftNodeDebugDumpResponse.OK(
-            definitions.CometBftNodeDumpOrErrorResponse.members.ErrorResponse(response)
-          ) =>
-        Left(response.error)
-    }
-  }
-
 }
