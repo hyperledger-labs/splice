@@ -27,6 +27,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
+import { spliceConfig } from '../../common/src/config/config';
 import { splitwellConfig } from '../../common/src/config/splitwellConfig';
 
 export async function installSplitwell(
@@ -48,6 +49,7 @@ export async function installSplitwell(
         'splitwell-pg',
         'splitwell-pg',
         activeVersion,
+        spliceConfig.pulumiProjectConfig.cloudSql,
         splitPostgresInstances
       );
 
@@ -71,7 +73,15 @@ export async function installSplitwell(
   );
 
   const swPostgres =
-    sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', activeVersion, true);
+    sharedPostgres ||
+    postgres.installPostgres(
+      xns,
+      'sw-pg',
+      'sw-pg',
+      activeVersion,
+      spliceConfig.pulumiProjectConfig.cloudSql,
+      true
+    );
   const splitwellDbName = 'app_splitwell';
 
   const scanAddress = `http://scan-app.sv-1:5012`;
@@ -107,7 +117,14 @@ export async function installSplitwell(
 
   const validatorPostgres =
     sharedPostgres ||
-    postgres.installPostgres(xns, 'validator-pg', 'validator-pg', activeVersion, true);
+    postgres.installPostgres(
+      xns,
+      'validator-pg',
+      'validator-pg',
+      activeVersion,
+      spliceConfig.pulumiProjectConfig.cloudSql,
+      true
+    );
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = imagePullDeps.concat(
