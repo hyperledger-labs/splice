@@ -610,9 +610,8 @@ class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTe
     sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_VALIDATOR1")
   override protected val validatorAuth0Audience = sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE")
   override protected val validatorWalletUser = sys.env("SPLICE_OAUTH_DEV_VALIDATOR_WALLET_USER")
-  override protected lazy val includeSplitwellTests =
-    checkIfAuth0() // We don't currently support no-auth splitwell in k8s, so we skip splitwell tests if we're running with no auth
   override protected lazy val isAuth0 = checkIfAuth0()
+  override protected lazy val includeSplitwellTests = isAuth0
 
   def checkIfAuth0(): Boolean = {
     withFrontEnd("alice-validator") { implicit webDriver =>
