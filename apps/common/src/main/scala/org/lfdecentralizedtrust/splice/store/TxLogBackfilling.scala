@@ -19,7 +19,8 @@ final class TxLogBackfilling(
 ) extends NamedLogging {
 
   private val currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId
-  private val sourceHistory = updateHistory.sourceHistory
+  // ACS import updates should not be included in txlog
+  private val sourceHistory = updateHistory.sourceHistory(excludeAcsImportUpdates = true)
   private val destinationHistory = store.destinationHistory
   private val backfilling =
     new HistoryBackfilling(

@@ -598,7 +598,7 @@ class AcsSnapshotTriggerTest
           )
         )
       )
-    when(updateHistory.sourceHistory).thenReturn(sourceHistory)
+    when(updateHistory.sourceHistory(anyBoolean)).thenReturn(sourceHistory)
     when(updateHistory.getPreviousMigrationId(anyLong)(any[TraceContext])).thenAnswer { (n: Long) =>
       Future.successful(n match {
         case 0L => None
@@ -667,7 +667,9 @@ class AcsSnapshotTriggerTest
 
     def historyBackfilled(migrationId: Long, complete: Boolean): Unit = {
       when(
-        updateHistory.sourceHistory.migrationInfo(eqTo(migrationId))(any[TraceContext])
+        updateHistory
+          .sourceHistory(excludeAcsImportUpdates = false)
+          .migrationInfo(eqTo(migrationId))(any[TraceContext])
       )
         .thenReturn(
           Future.successful(
@@ -690,7 +692,9 @@ class AcsSnapshotTriggerTest
         importUpdatesComplete: Boolean,
     ): Unit = {
       when(
-        updateHistory.sourceHistory.migrationInfo(eqTo(migrationId))(any[TraceContext])
+        updateHistory
+          .sourceHistory(excludeAcsImportUpdates = false)
+          .migrationInfo(eqTo(migrationId))(any[TraceContext])
       )
         .thenReturn(
           Future.successful(

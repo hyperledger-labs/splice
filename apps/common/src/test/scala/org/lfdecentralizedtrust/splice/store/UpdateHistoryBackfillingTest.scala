@@ -66,7 +66,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
             None,
             PageLimit.tryCreate(1000),
           )
-          infoB2 <- storeB2.sourceHistory.migrationInfo(0)
+          infoB2 <- storeB2.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(0)
         } yield {
           infoB2.value.complete shouldBe true
           updatesA.map(_.update.update.updateId) should contain theSameElementsAs updatesB.map(
@@ -88,7 +88,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           _ <- create(domain2, validContractId(2), validOffset(2), party1, storeA0, time(2))
           // If the store doesn't need backfilling, it should return the correct info
           // without explicit initialization of backfilling
-          infoS <- storeA0.sourceHistory.migrationInfo(13)
+          infoS <- storeA0.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(13)
         } yield {
           infoS.value.complete shouldBe true
           infoS.value.recordTimeRange shouldBe Map(
@@ -107,11 +107,11 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
           _ <- create(domain2, validContractId(2), validOffset(2), party1, storeA0, time(2))
           // Before initializing backfilling, it should not return any data
-          infoS1 <- storeA0.sourceHistory.migrationInfo(13)
+          infoS1 <- storeA0.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(13)
           infoD1 <- storeA0.destinationHistory.backfillingInfo
           // After initializing backfilling, it should return the correct data
           _ <- storeA0.initializeBackfilling(13, domain1, tx1.getUpdateId, complete = true)
-          infoS2 <- storeA0.sourceHistory.migrationInfo(13)
+          infoS2 <- storeA0.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(13)
           infoD2 <- storeA0.destinationHistory.backfillingInfo
         } yield {
           infoS1 shouldBe None
@@ -128,9 +128,9 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
           _ <- create(domain2, validContractId(2), validOffset(2), party1, storeA0, time(2))
           _ <- storeA0.initializeBackfilling(13, domain1, tx1.getUpdateId, complete = true)
-          info12 <- storeA0.sourceHistory.migrationInfo(12)
-          info13 <- storeA0.sourceHistory.migrationInfo(13)
-          info14 <- storeA0.sourceHistory.migrationInfo(14)
+          info12 <- storeA0.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(12)
+          info13 <- storeA0.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(13)
+          info14 <- storeA0.sourceHistory(excludeAcsImportUpdates = false).migrationInfo(14)
         } yield {
           info12 shouldBe None
           inside(info13) { case Some(s: SourceMigrationInfo) =>
@@ -341,7 +341,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
   ) =
     new HistoryBackfilling[UpdateHistoryResponse](
       destination.destinationHistory,
-      source.sourceHistory,
+      source.sourceHistory(excludeAcsImportUpdates = false),
       latestMigrationId,
       batchSize = 10,
       loggerFactory = loggerFactory,
