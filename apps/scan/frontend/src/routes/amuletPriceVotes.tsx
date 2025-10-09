@@ -4,7 +4,7 @@ import { Box, Container } from '@mui/material';
 
 import Layout from '../components/Layout';
 import ListAmuletPriceVotes from '../components/votes/ListAmuletPriceVotes';
-import { MedianAmuletPrice } from '@lfdecentralizedtrust/splice-common-frontend';
+import { MedianAmuletPrice } from '../components/MedianAmuletPrice';
 import { useScanConfig } from '../utils';
 
 const AmuletPriceVotes: React.FC = () => {

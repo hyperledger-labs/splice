@@ -4,9 +4,9 @@ import * as React from 'react';
 
 import { Box } from '@mui/material';
 
-import { MedianAmuletPrice } from '@lfdecentralizedtrust/splice-common-frontend';
 import DesiredAmuletPrice from '../components/amuletprice/DesiredAmuletPrice';
 import OpenMiningRounds from '../components/amuletprice/OpenMiningRounds';
+import { MedianAmuletPrice } from '../components/amuletprice/MedianAmuletPrice';
 import { useSvConfig } from '../utils';
 
 const AmuletPrice: React.FC = () => {

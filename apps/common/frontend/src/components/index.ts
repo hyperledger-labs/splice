@@ -20,7 +20,6 @@ import IntervalDisplay from './IntervalDisplay';
 import Loading from './Loading';
 import Login from './Login';
 import LoginFailed from './LoginFailed';
-import { MedianAmuletPrice } from './MedianAmuletPrice';
 import PartyId from './PartyId';
 import { computeDiff, PrettyJsonDiff } from './PrettyJsonDiff';
 import RateDisplay from './RateDisplay';
@@ -68,7 +67,6 @@ export {
   Loading,
   Login,
   LoginFailed,
-  MedianAmuletPrice,
   PartyId,
   PrettyJsonDiff,
   RateDisplay,
