@@ -201,7 +201,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
     super('canton:network:postgres', logicalName, [], {
-      protect: !disableProtection,
+      protect: disableProtection ? false : spliceConfig.pulumiProjectConfig.cloudSql.protected,
       aliases: [{ name: logicalNameAlias, type: 'canton:network:postgres' }],
     });
 
