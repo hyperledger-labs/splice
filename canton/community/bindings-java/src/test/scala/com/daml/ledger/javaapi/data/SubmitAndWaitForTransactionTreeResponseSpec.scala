@@ -10,6 +10,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.annotation.nowarn
 
+// TODO(#23504) remove
 @nowarn("cat=deprecation")
 class SubmitAndWaitForTransactionTreeResponseSpec
     extends AnyFlatSpec

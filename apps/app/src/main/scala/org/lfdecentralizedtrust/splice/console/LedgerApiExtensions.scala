@@ -6,9 +6,10 @@ package org.lfdecentralizedtrust.splice.console
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v2.event.CreatedEvent
-import com.daml.ledger.api.v2.transaction.TransactionTree
+import com.daml.ledger.api.v2.transaction.Transaction
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape
 import com.daml.ledger.javaapi
-import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
+import com.daml.ledger.javaapi.data.Transaction as JavaTransaction
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
@@ -71,10 +72,11 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             readAs: Seq[PartyId] = Seq.empty,
             userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-        ): JavaTransactionTree = {
+            includeCreatedEventBlob: Boolean = false,
+        ): JavaTransaction = {
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
-              LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
+              LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
                 actAs.map(_.toLf),
                 readAs.map(_.toLf),
                 commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
@@ -93,11 +95,13 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 synchronizerId = synchronizerId,
                 userId = userId,
                 packageIdSelectionPreference = Seq.empty,
+                transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                includeCreatedEventBlob = includeCreatedEventBlob,
               )
             )
           }
-          JavaTransactionTree.fromProto(
-            TransactionTree.toJavaProto(
+          JavaTransaction.fromProto(
+            Transaction.toJavaProto(
               // Never set the timeout, as Canton tries to be too clever and attempts to read the transaction
               // with an empty 'required_parties' parameter, which then fails.
               ledgerApi.optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout = None)
@@ -332,11 +336,20 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             endOffset: Option[Long] = None,
             verbose: Boolean = true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
-        ): Seq[JavaTransactionTree] = {
+        ): Seq[JavaTransaction] = {
           ledgerApi.ledger_api.updates
-            .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
-            .collect { case LedgerApiCommands.UpdateService.TransactionTreeWrapper(tree) =>
-              JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree))
+            .transactions(
+              // upcast from PartyId to Party
+              partyIds.map(p => p),
+              completeAfter,
+              beginOffset,
+              endOffset,
+              verbose,
+              timeout,
+              transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+            )
+            .collect { case LedgerApiCommands.UpdateService.TransactionWrapper(tree) =>
+              JavaTransaction.fromProto(Transaction.toJavaProto(tree))
             }
         }
       }

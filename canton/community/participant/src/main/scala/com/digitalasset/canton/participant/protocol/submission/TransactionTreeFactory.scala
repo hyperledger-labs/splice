@@ -16,12 +16,15 @@ import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
-  SerializableContractOfId,
+  ContractInstanceOfId,
   TransactionTreeConversionError,
 }
 import com.digitalasset.canton.participant.store.ContractLookup
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
+import com.digitalasset.canton.protocol.WellFormedTransaction.{
+  WithAbsoluteSuffixes,
+  WithoutSuffixes,
+}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -32,6 +35,11 @@ import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
 trait TransactionTreeFactory {
+
+  /** The [[com.digitalasset.canton.protocol.CantonContractIdVersion]] to be used for newly created
+    * contracts
+    */
+  def cantonContractIdVersion: CantonContractIdVersion
 
   /** Converts a `transaction: LfTransaction` to the corresponding transaction tree, if possible.
     *
@@ -48,7 +56,7 @@ trait TransactionTreeFactory {
       transactionSeed: SaltSeed,
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
       keyResolver: LfKeyResolver,
       maxSequencingTime: CantonTimestamp,
       validatePackageVettings: Boolean,
@@ -72,13 +80,14 @@ trait TransactionTreeFactory {
       salts: Iterable[Salt],
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
       rbContext: RollbackContext,
       keyResolver: LfKeyResolver,
+      absolutizer: ContractIdAbsolutizer,
   )(implicit traceContext: TraceContext): EitherT[
     FutureUnlessShutdown,
     TransactionTreeConversionError,
-    (TransactionView, WellFormedTransaction[WithSuffixes]),
+    (TransactionView, WellFormedTransaction[WithAbsoluteSuffixes]),
   ]
 
   /** Extracts the salts for the view from a transaction view tree. The salts appear in the same
@@ -90,29 +99,25 @@ trait TransactionTreeFactory {
 
 object TransactionTreeFactory {
 
-  type SerializableContractOfId =
-    LfContractId => EitherT[
-      Future,
-      ContractLookupError,
-      SerializableContract,
-    ]
+  type ContractInstanceOfId =
+    LfContractId => EitherT[Future, ContractLookupError, GenContractInstance]
 
-  def contractInstanceLookup(contractStore: ContractLookup)(implicit
-      ex: ExecutionContext,
-      traceContext: TraceContext,
-  ): SerializableContractOfId = id =>
-    for {
-      contract <- contractStore
-        .lookupContract(id)
-        .toRight(ContractLookupError(id, "Unknown contract"))
-        .failOnShutdownToAbortException("TransactionTreeFactory.contractInstanceLookup")
-    } yield contract
+  def contractInstanceLookup(
+      contractStore: ContractLookup
+  )(implicit ex: ExecutionContext, traceContext: TraceContext): ContractInstanceOfId =
+    id =>
+      for {
+        contract <- contractStore
+          .lookup(id)
+          .toRight(ContractLookupError(id, "Unknown contract"))
+          .failOnShutdownToAbortException("TransactionTreeFactory.contractInstanceLookup")
+      } yield contract
 
   /** Supertype for all errors than may arise during the conversion. */
   sealed trait TransactionTreeConversionError extends Product with Serializable with PrettyPrinting
 
   /** Indicates that a contract instance could not be looked up by an instance of
-    * [[SerializableContractOfId]].
+    * [[ContractInstanceOfId]].
     */
   final case class ContractLookupError(id: LfContractId, message: String)
       extends TransactionTreeConversionError {
@@ -167,6 +172,13 @@ object TransactionTreeFactory {
       err =>
         show"Detected conflicting package-ids for the same package name\n${err.conflicts}"
     }
+  }
+
+  final case class ContractIdAbsolutizationError(message: String)
+      extends TransactionTreeConversionError {
+    override protected def pretty: Pretty[ContractIdAbsolutizationError] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
   }
 
   final case class PackageUnknownTo(

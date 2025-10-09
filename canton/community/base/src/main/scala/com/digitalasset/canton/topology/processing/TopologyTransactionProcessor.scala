@@ -12,7 +12,7 @@ import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.SynchronizerCryptoPureApi
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
@@ -30,9 +30,12 @@ import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor.
 import com.digitalasset.canton.topology.store.TopologyStore.Change
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.ValidatingTopologyMappingChecks
+import com.digitalasset.canton.topology.transaction.{
+  SynchronizerUpgradeAnnouncement,
+  ValidatingTopologyMappingChecks,
+}
 import com.digitalasset.canton.topology.{
-  SynchronizerId,
+  PhysicalSynchronizerId,
   TopologyManagerError,
   TopologyStateProcessor,
 }
@@ -54,11 +57,10 @@ import scala.math.Ordering.Implicits.*
   * The processor works together with the StoreBasedSynchronizerTopologyClient
   */
 class TopologyTransactionProcessor(
-    synchronizerId: SynchronizerId,
     pureCrypto: SynchronizerCryptoPureApi,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
     acsCommitmentScheduleEffectiveTime: Traced[EffectiveTime] => Unit,
-    terminateProcessing: TerminateProcessing,
+    val terminateProcessing: TerminateProcessing,
     futureSupervisor: FutureSupervisor,
     exitOnFatalFailures: Boolean,
     timeouts: ProcessingTimeout,
@@ -71,6 +73,8 @@ class TopologyTransactionProcessor(
     )
     with NamedLogging
     with FlagCloseable {
+
+  private val psid = store.storeId.psid
 
   override protected lazy val stateProcessor: TopologyStateProcessor =
     TopologyStateProcessor.forTransactionProcessing(
@@ -130,7 +134,7 @@ class TopologyTransactionProcessor(
       // effective time at the given point in time. we need to recover these as otherwise, we might be using outdated
       // topology snapshots on startup. (wouldn't be tragic as by getting the rejects, we'd be updating the timestamps
       // anyway).
-      upcoming <- performUnlessClosingUSF(functionFullName)(
+      upcoming <- synchronizeWithClosing(functionFullName)(
         store.findUpcomingEffectiveChanges(sequencedTs.value)
         // find effective time of sequenced Ts (directly from store)
         // merge times
@@ -149,7 +153,7 @@ class TopologyTransactionProcessor(
     }
 
     for {
-      stateStoreTsO <- performUnlessClosingUSF(functionFullName)(maxTimestampFromStore())
+      stateStoreTsO <- synchronizeWithClosing(functionFullName)(maxTimestampFromStore())
       clientTs = subscriptionTimestamp(
         start,
         stateStoreTsO.map { case (_, effective) => effective },
@@ -261,7 +265,7 @@ class TopologyTransactionProcessor(
     for {
       _ <- ErrorUtil.requireStateAsyncShutdown(
         initialised.get(),
-        s"Topology client for $synchronizerId is not initialized. Cannot process sequenced event with counter $sc at $sequencedTime",
+        s"Topology client for $psid is not initialized. Cannot process sequenced event with counter $sc at $sequencedTime",
       )
     } yield {
       val txs = updates.flatMap(_.signedTransactions)
@@ -296,7 +300,7 @@ class TopologyTransactionProcessor(
       sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    this.performUnlessClosingF(functionFullName) {
+    this.synchronizeWithClosingF(functionFullName) {
       Future {
         val approximate = ApproximateTime(sequencedTimestamp.value)
         listenersUpdateHead(
@@ -308,7 +312,7 @@ class TopologyTransactionProcessor(
       }
     }
 
-  def createHandler(synchronizerId: SynchronizerId): UnsignedProtocolEventHandler =
+  def createHandler(synchronizerId: PhysicalSynchronizerId): UnsignedProtocolEventHandler =
     new UnsignedProtocolEventHandler {
 
       override def name: String = s"topology-processor-$synchronizerId"
@@ -405,7 +409,7 @@ class TopologyTransactionProcessor(
     LifeCycle.close(serializer)(logger)
 
   private val maxSequencedTimeAtInitializationF =
-    TraceContext.withNewTraceContext(implicit traceContext =>
+    TraceContext.withNewTraceContext("max_sequenced_time")(implicit traceContext =>
       maxTimestampFromStore().map(_.map { case (sequenced, _effective) => sequenced })
     )
 
@@ -449,7 +453,7 @@ class TopologyTransactionProcessor(
     // when initializing TopologyTransactionProcessor means that is it is being replayed
     // after crash recovery (eg reconnecting to a synchronizer or restart after a crash)
     for {
-      maxSequencedTimeAtInitialization <- performUnlessClosingUSF(
+      maxSequencedTimeAtInitialization <- synchronizeWithClosing(
         "max-sequenced-time-at-initialization"
       )(maxSequencedTimeAtInitializationF)
       eventIsBeingReplayed = maxSequencedTimeAtInitialization.exists(_ >= sequencingTimestamp)
@@ -459,7 +463,7 @@ class TopologyTransactionProcessor(
           s"Replaying topology transactions at $sequencingTimestamp and SC=$sc: $txs"
         )
       }
-      validationResult <- performUnlessClosingUSF("process-topology-transaction")(
+      validationResult <- synchronizeWithClosing("process-topology-transaction")(
         stateProcessor
           .validateAndApplyAuthorization(
             sequencingTimestamp,
@@ -480,7 +484,22 @@ class TopologyTransactionProcessor(
       validTransactions = validated.collect {
         case tx if tx.rejectionReason.isEmpty && !tx.transaction.isProposal => tx.transaction
       }
-      _ <- performUnlessClosingUSF("notify-topology-transaction-observers")(
+
+      /*
+      As part of terminate processing, the record order publisher is informed of the successor.
+      Doing that before the listener are informed ensures that any subsequent sequencer message will not be handled
+      before the record order publisher gets pinged.
+       */
+      validUpgradeAnnouncements = validTransactions
+        .mapFilter(_.selectMapping[SynchronizerUpgradeAnnouncement])
+        .map(_.mapping)
+
+      // TODO(#26580) Handle cancellation
+      _ = validUpgradeAnnouncements.foreach(announcement =>
+        terminateProcessing.notifyUpgradeAnnouncement(announcement.successor)
+      )
+
+      _ <- synchronizeWithClosing("notify-topology-transaction-observers")(
         MonadUtil.sequentialTraverse(listeners.get()) { listenerGroup =>
           logger.debug(
             s"Notifying listener group (${listenerGroup.head1.executionOrder}) of $sequencingTimestamp, $effectiveTimestamp and SC $sc"
@@ -496,7 +515,7 @@ class TopologyTransactionProcessor(
         }
       )
 
-      _ <- performUnlessClosingUSF("terminate-processing")(
+      _ <- synchronizeWithClosing("terminate-processing")(
         terminateProcessing.terminate(
           sc,
           sequencingTimestamp,
@@ -518,7 +537,7 @@ object TopologyTransactionProcessor {
 
   def createProcessorAndClientForSynchronizer(
       topologyStore: TopologyStore[TopologyStoreId.SynchronizerStore],
-      synchronizerId: SynchronizerId,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
       pureCrypto: SynchronizerCryptoPureApi,
       parameters: CantonNodeParameters,
       clock: Clock,
@@ -531,9 +550,7 @@ object TopologyTransactionProcessor {
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[(TopologyTransactionProcessor, SynchronizerTopologyClientWithInit)] = {
-
     val processor = new TopologyTransactionProcessor(
-      synchronizerId,
       pureCrypto,
       topologyStore,
       _ => (),
@@ -546,8 +563,8 @@ object TopologyTransactionProcessor {
 
     val cachingClientF = CachingSynchronizerTopologyClient.create(
       clock,
-      synchronizerId,
       topologyStore,
+      synchronizerPredecessor,
       StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       parameters.cachingConfigs,
       parameters.batchingConfig,

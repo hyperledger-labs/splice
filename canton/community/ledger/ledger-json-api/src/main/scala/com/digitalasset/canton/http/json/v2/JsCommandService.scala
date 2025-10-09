@@ -11,6 +11,7 @@ import com.daml.ledger.api.v2.command_service.{
 }
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.api.v2.{
   command_completion_service,
   command_service,
@@ -19,6 +20,7 @@ import com.daml.ledger.api.v2.{
   completion,
   reassignment_commands,
 }
+import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput, v2Endpoint}
@@ -56,6 +58,7 @@ class JsCommandService(
     esf: ExecutionSequencerFactory,
     materializer: Materializer,
     wsConfig: WebsocketConfig,
+    val authInterceptor: AuthInterceptor,
 ) extends Endpoints
     with NamedLogging {
 
@@ -106,7 +109,7 @@ class JsCommandService(
     asList(
       JsCommandService.completionListEndpoint,
       commandCompletionStream,
-      timeoutOpenEndedStream = true,
+      timeoutOpenEndedStream = (_: command_completion_service.CompletionStreamRequest) => true,
     ),
   )
 
@@ -138,6 +141,7 @@ class JsCommandService(
     } yield result
   }
 
+  // TODO(#23504) remove when TransactionTree is removed from the API
   @nowarn("cat=deprecation")
   def submitAndWaitForTransactionTree(
       callerContext: CallerContext
@@ -229,28 +233,28 @@ final case class JsSubmitAndWaitForReassignmentResponse(
 )
 
 object JsCommand {
-  sealed trait Command
+  sealed trait Command extends Product with Serializable
   final case class CreateCommand(
-      templateId: String,
+      templateId: Identifier,
       createArguments: Json,
   ) extends Command
 
   final case class ExerciseCommand(
-      templateId: String,
+      templateId: Identifier,
       contractId: String,
       choice: String,
       choiceArgument: Json,
   ) extends Command
 
   final case class CreateAndExerciseCommand(
-      templateId: String,
+      templateId: Identifier,
       createArguments: Json,
       choice: String,
       choiceArgument: Json,
   ) extends Command
 
   final case class ExerciseByKeyCommand(
-      templateId: String,
+      templateId: Identifier,
       contractKey: Json,
       choice: String,
       choiceArgument: Json,
@@ -271,6 +275,7 @@ final case class JsCommands(
     disclosedContracts: Seq[com.daml.ledger.api.v2.commands.DisclosedContract] = Seq.empty,
     synchronizerId: Option[String] = None,
     packageIdSelectionPreference: Seq[String] = Seq.empty,
+    prefetchContractKeys: Seq[js.PrefetchContractKey] = Seq.empty,
 )
 
 object JsCommandService extends DocumentationEndpoints {
@@ -336,8 +341,8 @@ object JsCommandService extends DocumentationEndpoints {
       .in(sttp.tapir.stringToPath("completions"))
       .in(jsonBody[command_completion_service.CompletionStreamRequest])
       .out(jsonBody[Seq[command_completion_service.CompletionStreamResponse]])
-      .inStreamListParams()
       .description("Query completions list (blocking call)")
+      .inStreamListParamsAndDescription()
 
   override def documentation: Seq[AnyEndpoint] = Seq(
     submitAndWait,

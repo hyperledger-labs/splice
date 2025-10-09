@@ -426,7 +426,8 @@ class WalletSweepToEndUserIntegrationTest extends WalletSweepIntegrationTest {
         .list()
         .exists(e => e.party == aliceEndUserPartyId)
     ) {
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api.parties.allocate(user)
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api.parties
+        .allocate(user, synchronizerId = Some(decentralizedSynchronizerId))
     }
     val newPartyId =
       aliceValidatorBackend.onboardUser(

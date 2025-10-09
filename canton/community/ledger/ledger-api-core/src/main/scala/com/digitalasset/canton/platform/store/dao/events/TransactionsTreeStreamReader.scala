@@ -17,6 +17,7 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.config.TransactionTreeStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{Entry, RawTreeEvent}
 import com.digitalasset.canton.platform.store.backend.common.{
   EventIdSource,
@@ -47,6 +48,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining.*
 
+// TODO(#23504) remove when TransctionTrees are removed
 @nowarn("cat=deprecation")
 class TransactionsTreeStreamReader(
     config: TransactionTreeStreamsConfig,
@@ -209,7 +211,7 @@ class TransactionsTreeStreamReader(
                   eventStorageBackend.fetchEventPayloadsLedgerEffects(
                     target = target
                   )(
-                    eventSequentialIds = ids,
+                    eventSequentialIds = Ids(ids),
                     requestingParties = requestingParties,
                   )(connection)
                 }

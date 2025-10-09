@@ -24,7 +24,7 @@ import com.digitalasset.canton.participant.store.{
   AcsCommitmentStore,
   AcsCounterParticipantConfigStore,
   ParticipantNodePersistentState,
-  SyncPersistentState,
+  SynchronizerConnectionConfigStore,
 }
 import com.digitalasset.canton.participant.sync.{
   ConnectedSynchronizersLookup,
@@ -35,7 +35,12 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.IndexedSynchronizer
 import com.digitalasset.canton.store.db.{DbTest, PostgresTest}
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{
   BaseTest,
@@ -77,39 +82,44 @@ sealed trait SyncStateInspectionTest
   private lazy val localId: ParticipantId = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("localParticipant::synchronizer")
   )
-  lazy val remoteId: ParticipantId = ParticipantId(
+  private lazy val remoteId: ParticipantId = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("remoteParticipant::synchronizer")
   )
-  lazy val remoteIdNESet: NonEmpty[Set[ParticipantId]] = NonEmptyUtil.fromElement(remoteId).toSet
+  private lazy val remoteIdNESet: NonEmpty[Set[ParticipantId]] =
+    NonEmptyUtil.fromElement(remoteId).toSet
 
-  lazy val remoteId2: ParticipantId = ParticipantId(
+  private lazy val remoteId2: ParticipantId = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("remoteParticipant2::synchronizer")
   )
 
-  lazy val remoteId2NESet: NonEmpty[Set[ParticipantId]] = NonEmptyUtil.fromElement(remoteId2).toSet
+  private lazy val remoteId2NESet: NonEmpty[Set[ParticipantId]] =
+    NonEmptyUtil.fromElement(remoteId2).toSet
 
   // values for synchronizer1
-  lazy val synchronizerId: SynchronizerId = SynchronizerId(
+  private lazy val synchronizerId: PhysicalSynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::synchronizer")
-  )
-  lazy val synchronizerIdAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("synchronizer")
-  lazy val indexedSynchronizer: IndexedSynchronizer =
+  ).toPhysical
+  private lazy val synchronizerIdAlias: SynchronizerAlias =
+    SynchronizerAlias.tryCreate("synchronizer")
+  private lazy val indexedSynchronizer: IndexedSynchronizer =
     IndexedSynchronizer.tryCreate(synchronizerId, 1)
   // values for synchronizer2
-  lazy val synchronizerId2: SynchronizerId = SynchronizerId(
+  private lazy val synchronizerId2: PhysicalSynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::synchronizer2")
-  )
-  lazy val synchronizerId2Alias: SynchronizerAlias = SynchronizerAlias.tryCreate("synchronizer2")
-  lazy val indexedSynchronizer2: IndexedSynchronizer =
+  ).toPhysical
+  private lazy val synchronizerId2Alias: SynchronizerAlias =
+    SynchronizerAlias.tryCreate("synchronizer2")
+  private lazy val indexedSynchronizer2: IndexedSynchronizer =
     IndexedSynchronizer.tryCreate(synchronizerId2, 2)
 
-  def buildSyncState(): (SyncStateInspection, SyncPersistentStateManager) = {
+  private def buildSyncState(): (SyncStateInspection, SyncPersistentStateManager) = {
     val stateManager = mock[SyncPersistentStateManager]
     val participantNodePersistentState = mock[ParticipantNodePersistentState]
 
     val syncStateInspection = new SyncStateInspection(
       stateManager,
       Eval.now(participantNodePersistentState),
+      mock[SynchronizerConnectionConfigStore],
       timeouts,
       JournalGarbageCollectorControl.NoOp,
       mock[ConnectedSynchronizersLookup],
@@ -121,31 +131,31 @@ sealed trait SyncStateInspectionTest
     (syncStateInspection, stateManager)
   }
 
-  protected def addSynchronizerToSyncState(
+  private def addSynchronizerToSyncState(
       stateManager: SyncPersistentStateManager,
-      synchronizerId: SynchronizerId,
+      syncStateInspection: SyncStateInspection,
+      synchronizerId: PhysicalSynchronizerId,
       synchronizerAlias: SynchronizerAlias,
   ): AcsCommitmentStore = {
-    val syncPersistentState = mock[SyncPersistentState]
     val acsCounterParticipantConfigStore = mock[AcsCounterParticipantConfigStore]
 
     val acsCommitmentStore = new DbAcsCommitmentStore(
       storage,
       indexedSynchronizer,
       acsCounterParticipantConfigStore,
-      testedProtocolVersion,
       timeouts,
       loggerFactory,
     )
-    when(syncPersistentState.acsCommitmentStore).thenReturn(acsCommitmentStore)
+
+    when(syncStateInspection.syncPersistentStateManager.acsCommitmentStore(synchronizerId))
+      .thenReturn(Some(acsCommitmentStore))
+
     when(stateManager.aliasForSynchronizerId(synchronizerId)).thenReturn(Some(synchronizerAlias))
-    when(stateManager.get(synchronizerId)).thenReturn(Some(syncPersistentState))
-    when(stateManager.getByAlias(synchronizerAlias)).thenReturn(Some(syncPersistentState))
 
     acsCommitmentStore
   }
 
-  def createDummyHash(default: Boolean = true): AcsCommitment.CommitmentType = {
+  private def createDummyHash(default: Boolean): AcsCommitment.CommitmentType = {
     val h = LtHash16()
     h.add("blah".getBytes())
     if (!default)
@@ -176,22 +186,12 @@ sealed trait SyncStateInspectionTest
     )
   }
 
-  def deriveFullPeriod(commitmentPeriods: NonEmpty[Set[CommitmentPeriod]]): CommitmentPeriod = {
-    val fromExclusive = commitmentPeriods.minBy1(_.fromExclusive).fromExclusive
-    val toInclusive = commitmentPeriods.maxBy1(_.toInclusive).toInclusive
-    new CommitmentPeriod(
-      fromExclusive,
-      PositiveSeconds
-        .create(toInclusive - fromExclusive) value,
-    )
-  }
-
   /** This message creates a dummy commitment that can be persisted with store.storeReceived method.
     * It also returns the corresponding ReceivedAcsCommitment for comparison. The
     * ReceivedAcsCommitment is in state Outstanding.
     */
-  def createDummyReceivedCommitment(
-      synchronizerId: SynchronizerId,
+  private def createDummyReceivedCommitment(
+      synchronizerId: PhysicalSynchronizerId,
       remoteParticipant: ParticipantId,
       commitmentPeriod: CommitmentPeriod,
       hashingState: HashingState = new HashingState(),
@@ -221,7 +221,7 @@ sealed trait SyncStateInspectionTest
         testedProtocolVersion,
       )
     val signed =
-      SignedProtocolMessage.from(dummyCommitmentMsg, testedProtocolVersion, dummySignature)
+      SignedProtocolMessage.from(dummyCommitmentMsg, dummySignature)
     val received = ReceivedAcsCommitment(
       synchronizerId,
       commitmentPeriod,
@@ -235,14 +235,14 @@ sealed trait SyncStateInspectionTest
 
   /** This message creates a dummy commitment that can be persisted with store.storeComputed method.
     * It also returns the corresponding SentAcsCommitment for comparison. The SentAcsCommitment is
-    * in state Outstanding.
+    * in state not compared by default.
     */
-  def createDummyComputedCommitment(
+  private def createDummyComputedCommitment(
       synchronizerId: SynchronizerId,
       counterParticipant: ParticipantId,
       period: CommitmentPeriod,
       hashingState: HashingState = new HashingState(),
-      state: ValidSentPeriodState = CommitmentPeriodState.Outstanding,
+      state: ValidSentPeriodState = CommitmentPeriodState.NotCompared,
   ): (SentAcsCommitment, AcsCommitmentStore.ParticipantCommitmentData) = {
 
     val dummyCommitment = createDummyHash(hashingState.isOwnDefault)
@@ -262,14 +262,14 @@ sealed trait SyncStateInspectionTest
     (sent, commitmentData)
   }
 
-  lazy val intervalInt: Int = 1
-  lazy val interval: PositiveSeconds = PositiveSeconds.tryOfSeconds(intervalInt.toLong)
-  def ts(time: Int): CantonTimestamp = CantonTimestamp.ofEpochSecond(time.toLong)
-  def period(fromExclusive: Int, toInclusive: Int): CommitmentPeriod = CommitmentPeriod
+  private lazy val intervalInt: Int = 1
+  private lazy val interval: PositiveSeconds = PositiveSeconds.tryOfSeconds(intervalInt.toLong)
+  private def ts(time: Int): CantonTimestamp = CantonTimestamp.ofEpochSecond(time.toLong)
+  private def period(fromExclusive: Int, toInclusive: Int): CommitmentPeriod = CommitmentPeriod
     .create(ts(fromExclusive), ts(toInclusive), interval)
     .value
 
-  def periods(fromExclusive: Int, toInclusive: Int): NonEmpty[Set[CommitmentPeriod]] =
+  private def periods(fromExclusive: Int, toInclusive: Int): NonEmpty[Set[CommitmentPeriod]] =
     NonEmptyUtil
       .fromUnsafe(
         (fromExclusive until toInclusive by intervalInt).map { i =>
@@ -278,26 +278,26 @@ sealed trait SyncStateInspectionTest
       )
       .toSet
 
-  lazy val symbolicCrypto: SymbolicCrypto = SymbolicCrypto.create(
+  private lazy val symbolicCrypto: SymbolicCrypto = SymbolicCrypto.create(
     testedReleaseProtocolVersion,
     timeouts,
     loggerFactory,
   )
 
-  lazy val testKey: SigningPublicKey =
+  private lazy val testKey: SigningPublicKey =
     symbolicCrypto.generateSymbolicSigningKey(usage = SigningKeyUsage.ProtocolOnly)
 
   "fetch empty sets if no synchronizers exists" in {
     val (syncStateInspection, _) = buildSyncState()
     val crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
     val crossSynchronizerComputed = syncStateInspection.crossSynchronizerSentCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
@@ -307,16 +307,21 @@ sealed trait SyncStateInspectionTest
 
   "fetch empty sets if no commitments exists" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
     val crossSynchronizerComputed = syncStateInspection.crossSynchronizerSentCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
@@ -326,7 +331,12 @@ sealed trait SyncStateInspectionTest
 
   "fetch a received commitment if it has been stored" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -336,24 +346,29 @@ sealed trait SyncStateInspectionTest
 
     val (received, dummyCommitment) =
       createDummyReceivedCommitment(synchronizerId, remoteId, testPeriod)
+
     for {
       _ <- store.markOutstanding(NonEmptyUtil.fromElement(testPeriod), remoteIdNESet)
       _ <- store.storeReceived(dummyCommitment)
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
-    } yield crossSynchronizerReceived.value.toSet shouldBe Set(
-      received
-    )
+
+    } yield crossSynchronizerReceived.value.toSet shouldBe Set(received)
   }
 
   "fetch a computed commitment if it has been computed" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -372,7 +387,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -381,7 +396,12 @@ sealed trait SyncStateInspectionTest
 
   "fetch matched received and computed commitments with hashes" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -418,13 +438,13 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = true,
       )
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = true,
       )
@@ -438,7 +458,12 @@ sealed trait SyncStateInspectionTest
 
   "fetch buffering commitments" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -458,7 +483,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -469,8 +494,18 @@ sealed trait SyncStateInspectionTest
 
   "only fetch requested synchronizers" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
-    val store2 = addSynchronizerToSyncState(stateManager, synchronizerId2, synchronizerId2Alias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
+    val store2 = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId2,
+      synchronizerId2Alias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -528,13 +563,13 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -548,8 +583,18 @@ sealed trait SyncStateInspectionTest
 
   "fetch requested counter participant from multiple synchronizers" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
-    val store2 = addSynchronizerToSyncState(stateManager, synchronizerId2, synchronizerId2Alias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
+    val store2 = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId2,
+      synchronizerId2Alias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -635,13 +680,13 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod, synchronizerSearchPeriod2),
-        Seq(remoteId),
+        NonEmpty.from(Seq(remoteId)),
         Seq.empty,
         verbose = false,
       )
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod, synchronizerSearchPeriod2),
-        Seq(remoteId),
+        NonEmpty.from(Seq(remoteId)),
         Seq.empty,
         verbose = false,
       )
@@ -656,7 +701,12 @@ sealed trait SyncStateInspectionTest
 
   "only fetch requested states" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2) // period will be matches
     val testPeriod2 = period(2, 3) // period will be mismatched
     val testPeriod3 = period(3, 4) // period will be outstanding
@@ -698,6 +748,14 @@ sealed trait SyncStateInspectionTest
         synchronizerId,
         remoteId,
         testPeriod3,
+        state = CommitmentPeriodState.NotCompared,
+      )
+
+    val (receivedOutstanding, _) =
+      createDummyReceivedCommitment(
+        synchronizerId,
+        remoteId,
+        testPeriod3,
         state = CommitmentPeriodState.Outstanding,
       )
 
@@ -716,58 +774,58 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSentMatched = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq(CommitmentPeriodState.Matched),
         verbose = false,
       )
       crossSynchronizerSentMismatched = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq(CommitmentPeriodState.Mismatched),
         verbose = false,
       )
-      crossSynchronizerSentOutstanding = syncStateInspection
+      crossSynchronizerSentNotCompared = syncStateInspection
         .crossSynchronizerSentCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
-          Seq(CommitmentPeriodState.Outstanding),
+          None,
+          Seq(CommitmentPeriodState.NotCompared),
           verbose = false,
         )
       crossSynchronizerAll = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq(
           CommitmentPeriodState.Matched,
           CommitmentPeriodState.Mismatched,
-          CommitmentPeriodState.Outstanding,
+          CommitmentPeriodState.NotCompared,
         ),
         verbose = false,
       )
       crossSynchronizerReceivedMatched = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Matched),
           verbose = false,
         )
       crossSynchronizerReceivedMismatched = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Mismatched),
           verbose = false,
         )
       crossSynchronizerReceivedOutstanding = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Outstanding),
           verbose = false,
         )
       crossSynchronizerReceivedAll = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(
             CommitmentPeriodState.Matched,
             CommitmentPeriodState.Mismatched,
@@ -778,7 +836,7 @@ sealed trait SyncStateInspectionTest
     } yield {
       crossSynchronizerSentMatched.value.toSet shouldBe Set(sentMatched)
       crossSynchronizerSentMismatched.value.toSet shouldBe Set(sentMismatched)
-      crossSynchronizerSentOutstanding.value.toSet shouldBe Set(sentOutstanding)
+      crossSynchronizerSentNotCompared.value.toSet shouldBe Set(sentOutstanding)
       crossSynchronizerAll.value.toSet shouldBe Set(
         sentMatched,
         sentMismatched,
@@ -790,29 +848,42 @@ sealed trait SyncStateInspectionTest
       crossSynchronizerReceivedMismatched.value.toSet shouldBe Set(
         receivedMismatched
       )
-      crossSynchronizerReceivedOutstanding.value.toSet shouldBe Set.empty
+      crossSynchronizerReceivedOutstanding.value.toSet shouldBe Set(receivedOutstanding)
       crossSynchronizerReceivedAll.value.toSet shouldBe Set(
         receivedMatched,
         receivedMismatched,
+        receivedOutstanding,
       )
     }
   }
   "should fetch latest iteration if called with lastComputedAndSent" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
-      testPeriod.toInclusive.forgetRefinement,
+      testPeriod.toInclusive.forgetRefinement.minusMillis(1),
       testPeriod.toInclusive.forgetRefinement,
     )
-    val (sentMatched, dummySentCommitment) =
+    val (_, dummySentCommitment) =
       createDummyComputedCommitment(
         synchronizerId,
         remoteId,
         testPeriod,
-        state = CommitmentPeriodState.Outstanding,
+        state = CommitmentPeriodState.NotCompared,
       )
+
+    val (receivedCmt, _) = createDummyReceivedCommitment(
+      synchronizerId,
+      remoteId,
+      testPeriod,
+      state = CommitmentPeriodState.Outstanding,
+    )
     for {
       _ <- store.markOutstanding(NonEmptyUtil.fromElement(testPeriod), remoteIdNESet)
       nonEmpty = NonEmpty
@@ -820,18 +891,23 @@ sealed trait SyncStateInspectionTest
         .getOrElse(throw new IllegalStateException("How is this empty?"))
       _ <- store.storeComputed(nonEmpty)
 
-      crossSynchronizerReceived = syncStateInspection.crossSynchronizerSentCommitmentMessages(
+      crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
-    } yield crossSynchronizerReceived.value.toSet shouldBe Set(sentMatched)
+    } yield crossSynchronizerReceived.value.toSet shouldBe Set(receivedCmt)
   }
 
   "not include duplicates with overlapping time periods" in {
     val (syncStateInspection, stateManager) = buildSyncState()
-    val store = addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
+    val store = addSynchronizerToSyncState(
+      stateManager,
+      syncStateInspection,
+      synchronizerId,
+      synchronizerIdAlias,
+    )
     val testPeriod = period(1, 2)
     val synchronizerSearchPeriod = SynchronizerSearchCommitmentPeriod(
       indexedSynchronizer,
@@ -847,7 +923,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod, synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )

@@ -85,6 +85,7 @@ package http {
   import com.daml.ledger.api.v2.commands.Commands
   import com.digitalasset.daml.lf.data.Ref.{HexString, PackageId, PackageRef}
   import com.digitalasset.canton.fetchcontracts.`fc ErrorOps`
+  import com.digitalasset.canton.http.json.v1.PackageService
   import com.digitalasset.canton.topology.SynchronizerId
 
   import scala.annotation.nowarn
@@ -197,7 +198,9 @@ package http {
   final case object IdentityProviderAdmin extends UserRight
   final case class CanActAs(party: Party) extends UserRight
   final case class CanReadAs(party: Party) extends UserRight
+  final case class CanExecuteAs(party: Party) extends UserRight
   final case object CanReadAsAnyParty extends UserRight
+  final case object CanExecuteAsAnyParty extends UserRight
 
   object UserRights {
     import com.digitalasset.daml.lf.data.Ref
@@ -214,6 +217,9 @@ package http {
         case CanReadAs(party) =>
           Ref.Party.fromString(party.unwrap).map(LedgerUserRight.CanReadAs.apply).disjunction
         case CanReadAsAnyParty => \/.right(LedgerUserRight.CanReadAsAnyParty)
+        case CanExecuteAs(party) =>
+          Ref.Party.fromString(party.unwrap).map(LedgerUserRight.CanExecuteAs.apply).disjunction
+        case CanExecuteAsAnyParty => \/.right(LedgerUserRight.CanExecuteAsAnyParty)
       }
 
     def fromLedgerUserRights(input: Seq[LedgerUserRight]): List[UserRight] = input
@@ -221,10 +227,13 @@ package http {
         case LedgerUserRight.ParticipantAdmin => ParticipantAdmin
         case LedgerUserRight.IdentityProviderAdmin => IdentityProviderAdmin
         case LedgerUserRight.CanReadAsAnyParty => CanReadAsAnyParty
+        case LedgerUserRight.CanExecuteAsAnyParty => CanExecuteAsAnyParty
         case LedgerUserRight.CanActAs(party) =>
           CanActAs(Party(party: String))
         case LedgerUserRight.CanReadAs(party) =>
           CanReadAs(Party(party: String))
+        case LedgerUserRight.CanExecuteAs(party) =>
+          CanExecuteAs(Party(party: String))
       }
       .toList
   }
@@ -258,7 +267,10 @@ package http {
 
   final case class DeleteUserRequest(userId: String)
 
-  final case class AllocatePartyRequest(identifierHint: Option[Party])
+  final case class AllocatePartyRequest(
+      identifierHint: Option[Party],
+      synchronizerId: Option[String],
+  )
 
   // Important note: when changing this ADT, adapt the custom associated JsonFormat codec in JsonProtocol
   sealed abstract class DeduplicationPeriod extends Product with Serializable {
@@ -392,6 +404,7 @@ package http {
 
   object Contract {
 
+    // TODO(#23504) remove when TransactionTree is removed from the API
     @nowarn("cat=deprecation")
     def fromTransactionTree(
         tx: lav2.transaction.TransactionTree
@@ -400,6 +413,7 @@ package http {
       fromTreeEvents(events)
     }
 
+    // TODO(#23504) remove when TreeEvent is removed from the API
     @nowarn("cat=deprecation")
     private[this] def fromTreeEvents(
         events: Vector[lav2.transaction.TreeEvent]
@@ -862,10 +876,11 @@ package http {
     * expectation of what the resolved ID will be, or neither, which indicates that resolving what
     * kind of ID this is will be part of the resolution.
     *
-    * Built-in equality is solely determined by the triple of package ID, module name, entity name.
-    * This is because there are likely insidious expectations that this be true dating to before
-    * contract type IDs were distinguished at all, and we are only interested in distinguishing them
-    * statically, which these types do, and by pattern-matching, which does work.
+    * Built-in equality is solely determined by the triple of package name, module name, entity
+    * name. This is because there are likely insidious expectations that this be true dating to
+    * before contract type IDs were distinguished at all, and we are only interested in
+    * distinguishing them statically, which these types do, and by pattern-matching, which does
+    * work.
     *
     * {{{
     *   val selector: ContractTypeId[Unit] = Template((), "M", "E")

@@ -17,6 +17,8 @@ import com.digitalasset.canton.sequencer.admin.v30.{
   InitializeSequencerFromGenesisStateResponse,
   InitializeSequencerFromOnboardingStateRequest,
   InitializeSequencerFromOnboardingStateResponse,
+  InitializeSequencerFromPredecessorRequest,
+  InitializeSequencerFromPredecessorResponse,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.synchronizer.Synchronizer.FailedToInitialiseSynchronizerNode
@@ -27,6 +29,7 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.{
 }
 import com.digitalasset.canton.topology.TopologyManagerError
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
@@ -55,28 +58,62 @@ class GrpcSequencerInitializationService(
       responseObserver: StreamObserver[InitializeSequencerFromGenesisStateResponse]
   ): StreamObserver[InitializeSequencerFromGenesisStateRequest] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    GrpcStreamingUtils.streamFromClient(
+    GrpcStreamingUtils.streamFromClient[
+      InitializeSequencerFromGenesisStateRequest,
+      InitializeSequencerFromGenesisStateResponse,
+      Option[v30.StaticSynchronizerParameters],
+    ](
       _.topologySnapshot,
       _.synchronizerParameters,
-      (
-          topologySnapshot: ByteString,
-          synchronizerParams: Option[v30.StaticSynchronizerParameters],
-      ) => initializeSequencerFromGenesisState(topologySnapshot, synchronizerParams),
+      (topologySnapshot, synchronizerParams) =>
+        initializeSequencerFromState(
+          topologySnapshot,
+          synchronizerParams,
+          doResetTimes = true,
+        ).map(InitializeSequencerFromGenesisStateResponse(_)),
       responseObserver,
     )
   }
 
-  private def initializeSequencerFromGenesisState(
+  override def initializeSequencerFromPredecessor(
+      responseObserver: StreamObserver[InitializeSequencerFromPredecessorResponse]
+  ): StreamObserver[InitializeSequencerFromPredecessorRequest] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    GrpcStreamingUtils.streamFromClient[
+      InitializeSequencerFromPredecessorRequest,
+      InitializeSequencerFromPredecessorResponse,
+      Option[v30.StaticSynchronizerParameters],
+    ](
+      _.topologySnapshot,
+      _.synchronizerParameters,
+      (topologySnapshot, synchronizerParams) =>
+        initializeSequencerFromState(
+          topologySnapshot,
+          synchronizerParams,
+          doResetTimes = false,
+        ).map(_ => InitializeSequencerFromPredecessorResponse()),
+      responseObserver,
+    )
+  }
+
+  /** Use for major upgrades and logical upgrades
+    *
+    * @param doResetTimes
+    *   If sequenced and effective time should be set to MinValue Use true for major upgrades
+    * @return
+    *   True if the sequencer is replicated
+    */
+  private def initializeSequencerFromState(
       topologySnapshot: ByteString,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
-  )(implicit traceContext: TraceContext): Future[InitializeSequencerFromGenesisStateResponse] = {
-    val res: EitherT[Future, RpcError, InitializeSequencerFromGenesisStateResponse] = for {
+      doResetTimes: Boolean,
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    val res: EitherT[Future, RpcError, Boolean] = for {
       topologyState <- EitherT.fromEither[Future](
         StoredTopologyTransactions
           .fromTrustedByteString(topologySnapshot)
           .leftMap(ProtoDeserializationFailure.Wrap(_))
       )
-
       synchronizerParameters <- EitherT.fromEither[Future](
         ProtoConverter
           .parseRequired(
@@ -88,19 +125,7 @@ class GrpcSequencerInitializationService(
       )
       // reset effective time and sequenced time if we are initializing the sequencer from the beginning
       genesisState: StoredTopologyTransactions[TopologyChangeOp, TopologyMapping] =
-        StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
-          topologyState.result.map(stored =>
-            StoredTopologyTransaction(
-              SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-              EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-              stored.validUntil.map(_ =>
-                EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime)
-              ),
-              stored.transaction,
-              stored.rejectionReason,
-            )
-          )
-        )
+        if (doResetTimes) resetTimes(topologyState) else topologyState
 
       // check that the snapshot is consistent with respect to effective proposals and effective fully authorized transactions
       multipleEffectivePerUniqueKey = genesisState.result
@@ -153,7 +178,11 @@ class GrpcSequencerInitializationService(
         ),
       )
 
-      initializeRequest = InitializeSequencerRequest(genesisState, synchronizerParameters, None)
+      initializeRequest = InitializeSequencerRequest(
+        genesisState,
+        synchronizerParameters,
+        None,
+      )
       result <- handler
         .initialize(initializeRequest)
         .leftMap(FailedToInitialiseSynchronizerNode.Failure(_))
@@ -162,9 +191,27 @@ class GrpcSequencerInitializationService(
         RpcError,
         InitializeSequencerResponse,
       ]
-    } yield InitializeSequencerFromGenesisStateResponse(result.replicated)
+    } yield result.replicated
+
     mapErrNew(res)
   }
+
+  private def resetTimes(
+      snapshot: GenericStoredTopologyTransactions
+  ): GenericStoredTopologyTransactions =
+    StoredTopologyTransactions(
+      snapshot.result.map(stored =>
+        StoredTopologyTransaction(
+          SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+          EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+          stored.validUntil.map(_ =>
+            EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime)
+          ),
+          stored.transaction,
+          stored.rejectionReason,
+        )
+      )
+    )
 
   override def initializeSequencerFromOnboardingState(
       responseObserver: StreamObserver[InitializeSequencerFromOnboardingStateResponse]

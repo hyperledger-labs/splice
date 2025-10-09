@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.crypto.{
@@ -38,14 +39,9 @@ import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
   NoMediatorError,
   ProcessorError,
 }
-import com.digitalasset.canton.participant.protocol.conflictdetection.ActivenessResult
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.EncryptedViewMessageCreationError
-import com.digitalasset.canton.participant.protocol.{
-  ContractAuthenticator,
-  ProcessingSteps,
-  ProtocolProcessor,
-}
+import com.digitalasset.canton.participant.protocol.{ProcessingSteps, ProtocolProcessor}
 import com.digitalasset.canton.participant.store.ReassignmentStore.ReassignmentStoreError
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.*
@@ -58,17 +54,16 @@ import com.digitalasset.canton.protocol.messages.Verdict.{
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.time.SynchronizerTimeTracker
-import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, ReassignmentTag}
+import com.digitalasset.canton.util.{ContractAuthenticator, EitherTUtil, ReassignmentTag}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 
 import scala.collection.concurrent
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-trait ReassignmentProcessingSteps[
+private[reassignment] trait ReassignmentProcessingSteps[
     SubmissionParam,
     SubmissionResult,
     RequestViewType <: ReassignmentViewType,
@@ -83,7 +78,9 @@ trait ReassignmentProcessingSteps[
 
   val participantId: ParticipantId
 
-  val synchronizerId: ReassignmentTag[SynchronizerId]
+  val synchronizerId: ReassignmentTag[PhysicalSynchronizerId]
+
+  val protocolVersion: ReassignmentTag[ProtocolVersion]
 
   protected def contractAuthenticator: ContractAuthenticator
 
@@ -95,7 +92,7 @@ trait ReassignmentProcessingSteps[
 
   override type PendingSubmissions = concurrent.Map[RootHash, PendingReassignmentSubmission]
 
-  override type PendingSubmissionData = PendingReassignmentSubmission
+  override type PendingSubmissionData = Some[PendingReassignmentSubmission]
 
   override type RequestError = ReassignmentProcessorError
 
@@ -109,38 +106,38 @@ trait ReassignmentProcessingSteps[
   override type FullView <: FullReassignmentViewTree
   override type ParsedRequestType = ParsedReassignmentRequest[FullView]
 
+  protected def reassignmentId(
+      fullViewTree: FullView,
+      requestTimestamp: CantonTimestamp,
+  ): ReassignmentId
+
   override def embedNoMediatorError(error: NoMediatorError): ReassignmentProcessorError =
     GenericStepsError(error)
 
   override def removePendingSubmission(
       pendingSubmissions: concurrent.Map[RootHash, PendingReassignmentSubmission],
       pendingSubmissionId: RootHash,
-  ): Option[PendingReassignmentSubmission] =
+  ): Option[Some[PendingReassignmentSubmission]] =
     pendingSubmissions.remove(pendingSubmissionId).map { pending =>
       pending.decisionTimeTickRequestTracker.cancel()
-      pending
+      Some(pending)
     }
 
   override def setDecisionTimeTickRequest(
-      pendingSubmissions: concurrent.Map[RootHash, PendingReassignmentSubmission],
-      pendingSubmissionId: RootHash,
+      pendingSubmissionData: Some[PendingReassignmentSubmission],
       requestedTick: SynchronizerTimeTracker.TickRequest,
   ): Unit =
-    pendingSubmissions.get(pendingSubmissionId) match {
-      case Some(pendingSubmissionData) =>
-        pendingSubmissionData.decisionTimeTickRequestTracker.setRequest(requestedTick)
-      case None => requestedTick.cancel()
-    }
+    pendingSubmissionData.value.decisionTimeTickRequestTracker.setRequest(requestedTick)
 
   override def postProcessSubmissionRejectedCommand(
       error: TransactionError,
-      pendingSubmission: PendingReassignmentSubmission,
+      pendingSubmission: Some[PendingReassignmentSubmission],
   )(implicit traceContext: TraceContext): Unit =
-    pendingSubmission.reassignmentCompletion.success(error.rpcStatus())
+    pendingSubmission.value.reassignmentCompletion.success(error.rpcStatus())
 
   override def postProcessResult(
       verdict: Verdict,
-      pendingSubmission: PendingReassignmentSubmission,
+      pendingSubmission: Some[PendingReassignmentSubmission],
   )(implicit traceContext: TraceContext): Unit = {
     val status = verdict match {
       case _: Approve =>
@@ -148,14 +145,13 @@ trait ReassignmentProcessingSteps[
       case reject: MediatorReject =>
         reject.reason
       case reasons: ParticipantReject =>
-        reasons.keyEvent.reason
+        reasons.keyErrorDetails.reason
     }
-    pendingSubmission.reassignmentCompletion.success(status)
+    pendingSubmission.value.reassignmentCompletion.success(status)
   }
 
   def localRejectFromActivenessCheck(
       requestId: RequestId,
-      activenessResult: ActivenessResult,
       validationResult: ReassignmentValidationResult,
   ): Option[LocalRejectError]
 
@@ -164,21 +160,20 @@ trait ReassignmentProcessingSteps[
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, ReassignmentProcessorError, Unit] =
-    EitherT.fromEither(
-      contractAuthenticator
-        .authenticateSerializable(parsedRequest.fullViewTree.contract)
-        .leftMap[ReassignmentProcessorError](ContractError.apply)
-    )
+    // this check is implemented in the ReassignmentValidation.checkMetadata as part of the phase 3 and phase 7.
+    // TODO(i12928): Remove this method once the transaction validation has fixed the non-authenticated contract issue.
+    EitherTUtil.unit
 
   protected def performPendingSubmissionMapUpdate(
       pendingSubmissionMap: concurrent.Map[RootHash, PendingReassignmentSubmission],
       reassignmentRef: ReassignmentRef,
       submitterLf: LfPartyId,
       rootHash: RootHash,
-  ): EitherT[Future, ReassignmentProcessorError, PendingReassignmentSubmission] = {
-    val pendingSubmission = PendingReassignmentSubmission()
+      mkReassignmentId: CantonTimestamp => ReassignmentId,
+  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, PendingReassignmentSubmission] = {
+    val pendingSubmission = PendingReassignmentSubmission(mkReassignmentId)
     val existing = pendingSubmissionMap.putIfAbsent(rootHash, pendingSubmission)
-    EitherT.cond[Future](
+    EitherT.cond[FutureUnlessShutdown](
       existing.isEmpty,
       pendingSubmission,
       DuplicateReassignmentTreeHash(
@@ -253,7 +248,7 @@ trait ReassignmentProcessingSteps[
 
     val (WithRecipients(viewTree, recipients), signature) = rootViewsWithMetadata.head1
 
-    FutureUnlessShutdown.pure(
+    contractsMaybeUnknown(viewTree, snapshot).map(contractsMaybeUnknown =>
       ParsedReassignmentRequest(
         rc,
         ts,
@@ -263,24 +258,35 @@ trait ReassignmentProcessingSteps[
         signature,
         submitterMetadataO,
         isFreshOwnTimelyRequest,
+        contractsMaybeUnknown,
         malformedPayloads,
         mediator,
         snapshot,
         synchronizerParameters,
+        reassignmentId(viewTree, ts),
       )
     )
   }
+
+  protected def contractsMaybeUnknown(
+      fullView: FullView,
+      snapshot: SynchronizerSnapshotSyncCryptoApi,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Boolean]
 
   override def constructResponsesForMalformedPayloads(
       requestId: RequestId,
       rootHash: RootHash,
       malformedPayloads: Seq[MalformedPayload],
   )(implicit traceContext: TraceContext): Option[ConfirmationResponses] =
-    // TODO(i12926) This will crash the ConnectedSynchronizer
-    ErrorUtil.internalError(
-      new UnsupportedOperationException(
-        s"Received a unassignment/assignment request with id $requestId with all payloads being malformed. Crashing..."
-      )
+    ProcessingSteps.constructResponsesForMalformedPayloads(
+      requestId = requestId,
+      rootHash = rootHash,
+      malformedPayloads = malformedPayloads,
+      synchronizerId = synchronizerId.unwrap,
+      participantId = participantId,
+      protocolVersion = protocolVersion.unwrap,
     )
 
   override def eventAndSubmissionIdForRejectedCommand(
@@ -307,7 +313,7 @@ trait ReassignmentProcessingSteps[
       Update.SequencedCommandRejected(
         completionInfo,
         rejection,
-        synchronizerId.unwrap,
+        synchronizerId.unwrap.logical,
         ts,
       )
     )
@@ -318,7 +324,7 @@ trait ReassignmentProcessingSteps[
       traceContext: TraceContext
   ): Either[ReassignmentProcessorError, Option[SequencedUpdate]] = {
 
-    val RejectionArgs(pendingReassignment, rejectionReason) = rejectionArgs
+    val RejectionArgs(pendingReassignment, errorDetails) = rejectionArgs
     val isSubmittingParticipant =
       pendingReassignment.submitterMetadata.submittingParticipant == participantId
 
@@ -331,14 +337,13 @@ trait ReassignmentProcessingSteps[
         submissionId = pendingReassignment.submitterMetadata.submissionId,
       )
     )
-
-    rejectionReason.logRejection(Map("requestId" -> pendingReassignment.requestId.toString))
-    val rejection = Update.CommandRejected.FinalReason(rejectionReason.reason())
+    errorDetails.logRejection(Map("requestId" -> pendingReassignment.requestId.toString))
+    val rejection = Update.CommandRejected.FinalReason(errorDetails.reason)
     val updateO = completionInfoO.map(info =>
       Update.SequencedCommandRejected(
         info,
         rejection,
-        synchronizerId.unwrap,
+        synchronizerId.unwrap.logical,
         pendingReassignment.requestId.unwrap,
       )
     )
@@ -375,87 +380,151 @@ trait ReassignmentProcessingSteps[
 
   protected def createConfirmationResponses(
       requestId: RequestId,
-      topologySnapshot: TopologySnapshot,
+      malformedPayloads: Seq[MalformedPayload],
       protocolVersion: ProtocolVersion,
-      confirmingParties: Set[LfPartyId],
       validationResult: ReassignmentValidationResult,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[ConfirmationResponses]] =
-    for {
-      hostedConfirmingParties <-
-        if (validationResult.isReassigningParticipant)
-          topologySnapshot.canConfirm(
-            participantId,
-            confirmingParties,
+    if (malformedPayloads.nonEmpty) {
+      FutureUnlessShutdown.pure(
+        ProcessingSteps.constructResponsesForMalformedPayloads(
+          requestId = requestId,
+          rootHash = validationResult.rootHash,
+          malformedPayloads = malformedPayloads,
+          synchronizerId = synchronizerId.unwrap,
+          participantId = participantId,
+          protocolVersion = protocolVersion,
+        )
+      )
+    } else {
+      responsesForWellformedPayloads(
+        requestId,
+        protocolVersion,
+        validationResult,
+      )
+    }
+
+  private def responsesForWellformedPayloads(
+      requestId: RequestId,
+      protocolVersion: ProtocolVersion,
+      validationResult: ReassignmentValidationResult,
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[ConfirmationResponses]] =
+    NonEmpty.from(validationResult.hostedConfirmingReassigningParties).traverse {
+      hostedConfirmingParties =>
+        for {
+          contractAuthenticationResult <-
+            validationResult.commonValidationResult.contractAuthenticationResultF.value
+        } yield {
+          val authenticationErrorO =
+            validationResult.commonValidationResult.participantSignatureVerificationResult
+
+          val authenticationRejection = authenticationErrorO.map(err =>
+            LocalRejectError.MalformedRejects.MalformedRequest
+              .Reject(err.message)
           )
-        else
-          FutureUnlessShutdown.pure(Set.empty[LfPartyId])
 
-      metadataResult <-
-        if (hostedConfirmingParties.nonEmpty) validationResult.metadataResultET.value
-        else
-          FutureUnlessShutdown.pure(Right(()))
-    } yield {
-      if (hostedConfirmingParties.isEmpty) None
-      else {
-        val activenessResult = validationResult.activenessResult
-        val authenticationErrorO = validationResult.authenticationErrorO
+          val modelConformanceRejection = contractAuthenticationResult.swap.toSeq
+            .map(err => LocalRejectError.MalformedRejects.ModelConformance.Reject(err.toString))
 
-        val authenticationRejection = authenticationErrorO.map(err =>
-          LocalRejectError.MalformedRejects.MalformedRequest
-            .Reject(err.message)
-        )
+          val submitterCheckRejection = validationResult.commonValidationResult.submitterCheckResult
+            .map(err => LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message))
 
-        val modelConformanceRejection = metadataResult.swap.toSeq.map(err =>
-          LocalRejectError.MalformedRejects.ModelConformance.Reject(err.toString)
-        )
+          val reassignmentIdRejection = validationResult.commonValidationResult.reassignmentIdResult
+            .map(err =>
+              LocalRejectError.ReassignmentRejects.InconsistentReassignmentId.Reject(err.message)
+            )
 
-        val failedValidationRejection =
-          validationResult.validationErrors.map(err =>
+          val failedValidationRejection =
+            validationResult.reassigningParticipantValidationResult.errors
+              .map(err => LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message))
+
+          val activenessRejection =
+            localRejectFromActivenessCheck(requestId, validationResult)
+
+          val localRejections =
+            (modelConformanceRejection ++ activenessRejection.toList ++
+              authenticationRejection.toList ++ submitterCheckRejection ++ reassignmentIdRejection ++ failedValidationRejection)
+              .map { err =>
+                err.logWithContext()
+                err.toLocalReject(protocolVersion)
+              }
+
+          val (localVerdict, parties) = localRejections
+            .collectFirst[(LocalVerdict, Set[LfPartyId])] {
+              case malformed: LocalReject if malformed.isMalformed => malformed -> Set.empty
+              case localReject: LocalReject =>
+                localReject -> hostedConfirmingParties.forgetNE
+            }
+            .getOrElse(
+              LocalApprove(protocolVersion) -> hostedConfirmingParties.forgetNE
+            )
+
+          val confirmationResponses = checked(
+            ConfirmationResponses.tryCreate(
+              requestId,
+              validationResult.rootHash,
+              synchronizerId.unwrap,
+              participantId,
+              NonEmpty.mk(
+                Seq,
+                ConfirmationResponse
+                  .tryCreate(
+                    Some(ViewPosition.root),
+                    localVerdict,
+                    parties,
+                  ),
+              ),
+              protocolVersion,
+            )
+          )
+          confirmationResponses
+        }
+    }
+
+  /** During phase 7, the validations that should be checked are the validations that can be done on
+    * all participants, whether reassigning or non-reassigning participants. These checks include:
+    *   - Contract authentication check.
+    *   - Validation of the signature of the submitting participant.
+    *   - Checks related to the submitter party:
+    *     - Is the submitter a stakeholder?
+    *     - Is the submitter hosted on the participant?
+    *   - Is the reassignment id consistent with the reassignment data?
+    */
+  def checkPhase7Validations(
+      reassignmentValidationResult: ReassignmentValidationResult
+  ): FutureUnlessShutdown[Option[LocalRejectError]] =
+    reassignmentValidationResult.commonValidationResult.contractAuthenticationResultF.value.map {
+      contractAuthenticationResult =>
+        val modelConformanceRejection =
+          contractAuthenticationResult
+            .leftMap(error =>
+              LocalRejectError.MalformedRejects.ModelConformance.Reject(error.toString)
+            )
+            .swap
+            .toOption
+
+        val authenticationRejection =
+          reassignmentValidationResult.commonValidationResult.participantSignatureVerificationResult
+            .map(err =>
+              LocalRejectError.MalformedRejects.MalformedRequest
+                .Reject(err.message)
+            )
+
+        val submitterCheckRejection =
+          reassignmentValidationResult.commonValidationResult.submitterCheckResult.map(err =>
             LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message)
           )
 
-        val contractRejection =
-          localRejectFromActivenessCheck(requestId, activenessResult, validationResult)
-
-        val localRejections =
-          (modelConformanceRejection ++ contractRejection.toList ++ authenticationRejection.toList ++ failedValidationRejection)
-            .map { err =>
-              err.logWithContext()
-              err.toLocalReject(protocolVersion)
-            }
-
-        val (localVerdict, parties) = localRejections
-          .collectFirst[(LocalVerdict, Set[LfPartyId])] {
-            case malformed: LocalReject if malformed.isMalformed => malformed -> Set.empty
-            case localReject: LocalReject =>
-              localReject -> hostedConfirmingParties
-          }
-          .getOrElse(
-            LocalApprove(protocolVersion) -> hostedConfirmingParties
+        val reassignmentIdResult =
+          reassignmentValidationResult.commonValidationResult.reassignmentIdResult.map(err =>
+            LocalRejectError.ReassignmentRejects.InconsistentReassignmentId.Reject(err.message)
           )
 
-        val confirmationResponses = checked(
-          ConfirmationResponses.tryCreate(
-            requestId,
-            validationResult.rootHash,
-            synchronizerId.unwrap,
-            participantId,
-            NonEmpty.mk(
-              Seq,
-              ConfirmationResponse
-                .tryCreate(
-                  Some(ViewPosition.root),
-                  localVerdict,
-                  parties,
-                ),
-            ),
-            protocolVersion,
-          )
-        )
-        Some(confirmationResponses)
-      }
+        modelConformanceRejection
+          .orElse(authenticationRejection)
+          .orElse(submitterCheckRejection)
+          .orElse(reassignmentIdResult)
     }
 
 }
@@ -463,6 +532,7 @@ trait ReassignmentProcessingSteps[
 object ReassignmentProcessingSteps {
 
   final case class PendingReassignmentSubmission(
+      mkReassignmentId: CantonTimestamp => ReassignmentId,
       reassignmentCompletion: Promise[com.google.rpc.status.Status] =
         Promise[com.google.rpc.status.Status](),
       private[ReassignmentProcessingSteps] val decisionTimeTickRequestTracker: SynchronizerTimeTracker.TickRequestTracker =
@@ -478,10 +548,12 @@ object ReassignmentProcessingSteps {
       signatureO: Option[Signature],
       override val submitterMetadataO: Option[ReassignmentSubmitterMetadata],
       override val isFreshOwnTimelyRequest: Boolean,
+      areContractsUnknown: Boolean,
       override val malformedPayloads: Seq[MalformedPayload],
       override val mediator: MediatorGroupRecipient,
       override val snapshot: SynchronizerSnapshotSyncCryptoApi,
       override val synchronizerParameters: DynamicSynchronizerParametersWithValidity,
+      reassignmentId: ReassignmentId,
   ) extends ParsedRequest[ReassignmentSubmitterMetadata] {
     override def rootHash: RootHash = fullViewTree.rootHash
   }
@@ -500,7 +572,7 @@ object ReassignmentProcessingSteps {
 
   final case class RejectionArgs[T <: PendingReassignment](
       pendingReassignment: T,
-      error: TransactionRejection,
+      errorDetails: ErrorDetails,
   )
 
   trait ReassignmentProcessorError
@@ -531,8 +603,17 @@ object ReassignmentProcessingSteps {
 
   final case class ContractError(message: String) extends ReassignmentProcessorError
 
-  final case class UnknownSynchronizer(synchronizerId: SynchronizerId, context: String)
-      extends ReassignmentProcessorError {
+  final case class UnknownPhysicalSynchronizer(
+      physicalSynchronizerId: PhysicalSynchronizerId,
+      context: String,
+  ) extends ReassignmentProcessorError {
+    override def message: String = s"Unknown synchronizer $physicalSynchronizerId when $context"
+  }
+
+  final case class UnknownSynchronizer(
+      synchronizerId: SynchronizerId,
+      context: String,
+  ) extends ReassignmentProcessorError {
     override def message: String = s"Unknown synchronizer $synchronizerId when $context"
   }
 
@@ -542,19 +623,23 @@ object ReassignmentProcessingSteps {
     override def message: String = "Application is shutting down"
   }
 
-  final case class SynchronizerNotReady(synchronizerId: SynchronizerId, context: String)
+  final case class SynchronizerNotReady(synchronizerId: PhysicalSynchronizerId, context: String)
       extends ReassignmentProcessorError {
     override def message: String = s"Synchronizer $synchronizerId is not ready when $context"
   }
 
-  final case class ReassignmentParametersError(synchronizerId: SynchronizerId, context: String)
-      extends ReassignmentProcessorError {
+  final case class ReassignmentParametersError(
+      synchronizerId: PhysicalSynchronizerId,
+      context: String,
+  ) extends ReassignmentProcessorError {
     override def message: String =
       s"Unable to compute reassignment parameters for $synchronizerId: $context"
   }
 
-  final case class NoTimeProofFromSynchronizer(synchronizerId: SynchronizerId, reason: String)
-      extends ReassignmentProcessorError {
+  final case class NoTimeProofFromSynchronizer(
+      synchronizerId: PhysicalSynchronizerId,
+      reason: String,
+  ) extends ReassignmentProcessorError {
     override def message: String =
       s"Cannot fetch time proof for synchronizer `$synchronizerId`: $reason"
   }
@@ -565,19 +650,19 @@ object ReassignmentProcessingSteps {
     override def message: String = show"Unable to sign reassignment request. $cause"
   }
 
-  final case class NoStakeholders private (contractId: LfContractId)
+  final case class NoStakeholders private (contractIds: Seq[LfContractId])
       extends ReassignmentProcessorError {
-    override def message: String = s"Contract $contractId does not have any stakeholder"
+    override def message: String = s"Contracts $contractIds do not have any stakeholder"
   }
 
   object NoStakeholders {
-    def logAndCreate(contract: LfContractId, logger: TracedLogger)(implicit
+    def logAndCreate(contracts: Seq[LfContractId], logger: TracedLogger)(implicit
         tc: TraceContext
     ): NoStakeholders = {
       logger.error(
-        s"Attempting reassignment for contract $contract without stakeholders. All contracts should have stakeholders."
+        s"Attempting reassignment for contracts $contracts without stakeholders. All contracts should have stakeholders."
       )
-      NoStakeholders(contract)
+      NoStakeholders(contracts)
     }
   }
 
@@ -590,10 +675,10 @@ object ReassignmentProcessingSteps {
   }
 
   final case class EncryptionError(
-      contractId: LfContractId,
+      contractIds: Seq[LfContractId],
       error: EncryptedViewMessageCreationError,
   ) extends ReassignmentProcessorError {
-    override def message: String = s"Cannot reassign contract `$contractId`: encryption error"
+    override def message: String = s"Cannot reassign contracts `$contractIds`: encryption error"
   }
 
   final case class DuplicateReassignmentTreeHash(

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend
 
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForUpdatesLedgerEffects
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -72,12 +73,12 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
       executeSql(
         backend.event.fetchEventPayloadsLedgerEffects(
           EventPayloadSourceForUpdatesLedgerEffects.Create
-        )(List(1L), Some(Set.empty))
+        )(Ids(List(1L)), Some(Set.empty))
       ) ++
         executeSql(
           backend.event.fetchEventPayloadsLedgerEffects(
             EventPayloadSourceForUpdatesLedgerEffects.Consuming
-          )(List(2L), Some(Set.empty))
+          )(Ids(List(2L)), Some(Set.empty))
         )
 
     def parties = executeSql(backend.party.knownParties(None, 10))
@@ -98,14 +99,14 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
 
     def assignEvents = executeSql(
       backend.event.assignEventBatch(
-        eventSequentialIds = List(4),
+        eventSequentialIds = Ids(List(4)),
         allFilterParties = Some(Set.empty),
       )
     )
 
     def unassignEvents = executeSql(
       backend.event.unassignEventBatch(
-        eventSequentialIds = List(5),
+        eventSequentialIds = Ids(List(5)),
         allFilterParties = Some(Set.empty),
       )
     )
@@ -120,7 +121,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
       )
     )
 
-    def unassignIds = executeSql(
+    def reassignmentIds = executeSql(
       backend.event.fetchUnassignEventIdsForStakeholder(
         stakeholderO = Some(someParty),
         templateId = None,
@@ -140,7 +141,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
     assignEvents should not be empty
     unassignEvents should not be empty
     assignIds should not be empty
-    unassignIds should not be empty
+    reassignmentIds should not be empty
 
     // Reset
     executeSql(backend.reset.resetAll)
@@ -159,7 +160,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
     assignEvents shouldBe empty
     unassignEvents shouldBe empty
     assignIds shouldBe empty
-    unassignIds shouldBe empty
+    reassignmentIds shouldBe empty
   }
 
   // Some queries are protected to never return data beyond the current ledger end.

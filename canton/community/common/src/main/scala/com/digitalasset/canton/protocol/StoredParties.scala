@@ -17,7 +17,6 @@ import com.digitalasset.canton.version.{
 
 import scala.collection.immutable.SortedSet
 
-// TODO(#3256) get rid of, or at least simplify this; using an array would also allow us to remove the stakeholders_hash column in the commitment_snapshot table
 final case class StoredParties(parties: SortedSet[LfPartyId])
     extends HasVersionedWrapper[StoredParties] {
 
@@ -31,7 +30,7 @@ object StoredParties
     with HasVersionedMessageCompanionDbHelpers[StoredParties] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.StoredParties)(fromProtoV30),
       _.toProtoV30,
     )

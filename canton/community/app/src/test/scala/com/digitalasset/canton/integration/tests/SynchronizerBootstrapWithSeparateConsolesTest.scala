@@ -17,7 +17,12 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{ForceFlag, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ForceFlag,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 
 import scala.concurrent.duration.DurationInt
 
@@ -36,6 +41,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
   // in this test we interleave various consoles, but we can assume that the individual nodes all have
   // the synchronizerId in scope after the decentralized namespace definition
   protected var synchronizerId: SynchronizerId = _
+  protected var physicalSynchronizerId: PhysicalSynchronizerId = _
 
   "Nodes in separate consoles" should {
     "be able to bootstrap distributed synchronizer by exchanging files" in { implicit env =>
@@ -77,6 +83,9 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
             paramsFile
           )
         }
+
+        // load the static synchronizer parameters
+        val synchronizerParams = StaticSynchronizerParameters.tryReadFromFile(paramsFile)
 
         // Sequencer1 console:
         // * extract sequencer1's and mediator1's identity+pubkey topology transactions and share via files
@@ -125,9 +134,13 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
 
           // share the decentralized namespace declaration
           seq1DND.writeToFile(decentralizedNamespaceFile)
+
           synchronizerId = SynchronizerId(
             UniqueIdentifier.tryCreate(synchronizerName, seq1DND.mapping.namespace.toProtoPrimitive)
           )
+
+          physicalSynchronizerId =
+            PhysicalSynchronizerId(synchronizerId, synchronizerParams.toInternal)
         }
 
         // Sequencer2 console:
@@ -152,7 +165,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
 
           // generate and export the synchronizer bootstrap transactions with sequencer2's signature
           sequencer2.topology.synchronizer_bootstrap.download_genesis_topology(
-            synchronizerId,
+            physicalSynchronizerId,
             synchronizerOwners = Seq(sequencer1Id, sequencer2Id),
             sequencers = Seq(sequencer1Id, sequencer2Id),
             mediators = Seq(mediator1.id, mediator2.id),
@@ -183,7 +196,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
 
           // generate and export the synchronizer bootstrap transactions with sequencer1's signature
           sequencer1.topology.synchronizer_bootstrap.download_genesis_topology(
-            synchronizerId,
+            physicalSynchronizerId,
             synchronizerOwners = Seq(sequencer1Id, sequencer2Id),
             sequencers = Seq(sequencer1Id, sequencer2Id),
             mediators = Seq(mediator1.id, mediator2.id),
@@ -230,7 +243,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
         // * initialize mediator1 with the sequencer connection and synchronizer parameters
         {
           mediator1.setup.assign(
-            synchronizerId,
+            physicalSynchronizerId,
             SequencerConnections.single(sequencer1.sequencerConnection),
           )
           mediator1.health.wait_for_initialized()
@@ -240,7 +253,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
         // * initialize mediator2 with the sequencer connection and synchronizer parameters
         {
           mediator2.setup.assign(
-            synchronizerId,
+            physicalSynchronizerId,
             SequencerConnections.single(sequencer2.sequencerConnection),
           )
           mediator2.health.wait_for_initialized()

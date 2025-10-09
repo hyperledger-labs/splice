@@ -3,14 +3,13 @@
 
 package com.digitalasset.canton.participant.ledger.api
 
-import cats.Eval
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.participant.v30.{
   PackageServiceGrpc,
   PartyManagementServiceGrpc,
   PingServiceGrpc,
 }
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
@@ -48,12 +47,12 @@ import scala.concurrent.{ExecutionContextExecutor, blocking}
 class StartableStoppableLedgerApiDependentServices(
     config: ParticipantNodeConfig,
     parameters: ParticipantNodeParameters,
-    packageServiceE: Eval[PackageService],
+    packageService: PackageService,
     syncService: CantonSyncService,
     participantId: ParticipantId,
     clock: Clock,
     registry: CantonMutableHandlerRegistry,
-    adminToken: CantonAdminToken,
+    adminTokenDispenser: CantonAdminTokenDispenser,
     futureSupervisor: FutureSupervisor,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -95,8 +94,6 @@ class StartableStoppableLedgerApiDependentServices(
           case None =>
             logger.debug("Starting Ledger API-dependent canton services")
 
-            // Capture the packageService for this active session
-            val packageService = packageServiceE.value
             val adminWorkflowServices =
               new AdminWorkflowServices(
                 config,
@@ -104,7 +101,7 @@ class StartableStoppableLedgerApiDependentServices(
                 packageService,
                 syncService,
                 participantId,
-                adminToken,
+                adminTokenDispenser,
                 futureSupervisor,
                 loggerFactory,
                 clock,

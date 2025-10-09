@@ -20,7 +20,7 @@ import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.{
-  InternalStateService,
+  InternalIndexService,
   PruningResult,
   ReassignmentCommand,
   RoutingSynchronizerState,
@@ -31,14 +31,14 @@ import com.digitalasset.canton.ledger.participant.state.{
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.protocol.{LfContractId, LfSubmittedTransaction}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.protocol.{LfContractId, LfFatContractInst, LfSubmittedTransaction}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.{BaseTest, LfKeyResolver, LfPackageId, LfPartyId}
 import com.digitalasset.daml.lf.data.Ref.{CommandId, Party, SubmissionId, UserId, WorkflowId}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction}
+import com.digitalasset.daml.lf.transaction.SubmittedTransaction
 import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
@@ -156,13 +156,13 @@ object ApiPackageManagementServiceSpec {
       Future.successful(state.SubmissionResult.Acknowledged)
     }
 
-    override def internalStateService: Option[InternalStateService] =
+    override def internalIndexService: Option[InternalIndexService] =
       throw new UnsupportedOperationException()
 
-    override def registerInternalStateService(internalStateService: InternalStateService): Unit =
+    override def registerInternalIndexService(internalIndexService: InternalIndexService): Unit =
       throw new UnsupportedOperationException()
 
-    override def unregisterInternalStateService(): Unit =
+    override def unregisterInternalIndexService(): Unit =
       throw new UnsupportedOperationException()
 
     override def currentHealth(): HealthStatus =
@@ -177,7 +177,7 @@ object ApiPackageManagementServiceSpec {
         // Currently, the estimated interpretation cost is not used
         _estimatedInterpretationCost: Long,
         keyResolver: LfKeyResolver,
-        processedDisclosedContracts: ImmArray[FatContractInstance],
+        processedDisclosedContracts: ImmArray[LfFatContractInst],
     )(implicit
         traceContext: TraceContext
     ): CompletionStage[SubmissionResult] =
@@ -196,13 +196,13 @@ object ApiPackageManagementServiceSpec {
     override def allocateParty(
         hint: Party,
         submissionId: SubmissionId,
+        synchronizerIdO: Option[SynchronizerId],
     )(implicit traceContext: TraceContext): FutureUnlessShutdown[SubmissionResult] =
       throw new UnsupportedOperationException()
 
     override def prune(
         pruneUpToInclusive: Offset,
         submissionId: SubmissionId,
-        pruneAllDivulgedContracts: Boolean,
     ): CompletionStage[PruningResult] =
       throw new UnsupportedOperationException()
 
@@ -214,19 +214,19 @@ object ApiPackageManagementServiceSpec {
         routingSynchronizerState: RoutingSynchronizerState,
     )(implicit
         traceContext: TraceContext
-    ): FutureUnlessShutdown[Map[SynchronizerId, Map[LfPartyId, Set[LfPackageId]]]] =
+    ): FutureUnlessShutdown[Map[PhysicalSynchronizerId, Map[LfPartyId, Set[LfPackageId]]]] =
       throw new UnsupportedOperationException()
 
     override def computeHighestRankedSynchronizerFromAdmissible(
         submitterInfo: SubmitterInfo,
         transaction: LfSubmittedTransaction,
         transactionMeta: TransactionMeta,
-        admissibleSynchronizers: NonEmpty[Set[SynchronizerId]],
+        admissibleSynchronizers: NonEmpty[Set[PhysicalSynchronizerId]],
         disclosedContractIds: List[LfContractId],
         routingSynchronizerState: RoutingSynchronizerState,
     )(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerId] =
+    ): EitherT[FutureUnlessShutdown, TransactionRoutingError, PhysicalSynchronizerId] =
       throw new UnsupportedOperationException()
 
     override def selectRoutingSynchronizer(

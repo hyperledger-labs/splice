@@ -25,7 +25,7 @@ import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMess
 }
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
-  SerializableContractOfId,
+  ContractInstanceOfId,
   TransactionTreeConversionError,
 }
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
@@ -88,7 +88,7 @@ class TransactionConfirmationRequestFactory(
       mediator: MediatorGroupRecipient,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       sessionKeyStore: SessionKeyStore,
-      contractInstanceOfId: SerializableContractOfId,
+      contractInstanceOfId: ContractInstanceOfId,
       maxSequencingTime: CantonTimestamp,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -359,8 +359,7 @@ class TransactionConfirmationRequestFactory(
 object TransactionConfirmationRequestFactory {
   def apply(
       submitterNode: ParticipantId,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
+      synchronizerId: PhysicalSynchronizerId,
   )(
       cryptoOps: HashOps & HmacOps,
       seedGenerator: SeedGenerator,
@@ -372,7 +371,8 @@ object TransactionConfirmationRequestFactory {
       TransactionTreeFactoryImpl(
         submitterNode,
         synchronizerId,
-        protocolVersion,
+        // TODO(#23971): Make this dependent on the protocol version when introducing V2 contract IDs
+        AuthenticatedContractIdVersionV11,
         cryptoOps,
         loggerFactory,
       )

@@ -10,7 +10,7 @@ import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCryptoPureApi}
 import com.digitalasset.canton.store.db.{DbTest, PostgresTest}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.store.db.DbTopologyStoreHelper
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.store.{
@@ -33,7 +33,9 @@ abstract class InitialTopologySnapshotValidatorTest
   import Factory.*
 
   protected def mk(
-      store: TopologyStore[TopologyStoreId.SynchronizerStore] = mkStore(Factory.synchronizerId1a)
+      store: TopologyStore[TopologyStoreId.SynchronizerStore] = mkStore(
+        Factory.physicalSynchronizerId1a
+      )
   ): (InitialTopologySnapshotValidator, TopologyStore[TopologyStoreId.SynchronizerStore]) = {
 
     val validator = new InitialTopologySnapshotValidator(
@@ -132,7 +134,7 @@ abstract class InitialTopologySnapshotValidatorTest
       // construct a proto with multiple signatures, just like it would be deserialized from a pre-signature-deduplication snapshot
       val dnd_duplicate_k1_sig = {
         val dndProto = dnd.toProtoV30
-        val newSig = cryptoApi.crypto.privateCrypto
+        val newSig = syncCryptoClient.crypto.privateCrypto
           .sign(dnd.hash.hash, SigningKeys.key1.fingerprint, SigningKeyUsage.NamespaceOnly)
           .futureValueUS
           .value
@@ -150,7 +152,9 @@ abstract class InitialTopologySnapshotValidatorTest
       }
 
       dnd.signatures should not be dnd_duplicate_k1_sig.signatures
-      dnd.signatures.map(_.signedBy) shouldBe dnd_duplicate_k1_sig.signatures.map(_.signedBy)
+      dnd.signatures.map(_.authorizingLongTermKey) shouldBe dnd_duplicate_k1_sig.signatures.map(
+        _.authorizingLongTermKey
+      )
 
       val inputTransactions = List(
         ns1k1_k1 -> false, // whether to expire immediately or not
@@ -317,7 +321,7 @@ abstract class InitialTopologySnapshotValidatorTest
 
 class InitialTopologySnapshotValidatorTestInMemory extends InitialTopologySnapshotValidatorTest {
   protected def mkStore(
-      synchronizerId: SynchronizerId = SynchronizerId(Factory.uid1a)
+      synchronizerId: PhysicalSynchronizerId = Factory.physicalSynchronizerId1
   ): TopologyStore[TopologyStoreId.SynchronizerStore] =
     new InMemoryTopologyStore(
       TopologyStoreId.SynchronizerStore(synchronizerId),

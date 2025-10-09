@@ -6,7 +6,7 @@ package com.digitalasset.canton.integration.tests
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import com.daml.ledger.api.v2.completion.Completion
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import com.digitalasset.base
 import com.digitalasset.base.error.GrpcStatuses
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
@@ -48,7 +48,12 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.Submiss
 }
 import com.digitalasset.canton.synchronizer.sequencer.{HasProgrammableSequencer, SendDecision}
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{BaseTest, LedgerSubmissionId, config}
 import com.digitalasset.daml.lf.data.Ref
@@ -57,13 +62,11 @@ import org.scalatest.Assertion
 
 import java.time.Duration
 import scala.Ordered.orderingToOrdered
-import scala.annotation.nowarn
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 import DeduplicationPeriod.{DeduplicationDuration, DeduplicationOffset}
 
-@nowarn("cat=deprecation")
 trait CommandDeduplicationIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
@@ -95,7 +98,8 @@ trait CommandDeduplicationIntegrationTest
         participant1.synchronizers.connect_local(sequencer1, alias = daName)
         participant1.synchronizers.connect_local(sequencer2, alias = acmeName)
         participant1.dars.upload(CantonExamplesPath)
-        participant1.parties.enable("Alice")
+        participant1.parties.enable("Alice", synchronizer = daName)
+        participant1.parties.enable("Alice", synchronizer = acmeName)
       }
 
   private def checkAccepted(
@@ -134,7 +138,7 @@ trait CommandDeduplicationIntegrationTest
       val dedupPeriod1 = DeduplicationDuration(java.time.Duration.ofHours(1))
       val submissionId1 = "first-submission"
 
-      def submit(submissionId: String, dedupPeriod: DeduplicationPeriod): TransactionTree =
+      def submit(submissionId: String, dedupPeriod: DeduplicationPeriod): Transaction =
         participant1.ledger_api.javaapi.commands.submit(
           Seq(alice),
           Seq(createCycleContract),
@@ -328,7 +332,7 @@ trait CommandDeduplicationIntegrationTest
     WithContext { (alice, _) => implicit env =>
       import env.*
 
-      val bob = participant1.parties.enable("Bob")
+      val bob = participant1.parties.enable("Bob", synchronizer = daName)
 
       val createCycleContract =
         new C.Cycle(
@@ -377,7 +381,7 @@ trait CommandDeduplicationIntegrationTest
       commandId: String,
       submitter: PartyId,
       submissionId: String,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
   )(logEntry: LogEntry): Assertion =
     if (submissionId.nonEmpty) {
       val changeId = ChangeId(
@@ -440,7 +444,7 @@ trait CommandDeduplicationIntegrationTest
           commandId,
           alice,
           submissionId2,
-          initializedSynchronizers(daName).synchronizerId,
+          initializedSynchronizers(daName).physicalSynchronizerId,
         ),
       )
 
@@ -459,7 +463,7 @@ trait CommandDeduplicationIntegrationTest
           commandId,
           alice,
           submissionId3,
-          initializedSynchronizers(daName).synchronizerId,
+          initializedSynchronizers(daName).physicalSynchronizerId,
         ),
       )
 
@@ -516,7 +520,7 @@ trait CommandDeduplicationIntegrationTest
           commandId,
           alice,
           submissionId2,
-          initializedSynchronizers(daName).synchronizerId,
+          initializedSynchronizers(daName).physicalSynchronizerId,
         ),
       )
       simClock.advance(java.time.Duration.ofSeconds(1))
@@ -534,7 +538,7 @@ trait CommandDeduplicationIntegrationTest
           commandId,
           alice,
           submissionId3,
-          initializedSynchronizers(daName).synchronizerId,
+          initializedSynchronizers(daName).physicalSynchronizerId,
         ),
       )
 
@@ -646,7 +650,7 @@ trait CommandDeduplicationIntegrationTest
       val completionEnd = participant1.ledger_api.state.end()
       logger.debug("Submit first command via the command service")
       val submitF = Future {
-        participant1.ledger_api.javaapi.commands.submit_flat(
+        participant1.ledger_api.javaapi.commands.submit(
           Seq(alice),
           Seq(createCycleContract),
           synchronizerId = Some(daId),
@@ -670,7 +674,7 @@ trait CommandDeduplicationIntegrationTest
           commandId,
           alice,
           emptySubmissionId,
-          initializedSynchronizers(daName).synchronizerId,
+          initializedSynchronizers(daName).physicalSynchronizerId,
         ),
       )
 

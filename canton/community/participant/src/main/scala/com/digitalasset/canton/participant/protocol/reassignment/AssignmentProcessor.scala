@@ -10,23 +10,24 @@ import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.ViewType.AssignmentViewType
 import com.digitalasset.canton.lifecycle.PromiseUnlessShutdownFactory
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.protocol.ProtocolProcessor
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.ReassignmentProcessorError
 import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionSynchronizerTracker,
   SeedGenerator,
 }
-import com.digitalasset.canton.participant.protocol.{ContractAuthenticator, ProtocolProcessor}
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.client.SequencerClient
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
+import com.digitalasset.canton.util.ContractAuthenticator
 import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
 class AssignmentProcessor(
-    synchronizerId: Target[SynchronizerId],
+    synchronizerId: Target[PhysicalSynchronizerId],
     override val participantId: ParticipantId,
     staticSynchronizerParameters: Target[StaticSynchronizerParameters],
     reassignmentCoordination: ReassignmentCoordination,
@@ -52,6 +53,7 @@ class AssignmentProcessor(
         synchronizerId,
         participantId,
         reassignmentCoordination,
+        synchronizerCrypto,
         seedGenerator,
         ContractAuthenticator(synchronizerCrypto.pureCrypto),
         staticSynchronizerParameters,
@@ -62,8 +64,6 @@ class AssignmentProcessor(
       ephemeral,
       synchronizerCrypto,
       sequencerClient,
-      synchronizerId.unwrap,
-      targetProtocolVersion.unwrap,
       loggerFactory,
       futureSupervisor,
       promiseFactory,

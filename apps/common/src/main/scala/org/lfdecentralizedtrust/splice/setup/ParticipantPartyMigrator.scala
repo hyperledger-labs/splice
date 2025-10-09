@@ -4,11 +4,11 @@
 package org.lfdecentralizedtrust.splice.setup
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxOptionId
+import cats.syntax.option.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   ParticipantPermission,
@@ -121,7 +121,7 @@ class ParticipantPartyMigrator(
         )
         participantAdminConnection
           .listPartyToParticipant(
-            TopologyStoreId.SynchronizerStore(synchronizerId).some,
+            TopologyStoreId.Synchronizer(synchronizerId).some,
             filterParticipant = oldParticipantId.uid.toProtoPrimitive,
           )
           .map(_.map(_.mapping.partyId))
@@ -226,7 +226,7 @@ class ParticipantPartyMigrator(
       // Unhosting all parties first is a prerequisite for removing the domain trust certificate
       allHostedParties <- participantAdminConnection
         .listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(synchronizerId).some,
+          TopologyStoreId.Synchronizer(synchronizerId).some,
           filterParticipant = oldParticipantId.uid.toProtoPrimitive,
         )
         .map(_.map(_.mapping.partyId))
@@ -274,7 +274,7 @@ class ParticipantPartyMigrator(
         for {
           synchronizerId <- participantAdminConnection.getSynchronizerId(synchronizerAlias)
           _ <- participantAdminConnection.ensureTopologyMapping[PartyToParticipant](
-            store = TopologyStoreId.SynchronizerStore(synchronizerId),
+            store = TopologyStoreId.Synchronizer(synchronizerId),
             s"Party $partyId is hosted on participant $participantId",
             topologyTransactionType =>
               EitherT {

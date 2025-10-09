@@ -59,6 +59,7 @@ final class CommandServiceAuthorization(
     )(request)
   }
 
+  // TODO(#23504) remove this method once SubmitAndWaitForTransactionTreeResponse is removed from the API
   @nowarn("cat=deprecation")
   override def submitAndWaitForTransactionTree(
       request: SubmitAndWaitRequest

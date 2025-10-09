@@ -5,14 +5,13 @@ package com.digitalasset.canton.ledger.participant.state
 
 import com.daml.logging.entries.{LoggingEntry, LoggingValue, ToLoggingValue}
 import com.digitalasset.base.error.GrpcStatuses
+import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.RejectionReasonTemplate
-import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.LfHash
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext}
-import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.{RepairCounter, data}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
@@ -57,7 +56,7 @@ sealed trait Update extends Product with Serializable with PrettyPrinting with H
   def recordTime: CantonTimestamp
 }
 
-// TODO(i21341) this will be removed later as Topology Event project progresses
+// TODO(i25076) this will be removed later as Topology Event project progresses
 sealed trait ParticipantUpdate extends Update {
   def withRecordTime(recordTime: CantonTimestamp): Update
 
@@ -102,23 +101,6 @@ sealed trait RepairUpdate extends SynchronizerIndexUpdate {
   final override def repairCounterO: Option[RepairCounter] = Some(repairCounter)
 
   final override def sequencerIndexO: Option[SequencerIndex] = None
-}
-
-trait LapiCommitSet
-
-sealed trait CommitSetUpdate extends SequencedUpdate {
-  protected def commitSetO: Option[LapiCommitSet]
-
-  /** Expected to be set already when accessed
-    * @return
-    *   IllegalStateException if not set
-    */
-  def commitSet(implicit errorLoggingContext: ErrorLoggingContext): LapiCommitSet =
-    commitSetO.getOrElse(
-      ErrorUtil.invalidState("CommitSet not specified.")
-    )
-
-  def withCommitSet(commitSet: LapiCommitSet): CommitSetUpdate
 }
 
 object Update {
@@ -247,6 +229,10 @@ object Update {
     }
   }
 
+  sealed trait AcsChangeSequencedUpdate extends SynchronizerIndexUpdate {
+    def acsChangeFactory: AcsChangeFactory
+  }
+
   /** Signal the acceptance of a transaction.
     */
   trait TransactionAccepted extends SynchronizerIndexUpdate {
@@ -277,19 +263,24 @@ object Update {
 
     def updateId: data.UpdateId
 
-    /** For each contract created in this transaction, this map may contain contract metadata
-      * assigned by the ledger implementation. This data is opaque and can only be used in
+    /** For each contract created in this transaction, this map may contain contract authentication
+      * data assigned by the ledger implementation. This data is opaque and can only be used in
       * [[com.digitalasset.daml.lf.transaction.FatContractInstance]]s when submitting transactions
       * trough the [[SyncService]]. If a contract created by this transaction is not element of this
-      * map, its metadata is equal to the empty byte array.
+      * map, its authentication data is equal to the empty byte array.
       */
-    def contractMetadata: Map[Value.ContractId, Bytes]
+    def contractAuthenticationData: Map[Value.ContractId, Bytes]
+
+    def externalTransactionHash: Option[Hash]
+
+    def isAcsDelta(contractId: Value.ContractId): Boolean
 
     lazy val blindingInfo: BlindingInfo = Blinding.blind(transaction)
 
     override protected def pretty: Pretty[TransactionAccepted] =
       prettyOfClass(
         param("recordTime", _.recordTime),
+        paramIfDefined("repairCounter", _.repairCounterO),
         param("updateId", _.updateId),
         param("transactionMeta", _.transactionMeta),
         paramIfDefined("completion", _.completionInfoO),
@@ -319,23 +310,24 @@ object Update {
       transactionMeta: TransactionMeta,
       transaction: CommittedTransaction,
       updateId: data.UpdateId,
-      contractMetadata: Map[Value.ContractId, Bytes],
+      contractAuthenticationData: Map[Value.ContractId, Bytes],
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
-      commitSetO: Option[LapiCommitSet] = None,
+      acsChangeFactory: AcsChangeFactory,
+      externalTransactionHash: Option[Hash] = None,
   )(implicit override val traceContext: TraceContext)
       extends TransactionAccepted
       with SequencedUpdate
-      with CommitSetUpdate {
-    override def withCommitSet(commitSet: LapiCommitSet): CommitSetUpdate =
-      this.copy(commitSetO = Some(commitSet))
+      with AcsChangeSequencedUpdate {
+    override def isAcsDelta(contractId: Value.ContractId): Boolean =
+      acsChangeFactory.contractActivenessChanged(contractId)
   }
 
   final case class RepairTransactionAccepted(
       transactionMeta: TransactionMeta,
       transaction: CommittedTransaction,
       updateId: data.UpdateId,
-      contractMetadata: Map[Value.ContractId, Bytes],
+      contractAuthenticationData: Map[Value.ContractId, Bytes],
       synchronizerId: SynchronizerId,
       repairCounter: RepairCounter,
       recordTime: CantonTimestamp,
@@ -343,7 +335,11 @@ object Update {
       extends TransactionAccepted
       with RepairUpdate {
 
+    override def externalTransactionHash: Option[Hash] = None
     override def completionInfoO: Option[CompletionInfo] = None
+
+    // Repair transactions have only contracts which affect the ACS.
+    override def isAcsDelta(contractId: Value.ContractId): Boolean = true
   }
 
   trait ReassignmentAccepted extends SynchronizerIndexUpdate {
@@ -368,23 +364,18 @@ object Update {
       */
     def reassignmentInfo: ReassignmentInfo
 
-    def reassignment: Reassignment
+    def reassignment: Reassignment.Batch
 
     override protected def pretty: Pretty[ReassignmentAccepted] =
       prettyOfClass(
         param("recordTime", _.recordTime),
+        paramIfDefined("repairCounter", _.repairCounterO),
         param("updateId", _.updateId),
         paramIfDefined("completion", _.optCompletionInfo),
         param("source", _.reassignmentInfo.sourceSynchronizer),
         param("target", _.reassignmentInfo.targetSynchronizer),
-        unnamedParam(_.reassignment.kind.unquoted),
         indicateOmittedFields,
       )
-
-    final override def synchronizerId: SynchronizerId = reassignment match {
-      case _: Reassignment.Assign => reassignmentInfo.targetSynchronizer.unwrap
-      case _: Reassignment.Unassign => reassignmentInfo.sourceSynchronizer.unwrap
-    }
   }
 
   final case class SequencedReassignmentAccepted(
@@ -392,27 +383,42 @@ object Update {
       workflowId: Option[Ref.WorkflowId],
       updateId: data.UpdateId,
       reassignmentInfo: ReassignmentInfo,
-      reassignment: Reassignment,
+      reassignment: Reassignment.Batch,
       recordTime: CantonTimestamp,
-      commitSetO: Option[LapiCommitSet] = None,
+      override val synchronizerId: SynchronizerId,
+      acsChangeFactory: AcsChangeFactory,
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with SequencedUpdate
-      with CommitSetUpdate {
-    override def withCommitSet(commitSet: LapiCommitSet): CommitSetUpdate =
-      this.copy(commitSetO = Some(commitSet))
-  }
+      with AcsChangeSequencedUpdate
 
   final case class RepairReassignmentAccepted(
       workflowId: Option[Ref.WorkflowId],
       updateId: data.UpdateId,
       reassignmentInfo: ReassignmentInfo,
-      reassignment: Reassignment,
+      reassignment: Reassignment.Batch,
       repairCounter: RepairCounter,
       recordTime: CantonTimestamp,
+      override val synchronizerId: SynchronizerId,
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with RepairUpdate {
+    override def optCompletionInfo: Option[CompletionInfo] = None
+  }
+
+  final case class OnPRReassignmentAccepted(
+      workflowId: Option[Ref.WorkflowId],
+      updateId: data.UpdateId,
+      reassignmentInfo: ReassignmentInfo,
+      reassignment: Reassignment.Batch,
+      repairCounter: RepairCounter,
+      recordTime: CantonTimestamp,
+      override val synchronizerId: SynchronizerId,
+      acsChangeFactory: AcsChangeFactory,
+  )(implicit override val traceContext: TraceContext)
+      extends ReassignmentAccepted
+      with RepairUpdate
+      with AcsChangeSequencedUpdate {
     override def optCompletionInfo: Option[CompletionInfo] = None
   }
 
@@ -552,6 +558,28 @@ object Update {
         )
   }
 
+  final case class LogicalSynchronizerUpgradeTimeReached(
+      synchronizerId: SynchronizerId,
+      recordTime: CantonTimestamp,
+  )(implicit override val traceContext: TraceContext)
+      extends FloatingUpdate {
+    override protected def pretty: Pretty[LogicalSynchronizerUpgradeTimeReached] =
+      prettyOfClass(
+        param("synchronizerId", _.synchronizerId.uid),
+        param("sequencerTimestamp", _.recordTime),
+      )
+  }
+
+  object LogicalSynchronizerUpgradeTimeReached {
+    implicit val `LogicalSynchronizerUpgradeTimeReached to LoggingValue`
+        : ToLoggingValue[LogicalSynchronizerUpgradeTimeReached] =
+      logicalSynchronizerUpgradeTimeReached =>
+        LoggingValue.Nested.fromEntries(
+          Logging.synchronizerId(logicalSynchronizerUpgradeTimeReached.synchronizerId),
+          "sequencerTimestamp" -> logicalSynchronizerUpgradeTimeReached.recordTime.toInstant,
+        )
+  }
+
   final case class EmptyAcsPublicationRequired(
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
@@ -599,6 +627,11 @@ object Update {
       EmptyAcsPublicationRequired.`EmptyAcsPublicationRequired to LoggingValue`.toLoggingValue(
         update
       )
+    case update: LogicalSynchronizerUpgradeTimeReached =>
+      LogicalSynchronizerUpgradeTimeReached.`LogicalSynchronizerUpgradeTimeReached to LoggingValue`
+        .toLoggingValue(
+          update
+        )
     case update: SequencerIndexMoved =>
       SequencerIndexMoved.`SequencerIndexMoved to LoggingValue`.toLoggingValue(update)
     case _: CommitRepair =>

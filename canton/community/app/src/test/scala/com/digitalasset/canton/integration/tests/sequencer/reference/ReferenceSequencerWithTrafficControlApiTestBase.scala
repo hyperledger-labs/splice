@@ -12,10 +12,11 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveDou
 import com.digitalasset.canton.config.{
   BatchAggregatorConfig,
   BatchingConfig,
+  CachingConfigs,
+  DefaultProcessingTimeouts,
   ProcessingTimeout,
-  SessionSigningKeysConfig,
 }
-import com.digitalasset.canton.crypto.{HashPurpose, Signature, SynchronizerCryptoClient}
+import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
@@ -40,15 +41,22 @@ import com.digitalasset.canton.sequencing.traffic.{
 import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.synchronizer.metrics.{SequencerHistograms, SequencerMetrics}
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
-import com.digitalasset.canton.synchronizer.sequencer.store.DbSequencerStoreTest
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  SequencerNodeParameterConfig,
+  SequencerNodeParameters,
+}
+import com.digitalasset.canton.synchronizer.sequencer.store.{DbSequencerStore, DbSequencerStoreTest}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficConfig,
   TimestampSelector,
 }
-import com.digitalasset.canton.synchronizer.sequencer.{Sequencer, SequencerApiTestUtils}
+import com.digitalasset.canton.synchronizer.sequencer.{
+  Sequencer,
+  SequencerApiTestUtils,
+  SequencerWriterConfig,
+}
 import com.digitalasset.canton.synchronizer.sequencing.traffic.TrafficPurchasedManager.TrafficPurchasedManagerError
 import com.digitalasset.canton.synchronizer.sequencing.traffic.store.{
   TrafficConsumedStore,
@@ -128,6 +136,20 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
 
     val clock = new SimClock(loggerFactory = loggerFactory)
 
+    val sequencerStore = new DbSequencerStore(
+      storage = storage,
+      protocolVersion = testedProtocolVersion,
+      bufferedEventsMaxMemory = SequencerWriterConfig.DefaultBufferedEventsMaxMemory,
+      bufferedEventsPreloadBatchSize = SequencerWriterConfig.DefaultBufferedEventsPreloadBatchSize,
+      timeouts = DefaultProcessingTimeouts.testing,
+      loggerFactory = loggerFactory,
+      sequencerMember = SequencerId(DefaultTestIdentities.physicalSynchronizerId.uid),
+      blockSequencerMode = true,
+      cachingConfigs = CachingConfigs(),
+      batchingConfig = BatchingConfig(),
+      sequencerMetrics = SequencerMetrics.noop(getClass.getName),
+    )
+
     val currentBalances =
       TrieMap.empty[Member, Either[TrafficPurchasedManagerError, NonNegativeLong]]
     val trafficConsumedStore = TrafficConsumedStore(
@@ -135,6 +157,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
       timeouts = timeouts,
       loggerFactory = loggerFactory,
       batchingConfig = BatchingConfig(),
+      sequencerStore = sequencerStore,
     )
 
     val topology: TestingTopology =
@@ -259,7 +282,6 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ProcessingTimeout()
       ),
       protocol = CantonNodeParameters.Protocol.Impl(
-        sessionSigningKeys = SessionSigningKeysConfig.disabled,
         alphaVersionSupport = false,
         betaVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
@@ -282,6 +304,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         timeouts,
         loggerFactory,
         BatchAggregatorConfig.defaultsForTesting,
+        env.sequencerStore,
       ),
       sequencerTrafficConfig,
       futureSupervisor,
@@ -352,7 +375,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
     sequencer -> rateLimitManager
   }
 
-  def synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId
+  def synchronizerId: PhysicalSynchronizerId = DefaultTestIdentities.physicalSynchronizerId
 
   def mediatorId: MediatorId = DefaultTestIdentities.mediatorId
 
@@ -377,7 +400,6 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
       sequencerMetrics,
     )
       .create(
-        synchronizerId,
         SequencerId(synchronizerId.uid),
         clock,
         clock,
@@ -389,6 +411,8 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ),
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS
@@ -890,9 +914,9 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
                                      |  trafficState = TrafficState(extraTrafficLimit = 0, extraTrafficConsumed = 0, baseTrafficRemainder = 0, lastConsumedCost = 0, timestamp = ${event.timestamp}, serial = 1, availableTraffic = 0)
                                      |)""".stripMargin
           }
-          // 259 == raw byte size of the signed submission request
+          // 134L == raw byte size of the signed submission request
           eventually() {
-            assertLongValue("daml.sequencer.traffic-control.wasted-sequencing", 259L)
+            assertLongValue("daml.sequencer.traffic-control.wasted-sequencing", 134L)
           }
           assertMemberIsInContext("daml.sequencer.traffic-control.wasted-sequencing", sender)
           assertInContext(
@@ -1208,7 +1232,7 @@ object ReferenceSequencerWithTrafficControlApiTestBase {
         submissionTimestamp: Option[CantonTimestamp],
         latestSequencerEventTimestamp: Option[CantonTimestamp],
         warnIfApproximate: Boolean,
-        sequencerSignature: Signature,
+        orderingSequencerId: SequencerId,
     )(implicit
         tc: TraceContext,
         closeContext: CloseContext,
@@ -1222,7 +1246,7 @@ object ReferenceSequencerWithTrafficControlApiTestBase {
             submissionTimestamp,
             latestSequencerEventTimestamp,
             warnIfApproximate,
-            sequencerSignature,
+            orderingSequencerId,
           )
         )
   }

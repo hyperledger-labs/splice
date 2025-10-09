@@ -10,8 +10,10 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyNameOnlyCase, Prett
 import com.digitalasset.canton.sequencer.admin.v30.PeerEndpoint.Security
 import com.digitalasset.canton.sequencer.admin.v30.PeerEndpoint.Security.Empty
 import com.digitalasset.canton.sequencer.admin.v30.{
+  Authenticated as ProtoAuthenticated,
   GetOrderingTopologyResponse,
   GetPeerNetworkStatusResponse,
+  PeerConnectionStatus as ProtoPeerConnectionStatus,
   PeerEndpoint as ProtoPeerEndpoint,
   PeerEndpointHealth as ProtoPeerEndpointHealth,
   PeerEndpointHealthStatus as ProtoPeerEndpointHealthStatus,
@@ -21,10 +23,10 @@ import com.digitalasset.canton.sequencer.admin.v30.{
   TlsClientCertificate as ProtoTlsClientCertificate,
   TlsPeerEndpoint as ProtoTlsPeerEndpoint,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.SequencerNodeId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.topology.SequencerNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.topology.SequencerId
 
 import scala.util.{Failure, Success, Try}
@@ -36,9 +38,9 @@ object SequencerBftAdminData {
       endpoint.address,
       endpoint.port.unwrap,
       endpoint match {
-        case _: GrpcNetworking.PlainTextP2PEndpoint =>
+        case _: P2PGrpcNetworking.PlainTextP2PEndpoint =>
           ProtoPeerEndpoint.Security.PlainText(ProtoPlainTextPeerEndpoint())
-        case GrpcNetworking.TlsP2PEndpoint(clientConfig) =>
+        case P2PGrpcNetworking.TlsP2PEndpoint(clientConfig) =>
           ProtoPeerEndpoint.Security.Tls(
             ProtoTlsPeerEndpoint(
               clientConfig.tlsConfig.flatMap(_.trustCollectionFile).map(_.pemBytes),
@@ -67,13 +69,13 @@ object SequencerBftAdminData {
       port <- Port.create(peerEndpoint.port).fold(e => Left(e.message), Right(_))
       peerEndpointOrError: Either[String, P2PEndpoint] = peerEndpoint.security match {
         case _: Security.PlainText =>
-          Right(GrpcNetworking.PlainTextP2PEndpoint(address, port))
+          Right(P2PGrpcNetworking.PlainTextP2PEndpoint(address, port))
         case Security.Tls(tls) =>
           def rightTlsP2PEndpoint(
               clientCertificate: Option[TlsClientCertificate]
-          ): Right[String, GrpcNetworking.TlsP2PEndpoint] =
+          ): Right[String, P2PGrpcNetworking.TlsP2PEndpoint] =
             Right(
-              GrpcNetworking.TlsP2PEndpoint(
+              P2PGrpcNetworking.TlsP2PEndpoint(
                 P2PEndpointConfig(
                   address,
                   port,
@@ -122,6 +124,7 @@ object SequencerBftAdminData {
   sealed trait PeerEndpointHealthStatus extends PrettyNameOnlyCase with Serializable
   object PeerEndpointHealthStatus {
     case object UnknownEndpoint extends PeerEndpointHealthStatus
+    case object Disconnected extends PeerEndpointHealthStatus
     case object Unauthenticated extends PeerEndpointHealthStatus
     final case class Authenticated(sequencerId: SequencerId) extends PeerEndpointHealthStatus {
       override val pretty: Pretty[Authenticated.this.type] =
@@ -139,58 +142,91 @@ object SequencerBftAdminData {
       )
   }
 
-  final case class PeerEndpointStatus(
-      endpointId: P2PEndpoint.Id,
-      health: PeerEndpointHealth,
-  ) extends PrettyPrinting {
+  sealed trait PeerConnectionStatus extends PrettyPrinting with Product with Serializable {
+    def toProto: ProtoPeerConnectionStatus
+  }
+  object PeerConnectionStatus {
 
-    override val pretty: Pretty[PeerEndpointStatus] =
-      prettyOfClass(param("endpointId", _.endpointId), param("health", _.health))
+    final case class PeerEndpointStatus(
+        p2pEndpointId: P2PEndpoint.Id,
+        isOutgoingConnection: Boolean,
+        health: PeerEndpointHealth,
+    ) extends PeerConnectionStatus {
 
-    def toProto: ProtoPeerEndpointStatus =
-      ProtoPeerEndpointStatus(
-        Some(endpointIdToProto(endpointId)),
-        Some(
-          ProtoPeerEndpointHealth(
-            health.status match {
-              case PeerEndpointHealthStatus.UnknownEndpoint =>
-                Some(
-                  ProtoPeerEndpointHealthStatus(
-                    ProtoPeerEndpointHealthStatus.Status.UnknownEndpoint(
-                      ProtoPeerEndpointHealthStatus.UnknownEndpoint()
-                    )
-                  )
+      override val pretty: Pretty[PeerEndpointStatus] =
+        prettyOfClass(param("p2pEndpointId", _.p2pEndpointId), param("health", _.health))
+
+      def toProto: ProtoPeerConnectionStatus =
+        ProtoPeerConnectionStatus(
+          ProtoPeerConnectionStatus.Status.PeerEndpointStatus(
+            ProtoPeerEndpointStatus(
+              Some(endpointIdToProto(p2pEndpointId)),
+              isOutgoingConnection,
+              Some(
+                ProtoPeerEndpointHealth(
+                  health.status match {
+                    case PeerEndpointHealthStatus.UnknownEndpoint =>
+                      Some(
+                        ProtoPeerEndpointHealthStatus(
+                          ProtoPeerEndpointHealthStatus.Status.UnknownEndpoint(
+                            ProtoPeerEndpointHealthStatus.UnknownEndpoint()
+                          )
+                        )
+                      )
+                    case PeerEndpointHealthStatus.Disconnected =>
+                      Some(
+                        ProtoPeerEndpointHealthStatus(
+                          ProtoPeerEndpointHealthStatus.Status.Disconnected(
+                            ProtoPeerEndpointHealthStatus.Disconnected()
+                          )
+                        )
+                      )
+                    case PeerEndpointHealthStatus.Unauthenticated =>
+                      Some(
+                        ProtoPeerEndpointHealthStatus(
+                          ProtoPeerEndpointHealthStatus.Status.Unauthenticated(
+                            ProtoPeerEndpointHealthStatus.Unauthenticated()
+                          )
+                        )
+                      )
+                    case PeerEndpointHealthStatus.Authenticated(sequencerId) =>
+                      Some(
+                        ProtoPeerEndpointHealthStatus(
+                          ProtoPeerEndpointHealthStatus.Status.Authenticated(
+                            ProtoAuthenticated(sequencerId.toProtoPrimitive)
+                          )
+                        )
+                      )
+                  },
+                  health.description,
                 )
-              case PeerEndpointHealthStatus.Unauthenticated =>
-                Some(
-                  ProtoPeerEndpointHealthStatus(
-                    ProtoPeerEndpointHealthStatus.Status.Unauthenticated(
-                      ProtoPeerEndpointHealthStatus.Unauthenticated()
-                    )
-                  )
-                )
-              case PeerEndpointHealthStatus.Authenticated(sequencerId) =>
-                Some(
-                  ProtoPeerEndpointHealthStatus(
-                    ProtoPeerEndpointHealthStatus.Status.Authenticated(
-                      ProtoPeerEndpointHealthStatus.Authenticated(sequencerId.toProtoPrimitive)
-                    )
-                  )
-                )
-            },
-            health.description,
+              ),
+            )
           )
-        ),
-      )
+        )
+    }
+
+    final case class PeerIncomingConnection(sequencerId: SequencerId) extends PeerConnectionStatus {
+
+      override val pretty: Pretty[PeerIncomingConnection] =
+        prettyOfClass(param("sequencerId", _.sequencerId))
+
+      override def toProto: ProtoPeerConnectionStatus =
+        ProtoPeerConnectionStatus(
+          ProtoPeerConnectionStatus.Status.PeerIncomingConnection(
+            ProtoAuthenticated(sequencerId.toProtoPrimitive)
+          )
+        )
+    }
   }
 
-  final case class PeerNetworkStatus(endpointStatuses: Seq[PeerEndpointStatus])
+  final case class PeerNetworkStatus(endpointStatuses: Seq[PeerConnectionStatus])
       extends PrettyPrinting {
 
     override val pretty: Pretty[PeerNetworkStatus] =
       prettyOfClass(param("endpoint statuses", _.endpointStatuses))
 
-    def +(status: PeerEndpointStatus): PeerNetworkStatus =
+    def +(status: PeerConnectionStatus): PeerNetworkStatus =
       copy(endpointStatuses = endpointStatuses :+ status)
 
     def toProto: GetPeerNetworkStatusResponse =
@@ -201,45 +237,59 @@ object SequencerBftAdminData {
 
     def fromProto(response: GetPeerNetworkStatusResponse): Either[String, PeerNetworkStatus] =
       response.statuses
-        .map { status =>
-          for {
-            protoEndpointId <- status.endpointId.toRight("Endpoint ID is missing")
-            port <- Port.create(protoEndpointId.port).fold(e => Left(e.message), Right(_))
-            endpointId = P2PEndpoint.Id(
-              protoEndpointId.address,
-              port,
-              protoEndpointId.tls,
-            )
-            protoHealth <- status.health.toRight("Health is missing")
-            healthDescription = protoHealth.description
-            health <- protoHealth.status match {
-              case Some(
-                    ProtoPeerEndpointHealthStatus(
+        .map(_.status)
+        .map {
+          case ProtoPeerConnectionStatus.Status.PeerEndpointStatus(
+                ProtoPeerEndpointStatus(endpointId, isOutgoingConnection, health)
+              ) =>
+            for {
+              protoEndpointId <- endpointId.toRight("Endpoint ID is missing")
+              port <- Port.create(protoEndpointId.port).fold(e => Left(e.message), Right(_))
+              endpointId = P2PEndpoint.Id(
+                protoEndpointId.address,
+                port,
+                protoEndpointId.tls,
+              )
+              protoHealth <- health.toRight("Health is missing")
+              healthDescription = protoHealth.description
+              health <- protoHealth.status.toRight("Health status is missing")
+              healthStatus <- health match {
+                case ProtoPeerEndpointHealthStatus(
                       ProtoPeerEndpointHealthStatus.Status.UnknownEndpoint(_)
-                    )
-                  ) =>
-                Right(PeerEndpointHealthStatus.UnknownEndpoint)
-              case Some(
-                    ProtoPeerEndpointHealthStatus(
+                    ) =>
+                  Right(PeerEndpointHealthStatus.UnknownEndpoint)
+                case ProtoPeerEndpointHealthStatus(
                       ProtoPeerEndpointHealthStatus.Status.Unauthenticated(_)
-                    )
-                  ) =>
-                Right(PeerEndpointHealthStatus.Unauthenticated)
-              case Some(
-                    ProtoPeerEndpointHealthStatus(
+                    ) =>
+                  Right(PeerEndpointHealthStatus.Unauthenticated)
+                case ProtoPeerEndpointHealthStatus(
+                      ProtoPeerEndpointHealthStatus.Status.Disconnected(_)
+                    ) =>
+                  Right(PeerEndpointHealthStatus.Disconnected)
+                case ProtoPeerEndpointHealthStatus(
                       ProtoPeerEndpointHealthStatus.Status.Authenticated(
-                        ProtoPeerEndpointHealthStatus.Authenticated(sequencerIdString)
+                        ProtoAuthenticated(sequencerIdString)
                       )
-                    )
-                  ) =>
-                SequencerId
-                  .fromProtoPrimitive(sequencerIdString, "sequencerId")
-                  .leftMap(_.toString)
-                  .map(PeerEndpointHealthStatus.Authenticated(_))
-              case _ =>
-                Left("Health status is empty")
-            }
-          } yield PeerEndpointStatus(endpointId, PeerEndpointHealth(health, healthDescription))
+                    ) =>
+                  SequencerId
+                    .fromProtoPrimitive(sequencerIdString, "sequencerId")
+                    .leftMap(_.toString)
+                    .map(PeerEndpointHealthStatus.Authenticated(_))
+                case value =>
+                  Left(s"Health status is empty $value")
+              }
+            } yield PeerConnectionStatus.PeerEndpointStatus(
+              endpointId,
+              isOutgoingConnection,
+              PeerEndpointHealth(healthStatus, healthDescription),
+            )
+          case ProtoPeerConnectionStatus.Status.PeerIncomingConnection(authenticated) =>
+            SequencerId
+              .fromProtoPrimitive(authenticated.sequencerId, "sequencerId")
+              .leftMap(_.message)
+              .map(PeerConnectionStatus.PeerIncomingConnection(_))
+          case _ =>
+            Left("Peer connection status is empty")
         }
         .sequence
         .map(PeerNetworkStatus(_))

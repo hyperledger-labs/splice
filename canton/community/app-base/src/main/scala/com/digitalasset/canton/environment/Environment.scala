@@ -144,7 +144,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
   ): HealthDumpGenerator =
-    new HealthDumpGenerator(this, commandRunner)
+    new HealthDumpGenerator(this, commandRunner, loggerFactory)
 
   /* We can't reliably use the health administration instance of the console because:
    * 1) it's tied to the console environment, which we don't have access to yet when the environment is instantiated
@@ -327,7 +327,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     * started nodes will not be stopped.
     */
   def startAndReconnect(runner: => Unit = ()): Either[StartupError, Unit] =
-    withNewTraceContext { implicit traceContext =>
+    withNewTraceContext("env_start_reconnect") { implicit traceContext =>
       if (config.parameters.manualStart) {
         logger.info("Manual start requested.")
         Right(runner)

@@ -16,7 +16,7 @@ import com.daml.ledger.api.v2.state_service.{
   GetLedgerEndRequest,
   GetLedgerEndResponse,
 }
-import com.daml.ledger.api.v2.transaction_filter.TransactionFilter
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, TransactionFilter}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
@@ -25,15 +25,19 @@ import org.apache.pekko.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class StateServiceClient(service: StateServiceStub)(implicit
+class StateServiceClient(
+    service: StateServiceStub,
+    getDefaultToken: () => Option[String] = () => None,
+)(implicit
     ec: ExecutionContext,
     esf: ExecutionSequencerFactory,
 ) {
 
   /** Returns a stream of GetActiveContractsResponse messages. */
+  // TODO(#23504) remove when TransactionFilter is removed
   @deprecated(
     "Use getActiveContractsSource with EventFormat instead",
-    "3.3.0",
+    "3.4.0",
   )
   def getActiveContractsSource(
       filter: TransactionFilter,
@@ -49,19 +53,37 @@ class StateServiceClient(service: StateServiceStub)(implicit
           activeAtOffset = validAtOffset,
           eventFormat = None,
         ),
-        LedgerClient.stubWithTracing(service, token).getActiveContracts,
+        LedgerClient.stubWithTracing(service, token.orElse(getDefaultToken())).getActiveContracts,
+      )
+
+  /** Returns a stream of GetActiveContractsResponse messages. */
+  def getActiveContractsSource(
+      eventFormat: EventFormat,
+      validAtOffset: Long,
+      token: Option[String],
+  )(implicit traceContext: TraceContext): Source[GetActiveContractsResponse, NotUsed] =
+    ClientAdapter
+      .serverStreaming(
+        GetActiveContractsRequest(
+          filter = None,
+          verbose = false,
+          activeAtOffset = validAtOffset,
+          eventFormat = Some(eventFormat),
+        ),
+        LedgerClient.stubWithTracing(service, token.orElse(getDefaultToken())).getActiveContracts,
       )
 
   /** Returns the resulting active contract set */
+  // TODO(#23504) remove when TransactionFilter is removed
   @deprecated(
     "Use getActiveContracts with EventFormat instead",
-    "3.3.0",
+    "3.4.0",
   )
   def getActiveContracts(
       filter: TransactionFilter,
       validAtOffset: Long,
-      verbose: Boolean = false,
-      token: Option[String] = None,
+      verbose: Boolean,
+      token: Option[String],
   )(implicit
       materializer: Materializer,
       traceContext: TraceContext,
@@ -75,11 +97,29 @@ class StateServiceClient(service: StateServiceStub)(implicit
         }
     } yield active
 
+  /** Returns the resulting active contract set */
+  def getActiveContracts(
+      eventFormat: EventFormat,
+      validAtOffset: Long,
+      token: Option[String] = None,
+  )(implicit
+      materializer: Materializer,
+      traceContext: TraceContext,
+  ): Future[Seq[ActiveContract]] =
+    for {
+      contracts <- getActiveContractsSource(eventFormat, validAtOffset, token).runWith(Sink.seq)
+      active = contracts
+        .map(_.contractEntry)
+        .collect { case ContractEntry.ActiveContract(value) =>
+          value
+        }
+    } yield active
+
   def getLedgerEnd(
       token: Option[String] = None
   )(implicit traceContext: TraceContext): Future[GetLedgerEndResponse] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .getLedgerEnd(GetLedgerEndRequest())
 
   /** Get the current participant offset */
@@ -93,11 +133,12 @@ class StateServiceClient(service: StateServiceStub)(implicit
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[GetConnectedSynchronizersResponse] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .getConnectedSynchronizers(
         GetConnectedSynchronizersRequest(
           party = party,
           participantId = "",
+          identityProviderId = "",
         )
       )
 }

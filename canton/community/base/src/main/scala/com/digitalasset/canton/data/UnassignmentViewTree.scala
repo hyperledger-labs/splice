@@ -3,8 +3,14 @@
 
 package com.digitalasset.canton.data
 
-import cats.syntax.traverse.*
-import com.digitalasset.canton.ProtoDeserializationError.OtherError
+import cats.syntax.either.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.toTraverseOps
+import com.digitalasset.canton.ProtoDeserializationError.{
+  ContractDeserializationError,
+  InvariantViolation,
+  OtherError,
+}
 import com.digitalasset.canton.ReassignmentCounter
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.MerkleTree.RevealSubtree
@@ -15,7 +21,7 @@ import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, TimeProof}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
@@ -85,7 +91,7 @@ object UnassignmentViewTree
   override val name: String = "UnassignmentViewTree"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ReassignmentViewTree)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ReassignmentViewTree)(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
       _.toProtoV30,
     )
@@ -143,7 +149,7 @@ object UnassignmentViewTree
   */
 final case class UnassignmentCommonData private (
     override val salt: Salt,
-    sourceSynchronizerId: Source[SynchronizerId],
+    sourceSynchronizerId: Source[PhysicalSynchronizerId],
     sourceMediatorGroup: MediatorGroupRecipient,
     stakeholders: Stakeholders,
     reassigningParticipants: Set[ParticipantId],
@@ -165,7 +171,7 @@ final case class UnassignmentCommonData private (
   protected def toProtoV30: v30.UnassignmentCommonData =
     v30.UnassignmentCommonData(
       salt = Some(salt.toProtoV30),
-      sourceSynchronizerId = sourceSynchronizerId.unwrap.toProtoPrimitive,
+      sourcePhysicalSynchronizerId = sourceSynchronizerId.unwrap.toProtoPrimitive,
       sourceMediatorGroup = sourceMediatorGroup.group.value,
       stakeholders = Some(stakeholders.toProtoV30),
       uuid = ProtoConverter.UuidConverter.toProtoPrimitive(uuid),
@@ -197,7 +203,7 @@ object UnassignmentCommonData
   override val name: String = "UnassignmentCommonData"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.UnassignmentCommonData)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.UnassignmentCommonData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30,
     )
@@ -205,7 +211,7 @@ object UnassignmentCommonData
 
   def create(hashOps: HashOps)(
       salt: Salt,
-      sourceSynchronizer: Source[SynchronizerId],
+      sourceSynchronizer: Source[PhysicalSynchronizerId],
       sourceMediatorGroup: MediatorGroupRecipient,
       stakeholders: Stakeholders,
       reassigningParticipants: Set[ParticipantId],
@@ -240,8 +246,8 @@ object UnassignmentCommonData
 
     for {
       salt <- ProtoConverter.parseRequired(Salt.fromProtoV30, "salt", saltP)
-      sourceSynchronizerId <- SynchronizerId
-        .fromProtoPrimitive(sourceSynchronizerP, "source_synchronizer")
+      sourceSynchronizerId <- PhysicalSynchronizerId
+        .fromProtoPrimitive(sourceSynchronizerP, "source_physical_synchronizer_id")
         .map(Source(_))
       sourceMediatorGroup <- ProtoConverter.parseNonNegativeInt(
         "source_mediator_group",
@@ -293,11 +299,9 @@ object UnassignmentCommonData
   */
 final case class UnassignmentView private (
     override val salt: Salt,
-    contract: SerializableContract,
-    targetSynchronizerId: Target[SynchronizerId],
+    contracts: ContractsReassignmentBatch,
+    targetSynchronizerId: Target[PhysicalSynchronizerId],
     targetTimeProof: TimeProof,
-    targetProtocolVersion: Target[ProtocolVersion],
-    reassignmentCounter: ReassignmentCounter,
 )(
     hashOps: HashOps,
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -318,22 +322,23 @@ final case class UnassignmentView private (
   protected def toProtoV30: v30.UnassignmentView =
     v30.UnassignmentView(
       salt = Some(salt.toProtoV30),
-      targetSynchronizerId = targetSynchronizerId.unwrap.toProtoPrimitive,
+      targetPhysicalSynchronizerId = targetSynchronizerId.unwrap.toProtoPrimitive,
       targetTimeProof = Some(targetTimeProof.toProtoV30),
-      targetProtocolVersion = targetProtocolVersion.unwrap.toProtoPrimitive,
-      reassignmentCounter = reassignmentCounter.toProtoPrimitive,
-      contract = Some(contract.toProtoV30),
+      contracts = contracts.contracts.map { reassign =>
+        v30.ActiveContract(
+          reassign.contract.encoded,
+          reassign.counter.toProtoPrimitive,
+        )
+      },
     )
 
   override protected def pretty: Pretty[UnassignmentView] = prettyOfClass(
-    param("template id", _.templateId),
+    param("template ids", _.contracts.contracts.map(_.templateId).toSet),
     param("target synchronizer id", _.targetSynchronizerId),
     param("target time proof", _.targetTimeProof),
-    param("target protocol version", _.targetProtocolVersion),
-    param("reassignment counter", _.reassignmentCounter),
     param(
-      "contract id",
-      _.contract.contractId,
+      "contracts",
+      _.contracts.contractIds,
     ), // do not log contract details because it contains confidential data
     param("salt", _.salt),
   )
@@ -343,7 +348,7 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
   override val name: String = "UnassignmentView"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.UnassignmentView)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.UnassignmentView)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30,
     )
@@ -351,20 +356,16 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
 
   def create(hashOps: HashOps)(
       salt: Salt,
-      contract: SerializableContract,
-      targetSynchronizer: Target[SynchronizerId],
+      contracts: ContractsReassignmentBatch,
+      targetSynchronizer: Target[PhysicalSynchronizerId],
       targetTimeProof: TimeProof,
       sourceProtocolVersion: Source[ProtocolVersion],
-      targetProtocolVersion: Target[ProtocolVersion],
-      reassignmentCounter: ReassignmentCounter,
   ): UnassignmentView =
     UnassignmentView(
       salt,
-      contract,
+      contracts,
       targetSynchronizer,
       targetTimeProof,
-      targetProtocolVersion,
-      reassignmentCounter,
     )(hashOps, protocolVersionRepresentativeFor(sourceProtocolVersion.unwrap), None)
 
   private[this] def fromProtoV30(hashOps: HashOps, unassignmentViewP: v30.UnassignmentView)(
@@ -374,32 +375,36 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
       saltP,
       targetSynchronizerIdP,
       targetTimeProofP,
-      targetProtocolVersionP,
-      reassignmentCounterP,
-      contractPO,
+      contractsP,
     ) = unassignmentViewP
 
     for {
       salt <- ProtoConverter.parseRequired(Salt.fromProtoV30, "salt", saltP)
-      targetSynchronizerId <- SynchronizerId.fromProtoPrimitive(
+      targetSynchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
         targetSynchronizerIdP,
-        "targetSynchronizerId",
+        "targetPhysicalSynchronizerId",
       )
-      targetProtocolVersion <- ProtocolVersion.fromProtoPrimitive(targetProtocolVersionP)
       targetTimeProof <- ProtoConverter
         .required("targetTimeProof", targetTimeProofP)
-        .flatMap(TimeProof.fromProtoV30(targetProtocolVersion, hashOps))
-      contract <- ProtoConverter
-        .required("UnassignmentViewTree.contract", contractPO)
-        .flatMap(SerializableContract.fromProtoV30)
+        .flatMap(TimeProof.fromProtoV30(targetSynchronizerId.protocolVersion, hashOps))
+      contracts <- contractsP
+        .traverse { case v30.ActiveContract(contractP, reassignmentCounterP) =>
+          ContractInstance
+            .decodeWithCreatedAt(contractP)
+            .leftMap(err => ContractDeserializationError(err))
+            .map(_ -> ReassignmentCounter(reassignmentCounterP))
+        }
+        .flatMap(
+          ContractsReassignmentBatch
+            .create(_)
+            .leftMap(err => InvariantViolation(Some("contracts"), err.toString))
+        )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield UnassignmentView(
       salt,
-      contract,
+      contracts,
       Target(targetSynchronizerId),
       targetTimeProof,
-      Target(targetProtocolVersion),
-      ReassignmentCounter(reassignmentCounterP),
     )(
       hashOps,
       rpv,
@@ -423,14 +428,14 @@ final case class FullUnassignmentTree(tree: UnassignmentViewTree)
   protected[this] val commonData: UnassignmentCommonData = tree.commonData.tryUnwrap
   protected[this] val view: UnassignmentView = tree.view.tryUnwrap
 
-  override def reassignmentRef: ContractIdRef = ContractIdRef(contractId)
+  override def reassignmentRef: ContractIdRef = ContractIdRef(contracts.contractIds.toSet)
 
   // Synchronizers
-  override def synchronizerId: SynchronizerId = sourceSynchronizer.unwrap
-  override def sourceSynchronizer: Source[SynchronizerId] = commonData.sourceSynchronizerId
-  override def targetSynchronizer: Target[SynchronizerId] = view.targetSynchronizerId
+  override def synchronizerId: PhysicalSynchronizerId = commonData.sourceSynchronizerId.unwrap
+  override def sourceSynchronizer: Source[PhysicalSynchronizerId] = commonData.sourceSynchronizerId
+  override def targetSynchronizer: Target[PhysicalSynchronizerId] = view.targetSynchronizerId
   def targetTimeProof: TimeProof = view.targetTimeProof
-  def targetProtocolVersion: Target[ProtocolVersion] = view.targetProtocolVersion
+  def targetProtocolVersion: Target[ProtocolVersion] = targetSynchronizer.map(_.protocolVersion)
 
   def mediatorMessage(
       submittingParticipantSignature: Signature,

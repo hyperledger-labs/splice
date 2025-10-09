@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
@@ -122,7 +122,7 @@ abstract class TransferInputStoreTest extends StoreTest {
       amuletPrice: Double = 1.0,
   )(
       offset: Long
-  ): TransactionTree = {
+  ): Transaction = {
     val amuletContract = amulet(receiver, amount, round, ratePerRound)
 
     // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist

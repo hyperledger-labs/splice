@@ -132,7 +132,8 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       val name = "dummy" + env.environment.config.name.getOrElse("")
       bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties
         .allocate(
-          name
+          name,
+          synchronizerId = Some(decentralizedSynchronizerId),
         )
         .party
 

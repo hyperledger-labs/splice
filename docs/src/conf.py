@@ -174,7 +174,6 @@ rst_prolog = f"""
 
 .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
 .. |image_tag_set| replace:: ``export IMAGE_TAG={version}``
-.. |image_tag_set_plain| replace:: export IMAGE_TAG={version}
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_openapi.tar.gz">Download OpenAPI specs</a>`

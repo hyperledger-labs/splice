@@ -4,7 +4,8 @@
 package com.digitalasset.canton.synchronizer.config
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.{CryptoConfig, ProtocolConfig, SessionSigningKeysConfig}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.{CryptoConfig, ProtocolConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
@@ -38,6 +39,8 @@ import com.digitalasset.canton.version.ProtocolVersion
   * @param requiredCryptoKeyFormats
   *   The optional required crypto key formats that a member has to support. If none is specified,
   *   all the supported algorithms are required.
+  * @param enableTransparencyChecks
+  *   A flag to enable transparency checks on the views.
   * @param dontWarnOnDeprecatedPV
   *   If true, then this synchronizer will not emit a warning when configured to use a deprecated
   *   protocol version (such as 2.0.0).
@@ -51,8 +54,9 @@ final case class SynchronizerParametersConfig(
     requiredHashAlgorithms: Option[NonEmpty[Set[HashAlgorithm]]] = None,
     requiredCryptoKeyFormats: Option[NonEmpty[Set[CryptoKeyFormat]]] = None,
     requiredSignatureFormats: Option[NonEmpty[Set[SignatureFormat]]] = None,
-    override val sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
-    override val alphaVersionSupport: Boolean = false,
+    enableTransparencyChecks: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    override val alphaVersionSupport: Boolean = true,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
 ) extends ProtocolConfig
@@ -67,7 +71,7 @@ final case class SynchronizerParametersConfig(
     param("requiredHashAlgorithms", _.requiredHashAlgorithms),
     param("requiredCryptoKeyFormats", _.requiredCryptoKeyFormats),
     param("requiredSignatureFormats", _.requiredSignatureFormats),
-    param("sessionSigningKeys", _.sessionSigningKeys),
+    param("enableTransparencyChecks", _.enableTransparencyChecks),
     param("alphaVersionSupport", _.alphaVersionSupport),
     param("betaVersionSupport", _.betaVersionSupport),
     param("dontWarnOnDeprecatedPV", _.dontWarnOnDeprecatedPV),
@@ -81,6 +85,7 @@ final case class SynchronizerParametersConfig(
   def toStaticSynchronizerParameters(
       cryptoConfig: CryptoConfig = CryptoConfig(),
       protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt,
   ): Either[String, StaticSynchronizerParameters] = {
 
     def selectSchemes[S](
@@ -145,7 +150,9 @@ final case class SynchronizerParametersConfig(
         requiredHashAlgorithms = newRequiredHashAlgorithms,
         requiredCryptoKeyFormats = newCryptoKeyFormats,
         requiredSignatureFormats = newSignatureFormats,
+        enableTransparencyChecks = enableTransparencyChecks,
         protocolVersion = protocolVersion,
+        serial = serial,
       )
     }
   }

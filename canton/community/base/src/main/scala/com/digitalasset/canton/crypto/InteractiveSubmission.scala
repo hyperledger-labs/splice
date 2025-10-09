@@ -73,7 +73,7 @@ object InteractiveSubmission {
     )
 
     def saltFromSerializedContract(serializedNode: SerializableContract): Bytes =
-      Bytes.fromByteString(serializedNode.contractSalt.toProtoV30.salt)
+      serializedNode.authenticationData.toLfBytes
 
     def apply(
         actAs: Set[Ref.Party],
@@ -90,7 +90,7 @@ object InteractiveSubmission {
         .map { case (contractId, serializedNode) =>
           contractId -> FatContractInstance.fromCreateNode(
             serializedNode.toLf,
-            serializedNode.ledgerCreateTime.toLf,
+            serializedNode.ledgerCreateTime,
             saltFromSerializedContract(serializedNode),
           )
         }
@@ -265,10 +265,11 @@ object InteractiveSubmission {
 
           (invalidSignatures, validSignatures) = signatures.map { signature =>
             authInfo.signingKeys
-              .find(_.fingerprint == signature.signedBy)
-              .toRight(s"Signing key ${signature.signedBy} is not a valid key for $party")
+              .find(_.fingerprint == signature.authorizingLongTermKey)
+              .toRight(
+                s"Signing key ${signature.authorizingLongTermKey} is not a valid key for $party"
+              )
               .flatMap(key =>
-                // TODO(#23551) Add new usage for interactive submission
                 cryptoPureApi
                   .verifySignature(hash.unwrap, key, signature, SigningKeyUsage.ProtocolOnly)
                   .map(_ => key.fingerprint)

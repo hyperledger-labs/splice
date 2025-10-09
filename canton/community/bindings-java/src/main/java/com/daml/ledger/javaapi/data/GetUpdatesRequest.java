@@ -18,6 +18,7 @@ public final class GetUpdatesRequest {
 
   @NonNull private final UpdateFormat updateFormat;
 
+  // TODO(#23504) remove
   @Deprecated
   public GetUpdatesRequest(
       @NonNull Long beginExclusive,

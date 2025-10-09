@@ -4,6 +4,7 @@
 package com.digitalasset.canton.ledger.participant.state
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 
@@ -29,13 +30,16 @@ trait PartySyncService {
     *   A party identifier suggestion
     * @param submissionId
     *   Client picked submission identifier for matching the responses with the request.
-    *
+    * @param synchronizerIdO
+    *   The synchronizer on which the party should be allocated. Can be omitted if the participant
+    *   is connected to only one synchronizer.
     * @return
     *   an async result of a SubmissionResult
     */
   def allocateParty(
       hint: Ref.Party,
       submissionId: Ref.SubmissionId,
+      synchronizerIdO: Option[SynchronizerId],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SubmissionResult]

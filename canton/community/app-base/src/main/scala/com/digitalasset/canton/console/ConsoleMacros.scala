@@ -4,7 +4,6 @@
 package com.digitalasset.canton.console
 
 import better.files.File
-import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import ch.qos.logback.classic.Level
@@ -32,11 +31,9 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.commands.PruningSchedulerAdministration
-import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{
   NamedLoggerFactory,
@@ -48,7 +45,6 @@ import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.config.BaseParticipantConfig
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation,
   SequencerConnections,
@@ -66,7 +62,6 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
-import com.digitalasset.daml.lf.value.Value.ContractId
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
@@ -76,7 +71,6 @@ import io.circe.syntax.*
 import java.io.File as JFile
 import java.time.Instant
 import scala.annotation.unused
-import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.sys.process.ProcessLogger
 
@@ -263,97 +257,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         defaultParticipant,
       )
 
-    // TODO(i7387): add check that flag is set
     @Help.Summary(
       "Register `AutoCloseable` object to be shutdown if Canton is shut down",
       FeatureFlag.Testing,
     )
     def auto_close(closeable: AutoCloseable)(implicit environment: ConsoleEnvironment): Unit =
-      environment.environment.addUserCloseable(closeable)
-
-    @Help.Summary("Recompute authenticated contract ids.")
-    @Help.Description(
-      """The `utils.recompute_contract_ids` regenerates "contract ids" of multiple contracts after their contents have
-        |changed. Starting from protocol version 4, Canton uses the so called authenticated contract ids which depend
-        |on the details of the associated contracts. When aspects of a contract such as the parties involved change as
-        |part of repair or export/import procedure, the corresponding contract id must be recomputed."""
-    )
-    def recompute_contract_ids(
-        participant: LocalParticipantReference,
-        acs: Seq[SerializableContract],
-    ): (Seq[SerializableContract], Map[LfContractId, LfContractId]) = {
-      val contractIdMappings = mutable.Map.empty[LfContractId, LfContractId]
-      // We assume ACS events are in order
-      val remappedCIds = acs.map { contract =>
-        // Update the referenced contract ids
-        val contractInstanceWithUpdatedContractIdReferences =
-          SerializableRawContractInstance
-            .create(contract.rawContractInstance.contractInstance.map(_.mapCid(contractIdMappings)))
-            .valueOr(err =>
-              throw new RuntimeException(
-                s"Could not create serializable raw contract instance: $err"
-              )
-            )
-
-        val LfContractId.V1(discriminator, _) = contract.contractId
-        val pureCrypto = participant.underlying
-          .map(_.cryptoPureApi)
-          .getOrElse(sys.error("where is my crypto?"))
-
-        // Compute the new contract id
-        val newContractId =
-          generate_contract_id(
-            cryptoPureApi = pureCrypto,
-            rawContract = contractInstanceWithUpdatedContractIdReferences,
-            createdAt = contract.ledgerCreateTime.ts,
-            discriminator = discriminator,
-            contractSalt = contract.contractSalt,
-            metadata = contract.metadata,
-          )
-
-        // Update the contract id mappings with the current contract's id
-        contractIdMappings += contract.contractId -> newContractId
-
-        // Update the contract with the new contract id and recomputed instance
-        contract
-          .copy(
-            contractId = newContractId,
-            rawContractInstance = contractInstanceWithUpdatedContractIdReferences,
-          )
-      }
-
-      remappedCIds -> Map.from(contractIdMappings)
-    }
-
-    @Help.Summary("Generate authenticated contract id.")
-    @Help.Description(
-      """The `utils.generate_contract_id` generates "contract id" of a contract. Starting from protocol version 4,
-        |Canton uses the so called authenticated contract ids which depend on the details of the associated contracts.
-        |When aspects of a contract such as the parties involved change as part of repair or export/import procedure,
-        |the corresponding contract id must be recomputed. This function can be used as a tool to generate an id for
-        |an arbitrary contract content"""
-    )
-    def generate_contract_id(
-        cryptoPureApi: CryptoPureApi,
-        rawContract: SerializableRawContractInstance,
-        createdAt: CantonTimestamp,
-        discriminator: LfHash,
-        contractSalt: Salt,
-        metadata: ContractMetadata,
-    ): ContractId.V1 = {
-      val unicumGenerator = new UnicumGenerator(cryptoPureApi)
-      val cantonContractIdVersion = AuthenticatedContractIdVersionV11
-      val unicum = unicumGenerator
-        .recomputeUnicum(
-          contractSalt,
-          LedgerCreateTime(createdAt),
-          metadata,
-          rawContract,
-          cantonContractIdVersion,
-        )
-        .valueOr(err => throw new RuntimeException(err))
-      cantonContractIdVersion.fromDiscriminator(discriminator, unicum)
-    }
+      FeatureFlagFilter.check(noTracingLogger, environment)(FeatureFlag.Testing)(
+        environment.environment.addUserCloseable(closeable)
+      )
 
     @Help.Summary("Writes several Protobuf messages to a file.")
     def write_to_file(data: Seq[scalapb.GeneratedMessage], fileName: String): Unit =
@@ -401,8 +312,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
   }
 
-  @Help.Summary("Canton development and testing utilities", FeatureFlag.Testing)
-  @Help.Group("Ledger Api Testing")
+  @Help.Summary("Canton development and testing utilities")
+  @Help.Group("Ledger Api Utils")
   object ledger_api_utils extends Helpful {
 
     private def buildIdentifier(packageId: String, module: String, template: String): IdentifierV1 =
@@ -463,7 +374,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         fields = map.map(mapToRecordField).toSeq
       )
 
-    @Help.Summary("Build create command", FeatureFlag.Testing)
+    @Help.Summary("Build create command")
     def create(
         packageId: String,
         module: String,
@@ -472,13 +383,12 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     ): Command =
       Command.defaultInstance.withCreate(
         CreateCommand(
-          // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
           createArguments = Some(buildArguments(arguments)),
         )
       )
 
-    @Help.Summary("Build exercise command", FeatureFlag.Testing)
+    @Help.Summary("Build exercise command")
     def exercise(
         packageId: String,
         module: String,
@@ -489,7 +399,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     ): Command =
       Command.defaultInstance.withExercise(
         ExerciseCommand(
-          // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
           choice = choice,
           choiceArgument = Some(Value(Value.Sum.Record(buildArguments(arguments)))),
@@ -497,7 +406,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         )
       )
 
-    @Help.Summary("Build exercise command from CreatedEvent", FeatureFlag.Testing)
+    @Help.Summary("Build exercise command from CreatedEvent")
     def exercise(choice: String, arguments: Map[String, Any], event: CreatedEvent): Command = {
       def getOrThrow(desc: String, opt: Option[String]): String =
         opt.getOrElse(
@@ -685,7 +594,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     private def in_synchronizer(
         sequencers: NonEmpty[Seq[SequencerReference]],
         mediators: NonEmpty[Seq[MediatorReference]],
-    )(synchronizerId: SynchronizerId): Either[String, Option[SynchronizerId]] = {
+    )(synchronizerId: PhysicalSynchronizerId): Either[String, Option[PhysicalSynchronizerId]] = {
       def isNotInitializedOrSuccessWithSynchronizer(
           instance: InstanceReference
       ): Either[String, Boolean /* isInitializedWithSynchronizer */ ] =
@@ -732,7 +641,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         owners: Seq[InstanceReference],
         sequencers: Seq[SequencerReference],
         mediators: Seq[MediatorReference],
-    ): Either[String, Option[SynchronizerId]] =
+        staticSynchronizerParameters: data.StaticSynchronizerParameters,
+    ): Either[String, Option[PhysicalSynchronizerId]] =
       for {
         neOwners <- NonEmpty
           .from(owners.distinct)
@@ -747,7 +657,10 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           DecentralizedNamespaceDefinition.computeNamespace(
             owners.map(_.namespace).toSet
           )
-        expectedId = SynchronizerId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive))
+        expectedId = PhysicalSynchronizerId(
+          SynchronizerId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive)),
+          staticSynchronizerParameters.toInternal,
+        )
         actualIdIfAllNodesAreInitialized <- in_synchronizer(neSequencers, neMediators)(expectedId)
       } yield actualIdIfAllNodesAreInitialized
 
@@ -757,14 +670,20 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         synchronizerOwners: Seq[InstanceReference],
         synchronizerThreshold: PositiveInt,
         sequencers: Seq[SequencerReference],
-        mediatorsToSequencers: Map[MediatorReference, (Seq[SequencerReference], PositiveInt)],
+        mediatorsToSequencers: Map[
+          MediatorReference,
+          (Seq[SequencerReference], PositiveInt, NonNegativeInt),
+        ],
         mediatorRequestAmplification: SubmissionRequestAmplification,
         mediatorThreshold: PositiveInt,
-    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
+    )(implicit consoleEnvironment: ConsoleEnvironment): PhysicalSynchronizerId = {
       val synchronizerNamespace =
         DecentralizedNamespaceDefinition.computeNamespace(synchronizerOwners.map(_.namespace).toSet)
-      val synchronizerId = SynchronizerId(
-        UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
+      val synchronizerId = PhysicalSynchronizerId(
+        SynchronizerId(
+          UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
+        ),
+        staticSynchronizerParameters.toInternal,
       )
 
       val tempStoreForBootstrap = synchronizerOwners
@@ -839,20 +758,22 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
       mediatorsToSequencers
         .filter(!_._1.health.initialized())
-        .foreach { case (mediator, (mediatorSequencers, sequencerTrustThreshold)) =>
-          mediator.setup.assign(
-            synchronizerId,
-            SequencerConnections.tryMany(
-              mediatorSequencers
-                .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
-              sequencerTrustThreshold = sequencerTrustThreshold,
-              submissionRequestAmplification = mediatorRequestAmplification,
-            ),
-            // if we run bootstrap ourselves, we should have been able to reach the nodes
-            // so we don't want the bootstrapping to fail spuriously here in the middle of
-            // the setup
-            SequencerConnectionValidation.Disabled,
-          )
+        .foreach {
+          case (mediator, (mediatorSequencers, sequencerTrustThreshold, sequencerLivenessMargin)) =>
+            mediator.setup.assign(
+              synchronizerId,
+              SequencerConnections.tryMany(
+                mediatorSequencers
+                  .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
+                sequencerTrustThreshold,
+                sequencerLivenessMargin,
+                mediatorRequestAmplification,
+              ),
+              // if we run bootstrap ourselves, we should have been able to reach the nodes
+              // so we don't want the bootstrapping to fail spuriously here in the middle of
+              // the setup
+              SequencerConnectionValidation.Disabled,
+            )
         }
 
       synchronizerOwners.foreach(
@@ -880,11 +801,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         mediatorRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
         mediatorThreshold: PositiveInt = PositiveInt.one,
-    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId =
+    )(implicit consoleEnvironment: ConsoleEnvironment): PhysicalSynchronizerId =
       synchronizer(
         synchronizerName,
         sequencers,
-        mediators.map(_ -> (sequencers, PositiveInt.one)).toMap,
+        mediators.map(_ -> (sequencers, PositiveInt.one, NonNegativeInt.zero)).toMap,
         synchronizerOwners,
         synchronizerThreshold,
         staticSynchronizerParameters,
@@ -900,20 +821,23 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
         |
         |Parameters:
-        |  mediatorsToSequencers: map of mediator reference to a tuple of a sequence of sequencer references and
-        |                         the sequencer trust threshold for the given mediator.
+        |  mediatorsToSequencers: map of mediator reference to a tuple of a sequence of sequencer references,
+        |                         the sequencer trust threshold and the liveness margin for the given mediator.
         """
     )
     def synchronizer(
         synchronizerName: String,
         sequencers: Seq[SequencerReference],
-        mediatorsToSequencers: Map[MediatorReference, (Seq[SequencerReference], PositiveInt)],
+        mediatorsToSequencers: Map[
+          MediatorReference,
+          (Seq[SequencerReference], PositiveInt, NonNegativeInt),
+        ],
         synchronizerOwners: Seq[InstanceReference],
         synchronizerThreshold: PositiveInt,
         staticSynchronizerParameters: data.StaticSynchronizerParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification,
         mediatorThreshold: PositiveInt,
-    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
+    )(implicit consoleEnvironment: ConsoleEnvironment): PhysicalSynchronizerId = {
       // skip over HA sequencers
       val uniqueSequencers =
         sequencers.groupBy(_.id).flatMap(_._2.headOption.toList).toList
@@ -926,6 +850,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         synchronizerOwnersOrDefault,
         uniqueSequencers,
         mediators,
+        staticSynchronizerParameters,
       ) match {
         case Right(Some(synchronizerId)) =>
           logger.info(
@@ -1048,94 +973,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
   }
 
-  object commitments extends Helpful {
-    // TODO(#9557) R2
-    @Help.Summary(
-      "Inspect ACS commitment mismatch as part of the reconciliation protocol.",
-      FeatureFlag.Preview,
-    )
-    @Help.Description(
-      """ Inspect commitment mismatch between computed local commitment and received commitment from counter-participant.
-        | Writes to files the contracts that cause the mismatch and the transactions that activated them.
-        | Assumes that the console is connected to both participants that observed the mismatch.
-        | The commands outputs an error if the counter-participant sent several commitments for the same interval end
-        | and synchronizer, because, e.g., it executed a repair command in the meantime and it cannot retrieve the data for the
-        | given commitment anymore.
-        | The arguments are:
-        | - synchronizerId: The synchronizer where the mismatch occurred
-        | - mismatchTimestamp: The synchronizer timestamp of the commitment mismatch. Needs to correspond to a commitment tick.
-        | - targetParticipant: The participant that reported the mismatch and wants to fix it on its side.
-        | - counterParticipant: The counter participant that sent the mismatching commitment, and with which we interact
-        |   to retrieve the mismatching contracts.
-        | - timeout: Time limit for each streaming grpc calls in the command to complete.
-        |   Optional argument. If not given, the time is unbounded.
-        | - integrityChecks: If true, the command performs additional checks:
-        |    - check that, at the given mismatch timestamp, the participant's own commitment and received
-        |    counterCommitment indeed mismatch
-        |    - check that the received contract metadata matches the counterCommitment
-        | - binaryOutputFile: File where to write the mismatch information in binary format. This can be passed to the
-        | command reconciling the mismatch. The mismatch information has the type CommitmentInspectContracts.
-        |   Optional argument. If not given, the default file name on the console is used.
-        | - readableOutputFile: File where to write the mismatch information in human-readable format. This file can
-        | be edited by users to indicate how to fix mismatches: keep, delete, etc. The data type is CommitmentMismatchInfo
-        | written in json format.
-        | Optional argument. If not given, the default file name on the console is used.""".stripMargin
-    )
-    def inspect_acs_commitment_mismatch(
-        synchronizerId: SynchronizerId,
-        mismatchTimestamp: CantonTimestamp,
-        targetParticipant: ParticipantReference,
-        // TODO(#20583) Pass only the ParticipantId and change to participant-to-participant communication when available.
-        counterParticipant: ParticipantReference,
-        timeout: Option[NonNegativeDuration] = None,
-        integrityChecks: Boolean = true,
-        binaryOutputFile: Option[String] = None,
-        readableOutputFile: Option[String] = None,
-    ): Unit = {
-
-      // TODO(#9557) 0. If integrityChecks is true, check that, at the given mismatch timestamp, the target
-      //  participant's own commitment and received counterCommitment indeed mismatch
-      //  We read these commitment from the target participant's store using R5 endpoints
-
-      // TODO(#9557) 1. Downloading the shared contract metadata from counter-participant:
-      // val counterParticipantCmtMetadata = counterParticipant.commitments.open_commitment(...)
-
-      // TODO(#9557) 2. If integrityChecks is true, check that the contract metadata sent matches the counter commitment
-      //  by uploading the contract metadata to the target participant.
-      //  The retrieved data might be insufficient for the check, because for example the target participant has never
-      //  seen some of the received cids, therefore it does not know the stakeholders and cannot properly compute the
-      //  hierarchical commitments. In this case, we can perform the check as the last step, after we retrieve the
-      //  contract payloads from the counter-participant.
-
-      // TODO(#9557) 3. Download the shared contract metadata from target participant
-      // val targetParticipantCmtMetadata = targetParticipant.commitments.open_commitment()
-
-      // TODO(#9557) 4. Identify mismatching contracts by checking the counterParticipant's contracts metadata
-      //  against the ACS contracts of the target participant:
-      // CommitmentContractMetadata.compare(targetParticipantCmtMetadata, counterParticipantCmtMetadata)
-
-      // TODO(#20583) Investigate fetching the ACS snapshot via LAPI without the contract payload. LAPI has longer lived data
-      //  and allows for party filtering.
-
-      // TODO(#9557) 5. Identify mismatch reasons from the target participant for shared contracts that cause mismatches
-      // targetParticipant.commitments.inspect_commitment_contract()
-
-      // TODO(#9557) 6. Request mismatch reasons contract payloads from the counterParticipant for shared contracts that cause mismatches
-      // counterParticipant.commitments.inspect_commitment_contract()
-
-      // TODO(#9557) 7. Compile the data in 4 and 5 into mismatch reasons and write them to the binary output file:
-      // counterParticipant.commitments.inspect_commitment_contract()
-
-      // mismatch reason lives only in console macros
-
-      // TODO(#9557) 8. Request contract payloads from the counterParticipant for shared contracts that cause mismatches
-      //   and write them to the binary output file:
-      //   counterParticipant.commitments.download_contract_reconciliation_payloads(...)
-
-      // TODO(#9557) 9. Write user-readable data in the readable output file regarding mismatching contracts ids
-    }
-  }
-
   @Help.Summary("Repair utilities")
   @Help.Group("Repair")
   lazy val repair = new RepairMacros(loggerFactory)
@@ -1206,14 +1043,14 @@ object DebuggingHelpers extends LazyLogging {
     get_active_contracts_helper(
       ref,
       alias =>
-        TraceContext.withNewTraceContext(implicit traceContext =>
+        TraceContext.withNewTraceContext("get_active_contracts")(implicit traceContext =>
           state.findContracts(alias, None, None, None, limit.value)
         ),
     )
 
   private def get_active_contracts_helper(
       ref: ParticipantReference,
-      lookup: SynchronizerAlias => Seq[(Boolean, SerializableContract)],
+      lookup: SynchronizerAlias => Seq[(Boolean, ContractInstance)],
   ): (Map[String, String], Map[String, TemplateId]) = {
     val syncAcs = ref.synchronizers
       .list_connected()
@@ -1221,7 +1058,7 @@ object DebuggingHelpers extends LazyLogging {
       .flatMap(lookup)
       .collect {
         case (active, sc) if active =>
-          (sc.contractId.coid, sc.contractInstance.unversioned.template.qualifiedName.toString())
+          (sc.contractId.coid, sc.templateId.qualifiedName.toString())
       }
       .toMap
     val lapiAcs =

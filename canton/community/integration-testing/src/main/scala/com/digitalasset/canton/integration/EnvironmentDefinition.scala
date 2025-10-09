@@ -103,7 +103,7 @@ final case class EnvironmentDefinition(
   def updateTestingConfig(
       update: TestingConfigInternal => TestingConfigInternal
   ): EnvironmentDefinition =
-    copy(testingConfig = testingConfig.focus().modify(update))
+    copy(testingConfig = update(testingConfig))
 
   private def setStaticSynchronizerParameters(
       map: Map[String, StaticSynchronizerParameters]
@@ -165,6 +165,7 @@ object EnvironmentDefinition extends LazyLogging {
       numSequencers: Int,
       numMediators: Int,
       withRemote: Boolean = false,
+      startingParticipantIndex: Int = 1,
   ): EnvironmentDefinition = {
 
     val sequencers = (1 to numSequencers).map { i =>
@@ -174,9 +175,10 @@ object EnvironmentDefinition extends LazyLogging {
     val mediators = (1 to numMediators).map { i =>
       InstanceName.tryCreate(s"mediator$i") -> MediatorNodeConfig()
     }.toMap
-    val participants = (1 to numParticipants).map { i =>
-      InstanceName.tryCreate(s"participant$i") -> ParticipantNodeConfig()
-    }.toMap
+    val participants =
+      (startingParticipantIndex until (startingParticipantIndex + numParticipants)).map { i =>
+        InstanceName.tryCreate(s"participant$i") -> ParticipantNodeConfig()
+      }.toMap
 
     val configWithDefaults = CantonConfig(
       sequencers = sequencers,
@@ -417,6 +419,13 @@ object EnvironmentDefinition extends LazyLogging {
       new NetworkBootstrapper(S2M1)
     }
 
+  lazy val P0S2M2_Config: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 0,
+      numSequencers = 2,
+      numMediators = 2,
+    )
+
   lazy val P1S1M1_Config = buildBaseEnvironmentDefinition(
     numParticipants = 1,
     numSequencers = 1,
@@ -463,6 +472,13 @@ object EnvironmentDefinition extends LazyLogging {
     ).withNetworkBootstrap { implicit env =>
       new NetworkBootstrapper(S2M2)
     }
+
+  lazy val P1S3M3_Config: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 1,
+      numSequencers = 3,
+      numMediators = 3,
+    )
 
   lazy val P2S3M3_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
@@ -521,6 +537,13 @@ object EnvironmentDefinition extends LazyLogging {
       numMediators = 1,
     )
 
+  lazy val P2S4M1_Config: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 2,
+      numSequencers = 4,
+      numMediators = 1,
+    )
+
   lazy val P2S2M2_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 2,
@@ -528,7 +551,7 @@ object EnvironmentDefinition extends LazyLogging {
       numMediators = 2,
     )
 
-  private lazy val P1S2M2_Config: EnvironmentDefinition =
+  lazy val P1S2M2_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 1,
       numSequencers = 2,
@@ -549,6 +572,14 @@ object EnvironmentDefinition extends LazyLogging {
     */
   lazy val P2S2M1_Manual: EnvironmentDefinition =
     P2S2M1_Config.withManualStart
+
+  /**   - 2 participants
+    *   - 4 sequencers
+    *   - 1 mediators
+    *   - no initialized synchronizer
+    */
+  lazy val P2S4M1_Manual: EnvironmentDefinition =
+    P2S4M1_Config.withManualStart
 
   /**   - 2 participants '''not''' connected to the synchronizer
     *   - 1 synchronizer with 2 sequencers and 2 mediators
@@ -657,7 +688,7 @@ object EnvironmentDefinition extends LazyLogging {
   lazy val P3_S1M1_Manual: EnvironmentDefinition =
     P3_S1M1_Config.withManualStart
 
-  private lazy val P3S2M2_Config: EnvironmentDefinition =
+  lazy val P3S2M2_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 3,
       numSequencers = 2,
@@ -875,6 +906,18 @@ object EnvironmentDefinition extends LazyLogging {
   )
     .withNetworkBootstrap { implicit env =>
       NetworkBootstrapper(S2M1_S2M1)
+    }
+
+  /**   - 3 participants '''not''' connected to any synchronizer
+    *   - 3 synchronizers with 1 sequencer and 1 mediator each
+    */
+  lazy val P3_S1M1_S1M1_S1M1: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+    numParticipants = 3,
+    numSequencers = 3,
+    numMediators = 3,
+  )
+    .withNetworkBootstrap { implicit env =>
+      NetworkBootstrapper(S1M1_S1M1_S1M1)
     }
 
   def fromResource(path: String): EnvironmentDefinition =

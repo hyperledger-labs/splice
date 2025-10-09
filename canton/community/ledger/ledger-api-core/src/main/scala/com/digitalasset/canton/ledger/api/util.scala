@@ -3,16 +3,20 @@
 
 package com.digitalasset.canton.ledger.api
 
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.{
+  TRANSACTION_SHAPE_ACS_DELTA,
+  TRANSACTION_SHAPE_LEDGER_EFFECTS,
+}
 import com.daml.logging.entries.{LoggingValue, ToLoggingValue}
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.LfFatContractInst
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPackageVersion}
 import com.digitalasset.daml.lf.command.{ApiCommands as LfCommands, ApiContractKey}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.logging.*
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
-import com.digitalasset.daml.lf.transaction.FatContractInstance
 import scalaz.@@
 import scalaz.syntax.tag.*
 
@@ -41,6 +45,14 @@ sealed trait TransactionShape
 object TransactionShape {
   case object LedgerEffects extends TransactionShape
   case object AcsDelta extends TransactionShape
+
+  def toProto(
+      transactionShape: TransactionShape
+  ): com.daml.ledger.api.v2.transaction_filter.TransactionShape =
+    transactionShape match {
+      case TransactionShape.LedgerEffects => TRANSACTION_SHAPE_LEDGER_EFFECTS
+      case TransactionShape.AcsDelta => TRANSACTION_SHAPE_ACS_DELTA
+    }
 }
 
 final case class EventFormat(
@@ -50,27 +62,19 @@ final case class EventFormat(
 )
 
 final case class InterfaceFilter(
-    interfaceTypeRef: Ref.TypeConRef,
+    interfaceTypeRef: Ref.TypeConRef, // TODO(#26879) use only NameTypeConRef and do not accept IdTypeConRef in 3.5
     includeView: Boolean,
     includeCreatedEventBlob: Boolean,
 )
 
 final case class TemplateFilter(
-    templateTypeRef: Ref.TypeConRef,
+    templateTypeRef: Ref.TypeConRef, // TODO(#26879) use only NameTypeConRef and do not accept IdTypeConRef in 3.5
     includeCreatedEventBlob: Boolean,
 )
 
 final case class TemplateWildcardFilter(
     includeCreatedEventBlob: Boolean
 )
-
-object TemplateFilter {
-  def apply(templateId: Ref.Identifier, includeCreatedEventBlob: Boolean): TemplateFilter =
-    TemplateFilter(
-      Ref.TypeConRef(Ref.PackageRef.Id(templateId.packageId), templateId.qualifiedName),
-      includeCreatedEventBlob,
-    )
-}
 
 final case class CumulativeFilter(
     templateFilters: immutable.Set[TemplateFilter],
@@ -148,7 +152,7 @@ object Commands {
 }
 
 final case class DisclosedContract(
-    fatContractInstance: FatContractInstance,
+    fatContractInstance: LfFatContractInst,
     synchronizerIdO: Option[SynchronizerId],
 ) extends PrettyPrinting {
   override protected def pretty: Pretty[DisclosedContract] = {

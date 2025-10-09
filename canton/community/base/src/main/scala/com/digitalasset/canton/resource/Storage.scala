@@ -612,7 +612,7 @@ object DbStorage {
     val baseLogger = loggerFactory.getLogger(classOf[DbStorage])
     val logger = TracedLogger(baseLogger)
 
-    TraceContext.withNewTraceContext { implicit traceContext =>
+    TraceContext.withNewTraceContext("create_db") { implicit traceContext =>
       // Must be called to set proper defaults in case of H2
       val configWithFallbacks: Config = {
         val cfg = DbConfig
@@ -763,7 +763,8 @@ object DbStorage {
     *
     * This operation is idempotent if the statement is idempotent for each value.
     *
-    * Use `transactional`
+    * Use `transactional = false` to disable the transaction wrapping. This is useful for
+    * long-running operations that do not require transactional integrity such as pruning.
     */
   def bulkOperation[A](
       statement: String,
@@ -825,8 +826,8 @@ object DbStorage {
 
   /* Helper methods to make usage of EitherT[DBIO,] possible without requiring type hints */
   def dbEitherT[A, B](value: DBIO[Either[A, B]]): EitherT[DBIO, A, B] = EitherT[DBIO, A, B](value)
-  def dbEitherT[A]: DbEitherTRight[A] = new DbEitherTRight[A]
-  class DbEitherTRight[A] private[resource] {
+  def dbEitherT[A]: DbEitherTRight[A] = new DbEitherTRight[A]()
+  final class DbEitherTRight[A](private val dummy: Boolean = true) extends AnyVal {
     def apply[B](value: DBIO[B])(implicit ec: ExecutionContext): EitherT[DBIO, A, B] = {
       import DbStorage.Implicits.functorDBIO
       EitherT.right[A](value)

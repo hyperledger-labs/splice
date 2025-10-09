@@ -5,29 +5,24 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
-import org.lfdecentralizedtrust.splice.automation.{
-  SourceBasedTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvTopologyStatePollingAndAssignedTrigger.{
   StreamedAssignedContract,
   TaskTrigger,
   Tick,
 }
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import org.lfdecentralizedtrust.splice.util.AssignedContract
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import io.opentelemetry.api.trace.Tracer
-import monocle.Monocle.toAppliedFocusOps
-import org.apache.pekko.stream.Materializer
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
 import pprint.Tree
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -120,7 +115,11 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
               reconciler.reconcileTask(task)
             }
           )
-          .map(outcomes => TaskSuccess(s"Tasks reconciled: $outcomes"))
+          .map(outcomes => {
+            if (outcomes.nonEmpty) {
+              TaskSuccess(s"Tasks reconciled: $outcomes")
+            } else TaskNoop
+          })
       }
   }
 

@@ -7,6 +7,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.common.sequencer.SequencerConnectClient
 import com.digitalasset.canton.common.sequencer.SequencerConnectClient.SynchronizerClientBootstrapInfo
 import com.digitalasset.canton.common.sequencer.grpc.GrpcSequencerConnectClient
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   CryptoConfig,
   CryptoProvider,
@@ -137,7 +138,7 @@ trait SequencerConnectServiceIntegrationTest
           Some(cryptoProvider.supportedSignatureFormatsForProtocol(testedProtocolVersion)),
       )
       val expectedSynchronizerParameters = defaultSynchronizerParametersConfig
-        .toStaticSynchronizerParameters(CryptoConfig(), testedProtocolVersion)
+        .toStaticSynchronizerParameters(CryptoConfig(), testedProtocolVersion, NonNegativeInt.zero)
         .value
 
       fetchedSynchronizerParameters shouldBe expectedSynchronizerParameters
@@ -164,7 +165,10 @@ trait SequencerConnectServiceIntegrationTest
 
       val grpcSequencerConnectClient = getSequencerConnectClient()
 
-      grpcSequencerConnectClient.getSynchronizerId(daName.unwrap).futureValueUS.value shouldBe daId
+      grpcSequencerConnectClient
+        .getSynchronizerId(daName.unwrap)
+        .futureValueUS
+        .value shouldBe daId
     }
 
     "respond to is active requests" in { implicit env =>
@@ -202,6 +206,7 @@ trait GrpcSequencerConnectServiceIntegrationTest extends SequencerConnectService
         transportSecurity = false,
         customTrustCertificates = None,
         SequencerAlias.Default,
+        None,
       )
 
     new GrpcSequencerConnectClient(
@@ -236,7 +241,7 @@ trait GrpcSequencerConnectServiceIntegrationTest extends SequencerConnectService
 
         val publicApi = sequencerNodeConfig.publicApi
         val badSequencerNodeEndpoint =
-          Endpoint(publicApi.address, RequireTypes.Port.tryCreate(publicApi.port.unwrap + 10000))
+          Endpoint(publicApi.address, RequireTypes.Port.tryCreate(0))
         val grpcSequencerConnectClient = getSequencerConnectClientInternal(
           badSequencerNodeEndpoint,
           // Lower the timeout to avoid lengthy retries of 60 seconds by default
@@ -246,9 +251,8 @@ trait GrpcSequencerConnectServiceIntegrationTest extends SequencerConnectService
         val errorFromLeft = grpcSequencerConnectClient
           .isActive(participant1.id, alias, waitForActive = false)
           .leftMap(_.message)
-          .leftOrFail("expected a left")
           .futureValueUS
-        errorFromLeft should include regex "Request failed for .*. Is the server running?"
+        errorFromLeft.left.value should include regex "Request failed for .*. Is the server running?"
     }
   }
 }

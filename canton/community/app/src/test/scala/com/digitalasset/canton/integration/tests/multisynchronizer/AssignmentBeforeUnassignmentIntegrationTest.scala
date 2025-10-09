@@ -13,6 +13,7 @@ import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBas
 import com.digitalasset.canton.integration.plugins.{
   UseCommunityReferenceBlockSequencer,
   UsePostgres,
+  UseProgrammableSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{EntitySyntax, PartiesAllocator}
@@ -21,14 +22,25 @@ import com.digitalasset.canton.integration.{
   EnvironmentDefinition,
   SharedEnvironment,
 }
+import com.digitalasset.canton.participant.store.ReassignmentStore.UnknownReassignmentId
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.ContractIdSyntax
+import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.synchronizer.sequencer.ProgrammableSequencerPolicies.isMediatorResult
+import com.digitalasset.canton.synchronizer.sequencer.{
+  HasProgrammableSequencer,
+  SendDecision,
+  SendPolicyWithoutTraceContext,
+}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 
-class AssignmentBeforeUnassignmentIntegrationTest
+import scala.concurrent.Promise
+
+sealed trait AssignmentBeforeUnassignmentIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
-    with EntitySyntax {
+    with EntitySyntax
+    with HasProgrammableSequencer {
 
   private var aliceId: PartyId = _
 
@@ -43,7 +55,7 @@ class AssignmentBeforeUnassignmentIntegrationTest
         val alice = "alice"
 
         // Enable alice on other participants, on all synchronizers
-        new PartiesAllocator(participants.all.toSet)(
+        PartiesAllocator(participants.all.toSet)(
           Seq(alice -> participant1),
           Map(
             alice -> Map(
@@ -57,31 +69,35 @@ class AssignmentBeforeUnassignmentIntegrationTest
               )),
             )
           ),
-        ).run()
+        )
 
         aliceId = alice.toPartyId(participant1)
-
-        IouSyntax.createIou(participant1, Some(daId))(aliceId, aliceId)
       }
 
   "assignment is completed on participant2 before unassignment" in { implicit env =>
     import env.*
 
-    val contract = participant1.ledger_api.javaapi.state.acs
-      .await(Iou.COMPANION)(aliceId, synchronizerFilter = Some(daId))
+    val contract = IouSyntax.createIou(participant1, Some(daId))(aliceId, aliceId)
 
     // we disconnect participant2 from the synchronizer in order to no process the unassignment
     participant2.synchronizers.disconnect(daName)
 
-    val unassignId = participant1.ledger_api.commands
-      .submit_unassign(aliceId, Seq(contract.id.toLf), daId, acmeId)
-      .unassignId
+    val reassignmentId = participant1.ledger_api.commands
+      .submit_unassign(
+        aliceId,
+        Seq(contract.id.toLf),
+        daId,
+        acmeId,
+        timeout = None, // not waiting for all the other participants to receive the unassignment
+      )
+      .reassignmentId
 
     participant1.ledger_api.commands.submit_assign(
       aliceId,
-      unassignId,
+      reassignmentId,
       daId,
       acmeId,
+      timeout = None, // not waiting for all the other participants to receive the unassignment
     )
 
     val contractReassigned = participant1.ledger_api.javaapi.state.acs
@@ -92,8 +108,9 @@ class AssignmentBeforeUnassignmentIntegrationTest
     val begin = participant2.ledger_api.state.end()
     participant2.synchronizers.reconnect_local(daName)
 
-    val updates = participant2.ledger_api.updates.flat(
+    val updates = participant2.ledger_api.updates.reassignments(
       partyIds = Set(aliceId),
+      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = begin,
       synchronizerFilter = Some(daId),
@@ -102,11 +119,103 @@ class AssignmentBeforeUnassignmentIntegrationTest
     // unassignment succeeded on participant2
     updates.headOption.value match {
       case unassigned: UpdateService.UnassignedWrapper =>
-        unassigned.unassignId shouldBe unassignId
+        unassigned.reassignmentId shouldBe reassignmentId
       case other =>
         fail(s"Expected a reassignment event but got $other")
     }
   }
+
+  "assignment starts while unassignment is still in progress" in { implicit env =>
+    import env.*
+    val iou = IouSyntax.createIou(participant1, Some(daId))(aliceId, aliceId)
+
+    val until: Promise[Unit] = Promise[Unit]()
+    val aboutToSendVerdict: Promise[Unit] = Promise[Unit]()
+    val begin = participant1.ledger_api.state.end()
+
+    getProgrammableSequencer(sequencer1.name).setPolicy_(
+      "delay mediator result"
+    )(
+      delayMediatorResult(until, aboutToSendVerdict)
+    )
+
+    participant1.ledger_api.commands
+      .submit_unassign_async(
+        aliceId,
+        Seq(LfContractId.assertFromString(iou.id.contractId)),
+        daId,
+        acmeId,
+      )
+
+    aboutToSendVerdict.future.futureValue
+    // Don't allow participant 2 to receive the mediator result and thus to finish phase 7 of the unassignment
+    getProgrammableSequencer(sequencer1.name).blockFutureMemberRead(participant2)
+
+    participant2.synchronizers.disconnect(daName)
+    participant2.synchronizers.reconnect_local(daName)
+
+    until.trySuccess(())
+
+    val updates = participant1.ledger_api.updates.reassignments(
+      partyIds = Set(aliceId),
+      filterTemplates = Seq.empty,
+      completeAfter = 1,
+      beginOffsetExclusive = begin,
+      resultFilter = _.isUnassignment,
+      synchronizerFilter = Some(daId),
+    )
+
+    val unassign1 = updates.headOption.value match {
+      case unassigned: UpdateService.UnassignedWrapper =>
+        unassigned.reassignmentId
+      case other =>
+        fail(s"Expected an unassignment event but got $other")
+    }
+
+    participant1.ledger_api.commands
+      .submit_assign(
+        aliceId,
+        unassign1,
+        daId,
+        acmeId,
+        timeout = None, // only participant 1 will see the assignment event
+      )
+
+    val reassignmentStoreP2 = participant2.underlying.value.sync.syncPersistentStateManager
+      .get(acmeId)
+      .value
+      .reassignmentStore
+
+    val reassignmentId = ReassignmentId.tryCreate(unassign1)
+
+    reassignmentStoreP2.findReassignmentEntry(reassignmentId).futureValueUS shouldBe Left(
+      UnknownReassignmentId(reassignmentId)
+    )
+
+    // unblock the read of the mediator result to finish the unassignment and to unblock the assignment
+    getProgrammableSequencer(sequencer1.name).unBlockMemberRead(participant2)
+
+    eventually() {
+      val reassignmentEntry = reassignmentStoreP2
+        .findReassignmentEntry(reassignmentId)
+        .futureValueUS
+        .value
+
+      reassignmentEntry.assignmentTs should not be empty
+      reassignmentEntry.unassignmentData should not be empty
+    }
+
+  }
+
+  private def delayMediatorResult(
+      until: Promise[Unit],
+      aboutToSendVerdict: Promise[Unit],
+  ): SendPolicyWithoutTraceContext =
+    submissionRequest =>
+      if (isMediatorResult(submissionRequest)) {
+        aboutToSendVerdict.trySuccess(())
+        SendDecision.HoldBack(until.future)
+      } else SendDecision.Process
 
 }
 
@@ -117,9 +226,10 @@ class AssignmentBeforeUnassignmentIntegrationTestPostgres
     new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
-        Seq(Set("sequencer1"), Set("sequencer2"))
-          .map(_.map(InstanceName.tryCreate))
+        Seq(Set("sequencer1"), Set("sequencer2")).map(_.map(InstanceName.tryCreate))
       ),
     )
   )
+
+  registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

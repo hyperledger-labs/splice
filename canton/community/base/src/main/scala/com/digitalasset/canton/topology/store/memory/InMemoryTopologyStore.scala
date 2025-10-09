@@ -169,7 +169,7 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
             tx.transaction.hashOfSignatures(protocolVersion),
             tx.hash,
           )
-          if (topologyTransactionsStoreUniqueIndex.add(uniqueKey)) {
+          if (topologyTransactionsStoreUniqueIndex.add(uniqueKey))
             topologyTransactionStore.append(
               TopologyStoreEntry(
                 tx.transaction,
@@ -181,7 +181,6 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
                 )(effective),
               )
             )
-          }
         }
       }
     }
@@ -344,8 +343,8 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Seq[TopologyMapping.Code],
-      filterUid: Option[Seq[UniqueIdentifier]],
-      filterNamespace: Option[Seq[Namespace]],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[PositiveStoredTopologyTransactions] =
     findTransactionsInStore(asOf, asOfInclusive, isProposal, types, filterUid, filterNamespace).map(
       _.collectOfType[TopologyChangeOp.Replace]
@@ -356,8 +355,8 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Seq[TopologyMapping.Code],
-      filterUid: Option[Seq[UniqueIdentifier]],
-      filterNamespace: Option[Seq[Namespace]],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
   ): FutureUnlessShutdown[GenericStoredTopologyTransactions] = {
     val timeFilter = asOfFilter(asOf, asOfInclusive)
     def pathFilter(mapping: TopologyMapping): Boolean =
@@ -630,6 +629,7 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
 
   override def findEffectiveStateChanges(
       fromEffectiveInclusive: CantonTimestamp,
+      filterTypes: Option[Seq[TopologyMapping.Code]],
       onlyAtEffective: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -637,13 +637,17 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
     val inRange: EffectiveTime => Boolean =
       if (onlyAtEffective) _.value == fromEffectiveInclusive
       else _.value >= fromEffectiveInclusive
+
+    def isEffective(x: TopologyStoreEntry) = inRange(x.from) || x.until.exists(inRange)
+    def hasCorrectType(x: TopologyStoreEntry) = filterTypes.fold(true)(_.contains(x.mapping.code))
+
     val res = blocking(synchronized {
       topologyTransactionStore.view
         .filter(x =>
           !x.transaction.isProposal &&
-            (inRange(x.from) || x.until.exists(inRange)) &&
+            isEffective(x) &&
             !x.until.contains(x.from) &&
-            x.rejected.isEmpty
+            x.rejected.isEmpty && hasCorrectType(x)
         )
         .toSeq
     })

@@ -34,9 +34,9 @@ import com.digitalasset.canton.participant.store.{
 import com.digitalasset.canton.protocol.RootHash
 import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ReassignmentTag.Source
+import com.digitalasset.daml.lf.transaction.CreationTime
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
@@ -74,7 +74,9 @@ class SyncEphemeralState(
   override def closingState: ComponentHealthState =
     ComponentHealthState.failed("Disconnected from synchronizer")
 
-  val synchronizerId = persistentState.indexedSynchronizer.synchronizerId
+  val synchronizerId: PhysicalSynchronizerId =
+    persistentState.physicalSynchronizerIdx.synchronizerId
+
   // Key is the root hash of the reassignment tree
   val pendingUnassignmentSubmissions: TrieMap[RootHash, PendingReassignmentSubmission] =
     TrieMap.empty[RootHash, PendingReassignmentSubmission]
@@ -82,9 +84,10 @@ class SyncEphemeralState(
     TrieMap.empty[RootHash, PendingReassignmentSubmission]
 
   val reassignmentSynchronizer: ReassignmentSynchronizer =
-    new ReassignmentSynchronizer(Source(synchronizerId), loggerFactory, timeouts)
+    new ReassignmentSynchronizer(loggerFactory, timeouts)
 
-  val sessionKeyStore: SessionKeyStore = SessionKeyStore(sessionKeyCacheConfig)
+  val sessionKeyStore: SessionKeyStore =
+    SessionKeyStore(sessionKeyCacheConfig, timeouts, loggerFactory)
 
   val requestJournal =
     new RequestJournal(
@@ -159,6 +162,7 @@ class SyncEphemeralState(
       phase37Synchronizer,
       reassignmentCache,
       reassignmentSynchronizer,
+      sessionKeyStore,
     )(logger)
 
 }
@@ -172,7 +176,8 @@ trait SyncEphemeralStateLookup {
 
   def sessionKeyStoreLookup: SessionKeyStore = sessionKeyStore
 
-  def contractLookup: ContractLookup = contractStore
+  def contractLookup: ContractLookup { type ContractsCreatedAtTime = CreationTime.CreatedAt } =
+    contractStore
 
   def reassignmentLookup: ReassignmentLookup = reassignmentCache
 

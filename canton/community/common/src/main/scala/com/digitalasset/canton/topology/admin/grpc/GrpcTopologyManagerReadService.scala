@@ -5,6 +5,8 @@ package com.digitalasset.canton.topology.admin.grpc
 
 import cats.data.EitherT
 import cats.implicits.catsSyntaxEitherId
+import cats.syntax.bifunctor.*
+import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
@@ -106,6 +108,7 @@ class GrpcTopologyManagerReadService(
     stores: => Seq[topology.store.TopologyStore[topology.store.TopologyStoreId]],
     crypto: Crypto,
     topologyClientLookup: topology.store.TopologyStoreId => Option[SynchronizerTopologyClient],
+    physicalSynchronizerIdLookup: PSIdLookup,
     processingTimeout: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
@@ -125,14 +128,27 @@ class GrpcTopologyManagerReadService(
 
   private def collectStores(
       storeO: Option[grpc.TopologyStoreId]
-  ): EitherT[FutureUnlessShutdown, RpcError, Seq[
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, RpcError, Seq[
     topology.store.TopologyStore[topology.store.TopologyStoreId]
   ]] =
     storeO match {
       case Some(store) =>
-        EitherT.rightT(stores.filter(_.storeId == store.toInternal))
+        EitherT.rightT(
+          activePSIdFor(store).toOption.toList.flatMap(targetStoreId =>
+            stores.filter(_.storeId == targetStoreId)
+          )
+        )
       case None => EitherT.rightT(stores)
     }
+
+  private def activePSIdFor(
+      grpcTopologyStoreId: grpc.TopologyStoreId
+  )(implicit
+      traceContext: TraceContext
+  ): Either[RpcError, topology.store.TopologyStoreId] =
+    grpcTopologyStoreId
+      .toInternal(physicalSynchronizerIdLookup)
+      .leftMap(TopologyManagerError.InvalidSynchronizer.Failure(_))
 
   private def collectSynchronizerStore(
       storeO: Option[grpc.TopologyStoreId]
@@ -145,20 +161,21 @@ class GrpcTopologyManagerReadService(
         : Either[RpcError, topology.store.TopologyStore[topology.store.TopologyStoreId]] =
       storeO match {
         case Some(store) =>
-          val targetStoreInternal = store.toInternal
-          val synchronizerStores = stores.filter { s =>
-            s.storeId.isSynchronizerStore && s.storeId == targetStoreInternal
-          }
-          synchronizerStores match {
-            case Nil =>
-              TopologyManagerError.TopologyStoreUnknown
-                .Failure(targetStoreInternal)
-                .asLeft
-            case Seq(synchronizerStore) => synchronizerStore.asRight
-            case _ =>
-              TopologyManagerError.InvalidSynchronizer
-                .MultipleSynchronizerStoresFound(targetStoreInternal)
-                .asLeft
+          activePSIdFor(store).flatMap { targetStoreInternal =>
+            val synchronizerStores = stores.filter { s =>
+              s.storeId.isSynchronizerStore && s.storeId == targetStoreInternal
+            }
+            synchronizerStores match {
+              case Nil =>
+                TopologyManagerError.TopologyStoreUnknown
+                  .Failure(targetStoreInternal)
+                  .asLeft
+              case Seq(synchronizerStore) => synchronizerStore.asRight
+              case multiple =>
+                TopologyManagerError.InvalidSynchronizer
+                  .MultipleSynchronizerStoresFound(multiple.map(_.storeId))
+                  .asLeft
+            }
           }
 
         case None =>
@@ -246,7 +263,7 @@ class GrpcTopologyManagerReadService(
           col.result
             .filter(
               baseQuery.filterSigningKey.isEmpty || _.transaction.signatures
-                .exists(_.signedBy.unwrap.startsWith(baseQuery.filterSigningKey))
+                .exists(_.authorizingLongTermKey.unwrap.startsWith(baseQuery.filterSigningKey))
             )
             .parTraverse { tx =>
               val resultE = for {
@@ -272,7 +289,7 @@ class GrpcTopologyManagerReadService(
                   signedTx.operation,
                   signedTx.transaction.hash.hash.getCryptographicEvidence,
                   signedTx.transaction.serial,
-                  signedTx.signatures.map(_.signedBy),
+                  signedTx.signatures.map(_.authorizingLongTermKey),
                 )
               } yield (result, tx.transaction.transaction.mapping)
 
@@ -701,15 +718,16 @@ class GrpcTopologyManagerReadService(
         }
       ): EitherT[FutureUnlessShutdown, RpcError, Seq[GenericStoredTopologyTransactions]]
     } yield {
-      val res = results.foldLeft(StoredTopologyTransactions.empty) { case (acc, elem) =>
-        StoredTopologyTransactions(
-          acc.result ++ elem.result.filter(
+      val res = StoredTopologyTransactions(
+        results.foldMap(
+          _.result.filter(
             baseQuery.filterSigningKey.isEmpty || _.transaction.signatures.exists(
-              _.signedBy.unwrap.startsWith(baseQuery.filterSigningKey)
+              _.authorizingLongTermKey.unwrap.startsWith(baseQuery.filterSigningKey)
             )
           )
         )
-      }
+      )
+
       if (logger.underlying.isDebugEnabled()) {
         logger.debug(s"All listed topology transactions: ${res.result}")
       }
@@ -801,27 +819,98 @@ class GrpcTopologyManagerReadService(
     CantonGrpcUtil.mapErrNewEUS(res)
   }
 
-  override def listPurgeTopologyTransaction(
-      request: ListPurgeTopologyTransactionRequest
-  ): Future[ListPurgeTopologyTransactionResponse] = {
+  override def logicalUpgradeState(
+      request: LogicalUpgradeStateRequest,
+      responseObserver: StreamObserver[LogicalUpgradeStateResponse],
+  ): Unit = GrpcStreamingUtils.streamToClient(
+    (out: OutputStream) => getLogicalUpgradeState(out),
+    responseObserver,
+    byteString => LogicalUpgradeStateResponse(byteString),
+    processingTimeout.unbounded.duration,
+  )
+
+  private def getLogicalUpgradeState(
+      out: OutputStream
+  ): Future[Unit] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val res: EitherT[FutureUnlessShutdown, RpcError, Unit] =
+      for {
+        synchronizerTopologyStore <- collectSynchronizerStore(None)
+
+        topologyClient <- EitherT.fromEither[FutureUnlessShutdown](
+          topologyClientLookup(synchronizerTopologyStore.storeId).toRight(
+            TopologyManagerError.TopologyStoreUnknown.Failure(synchronizerTopologyStore.storeId)
+          )
+        )
+
+        topologySnapshot = topologyClient.currentSnapshotApproximation
+        _ <- EitherT.fromOptionF(
+          fopt = topologySnapshot.isSynchronizerUpgradeOngoing(),
+          ifNone = TopologyManagerError.NoOngoingSynchronizerUpgrade.Failure(),
+        )
+
+        topologySnapshot <- EitherT.right[RpcError](
+          synchronizerTopologyStore.findEssentialStateAtSequencedTime(
+            SequencedTime(topologySnapshot.timestamp),
+            includeRejected = false,
+          )
+        )
+        nonLogicalUpgradeMappings = topologySnapshot.filter { stored =>
+          val isNonLSU =
+            !TopologyMapping.Code.logicalSynchronizerUpgradeMappings.contains(stored.mapping.code)
+          val isFullyAuthorizedOrNotExpiredProposal =
+            !stored.transaction.isProposal || stored.validUntil.isEmpty
+
+          isNonLSU && isFullyAuthorizedOrNotExpiredProposal
+        }
+
+      } yield {
+        nonLogicalUpgradeMappings.toByteString(ProtocolVersion.latest).writeTo(out)
+      }
+    CantonGrpcUtil.mapErrNewEUS(res)
+  }
+
+  override def listSynchronizerUpgradeAnnouncement(
+      request: ListSynchronizerUpgradeAnnouncementRequest
+  ): Future[ListSynchronizerUpgradeAnnouncementResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val ret = for {
       res <- collectFromStoresByFilterString(
         request.baseQuery,
-        PurgeTopologyTransaction.code,
+        SynchronizerUpgradeAnnouncement.code,
         request.filterSynchronizerId,
       )
     } yield {
-      val results = res
-        .collect { case (result, x: PurgeTopologyTransaction) => (result, x) }
-        .map { case (context, elem) =>
-          new adminProto.ListPurgeTopologyTransactionResponse.Result(
-            context = Some(createBaseResult(context)),
-            item = Some(elem.toProto),
-          )
-        }
+      val results = res.collect { case (context, announcement: SynchronizerUpgradeAnnouncement) =>
+        adminProto.ListSynchronizerUpgradeAnnouncementResponse.Result(
+          context = Some(createBaseResult(context)),
+          item = Some(announcement.toProto),
+        )
+      }
+      adminProto.ListSynchronizerUpgradeAnnouncementResponse(results)
+    }
+    CantonGrpcUtil.mapErrNewEUS(ret)
+  }
 
-      adminProto.ListPurgeTopologyTransactionResponse(results = results)
+  override def listSequencerConnectionSuccessor(
+      request: ListSequencerConnectionSuccessorRequest
+  ): Future[ListSequencerConnectionSuccessorResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val ret = for {
+      res <- collectFromStoresByFilterString(
+        request.baseQuery,
+        SequencerConnectionSuccessor.code,
+        request.filterSequencerId,
+      )
+    } yield {
+      val results = res.collect { case (context, successor: SequencerConnectionSuccessor) =>
+        adminProto.ListSequencerConnectionSuccessorResponse.Result(
+          context = Some(createBaseResult(context)),
+          item = Some(successor.toProto),
+        )
+      }
+      adminProto.ListSequencerConnectionSuccessorResponse(results)
     }
     CantonGrpcUtil.mapErrNewEUS(ret)
   }

@@ -9,11 +9,14 @@ import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.api.v2.completion.Completion
-import com.daml.ledger.api.v2.transaction.TransactionTree
+import com.daml.ledger.api.v2.transaction.Transaction as ApiTransaction
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
+  EventFormat,
   Filters,
-  TransactionFilter,
+  TransactionFormat,
+  UpdateFormat,
   WildcardFilter,
 }
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
@@ -21,7 +24,7 @@ import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.UpdateTreeWrapper
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.UpdateWrapper
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.data.{DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.integration.TestConsoleEnvironment
@@ -52,8 +55,10 @@ import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.TryUtil
 import com.digitalasset.daml.lf.command.ApiCommands
 import com.digitalasset.daml.lf.crypto
+import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{CommandId, SubmissionId, UserId, WorkflowId}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.engine.ResultNeedContract.Response
 import com.digitalasset.daml.lf.engine.{
   Engine,
   EngineConfig,
@@ -65,7 +70,6 @@ import com.digitalasset.daml.lf.engine.{
   ResultNeedContract,
   ResultNeedKey,
   ResultNeedPackage,
-  ResultNeedUpgradeVerification,
   ResultPrefetch,
 }
 import com.digitalasset.daml.lf.language.LanguageVersion
@@ -75,16 +79,15 @@ import org.scalatest.OptionValues.*
 
 import java.time.Duration
 import java.util.UUID
-import scala.annotation.{nowarn, tailrec, unused}
+import scala.annotation.{tailrec, unused}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-@nowarn("cat=deprecation")
 class TestSubmissionService(
     participantId: ParticipantId,
     maxDeduplicationDuration: NonNegativeFiniteDuration,
     damle: Engine,
-    contractResolver: LfContractId => TraceContext => Future[Option[LfContractInst]],
+    contractResolver: LfContractId => TraceContext => Future[Option[FatContractInstance]],
     keyResolver: TestKeyResolver,
     packageResolver: PackageResolver,
     syncService: SyncService,
@@ -96,31 +99,31 @@ class TestSubmissionService(
   implicit lazy val loggingContext: LoggingContextWithTrace =
     LoggingContextWithTrace.ForTesting
 
-  def submitAndWaitForTransactionTree(
+  def submitAndWaitForTransaction(
       submittingParticipant: ParticipantReference,
       commands: CommandsWithMetadata,
-  )(implicit traceContext: TraceContext): Future[TransactionTree] =
-    waitForTransactionTree(submittingParticipant, commands, submitAsync_(commands))
+  )(implicit traceContext: TraceContext): Future[ApiTransaction] =
+    waitForTransaction(submittingParticipant, commands, submitAsync_(commands))
 
-  def waitForTransactionTree(
+  def waitForTransaction(
       submittingParticipant: ParticipantReference,
       commands: CommandsWithMetadata,
       doSubmit: => Future[Unit],
-  ): Future[TransactionTree] = {
-    val resultP = Promise[UpdateTreeWrapper]()
+  ): Future[ApiTransaction] = {
+    val resultP = Promise[UpdateWrapper]()
 
-    val observer = new CollectFirstObserver[UpdateTreeWrapper]({
-      case UpdateService.TransactionTreeWrapper(transactionTree) =>
-        transactionTree.commandId == commands.commandId
+    val observer = new CollectFirstObserver[UpdateWrapper]({
+      case UpdateService.TransactionWrapper(transaction) =>
+        transaction.commandId == commands.commandId
       case _: UpdateService.ReassignmentWrapper => false
+      case _: UpdateService.TopologyTransactionWrapper => false
     })
     resultP.completeWith(observer.result)
 
-    val closeSubscription = submittingParticipant.ledger_api.updates.subscribe_trees(
+    val closeSubscription = submittingParticipant.ledger_api.updates.subscribe_updates(
       observer,
-      commands.filter,
+      updateFormat = commands.format,
       beginOffsetExclusive = submittingParticipant.ledger_api.state.end(),
-      verbose = false,
     )
     resultP.future.onComplete(_ => closeSubscription.close())
 
@@ -130,7 +133,7 @@ class TestSubmissionService(
     }
 
     resultP.future.map {
-      case UpdateService.TransactionTreeWrapper(transactionTree) => transactionTree
+      case UpdateService.TransactionWrapper(transaction) => transaction
       case other => sys.error(s"Unexpected update: $other")
     }
   }
@@ -338,8 +341,15 @@ class TestSubmissionService(
 
       case ResultNeedContract(acoid, resume) =>
         for {
-          contractO <- contractResolver(acoid)(traceContext)
-          r <- resolve(resume(contractO))
+          contractOpt <- contractResolver(acoid)(traceContext)
+          response: Response =
+            contractOpt match {
+              case Some(contract) =>
+                Response.ContractFound(contract, Hash.HashingMethod.UpgradeFriendly, _ => true)
+              case None =>
+                Response.ContractNotFound
+            }
+          r <- resolve(resume(response))
         } yield r
 
       case ResultNeedPackage(packageId, resume) =>
@@ -360,15 +370,11 @@ class TestSubmissionService(
       case ResultInterruption(continue, _) =>
         resolve(iterateOverInterrupts(continue))
 
-      case ResultNeedUpgradeVerification(_, _, _, _, resume) =>
-        resolve(resume(None))
-
       case ResultPrefetch(_, _, resume) => resolve(resume())
     }
   }
 }
 
-@nowarn("cat=deprecation")
 object TestSubmissionService {
 
   /** Creates a `TestSubmissionService` for submitting commands to the given `participant`. The
@@ -414,16 +420,16 @@ object TestSubmissionService {
 
     def resolveContract(
         coid: LfContractId
-    )(traceContext: TraceContext): Future[Option[LfContractInst]] =
+    )(traceContext: TraceContext): Future[Option[FatContractInstance]] =
       participantNode.sync.participantNodePersistentState.value.contractStore
-        .lookupLfInstance(coid)(traceContext)
+        .lookupFatContract(coid)(traceContext)
         .value
         .failOnShutdownToAbortException("TestSubmissionService")
 
     val keyResolver = customKeyResolver.getOrElse(ActiveKeyResolver(participant))
 
     val packageResolver: PackageResolver = id =>
-      tc => participantNode.sync.packageService.value.getPackage(id)(tc)
+      tc => participantNode.sync.packageService.getPackage(id)(tc)
 
     val loggerFactory = participantNode.loggerFactory
 
@@ -449,7 +455,7 @@ object TestSubmissionService {
       val id = Ref.PackageId.assertFromString(p.id)
       val name = Ref.PackageName.assertFromString(p.name)
       val version = Ref.PackageVersion.assertFromString(p.version.toString)
-      (id -> (name, version))
+      id -> (name, version)
     }.toMap
 
   /** Strategy to resolve a contract key for use by DAML engine.
@@ -486,7 +492,9 @@ object TestSubmissionService {
                 allContracts <- contractStore
                   .find(None, None, None, Int.MaxValue)
                   .failOnShutdownToAbortException("resolveKey")
-                contractsWithKey = allContracts.filter(_.metadata.maybeKey.contains(globalKey))
+                contractsWithKey = allContracts.filter(
+                  _.contractKeyWithMaintainers.map(_.globalKey).contains(globalKey)
+                )
                 allContractIds = contractsWithKey.map(_.contractId)
                 // At this stage, the ledger api server would filter out divulged contracts that are invisible to all submitters.
                 activeContractIds <- contractsWithKey.parTraverseFilter { contract =>
@@ -618,18 +626,30 @@ object TestSubmissionService {
       )
     }
 
-    def filter: TransactionFilter = TransactionFilter(
-      filtersByParty = (actAs ++ readAs)
-        .map(party =>
-          party.toLf -> Filters(
-            Seq(
-              CumulativeFilter.defaultInstance
-                .withWildcardFilter(WildcardFilter(includeCreatedEventBlob = false))
+    def format: UpdateFormat = UpdateFormat(
+      includeTransactions = Some(
+        TransactionFormat(
+          Some(
+            EventFormat(
+              filtersByParty = (actAs ++ readAs)
+                .map(party =>
+                  party.toLf -> Filters(
+                    Seq(
+                      CumulativeFilter.defaultInstance
+                        .withWildcardFilter(WildcardFilter(includeCreatedEventBlob = false))
+                    )
+                  )
+                )
+                .toMap,
+              filtersForAnyParty = None,
+              verbose = false,
             )
-          )
+          ),
+          TRANSACTION_SHAPE_LEDGER_EFFECTS,
         )
-        .toMap,
-      filtersForAnyParty = None,
+      ),
+      includeReassignments = None,
+      includeTopologyEvents = None,
     )
   }
 }

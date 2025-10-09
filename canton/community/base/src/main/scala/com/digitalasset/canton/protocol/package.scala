@@ -87,9 +87,20 @@ package object protocol {
   /** Shorthand for leaf only action nodes. */
   type LfLeafOnlyActionNode = Node.LeafOnlyAction
 
-  /** Shorthand for contract instances. */
-  type LfContractInst = Value.VersionedContractInstance
-  val LfContractInst: Value.VersionedContractInstance.type = Value.VersionedContractInstance
+  /** Shorthand for contract instances with a known creation time. */
+  type LfFatContractInst = FatContractInstance { type CreatedAtTime <: CreationTime.CreatedAt }
+  val LfFatContractInst: FatContractInstance.type = FatContractInstance
+
+  type LfThinContractInst = Value.VersionedThinContractInstance
+  val LfThinContractInst: Value.VersionedContractInstance.type = Value.VersionedContractInstance
+
+  /** A contract instance with a known creation time */
+  type ContractInstance =
+    GenContractInstance { type InstCreatedAtTime <: CreationTime.CreatedAt }
+
+  type NewContractInstance =
+    // TODO(#23971): Specialize this to `CreationTime.Now` once all locally created contracts use contract ID V2.
+    GenContractInstance { type InstCreatedAtTime <: CreationTime }
 
   type LfHash = Hash
   val LfHash: Hash.type = Hash
@@ -101,8 +112,8 @@ package object protocol {
   type LfGlobalKeyWithMaintainers = GlobalKeyWithMaintainers
   val LfGlobalKeyWithMaintainers: GlobalKeyWithMaintainers.type = GlobalKeyWithMaintainers
 
-  type LfTemplateId = Ref.TypeConName
-  val LfTemplateId: Ref.TypeConName.type = Ref.TypeConName
+  type LfTemplateId = Ref.TypeConId
+  val LfTemplateId: Ref.TypeConId.type = Ref.TypeConId
 
   type LfChoiceName = Ref.ChoiceName
   val LfChoiceName: Ref.ChoiceName.type = Ref.ChoiceName

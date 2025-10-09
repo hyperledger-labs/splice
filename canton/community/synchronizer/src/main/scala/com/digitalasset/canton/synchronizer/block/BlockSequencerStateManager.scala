@@ -30,7 +30,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SequencerIntegration,
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.store.TrafficConsumedStore
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, LoggerUtil}
@@ -41,7 +41,6 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.Success
 
 /** Thrown if the ephemeral state does not match what is expected in the persisted store. This is
   * not expected to be able to occur, but if it does likely means that the ephemeral state is
@@ -155,14 +154,15 @@ class BlockSequencerStateManager(
           noTracingLogger.error(msg)
           throw new SequencerUnexpectedStateChange(msg)
         } else {
-          implicit val traceContext: TraceContext = TraceContext.ofBatch(blockEvents.events)(logger)
+          implicit val traceContext: TraceContext =
+            TraceContext.ofBatch("check_block_height")(blockEvents.events)(logger)
           // Set the current block height to the new block's height instead of + 1 of the previous value
           // so that we support starting from an arbitrary block height
 
           logger.debug(
             s"Processing block $height with ${blockEvents.events.size} block events.${blockEvents.events
                 .map(_.value)
-                .collectFirst { case LedgerBlockEvent.Send(timestamp, _, _) =>
+                .collectFirst { case LedgerBlockEvent.Send(timestamp, _, _, _) =>
                   s" First timestamp in block: $timestamp"
                 }
                 .getOrElse("")}"
@@ -194,7 +194,7 @@ class BlockSequencerStateManager(
       dbSequencerIntegration: SequencerIntegration
   ): Flow[Traced[BlockUpdate], Traced[CantonTimestamp], NotUsed] = {
     implicit val traceContext = TraceContext.empty
-    Flow[Traced[BlockUpdate]].statefulMapAsync(getHeadState) { (priorHead, update) =>
+    Flow[Traced[BlockUpdate]].statefulMapAsyncUSAndDrain(getHeadState) { (priorHead, update) =>
       implicit val traceContext = update.traceContext
       val currentBlockNumber = priorHead.block.height + 1
       val fut = update.value match {
@@ -214,7 +214,6 @@ class BlockSequencerStateManager(
       }
       fut
         .map(newHead => newHead -> Traced(newHead.block.lastTs))
-        .failOnShutdownToAbortException("BlockSequencerStateManagerBase.applyBlockUpdate")
     }
   }
 
@@ -279,7 +278,7 @@ class BlockSequencerStateManager(
     }
 
     val trafficConsumedFUS = EitherT.right[String](
-      performUnlessClosingUSF("trafficConsumedStore.store")(
+      synchronizeWithClosing("trafficConsumedStore.store")(
         trafficConsumedStore.store(trafficConsumedUpdates)
       )
     )
@@ -289,7 +288,7 @@ class BlockSequencerStateManager(
       dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
     )
     val inFlightAggregationUpdatesFUS = EitherT.right[String](
-      performUnlessClosingUSF("partialBlockUpdate")(
+      synchronizeWithClosing("partialBlockUpdate")(
         store.partialBlockUpdate(inFlightAggregationUpdates = update.inFlightAggregationUpdates)
       )
     )
@@ -311,11 +310,7 @@ class BlockSequencerStateManager(
       newHead
     }).valueOr(e =>
       ErrorUtil.internalError(new RuntimeException(s"handleChunkUpdate failed with error: $e"))
-    ).transform {
-      case Success(UnlessShutdown.AbortedDueToShutdown) =>
-        Success(UnlessShutdown.Outcome(priorHead))
-      case other => other
-    }
+    )
   }
 
   private def handleComplete(priorHead: HeadState, newBlock: BlockInfo)(implicit
@@ -437,7 +432,7 @@ class BlockSequencerStateManager(
 object BlockSequencerStateManager {
 
   def create(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       store: SequencerBlockStore,
       trafficConsumedStore: TrafficConsumedStore,
       enableInvariantCheck: Boolean,
@@ -454,9 +449,12 @@ object BlockSequencerStateManager {
       ErrorLoggingContext.fromTracedLogger(logger)
     timeouts.unbounded
       .awaitUS(s"Reading the head of the $synchronizerId sequencer state")(store.readHead)
-      .map { headBlock =>
+      .map { headBlockO =>
+        val headBlock = headBlockO.getOrElse(BlockEphemeralState.empty)
         new AtomicReference[HeadState]({
-          logger.debug(s"Initialized the block sequencer with head block ${headBlock.latestBlock}")
+          logger.debug(
+            s"Initialized the block sequencer with head block ${headBlock.latestBlock}"
+          )
           HeadState.fullyProcessed(headBlock)
         })
       }

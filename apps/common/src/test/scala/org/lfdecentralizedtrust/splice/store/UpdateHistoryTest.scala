@@ -112,6 +112,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*signatories*/ Seq(party1, party2).asJava,
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
+                  /*acsDelta*/ false,
                 ),
                 new ExercisedEvent(
                   /*witnessParties*/ Seq(party1).asJava,
@@ -128,6 +129,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*lastDescendedNodeId*/ Integer.valueOf(52),
                   /*exerciseResult*/ someValue,
                   /*implementedInterfaces*/ Seq.empty.asJava,
+                  /*acsDelta*/ false,
                 ),
               ),
               synchronizerId = domain1,
@@ -727,6 +729,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*signatories*/ Seq(party1).asJava,
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
+                  /*acsDelta*/ false,
                 ),
                 new CreatedEvent(
                   /*witnessParties*/ Seq(party1).asJava,
@@ -745,6 +748,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*signatories*/ Seq(party2).asJava,
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
+                  /*acsDelta*/ false,
                 ),
               ),
               synchronizerId = domain1,
@@ -777,6 +781,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*signatories*/ Seq(party1).asJava,
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
+                  /*acsDelta*/ false,
                 )
               ),
               synchronizerId = domain1,
@@ -807,6 +812,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*signatories*/ Seq(party2).asJava,
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
+                  /*acsDelta*/ false,
                 )
               ),
               synchronizerId = domain1,

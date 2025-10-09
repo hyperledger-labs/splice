@@ -12,10 +12,12 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.TemplatePartiesFilter
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
   RawAssignEvent,
   RawUnassignEvent,
+  SequentialIdBatch,
 }
 import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPaginationState
 import com.digitalasset.canton.platform.store.dao.events.ReassignmentStreamReader.{
@@ -34,7 +36,7 @@ import com.digitalasset.canton.platform.store.utils.{
 }
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.Party
+import com.digitalasset.daml.lf.data.Ref.{NameTypeConRef, Party}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Attributes
 import org.apache.pekko.stream.scaladsl.Source
@@ -135,7 +137,7 @@ class ReassignmentStreamReader(
                         .fold(0L)(_.unwrap)}",
                 ) {
                   payloadDbQuery.fetchPayloads(
-                    eventSequentialIds = ids,
+                    eventSequentialIds = Ids(ids),
                     allFilterParties = filteringConstraints.allFilterParties,
                   )(connection)
                 }
@@ -234,7 +236,7 @@ object ReassignmentStreamReader {
   trait IdDbQuery {
     def fetchIds(
         stakeholder: Option[Party],
-        templateIdO: Option[Ref.Identifier],
+        templateIdO: Option[NameTypeConRef],
         startExclusive: Long,
         endInclusive: Long,
         limit: Int,
@@ -244,7 +246,7 @@ object ReassignmentStreamReader {
   @FunctionalInterface
   trait PayloadDbQuery[T] {
     def fetchPayloads(
-        eventSequentialIds: Iterable[Long],
+        eventSequentialIds: SequentialIdBatch,
         allFilterParties: Option[Set[Ref.Party]],
     ): Connection => Vector[T]
   }

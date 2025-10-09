@@ -13,7 +13,14 @@ import com.digitalasset.canton.ledger.api.{
 import com.digitalasset.canton.platform.store.dao.EventProjectionProperties.Projection
 import com.digitalasset.canton.platform.store.dao.EventProjectionPropertiesSpec.Scope
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.{Identifier, Party, TypeConRef}
+import com.digitalasset.daml.lf.data.Ref.{
+  FullIdentifier,
+  Identifier,
+  IdentifierConverter,
+  NameTypeConRef,
+  Party,
+  TypeConRef,
+}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -25,13 +32,11 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       eventFormat = noFilter.copy(verbose = true),
       interfaceImplementedBy = noInterface,
       resolveTypeConRef = noTemplatesForPackageName,
-      alwaysPopulateArguments = false,
     ).verbose shouldBe true
     EventProjectionProperties(
       eventFormat = noFilter.copy(verbose = false),
       interfaceImplementedBy = noInterface,
       resolveTypeConRef = noTemplatesForPackageName,
-      alwaysPopulateArguments = false,
     ).verbose shouldBe false
   }
 
@@ -40,9 +45,8 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       eventFormat = noFilter.copy(verbose = true),
       interfaceImplementedBy = noInterface,
       resolveTypeConRef = noTemplatesForPackageName,
-      alwaysPopulateArguments = false,
     )
-      .render(Set.empty, id) shouldBe Projection(Set.empty, false, false)
+      .render(Set.empty, id) shouldBe Projection(Set.empty, false)
   }
 
   it should "project nothing in case of empty witnesses" in new Scope {
@@ -50,23 +54,16 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       eventFormat = templateWildcardFilter(),
       interfaceImplementedBy = interfaceImpl,
       resolveTypeConRef = noTemplatesForPackageName,
-      alwaysPopulateArguments = false,
     )
-      .render(Set.empty, id) shouldBe Projection(Set.empty, false, false)
+      .render(Set.empty, id) shouldBe Projection(Set.empty, false)
 
     EventProjectionProperties(
       eventFormat = templateWildcardPartyWildcardFilter(),
       interfaceImplementedBy = interfaceImpl,
       resolveTypeConRef = noTemplatesForPackageName,
-      alwaysPopulateArguments = false,
     )
-      .render(Set.empty, id) shouldBe Projection(Set.empty, false, false)
+      .render(Set.empty, id) shouldBe Projection(Set.empty, false)
   }
-
-  behavior of "projecting contract arguments"
-
-  projectingContractArgumentsTests(withPartyWildcard = false)
-  projectingContractArgumentsTests(withPartyWildcard = true)
 
   behavior of "projecting interfaces"
 
@@ -83,7 +80,7 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       filtersByParty = Map(
         party ->
           CumulativeFilter(
-            templateFilters = Set(TemplateFilter(template1, false)),
+            templateFilters = Set(TemplateFilter(template1Full.toIdentifier.toRef, false)),
             interfaceFilters = Set.empty,
             templateWildcardFilter = None,
           ),
@@ -108,7 +105,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       eventFormat = transactionFilter,
       interfaceImplementedBy = interfaceImpl,
       resolveTypeConRef = noTemplatesForPackageName,
-      alwaysPopulateArguments = true,
     )
     testee.render(Set(party), template1).createdEventBlob shouldBe true
     testee.render(Set(party2), template1).createdEventBlob shouldBe true
@@ -152,7 +148,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         templatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(
@@ -161,14 +156,13 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = true,
-        contractArguments = true,
       )
 
-      // createdEventBlob not enabled as it's only matched by the package-name scoped template filter with createdEventBlob = false
+      // createdEventBlob enabled as it's matched by the package-id scoped template filter for template1 with createdEventBlob = true
+      // which internally translates to package-name which is the same with that of template2
       eventProjectionProperties.render(Set(party), template2) shouldBe Projection(
         interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = true,
+        createdEventBlob = true,
       )
     }
 
@@ -206,7 +200,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         templatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(
@@ -215,14 +208,13 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = true,
-        contractArguments = true,
       )
 
-      // createdEventBlob not enabled as it's only matched by the package-name scoped template filter with createdEventBlob = false
+      // createdEventBlob enabled as it's matched by the package-id scoped template filter for template1 with createdEventBlob = true
+      // which internally translates to package-name which is the same with that of template2
       eventProjectionProperties.render(Set(party), template2) shouldBe Projection(
         interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = true,
+        createdEventBlob = true,
       )
     }
 
@@ -265,333 +257,21 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       eventFormat = transactionFilter,
       interfaceImplementedBy = interfaceImpl,
       templatesForPackageName,
-      alwaysPopulateArguments = false,
     )
     private val eventProjectionPropertiesSwapped = EventProjectionProperties(
       eventFormat = transactionFilterSwapped,
       interfaceImplementedBy = interfaceImpl,
       templatesForPackageName,
-      alwaysPopulateArguments = false,
     )
 
     eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
       interfaces = Set(iface1),
       createdEventBlob = true,
-      contractArguments = true,
     )
     eventProjectionPropertiesSwapped.render(Set(party), template1) shouldBe Projection(
       interfaces = Set(iface1),
       createdEventBlob = true,
-      contractArguments = true,
     )
-  }
-
-  def projectingContractArgumentsTests(withPartyWildcard: Boolean) = {
-    val details =
-      if (withPartyWildcard) " (with party-wildcard filters)" else " (with filters by party)"
-
-    it should "project contract arguments in case of match by template" ++ details in new Scope {
-      private val filters = templateFilterFor(template1Ref)
-      private val transactionFilter = withPartyWildcard match {
-        case false =>
-          EventFormat(
-            filtersByParty = Map(party -> filters),
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        case true =>
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(filters),
-            verbose = true,
-          )
-      }
-
-      private val eventProjectionProperties = EventProjectionProperties(
-        eventFormat = transactionFilter,
-        interfaceImplementedBy = noInterface,
-        resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-      eventProjectionProperties.render(
-        Set(party),
-        template1,
-      ) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = true,
-      )
-      eventProjectionProperties.render(
-        Set(party2),
-        template1,
-      ) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = withPartyWildcard,
-      )
-    }
-
-    it should "not project contract arguments in case of mismatch by template" ++ details in new Scope {
-      private val filters = templateFilterFor(template1Ref)
-      private val transactionFilter = withPartyWildcard match {
-        case false =>
-          EventFormat(
-            filtersByParty = Map(party -> filters),
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        case true =>
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(filters),
-            verbose = true,
-          )
-      }
-
-      EventProjectionProperties(
-        eventFormat = transactionFilter,
-        interfaceImplementedBy = noInterface,
-        resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
-      ).render(
-        Set(party),
-        template2,
-      ) shouldBe Projection(Set.empty, false, false)
-    }
-
-    it should "project contract arguments in case of match by package-name" ++ details in new Scope {
-      private val filters = templateFilterFor(packageNameScopedTemplate)
-      private val transactionFilter = withPartyWildcard match {
-        case false =>
-          EventFormat(
-            filtersByParty = Map(party -> filters),
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        case true =>
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(filters),
-            verbose = true,
-          )
-      }
-      private val eventProjectionProperties = EventProjectionProperties(
-        eventFormat = transactionFilter,
-        interfaceImplementedBy = noInterface,
-        resolveTypeConRef = templatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-
-      eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = true,
-      )
-      eventProjectionProperties.render(Set(party), template2) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = true,
-      )
-      eventProjectionProperties.render(Set(party2), template2) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = withPartyWildcard,
-      )
-      eventProjectionProperties.render(Set(party), template3) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = false,
-      )
-    }
-
-    it should "project contract arguments in case of template-wildcard match" ++ details in new Scope {
-      private val eventProjectionProperties = EventProjectionProperties(
-        eventFormat =
-          if (withPartyWildcard) templateWildcardPartyWildcardFilter()
-          else templateWildcardFilter(),
-        interfaceImplementedBy = noInterface,
-        resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-      eventProjectionProperties.render(
-        Set(party),
-        template1,
-      ) shouldBe Projection(Set.empty, false, true)
-      eventProjectionProperties.render(
-        Set(party2),
-        template1,
-      ) shouldBe Projection(Set.empty, false, withPartyWildcard)
-    }
-
-    it should "not project contract arguments in case of empty CumulativeFilters" ++ details in new Scope {
-      private val eventProjectionProperties = EventProjectionProperties(
-        eventFormat =
-          if (withPartyWildcard) emptyCumulativePartyWildcardFilters else emptyCumulativeFilters,
-        interfaceImplementedBy = noInterface,
-        resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-      eventProjectionProperties.render(
-        Set(party),
-        template1,
-      ) shouldBe Projection(Set.empty, false, false)
-      eventProjectionProperties.render(
-        Set(party2),
-        template1,
-      ) shouldBe Projection(Set.empty, false, false)
-    }
-
-    it should "project contract arguments with template-wildcard and another filter" ++ details in new Scope {
-      private val filters =
-        CumulativeFilter(
-          templateFilters = Set.empty,
-          interfaceFilters = Set.empty,
-          templateWildcardFilter = Some(TemplateWildcardFilter(includeCreatedEventBlob = false)),
-        )
-      private val transactionFilter = withPartyWildcard match {
-        case false =>
-          EventFormat(
-            filtersByParty = Map(
-              party -> filters,
-              party2 ->
-                CumulativeFilter(
-                  templateFilters = Set(template1Filter),
-                  interfaceFilters = Set.empty,
-                  templateWildcardFilter = None,
-                ),
-            ),
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        case true =>
-          EventFormat(
-            filtersByParty = Map(
-              party2 ->
-                CumulativeFilter(
-                  templateFilters = Set(template1Filter),
-                  interfaceFilters = Set.empty,
-                  templateWildcardFilter = None,
-                )
-            ),
-            filtersForAnyParty = Some(filters),
-            verbose = true,
-          )
-      }
-      private val eventProjectionProperties = EventProjectionProperties(
-        eventFormat = transactionFilter,
-        interfaceImplementedBy = noInterface,
-        resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-
-      eventProjectionProperties.render(
-        Set(party, party2),
-        template2,
-      ) shouldBe Projection(Set.empty, false, true)
-      eventProjectionProperties.render(
-        Set(party),
-        template2,
-      ) shouldBe Projection(Set.empty, false, true)
-      eventProjectionProperties.render(
-        Set(party2),
-        template2,
-      ) shouldBe Projection(Set.empty, false, withPartyWildcard)
-    }
-
-    it should "project contract arguments if interface filter and package-name scope template filter" ++ details in new Scope {
-      private val filters: CumulativeFilter =
-        CumulativeFilter(
-          templateFilters =
-            Set(TemplateFilter(packageNameScopedTemplate, includeCreatedEventBlob = false)),
-          interfaceFilters = Set(
-            InterfaceFilter(
-              packageNameScopedIface1,
-              includeView = true,
-              includeCreatedEventBlob = false,
-            )
-          ),
-          templateWildcardFilter = None,
-        )
-      private val transactionFilter = withPartyWildcard match {
-        case false =>
-          EventFormat(
-            filtersByParty = Map(party -> filters),
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        case true =>
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(filters),
-            verbose = true,
-          )
-      }
-      private val eventProjectionProperties = EventProjectionProperties(
-        eventFormat = transactionFilter,
-        interfaceImplementedBy = Map(iface1 -> Set(template1)),
-        resolveTypeConRef = templatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-
-      eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
-        interfaces = Set(iface1),
-        createdEventBlob = false,
-        contractArguments = true,
-      )
-      eventProjectionProperties.render(Set(party2), template1) shouldBe Projection(
-        interfaces = if (!withPartyWildcard) Set.empty else Set(iface1),
-        createdEventBlob = false,
-        contractArguments = withPartyWildcard,
-      )
-    }
-
-    it should "project contract arguments with template-wildcard and another filter with alwaysPopulateArguments, " +
-      "if queried non template-wildcard party/template combination" ++ details in new Scope {
-        private val filters: CumulativeFilter = CumulativeFilter(Set.empty, Set.empty, None)
-        private val transactionFilter = withPartyWildcard match {
-          case false =>
-            EventFormat(
-              filtersByParty = Map(
-                party -> filters,
-                party2 -> CumulativeFilter(Set(template1Filter), Set.empty, None),
-              ),
-              filtersForAnyParty = None,
-              verbose = true,
-            )
-          case true =>
-            EventFormat(
-              filtersByParty = Map(
-                party2 -> CumulativeFilter(Set(template1Filter), Set.empty, None)
-              ),
-              filtersForAnyParty = Some(filters),
-              verbose = true,
-            )
-        }
-
-        private val eventProjectionProperties = EventProjectionProperties(
-          eventFormat = transactionFilter,
-          interfaceImplementedBy = noInterface,
-          resolveTypeConRef = noTemplatesForPackageName,
-          alwaysPopulateArguments = true,
-        )
-        eventProjectionProperties.render(
-          Set(party2),
-          template2,
-        ) shouldBe Projection(
-          interfaces = Set.empty,
-          createdEventBlob = false,
-          contractArguments = true,
-        )
-        eventProjectionProperties.render(
-          Set(party3),
-          template2,
-        ) shouldBe Projection(
-          interfaces = Set.empty,
-          createdEventBlob = false,
-          contractArguments = withPartyWildcard,
-        )
-      }
-
   }
 
   def projectingInterfacesTests(withPartyWildcard: Boolean) = {
@@ -629,18 +309,15 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
         interfaces = Set(iface1),
         createdEventBlob = false,
-        contractArguments = false,
       )
       eventProjectionProperties.render(Set(party2), template1) shouldBe Projection(
         interfaces = if (!withPartyWildcard) Set.empty else Set(iface1),
         createdEventBlob = false,
-        contractArguments = false,
       )
     }
 
@@ -675,61 +352,16 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = true,
       )
 
       eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
         interfaces = Set(iface1),
         createdEventBlob = false,
-        contractArguments = true,
       )
       eventProjectionProperties.render(Set(party2), template1) shouldBe Projection(
         interfaces = if (!withPartyWildcard) Set.empty else Set(iface1),
         createdEventBlob = false,
-        contractArguments = withPartyWildcard,
       )
-    }
-
-    it should "not project interface in case of match by interface id and witness" ++ details in new Scope {
-      private val filters =
-        CumulativeFilter(
-          templateFilters = Set.empty,
-          interfaceFilters = Set(
-            InterfaceFilter(
-              iface1Ref,
-              includeView = false,
-              includeCreatedEventBlob = false,
-            )
-          ),
-          templateWildcardFilter = None,
-        )
-      private val transactionFilter = withPartyWildcard match {
-        case false =>
-          EventFormat(
-            filtersByParty = Map(party -> filters),
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        case true =>
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(filters),
-            verbose = true,
-          )
-      }
-
-      EventProjectionProperties(
-        eventFormat = transactionFilter,
-        interfaceImplementedBy = interfaceImpl,
-        resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
-      )
-        .render(Set(party), template1) shouldBe Projection(
-        interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = false,
-      )
-
     }
 
     it should "not project interface in case of match by interface id but not witness with alwaysPopulateArguments" ++ details in new Scope {
@@ -763,12 +395,10 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = true,
       )
         .render(Set(party2), template1) shouldBe Projection(
         interfaces = if (!withPartyWildcard) Set.empty else Set(iface1),
         createdEventBlob = false,
-        contractArguments = withPartyWildcard,
       )
     }
 
@@ -803,12 +433,10 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
         .render(Set(party), template1) shouldBe Projection(
         interfaces = Set(iface1),
         createdEventBlob = false,
-        contractArguments = true,
       )
     }
 
@@ -843,12 +471,10 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = true,
       )
         .render(Set(party), template1) shouldBe Projection(
         interfaces = Set(iface1),
         createdEventBlob = false,
-        contractArguments = true,
       )
     }
 
@@ -889,17 +515,14 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
       eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
         interfaces = Set(iface1, iface2),
         createdEventBlob = false,
-        contractArguments = false,
       )
       eventProjectionProperties.render(Set(party2), template1) shouldBe Projection(
         interfaces = if (!withPartyWildcard) Set.empty else Set(iface1, iface2),
         createdEventBlob = false,
-        contractArguments = false,
       )
     }
 
@@ -935,16 +558,13 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
           eventFormat = transactionFilter,
           interfaceImplementedBy = interfaceImpl,
           resolveTypeConRef = noTemplatesForPackageName,
-          alwaysPopulateArguments = false,
         )
         eventProjectionProperties.render(Set(party), template1) shouldBe Projection(
           Set(iface1, iface2),
           false,
-          false,
         )
         eventProjectionProperties.render(Set(party2), template1) shouldBe Projection(
           Set(iface2),
-          false,
           false,
         )
       }
@@ -1009,11 +629,9 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
         .render(Set(party, party2), template1) shouldBe Projection(
-        Set(iface2, iface1),
-        false,
+        Set(iface1, iface2),
         false,
       )
     }
@@ -1055,7 +673,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(
@@ -1064,7 +681,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = true,
-        contractArguments = false,
       )
       eventProjectionProperties.render(
         Set(party2),
@@ -1072,7 +688,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = withPartyWildcard,
-        contractArguments = false,
       )
     }
 
@@ -1107,7 +722,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(
@@ -1116,7 +730,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = true,
-        contractArguments = true,
       )
       eventProjectionProperties.render(
         Set(party2),
@@ -1124,7 +737,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = withPartyWildcard,
-        contractArguments = withPartyWildcard,
       )
     }
 
@@ -1162,7 +774,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         templatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(
@@ -1171,14 +782,13 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set.empty,
         createdEventBlob = true,
-        contractArguments = true,
       )
 
-      // createdEventBlob not enabled as it's only matched by the package-name scoped template filter with createdEventBlob = false
+      // createdEventBlob enabled as it's matched by the package-id scoped template filter with createdEventBlob = true
+      // (it internally translates to package-name which is the same with that of template2)
       eventProjectionProperties.render(Set(party), template2) shouldBe Projection(
         interfaces = Set.empty,
-        createdEventBlob = false,
-        contractArguments = true,
+        createdEventBlob = true,
       )
     }
 
@@ -1207,7 +817,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       )
 
       eventProjectionProperties.render(
@@ -1216,7 +825,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = Set(iface1),
         createdEventBlob = true,
-        contractArguments = true,
       )
       eventProjectionProperties.render(
         witnesses = Set(party2),
@@ -1224,7 +832,6 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       ) shouldBe Projection(
         interfaces = if (!withPartyWildcard) Set.empty else Set(iface1),
         createdEventBlob = withPartyWildcard,
-        contractArguments = withPartyWildcard,
       )
 
     }
@@ -1266,18 +873,17 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       ).render(
         Set(party),
         template1,
-      ) shouldBe Projection(Set.empty, true, false)
+      ) shouldBe Projection(Set.empty, true)
 
     }
 
     it should "project created_event_blob in case of match by interface, template-id (but both without flag enabled) and " +
       "package-name-scoped template (flag enabled)" ++ details in new Scope {
         val template2Filter: TemplateFilter =
-          TemplateFilter(templateId = template2, includeCreatedEventBlob = false)
+          TemplateFilter(template2Full.toIdentifier.toRef, includeCreatedEventBlob = false)
         private val filters =
           CumulativeFilter(
             templateFilters = Set(
@@ -1311,24 +917,30 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
             eventFormat = transactionFilter,
             interfaceImplementedBy = interfaceImpl,
             resolveTypeConRef = Map(
-              template1Ref -> Set(template1),
-              template2Ref -> Set(template2),
+              template1Ref -> Set(template1Full),
+              template2Ref -> Set(template2Full),
               iface1Ref -> Set(iface1),
               iface2Ref -> Set(iface2),
-              packageNameScopedTemplate -> Set(template2),
+              packageNameScopedTemplate -> Set(template2Full),
             ),
-            alwaysPopulateArguments = false,
           )
+
+        // createdEventBlob enabled as it's matched by the package-named scoped template filter with createdEventBlob = true
+        // (template1 internally translates to package-name which is the same with that of template2)
         eventProjectionProperties.render(
           Set(party),
           template1,
-        ) shouldBe Projection(Set.empty, false, true)
+        ) shouldBe Projection(Set.empty, true)
+
+        eventProjectionProperties.render(
+          Set(party),
+          template3,
+        ) shouldBe Projection(Set.empty, false)
 
         // createdEventBlob enabled as it's matched by the package-name scoped template filter with createdEventBlob = true
         eventProjectionProperties.render(Set(party), template2) shouldBe Projection(
           interfaces = Set.empty,
           createdEventBlob = true,
-          contractArguments = true,
         )
       }
 
@@ -1363,11 +975,19 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = false,
       ).render(
         Set(party),
         template2,
-      ) shouldBe Projection(Set.empty, false, false)
+      ) shouldBe Projection(Set.empty, true)
+
+      EventProjectionProperties(
+        eventFormat = transactionFilter,
+        interfaceImplementedBy = interfaceImpl,
+        resolveTypeConRef = noTemplatesForPackageName,
+      ).render(
+        Set(party),
+        template3,
+      ) shouldBe Projection(Set.empty, false)
 
     }
 
@@ -1403,22 +1023,25 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = true,
       )
       eventProjectionProperties.render(
         Set(party),
         template1,
-      ) shouldBe Projection(Set.empty, true, true)
+      ) shouldBe Projection(Set.empty, true)
       eventProjectionProperties.render(
         Set(party),
         template2,
-      ) shouldBe Projection(Set.empty, false, true)
+      ) shouldBe Projection(Set.empty, true)
+      eventProjectionProperties.render(
+        Set(party),
+        template3,
+      ) shouldBe Projection(Set.empty, false)
     }
 
     it should "project created_event_blob for wildcard templates, if it is specified explicitly via template filter" ++ details in new Scope {
       private val filters =
         CumulativeFilter(
-          templateFilters = Set(TemplateFilter(template1, true)),
+          templateFilters = Set(TemplateFilter(template1Full.toIdentifier.toRef, true)),
           interfaceFilters = Set.empty,
           templateWildcardFilter = None,
         )
@@ -1440,17 +1063,20 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
         eventFormat = transactionFilter,
         interfaceImplementedBy = interfaceImpl,
         resolveTypeConRef = noTemplatesForPackageName,
-        alwaysPopulateArguments = true,
       )
 
       eventProjectionProperties.render(
         Set(party),
         template1,
-      ) shouldBe Projection(Set.empty, true, true)
+      ) shouldBe Projection(Set.empty, true)
       eventProjectionProperties.render(
         Set(party),
         template2,
-      ) shouldBe Projection(Set.empty, false, true)
+      ) shouldBe Projection(Set.empty, true)
+      eventProjectionProperties.render(
+        Set(party),
+        template3,
+      ) shouldBe Projection(Set.empty, false)
     }
 
   }
@@ -1462,41 +1088,57 @@ object EventProjectionPropertiesSpec {
     val qualifiedName: Ref.QualifiedName = Ref.QualifiedName.assertFromString("ModuleName:template")
     val packageNameScopedTemplate: Ref.TypeConRef = Ref.TypeConRef(packageRefName, qualifiedName)
 
-    val template1: Identifier = Identifier.assertFromString("PackageId2:ModuleName:template")
-    val template1Ref: Ref.TypeConRef = TypeConRef.fromIdentifier(template1)
+    val template1Full: FullIdentifier = Identifier
+      .assertFromString("PackageId2:ModuleName:template")
+      .toFullIdentifier(packageRefName.name)
+    val template1: NameTypeConRef = template1Full.toNameTypeConRef
+    val template1Ref: Ref.TypeConRef = template1Full.toIdentifier.toRef
     val template1Filter: TemplateFilter =
-      TemplateFilter(templateId = template1, includeCreatedEventBlob = false)
-    val template2: Identifier = Identifier.assertFromString("PackageId1:ModuleName:template")
-    val template2Ref: Ref.TypeConRef = TypeConRef.fromIdentifier(template2)
-    val template3: Identifier = Identifier.assertFromString("PackageId3:ModuleName:template")
-    val id: Identifier = Identifier.assertFromString("PackageId:ModuleName:id")
-    val iface1: Identifier = Identifier.assertFromString("PackageId:ModuleName:iface1")
-    val iface1Ref: TypeConRef = TypeConRef.fromIdentifier(iface1)
-    val iface2: Identifier = Identifier.assertFromString("PackageId:ModuleName:iface2")
-    val iface2Ref: TypeConRef = TypeConRef.fromIdentifier(iface2)
+      TemplateFilter(template1Full.toIdentifier.toRef, includeCreatedEventBlob = false)
+    val template2Full: FullIdentifier = Identifier
+      .assertFromString("PackageId1:ModuleName:template")
+      .toFullIdentifier(packageRefName.name)
+    val template2: NameTypeConRef = template2Full.toNameTypeConRef
+    val template2Ref: Ref.TypeConRef = template2Full.toIdentifier.toRef
+    val template3Full: FullIdentifier = Identifier
+      .assertFromString("PackageId1:ModuleName:template3")
+      .toFullIdentifier(packageRefName.name)
+    val template3: NameTypeConRef = template3Full.toNameTypeConRef
+    val template3Ref: Ref.TypeConRef = template3Full.toIdentifier.toRef
+    val id: NameTypeConRef =
+      NameTypeConRef.assertFromString(s"$packageRefName:ModuleName:id")
+    val iface1: FullIdentifier = Identifier
+      .assertFromString("PackageId:ModuleName:iface1")
+      .toFullIdentifier(packageRefName.name)
+    val iface1Ref: TypeConRef = iface1.toIdentifier.toRef
+    val iface2: FullIdentifier = Identifier
+      .assertFromString("PackageId:ModuleName:iface2")
+      .toFullIdentifier(packageRefName.name)
+    val iface2Ref: TypeConRef = iface2.toIdentifier.toRef
     val packageNameScopedIface1 = Ref.TypeConRef(packageRefName, iface1.qualifiedName)
 
-    val noInterface: Identifier => Set[Identifier] = _ => Set.empty[Identifier]
-    val noTemplatesForPackageName: TypeConRef => Set[Identifier] =
+    val noInterface: FullIdentifier => Set[FullIdentifier] = _ => Set.empty[FullIdentifier]
+    val noTemplatesForPackageName: TypeConRef => Set[FullIdentifier] =
       Map(
-        template1Ref -> Set(template1),
-        template2Ref -> Set(template2),
+        template1Ref -> Set(template1Full),
+        template2Ref -> Set(template2Full),
+        template3Ref -> Set(template3Full),
         iface1Ref -> Set(iface1),
         iface2Ref -> Set(iface2),
       )
-    val templatesForPackageName: TypeConRef => Set[Identifier] =
+    val templatesForPackageName: TypeConRef => Set[FullIdentifier] =
       Map(
-        template1Ref -> Set(template1),
-        template2Ref -> Set(template2),
+        template1Ref -> Set(template1Full),
+        template2Ref -> Set(template2Full),
         iface1Ref -> Set(iface1),
         iface2Ref -> Set(iface2),
-        packageNameScopedTemplate -> Set(template1, template2),
+        packageNameScopedTemplate -> Set(template1Full, template2Full),
         packageNameScopedIface1 -> Set(iface1),
       )
 
-    val interfaceImpl: Identifier => Set[Identifier] = {
-      case `iface1` => Set(template1)
-      case `iface2` => Set(template1, template2)
+    val interfaceImpl: FullIdentifier => Set[FullIdentifier] = {
+      case `iface1` => Set(template1Full)
+      case `iface2` => Set(template1Full, template2Full, template3Full)
       case _ => Set.empty
     }
     val party: Party = Party.assertFromString("party")

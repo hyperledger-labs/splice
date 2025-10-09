@@ -76,3 +76,4 @@ docs/src/deployment/observability/metrics_reference.rst
 # For Vagrant
 /.vagrant/
 /vagrant-nix-cache/
+lnav*work

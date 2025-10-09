@@ -16,6 +16,15 @@ $$
   immutable
   returns null on null input;
 
+-- convert canton logs timestamp string to the bigint representation used in the tables
+create or replace function debug.to_canton_timestamp(text) returns bigint as
+$$
+select (extract(epoch from $1::timestamptz) * 1000000)::bigint;
+$$
+    language sql
+    immutable
+    returns null on null input;
+
 -- convert the integer representation to the name of the topology mapping
 create or replace function debug.topology_mapping(integer) returns char as
 $$
@@ -35,7 +44,7 @@ select
     when $1 = 12 then 'MediatorSynchronizerState'
     when $1 = 13 then 'SequencerSynchronizerState'
     -- 14 was OffboardParticipant
-    when $1 = 15 then 'PurgeTopologyTransaction'
+    -- 15 was PurgeTopologyTransaction
     -- 16 was TrafficControlState
     when $1 = 17 then 'DynamicSequencingParametersState'
     when $1 = 18 then 'PartyToKeyMapping'
@@ -51,8 +60,8 @@ create or replace function debug.topology_change_op(integer) returns varchar as
 $$
 select
   case
-    when $1 = 1 then 'Remove'
-    when $1 = 2 then 'Replace'
+    when $1 = 1 then 'Replace'
+    when $1 = 2 then 'Remove'
     else $1::text
   end;
 $$
@@ -188,11 +197,8 @@ create or replace view debug.par_contracts as
   select
     lower(encode(contract_id, 'hex')) as contract_id,
     instance,
-    metadata,
-    ledger_create_time,
     package_id,
-    template_id,
-    contract_salt
+    template_id
   from par_contracts;
 
 create or replace view debug.common_node_id as
@@ -229,7 +235,7 @@ create or replace view debug.par_active_contracts as
 
 create or replace view debug.par_fresh_submitted_transaction as
   select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.resolve_common_static_string(physical_synchronizer_idx) as physical_synchronizer_idx,
     root_hash_hex,
     debug.canton_timestamp(request_id) as request_id,
     debug.canton_timestamp(max_sequencing_time) as max_sequencing_time
@@ -237,7 +243,7 @@ create or replace view debug.par_fresh_submitted_transaction as
 
 create or replace view debug.par_fresh_submitted_transaction_pruning as
   select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.resolve_common_static_string(physical_synchronizer_idx) as physical_synchronizer_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -254,7 +260,7 @@ create or replace view debug.med_response_aggregations as
 
 create or replace view debug.common_sequenced_events as
   select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.resolve_common_static_string(physical_synchronizer_idx) as physical_synchronizer_idx,
     sequenced_event,
     type,
     debug.canton_timestamp(ts) as ts,
@@ -263,45 +269,38 @@ create or replace view debug.common_sequenced_events as
     ignore
   from common_sequenced_events;
 
-create or replace view debug.sequencer_client_pending_sends as
-  select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
-    message_id,
-    debug.canton_timestamp(max_sequencing_time) as max_sequencing_time
-  from sequencer_client_pending_sends;
-
 create or replace view debug.par_synchronizer_connection_configs as
   select
     synchronizer_alias,
+    physical_synchronizer_id,
+    empty_if_null_physical_synchronizer_id,
     config,
-    status
+    status,
+    synchronizer_predecessor
   from par_synchronizer_connection_configs;
 
-create or replace view debug.par_synchronizers as
+create or replace view debug.par_registered_synchronizers as
   select
-    order_number,
-    alias,
-    synchronizer_id,
-    status
-  from par_synchronizers;
+    synchronizer_alias,
+    physical_synchronizer_id
+  from par_registered_synchronizers;
 
 create or replace view debug.par_reassignments as
   select
     debug.resolve_common_static_string(target_synchronizer_idx) as target_synchronizer_idx,
     debug.resolve_common_static_string(source_synchronizer_idx) as source_synchronizer_idx,
+    reassignment_id,
     unassignment_global_offset,
     assignment_global_offset,
     debug.canton_timestamp(unassignment_timestamp) as unassignment_timestamp,
-    unassignment_request,
-    debug.canton_timestamp(unassignment_decision_time) as unassignment_decision_time,
-    unassignment_result,
-    contract,
+    unassignment_data,
+    contracts,
     debug.canton_timestamp(assignment_timestamp) as assignment_timestamp
   from par_reassignments;
 
 create or replace view debug.par_journal_requests as
   select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.resolve_common_static_string(physical_synchronizer_idx) as physical_synchronizer_idx,
     request_counter,
     request_state_index,
     debug.canton_timestamp(request_timestamp) as request_timestamp,
@@ -358,6 +357,14 @@ create or replace view debug.par_commitment_snapshot_time as
     tie_breaker
   from par_commitment_snapshot_time;
 
+
+create or replace view debug.par_commitment_reinitialization as
+  select
+    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.canton_timestamp(ts_reinit_ongoing) as ts_reinit_ongoing,
+    debug.canton_timestamp(ts_reinit_completed) as ts_reinit_completed
+  from par_commitment_reinitialization;
+
 create or replace view debug.par_commitment_queue as
   select
     debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
@@ -370,7 +377,7 @@ create or replace view debug.par_commitment_queue as
 
 create or replace view debug.par_static_synchronizer_parameters as
   select
-    synchronizer_id,
+    physical_synchronizer_id,
     params
   from par_static_synchronizer_parameters;
 
@@ -406,7 +413,7 @@ create or replace view debug.par_commitment_pruning as
 
 create or replace view debug.common_sequenced_event_store_pruning as
   select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.resolve_common_static_string(physical_synchronizer_idx) as physical_synchronizer_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -415,14 +422,15 @@ create or replace view debug.common_sequenced_event_store_pruning as
 create or replace view debug.mediator_synchronizer_configuration as
   select
     lock,
-    synchronizer_id,
+    physical_synchronizer_id,
     static_synchronizer_parameters,
-    sequencer_connection
+    sequencer_connection,
+    is_topology_initialized
   from mediator_synchronizer_configuration;
 
 create or replace view debug.common_head_sequencer_counters as
   select
-    debug.resolve_common_static_string(synchronizer_idx) as synchronizer_idx,
+    debug.resolve_common_static_string(physical_synchronizer_idx) as physical_synchronizer_idx,
     prehead_counter,
     debug.canton_timestamp(ts) as ts
   from common_head_sequencer_counters;
@@ -450,14 +458,6 @@ create or replace view debug.sequencer_watermarks as
     sequencer_online
   from sequencer_watermarks;
 
-create or replace view debug.sequencer_counter_checkpoints as
-  select
-    debug.resolve_sequencer_member(member) as member,
-    counter,
-    debug.canton_timestamp(ts) as ts,
-    debug.canton_timestamp(latest_sequencer_event_ts) as latest_sequencer_event_ts
-  from sequencer_counter_checkpoints;
-
 create or replace view debug.sequencer_acknowledgements as
   select
     debug.resolve_sequencer_member(member) as member,
@@ -467,7 +467,8 @@ create or replace view debug.sequencer_acknowledgements as
 create or replace view debug.sequencer_lower_bound as
   select
     single_row_lock,
-    debug.canton_timestamp(ts) as ts
+    debug.canton_timestamp(ts) as ts,
+    debug.canton_timestamp(latest_topology_client_timestamp) as latest_topology_client_timestamp
   from sequencer_lower_bound;
 
 create or replace view debug.sequencer_events as
@@ -486,6 +487,14 @@ create or replace view debug.sequencer_events as
     extra_traffic_consumed,
     base_traffic_remainder
   from sequencer_events;
+
+create or replace view debug.sequencer_event_recipients as
+select
+    debug.canton_timestamp(ts) as ts,
+    debug.resolve_sequencer_member(recipient_id) as recipient_id,
+    node_index,
+    is_topology_event
+from sequencer_event_recipients;
 
 create or replace view debug.par_pruning_schedules as
   select
@@ -544,7 +553,7 @@ create or replace view debug.par_command_deduplication_pruning as
 create or replace view debug.sequencer_synchronizer_configuration as
   select
     lock,
-    synchronizer_id,
+    physical_synchronizer_id,
     static_synchronizer_parameters
   from sequencer_synchronizer_configuration;
 
@@ -567,7 +576,6 @@ create or replace view debug.common_pruning_schedules as
 create or replace view debug.seq_in_flight_aggregation as
   select
     aggregation_id,
-    debug.canton_timestamp(first_sequencing_timestamp) as first_sequencing_timestamp,
     debug.canton_timestamp(max_sequencing_time) as max_sequencing_time,
     aggregation_rule
   from seq_in_flight_aggregation;
@@ -575,9 +583,8 @@ create or replace view debug.seq_in_flight_aggregation as
 create or replace view debug.seq_in_flight_aggregated_sender as
   select
     aggregation_id,
-    sender,
+    sender_id,
     debug.canton_timestamp(sequencing_timestamp) as sequencing_timestamp,
-    debug.canton_timestamp(max_sequencing_time) as max_sequencing_time,
     signatures
   from seq_in_flight_aggregated_sender;
 
@@ -604,7 +611,7 @@ create or replace view debug.common_topology_transactions as
 
 create or replace view debug.seq_traffic_control_balance_updates as
   select
-    member,
+    member_id,
     debug.canton_timestamp(sequencing_timestamp) as sequencing_timestamp,
     balance,
     serial
@@ -612,7 +619,7 @@ create or replace view debug.seq_traffic_control_balance_updates as
 
 create or replace view debug.seq_traffic_control_consumed_journal as
   select
-    member,
+    member_id,
     debug.canton_timestamp(sequencing_timestamp) as sequencing_timestamp,
     extra_traffic_consumed,
     base_traffic_remainder,
@@ -678,6 +685,21 @@ create or replace view debug.ord_output_lower_bound as
     epoch_number,
     block_number
   from ord_output_lower_bound;
+
+create or replace view debug.ord_pruning_schedules as
+select
+    lock,
+    cron,
+    max_duration,
+    retention,
+    min_blocks_to_keep
+from ord_pruning_schedules;
+
+create or replace view debug.ord_leader_selection_state as
+  select
+    epoch_number,
+    state
+  from ord_leader_selection_state;
 
 create or replace view debug.common_static_strings as
   select

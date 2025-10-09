@@ -10,7 +10,7 @@ import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.SupportedVersions
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.SupportedVersions
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   BlockNumber,
@@ -76,6 +76,7 @@ object ConsensusSegment {
 
     final case class AsyncException(e: Throwable) extends Message
 
+    final case object BlockInactivityTimeout extends Message
   }
 
   sealed trait RetransmissionsMessage extends Message
@@ -89,7 +90,7 @@ object ConsensusSegment {
 
   sealed trait ConsensusMessage extends Message
   object ConsensusMessage {
-    final case class BlockProposal(orderingBlock: OrderingBlock, epochNumber: EpochNumber)
+    final case class LocalAvailability(message: Consensus.LocalAvailability)
         extends ConsensusMessage
 
     sealed trait PbftEvent extends ConsensusMessage {
@@ -131,7 +132,9 @@ object ConsensusSegment {
     sealed trait PbftNetworkMessage
         extends HasRepresentativeProtocolVersion
         with ProtocolVersionedMemoizedEvidence
-        with MessageFrom {
+        with MessageFrom
+        with Product
+        with Serializable {
       def blockMetadata: BlockMetadata
       def viewNumber: ViewNumber
       def toProto: v30.ConsensusMessage
@@ -693,7 +696,8 @@ object ConsensusSegment {
         signedMessages: Seq[SignedMessage[PrePrepare]],
     ) extends PbftViewChangeEvent
 
-    final case class BlockOrdered(metadata: BlockMetadata) extends ConsensusMessage
+    final case class BlockOrdered(metadata: BlockMetadata, isEmpty: Boolean)
+        extends ConsensusMessage
 
     final case class CompletedEpoch(epochNumber: EpochNumber) extends ConsensusMessage
 

@@ -9,11 +9,16 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing.protocol.{AggregationRule, Batch, MessageId}
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
 trait SequencerClientSend {
+  def psid: PhysicalSynchronizerId
+  final def protocolVersion: ProtocolVersion = psid.protocolVersion
+
   implicit protected def executionContext: ExecutionContext
 
   /** Sends a request to sequence a deliver event to the sequencer. If we fail to make the request

@@ -24,14 +24,23 @@ messages:
     message:
       comments: 'Required authorization: ``HasRight(ParticipantAdmin) OR IsAuthenticatedIdentityProviderAdmin(identity_provider_id)``'
       fieldComments:
-        party_id_hint: |-
-          A hint to the participant which party ID to allocate. It can be
-          ignored.
-          Must be a valid PartyIdString (as described in ``value.proto``).
+        synchronizer_id: |-
+          The synchronizer, on which the party should be allocated.
+          For backwards compatibility, this field may be omitted, if the participant is connected to only one synchronizer.
+          Otherwise a synchronizer must be specified.
           Optional
         local_metadata: |-
           Formerly "display_name"
           Participant-local metadata to be stored in the ``PartyDetails`` of this newly allocated party.
+          Optional
+        user_id: |-
+          The user who will get the act_as rights to the newly allocated party.
+          If set to an empty string (the default), no user will get rights to the party.
+          Optional
+        party_id_hint: |-
+          A hint to the participant which party ID to allocate. It can be
+          ignored.
+          Must be a valid PartyIdString (as described in ``value.proto``).
           Optional
         identity_provider_id: |-
           The id of the ``Identity Provider``
@@ -85,7 +94,10 @@ messages:
           The package name of the contract.
           Required
         template_id: |-
-          The template of the archived contract.
+          Identifies the template that defines the choice that archived the contract.
+          This template's package-id may differ from the target contract's package-id
+          if the target contract has been upgraded or downgraded.
+
           The identifier uses the package-id reference format.
 
           Required
@@ -97,7 +109,7 @@ messages:
     message:
       comments: Assign a contract
       fieldComments:
-        unassign_id: |-
+        reassignment_id: |-
           The ID from the unassigned event to be completed by this assignment.
           Must be a valid LedgerString (as described in ``value.proto``).
           Required
@@ -118,12 +130,6 @@ messages:
           Required
           The offset of this event refers to the offset of the assignment,
           while the node_id is the index of within the batch.
-        unassign_id: |-
-          The ID from the unassigned event.
-          For correlation capabilities.
-          For one contract the (unassign_id, source synchronizer) pair is unique.
-          Must be a valid LedgerString (as described in ``value.proto``).
-          Required
         source: |-
           The ID of the source synchronizer.
           Must be a valid synchronizer id.
@@ -132,6 +138,11 @@ messages:
           Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases
           with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter
           equals zero.
+          Required
+        reassignment_id: |-
+          The ID from the unassigned event.
+          For correlation capabilities.
+          Must be a valid LedgerString (as described in ``value.proto``).
           Required
         target: |-
           The ID of the target synchronizer.
@@ -465,8 +476,10 @@ messages:
         witness_parties: |-
           The parties that are notified of this event. When a ``CreatedEvent``
           is returned as part of a transaction tree or ledger-effects transaction, this will include all
-          the parties specified in the ``TransactionFilter`` that are informees
-          of the event. If served as part of a ACS delta transaction those will
+          the parties specified in the ``TransactionFilter`` that are witnesses  of the event
+          (the stakeholders of the contract and all informees of all the ancestors
+          of this create action that this participant knows about).
+          If served as part of a ACS delta transaction those will
           be limited to all parties specified in the ``TransactionFilter`` that
           are stakeholders of the contract (i.e. either signatories or observers).
           If the ``CreatedEvent`` is returned as part of an AssignedEvent,
@@ -501,6 +514,10 @@ messages:
         package_name: |-
           The package name of the created contract.
           Required
+        acs_delta: |-
+          Whether this event would be part of respective ACS_DELTA shaped stream,
+          and should therefore considered when tracking contract activeness on the client-side.
+          Required
         node_id: |-
           The position of this event in the originating transaction or reassignment.
           The origin has contextual meaning, please see description at messages that include a CreatedEvent.
@@ -509,22 +526,15 @@ messages:
           Required, must be valid node ID (non-negative integer)
         contract_key: |-
           The key of the created contract.
-          This will be set if and only if ``create_arguments`` is set and ``template_id`` defines a contract key.
+          This will be set if and only if ``template_id`` defines a contract key.
           Optional
         created_at: |-
           Ledger effective time of the transaction that created the contract.
           Required
         create_arguments: |-
           The arguments that have been used to create the contract.
-          Set either:
 
-          - if there was a party, which is in the ``witness_parties`` of this event,
-            and for which a ``CumulativeFilter`` exists with the ``template_id`` of this event
-            among the ``template_filters``,
-          - or if there was a party, which is in the ``witness_parties`` of this event,
-            and for which a wildcard filter exists (``Filters`` with a ``CumulativeFilter`` of ``WildcardFilter``).
-
-          Optional
+          Required
         template_id: |-
           The template of the created contract.
           The identifier uses the package-id reference format.
@@ -656,7 +666,7 @@ messages:
           If enabled, values served over the API will contain more information than strictly necessary to interpret the data.
           In particular, setting the verbose flag to true triggers the ledger to include labels for record fields.
           Optional
-  ExecuteSubmissionRequest:
+  ExecuteSubmissionAndWaitForTransactionRequest:
     message:
       comments: null
       fieldComments:
@@ -665,16 +675,26 @@ messages:
           Each party can provide one or more signatures..
           and one or more parties can sign.
           Note that currently, only single party submissions are supported.
-        hashing_scheme_version: The hashing scheme version used when building the
-          hash
+          Required
+        hashing_scheme_version: |-
+          The hashing scheme version used when building the hash
+          Required
         deduplication_duration: |-
           Specifies the length of the deduplication period.
           It is interpreted relative to the local clock at some point during the submission's processing.
           Must be non-negative. Must not exceed the maximum deduplication time.
+        transaction_format: |-
+          If no ``transaction_format`` is provided, a default will be used where ``transaction_shape`` is set to
+          TRANSACTION_SHAPE_ACS_DELTA, ``event_format`` is defined with ``filters_by_party`` containing wildcard-template
+          filter for all original ``act_as`` and ``read_as`` parties and the ``verbose`` flag is set.
+          When the ``transaction_shape`` TRANSACTION_SHAPE_ACS_DELTA shape is used (explicitly or is defaulted to as explained above),
+          events will only be returned if the submitting party is hosted on this node.
+          Optional
         prepared_transaction: |-
           the prepared transaction
           Typically this is the value of the `prepared_transaction` field in `PrepareSubmissionResponse`
           obtained from calling `prepareSubmission`.
+          Required
         deduplication_offset: |-
           Specifies the start of the deduplication period by a completion stream offset (exclusive).
           Must be a valid absolute offset (positive integer).
@@ -689,7 +709,106 @@ messages:
           If set will influence the chosen ledger effective time but will not result in a submission delay so any override
           should be scheduled to executed within the window allowed by synchronizer.
           Optional
-        user_id: See [PrepareSubmissionRequest.user_id]
+        user_id: |-
+          See [PrepareSubmissionRequest.user_id]
+          Optional
+  ExecuteSubmissionAndWaitForTransactionResponse:
+    message:
+      comments: null
+      fieldComments:
+        transaction: |-
+          The transaction that resulted from the submitted command.
+          The transaction might contain no events (request conditions result in filtering out all of them).
+          Required
+  ExecuteSubmissionAndWaitRequest:
+    message:
+      comments: null
+      fieldComments:
+        party_signatures: |-
+          The party(ies) signatures that authorize the prepared submission to be executed by this node.
+          Each party can provide one or more signatures..
+          and one or more parties can sign.
+          Note that currently, only single party submissions are supported.
+          Required
+        hashing_scheme_version: |-
+          The hashing scheme version used when building the hash
+          Required
+        deduplication_duration: |-
+          Specifies the length of the deduplication period.
+          It is interpreted relative to the local clock at some point during the submission's processing.
+          Must be non-negative. Must not exceed the maximum deduplication time.
+        prepared_transaction: |-
+          the prepared transaction
+          Typically this is the value of the `prepared_transaction` field in `PrepareSubmissionResponse`
+          obtained from calling `prepareSubmission`.
+          Required
+        deduplication_offset: |-
+          Specifies the start of the deduplication period by a completion stream offset (exclusive).
+          Must be a valid absolute offset (positive integer).
+        submission_id: |-
+          A unique identifier to distinguish completions for different submissions with the same change ID.
+          Typically a random UUID. Applications are expected to use a different UUID for each retry of a submission
+          with the same change ID.
+          Must be a valid LedgerString (as described in ``value.proto``).
+
+          Required
+        min_ledger_time: |-
+          If set will influence the chosen ledger effective time but will not result in a submission delay so any override
+          should be scheduled to executed within the window allowed by synchronizer.
+          Optional
+        user_id: |-
+          See [PrepareSubmissionRequest.user_id]
+          Optional
+  ExecuteSubmissionAndWaitResponse:
+    message:
+      comments: null
+      fieldComments:
+        update_id: |-
+          The id of the transaction that resulted from the submitted command.
+          Must be a valid LedgerString (as described in ``value.proto``).
+          Required
+        completion_offset: |-
+          The details of the offset field are described in ``community/ledger-api/README.md``.
+          Required
+  ExecuteSubmissionRequest:
+    message:
+      comments: null
+      fieldComments:
+        party_signatures: |-
+          The party(ies) signatures that authorize the prepared submission to be executed by this node.
+          Each party can provide one or more signatures..
+          and one or more parties can sign.
+          Note that currently, only single party submissions are supported.
+          Required
+        hashing_scheme_version: |-
+          The hashing scheme version used when building the hash
+          Required
+        deduplication_duration: |-
+          Specifies the length of the deduplication period.
+          It is interpreted relative to the local clock at some point during the submission's processing.
+          Must be non-negative. Must not exceed the maximum deduplication time.
+        prepared_transaction: |-
+          the prepared transaction
+          Typically this is the value of the `prepared_transaction` field in `PrepareSubmissionResponse`
+          obtained from calling `prepareSubmission`.
+          Required
+        deduplication_offset: |-
+          Specifies the start of the deduplication period by a completion stream offset (exclusive).
+          Must be a valid absolute offset (positive integer).
+        submission_id: |-
+          A unique identifier to distinguish completions for different submissions with the same change ID.
+          Typically a random UUID. Applications are expected to use a different UUID for each retry of a submission
+          with the same change ID.
+          Must be a valid LedgerString (as described in ``value.proto``).
+
+          Required
+        min_ledger_time: |-
+          If set will influence the chosen ledger effective time but will not result in a submission delay so any override
+          should be scheduled to executed within the window allowed by synchronizer.
+          Optional
+        user_id: |-
+          See [PrepareSubmissionRequest.user_id]
+          Optional
   ExecuteSubmissionResponse:
     message:
       comments: null
@@ -774,22 +893,22 @@ messages:
           If defined, the identifier uses the package-id reference format.
 
           Optional
-        node_id: |-
-          The position of this event in the originating transaction or reassignment.
-          Node IDs are not necessarily equal across participants,
-          as these may see different projections/parts of transactions.
-          Required, must be valid node ID (non-negative integer)
         consuming: |-
           If true, the target contract may no longer be exercised.
           Required
         witness_parties: |-
           The parties that are notified of this event. The witnesses of an exercise
           node will depend on whether the exercise was consuming or not.
-          If consuming, the witnesses are the union of the stakeholders and
-          the actors.
-          If not consuming, the witnesses are the union of the signatories and
-          the actors. Note that the actors might not necessarily be observers
-          and thus signatories. This is the case when the controllers of a
+          If consuming, the witnesses are the union of the stakeholders,
+          the actors and all informees of all the ancestors of this event this
+          participant knows about.
+          If not consuming, the witnesses are the union of the signatories,
+          the actors and all informees of all the ancestors of this event this
+          participant knows about.
+          In both cases the witnesses are limited to the querying parties, or not
+          limited in case anyParty filters are used.
+          Note that the actors might not necessarily be observers
+          and thus stakeholders. This is the case when the controllers of a
           choice are specified using "flexible controllers", using the
           ``choice ... controller`` syntax, and said controllers are not
           explicitly marked as observers.
@@ -811,6 +930,15 @@ messages:
           The choice that was exercised on the target contract.
           Must be a valid NameString (as described in ``value.proto``).
           Required
+        acs_delta: |-
+          Whether this event would be part of respective ACS_DELTA shaped stream,
+          and should therefore considered when tracking contract activeness on the client-side.
+          Required
+        node_id: |-
+          The position of this event in the originating transaction or reassignment.
+          Node IDs are not necessarily equal across participants,
+          as these may see different projections/parts of transactions.
+          Required, must be valid node ID (non-negative integer)
         last_descendant_node_id: |-
           Specifies the upper boundary of the node ids of the events in the same transaction that appeared as a result of
           this ``ExercisedEvent``. This allows unambiguous identification of all the members of the subtree rooted at this
@@ -821,7 +949,10 @@ messages:
           The result of exercising the choice.
           Required
         template_id: |-
-          The template of the target contract.
+          Identifies the template that defines the executed choice.
+          This template's package-id may differ from the target contract's package-id
+          if the target contract has been upgraded or downgraded.
+
           The identifier uses the package-id reference format.
 
           Required
@@ -890,10 +1021,10 @@ messages:
           template or wildcard filter means additional events that will match the query.
           The impact of include_interface_view and include_created_event_blob fields in the filters will
           also be accumulated.
-          At least one cumulative filter MUST be specified.
           A template or an interface SHOULD NOT appear twice in the accumulative field.
           A wildcard filter SHOULD NOT be defined more than once in the accumulative field.
-          Optional
+          Optional, if no ``CumulativeFilter`` defined, the default of a single ``WildcardFilter`` with
+          include_created_event_blob unset is used.
   GetActiveContractsRequest:
     message:
       comments: |-
@@ -973,6 +1104,9 @@ messages:
           Must be a valid participant-id retrieved through a prior call to getParticipantId.
           Defaults to the participant id of the host participant.
           Optional
+        identity_provider_id: |-
+          The ID of the identity provider configured by ``Identity Provider Config``
+          Optional, if not set, assume the user is managed by the default identity provider.
   GetConnectedSynchronizersResponse:
     message:
       comments: null
@@ -985,20 +1119,9 @@ messages:
         contract_id: |-
           The contract id being queried.
           Required
-        requesting_parties: |-
-          Provided for backwards compatibility, it will be removed in the Canton version 3.4.0.
-          The parties whose events the client expects to see.
-          The events associated with the contract id will only be returned if the requesting parties includes
-          at least one party that is a stakeholder of the event. For a definition of stakeholders see
-          https://docs.daml.com/concepts/ledger-model/ledger-privacy.html#contract-observers-and-stakeholders
-          Optional, if some parties specified, event_format needs to be unset.
         event_format: |-
           Format of the events in the result, the presentation will be of TRANSACTION_SHAPE_ACS_DELTA.
-          Optional for backwards compatibility, defaults to an EventFormat where:
-
-          - filters_by_party is a template-wildcard filter for all requesting_parties
-          - filters_for_any_party is unset
-          - verbose is set
+          Required
   GetEventsByContractIdResponse:
     message:
       comments: null
@@ -1148,8 +1271,8 @@ messages:
           The package-name for which the preferred package should be resolved.
           Required
         synchronizer_id: |-
-          The synchronizer whose vetting state to use for resolving this query.
-          If not specified, the vetting state of all the synchronizers the participant is connected to will be used.
+          The synchronizer whose vetting state should be used for resolving this query.
+          If not specified, the vetting states of all synchronizers to which the participant is connected are used.
           Optional
         vetting_valid_at: |-
           The timestamp at which the package vetting validity should be computed
@@ -1176,8 +1299,8 @@ messages:
 
           Required
         synchronizer_id: |-
-          The synchronizer whose vetting state to use for resolving this query.
-          If not specified, the vetting state of all the synchronizers the participant is connected to will be used.
+          The synchronizer whose vetting state should be used for resolving this query.
+          If not specified, the vetting states of all synchronizers to which the participant is connected are used.
           Optional
         vetting_valid_at: |-
           The timestamp at which the package vetting validity should be computed
@@ -1488,7 +1611,7 @@ messages:
         view_value: |-
           The value of the interface's view method on this event.
           Set if it was requested in the ``InterfaceFilter`` and it could be
-          sucessfully computed.
+          successfully computed.
           Optional
   ListIdentityProviderConfigsRequest:
     message:
@@ -1806,7 +1929,9 @@ messages:
     message:
       comments: Additional signatures provided by the submitting parties
       fieldComments:
-        signatures: Additional signatures provided by all individual parties
+        signatures: |-
+          Additional signatures provided by all individual parties
+          Required
   PrefetchContractKey:
     message:
       comments: Preload contracts
@@ -1837,12 +1962,14 @@ messages:
         package_id_selection_preference: |-
           The package-id selection preference of the client for resolving
           package names and interface instances in command submission and interpretation
+          Optional
         disclosed_contracts: |-
           Additional contracts used to resolve contract & contract key lookups.
           Optional
         verbose_hashing: |-
           When true, the response will contain additional details on how the transaction was encoded and hashed
           This can be useful for troubleshooting of hash mismatches. Should only be used for debugging.
+          Optional, default to false
         prefetch_contract_keys: |-
           Fetches the contract keys into the caches to speed up the command processing.
           Should only contain contract keys that are expected to be resolved during interpretation of the commands.
@@ -1851,6 +1978,8 @@ messages:
           Optional
         commands: |-
           Individual elements of this atomic command. Must be non-empty.
+          Limitation: Only single command transaction are currently supported by the API.
+          The field is marked as repeated in preparation for future support of multiple commands.
           Required
         read_as: |-
           Set of parties on whose behalf (in addition to all parties listed in ``act_as``) contracts can be retrieved.
@@ -1875,6 +2004,7 @@ messages:
           Must be a valid UserIdString (as described in ``value.proto``).
           Required unless authentication is used with a user token.
           In that case, the token's user-id will be used for the request's user_id.
+          Optional
   PrepareSubmissionResponse:
     message:
       comments: '[docs-entry-end: HashingSchemeVersion]'
@@ -1910,23 +2040,14 @@ messages:
           1. All normal and divulged contracts that have been archived before
              `prune_up_to`.
           2. All transaction events and completions before `prune_up_to`
+          3. All immediately divulged contracts created before `prune_up_to` independent of whether
+             they were archived before `prune_up_to`.
         submission_id: |-
           Unique submission identifier.
           Optional, defaults to a random identifier, used for logging.
         prune_all_divulged_contracts: |-
-          Prune all immediately and retroactively divulged contracts created before `prune_up_to`
-          independent of whether they were archived before `prune_up_to`. Useful to avoid leaking
-          storage on participant nodes that can see a divulged contract but not its archival.
-
-          Application developers SHOULD write their Daml applications
-          such that they do not rely on divulged contracts; i.e., no warnings from
-          using divulged contracts as inputs to transactions are emitted.
-
-          Participant node operators SHOULD set the `prune_all_divulged_contracts` flag to avoid leaking
-          storage due to accumulating unarchived divulged contracts PROVIDED that:
-
-          1. no application using this participant node relies on divulgence OR
-          2. divulged contracts on which applications rely have been re-divulged after the `prune_up_to` offset.
+          Deprecated flag used to prune all immediately and retroactively divulged contracts.
+          It is a no-op since the divulged contracts are pruned along with the deactivated contracts.
   PruneResponse:
     message:
       comments: null
@@ -1949,6 +2070,10 @@ messages:
           This field will be populated with the trace context contained in the original submission.
           If that was not provided, a unique ledger-api-server generated trace context will be used
           instead.
+        synchronizer_id: |-
+          A valid synchronizer id.
+          Identifies the synchronizer that synchronized this Reassignment.
+          Required
         update_id: |-
           Assigned by the server. Useful for correlating logs.
           Must be a valid LedgerString (as described in ``value.proto``).
@@ -2043,6 +2168,10 @@ messages:
     message:
       comments: A right granted to a user.
       fieldComments:
+        can_execute_as: The user can prepare and execute submissions as a specific
+          party.
+        can_execute_as_any_party: The user can prepare and execute submissions as
+          any party on a participant.
         can_read_as_any_party: The user can read as any party on a participant
         identity_provider_admin: The user can administer users and parties assigned
           to the same identity provider as the one of the user.
@@ -2077,8 +2206,12 @@ messages:
     message:
       comments: Signatures provided by a single party
       fieldComments:
-        party: Submitting party
-        signatures: Signatures
+        party: |-
+          Submitting party
+          Required
+        signatures: |-
+          Signatures
+          Required
   SubmitAndWaitForReassignmentRequest:
     message:
       comments: This reassignment is executed as a single atomic update.
@@ -2258,6 +2391,10 @@ messages:
           The ID of the command which resulted in this transaction. Missing for everyone except the submitting party.
           Must be a valid LedgerString (as described in ``value.proto``).
           Optional
+        external_transaction_hash: |-
+          For transaction externally signed, contains the external transaction hash
+          signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          Optional
         trace_context: |-
           Optional; ledger API trace context
 
@@ -2419,11 +2556,6 @@ messages:
           Node IDs are not necessarily equal across participants,
           as these may see different projections/parts of reassignments.
           Required, must be valid node ID (non-negative integer)
-        unassign_id: |-
-          The ID of the unassignment. This needs to be used as an input for a assign ReassignmentCommand.
-          For one contract the (unassign_id, source synchronizer) pair is unique.
-          Must be a valid LedgerString (as described in ``value.proto``).
-          Required
         offset: |-
           The offset of origin.
           Offsets are managed by the participant nodes.
@@ -2449,6 +2581,10 @@ messages:
           Before this time (measured on the target synchronizer), only the submitter of the unassignment can initiate the assignment
           Defined for reassigning participants.
           Optional
+        reassignment_id: |-
+          The ID of the unassignment. This needs to be used as an input for a assign ReassignmentCommand.
+          Must be a valid LedgerString (as described in ``value.proto``).
+          Required
         target: |-
           The ID of the target synchronizer
           Must be a valid synchronizer id
@@ -2793,12 +2929,45 @@ oneOfs:
           archived: ''
           exercised: ''
   EventFormat: {}
+  ExecuteSubmissionAndWaitForTransactionRequest:
+    deduplication_period:
+      message:
+        comments: |-
+          Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
+          If omitted, the participant will assume the configured maximum deduplication time.
+          Optional
+        fieldComments:
+          deduplication_duration: |-
+            Specifies the length of the deduplication period.
+            It is interpreted relative to the local clock at some point during the submission's processing.
+            Must be non-negative. Must not exceed the maximum deduplication time.
+          deduplication_offset: |-
+            Specifies the start of the deduplication period by a completion stream offset (exclusive).
+            Must be a valid absolute offset (positive integer).
+  ExecuteSubmissionAndWaitForTransactionResponse: {}
+  ExecuteSubmissionAndWaitRequest:
+    deduplication_period:
+      message:
+        comments: |-
+          Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
+          If omitted, the participant will assume the configured maximum deduplication time.
+          Optional
+        fieldComments:
+          deduplication_duration: |-
+            Specifies the length of the deduplication period.
+            It is interpreted relative to the local clock at some point during the submission's processing.
+            Must be non-negative. Must not exceed the maximum deduplication time.
+          deduplication_offset: |-
+            Specifies the start of the deduplication period by a completion stream offset (exclusive).
+            Must be a valid absolute offset (positive integer).
+  ExecuteSubmissionAndWaitResponse: {}
   ExecuteSubmissionRequest:
     deduplication_period:
       message:
         comments: |-
           Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
           If omitted, the participant will assume the configured maximum deduplication time.
+          Optional
         fieldComments:
           deduplication_duration: |-
             Specifies the length of the deduplication period.
@@ -3000,6 +3169,10 @@ oneOfs:
       message:
         comments: Required
         fieldComments:
+          can_execute_as: The user can prepare and execute submissions as a specific
+            party.
+          can_execute_as_any_party: The user can prepare and execute submissions as
+            any party on a participant.
           can_read_as_any_party: The user can read as any party on a participant
           identity_provider_admin: The user can administer users and parties assigned
             to the same identity provider as the one of the user.

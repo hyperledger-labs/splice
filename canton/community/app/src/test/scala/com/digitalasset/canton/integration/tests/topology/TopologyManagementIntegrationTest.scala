@@ -9,11 +9,12 @@ import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.Security.SecurityTest.Property.*
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{DbConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.cycle as C
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.{
@@ -121,6 +122,7 @@ trait TopologyManagementIntegrationTest
       participant1.topology.party_to_participant_mappings.propose(
         newParty,
         List(p1Id -> ParticipantPermission.Submission),
+        store = daId,
       )
 
       eventually() {
@@ -271,6 +273,7 @@ trait TopologyManagementIntegrationTest
       def add() = participant1.topology.party_to_participant_mappings.propose(
         PartyId(participant1.uid.tryChangeId("Boris")),
         newParticipants = List(participant1.id -> ParticipantPermission.Submission),
+        store = daId,
       )
 
       // add once
@@ -590,6 +593,7 @@ trait TopologyManagementIntegrationTest
         PartyId(Rick.uid),
         removes = List(participant1.id),
         forceFlags = ForceFlags(DisablePartyWithActiveContracts),
+        store = daId,
       )
 
       eventually(timeUntilSuccess = 30.seconds) {
@@ -615,6 +619,7 @@ trait TopologyManagementIntegrationTest
           PartyId(participant1.uid.tryChangeId("Jeremias")),
           newParticipants = List(participant1.id -> ParticipantPermission.Submission),
           signedBy = signingKey.toList,
+          store = daId,
         )
       // vanilla add
       add(Some(participant1.fingerprint))
@@ -629,6 +634,7 @@ trait TopologyManagementIntegrationTest
         participant1.namespace,
         key1,
         CanSignAllButNamespaceDelegations,
+        store = daId,
       )
       // add previous statement again but signed with a different key
       add(Some(key1.fingerprint))
@@ -701,7 +707,7 @@ trait TopologyManagementIntegrationTest
           TopologyTransaction(
             TopologyChangeOp.Replace,
             PositiveInt.tryCreate(2),
-            OwnerToKeyMapping(sequencer1.id, NonEmpty(Seq, key)),
+            OwnerToKeyMapping.tryCreate(sequencer1.id, NonEmpty(Seq, key)),
             testedProtocolVersion,
           ),
           key,
@@ -726,6 +732,7 @@ trait TopologyManagementIntegrationTest
           PartyId(participant2.uid.tryChangeId("NothingToSignWith")),
           newParticipants = List(participant2.id -> ParticipantPermission.Submission),
           signedBy = Seq.empty,
+          store = daId,
         ),
         _.shouldBeCommandFailure(TopologyManagerError.NoAppropriateSigningKeyInStore),
       )
@@ -745,6 +752,7 @@ trait TopologyManagementIntegrationTest
         newParticipants = List(participant2.id -> ParticipantPermission.Submission),
         signedBy = Seq(p2Key.fingerprint),
         forceFlags = if (force) ForceFlags(AllowUnvalidatedSigningKeys) else ForceFlags.none,
+        store = daId,
       )
 
       assertThrowsAndLogsCommandFailures(
@@ -783,6 +791,7 @@ trait TopologyManagementIntegrationTest
         newParticipants = List(participant1.id -> ParticipantPermission.Submission),
         signedBy = Seq(p1Key.fingerprint),
         forceFlags = if (force) ForceFlags(AllowUnvalidatedSigningKeys) else ForceFlags.none,
+        store = daId,
       )
 
       loggerFactory.assertThrowsAndLogs[CommandFailure](
@@ -829,9 +838,9 @@ trait TopologyManagementIntegrationTest
       val tx2 = create(2)
 
       // steal the sig of tx2 and use it for tx1
-      val fakeTx = SignedTopologyTransaction.tryCreate(
+      val fakeTx = SignedTopologyTransaction.withTopologySignatures(
         transaction = tx1.transaction,
-        signatures = tx2.signatures,
+        signatures = tx2.signatures.toSeq,
         isProposal = tx1.isProposal,
         testedProtocolVersion,
       )
@@ -1046,6 +1055,7 @@ trait TopologyManagementIntegrationTest
       participant1.topology.party_to_participant_mappings.propose(
         PartyId(participant1.uid.tryChangeId("Bertram")),
         newParticipants = List(participant1.id -> ParticipantPermission.Submission),
+        store = daId,
       )
 
       eventually() {
@@ -1071,6 +1081,40 @@ trait TopologyManagementIntegrationTest
         ) shouldBe empty
       }
 
+    }
+
+    "query migration announcements" in { implicit env =>
+      import env.*
+
+      val upgradeTime = CantonTimestamp.now().plusSeconds(60)
+
+      val announcementMapping = synchronizerOwners1
+        .map { owner =>
+          owner.topology.synchronizer_upgrade.announcement.propose(
+            PhysicalSynchronizerId(daId, testedProtocolVersion, serial = NonNegativeInt.two),
+            upgradeTime,
+          )
+        }
+        .headOption
+        .value
+        .mapping
+
+      eventually() {
+        forAll(
+          synchronizerOwners1.map(
+            _.topology.synchronizer_upgrade.announcement
+              .list(daId)
+              .loneElement
+              .item
+          )
+        )(result => result shouldBe announcementMapping)
+      }
+      synchronizerOwners1.foreach(
+        _.topology.synchronizer_upgrade.announcement.revoke(
+          PhysicalSynchronizerId(daId, testedProtocolVersion, serial = NonNegativeInt.two),
+          upgradeTime,
+        )
+      )
     }
 
     "issue topology transactions concurrently" in { implicit env =>
@@ -1204,7 +1248,7 @@ trait TopologyManagementIntegrationTest
           .find(_.participant == participant.id)
           .value
           .synchronizers
-          .find(_.synchronizerId == daId)
+          .find(_.synchronizerId == daId.logical)
           .value
           .permission shouldBe permission
       }

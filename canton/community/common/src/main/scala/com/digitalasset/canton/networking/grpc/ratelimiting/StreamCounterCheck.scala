@@ -55,13 +55,15 @@ abstract class StreamCounterCheck(
         val current = counters.getOrElse(methodName, 0)
         if (current >= limit.value) {
           LimitResult.OverLimit(
-            errorFactory(methodName, limit)(TraceContextGrpc.fromGrpcContextOrNew)
+            errorFactory(methodName, limit)(
+              TraceContextGrpc.fromGrpcContextOrNew("StreamCounterCheck.check")
+            )
           )
         } else LimitResult.UnderLimit
       case None =>
         if (!notified.get().contains(methodName)) {
           val msg = s"No upper active stream limit configured for $methodName"
-          val tc = TraceContextGrpc.fromGrpcContextOrNew
+          val tc = TraceContextGrpc.fromGrpcContextOrNew("StreamCounterCheck.check")
           if (warnOnUnconfiguredLimits)
             logger.warn(msg)(tc)
           else

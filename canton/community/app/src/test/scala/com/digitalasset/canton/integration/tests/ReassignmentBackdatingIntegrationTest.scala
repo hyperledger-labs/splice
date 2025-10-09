@@ -114,7 +114,7 @@ abstract class ReassignmentBackdatingIntegrationTest
               painters.forall(
                 _.participants.forall(pd =>
                   pd.participant != P4.id || pd.synchronizers.forall(
-                    _.synchronizerId != iouSynchronizerId
+                    _.synchronizerId != iouSynchronizerId.logical
                   )
                 )
               )
@@ -136,7 +136,7 @@ abstract class ReassignmentBackdatingIntegrationTest
               participantRef.ledger_api.state.acs
                 .incomplete_unassigned_of_party(alice)
                 .filter(
-                  _.unassignId == unassignedEvent.unassignId
+                  _.reassignmentId == unassignedEvent.reassignmentId
                 ) should have size 1
             }
           }

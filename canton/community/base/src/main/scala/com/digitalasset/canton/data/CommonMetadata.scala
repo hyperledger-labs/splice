@@ -4,7 +4,6 @@
 package com.digitalasset.canton.data
 
 import cats.syntax.either.*
-import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.v30
@@ -20,17 +19,19 @@ import java.util.UUID
 /** Information concerning every '''member''' involved in the underlying transaction.
   */
 final case class CommonMetadata private (
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     mediator: MediatorGroupRecipient,
     salt: Salt,
     uuid: UUID,
 )(
     hashOps: HashOps,
-    override val representativeProtocolVersion: RepresentativeProtocolVersion[CommonMetadata.type],
     override val deserializedFrom: Option[ByteString],
 ) extends MerkleTreeLeaf[CommonMetadata](hashOps)
     with HasProtocolVersionedWrapper[CommonMetadata]
     with ProtocolVersionedMemoizedEvidence {
+
+  override val representativeProtocolVersion: RepresentativeProtocolVersion[CommonMetadata.type] =
+    CommonMetadata.protocolVersionRepresentativeFor(synchronizerId.protocolVersion)
 
   override protected[this] def toByteStringUnmemoized: ByteString =
     super[HasProtocolVersionedWrapper].toByteString
@@ -48,7 +49,7 @@ final case class CommonMetadata private (
 
   private def toProtoV30: v30.CommonMetadata =
     v30.CommonMetadata(
-      synchronizerId = synchronizerId.toProtoPrimitive,
+      physicalSynchronizerId = synchronizerId.toProtoPrimitive,
       salt = Some(salt.toProtoV30),
       uuid = ProtoConverter.UuidConverter.toProtoPrimitive(uuid),
       mediatorGroup = mediator.group.value,
@@ -63,37 +64,22 @@ object CommonMetadata
   override val name: String = "CommonMetadata"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.CommonMetadata)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.CommonMetadata)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30,
     )
   )
 
   def create(
-      hashOps: HashOps,
-      protocolVersion: ProtocolVersion,
+      hashOps: HashOps
   )(
-      synchronizerId: SynchronizerId,
-      mediator: MediatorGroupRecipient,
-      salt: Salt,
-      uuid: UUID,
-  ): CommonMetadata = create(
-    hashOps,
-    protocolVersionRepresentativeFor(protocolVersion),
-  )(synchronizerId, mediator, salt, uuid)
-
-  def create(
-      hashOps: HashOps,
-      protocolVersion: RepresentativeProtocolVersion[CommonMetadata.type],
-  )(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       mediator: MediatorGroupRecipient,
       salt: Salt,
       uuid: UUID,
   ): CommonMetadata =
     CommonMetadata(synchronizerId, mediator, salt, uuid)(
       hashOps,
-      protocolVersion,
       None,
     )
 
@@ -102,21 +88,17 @@ object CommonMetadata
   ): ParsingResult[CommonMetadata] = {
     val v30.CommonMetadata(saltP, synchronizerIdP, uuidP, mediatorP) = metaDataP
     for {
-      synchronizerUid <- UniqueIdentifier
-        .fromProtoPrimitive_(synchronizerIdP)
-        .leftMap(e =>
-          ProtoDeserializationError.ValueDeserializationError("synchronizer_id", e.message)
-        )
+      synchronizerId <- PhysicalSynchronizerId
+        .fromProtoPrimitive(synchronizerIdP, "physical_synchronizer_id")
+
       mediatorGroup <- ProtoConverter.parseNonNegativeInt("mediator", mediatorP)
       mediatorGroupRecipient = MediatorGroupRecipient.apply(mediatorGroup)
       salt <- ProtoConverter
         .parseRequired(Salt.fromProtoV30, "salt", saltP)
         .leftMap(_.inField("salt"))
       uuid <- ProtoConverter.UuidConverter.fromProtoPrimitive(uuidP).leftMap(_.inField("uuid"))
-      pv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-    } yield CommonMetadata(SynchronizerId(synchronizerUid), mediatorGroupRecipient, salt, uuid)(
+    } yield CommonMetadata(synchronizerId, mediatorGroupRecipient, salt, uuid)(
       hashOps,
-      pv,
       Some(bytes),
     )
   }

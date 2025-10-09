@@ -119,7 +119,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
           "reassign-contract",
           participant1.adminParty.toProtoPrimitive,
         ).create.commands.loneElement
-      val tx = participant1.ledger_api.javaapi.commands.submit_flat(
+      val tx = participant1.ledger_api.javaapi.commands.submit(
         Seq(participant1.adminParty),
         Seq(cycle),
         synchronizerId = Some(synchronizer1Id),
@@ -129,11 +129,12 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
       logger.info("Switch out the mediator during unassignment")
 
       val unassignF = switchMediatorDuringSubmission(
-        sequencer1,
-        NonNegativeInt.zero,
-        NonNegativeInt.one,
-        mediator2,
-        participant1,
+        sequencer = sequencer1,
+        oldMediatorGroup = NonNegativeInt.zero,
+        oldMediator = mediator1,
+        newMediatorGroup = NonNegativeInt.one,
+        newMediator = mediator2,
+        participant = participant1,
       ) { () =>
         participant1.testing.fetch_synchronizer_time(synchronizer2Id)
 
@@ -153,11 +154,12 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
       logger.debug("Switch out the mediator during assignment")
 
       val assignF = switchMediatorDuringSubmission(
-        sequencer2,
-        NonNegativeInt.zero,
-        NonNegativeInt.one,
-        mediator4,
-        participant1,
+        sequencer = sequencer2,
+        oldMediatorGroup = NonNegativeInt.zero,
+        oldMediator = mediator3,
+        newMediatorGroup = NonNegativeInt.one,
+        newMediator = mediator4,
+        participant = participant1,
       ) { () =>
         val unassigned = participant1.ledger_api.commands.submit_unassign(
           participant1.adminParty,
@@ -169,7 +171,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
         a[CommandFailure] shouldBe thrownBy {
           participant1.ledger_api.commands.submit_assign(
             participant1.adminParty,
-            unassigned.unassignId,
+            unassigned.reassignmentId,
             synchronizer1Id,
             synchronizer2Id,
           )
@@ -186,7 +188,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
 
       participant1.ledger_api.commands.submit_assign(
         participant1.adminParty,
-        unassignedEvent.unassignId,
+        unassignedEvent.reassignmentId,
         synchronizer1Id,
         synchronizer2Id,
       )

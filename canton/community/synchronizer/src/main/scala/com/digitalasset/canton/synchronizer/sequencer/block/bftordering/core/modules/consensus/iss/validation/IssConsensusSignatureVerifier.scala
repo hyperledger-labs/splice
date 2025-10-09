@@ -6,10 +6,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 import cats.syntax.either.*
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.crypto.SignatureCheckError
+import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider.AuthenticatedMessageType
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider.AuthenticatedMessageType
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.{
   AvailabilityAck,
   OrderingBlock,
@@ -24,6 +24,15 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Membership,
   OrderingTopologyInfo,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
+  MessageFrom,
+  SignedMessage,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.Consensus.RetransmissionsMessage.{
+  RetransmissionRequest,
+  RetransmissionResponse,
+  RetransmissionsNetworkMessage,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.{
   Commit,
   NewView,
@@ -32,6 +41,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Prepare,
   ViewChange,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus.EpochStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   Env,
   FutureContext,
@@ -61,9 +71,7 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
     )(message)
   }
 
-  private def validateMessage(
-      message: PbftNetworkMessage
-  )(implicit
+  private def validateMessage(message: PbftNetworkMessage)(implicit
       context: FutureContext[E],
       traceContext: TraceContext,
       metricsContext: MetricsContext,
@@ -90,22 +98,23 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
       cryptoProvider: CryptoProvider[E],
       traceContext: TraceContext,
       metricsContext: MetricsContext,
-  ): VerificationResult = collectFutures[SignatureCheckError] {
-    proofOfAvailability.acks.map { ack =>
-      val hash = AvailabilityAck.hashFor(
-        proofOfAvailability.batchId,
-        proofOfAvailability.epochNumber,
-        ack.from,
-        metrics,
-      )
-      cryptoProvider.verifySignature(
-        hash,
-        ack.from,
-        ack.signature,
-        "consensus-signature-verify-poa-ack",
-      )
-    }
-  }
+  ): VerificationResult =
+    collectFutures[SignatureCheckError](
+      proofOfAvailability.acks.map { ack =>
+        val hash = AvailabilityAck.hashFor(
+          proofOfAvailability.batchId,
+          proofOfAvailability.epochNumber,
+          ack.from,
+          metrics,
+        )
+        cryptoProvider.verifySignature(
+          hash,
+          ack.from,
+          ack.signature,
+          "consensus-signature-verify-poa-ack",
+        )
+      }
+    )
 
   private def validateOrderingBlock(
       block: OrderingBlock
@@ -115,7 +124,9 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): VerificationResult =
-    collectFuturesAndFlatten(block.proofs.map(validateProofOfAvailability(_)))
+    collectFuturesAndFlatten(
+      block.proofs.map(validateProofOfAvailability(_))
+    )
 
   private def validatePrePrepare(
       message: PrePrepare
@@ -149,6 +160,7 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
             (_: PbftNetworkMessage) => context.pureFuture(Either.unit[Seq[SignatureCheckError]]),
             cryptoProviderForCanonicalCommits,
             membership,
+            AuthenticatedMessageType.BftSignedConsensusMessage,
           )(commit)
         ) :+ validateOrderingBlock(block)
       )
@@ -163,10 +175,32 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
       topologyInfo: OrderingTopologyInfo[E],
   ): VerificationResult =
     collectFuturesAndFlatten(
-      message.consensusCerts.map(validateConsensusCertificate(_, topologyInfo))
+      message.consensusCerts.map(verifyConsensusCertificate(_, topologyInfo))
     )
 
-  def validateConsensusCertificate(
+  def verifyRetransmissionMessage(
+      message: RetransmissionsNetworkMessage,
+      topologyInfo: OrderingTopologyInfo[E],
+  )(implicit
+      context: FutureContext[E],
+      traceContext: TraceContext,
+      metricsContext: MetricsContext,
+  ): VerificationResult =
+    message match {
+      case request: RetransmissionRequest =>
+        validateSignedMessage[EpochStatus](
+          _ => context.pureFuture(Either.unit[Seq[SignatureCheckError]]),
+          topologyInfo.currentCryptoProvider,
+          topologyInfo.currentMembership,
+          AuthenticatedMessageType.BftSignedRetransmissionMessage,
+        )(request.signedEpochStatus)
+      case RetransmissionResponse(_, consensusCerts) =>
+        collectFuturesAndFlatten(
+          consensusCerts.map(verifyConsensusCertificate(_, topologyInfo))
+        )
+    }
+
+  def verifyConsensusCertificate(
       certificate: ConsensusCertificate,
       topologyInfo: OrderingTopologyInfo[E],
   )(implicit
@@ -183,11 +217,18 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
       validateSignedMessage[PrePrepare](validatePrePrepare(_))(certificate.prePrepare)
     val remainingValidationF: VerificationResult = certificate match {
       case CommitCertificate(_, commits) =>
-        collectFuturesAndFlatten(commits.map(validate(_)))
+        collectFuturesAndFlatten(
+          commits.map(validate(_))
+        )
       case PrepareCertificate(_, prepares) =>
-        collectFuturesAndFlatten(prepares.map(validate(_)))
+        collectFuturesAndFlatten(
+          prepares.map(validate(_))
+        )
     }
-    collectFuturesAndFlatten(Seq(prePrepareValidationF, remainingValidationF))
+    collectFuturesAndFlatten(
+      Seq(prePrepareValidationF, remainingValidationF),
+      orderingStage = Some("consensus-validate-consensus-certificate"),
+    )
   }
 
   private def validateSignedMessage[A <: PbftNetworkMessage](
@@ -202,12 +243,14 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
       validator,
       topologyInfo.currentCryptoProvider,
       topologyInfo.currentMembership,
+      AuthenticatedMessageType.BftSignedConsensusMessage,
     )(signedMessage)
 
-  private def validateSignedMessage[A <: PbftNetworkMessage](
+  private def validateSignedMessage[A <: ProtocolVersionedMemoizedEvidence & MessageFrom](
       validator: A => VerificationResult,
       cryptoProvider: CryptoProvider[E],
       membership: Membership,
+      authenticatedMessageType: AuthenticatedMessageType,
   )(signedMessage: SignedMessage[A])(implicit
       context: FutureContext[E],
       traceContext: TraceContext,
@@ -221,13 +264,14 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
             Seq(
               cryptoProvider.verifySignedMessage(
                 signedMessage,
-                AuthenticatedMessageType.BftSignedConsensusMessage,
+                authenticatedMessageType,
               )
             )
           ),
         )
       )(
-        PureFun.Util.CollectPairErrors[SignatureCheckError]()
+        PureFun.Util.CollectPairErrors[SignatureCheckError](),
+        orderingStage = Some("consensus-validate-signed-message"),
       )
     else {
       val error = SignatureCheckError.SignerHasNoValidKeys(
@@ -236,17 +280,25 @@ final class IssConsensusSignatureVerifier[E <: Env[E]](metrics: BftOrderingMetri
       context.pureFuture[Either[Seq[SignatureCheckError], Unit]](Left(Seq(error)))
     }
 
-  private def collectFutures[Err](
-      futures: Seq[E#FutureUnlessShutdownT[Either[Err, Unit]]]
-  )(implicit
-      context: FutureContext[E]
-  ): E#FutureUnlessShutdownT[Either[Seq[Err], Unit]] =
-    context.mapFuture(context.sequenceFuture(futures))(PureFun.Util.CollectErrors())
-
   private def collectFuturesAndFlatten[Err](
-      futures: Seq[E#FutureUnlessShutdownT[Either[Seq[Err], Unit]]]
+      futures: Seq[E#FutureUnlessShutdownT[Either[Seq[Err], Unit]]],
+      orderingStage: Option[String] = None,
   )(implicit
       context: FutureContext[E]
   ): E#FutureUnlessShutdownT[Either[Seq[Err], Unit]] =
-    context.mapFuture(collectFutures(futures))(PureFun.Either.LeftMap(PureFun.Seq.Flatten()))
+    context.mapFuture(collectFutures(futures))(
+      PureFun.Either.LeftMap(PureFun.Seq.Flatten()),
+      orderingStage,
+    )
+
+  private def collectFutures[Err](
+      futures: Seq[E#FutureUnlessShutdownT[Either[Err, Unit]]],
+      orderingStage: Option[String] = None,
+  )(implicit
+      context: FutureContext[E]
+  ): E#FutureUnlessShutdownT[Either[Seq[Err], Unit]] =
+    context.mapFuture(context.sequenceFuture(futures))(
+      PureFun.Util.CollectErrors(),
+      orderingStage,
+    )
 }

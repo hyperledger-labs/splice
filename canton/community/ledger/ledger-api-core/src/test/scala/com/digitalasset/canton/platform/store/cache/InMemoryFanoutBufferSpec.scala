@@ -6,7 +6,7 @@ package com.digitalasset.canton.platform.store.cache
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.participant.state.ReassignmentInfo
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
@@ -16,6 +16,7 @@ import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer.{
   UnorderedException,
 }
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
+import com.digitalasset.canton.protocol.ReassignmentId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ReassignmentTag
 import com.digitalasset.daml.lf.data.{Ref, Time}
@@ -553,6 +554,7 @@ class InMemoryFanoutBufferSpec
       commandId = "",
       synchronizerId = someSynchronizerId.toProtoPrimitive,
       recordTime = Time.Timestamp.Epoch,
+      externalTransactionHash = None,
     )
 
   private def txRejected(idx: Long, offset: Offset) =
@@ -577,11 +579,11 @@ class InMemoryFanoutBufferSpec
         sourceSynchronizer = ReassignmentTag.Source(someSynchronizerId),
         targetSynchronizer = ReassignmentTag.Target(someSynchronizerId),
         submitter = None,
-        reassignmentCounter = 1,
-        unassignId = CantonTimestamp.assertFromLong(1L),
+        reassignmentId = ReassignmentId.tryCreate("0001"),
         isReassigningParticipant = false,
       ),
-      reassignment = mock[TransactionLogUpdate.ReassignmentAccepted.Reassignment],
+      reassignment = null,
+      synchronizerId = someSynchronizerId.toProtoPrimitive,
     )
 
   private def topologyTxAccepted(idx: Long, offset: Offset) =

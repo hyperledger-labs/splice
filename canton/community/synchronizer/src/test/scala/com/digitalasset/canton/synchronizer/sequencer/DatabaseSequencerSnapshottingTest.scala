@@ -15,6 +15,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.{DbSequencerStoreTest, SequencerStore}
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{MediatorId, TestingIdentityFactory, TestingTopology}
@@ -30,13 +31,13 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
   )(implicit materializer: Materializer): CantonSequencer =
     createSequencerWithSnapshot(None)
 
-  val crypto = TestingIdentityFactory(
+  private val crypto = TestingIdentityFactory(
     TestingTopology(),
     loggerFactory,
     DynamicSynchronizerParameters.initialValues(clock, testedProtocolVersion),
-  ).forOwnerAndSynchronizer(owner = mediatorId, synchronizerId)
+  ).forOwnerAndSynchronizer(owner = mediatorId, psid)
 
-  val requestSigner = RequestSigner(crypto, testedProtocolVersion, loggerFactory)
+  private val requestSigner = RequestSigner(crypto, testedProtocolVersion, loggerFactory)
 
   def createSequencerWithSnapshot(
       initialState: Option[SequencerInitialState]
@@ -57,6 +58,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       blockSequencerMode = false,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(),
+      sequencerMetrics = metrics,
     )
 
     DatabaseSequencer.single(
@@ -65,10 +67,10 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       DefaultProcessingTimeouts.testing,
       storage,
       sequencerStore,
+      sequencingTimeLowerBoundExclusive =
+        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
       clock,
-      synchronizerId,
       sequencerId,
-      testedProtocolVersion,
       crypto,
       metrics,
       loggerFactory,
@@ -148,7 +150,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
         secondSequencer = createSequencerWithSnapshot(
           Some(
             SequencerInitialState(
-              synchronizerId,
+              psid,
               snapshot,
               latestSequencerEventTimestamp = None,
               initialTopologyEffectiveTimestamp = None,

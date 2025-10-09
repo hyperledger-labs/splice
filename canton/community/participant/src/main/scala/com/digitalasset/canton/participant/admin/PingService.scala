@@ -11,7 +11,7 @@ import com.daml.ledger.api.v2.event.Event.Event
 import com.daml.ledger.api.v2.reassignment.{Reassignment, ReassignmentEvent}
 import com.daml.ledger.api.v2.state_service.ActiveContract
 import com.daml.ledger.api.v2.transaction.Transaction
-import com.daml.ledger.api.v2.transaction_filter.TransactionFilter
+import com.daml.ledger.api.v2.transaction_filter.EventFormat
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{Command, CreatedEvent as JavaCreatedEvent, Identifier}
 import com.digitalasset.base.error.utils.DecodedCantonError
@@ -23,7 +23,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.WorkflowId
 import com.digitalasset.canton.ledger.client.{LedgerClient, LedgerClientUtils}
-import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.ledger.error.groups.{CommandExecutionErrors, RequestValidationErrors}
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   HasCloseContext,
@@ -55,7 +55,6 @@ import scalaz.Tag
 import java.time.{Duration, Instant}
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.*
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
@@ -175,7 +174,6 @@ class PingService(
 
 }
 
-@nowarn("cat=deprecation")
 object PingService {
 
   trait SyncServiceHandle {
@@ -192,6 +190,7 @@ object PingService {
     TopologyErrors.NoCommonSynchronizer,
     TopologyErrors.UnknownContractSynchronizers, // required for restart tests
     RequestValidationErrors.NotFound.Package,
+    CommandExecutionErrors.PackageSelectionFailed,
   ).map(_.id)
 
   /** Cleanup time: when will we deregister pings after their completion */
@@ -229,9 +228,20 @@ object PingService {
     protected def futureSupervisor: FutureSupervisor
     protected implicit def tracer: Tracer
 
-    override private[admin] def filters: TransactionFilter =
-      // we can't filter by template id as we don't know when the admin workflow package is loaded
-      LedgerConnection.transactionFilterByParty(Map(adminPartyId -> Seq.empty))
+    override private[admin] def eventFormat: EventFormat = {
+      val templates = Seq(
+        M.ping.Ping.TEMPLATE_ID,
+        M.bong.BongProposal.TEMPLATE_ID,
+        M.bong.Explode.TEMPLATE_ID,
+        M.bong.Collapse.TEMPLATE_ID,
+        M.bong.Merge.TEMPLATE_ID,
+        M.bong.Bong.TEMPLATE_ID,
+      )
+
+      LedgerConnection.eventFormatByParty(
+        Map(adminPartyId -> templates.map(LedgerConnection.mapTemplateIds))
+      )
+    }
 
     private[admin] abstract class ContractWithExpiry(
         val contractId: ContractId[?],

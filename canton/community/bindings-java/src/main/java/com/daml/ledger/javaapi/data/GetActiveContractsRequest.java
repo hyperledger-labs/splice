@@ -14,6 +14,7 @@ public final class GetActiveContractsRequest {
 
   @NonNull private final Long activeAtOffset;
 
+  // TODO(#23504) remove
   @Deprecated
   public GetActiveContractsRequest(
       @NonNull TransactionFilter transactionFilter, boolean verbose, @NonNull Long activeAtOffset) {

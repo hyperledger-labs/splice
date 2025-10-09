@@ -16,11 +16,14 @@ import com.digitalasset.base.error.utils.ErrorDetails.RetryInfoDetail
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.ledger.api.{IdentityProviderId, ObjectMeta}
-import com.digitalasset.canton.ledger.localstore.api.{PartyRecord, PartyRecordStore}
+import com.digitalasset.canton.ledger.localstore.api.{
+  PartyRecord,
+  PartyRecordStore,
+  UserManagementStore,
+}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.index.{
   IndexPartyManagementService,
-  IndexUpdateService,
   IndexerPartyDetails,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -29,6 +32,7 @@ import com.digitalasset.canton.platform.apiserver.services.admin.ApiPartyManagem
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiPartyManagementServiceSpec.*
 import com.digitalasset.canton.platform.apiserver.services.admin.PartyAllocation
 import com.digitalasset.canton.platform.apiserver.services.tracking.{InFlight, StreamTracker}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.daml.lf.data.Ref
@@ -106,19 +110,19 @@ class ApiPartyManagementServiceSpec
 
     "propagate trace context" in {
       val (
-        mockIndexTransactionsService,
         mockIdentityProviderExists,
         mockIndexPartyManagementService,
+        mockUserManagementStore,
         mockPartyRecordStore,
       ) = mockedServices()
       val partyAllocationTracker = makePartyAllocationTracker(loggerFactory)
 
       val apiService = ApiPartyManagementService.createApiService(
         mockIndexPartyManagementService,
+        mockUserManagementStore,
         mockIdentityProviderExists,
         partiesPageSize,
         mockPartyRecordStore,
-        mockIndexTransactionsService,
         TestPartySyncService(testTelemetrySetup.tracer),
         oneHour,
         ApiPartyManagementService.CreateSubmissionId.fixedForTests(aSubmissionId),
@@ -132,7 +136,7 @@ class ApiPartyManagementServiceSpec
 
       // Kick the interaction off
       val future = apiService
-        .allocateParty(AllocatePartyRequest("aParty", None, ""))
+        .allocateParty(AllocatePartyRequest("aParty", None, "", "", ""))
         .thereafter { _ =>
           scope.close()
           span.end()
@@ -154,19 +158,19 @@ class ApiPartyManagementServiceSpec
 
     "close while allocating party" in {
       val (
-        mockIndexTransactionsService,
         mockIdentityProviderExists,
         mockIndexPartyManagementService,
+        mockUserManagementStore,
         mockPartyRecordStore,
       ) = mockedServices()
       val partyAllocationTracker = makePartyAllocationTracker(loggerFactory)
 
       val apiPartyManagementService = ApiPartyManagementService.createApiService(
         mockIndexPartyManagementService,
+        mockUserManagementStore,
         mockIdentityProviderExists,
         partiesPageSize,
         mockPartyRecordStore,
-        mockIndexTransactionsService,
         TestPartySyncService(testTelemetrySetup.tracer),
         oneHour,
         ApiPartyManagementService.CreateSubmissionId.fixedForTests(aSubmissionId.toString),
@@ -176,7 +180,8 @@ class ApiPartyManagementServiceSpec
       )
 
       // Kick the interaction off
-      val future = apiPartyManagementService.allocateParty(AllocatePartyRequest("aParty", None, ""))
+      val future =
+        apiPartyManagementService.allocateParty(AllocatePartyRequest("aParty", None, "", "", ""))
 
       // Close the service
       apiPartyManagementService.close()
@@ -190,18 +195,17 @@ class ApiPartyManagementServiceSpec
             assertError(
               actual = err,
               expectedStatusCode = Code.UNAVAILABLE,
-              expectedMessage = "SERVER_IS_SHUTTING_DOWN(1,0): Server is shutting down",
+              expectedMessage = "ABORTED_DUE_TO_SHUTDOWN(1,0): request aborted due to shutdown",
               expectedDetails = List(
                 ErrorDetails.ErrorInfoDetail(
-                  "SERVER_IS_SHUTTING_DOWN",
+                  "ABORTED_DUE_TO_SHUTDOWN",
                   Map(
                     "parties" -> "['aParty']",
                     "category" -> "1",
-                    "definite_answer" -> "false",
                     "test" -> s"'${getClass.getSimpleName}'",
                   ),
                 ),
-                RetryInfoDetail(1.second),
+                RetryInfoDetail(10.seconds),
               ),
               verifyEmptyStackTrace = true,
             )
@@ -223,15 +227,11 @@ class ApiPartyManagementServiceSpec
     )
 
   private def mockedServices(): (
-      IndexUpdateService,
       IdentityProviderExists,
       IndexPartyManagementService,
+      UserManagementStore,
       PartyRecordStore,
   ) = {
-    val mockIndexUpdateService = mock[IndexUpdateService]
-    when(mockIndexUpdateService.currentLedgerEnd())
-      .thenReturn(Future.successful(None))
-
     val mockIdentityProviderExists = mock[IdentityProviderExists]
     when(
       mockIdentityProviderExists.apply(ArgumentMatchers.eq(IdentityProviderId.Default))(
@@ -254,10 +254,12 @@ class ApiPartyManagementServiceSpec
       mockPartyRecordStore.getPartyRecordO(any[Ref.Party])(any[LoggingContextWithTrace])
     ).thenReturn(Future.successful(Right(None)))
 
+    val mockUserManagementStore = mock[UserManagementStore]
+
     (
-      mockIndexUpdateService,
       mockIdentityProviderExists,
       mockIndexPartyManagementService,
+      mockUserManagementStore,
       mockPartyRecordStore,
     )
   }
@@ -291,6 +293,7 @@ object ApiPartyManagementServiceSpec {
     override def allocateParty(
         hint: Ref.Party,
         submissionId: Ref.SubmissionId,
+        synchronizerIdO: Option[SynchronizerId],
     )(implicit
         traceContext: TraceContext
     ): FutureUnlessShutdown[state.SubmissionResult] = {

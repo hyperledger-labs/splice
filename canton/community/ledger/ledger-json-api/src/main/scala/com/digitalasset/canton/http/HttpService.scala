@@ -4,22 +4,21 @@
 package com.digitalasset.canton.http
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.jwt.{Jwt, JwtDecoder}
+import com.daml.jwt.JwtDecoder
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.logging.LoggingContextOf
 import com.daml.metrics.pekkohttp.HttpMetricsInterceptor
 import com.daml.ports.{Port, PortFiles}
-import com.digitalasset.canton.concurrent.DirectExecutionContext
-import com.digitalasset.canton.config.{TlsClientConfig, TlsServerConfig}
-import com.digitalasset.canton.http.json.v2.V2Routes
-import com.digitalasset.canton.http.json.{
-  ApiJsonDecoder,
-  ApiJsonEncoder,
-  ApiValueToJsValueConverter,
-  JsValueToApiValueConverter,
+import com.daml.tls.TlsVersion
+import com.digitalasset.canton.auth.AuthInterceptor
+import com.digitalasset.canton.config.{
+  ServerAuthRequirementConfig,
+  TlsClientConfig,
+  TlsServerConfig,
 }
+import com.digitalasset.canton.http.json.v1.V1Routes
+import com.digitalasset.canton.http.json.v2.V2Routes
 import com.digitalasset.canton.http.metrics.HttpApiMetrics
-import com.digitalasset.canton.http.util.ApiValueToLfValueConverter
 import com.digitalasset.canton.http.util.FutureUtil.*
 import com.digitalasset.canton.http.util.Logging.InstanceUUID
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.UserId
@@ -32,11 +31,9 @@ import com.digitalasset.canton.ledger.client.services.admin.{
   IdentityProviderConfigClient,
   UserManagementClient,
 }
-import com.digitalasset.canton.ledger.client.services.pkg.PackageClient
 import com.digitalasset.canton.ledger.participant.state.PackageSyncService
-import com.digitalasset.canton.ledger.service.LedgerReader
-import com.digitalasset.canton.ledger.service.LedgerReader.PackageStore
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.tracing.NoTracing
 import io.grpc.Channel
 import io.grpc.health.v1.health.{HealthCheckRequest, HealthGrpc}
@@ -54,7 +51,6 @@ import java.io.InputStream
 import java.nio.file.{Files, Path}
 import java.security.{Key, KeyStore}
 import javax.net.ssl.SSLContext
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Using
 
@@ -63,6 +59,7 @@ class HttpService(
     httpsConfiguration: Option[TlsServerConfig],
     channel: Channel,
     packageSyncService: PackageSyncService,
+    packagePreferenceBackend: PackagePreferenceBackend,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     asys: ActorSystem,
@@ -70,17 +67,13 @@ class HttpService(
     esf: ExecutionSequencerFactory,
     lc: LoggingContextOf[InstanceUUID],
     metrics: HttpApiMetrics,
+    authInterceptor: AuthInterceptor,
 ) extends ResourceOwner[ServerBinding]
     with NamedLogging
     with NoTracing {
-  import HttpService.doLoad
-
   private type ET[A] = EitherT[Future, HttpService.Error, A]
 
-  private val directEc = DirectExecutionContext(noTracingLogger)
-
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  @nowarn("cat=deprecation")
   def acquire()(implicit context: ResourceContext): Resource[ServerBinding] =
     Resource({
       logger.info(s"Starting JSON API server, ${lc.makeString}")
@@ -115,53 +108,6 @@ class HttpService(
       val bindingEt: EitherT[Future, HttpService.Error, ServerBinding] =
         for {
           _ <- eitherT(Future.successful(\/-(ledgerClient)))
-          packageCache = LedgerReader.LoadCache.freshCache()
-
-          packageService = new PackageService(
-            reloadPackageStoreIfChanged =
-              doLoad(ledgerClient.packageService, LedgerReader(loggerFactory), packageCache),
-            loggerFactory = loggerFactory,
-          )
-
-          ledgerClientJwt = LedgerClientJwt(loggerFactory)
-
-          commandService = new CommandService(
-            ledgerClientJwt.submitAndWaitForTransaction(ledgerClient),
-            ledgerClientJwt.submitAndWaitForTransactionTree(ledgerClient),
-            loggerFactory,
-          )
-
-          contractsService = new ContractsService(
-            packageService.resolveContractTypeId,
-            packageService.allTemplateIds,
-            ledgerClientJwt.getByContractId(ledgerClient),
-            ledgerClientJwt.getActiveContracts(ledgerClient),
-            ledgerClientJwt.getCreatesAndArchivesSince(ledgerClient),
-            ledgerClientJwt.getLedgerEnd(ledgerClient),
-            loggerFactory,
-          )
-
-          partiesService = new PartiesService(
-            ledgerClientJwt.listKnownParties(ledgerClient),
-            ledgerClientJwt.getParties(ledgerClient),
-            ledgerClientJwt.allocateParty(ledgerClient),
-          )
-
-          packageManagementService = new PackageManagementService(
-            ledgerClientJwt.listPackages(ledgerClient),
-            ledgerClientJwt.getPackage(ledgerClient),
-            { case (jwt, byteString) =>
-              implicit lc =>
-                ledgerClientJwt
-                  .uploadDar(ledgerClient)(directEc, traceContext)(
-                    jwt,
-                    byteString,
-                  )(lc)
-                  .flatMap(_ => packageService.reload(jwt))
-                  .map(_ => ())
-            },
-          )
-
           ledgerHealthService = HealthGrpc.stub(channel)
 
           healthService = new HealthService(() => ledgerHealthService.check(HealthCheckRequest()))
@@ -171,55 +117,38 @@ class HttpService(
             () => healthService.ready().map(_.checks.forall(_.result)),
           )
 
-          (encoder, decoder) = HttpService.buildJsonCodecs(packageService)
-
           v2Routes = V2Routes(
             ledgerClient,
             metadataServiceEnabled = startSettings.damlDefinitionsServiceEnabled,
             packageSyncService,
+            packagePreferenceBackend,
             mat.executionContext,
             loggerFactory,
           )
 
-          jsonEndpoints = new Endpoints(
+          v1Routes = V1Routes(
+            ledgerClient,
             httpsConfiguration.isEmpty,
             HttpService.decodeJwt,
-            commandService,
-            contractsService,
-            partiesService,
-            packageManagementService,
-            healthService,
-            v2Routes,
-            encoder,
-            decoder,
             debugLoggingOfHttpBodies,
             resolveUser,
             ledgerClient.userManagementClient,
             loggerFactory,
-          )
-
-          websocketService = new WebSocketService(
-            contractsService,
-            packageService.resolveContractTypeId,
-            decoder,
             websocketConfig,
-            loggerFactory,
           )
 
-          websocketEndpoints = new WebsocketEndpoints(
-            HttpService.decodeJwt,
-            websocketService,
-            resolveUser,
+          jsonEndpoints = new Endpoints(
+            healthService,
+            v2Routes,
+            v1Routes,
+            debugLoggingOfHttpBodies,
             loggerFactory,
           )
 
           rateDurationSizeMetrics = HttpMetricsInterceptor.rateDurationSizeMetrics(metrics.http)
 
           defaultEndpoints =
-            rateDurationSizeMetrics apply concat(
-              jsonEndpoints.all: Route,
-              websocketEndpoints.transactionWebSocket,
-            )
+            rateDurationSizeMetrics apply jsonEndpoints.all
 
           allEndpoints: Route = concat(
             defaultEndpoints,
@@ -241,7 +170,7 @@ class HttpService(
             httpsConfiguration
               .fold(serverBuilder) { config =>
                 logger.info(s"Enabling HTTPS with $config")
-                serverBuilder.enableHttps(HttpService.httpsConnectionContext(config))
+                serverBuilder.enableHttps(HttpService.httpsConnectionContext(config)(logger))
               }
               .bind(prefixedEndpoints)
           }
@@ -264,6 +193,10 @@ class HttpService(
 }
 
 object HttpService extends NoTracing {
+  // if no minimumServerProtocolVersion is set `config.protocols` returns an empty list
+  // but we still want to setup some protocols
+  private val allowedProtocols =
+    Set[TlsVersion.TlsVersion](TlsVersion.V1_2, TlsVersion.V1_3).map(_.version)
 
   def resolveUser(userManagementClient: UserManagementClient): EndpointsCompanion.ResolveUser =
     jwt => userId => userManagementClient.listUserRights(userId = userId, token = Some(jwt.value))
@@ -305,51 +238,10 @@ object HttpService extends NoTracing {
   //              and inline.
   // Decode JWT without any validation
   private val decodeJwt: EndpointsCompanion.ValidateJwt =
-    jwt => JwtDecoder.decode(jwt).leftMap(e => EndpointsCompanion.Unauthorized(e.shows))
-
-  def doLoad(
-      packageClient: PackageClient,
-      ledgerReader: LedgerReader,
-      loadCache: LedgerReader.LoadCache,
-  )(jwt: Jwt)(ids: Set[String])(implicit
-      ec: ExecutionContext,
-      lc: LoggingContextOf[InstanceUUID],
-  ): Future[PackageService.ServerError \/ Option[PackageStore]] =
-    ledgerReader
-      .loadPackageStoreUpdates(
-        packageClient,
-        loadCache,
-        some(jwt.value),
-      )(ids)
-      .map(_.leftMap(e => PackageService.ServerError(e)))
-
-  def buildJsonCodecs(
-      packageService: PackageService
-  )(implicit ec: ExecutionContext): (ApiJsonEncoder, ApiJsonDecoder) = {
-
-    val lfTypeLookup = LedgerReader.damlLfTypeLookup(() => packageService.packageStore) _
-    val jsValueToApiValueConverter = new JsValueToApiValueConverter(lfTypeLookup)
-
-    val apiValueToJsValueConverter = new ApiValueToJsValueConverter(
-      ApiValueToLfValueConverter.apiValueToLfValue
-    )
-
-    val encoder = new ApiJsonEncoder(
-      apiValueToJsValueConverter.apiRecordToJsObject,
-      apiValueToJsValueConverter.apiValueToJsValue,
-    )
-
-    val decoder = new ApiJsonDecoder(
-      packageService.resolveContractTypeId,
-      packageService.resolveTemplateRecordType,
-      packageService.resolveChoiceArgType,
-      packageService.resolveKeyType,
-      jsValueToApiValueConverter.jsValueToApiValue,
-      jsValueToApiValueConverter.jsValueToLfValue,
-    )
-
-    (encoder, decoder)
-  }
+    jwt =>
+      \/.fromEither(
+        JwtDecoder.decode(jwt).leftMap(e => EndpointsCompanion.Unauthorized(e.prettyPrint))
+      )
 
   private[http] def createPortFile(
       file: Path,
@@ -360,8 +252,8 @@ object HttpService extends NoTracing {
   }
 
   def buildSSLContext(config: TlsServerConfig): SSLContext = {
-    val keyStore = buildKeyStore(config)
-    buildSSLContext(keyStore)
+    val serverKeyStore = buildKeyStore(config)
+    buildSSLContext(serverKeyStore)
   }
 
   def buildSSLContext(config: TlsClientConfig): SSLContext = {
@@ -390,8 +282,46 @@ object HttpService extends NoTracing {
     context
   }
 
-  private def httpsConnectionContext(config: TlsServerConfig): HttpsConnectionContext =
-    ConnectionContext.httpsServer(buildSSLContext(config))
+  private def httpsConnectionContext(
+      config: TlsServerConfig
+  )(implicit logger: TracedLogger): HttpsConnectionContext =
+    ConnectionContext.httpsServer { () =>
+      val engine = buildSSLContext(config).createSSLEngine()
+      engine.setUseClientMode(false)
+      engine.setEnabledCipherSuites(config.ciphers.getOrElse(Seq.empty).toArray)
+      logger.info(
+        s"Ledger JSON API Enabled Ciphers: ${engine.getEnabledCipherSuites.mkString(", ")}"
+      )
+      config.clientAuth match {
+        case ServerAuthRequirementConfig.None =>
+          engine.setNeedClientAuth(false)
+          engine.setWantClientAuth(false)
+        case ServerAuthRequirementConfig.Optional =>
+          engine.setNeedClientAuth(false)
+          engine.setWantClientAuth(true)
+        case ServerAuthRequirementConfig.Require(
+              _
+            ) => // certs inside Require are only needed to construct grpc client
+          engine.setNeedClientAuth(true)
+          engine.setWantClientAuth(true)
+      }
+      logger.info(
+        s"Ledger JSON API NeedClientAuth:${engine.getNeedClientAuth} WantClientAuth:${engine.getWantClientAuth}"
+      )
+
+      val enabledProtocols = config.protocols.getOrElse(
+        engine
+          .getEnabledProtocols()
+          .toSeq
+          .filter(
+            HttpService.allowedProtocols.contains(_)
+          )
+      )
+
+      logger.info(s"Ledger JSON API enabled TLS protocols: $enabledProtocols")
+      engine.setEnabledProtocols(enabledProtocols.toArray)
+      engine
+    }
 
   // TODO(i22574): Remove OptionPartial and Null warts in HttpService
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))

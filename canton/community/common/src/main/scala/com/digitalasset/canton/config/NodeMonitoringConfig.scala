@@ -6,7 +6,9 @@ package com.digitalasset.canton.config
 import com.daml.jwt.JwtTimestampLeeway
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
-import io.netty.handler.ssl.SslContext
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
+
+import scala.concurrent.duration.Duration
 
 /** Configuration of the gRPC health server for a canton node.
   * @param parallelism
@@ -23,11 +25,12 @@ final case class GrpcHealthServerConfig(
 ) extends ServerConfig
     with UniformCantonConfigValidation {
   override def authServices: Seq[AuthServiceConfig] = Seq.empty
-  override def adminToken: Option[String] = None
+  override def adminTokenConfig: AdminTokenConfig = AdminTokenConfig()
   override val sslContext: Option[SslContext] = None
   override val serverCertChainFile: Option[PemFileOrString] = None
   override def maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize
-
+  override val maxTokenLifetime: NonNegativeDuration = NonNegativeDuration(Duration.Inf)
+  override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig()
   def toRemoteConfig: FullClientConfig =
     FullClientConfig(address, port, keepAliveClient = keepAliveServer.map(_.clientConfigFor))
 }

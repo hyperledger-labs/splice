@@ -4,6 +4,7 @@
 package com.digitalasset.canton.ledger.api.validation
 
 import cats.implicits.toBifunctorOps
+import com.daml.jwt.JwksUrl
 import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator.{
   AnnotationsSizeExceededError,
@@ -12,7 +13,7 @@ import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator
 }
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.*
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
-import com.digitalasset.canton.ledger.api.{IdentityProviderId, JwksUrl, SubmissionId, WorkflowId}
+import com.digitalasset.canton.ledger.api.{IdentityProviderId, SubmissionId, WorkflowId}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId as TopologyPartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Ref
@@ -98,6 +99,17 @@ object FieldValidator {
       errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.UserId] =
     requireNonEmptyParsedId(Ref.UserId.fromString)(s, fieldName)
+
+  def optionalUserId(
+      s: String,
+      fieldName: String,
+  )(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, Option[Ref.UserId]] =
+    if (s.isEmpty) Right(None)
+    else {
+      Ref.UserId.fromString(s).map(Some(_)).left.map(invalidField(fieldName, _))
+    }
 
   def requireLedgerString(
       s: String,

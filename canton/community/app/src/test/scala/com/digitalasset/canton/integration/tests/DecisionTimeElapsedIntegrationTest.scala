@@ -17,7 +17,6 @@ import com.digitalasset.canton.integration.{
   SharedEnvironment,
 }
 import com.digitalasset.canton.participant.admin.workflows.java.canton.internal.ping.Ping
-import com.digitalasset.canton.protocol.LocalRejectError
 import com.digitalasset.canton.sequencing.protocol.SubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.{HasProgrammableSequencer, SendDecision}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -56,11 +55,11 @@ trait DecisionTimeElapsedIntegrationTest
     participant2.synchronizers.connect_local(sequencer1, daName)
 
     participant1.testing.state_inspection
-      .lookupCleanTimeOfRequest(daName)
+      .lookupCleanTimeOfRequest(daId)
       .value
       .futureValueUS shouldBe None
     participant2.testing.state_inspection
-      .lookupCleanTimeOfRequest(daName)
+      .lookupCleanTimeOfRequest(daId)
       .value
       .futureValueUS shouldBe None
 
@@ -97,16 +96,7 @@ trait DecisionTimeElapsedIntegrationTest
       // The mediator does not observe a timestamp after the decision time as we don't request a time proof for
       // observing elapsed decision times (we'd only produce a log line anyway).
       // So no warning message is expected in this test.
-      // the participants will see this as well and emit a timeout error (so 2 of such should be expected)
-      _.shouldBeCantonError(
-        LocalRejectError.TimeRejects.LocalTimeout,
-        _ should startWith("Rejected transaction due to a participant determined timeout"),
-      ),
-      _.shouldBeCantonError(
-        LocalRejectError.TimeRejects.LocalTimeout,
-        _ should startWith("Rejected transaction due to a participant determined timeout"),
-      ),
-      // finally, the command failed in the console
+      // Just the command failed in the console
       _.commandFailureMessage should include(
         "Rejected transaction due to a participant determined timeout"
       ),
@@ -119,14 +109,14 @@ trait DecisionTimeElapsedIntegrationTest
 
       eventually() {
         participant1.testing.state_inspection
-          .lookupCleanTimeOfRequest(daName)
+          .lookupCleanTimeOfRequest(daId)
           .value
           .futureValueUS
           .value
           .rc
           .unwrap shouldBe 0L
         participant2.testing.state_inspection
-          .lookupCleanTimeOfRequest(daName)
+          .lookupCleanTimeOfRequest(daId)
           .value
           .futureValueUS
           .value

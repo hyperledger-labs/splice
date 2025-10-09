@@ -144,22 +144,12 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
     )
 
     darPaths.foreach { darPath =>
-      participants.all.foreach(p => p.dars.upload(darPath))
+      participants.all.foreach(_.dars.upload(darPath))
     }
 
     // Advance the simClock to trigger time-proof requests, if present
     val clock = environment.simClock
     clock.foreach(_.advance(java.time.Duration.ofSeconds(5)))
-
-    val partyAssignment: Set[(PartyId, ParticipantReference)] =
-      Set(alice -> P5, alice -> P2, painter -> P4, painter -> P3, bank -> P1).map {
-        case (party, participant) => (party.toPartyId(), participant)
-      }
-
-    logger.debug(s"Waiting to see topology assignments for $alice, $bank and $painter")
-    List(P1, P2, P3, P4, P5).foreach { x =>
-      x.parties.await_topology_observed(partyAssignment)
-    }
   }
 
   protected def withUniqueParties[T](
@@ -191,8 +181,8 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
   def P4(implicit env: FixtureParam): LocalParticipantReference = env.participant4
   def P5(implicit env: FixtureParam): LocalParticipantReference = env.participant5
 
-  def iouSynchronizerId(implicit env: FixtureParam): SynchronizerId = env.daId
-  def paintSynchronizerId(implicit env: FixtureParam): SynchronizerId = env.acmeId
+  def iouSynchronizerId(implicit env: FixtureParam): PhysicalSynchronizerId = env.daId
+  def paintSynchronizerId(implicit env: FixtureParam): PhysicalSynchronizerId = env.acmeId
 
   val PaintModule: String = "Paint"
   val IouModule: String = "Iou"
@@ -223,7 +213,7 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
       JavaDecodeUtil
         .decodeAllCreated(Iou.COMPANION)(
           P1.ledger_api.javaapi.commands
-            .submit_flat(Seq(bank), createIouCmd)
+            .submit(Seq(bank), createIouCmd)
         )
         .loneElement
     }
@@ -608,7 +598,7 @@ abstract class SynchronizerChangeSimClockIntegrationTest
 
           P4.ledger_api.commands.submit_assign(
             painter,
-            unassignedEvent.unassignId,
+            unassignedEvent.reassignmentId,
             paintSynchronizerId,
             iouSynchronizerId,
           )
@@ -796,7 +786,7 @@ trait SynchronizerChangeRealClockIntegrationTest
                   createdEventO.exists(e => e.contractId == paintOfferId.toProtoPrimitive)
                 }
                 .map(_._1)
-              synchronizerIdOfContract shouldBe Some(paintSynchronizerId.toProtoPrimitive)
+              synchronizerIdOfContract shouldBe Some(paintSynchronizerId.logical.toProtoPrimitive)
 
             }
           }
@@ -819,7 +809,7 @@ trait SynchronizerChangeRealClockIntegrationTest
                 }
                 .map(_._1)
 
-              synchronizerId.value shouldBe iouSynchronizerId.toProtoPrimitive
+              synchronizerId.value shouldBe iouSynchronizerId.logical.toProtoPrimitive
             }
           }
         }
@@ -865,22 +855,23 @@ trait SynchronizerChangeRealClockIntegrationTest
                 Seq(paintOfferId),
                 sourceId,
                 targetId,
+                timeout = None, // not waiting for other participants to observe the unassign
               )
 
           def assign(participant: ParticipantReference, party: PartyId): Unit =
             participant.ledger_api.commands.submit_assign(
               party,
-              paintOfferUnassignedEvent.unassignId,
+              paintOfferUnassignedEvent.reassignmentId,
               sourceId,
               targetId,
-              timeout = 10 seconds,
+              timeout = None, // not waiting for other participants to observe the assign
             )
 
           // Wait until P5 sees the unassignment result so that assignments do not fail with `UnassignmentIncomplete`
           eventually() {
             P5.ledger_api.state.acs
               .incomplete_unassigned_of_party(painter)
-              .map(_.unassignId) should contain(paintOfferUnassignedEvent.unassignId)
+              .map(_.reassignmentId) should contain(paintOfferUnassignedEvent.reassignmentId)
           }
 
           logger.info(s"Racy assignments of $paintOfferUnassignedEvent occur")

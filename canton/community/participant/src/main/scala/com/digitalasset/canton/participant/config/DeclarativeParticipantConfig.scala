@@ -5,9 +5,10 @@ package com.digitalasset.canton.participant.config
 
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
+import com.daml.jwt.JwksUrl
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.config.{
   CantonConfigValidator,
@@ -15,7 +16,7 @@ import com.digitalasset.canton.config.{
   ConfidentialConfigWriter,
   UniformCantonConfigValidation,
 }
-import com.digitalasset.canton.ledger.api.{IdentityProviderId, JwksUrl}
+import com.digitalasset.canton.ledger.api.IdentityProviderId
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -142,7 +143,9 @@ final case class DeclarativePartyConfig(
 final case class DeclarativeUserRightsConfig(
     actAs: Set[String] = Set(),
     readAs: Set[String] = Set(),
+    executeAs: Set[String] = Set(),
     readAsAnyParty: Boolean = false,
+    executeAsAnyParty: Boolean = false,
     participantAdmin: Boolean = false,
     identityProviderAdmin: Boolean = false,
 ) extends UniformCantonConfigValidation
@@ -273,6 +276,7 @@ final case class DeclarativeConnectionConfig(
     priority: Int = 0,
     initializeFromTrustedSynchronizer: Boolean = false,
     trustThreshold: PositiveInt = PositiveInt.one,
+    livenessMargin: NonNegativeInt = NonNegativeInt.zero,
 ) extends UniformCantonConfigValidation {
 
   def isEquivalent(other: DeclarativeConnectionConfig): Boolean = {
@@ -295,9 +299,11 @@ final case class DeclarativeConnectionConfig(
             transportSecurity = conn.transportSecurity,
             sequencerAlias = SequencerAlias.tryCreate(alias),
             customTrustCertificates = conn.customTrustCertificatesAsByteString.toOption.flatten,
+            sequencerId = None,
           )
         }.toSeq,
         sequencerTrustThreshold = trustThreshold,
+        sequencerLivenessMargin = livenessMargin,
         submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
       )
 
@@ -310,9 +316,7 @@ final case class DeclarativeConnectionConfig(
         initializeFromTrustedSynchronizer = initializeFromTrustedSynchronizer,
       )
     }
-
   }
-
 }
 
 object DeclarativeConnectionConfig {

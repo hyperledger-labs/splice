@@ -61,22 +61,26 @@ sealed trait TopologyStoreId extends PrettyPrinting with Product with Serializab
   def isAuthorizedStore: Boolean = false
   def isSynchronizerStore: Boolean = false
   def isTemporaryStore: Boolean = false
+
+  def forSynchronizer: Option[PhysicalSynchronizerId] = None
 }
 
 object TopologyStoreId {
 
   /** A topology store storing sequenced topology transactions
     *
-    * @param synchronizerId
+    * @param psid
     *   the synchronizer id of the store
     */
-  final case class SynchronizerStore(synchronizerId: SynchronizerId) extends TopologyStoreId {
-    override val dbString = synchronizerId.toLengthLimitedString
+  final case class SynchronizerStore(psid: PhysicalSynchronizerId) extends TopologyStoreId {
+    override val dbString = psid.toLengthLimitedString
 
     override protected def pretty: Pretty[this.type] =
-      prettyOfParam(_.synchronizerId)
+      prettyOfParam(_.psid)
 
     override def isSynchronizerStore: Boolean = true
+
+    override def forSynchronizer: Option[PhysicalSynchronizerId] = Some(psid)
   }
 
   // authorized transactions (the topology managers store)
@@ -380,8 +384,8 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Seq[TopologyMapping.Code],
-      filterUid: Option[Seq[UniqueIdentifier]],
-      filterNamespace: Option[Seq[Namespace]],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[PositiveStoredTopologyTransactions]
@@ -482,8 +486,8 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     findStored(CantonTimestamp.MaxValue, transaction).map(_.forall { inStore =>
       // check whether source still could provide an additional signature
       transaction.signatures
-        .map(_.signedBy)
-        .diff(inStore.transaction.signatures.map(_.signedBy))
+        .map(_.authorizingLongTermKey)
+        .diff(inStore.transaction.signatures.map(_.authorizingLongTermKey))
         .nonEmpty &&
       // but only if the transaction in the target store is a valid proposal
       inStore.transaction.isProposal &&
@@ -552,6 +556,8 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     *   produce at most one result per mapping unique key. If onlyAtEffective is false, this defines
     *   the inclusive lower bound for effective time: lookup up all state changes for all effective
     *   times bigger than or equal to this.
+    * @param filterTypes
+    *   If defined, restrict the query to specific mappings.
     * @param onlyAtEffective
     *   Controls whether fromEffectiveInclusive defines a single effective time, or an inclusive
     *   lower bound for the query.
@@ -561,6 +567,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     */
   def findEffectiveStateChanges(
       fromEffectiveInclusive: CantonTimestamp,
+      filterTypes: Option[Seq[TopologyMapping.Code]] = None,
       onlyAtEffective: Boolean,
   )(implicit
       traceContext: TraceContext

@@ -109,6 +109,7 @@ object TopologyTransactionRejection {
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
       TopologyManagerError.InvalidSynchronizer.Failure(synchronizerId)
   }
+
   final case class SerialMismatch(expected: PositiveInt, actual: PositiveInt)
       extends TopologyTransactionRejection {
     override def asString: String =
@@ -243,4 +244,40 @@ object TopologyTransactionRejection {
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
       TopologyManagerError.MemberCannotRejoinSynchronizer.Reject(members)
   }
+
+  final case class OngoingSynchronizerUpgrade(synchronizerId: SynchronizerId)
+      extends TopologyTransactionRejection {
+    override def asString: String =
+      s"The topology state of synchronizer $synchronizerId is frozen due to an ongoing synchronizer migration and no more topology changes are allowed."
+
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+      TopologyManagerError.OngoingSynchronizerUpgrade.Reject(synchronizerId)
+  }
+
+  final case class InvalidSynchronizerSuccessor(
+      currentSynchronizerId: PhysicalSynchronizerId,
+      successorSynchronizerId: PhysicalSynchronizerId,
+  ) extends TopologyTransactionRejection {
+    override def asString: String =
+      s"The declared successor $successorSynchronizerId of synchronizer $currentSynchronizerId is not valid."
+
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+      TopologyManagerError.InvalidSynchronizerSuccessor.Reject(
+        currentSynchronizerId,
+        successorSynchronizerId,
+      )
+  }
+
+  final case class InvalidUpgradeTime(
+      synchronizerId: SynchronizerId,
+      effective: EffectiveTime,
+      upgradeTime: CantonTimestamp,
+  ) extends TopologyTransactionRejection {
+    override def asString: String =
+      s"The upgrade time $upgradeTime must be after the effective ${effective.value} of the synchronizer upgrade announcement for synchronizer $synchronizerId."
+
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+      TopologyManagerError.InvalidUpgradeTime.Reject(synchronizerId, effective, upgradeTime)
+  }
+
 }

@@ -27,6 +27,15 @@ object RequiredClaims {
       actAs.view.map(RequiredClaim.ActAs[Req]).toList :::
       readAs.view.map(RequiredClaim.ReadAs[Req]).toList
 
+  def executionClaims[Req](
+      executeAs: Set[String],
+      readAs: Set[String],
+      userIdL: Lens[Req, String],
+  ): List[RequiredClaim[Req]] =
+    RequiredClaim.MatchUserId(userIdL) ::
+      executeAs.view.map(RequiredClaim.ExecuteAs[Req]).toList :::
+      readAs.view.map(RequiredClaim.ReadAs[Req]).toList
+
   def readAsForAllParties[Req](parties: Iterable[String]): List[RequiredClaim[Req]] =
     parties.view.map(RequiredClaim.ReadAs[Req]).toList
 
@@ -53,11 +62,11 @@ object RequiredClaims {
         },
     ).flatten.distinct
 
+  // TODO(#23504) remove this method once TransactionFilter is removed from the API
   @nowarn("cat=deprecation")
   def transactionFilterClaims[Req](transactionFilter: TransactionFilter): List[RequiredClaim[Req]] =
-    readAsForAllParties[Req](
-      transactionFilter.filtersByParty.keys
-    ) ::: transactionFilter.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
+    readAsForAllParties[Req](transactionFilter.filtersByParty.keys) :::
+      transactionFilter.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
 
   def idpAdminClaimsAndMatchingRequestIdpId[Req](
       identityProviderIdL: Lens[Req, String],

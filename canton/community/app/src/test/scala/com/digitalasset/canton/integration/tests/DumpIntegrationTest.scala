@@ -30,6 +30,7 @@ import com.digitalasset.canton.{ProtoDeserializationError, SequencerCounter, con
 import com.google.protobuf.{ByteString, InvalidProtocolBufferException}
 
 import java.nio.file.NoSuchFileException
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
 sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
@@ -54,9 +55,14 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
         participants.all.dars.upload(CantonExamplesPath)
       }
 
-  def cryptoPureApi(config: LocalNodeConfig): CryptoPureApi =
+  def cryptoPureApi(config: LocalNodeConfig)(implicit ec: ExecutionContext): CryptoPureApi =
     JcePureCrypto
-      .create(config.crypto, loggerFactory)
+      .create(
+        config.crypto,
+        config.parameters.caching.sessionEncryptionKeyCache,
+        config.parameters.caching.publicKeyConversionCache,
+        loggerFactory,
+      )
       .valueOr(err => throw new RuntimeException(s"Failed to create pure crypto api: $err"))
 
   "create a dump file" in { implicit env =>
@@ -84,8 +90,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
       // Obtain the last event.
       val lastEvent: PossiblyIgnoredProtocolEvent =
         participant1.testing.state_inspection
-          .findMessage(daName, LatestUpto(CantonTimestamp.MaxValue))
-          .value
+          .findMessage(daId, LatestUpto(CantonTimestamp.MaxValue))
           .value
 
       // Dump the last event to a file.
@@ -120,7 +125,8 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
 // architecture-handbook-entry-begin: DumpAllSequencedEventsToFile
       // Obtain all events.
       val allEvents: Seq[PossiblyIgnoredProtocolEvent] =
-        participant1.testing.state_inspection.findMessages(daName, None, None, None).map(_.value)
+        participant1.testing.state_inspection
+          .findMessages(daId, None, None, None, warnOnDiscardedEnvelopes = false)
 
       // Dump all events to a file.
       utils.write_to_file(allEvents.map(_.toProtoV30), dumpFilePath)
@@ -156,8 +162,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
       // Create ignored events.
       val lastEvent =
         participant1.testing.state_inspection
-          .findMessage(daName, LatestUpto(CantonTimestamp.MaxValue))
-          .value
+          .findMessage(daId, LatestUpto(CantonTimestamp.MaxValue))
           .value
       val emptyIgnoredEvent =
         IgnoredSequencedEvent(

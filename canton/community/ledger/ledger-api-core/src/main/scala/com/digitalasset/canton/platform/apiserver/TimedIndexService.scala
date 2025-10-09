@@ -20,6 +20,7 @@ import com.digitalasset.canton.ledger.api.{EventFormat, TransactionFormat, Updat
 import com.digitalasset.canton.ledger.participant.state.index.*
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.Party
@@ -32,6 +33,7 @@ import org.apache.pekko.stream.scaladsl.Source
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
+// TODO(#23504) remove deprecation warning suppression
 @nowarn("cat=deprecation")
 final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMetrics)
     extends IndexService {
@@ -128,7 +130,7 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
       contractId: Value.ContractId,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Option[Value.VersionedContractInstance]] =
+  ): Future[Option[FatContract]] =
     Timed.future(
       metrics.services.index.lookupActiveContract,
       delegate.lookupActiveContract(readers, contractId),
@@ -172,12 +174,11 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
 
   override def prune(
       pruneUpToInclusive: Offset,
-      pruneAllDivulgedContracts: Boolean,
       incompletReassignmentOffsets: Vector[Offset],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] =
     Timed.future(
       metrics.services.index.prune,
-      delegate.prune(pruneUpToInclusive, pruneAllDivulgedContracts, incompletReassignmentOffsets),
+      delegate.prune(pruneUpToInclusive, incompletReassignmentOffsets),
     )
 
   override def currentHealth(): HealthStatus =
@@ -191,10 +192,10 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
       delegate.lookupContractState(contractId),
     )
 
-  override def latestPrunedOffsets()(implicit
+  override def latestPrunedOffset()(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[(Option[Offset], Option[Offset])] =
-    Timed.future(metrics.services.index.latestPrunedOffsets, delegate.latestPrunedOffsets())
+  ): Future[Option[Offset]] =
+    Timed.future(metrics.services.index.latestPrunedOffsets, delegate.latestPrunedOffset())
 
   override def getEventsByContractId(
       contractId: ContractId,

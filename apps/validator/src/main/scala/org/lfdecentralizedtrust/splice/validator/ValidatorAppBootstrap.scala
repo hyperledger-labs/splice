@@ -63,21 +63,17 @@ class ValidatorAppBootstrap(
 
   override def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit] =
     startInstanceUnlessClosing {
-      EitherT.fromEither(
-        Right(
-          new ValidatorApp(
-            name,
-            config,
-            validatorAppParameters,
-            storage,
-            clock,
-            loggerFactory,
-            tracerProvider,
-            futureSupervisor,
-            metrics,
-            adminRoutes,
-          )
-        )
+      new ValidatorApp(
+        name,
+        config,
+        validatorAppParameters,
+        storage,
+        clock,
+        loggerFactory,
+        tracerProvider,
+        futureSupervisor,
+        metrics,
+        adminRoutes,
       )
     }
 

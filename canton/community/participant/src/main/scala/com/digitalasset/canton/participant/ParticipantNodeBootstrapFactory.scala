@@ -15,9 +15,9 @@ import com.digitalasset.canton.environment.{
   NodeFactoryArguments,
 }
 import com.digitalasset.canton.networking.grpc.StaticGrpcServices
+import com.digitalasset.canton.participant.LedgerApiServerBootstrapUtils.IndexerLockIds
 import com.digitalasset.canton.participant.admin.ResourceManagementService
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
-import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.IndexerLockIds
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.store.ParticipantSettingsStore
 import com.digitalasset.canton.participant.sync.CantonSyncService
@@ -44,6 +44,7 @@ trait ParticipantNodeBootstrapFactory {
     enableLfBeta = arguments.parameterConfig.betaVersionSupport,
     enableStackTraces = arguments.parameterConfig.engine.enableEngineStackTraces,
     profileDir = arguments.config.features.profileDir,
+    snapshotDir = arguments.config.features.snapshotDir,
     iterationsBetweenInterruptions =
       arguments.parameterConfig.engine.iterationsBetweenInterruptions,
     paranoidMode = arguments.parameterConfig.engine.enableAdditionalConsistencyChecks,
@@ -58,14 +59,14 @@ trait ParticipantNodeBootstrapFactory {
       arguments.metrics,
     )
 
-  protected def createLedgerApiServerFactory(
+  protected def createLedgerApiBootstrapUtils(
       arguments: Arguments,
       engine: Engine,
       testingTimeService: TestingTimeService,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       actorSystem: ActorSystem,
-  ): CantonLedgerApiServerFactory
+  ): LedgerApiServerBootstrapUtils
 
   def create(
       arguments: NodeFactoryArguments[
@@ -94,20 +95,19 @@ object CommunityParticipantNodeBootstrapFactory extends ParticipantNodeBootstrap
         arguments.loggerFactory,
       )
 
-  override protected def createLedgerApiServerFactory(
+  override protected def createLedgerApiBootstrapUtils(
       arguments: Arguments,
       engine: Engine,
       testingTimeService: TestingTimeService,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       actorSystem: ActorSystem,
-  ): CantonLedgerApiServerFactory =
-    new CantonLedgerApiServerFactory(
+  ): LedgerApiServerBootstrapUtils =
+    new LedgerApiServerBootstrapUtils(
       engine = engine,
       clock = arguments.clock,
       testingTimeService = testingTimeService,
       allocateIndexerLockIds = _ => Option.empty[IndexerLockIds].asRight,
-      futureSupervisor = arguments.futureSupervisor,
       loggerFactory = arguments.loggerFactory,
     )
 
@@ -133,7 +133,6 @@ object CommunityParticipantNodeBootstrapFactory extends ParticipantNodeBootstrap
           CommunityKmsFactory,
           arguments.config.parameters.caching.kmsMetadataCache,
           arguments.config.crypto.privateKeyStore,
-          arguments.parameters.nonStandardConfig,
           arguments.futureSupervisor,
           arguments.clock,
           arguments.executionContext,
@@ -144,7 +143,8 @@ object CommunityParticipantNodeBootstrapFactory extends ParticipantNodeBootstrap
         val engine = createEngine(arguments)
         createNode(
           arguments,
-          createLedgerApiServerFactory(
+          engine,
+          createLedgerApiBootstrapUtils(
             arguments,
             engine,
             testingTimeService,
@@ -154,7 +154,8 @@ object CommunityParticipantNodeBootstrapFactory extends ParticipantNodeBootstrap
 
   private def createNode(
       arguments: Arguments,
-      ledgerApiServerFactory: CantonLedgerApiServerFactory,
+      engine: Engine,
+      ledgerApiServerBootstrapUtils: LedgerApiServerBootstrapUtils,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -163,11 +164,11 @@ object CommunityParticipantNodeBootstrapFactory extends ParticipantNodeBootstrap
   ): ParticipantNodeBootstrap =
     new ParticipantNodeBootstrap(
       arguments,
-      createEngine(arguments),
+      engine,
       CantonSyncService.DefaultFactory,
       createResourceService(arguments),
       _ => createReplicationServiceFactory(arguments),
-      ledgerApiServerFactory = ledgerApiServerFactory,
+      ledgerApiServerBootstrapUtils = ledgerApiServerBootstrapUtils,
       setInitialized = _ => (),
     )
 }

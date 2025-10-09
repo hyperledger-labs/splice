@@ -30,14 +30,19 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.PreparedTransactionCodec.*
 import com.digitalasset.canton.protocol.{LfNode, LfNodeId}
-import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf
-import com.digitalasset.daml.lf.data.Ref.TypeConName
+import com.digitalasset.daml.lf.data.Ref.TypeConId
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, NodeId, TransactionCoder}
+import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
+  FatContractInstance,
+  NodeId,
+  TransactionCoder,
+}
 import com.digitalasset.daml.lf.value.Value
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -49,9 +54,7 @@ import io.scalaland.chimney.partial.Result
 import io.scalaland.chimney.syntax.*
 import io.scalaland.chimney.{PartialTransformer, Transformer}
 
-import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 /** Class to decode a PreparedTransaction to an LF Transaction and its metadata. Uses chimney to
   * define Transformers and PartialTransformer for all conversions.
@@ -124,9 +127,6 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
         contractId <- lf.value.Value.ContractId.fromBytes(bytes).toResult
       } yield contractId
     }
-  private implicit val uuidTransformer: PartialTransformer[String, UUID] =
-    PartialTransformer(src => Try(UUID.fromString(src)).toEither.leftMap(_.getMessage).toResult)
-
   private implicit val hashTransformer: PartialTransformer[ByteString, lf.crypto.Hash] =
     PartialTransformer { src =>
       lf.crypto.Hash.fromBytes(Bytes.fromByteString(src)).toResult
@@ -159,9 +159,6 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
   private implicit val partyTransformer: PartialTransformer[String, lf.data.Ref.Party] =
     PartialTransformer(src => lf.data.Ref.Party.fromString(src).toResult)
 
-  private implicit val mediatorGroupIndexDecoder: PartialTransformer[Int, MediatorGroupIndex] =
-    PartialTransformer(src => MediatorGroupIndex.create(src).leftMap(_.message).toResult)
-
   private implicit val nodeIdTransformer: PartialTransformer[String, lf.transaction.NodeId] =
     PartialTransformer { src =>
       src.toIntOption
@@ -179,7 +176,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
     // GlobalKey default constructor is private, so create a constructor function from the companion builder
     // and pass that to chimney so it can construct the instance
     def globalKeyConstructor(
-        templateId: TypeConName,
+        templateId: TypeConId,
         key: Value,
         packageName: Ref.PackageName,
     ): Result[lf.transaction.GlobalKey] =
@@ -357,14 +354,21 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
           .decodeFatContractInstance(src.eventBlob)
           .leftMap(_.errorMessage)
           .toResult
+        lfOriginalContract <- Either
+          .cond(
+            originalContract.createdAt == CreationTime.CreatedAt(createTime),
+            originalContract.updateCreateAt(createTime),
+            "Creation time of the original contract does not match the create time of the input contract",
+          )
+          .toResult
         enrichedContract = FatContractInstance.fromCreateNode(
           createNode,
-          createTime,
-          originalContract.cantonData,
+          CreationTime.CreatedAt(createTime),
+          originalContract.authenticationData,
         )
       } yield ExternalInputContract(
-        enrichedFci = enrichedContract,
-        originalFci = originalContract,
+        originalContract = lfOriginalContract,
+        enrichedContract = enrichedContract,
       )
     }
 
@@ -413,13 +417,13 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
     for {
       metadataProto <- requireField(executeRequest.preparedTransaction.metadata, "metadata")
       submitterInfoProto <- requireField(metadataProto.submitterInfo, "submitter_info")
-      transactionUUID <- metadataProto.transactionUuid
-        .transformIntoPartial[UUID]
-        .toFutureWithLoggedFailures("Failed to deserialize transaction UUID", logger)
+      transactionUUID <- ProtoConverter.UuidConverter
+        .fromProtoPrimitive(metadataProto.transactionUuid)
+        .toFutureWithLoggedFailuresDecode("Failed to deserialize transaction UUID", logger)
       externallySignedSubmission <- for {
-        mediatorGroup <- metadataProto.mediatorGroup
-          .transformIntoPartial[MediatorGroupIndex]
-          .toFutureWithLoggedFailures("Failed to deserialize mediator group", logger)
+        mediatorGroup <- ProtoConverter
+          .parseNonNegativeInt("mediator_group", metadataProto.mediatorGroup)
+          .toFutureWithLoggedFailuresDecode("Failed to deserialize mediator group", logger)
       } yield ExternallySignedSubmission(
         executeRequest.serializationVersion,
         executeRequest.signatures,
@@ -442,7 +446,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
           Some(externallySignedSubmission),
         )
         .transform
-        .toFutureWithLoggedFailures("Failed to deserialize submitter info", logger)
+        .toFutureWithLoggedFailuresDecode("Failed to deserialize submitter info", logger)
       synchronizerId <- Future.fromTry(
         SynchronizerId
           .fromProtoPrimitive(metadataProto.synchronizerId, "synchronizer_id")
@@ -456,7 +460,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
       )
       timeBoundaries <- metadataProto
         .transformIntoPartial[LedgerTimeBoundaries]
-        .toFutureWithLoggedFailures("Failed to deserialize time boundaries", logger)
+        .toFutureWithLoggedFailuresDecode("Failed to deserialize time boundaries", logger)
       ledgerEffectiveTime = adjustLedgerTimeToBounds(
         executeRequest.tentativeLedgerEffectiveTime,
         timeBoundaries.range,
@@ -489,17 +493,17 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
           )
           .withFieldRenamed(_.preparationTime, _.preparationTime)
           .transform
-          .toFutureWithLoggedFailures("Failed to deserialize transaction meta", logger)
+          .toFutureWithLoggedFailuresDecode("Failed to deserialize transaction meta", logger)
       transaction <- transactionProto
         .transformIntoPartial[lf.transaction.VersionedTransaction]
-        .toFutureWithLoggedFailures("Failed to deserialize transaction", logger)
+        .toFutureWithLoggedFailuresDecode("Failed to deserialize transaction", logger)
       globalKeyMapping <- metadataProto.globalKeyMapping
         .transformIntoPartial[Map[lf.transaction.GlobalKey, Option[lf.value.Value.ContractId]]]
-        .toFutureWithLoggedFailures("Failed to deserialize global key mapping", logger)
+        .toFutureWithLoggedFailuresDecode("Failed to deserialize global key mapping", logger)
       inputContracts <- metadataProto.inputContracts
         .traverse(_.transformIntoPartial[ExternalInputContract])
         .map(_.map(eic => eic.contractId -> eic).toMap)
-        .toFutureWithLoggedFailures("Failed to deserialize input contracts", logger)
+        .toFutureWithLoggedFailuresDecode("Failed to deserialize input contracts", logger)
       missingInputContracts = transaction.inputContracts.diff(inputContracts.keySet)
       _ <- Either
         .cond(
@@ -508,7 +512,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
           s"Missing input contracts: ${missingInputContracts.mkString(",")}",
         )
         .toResult
-        .toFutureWithLoggedFailures(
+        .toFutureWithLoggedFailuresDecode(
           "Provided input contracts do not match the input contracts in the transaction",
           logger,
         )
@@ -520,7 +524,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
           s"Superfluous input contracts: ${superfluousInputContracts.mkString(",")}",
         )
         .toResult
-        .toFutureWithLoggedFailures(
+        .toFutureWithLoggedFailuresDecode(
           "Provided input contracts do not match the input contracts in the transaction",
           logger,
         )

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.ledger.api.v2.admin.party_management_service
+import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
@@ -13,6 +14,7 @@ import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.Inval
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.ServerEndpoint
@@ -22,9 +24,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class JsPartyManagementService(
     partyManagementClient: PartyManagementClient,
+    protocolConverters: ProtocolConverters,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
-    val executionContext: ExecutionContext
+    val executionContext: ExecutionContext,
+    val authInterceptor: AuthInterceptor,
 ) extends Endpoints
     with NamedLogging {
   import JsPartyManagementService.*
@@ -89,16 +93,21 @@ class JsPartyManagementService(
       .resultToRight
   }
 
-  private val allocateParty
-      : CallerContext => TracedInput[party_management_service.AllocatePartyRequest] => Future[
-        Either[JsCantonError, party_management_service.AllocatePartyResponse]
-      ] =
+  private val allocateParty: CallerContext => TracedInput[js.AllocatePartyRequest] => Future[
+    Either[JsCantonError, party_management_service.AllocatePartyResponse]
+  ] =
     caller =>
-      req =>
-        partyManagementClient
-          .serviceStub(caller.token())(req.traceContext)
-          .allocateParty(req.in)
-          .resultToRight
+      req => {
+        implicit val traceContext: TraceContext = req.traceContext
+        for {
+
+          request <- protocolConverters.AllocatePartyRequest.fromJson(req.in)
+          response <- partyManagementClient
+            .serviceStub(caller.token())
+            .allocateParty(request)
+            .resultToRight
+        } yield response
+      }
 
   private val updateParty: CallerContext => TracedInput[
     (String, party_management_service.UpdatePartyDetailsRequest)
@@ -130,7 +139,7 @@ object JsPartyManagementService extends DocumentationEndpoints {
   private val partyPath = "party"
 
   val allocatePartyEndpoint = parties.post
-    .in(jsonBody[party_management_service.AllocatePartyRequest])
+    .in(jsonBody[js.AllocatePartyRequest])
     .out(jsonBody[party_management_service.AllocatePartyResponse])
     .description("Allocate a new party to the participant node")
 
@@ -175,8 +184,8 @@ object JsPartyManagementCodecs {
   implicit val listKnownPartiesResponse: Codec[party_management_service.ListKnownPartiesResponse] =
     deriveRelaxedCodec
 
-  implicit val allocatePartyRequest: Codec[party_management_service.AllocatePartyRequest] =
-    deriveRelaxedCodec
+  implicit val allocatePartyRequest: Codec[js.AllocatePartyRequest] =
+    deriveConfiguredCodec
   implicit val allocatePartyResponse: Codec[party_management_service.AllocatePartyResponse] =
     deriveRelaxedCodec
 

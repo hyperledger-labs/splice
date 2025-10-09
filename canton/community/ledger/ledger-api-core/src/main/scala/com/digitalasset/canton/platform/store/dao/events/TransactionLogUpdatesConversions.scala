@@ -4,6 +4,10 @@
 package com.digitalasset.canton.platform.store.dao.events
 
 import com.daml.ledger.api.v2.event as apiEvent
+import com.daml.ledger.api.v2.reassignment.ReassignmentEvent.Event.{
+  Assigned as ApiAssigned,
+  Unassigned as ApiUnassigned,
+}
 import com.daml.ledger.api.v2.reassignment.{
   AssignedEvent as ApiAssignedEvent,
   Reassignment as ApiReassignment,
@@ -22,9 +26,12 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.TransactionShape.{AcsDelta, LedgerEffects}
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
 import com.digitalasset.canton.ledger.api.{ParticipantAuthorizationFormat, TransactionShape}
+import com.digitalasset.canton.ledger.participant.state.Reassignment
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.store.ScalaPbStreamingOptimizations.*
 import com.digitalasset.canton.platform.store.dao.EventProjectionProperties
@@ -35,19 +42,32 @@ import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.{
   ExercisedEvent,
 }
 import com.digitalasset.canton.platform.store.utils.EventOps.TreeEventOps
-import com.digitalasset.canton.platform.{InternalTransactionFormat, InternalUpdateFormat, Value}
+import com.digitalasset.canton.platform.{
+  InternalTransactionFormat,
+  InternalUpdateFormat,
+  TemplatePartiesFilter,
+  Value,
+}
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.Party
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, GlobalKeyWithMaintainers, Node}
-import com.digitalasset.daml.lf.value.Value.ContractId
+import com.digitalasset.daml.lf.data.Ref.{IdentifierConverter, NameTypeConRef, Party}
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{Bytes, Ref}
+import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
+  FatContractInstance,
+  GlobalKeyWithMaintainers,
+  Node,
+  Versioned,
+}
 import com.google.protobuf.ByteString
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 private[events] object TransactionLogUpdatesConversions {
+
   // TODO(i23504) flatten to the main object
   object ToFlatTransaction {
     def filter(
@@ -70,12 +90,10 @@ private[events] object TransactionLogUpdatesConversions {
                 filteredEvents,
                 transactionFormat.internalEventFormat.templatePartiesFilter.allFilterParties,
               )
-              val nonTransient = removeTransient(filteredEvents)
-              // Allows emitting AcsDelta transactions with no events for providing completion evidence for submitter-witnesses.
-              Option.when(nonTransient.nonEmpty || commandId.nonEmpty)(
+              Option.when(filteredEvents.nonEmpty)(
                 transaction.copy(
                   commandId = commandId,
-                  events = nonTransient,
+                  events = filteredEvents,
                 )(transaction.traceContext)
               )
 
@@ -91,24 +109,19 @@ private[events] object TransactionLogUpdatesConversions {
       case _: TransactionLogUpdate.TransactionRejected => None
 
       case u: TransactionLogUpdate.ReassignmentAccepted =>
-        internalUpdateFormat.includeReassignments.flatMap(reassignmentFormat =>
-          Option.when(
-            u.stakeholders.exists(party =>
-              reassignmentFormat.templatePartiesFilter.templateWildcardParties.fold(true)(parties =>
-                parties(party)
-              ) || (reassignmentFormat.templatePartiesFilter.relation.get(u.reassignment match {
-                case TransactionLogUpdate.ReassignmentAccepted.Unassigned(unassign) =>
-                  unassign.templateId
-                case TransactionLogUpdate.ReassignmentAccepted.Assigned(createdEvent) =>
-                  createdEvent.templateId
-              }) match {
-                case Some(Some(ps)) => ps contains party
-                case Some(None) => true
-                case None => false
-              })
-            )
-          )(u)
-        )
+        internalUpdateFormat.includeReassignments.flatMap { reassignmentFormat =>
+          val filteredReassignments = u.reassignment.iterator.filter { r =>
+            partiesMatchFilter(
+              reassignmentFormat.templatePartiesFilter,
+              u.reassignment.iterator
+                .map(r => r.templateId.toFullIdentifier(r.packageName).toNameTypeConRef)
+                .toSet,
+            )(r.stakeholders)
+          }
+          NonEmpty
+            .from(filteredReassignments.toSeq)
+            .map(rs => u.copy(reassignment = Reassignment.Batch(rs))(u.traceContext))
+        }
 
       case u: TransactionLogUpdate.TopologyTransactionEffective =>
         internalUpdateFormat.includeTopologyEvents
@@ -260,43 +273,18 @@ private[events] object TransactionLogUpdatesConversions {
               synchronizerId = transactionAccepted.synchronizerId,
               traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
               recordTime = Some(TimestampConversion.fromLf(transactionAccepted.recordTime)),
+              externalTransactionHash = transactionAccepted.externalTransactionHash.map(_.unwrap),
             )
           )
       }
 
-    private def removeTransient(aux: Vector[TransactionLogUpdate.Event]) = {
-      val permanent = aux.foldLeft(Set.empty[ContractId]) {
-        case (contractIds, event) if !contractIds(event.contractId) =>
-          contractIds + event.contractId
-        case (contractIds, event: ExercisedEvent) if event.consuming =>
-          contractIds - event.contractId
-        case (contractIds, _) =>
-          val prettyCids = contractIds.iterator.map(_.coid).mkString(", ")
-          throw new RuntimeException(s"Unexpected non-consuming event for contractIds $prettyCids")
-      }
-      aux.filter(ev => permanent(ev.contractId))
-    }
-
     private def transactionPredicate(
         transactionFormat: InternalTransactionFormat
-    )(event: TransactionLogUpdate.Event) = {
-      val witnesses = event.witnesses(transactionFormat.transactionShape)
-      val witnessesMatchingWildcardParties: Boolean =
-        transactionFormat.internalEventFormat.templatePartiesFilter.templateWildcardParties match {
-          case Some(parties) => witnesses.exists(parties)
-          case None => true
-        }
-
-      def witnessesMatchingTemplateRelation: Boolean =
-        transactionFormat.internalEventFormat.templatePartiesFilter.relation
-          .get(event.templateId) match {
-          case Some(Some(filterParties)) => filterParties.exists(witnesses)
-          case Some(None) => true // party wildcard
-          case None => false // templateId is not in the filter
-        }
-
-      witnessesMatchingWildcardParties || witnessesMatchingTemplateRelation
-    }
+    )(event: TransactionLogUpdate.Event): Boolean =
+      partiesMatchFilter(
+        transactionFormat.internalEventFormat.templatePartiesFilter,
+        Set(event.templateId.toFullIdentifier(event.packageName).toNameTypeConRef),
+      )(event.witnesses(transactionFormat.transactionShape))
 
     private def topologyEventPredicate(
         participantAuthorizationFormat: ParticipantAuthorizationFormat
@@ -333,6 +321,26 @@ private[events] object TransactionLogUpdatesConversions {
             lfValueTranslation,
           )
       }
+    }
+
+    private def partiesMatchFilter(
+        filter: TemplatePartiesFilter,
+        templateIds: Set[NameTypeConRef],
+    )(parties: Set[Party]) = {
+      val matchesByWildcard: Boolean =
+        filter.templateWildcardParties match {
+          case Some(include) => parties.exists(p => include(p))
+          case None => parties.nonEmpty // the witnesses should not be empty
+        }
+
+      def matchesByTemplateId(templateId: NameTypeConRef): Boolean =
+        filter.relation.get(templateId) match {
+          case Some(Some(include)) => parties.exists(include)
+          case Some(None) => parties.nonEmpty // party wildcard
+          case None => false // templateId is not in the filter
+        }
+
+      matchesByWildcard || templateIds.exists(matchesByTemplateId)
     }
 
     private def exercisedToEvent(
@@ -373,7 +381,9 @@ private[events] object TransactionLogUpdatesConversions {
                   implementedInterfaces = lfValueTranslation.implementedInterfaces(
                     eventProjectionProperties,
                     witnessParties.toSet,
-                    exercisedEvent.templateId,
+                    exercisedEvent.templateId.toFullIdentifier(
+                      exercisedEvent.packageName
+                    ),
                   ),
                 )
               )
@@ -426,6 +436,11 @@ private[events] object TransactionLogUpdatesConversions {
                 _.filter(exercisedEvent.treeEventWitnesses)
               )
               .toSeq
+            flatEventWitnesses = requestingParties
+              .fold(exercisedEvent.flatEventWitnesses)(
+                _.filter(exercisedEvent.flatEventWitnesses)
+              )
+              .toSeq
           } yield apiEvent.Event(
             apiEvent.Event.Event.Exercised(
               apiEvent.ExercisedEvent(
@@ -447,9 +462,12 @@ private[events] object TransactionLogUpdatesConversions {
                     lfValueTranslation.implementedInterfaces(
                       eventProjectionProperties,
                       witnessParties.toSet,
-                      exercisedEvent.templateId,
+                      exercisedEvent.templateId.toFullIdentifier(
+                        exercisedEvent.packageName
+                      ),
                     )
                   else Nil,
+                acsDelta = flatEventWitnesses.nonEmpty,
               )
             )
           )
@@ -654,6 +672,11 @@ private[events] object TransactionLogUpdatesConversions {
             _.filter(exercisedEvent.treeEventWitnesses)
           )
           .toSeq
+        flatEventWitnesses = requestingParties
+          .fold(exercisedEvent.treeEventWitnesses)(
+            _.filter(exercisedEvent.treeEventWitnesses)
+          )
+          .toSeq
       } yield TreeEvent(
         TreeEvent.Kind.Exercised(
           apiEvent.ExercisedEvent(
@@ -675,9 +698,10 @@ private[events] object TransactionLogUpdatesConversions {
                 lfValueTranslation.implementedInterfaces(
                   eventProjectionProperties,
                   witnessParties.toSet,
-                  exercisedEvent.templateId,
+                  exercisedEvent.templateId.toFullIdentifier(exercisedEvent.packageName),
                 )
               else Nil,
+            acsDelta = flatEventWitnesses.nonEmpty,
           )
         )
       )
@@ -704,55 +728,89 @@ private[events] object TransactionLogUpdatesConversions {
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
   ): Future[apiEvent.CreatedEvent] = {
+    val createNode = Node.Create(
+      coid = createdEvent.contractId,
+      templateId = createdEvent.templateId,
+      packageName = createdEvent.packageName,
+      arg = createdEvent.createArgument.unversioned,
+      signatories = createdEvent.createSignatories,
+      stakeholders = createdEvent.createSignatories ++ createdEvent.createObservers,
+      keyOpt = createdEvent.createKey.flatMap(k =>
+        createdEvent.createKeyMaintainers.map(GlobalKeyWithMaintainers(k, _))
+      ),
+      version = createdEvent.createArgument.version,
+    )
+    createdToApiCreatedEvent(
+      requestingPartiesO = requestingPartiesO,
+      eventProjectionProperties = eventProjectionProperties,
+      lfValueTranslation = lfValueTranslation,
+      create = createNode,
+      ledgerEffectiveTime = createdEvent.ledgerEffectiveTime,
+      offset = createdEvent.eventOffset,
+      nodeId = createdEvent.nodeId,
+      authenticationData = createdEvent.authenticationData,
+      createdEventWitnesses = createdWitnesses(createdEvent),
+      flatEventWitnesses = createdEvent.flatEventWitnesses,
+    )
+  }
+
+  private def createdToApiCreatedEvent(
+      requestingPartiesO: Option[Set[Party]],
+      eventProjectionProperties: EventProjectionProperties,
+      lfValueTranslation: LfValueTranslation,
+      create: Node.Create,
+      ledgerEffectiveTime: Timestamp,
+      offset: Offset,
+      nodeId: Int,
+      authenticationData: Bytes,
+      createdEventWitnesses: Set[Party],
+      flatEventWitnesses: Set[Party],
+  )(implicit
+      loggingContext: LoggingContextWithTrace,
+      executionContext: ExecutionContext,
+  ): Future[apiEvent.CreatedEvent] = {
 
     def getFatContractInstance: Right[Nothing, FatContractInstance] =
       Right(
         FatContractInstance.fromCreateNode(
-          Node.Create(
-            coid = createdEvent.contractId,
-            templateId = createdEvent.templateId,
-            packageName = createdEvent.packageName,
-            arg = createdEvent.createArgument.unversioned,
-            signatories = createdEvent.createSignatories,
-            stakeholders = createdEvent.createSignatories ++ createdEvent.createObservers,
-            keyOpt = createdEvent.createKey.flatMap(k =>
-              createdEvent.createKeyMaintainers.map(GlobalKeyWithMaintainers(k, _))
-            ),
-            version = createdEvent.createArgument.version,
-          ),
-          createTime = createdEvent.ledgerEffectiveTime,
-          cantonData = createdEvent.driverMetadata,
+          create,
+          CreationTime.CreatedAt(ledgerEffectiveTime),
+          authenticationData,
         )
       )
 
-    val createdEventWitnesses = createdWitnesses(createdEvent)
     val witnesses = requestingPartiesO
       .fold(createdEventWitnesses)(_.view.filter(createdEventWitnesses).toSet)
       .map(_.toString)
+
+    val acsDelta =
+      requestingPartiesO.fold(flatEventWitnesses.view)(_.view.filter(flatEventWitnesses)).nonEmpty
+
     lfValueTranslation
       .toApiContractData(
-        value = createdEvent.createArgument,
-        key = createdEvent.contractKey,
-        templateId = createdEvent.templateId,
+        value = Versioned(create.version, create.arg),
+        key = create.keyOpt.map(k => Versioned(create.version, k.value)),
+        templateId = create.templateId.toFullIdentifier(create.packageName),
         witnesses = witnesses,
         eventProjectionProperties = eventProjectionProperties,
         fatContractInstance = getFatContractInstance,
       )
       .map(apiContractData =>
         apiEvent.CreatedEvent(
-          offset = createdEvent.eventOffset.unwrap,
-          nodeId = createdEvent.nodeId,
-          contractId = createdEvent.contractId.coid,
-          templateId = Some(LfEngineToApi.toApiIdentifier(createdEvent.templateId)),
-          packageName = createdEvent.packageName,
+          offset = offset.unwrap,
+          nodeId = nodeId,
+          contractId = create.coid.coid,
+          templateId = Some(LfEngineToApi.toApiIdentifier(create.templateId)),
+          packageName = create.packageName,
           contractKey = apiContractData.contractKey,
-          createArguments = apiContractData.createArguments,
+          createArguments = Some(apiContractData.createArguments),
           createdEventBlob = apiContractData.createdEventBlob.getOrElse(ByteString.EMPTY),
           interfaceViews = apiContractData.interfaceViews,
           witnessParties = witnesses.toSeq,
-          signatories = createdEvent.createSignatories.toSeq,
-          observers = createdEvent.createObservers.toSeq,
-          createdAt = Some(TimestampConversion.fromLf(createdEvent.ledgerEffectiveTime)),
+          signatories = create.signatories.toSeq,
+          observers = create.stakeholders.diff(create.signatories).toSeq,
+          createdAt = Some(TimestampConversion.fromLf(ledgerEffectiveTime)),
+          acsDelta = acsDelta,
         )
       )
   }
@@ -786,67 +844,76 @@ private[events] object TransactionLogUpdatesConversions {
   ): Future[ApiReassignment] = {
     val stringRequestingParties = requestingParties.map(_.map(_.toString))
     val info = reassignmentAccepted.reassignmentInfo
-    (reassignmentAccepted.reassignment match {
-      case TransactionLogUpdate.ReassignmentAccepted.Assigned(createdEvent) =>
-        createdToApiCreatedEvent(
-          requestingPartiesO = requestingParties,
-          eventProjectionProperties = eventProjectionProperties,
-          lfValueTranslation = lfValueTranslation,
-          createdEvent = createdEvent,
-          createdWitnesses = _.flatEventWitnesses,
-        ).map(createdEvent =>
-          ApiReassignmentEvent(
-            ApiReassignmentEvent.Event.Assigned(
-              ApiAssignedEvent(
-                source = info.sourceSynchronizer.unwrap.toProtoPrimitive,
-                target = info.targetSynchronizer.unwrap.toProtoPrimitive,
-                unassignId = info.unassignId.toMicros.toString,
-                submitter = info.submitter.getOrElse(""),
-                reassignmentCounter = info.reassignmentCounter,
-                createdEvent = Some(createdEvent),
-              )
-            )
-          )
-        )
 
-      case TransactionLogUpdate.ReassignmentAccepted.Unassigned(unassign) =>
-        val stakeholders = unassign.stakeholders
-        Future.successful(
-          ApiReassignmentEvent(
-            ApiReassignmentEvent.Event.Unassigned(
-              ApiUnassignedEvent(
-                offset = reassignmentAccepted.offset.unwrap,
-                source = info.sourceSynchronizer.unwrap.toProtoPrimitive,
-                target = info.targetSynchronizer.unwrap.toProtoPrimitive,
-                unassignId = info.unassignId.toMicros.toString,
-                submitter = info.submitter.getOrElse(""),
-                reassignmentCounter = info.reassignmentCounter,
-                contractId = unassign.contractId.coid,
-                templateId = Some(LfEngineToApi.toApiIdentifier(unassign.templateId)),
-                packageName = unassign.packageName,
-                assignmentExclusivity =
-                  unassign.assignmentExclusivity.map(TimestampConversion.fromLf),
-                witnessParties = requestingParties.fold(stakeholders)(stakeholders.filter),
-                nodeId = 0,
+    (MonadUtil
+      .sequentialTraverse(reassignmentAccepted.reassignment.toSeq) {
+        case assigned: Reassignment.Assign =>
+          createdToApiCreatedEvent(
+            requestingPartiesO = requestingParties,
+            eventProjectionProperties = eventProjectionProperties,
+            lfValueTranslation = lfValueTranslation,
+            create = assigned.createNode,
+            ledgerEffectiveTime = assigned.ledgerEffectiveTime,
+            offset = reassignmentAccepted.offset,
+            nodeId = assigned.nodeId,
+            authenticationData = assigned.contractAuthenticationData,
+            createdEventWitnesses = assigned.createNode.stakeholders,
+            flatEventWitnesses = assigned.createNode.stakeholders,
+          ).map(createdEvent =>
+            ApiReassignmentEvent(
+              ApiAssigned(
+                ApiAssignedEvent(
+                  source = info.sourceSynchronizer.unwrap.toProtoPrimitive,
+                  target = info.targetSynchronizer.unwrap.toProtoPrimitive,
+                  reassignmentId = info.reassignmentId.toProtoPrimitive,
+                  submitter = info.submitter.getOrElse(""),
+                  reassignmentCounter = assigned.reassignmentCounter,
+                  createdEvent = Some(createdEvent),
+                )
               )
             )
           )
+
+        case unassigned: Reassignment.Unassign =>
+          val stakeholders = unassigned.stakeholders
+          Future.successful(
+            ApiReassignmentEvent(
+              ApiUnassigned(
+                ApiUnassignedEvent(
+                  offset = reassignmentAccepted.offset.unwrap,
+                  source = info.sourceSynchronizer.unwrap.toProtoPrimitive,
+                  target = info.targetSynchronizer.unwrap.toProtoPrimitive,
+                  reassignmentId = info.reassignmentId.toProtoPrimitive,
+                  submitter = info.submitter.getOrElse(""),
+                  reassignmentCounter = unassigned.reassignmentCounter,
+                  contractId = unassigned.contractId.coid,
+                  templateId = Some(LfEngineToApi.toApiIdentifier(unassigned.templateId)),
+                  packageName = unassigned.packageName,
+                  assignmentExclusivity =
+                    unassigned.assignmentExclusivity.map(TimestampConversion.fromLf),
+                  witnessParties = requestingParties.fold(stakeholders)(stakeholders.filter).toSeq,
+                  nodeId = unassigned.nodeId,
+                )
+              )
+            )
+          )
+      })
+      .map(events =>
+        ApiReassignment(
+          updateId = reassignmentAccepted.updateId,
+          commandId = reassignmentAccepted.completionStreamResponse
+            .flatMap(_.completionResponse.completion)
+            .filter(completion => stringRequestingParties.fold(true)(completion.actAs.exists))
+            .map(_.commandId)
+            .getOrElse(""),
+          workflowId = reassignmentAccepted.workflowId,
+          offset = reassignmentAccepted.offset.unwrap,
+          events = events,
+          traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
+          recordTime = Some(TimestampConversion.fromLf(reassignmentAccepted.recordTime)),
+          synchronizerId = reassignmentAccepted.synchronizerId,
         )
-    }).map(event =>
-      ApiReassignment(
-        updateId = reassignmentAccepted.updateId,
-        commandId = reassignmentAccepted.completionStreamResponse
-          .flatMap(_.completionResponse.completion)
-          .filter(completion => stringRequestingParties.fold(true)(completion.actAs.exists))
-          .map(_.commandId)
-          .getOrElse(""),
-        workflowId = reassignmentAccepted.workflowId,
-        offset = reassignmentAccepted.offset.unwrap,
-        events = Seq(event),
-        traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
-        recordTime = Some(TimestampConversion.fromLf(reassignmentAccepted.recordTime)),
       )
-    )
   }
 
   private def toTopologyTransaction(

@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration as ConfigNonNegativeFiniteDuration,
 }
 import com.digitalasset.canton.console.LocalParticipantReference
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, UnassignmentData}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
@@ -37,7 +37,6 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentData
 import com.digitalasset.canton.participant.store.ReassignmentStore
 import com.digitalasset.canton.participant.store.ReassignmentStore.UnknownReassignmentId
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
@@ -48,8 +47,13 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   ProgrammableSequencerPolicies,
 }
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.util.ReassignmentTag.Source
-import com.digitalasset.canton.{BaseTest, HasExecutionContext, SynchronizerAlias}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.{
+  BaseTest,
+  HasExecutionContext,
+  ReassignmentCounter,
+  SynchronizerAlias,
+}
 import org.scalatest.Assertion
 
 import scala.collection.mutable
@@ -179,7 +183,12 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
             .fromProtoTimestamp(unassignmentCompletion.synchronizerTime.value.recordTime.value)
             .value
 
-          val reassignmentId = ReassignmentId(Source(daId), unassignmentTs)
+          val reassignmentId = ReassignmentId(
+            Source(daId),
+            Target(acmeId),
+            unassignmentTs,
+            Seq(cid -> ReassignmentCounter(0)),
+          )
 
           // Entry is deleted upon timeout
           getReassignmentData(
@@ -259,7 +268,7 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
       loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
           val failedAssignmentCompletion = failingAssignment(
-            unassignId = unassignedEvent.unassignId,
+            reassignmentId = unassignedEvent.reassignmentId,
             source = daId,
             target = acmeId,
             submittingParty = signatory.toLf,
@@ -283,7 +292,7 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
           )
 
           assign(
-            unassignId = unassignedEvent.unassignId,
+            reassignmentId = unassignedEvent.reassignmentId,
             source = daId,
             target = acmeId,
             submittingParty = signatory.toLf,

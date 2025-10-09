@@ -24,6 +24,7 @@ import scala.concurrent.Future
 /** Serves as a backend to implement
   * [[com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.UpdateService]]
   */
+// TODO(#23504) remove deprecation warning suppression
 @nowarn("cat=deprecation")
 trait IndexUpdateService extends LedgerEndService {
   def updates(
@@ -39,6 +40,7 @@ trait IndexUpdateService extends LedgerEndService {
       eventFormat: EventFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetUpdateTreesResponse, NotUsed]
 
+  // TODO(#23504) cleanup
   def getTransactionById(
       updateId: UpdateId,
       transactionFormat: TransactionFormat,
@@ -50,6 +52,7 @@ trait IndexUpdateService extends LedgerEndService {
       requestingParties: Set[Ref.Party],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionTreeResponse]]
 
+  // TODO(#23504) cleanup
   def getTransactionByOffset(
       offset: Offset,
       transactionFormat: TransactionFormat,
@@ -66,7 +69,7 @@ trait IndexUpdateService extends LedgerEndService {
       updateFormat: UpdateFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetUpdateResponse]]
 
-  def latestPrunedOffsets()(implicit
+  def latestPrunedOffset()(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[(Option[Offset], Option[Offset])]
+  ): Future[Option[Offset]]
 }

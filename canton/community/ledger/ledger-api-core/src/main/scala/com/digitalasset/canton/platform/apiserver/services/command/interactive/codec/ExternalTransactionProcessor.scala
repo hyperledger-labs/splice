@@ -4,8 +4,8 @@
 package com.digitalasset.canton.platform.apiserver.services.command.interactive.codec
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.PreparedTransaction
-import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
@@ -26,11 +26,9 @@ import com.digitalasset.canton.platform.apiserver.execution.CommandExecutionResu
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.ExternalTransactionProcessor.PrepareResult
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction, Transaction}
+import com.digitalasset.canton.version.HashingSchemeVersion
+import com.digitalasset.daml.lf.transaction.{SubmittedTransaction, Transaction}
 import com.digitalasset.daml.lf.value.Value.ContractId
 
 import java.util.UUID
@@ -44,41 +42,42 @@ object ExternalTransactionProcessor {
   )
 }
 
-// format: off
-/** This class contains the logic to processes prepare and execute requests from the interactive
- * submission API. The general flow is as follows:
- *
- * IC = Input Contract
- *
- *                                          ┌───────────────┐         ┌──────────────────────┐           ExternalHash = Hash(EnrichedLfTx, EnrichedIC)
- *                                          │     LfTx      │         │     EnrichedLfTx     │           Sign(ExternalHash)
- *          ┌─────────┐  Interpretation     ├───────────────┤ Enrich  ├──────────────────────┤ Encode   ┌─────────────────────┐
- * Prepare: │ Command ┼────────────────────►│  Original IC  │────────►│EnrichedIC, OriginalIC│─────────►│ PreparedTransaction │
- *          └─────────┘                     └───────────────┘         └──────────────────────┘          └───────────────────┬─┘
- *                                                 ||                                      ||                               │
- *                                          Equal  ||                               Equal  ||                               │
- *                                                 ||                                      ||                               │
- *                         Submit to Sync   ┌───────────────┐                         ┌──────────────────────┐   Decode     │
- * Execute:              ◄──────────────────│     LfTx      │                         │     EnrichedLfTx     │◄─────────────┘
- *                                          ├───────────────┤                         ├──────────────────────┤
- *                                          │  Original IC  │                         │EnrichedIC, OriginalIC│
- *                                          └───────────────┘                         └──────────┬───────────┘
- *                                                   ▲                                           │
- *                                                   │                                           │
- *                                                   │                           VerifySignature(EnrichedTx, EnrichedIC)
- *                                       Impoverish(EnrichedLfTx)                                │
- *                                                   │                                           │
- *                                                   │                                           │
- *                                                   └───────────────────────◄───────────────────┘
- *
- * Important to note is that input contracts' original data is passed back and forth between prepare and execute, whereas the transaction itself is not.
- * That's because it would become increasingly difficult to maintain a correct enrich / impoverish logic over arbitrary old input contracts with different Lf encodings.
- * The downside is increased payload size for the prepared transaction that now contains the input contracts in both enriched and original form.
- * For transactions we can tie the enrich / impoverish to the hashing scheme version and ensure that the roundtrip is injective within the same version.
- * Prepared transaction also have a much shorter lifetime than input contracts in general so re-preparing a transaction with a newer hashing version
- * after an upgrade is relatively cheap.
- */
-// format: on
+/** This class contains the logic to process prepare and execute requests from the interactive
+  * submission API. The general flow is as follows:
+  * {{{
+  * IC = Input Contract
+  *
+  *                                          ┌───────────────┐         ┌──────────────────────┐           ExternalHash = Hash(EnrichedLfTx, EnrichedIC)
+  *                                          │     LfTx      │         │     EnrichedLfTx     │           Sign(ExternalHash)
+  *          ┌─────────┐  Interpretation     ├───────────────┤ Enrich  ├──────────────────────┤ Encode   ┌─────────────────────┐
+  * Prepare: │ Command ┼────────────────────►│  Original IC  │────────►│EnrichedIC, OriginalIC│─────────►│ PreparedTransaction │
+  *          └─────────┘                     └───────────────┘         └──────────────────────┘          └───────────────────┬─┘
+  *                                                 ||                                      ||                               │
+  *                                          Equal  ||                               Equal  ||                               │
+  *                                                 ||                                      ||                               │
+  *                         Submit to Sync   ┌───────────────┐                         ┌──────────────────────┐   Decode     │
+  * Execute:              ◄──────────────────│     LfTx      │                         │     EnrichedLfTx     │◄─────────────┘
+  *                                          ├───────────────┤                         ├──────────────────────┤
+  *                                          │  Original IC  │                         │EnrichedIC, OriginalIC│
+  *                                          └───────────────┘                         └──────────┬───────────┘
+  *                                                   ▲                                           │
+  *                                                   │                                           │
+  *                                                   │                           VerifySignature(EnrichedTx, EnrichedIC)
+  *                                       Impoverish(EnrichedLfTx)                                │
+  *                                                   │                                           │
+  *                                                   │                                           │
+  *                                                   └───────────────────────◄───────────────────┘
+  * }}}
+  * Important to note is that input contracts' original data is passed back and forth between
+  * prepare and execute, whereas the transaction itself is not. That's because it would become
+  * increasingly difficult to maintain a correct enrich / impoverish logic over arbitrary old input
+  * contracts with different Lf encodings. The downside is increased payload size for the prepared
+  * transaction that now contains the input contracts in both enriched and original form. For
+  * transactions we can tie the enrich / impoverish to the hashing scheme version and ensure that
+  * the roundtrip is injective within the same version. Prepared transaction also have a much
+  * shorter lifetime than input contracts in general so re-preparing a transaction with a newer
+  * hashing version after an upgrade is relatively cheap.
+  */
 class ExternalTransactionProcessor(
     enricher: InteractiveSubmissionEnricher,
     contractStore: ContractStore,
@@ -99,11 +98,6 @@ class ExternalTransactionProcessor(
     val disclosedContractsByCoid =
       disclosedContracts.groupMap(_.fatContractInstance.contractId)(_.fatContractInstance)
 
-    def enrich(
-        instance: FatContractInstance
-    ): FutureUnlessShutdown[FatContractInstance] =
-      enricher.enrichContract(instance)
-
     MonadUtil
       .parTraverseWithLimit(contractLookupParallelism)(transaction.inputContracts.toList) {
         inputCoid =>
@@ -112,10 +106,10 @@ class ExternalTransactionProcessor(
             // We expect a single disclosed contract for a coid
             case Some(Seq(originalFci)) =>
               EitherT.liftF[FutureUnlessShutdown, String, (ContractId, ExternalInputContract)](
-                enrich(originalFci).map { enrichedFci =>
+                enricher.enrichContract(originalFci).map { enrichedFci =>
                   val externalInputContract = ExternalInputContract(
-                    originalFci = originalFci,
-                    enrichedFci = enrichedFci,
+                    originalContract = originalFci,
+                    enrichedContract = enrichedFci,
                   )
                   externalInputContract.contractId -> externalInputContract
                 }
@@ -134,16 +128,16 @@ class ExternalTransactionProcessor(
                   )
                   .flatMap {
                     case active: ContractState.Active =>
-                      val originalFci = active.toFatContractInstance(inputCoid)
-                      enrich(originalFci)
+                      val originalFci = active.contractInstance
+                      enricher
+                        .enrichContract(originalFci)
                         .map { enrichedFci =>
                           val externalInputContract = ExternalInputContract(
-                            originalFci = originalFci,
-                            enrichedFci = enrichedFci,
+                            originalContract = originalFci,
+                            enrichedContract = enrichedFci,
                           )
-                          externalInputContract.contractId -> externalInputContract
+                          Right(externalInputContract.contractId -> externalInputContract)
                         }
-                        .map(Right(_))
                     // Engine interpretation likely would have failed if that was the case
                     // However it's possible that the contract was archived or pruned in the meantime
                     // That's not an issue however because if that was the case the transaction would have failed later
@@ -190,13 +184,11 @@ class ExternalTransactionProcessor(
   ] =
     for {
       // First enrich the transaction
-      enrichedTransaction <- EitherT
-        .liftF(
-          enricher
-            .enrichVersionedTransaction(
-              commandExecutionResult.commandInterpretationResult.transaction
-            )
+      enrichedTransaction <- EitherT.liftF(
+        enricher.enrichVersionedTransaction(
+          commandExecutionResult.commandInterpretationResult.transaction
         )
+      )
       // Compute input contracts by looking them up either from disclosed contracts or the local store
       inputContracts <- lookupAndEnrichInputContracts(
         enrichedTransaction.transaction,
@@ -204,7 +196,7 @@ class ExternalTransactionProcessor(
         contractLookupParallelism,
       )
         .leftMap(CommandExecutionErrors.InteractiveSubmissionPreparationError.Reject(_))
-      // Require this participant to be connected to the synchronizer on which the transaction will be run
+      // The participant needs to be connected to this synchronizer ID for the transaction to be submitted successfully
       synchronizerId = commandExecutionResult.synchronizerRank.synchronizerId
       transactionData = PrepareTransactionData(
         submitterInfo = commandExecutionResult.commandInterpretationResult.submitterInfo,
@@ -212,7 +204,7 @@ class ExternalTransactionProcessor(
         transaction = SubmittedTransaction(enrichedTransaction),
         globalKeyMapping = commandExecutionResult.commandInterpretationResult.globalKeyMapping,
         inputContracts = inputContracts,
-        synchronizerId = synchronizerId,
+        synchronizerId = synchronizerId.logical,
         mediatorGroup = 0,
         transactionUUID = UUID.randomUUID(),
       )
@@ -245,17 +237,16 @@ class ExternalTransactionProcessor(
         ](encoder.encode(enriched))
         .mapK(FutureUnlessShutdown.outcomeK)
       // Compute the pre-computed hash for convenience
-      protocolVersion <- EitherT
-        .fromEither[FutureUnlessShutdown](protocolVersionForSynchronizerId(enriched.synchronizerId))
-        .leftMap(error => InteractiveSubmissionPreparationError.Reject(error.cause))
+      protocolVersion = commandExecutionResult.synchronizerRank.synchronizerId.protocolVersion
       hashVersion = HashingSchemeVersion
         .getHashingSchemeVersionsForProtocolVersion(protocolVersion)
         .max1
       hash <- EitherT
         .fromEither[FutureUnlessShutdown](
-          enriched.computeHash(hashVersion, protocolVersion, hashTracer)
+          enriched
+            .computeHash(hashVersion, protocolVersion, hashTracer)
+            .leftMap(error => InteractiveSubmissionPreparationError.Reject(error.message))
         )
-        .leftMap(error => InteractiveSubmissionPreparationError.Reject(error.message))
     } yield {
       PrepareResult(encoded, hash, hashVersion)
     }
@@ -269,19 +260,17 @@ class ExternalTransactionProcessor(
     FutureUnlessShutdown,
     InteractiveSubmissionExecuteError.Reject,
     CommandExecutionResult,
-  ] =
+  ] = {
+    val routingSynchronizerState = syncService.getRoutingSynchronizerState
+
     for {
       decoded <- EitherT
         .liftF[Future, InteractiveSubmissionExecuteError.Reject, ExecuteTransactionData](
           decoder.decode(executeRequest)
         )
         .mapK(FutureUnlessShutdown.outcomeK)
-      routingSynchronizerState = syncService.getRoutingSynchronizerState
-      protocolVersion <- EitherT
-        .fromEither[FutureUnlessShutdown](protocolVersionForSynchronizerId(decoded.synchronizerId))
-        .leftMap(error => InteractiveSubmissionExecuteError.Reject(error.cause))
       _ <- decoded
-        .verifySignature(routingSynchronizerState, protocolVersion, logger)
+        .verifySignature(routingSynchronizerState, logger)
         .leftMap(err => InteractiveSubmissionExecuteError.Reject(err))
       commandInterpretationResult = decoded.impoverish
       selectRoutingSynchronizer <- EitherT.liftF(
@@ -304,18 +293,9 @@ class ExternalTransactionProcessor(
           .flatten
       )
     } yield CommandExecutionResult(
-      decoded.impoverish,
+      commandInterpretationResult,
       selectRoutingSynchronizer,
       routingSynchronizerState,
     )
-
-  private def protocolVersionForSynchronizerId(
-      synchronizerId: SynchronizerId
-  )(implicit loggingContext: LoggingContextWithTrace): Either[RpcError, ProtocolVersion] =
-    syncService
-      .getProtocolVersionForSynchronizer(Traced(synchronizerId))
-      .toRight(
-        CommandExecutionErrors.InteractiveSubmissionPreparationError
-          .Reject(s"Unknown synchronizer id $synchronizerId")
-      )
+  }
 }

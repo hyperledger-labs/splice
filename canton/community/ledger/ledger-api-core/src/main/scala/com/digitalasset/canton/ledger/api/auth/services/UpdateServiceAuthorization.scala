@@ -39,6 +39,7 @@ final class UpdateServiceAuthorization(
       getUpdatesClaims(request)*
     )(request, responseObserver)
 
+  // TODO(#23504) remove when TransactionTrees are removed from the API
   @nowarn("cat=deprecation")
   override def getUpdateTrees(
       request: GetUpdatesRequest,
@@ -48,6 +49,7 @@ final class UpdateServiceAuthorization(
       getUpdatesClaims(request)*
     )(request, responseObserver)
 
+  // TODO(#23504) remove when TransactionTrees are removed from the API
   @nowarn("cat=deprecation")
   override def getTransactionTreeByOffset(
       request: GetTransactionByOffsetRequest
@@ -56,6 +58,7 @@ final class UpdateServiceAuthorization(
       RequiredClaims.readAsForAllParties[GetTransactionByOffsetRequest](request.requestingParties)*
     )(request)
 
+  // TODO(#23504) remove when TransactionTrees are removed from the API
   @nowarn("cat=deprecation")
   override def getTransactionTreeById(
       request: GetTransactionByIdRequest
@@ -64,6 +67,7 @@ final class UpdateServiceAuthorization(
       RequiredClaims.readAsForAllParties[GetTransactionByIdRequest](request.requestingParties)*
     )(request)
 
+  // TODO(#23504) remove when getTransactionByOffset is removed from the API
   @nowarn("cat=deprecation")
   override def getTransactionByOffset(
       request: GetTransactionByOffsetRequest
@@ -72,6 +76,7 @@ final class UpdateServiceAuthorization(
       getTransactionByOffsetClaims(request)*
     )(request)
 
+  // TODO(#23504) remove when getTransactionById is removed from the API
   @nowarn("cat=deprecation")
   override def getTransactionById(
       request: GetTransactionByIdRequest
@@ -101,12 +106,14 @@ final class UpdateServiceAuthorization(
 
 object UpdateServiceAuthorization {
 
+  // TODO(#23504) remove checking filter when it is removed from GetUpdatesRequest
   @nowarn("cat=deprecation")
   def getUpdatesClaims(request: GetUpdatesRequest): List[RequiredClaim[GetUpdatesRequest]] =
     request.updateFormat.toList.flatMap(
       RequiredClaims.updateFormatClaims[GetUpdatesRequest]
     ) ::: request.filter.toList.flatMap(RequiredClaims.transactionFilterClaims[GetUpdatesRequest])
 
+  // TODO(#23504) remove when getTransactionByOffset is removed from the API
   @nowarn("cat=deprecation")
   def getTransactionByOffsetClaims(
       request: GetTransactionByOffsetRequest
@@ -118,6 +125,7 @@ object UpdateServiceAuthorization {
       request.requestingParties
     )
 
+  // TODO(#23504) remove when getTransactionById is removed from the API
   @nowarn("cat=deprecation")
   def getTransactionByIdClaims(
       request: GetTransactionByIdRequest

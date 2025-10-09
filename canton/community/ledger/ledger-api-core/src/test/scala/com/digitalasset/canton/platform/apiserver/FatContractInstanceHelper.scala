@@ -3,9 +3,15 @@
 
 package com.digitalasset.canton.platform.apiserver
 
+import com.digitalasset.canton.protocol.LfFatContractInst
 import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, GlobalKeyWithMaintainers, Node}
+import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
+  FatContractInstance,
+  GlobalKeyWithMaintainers,
+  Node,
+}
 import com.digitalasset.daml.lf.value.Value
 
 object FatContractInstanceHelper {
@@ -16,12 +22,12 @@ object FatContractInstanceHelper {
       contractId: Value.ContractId,
       argument: Value,
       createdAt: Time.Timestamp,
-      driverMetadata: Bytes,
+      authenticationData: Bytes,
       signatories: Set[Ref.Party],
       stakeholders: Set[Ref.Party],
       keyOpt: Option[GlobalKeyWithMaintainers],
       version: LanguageVersion,
-  ): FatContractInstance = {
+  ): LfFatContractInst = {
     val create = Node.Create(
       templateId = templateId,
       packageName = packageName,
@@ -32,7 +38,11 @@ object FatContractInstanceHelper {
       keyOpt = keyOpt,
       version = version,
     )
-    FatContractInstance.fromCreateNode(create, createdAt, driverMetadata)
+    FatContractInstance.fromCreateNode(
+      create,
+      CreationTime.CreatedAt(createdAt),
+      authenticationData,
+    )
   }
 
 }

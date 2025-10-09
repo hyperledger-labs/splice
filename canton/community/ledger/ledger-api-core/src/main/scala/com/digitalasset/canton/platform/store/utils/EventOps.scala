@@ -97,6 +97,7 @@ object EventOps {
       }
   }
 
+  // TODO(#23504) remove when TreeEvent is removed
   @nowarn("cat=deprecation")
   implicit final class TreeEventOps(val event: TreeEvent) extends AnyVal {
     def nodeId: Int = event.kind.fold(_.nodeId, _.nodeId)

@@ -77,7 +77,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               NonNegativeFiniteDuration.ofSeconds(10),
             )
             val endpoints = connections.map { s =>
-              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _) =>
+              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _, _) =>
                 endpoint
               }
             }

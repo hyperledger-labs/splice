@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -579,7 +579,7 @@ class ScanHistoryBackfillingIntegrationTest
   private def itemTime(t: TreeUpdateWithMigrationId): CantonTimestamp = t.update.update.recordTime
 
   implicit class TreeUpdateTestSyntax(update: TreeUpdateWithMigrationId) {
-    def transactionTree(implicit pos: Position): TransactionTree = update.update.update match {
+    def transactionTree(implicit pos: Position): Transaction = update.update.update match {
       case TransactionTreeUpdate(tree) => tree
       case _ => fail(s"Expected a TransactionTreeUpdate, got: ${update.update}")(pos)
     }

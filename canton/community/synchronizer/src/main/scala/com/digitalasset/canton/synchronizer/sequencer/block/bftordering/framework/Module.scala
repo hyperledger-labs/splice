@@ -10,14 +10,15 @@ import com.digitalasset.canton.DoNotDiscardLikeFuture
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Consensus,
   Output,
   P2PNetworkOut,
+  Pruning,
 }
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{HasTraceContext, Spanning, TraceContext}
 import org.apache.pekko.dispatch.ControlMessage
 
 import java.time.Instant
@@ -35,7 +36,7 @@ final case class ModuleName(name: String)
   * @tparam MessageT
   *   The root message type understood by the actor.
   */
-trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
+trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable with Spanning {
 
   /** The module's message handler.
     *
@@ -49,7 +50,7 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
       traceContext: TraceContext,
   ): Unit =
     try {
-      performUnlessClosing("receive")(receiveInternal(message))
+      synchronizeWithClosingSync("receive")(receiveInternal(message))
         .onShutdown {
           logger.info(s"Received $message but won't process because we're shutting down")
         }
@@ -80,6 +81,15 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
   //  made available by FlagCloseable, they must not hold resources and don't need to be closed.
   override protected def onClosed(): Unit = ()
 
+  final def pipeToSelfOpt[X](futureUnlessShutdown: E#FutureUnlessShutdownT[X])(
+      fun: Try[X] => Option[MessageT]
+  )(implicit
+      context: E#ActorContextT[MessageT],
+      traceContext: TraceContext,
+      merticsContext: MetricsContext,
+  ): Unit =
+    context.pipeToSelf(futureUnlessShutdown)(fun)
+
   final def pipeToSelf[X](futureUnlessShutdown: E#FutureUnlessShutdownT[X])(
       fun: Try[X] => MessageT
   )(implicit
@@ -87,7 +97,7 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
       traceContext: TraceContext,
       merticsContext: MetricsContext,
   ): Unit =
-    context.pipeToSelf(futureUnlessShutdown)(fun.andThen(Some(_)))
+    pipeToSelfOpt(futureUnlessShutdown)(fun.andThen(Some(_)))
 
   final def pipeToSelf[X](futureUnlessShutdown: E#FutureUnlessShutdownT[X], timer: Timer)(
       fun: Try[X] => MessageT
@@ -96,7 +106,7 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): Unit =
-    context.pipeToSelf(context.timeFuture(timer, futureUnlessShutdown))(fun.andThen(Some(_)))
+    pipeToSelf(context.timeFuture(timer, futureUnlessShutdown))(fun)
 
   final protected def abort(
       msg: String
@@ -121,25 +131,6 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
     context.abort(failure)
   }
 
-  // Aborting initialization in Canton shouldn't kill the whole process, as it may contain several nodes,
-  //  but rather only the module/sequencer.
-  final protected def abortInit(
-      msg: String
-  ): Nothing = {
-    // Ensure that the log contains the failure, as exceptions may be swallowed by the actor framework
-    logError(msg)(TraceContext.empty)
-    sys.error(msg)
-  }
-
-  final protected def abortInit(
-      msg: String,
-      failure: Throwable,
-  ): Nothing = {
-    // Ensure that the log contains the failure, as exceptions may be swallowed by the actor framework
-    logError(msg, failure)(TraceContext.empty)
-    throw failure
-  }
-
   private def logError(msg: String, failure: Throwable)(implicit
       traceContext: TraceContext
   ): Unit =
@@ -157,18 +148,16 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
   */
 trait ModuleRef[-AcceptedMessageT] {
 
-  /** The module reference's asynchronous send operation.
+  /** Send operation that is also providing the current TraceContext
     */
   def asyncSend(
       msg: AcceptedMessageT
-  )(implicit metricsContext: MetricsContext): Unit =
-    asyncSendTraced(msg)(TraceContext.empty, metricsContext)
-
-  /** Send operation that is also providing the current TraceContext
-    */
-  def asyncSendTraced(
-      msg: AcceptedMessageT
   )(implicit traceContext: TraceContext, metricsContext: MetricsContext): Unit
+
+  def asyncSendNoTrace(
+      msg: AcceptedMessageT
+  )(implicit metricsContext: MetricsContext): Unit =
+    asyncSend(msg)(traceContext = TraceContext.empty, metricsContext = metricsContext)
 }
 
 /** An abstraction of the network for deterministic simulation testing purposes.
@@ -180,16 +169,74 @@ trait P2PNetworkRef[-P2PMessageT] extends FlagCloseable {
   ): Unit
 }
 
-/** An abstraction of the P2P network manager for deterministic simulation testing purposes.
+trait P2PConnectionEventListener {
+  def onConnect(p2pEndpointId: P2PEndpoint.Id)(implicit traceContext: TraceContext): Unit
+  def onDisconnect(p2pEndpointId: P2PEndpoint.Id)(implicit traceContext: TraceContext): Unit
+  // The P2P endpoint may be None if the connection is incoming and the connecting peer did not communicate one
+  def onSequencerId(bftNodeId: BftNodeId, maybeP2PEndpoint: Option[P2PEndpoint])(implicit
+      traceContext: TraceContext
+  ): Unit
+}
+object P2PConnectionEventListener {
+  val NoOp: P2PConnectionEventListener = new P2PConnectionEventListener {
+    override def onConnect(p2pEndpointId: P2PEndpoint.Id)(implicit
+        traceContext: TraceContext
+    ): Unit = ()
+    override def onDisconnect(p2pEndpointId: P2PEndpoint.Id)(implicit
+        traceContext: TraceContext
+    ): Unit = ()
+    override def onSequencerId(bftNodeId: BftNodeId, maybeP2PEndpoint: Option[P2PEndpoint])(implicit
+        traceContext: TraceContext
+    ): Unit =
+      ()
+  }
+}
+
+sealed trait P2PAddress extends Product with Serializable {
+
+  val maybeP2PEndpoint: Option[P2PEndpoint]
+
+  lazy val maybeBftNodeId: Option[BftNodeId] =
+    this match {
+      case P2PAddress.Endpoint(_) => None
+      case P2PAddress.NodeId(bftNodeId, _) => Some(bftNodeId)
+    }
+
+  lazy val id: P2PAddress.Id =
+    this match {
+      case P2PAddress.Endpoint(p2pEndpoint) => Left(p2pEndpoint.id)
+      case P2PAddress.NodeId(bftNodeId, _) => Right(bftNodeId)
+    }
+}
+object P2PAddress {
+
+  type Id = Either[P2PEndpoint.Id, BftNodeId]
+
+  final case class Endpoint(p2pEndpoint: P2PEndpoint) extends P2PAddress {
+    override val maybeP2PEndpoint: Option[P2PEndpoint] = Some(p2pEndpoint)
+  }
+
+  final case class NodeId(
+      bftNodeId: BftNodeId,
+      maybeCommunicatedEndpoint: Option[P2PEndpoint] = None,
+  ) extends P2PAddress {
+    override val maybeP2PEndpoint: Option[P2PEndpoint] = maybeCommunicatedEndpoint
+  }
+}
+
+/** An abstraction of the P2P network reference factory for deterministic simulation testing
+  * purposes.
   */
-trait ClientP2PNetworkManager[E <: Env[E], -P2PMessageT] {
+trait P2PNetworkManager[E <: Env[E], -P2PMessageT] extends FlagCloseable {
 
   def createNetworkRef[ActorContextT](
       context: E#ActorContextT[ActorContextT],
-      endpoint: P2PEndpoint,
-  )(
-      onSequencerId: (P2PEndpoint.Id, BftNodeId) => Unit
-  ): P2PNetworkRef[P2PMessageT]
+      p2pAddress: P2PAddress,
+  )(implicit traceContext: TraceContext): P2PNetworkRef[P2PMessageT]
+
+  def shutdownOutgoingConnection(p2pEndpointId: P2PEndpoint.Id)(implicit
+      traceContext: TraceContext
+  ): Unit
 }
 
 /** An abstraction of cancelable delayedEvent for deterministic simulation testing purposes.
@@ -199,7 +246,7 @@ trait CancellableEvent {
   /** @return
     *   True if the cancellation was successful.
     */
-  def cancel(): Boolean
+  def cancel()(implicit metricsContext: MetricsContext): Boolean
 }
 
 /** FutureContext contains functions for creating and combining E#FutureUnlessShutdown that will be
@@ -207,7 +254,10 @@ trait CancellableEvent {
   */
 trait FutureContext[E <: Env[E]] {
 
-  def timeFuture[X](timer: Timer, futureUnlessShutdown: => E#FutureUnlessShutdownT[X])(implicit
+  def timeFuture[X](
+      timer: Timer,
+      futureUnlessShutdown: => E#FutureUnlessShutdownT[X],
+  )(implicit
       mc: MetricsContext
   ): E#FutureUnlessShutdownT[X]
 
@@ -217,22 +267,27 @@ trait FutureContext[E <: Env[E]] {
     * be careful not to mutate state of the modules in the [[Env#FutureUnlessShutdownT]], as this
     * would violate the assumptions we use when writing [[Module]]s.
     */
-  def mapFuture[X, Y](future: E#FutureUnlessShutdownT[X])(
-      fun: PureFun[X, Y]
-  ): E#FutureUnlessShutdownT[Y]
+  def mapFuture[X, Y](
+      future: E#FutureUnlessShutdownT[X]
+  )(fun: PureFun[X, Y], orderingStage: Option[String] = None): E#FutureUnlessShutdownT[Y]
 
   def zipFuture[X, Y](
       future1: E#FutureUnlessShutdownT[X],
       future2: E#FutureUnlessShutdownT[Y],
+      orderingStage: Option[String] = None,
   ): E#FutureUnlessShutdownT[(X, Y)]
 
-  def zipFuture[X, Y, Z](
+  def zipFuture3[X, Y, Z](
       future1: E#FutureUnlessShutdownT[X],
       future2: E#FutureUnlessShutdownT[Y],
       future3: E#FutureUnlessShutdownT[Z],
+      orderingStage: Option[String] = None,
   ): E#FutureUnlessShutdownT[(X, Y, Z)]
 
-  def sequenceFuture[A, F[_]](futures: F[E#FutureUnlessShutdownT[A]])(implicit
+  def sequenceFuture[A, F[_]](
+      futures: F[E#FutureUnlessShutdownT[A]],
+      orderingStage: Option[String] = None,
+  )(implicit
       ev: Traverse[F]
   ): E#FutureUnlessShutdownT[F[A]]
 
@@ -242,6 +297,7 @@ trait FutureContext[E <: Env[E]] {
   def flatMapFuture[R1, R2](
       future1: E#FutureUnlessShutdownT[R1],
       future2: PureFun[R1, E#FutureUnlessShutdownT[R2]],
+      orderingStage: Option[String] = None,
   ): E#FutureUnlessShutdownT[R2]
 }
 
@@ -251,8 +307,8 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
 
   // Client API, used by system construction logic
 
-  def newModuleRef[NewModuleMessageT](
-      moduleName: ModuleName
+  def newModuleRef[NewModuleMessageT](moduleName: ModuleName)(
+      moduleNameForMetrics: String = moduleName.name
   ): E#ModuleRefT[NewModuleMessageT]
 
   /** Spawns a new module. The `module` handler object must not be spawned more than once, lest it
@@ -267,19 +323,23 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
 
   def self: E#ModuleRefT[MessageT]
 
-  def delayedEvent(delay: FiniteDuration, message: MessageT)(implicit
-      metricsContext: MetricsContext
-  ): CancellableEvent =
-    delayedEventTraced(delay, message)(TraceContext.empty, metricsContext)
-
-  def delayedEventTraced(delay: FiniteDuration, messageT: MessageT)(implicit
+  def delayedEvent(delay: FiniteDuration, messageT: MessageT)(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): CancellableEvent
 
+  def delayedEventNoTrace(delay: FiniteDuration, messageT: MessageT)(implicit
+      metricsContext: MetricsContext
+  ): CancellableEvent = delayedEvent(delay, messageT)(
+    traceContext = TraceContext.empty,
+    metricsContext = metricsContext,
+  )
+
   /** Similar to TraceContext.withNewTraceContext but can be deterministically simulated
     */
   def withNewTraceContext[A](fn: TraceContext => A): A
+
+  def traceContextOfBatch(items: IterableOnce[HasTraceContext]): TraceContext
 
   def futureContext: FutureContext[E]
 
@@ -291,31 +351,43 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
   ): E#FutureUnlessShutdownT[X] =
     futureContext.timeFuture(timer, futureUnlessShutdown)
 
-  final override def pureFuture[X](x: X): E#FutureUnlessShutdownT[X] = futureContext.pureFuture(x)
+  final override def pureFuture[X](x: X): E#FutureUnlessShutdownT[X] =
+    futureContext.pureFuture(x)
 
-  final override def mapFuture[X, Y](future: E#FutureUnlessShutdownT[X])(
-      fun: PureFun[X, Y]
-  ): E#FutureUnlessShutdownT[Y] = futureContext.mapFuture(future)(fun)
+  final override def mapFuture[X, Y](
+      future: E#FutureUnlessShutdownT[X]
+  )(fun: PureFun[X, Y], orderingStage: Option[String] = None): E#FutureUnlessShutdownT[Y] =
+    futureContext.mapFuture(future)(fun, orderingStage)
 
   final override def zipFuture[X, Y](
       future1: E#FutureUnlessShutdownT[X],
       future2: E#FutureUnlessShutdownT[Y],
-  ): E#FutureUnlessShutdownT[(X, Y)] = futureContext.zipFuture(future1, future2)
+      orderingStage: Option[String] = None,
+  ): E#FutureUnlessShutdownT[(X, Y)] =
+    futureContext.zipFuture(future1, future2, orderingStage)
 
-  final override def zipFuture[X, Y, Z](
+  final override def zipFuture3[X, Y, Z](
       future1: E#FutureUnlessShutdownT[X],
       future2: E#FutureUnlessShutdownT[Y],
       future3: E#FutureUnlessShutdownT[Z],
-  ): E#FutureUnlessShutdownT[(X, Y, Z)] = futureContext.zipFuture(future1, future2, future3)
+      orderingStage: Option[String] = None,
+  ): E#FutureUnlessShutdownT[(X, Y, Z)] =
+    futureContext.zipFuture3(future1, future2, future3, orderingStage)
 
-  final override def sequenceFuture[A, F[_]](futures: F[E#FutureUnlessShutdownT[A]])(implicit
+  final override def sequenceFuture[A, F[_]](
+      futures: F[E#FutureUnlessShutdownT[A]],
+      orderingStage: Option[String] = None,
+  )(implicit
       ev: Traverse[F]
-  ): E#FutureUnlessShutdownT[F[A]] = futureContext.sequenceFuture(futures)
+  ): E#FutureUnlessShutdownT[F[A]] =
+    futureContext.sequenceFuture(futures, orderingStage)
 
   final override def flatMapFuture[R1, R2](
       future1: E#FutureUnlessShutdownT[R1],
       future2: PureFun[R1, E#FutureUnlessShutdownT[R2]],
-  ): E#FutureUnlessShutdownT[R2] = futureContext.flatMapFuture(future1, future2)
+      orderingStage: Option[String] = None,
+  ): E#FutureUnlessShutdownT[R2] =
+    futureContext.flatMapFuture(future1, future2, orderingStage)
 
   def pipeToSelf[X](futureUnlessShutdown: E#FutureUnlessShutdownT[X])(
       fun: Try[X] => Option[MessageT]
@@ -383,7 +455,7 @@ trait ModuleSystem[E <: Env[E]] {
 
   def newModuleRef[AcceptedMessageT](
       moduleName: ModuleName
-  ): E#ModuleRefT[AcceptedMessageT]
+  )(moduleNameForMetrics: String = moduleName.name): E#ModuleRefT[AcceptedMessageT]
 
   def setModule[AcceptedMessageT](
       moduleRef: E#ModuleRefT[AcceptedMessageT],
@@ -393,8 +465,8 @@ trait ModuleSystem[E <: Env[E]] {
 
 object Module {
 
-  protected[framework] sealed trait ModuleControl[E <: Env[E], AcceptedMessageT] extends Product
-  protected[framework] object ModuleControl {
+  protected[bftordering] sealed trait ModuleControl[E <: Env[E], AcceptedMessageT] extends Product
+  protected[bftordering] object ModuleControl {
     final case class Send[E <: Env[E], AcceptedMessageT](
         message: AcceptedMessageT,
         traceContext: TraceContext,
@@ -422,23 +494,39 @@ object Module {
     * of the concrete actors framework, such as Pekko or the simulation testing framework, as to
     * further reduce the gap between what is run and what is deterministically simulation-tested.
     *
-    * Inputs are a module system and a network manager; the latter defines how nodes connect.
+    * Inputs are a module system and a client P2P network manager factory; the latter defines how
+    * nodes connect.
     */
-  trait SystemInitializer[E <: Env[E], P2PMessageT, InputMessageT] {
+  trait SystemInitializer[
+      E <: Env[E],
+      P2PNetworkManagerT <: P2PNetworkManager[E, P2PMessageT],
+      P2PMessageT,
+      InputMessageT,
+  ] {
     def initialize(
         moduleSystem: ModuleSystem[E],
-        networkManager: ClientP2PNetworkManager[E, P2PMessageT],
-    ): SystemInitializationResult[P2PMessageT, InputMessageT]
+        createP2PNetworkManager: (
+            P2PConnectionEventListener,
+            ModuleRef[P2PMessageT],
+        ) => P2PNetworkManagerT,
+    ): SystemInitializationResult[E, P2PNetworkManagerT, P2PMessageT, InputMessageT]
   }
 
   /** The result of initializing a module system independent of the actor framework, to be used
     * during the actor framework-specific initialization.
     */
-  final case class SystemInitializationResult[P2PMessageT, InputMessageT](
+  final case class SystemInitializationResult[
+      E <: Env[E],
+      P2PNetworkManagerT <: P2PNetworkManager[E, P2PMessageT],
+      P2PMessageT,
+      InputMessageT,
+  ](
       inputModuleRef: ModuleRef[InputMessageT],
       p2pNetworkInModuleRef: ModuleRef[P2PMessageT],
       p2pNetworkOutAdminModuleRef: ModuleRef[P2PNetworkOut.Admin],
       consensusAdminModuleRef: ModuleRef[Consensus.Admin],
       outputModuleRef: ModuleRef[Output.SequencerSnapshotMessage],
+      pruningModuleRef: ModuleRef[Pruning.Message],
+      p2pNetworkManager: P2PNetworkManagerT,
   )
 }

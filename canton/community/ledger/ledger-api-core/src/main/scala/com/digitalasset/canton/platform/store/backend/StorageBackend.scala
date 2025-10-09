@@ -20,6 +20,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawParticipantAuthorization,
   RawTreeEvent,
   RawUnassignEvent,
+  SequentialIdBatch,
   SynchronizerOffset,
   UnassignProperties,
 }
@@ -38,7 +39,9 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{FullIdentifier, NameTypeConRef}
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.google.common.annotations.VisibleForTesting
 
 import java.sql.Connection
 import javax.sql.DataSource
@@ -136,14 +139,6 @@ trait ParameterStorageBackend {
   def prunedUpToInclusive(connection: Connection): Option[Offset]
 
   def prunedUpToInclusiveAndLedgerEnd(connection: Connection): PruneUptoInclusiveAndLedgerEnd
-
-  def updatePrunedAllDivulgedContractsUpToInclusive(
-      prunedUpToInclusive: Offset
-  )(connection: Connection): Unit
-
-  def participantAllDivulgedContractsPrunedUpToInclusive(
-      connection: Connection
-  ): Option[Offset]
 
   def updatePostProcessingEnd(
       postProcessingEnd: Option[Offset]
@@ -251,7 +246,7 @@ object ContractStorageBackend {
 
   final case class RawCreatedContract(
       templateId: String,
-      packageName: String,
+      packageId: String,
       flatEventWitnesses: Set[Party],
       createArgument: Array[Byte],
       createArgumentCompression: Option[Int],
@@ -260,7 +255,7 @@ object ContractStorageBackend {
       createKey: Option[Array[Byte]],
       createKeyCompression: Option[Int],
       keyMaintainers: Option[Set[Party]],
-      driverMetadata: Array[Byte],
+      authenticationData: Array[Byte],
   ) extends RawContractState
 
   final case class RawArchivedContract(
@@ -279,7 +274,6 @@ trait EventStorageBackend {
     */
   def pruneEvents(
       pruneUpToInclusive: Offset,
-      pruneAllDivulgedContracts: Boolean,
       incompleteReassignmentOffsets: Vector[Offset],
   )(implicit
       connection: Connection,
@@ -300,7 +294,7 @@ trait EventStorageBackend {
 
   def fetchAssignEventIdsForStakeholder(
       stakeholderO: Option[Party],
-      templateId: Option[Identifier],
+      templateId: Option[NameTypeConRef],
       startExclusive: Long,
       endInclusive: Long,
       limit: Int,
@@ -308,19 +302,19 @@ trait EventStorageBackend {
 
   def fetchUnassignEventIdsForStakeholder(
       stakeholderO: Option[Party],
-      templateId: Option[Identifier],
+      templateId: Option[NameTypeConRef],
       startExclusive: Long,
       endInclusive: Long,
       limit: Int,
   )(connection: Connection): Vector[Long]
 
   def assignEventBatch(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       allFilterParties: Option[Set[Party]],
   )(connection: Connection): Vector[Entry[RawAssignEvent]]
 
   def unassignEventBatch(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       allFilterParties: Option[Set[Party]],
   )(connection: Connection): Vector[Entry[RawUnassignEvent]]
 
@@ -346,28 +340,28 @@ trait EventStorageBackend {
 
   def firstSynchronizerOffsetAfterOrAt(
       synchronizerId: SynchronizerId,
-      afterOrAtRecordTime: Timestamp,
+      afterOrAtRecordTimeInclusive: Timestamp,
   )(connection: Connection): Option[SynchronizerOffset]
 
   def lastSynchronizerOffsetBeforeOrAt(
       synchronizerIdO: Option[SynchronizerId],
-      beforeOrAtOffset: Offset,
+      beforeOrAtOffsetInclusive: Offset,
   )(connection: Connection): Option[SynchronizerOffset]
 
   def synchronizerOffset(offset: Offset)(connection: Connection): Option[SynchronizerOffset]
 
   def firstSynchronizerOffsetAfterOrAtPublicationTime(
-      afterOrAtPublicationTime: Timestamp
+      afterOrAtPublicationTimeInclusive: Timestamp
   )(connection: Connection): Option[SynchronizerOffset]
 
   def lastSynchronizerOffsetBeforeOrAtPublicationTime(
-      beforeOrAtPublicationTime: Timestamp
+      beforeOrAtPublicationTimeInclusive: Timestamp
   )(connection: Connection): Option[SynchronizerOffset]
 
   // Note: Added for offline party replication as CN is using it.
   def lastSynchronizerOffsetBeforeOrAtRecordTime(
       synchronizerId: SynchronizerId,
-      beforeOrAtRecordTime: Timestamp,
+      beforeOrAtRecordTimeInclusive: Timestamp,
   )(connection: Connection): Option[SynchronizerOffset]
 
   def archivals(fromExclusive: Option[Offset], toInclusive: Offset)(
@@ -382,7 +376,7 @@ trait EventStorageBackend {
   )(connection: Connection): Vector[Long]
 
   def topologyPartyEventBatch(
-      eventSequentialIds: Iterable[Long]
+      eventSequentialIds: SequentialIdBatch
   )(connection: Connection): Vector[RawParticipantAuthorization]
 
   def topologyEventOffsetPublishedOnRecordTime(
@@ -391,12 +385,12 @@ trait EventStorageBackend {
   )(connection: Connection): Option[Offset]
 
   def fetchEventPayloadsAcsDelta(target: EventPayloadSourceForUpdatesAcsDelta)(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       requestingParties: Option[Set[Party]],
   )(connection: Connection): Vector[Entry[RawFlatEvent]]
 
   def fetchEventPayloadsLedgerEffects(target: EventPayloadSourceForUpdatesLedgerEffects)(
-      eventSequentialIds: Iterable[Long],
+      eventSequentialIds: SequentialIdBatch,
       requestingParties: Option[Set[Ref.Party]],
   )(connection: Connection): Vector[Entry[RawTreeEvent]]
 
@@ -413,11 +407,12 @@ object EventStorageBackend {
       synchronizerId: String,
       traceContext: Option[Array[Byte]],
       recordTime: Timestamp,
+      externalTransactionHash: Option[Array[Byte]],
       event: E,
   )
 
   sealed trait RawEvent {
-    def templateId: Identifier
+    def templateId: FullIdentifier
     def witnessParties: Set[String]
   }
   // TODO(#23504) rename to RawAcsDeltaEvent?
@@ -432,9 +427,9 @@ object EventStorageBackend {
       offset: Long,
       nodeId: Int,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       witnessParties: Set[String],
+      flatEventWitnesses: Set[String],
       signatories: Set[String],
       observers: Set[String],
       createArgument: Array[Byte],
@@ -444,7 +439,7 @@ object EventStorageBackend {
       createKeyValueCompression: Option[Int],
       ledgerEffectiveTime: Timestamp,
       createKeyHash: Option[Hash],
-      driverMetadata: Array[Byte],
+      authenticationData: Array[Byte],
   ) extends RawFlatEvent
       with RawTreeEvent
 
@@ -453,8 +448,7 @@ object EventStorageBackend {
       offset: Long,
       nodeId: Int,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       witnessParties: Set[String],
   ) extends RawFlatEvent
 
@@ -463,8 +457,7 @@ object EventStorageBackend {
       offset: Long,
       nodeId: Int,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       exerciseConsuming: Boolean,
       exerciseChoice: String,
       exerciseArgument: Array[Byte],
@@ -474,6 +467,7 @@ object EventStorageBackend {
       exerciseActors: Seq[String],
       exerciseLastDescendantNodeId: Int,
       witnessParties: Set[String],
+      flatEventWitnesses: Set[String],
   ) extends RawTreeEvent
 
   final case class RawActiveContract(
@@ -487,12 +481,11 @@ object EventStorageBackend {
   final case class RawUnassignEvent(
       sourceSynchronizerId: String,
       targetSynchronizerId: String,
-      unassignId: String,
+      reassignmentId: String,
       submitter: Option[String],
       reassignmentCounter: Long,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       witnessParties: Set[String],
       assignmentExclusivity: Option[Timestamp],
       nodeId: Int,
@@ -501,12 +494,12 @@ object EventStorageBackend {
   final case class RawAssignEvent(
       sourceSynchronizerId: String,
       targetSynchronizerId: String,
-      unassignId: String,
+      reassignmentId: String,
       submitter: Option[String],
       reassignmentCounter: Long,
       rawCreatedEvent: RawCreatedEvent,
   ) extends RawReassignmentEvent {
-    override def templateId: Identifier = rawCreatedEvent.templateId
+    override def templateId: FullIdentifier = rawCreatedEvent.templateId
     override def witnessParties: Set[String] = rawCreatedEvent.witnessParties
   }
 
@@ -533,6 +526,12 @@ object EventStorageBackend {
       synchronizerId: String,
       sequentialId: Long,
   )
+
+  sealed trait SequentialIdBatch
+  object SequentialIdBatch {
+    final case class IdRange(fromInclusive: Long, toInclusive: Long) extends SequentialIdBatch
+    final case class Ids(ids: Iterable[Long]) extends SequentialIdBatch
+  }
 }
 
 trait DataSourceStorageBackend {
@@ -594,13 +593,16 @@ trait IntegrityStorageBackend {
     * This operation is allowed to take some time to finish. It is not expected that it is used
     * during regular index/indexer operation.
     */
-  def onlyForTestingVerifyIntegrity(failForEmptyDB: Boolean = true)(connection: Connection): Unit
+  @VisibleForTesting
+  def verifyIntegrity(failForEmptyDB: Boolean = true)(connection: Connection): Unit
 
-  def onlyForTestingNumberOfAcceptedTransactionsFor(synchronizerId: SynchronizerId)(
+  @VisibleForTesting
+  def numberOfAcceptedTransactionsFor(synchronizerId: SynchronizerId)(
       connection: Connection
   ): Int
 
-  def onlyForTestingMoveLedgerEndBackToScratch()(connection: Connection): Unit
+  @VisibleForTesting
+  def moveLedgerEndBackToScratch()(connection: Connection): Unit
 }
 
 trait StringInterningStorageBackend {

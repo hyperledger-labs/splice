@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Helper wrapper of a grpc message used in GetUpdateTrees call. Class will be removed in 3.4.0. */
+// TODO(#23504) remove
 @Deprecated
 public final class GetUpdateTreesResponse {
 

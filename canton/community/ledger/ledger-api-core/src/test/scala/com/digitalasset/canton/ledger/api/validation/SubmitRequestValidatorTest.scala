@@ -30,7 +30,7 @@ import com.digitalasset.daml.lf.command.{
 import com.digitalasset.daml.lf.data.*
 import com.digitalasset.daml.lf.data.Ref.TypeConRef
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Node as LfNode}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Node as LfNode}
 import com.digitalasset.daml.lf.value.Value as Lf
 import com.digitalasset.daml.lf.value.Value.ValueRecord
 import com.google.protobuf.duration.Duration
@@ -146,8 +146,8 @@ class SubmitRequestValidatorTest
             keyOpt = None,
             version = LanguageVersion.v2_dev,
           ),
-          createTime = Time.Timestamp.now(),
-          cantonData = Bytes.Empty,
+          createTime = CreationTime.CreatedAt(Time.Timestamp.now()),
+          authenticationData = Bytes.Empty,
         ),
         synchronizerIdO = Some(SynchronizerId.tryFromString(api.synchronizerId)),
       )
@@ -1078,7 +1078,7 @@ class SubmitRequestValidatorTest
       "convert valid maps" in {
         val entries = (1 until 5)
           .map { x =>
-            Utf8.sha256(x.toString) -> x.toLong
+            Utf8.sha256(Utf8.getBytes(x.toString)) -> x.toLong
           }
           .to(ImmArray)
         val apiEntries = entries.map { case (k, v) =>
@@ -1095,7 +1095,7 @@ class SubmitRequestValidatorTest
       "reject maps with repeated keys" in {
         val entries = (1 +: (1 until 5))
           .map { x =>
-            Utf8.sha256(x.toString) -> x.toLong
+            Utf8.sha256(Utf8.getBytes(x.toString)) -> x.toLong
           }
           .to(ImmArray)
         val apiEntries = entries.map { case (k, v) =>

@@ -29,14 +29,20 @@ service TopologyManagerReadService {
   rpc ListMediatorSynchronizerState(ListMediatorSynchronizerStateRequest) returns (ListMediatorSynchronizerStateResponse);
   rpc ListSequencerSynchronizerState(ListSequencerSynchronizerStateRequest) returns (ListSequencerSynchronizerStateResponse);
 
-  rpc ListPurgeTopologyTransaction(ListPurgeTopologyTransactionRequest) returns (ListPurgeTopologyTransactionResponse);
+  rpc ListSynchronizerUpgradeAnnouncement(ListSynchronizerUpgradeAnnouncementRequest) returns (ListSynchronizerUpgradeAnnouncementResponse);
+  rpc ListSequencerConnectionSuccessor(ListSequencerConnectionSuccessorRequest) returns (ListSequencerConnectionSuccessorResponse);
 
   rpc ListAvailableStores(ListAvailableStoresRequest) returns (ListAvailableStoresResponse);
   rpc ListAll(ListAllRequest) returns (ListAllResponse);
   rpc ExportTopologySnapshot(ExportTopologySnapshotRequest) returns (stream ExportTopologySnapshotResponse);
+
   // Fetch the genesis topology state.
   // The returned bytestring can be used directly to initialize a sequencer.
   rpc GenesisState(GenesisStateRequest) returns (stream GenesisStateResponse);
+
+  // Fetch the topology state
+  // The returned bytestring can be used directly to initialize a successor sequencer
+  rpc LogicalUpgradeState(LogicalUpgradeStateRequest) returns (stream LogicalUpgradeStateResponse);
 }
 
 message BaseQuery {
@@ -232,15 +238,28 @@ message ListSequencerSynchronizerStateResponse {
   repeated Result results = 1;
 }
 
-message ListPurgeTopologyTransactionRequest {
+message ListSynchronizerUpgradeAnnouncementRequest {
   BaseQuery base_query = 1;
   string filter_synchronizer_id = 2;
 }
 
-message ListPurgeTopologyTransactionResponse {
+message ListSynchronizerUpgradeAnnouncementResponse {
   message Result {
     BaseResult context = 1;
-    com.digitalasset.canton.protocol.v30.PurgeTopologyTransaction item = 2;
+    com.digitalasset.canton.protocol.v30.SynchronizerUpgradeAnnouncement item = 2;
+  }
+  repeated Result results = 1;
+}
+
+message ListSequencerConnectionSuccessorRequest {
+  BaseQuery base_query = 1;
+  string filter_sequencer_id = 2;
+}
+
+message ListSequencerConnectionSuccessorResponse {
+  message Result {
+    BaseResult context = 1;
+    com.digitalasset.canton.protocol.v30.SequencerConnectionSuccessor item = 2;
   }
   repeated Result results = 1;
 }
@@ -280,6 +299,13 @@ message GenesisStateRequest {
 }
 
 message GenesisStateResponse {
+  // versioned stored topology transactions
+  bytes chunk = 1;
+}
+
+message LogicalUpgradeStateRequest {}
+
+message LogicalUpgradeStateResponse {
   // versioned stored topology transactions
   bytes chunk = 1;
 }

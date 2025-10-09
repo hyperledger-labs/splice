@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.topology.transaction
 
+import cats.Monad
 import cats.data.EitherT
 import cats.instances.order.*
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.KeyPurpose
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -26,6 +28,7 @@ import com.digitalasset.canton.util.EitherTUtil
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
+import scala.math.Ordering.Implicits.*
 
 object TopologyMappingChecks {
   type PendingChangesLookup = Map[MappingHash, GenericSignedTopologyTransaction]
@@ -75,6 +78,13 @@ class ValidatingTopologyMappingChecks(
         !(toValidate.operation == TopologyChangeOp.Remove && inStore.isEmpty),
         TopologyTransactionRejection.NoCorrespondingActiveTxToRevoke(toValidate.mapping),
       )
+    val checkReplaceIsNotMaxSerial = EitherTUtil.condUnitET[FutureUnlessShutdown](
+      toValidate.operation == TopologyChangeOp.Remove ||
+        (toValidate.operation == TopologyChangeOp.Replace && toValidate.serial < PositiveInt.MaxValue),
+      TopologyTransactionRejection.InvalidTopologyMapping(
+        s"The serial for a REPLACE must be less than ${PositiveInt.MaxValue}."
+      ),
+    )
     val checkRemoveDoesNotChangeMapping = EitherT.fromEither[FutureUnlessShutdown](
       inStore
         .collect {
@@ -190,16 +200,62 @@ class ValidatingTopologyMappingChecks(
             )
           )
 
+      case (
+            Code.SynchronizerUpgradeAnnouncement,
+            None | Some(Code.SynchronizerUpgradeAnnouncement),
+          ) =>
+        toValidate
+          .select[TopologyChangeOp.Replace, SynchronizerUpgradeAnnouncement]
+          .map(checkSynchronizerUpgradeAnnouncement(effective, _))
+
       case _otherwise => None
     }
 
     for {
       _ <- checkFirstIsNotRemove
+      _ <- checkReplaceIsNotMaxSerial
       _ <- checkRemoveDoesNotChangeMapping
+      _ <- checkNoOngoingSynchronizerUpgrade(effective, toValidate, pendingChangesLookup)
       _ <- checkOpt.getOrElse(EitherTUtil.unitUS)
     } yield ()
 
   }
+
+  private val mappingsAllowedDuringSynchronizerUpgrade =
+    TopologyMapping.Code.logicalSynchronizerUpgradeMappings
+
+  /** Check that the topology state is not frozen if this store is a synchronizer store. All other
+    * stores are not subject to freezing the topology state.
+    */
+  private def checkNoOngoingSynchronizerUpgrade(
+      effective: EffectiveTime,
+      toValidate: GenericSignedTopologyTransaction,
+      pendingChangesLookup: PendingChangesLookup,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Unit] =
+    Monad[EitherT[FutureUnlessShutdown, TopologyTransactionRejection, *]].whenA(
+      store.storeId.isSynchronizerStore
+    )(for {
+      results <- loadFromStore(
+        effective,
+        Set(Code.SynchronizerUpgradeAnnouncement),
+        pendingChangesLookup,
+      )
+      announcements = NonEmpty.from(
+        results.flatMap(_.selectMapping[SynchronizerUpgradeAnnouncement].toList)
+      )
+      _ <- announcements match {
+        case None => EitherTUtil.unitUS[TopologyTransactionRejection]
+        case Some(announcement) =>
+          EitherTUtil.condUnitET[FutureUnlessShutdown](
+            mappingsAllowedDuringSynchronizerUpgrade.contains(toValidate.mapping.code),
+            TopologyTransactionRejection.OngoingSynchronizerUpgrade(
+              announcement.head1.mapping.successorSynchronizerId.logical
+            ): TopologyTransactionRejection,
+          )
+      }
+    } yield {})
 
   private def loadHistoryFromStore(
       effectiveTime: EffectiveTime,
@@ -243,8 +299,8 @@ class ValidatingTopologyMappingChecks(
       effective: EffectiveTime,
       codes: Set[Code],
       pendingChangesLookup: PendingChangesLookup,
-      filterUid: Option[Seq[UniqueIdentifier]] = None,
-      filterNamespace: Option[Seq[Namespace]] = None,
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]] = None,
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]] = None,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Seq[
@@ -400,7 +456,7 @@ class ValidatingTopologyMappingChecks(
           effective,
           Set(Code.ParticipantSynchronizerPermission),
           pendingChangesLookup,
-          filterUid = Some(Seq(toValidate.mapping.participantId.uid)),
+          filterUid = Some(NonEmpty(Seq, toValidate.mapping.participantId.uid)),
         ).subflatMap { storedPermissions =>
           val isAllowlisted = storedPermissions.view
             .flatMap(_.selectMapping[ParticipantSynchronizerPermission])
@@ -445,7 +501,7 @@ class ValidatingTopologyMappingChecks(
         effective,
         Set(Code.PartyToParticipant),
         pendingChangesLookup,
-        filterUid = Some(Seq(participantId.uid)),
+        filterUid = Some(NonEmpty(Seq, participantId.uid)),
       )
       conflictingPartyIdO = ptps
         .flatMap(_.selectMapping[PartyToParticipant])
@@ -503,7 +559,7 @@ class ValidatingTopologyMappingChecks(
           effective,
           Set(Code.SynchronizerTrustCertificate, Code.OwnerToKeyMapping),
           pendingChangesLookup,
-          filterUid = Some(newParticipants.toSeq.map(_.uid) :+ mapping.partyId.uid),
+          filterUid = Some(NonEmpty(Seq, mapping.partyId.uid) ++ newParticipants.toSeq.map(_.uid)),
         )
 
         // if we found a DTC with the same uid as the partyId,
@@ -745,7 +801,7 @@ class ValidatingTopologyMappingChecks(
         Set(Code.NamespaceDelegation),
         pendingChangesLookup,
         filterUid = None,
-        filterNamespace = Some(Seq(toValidate.mapping.namespace)),
+        filterNamespace = Some(NonEmpty(Seq, toValidate.mapping.namespace)),
       ).flatMap { namespaceDelegations =>
         EitherTUtil.condUnitET(
           namespaceDelegations.isEmpty,
@@ -802,7 +858,7 @@ class ValidatingTopologyMappingChecks(
         Set(Code.DecentralizedNamespaceDefinition),
         pendingChangesLookup,
         filterUid = None,
-        filterNamespace = Some(Seq(toValidate.mapping.namespace)),
+        filterNamespace = Some(NonEmpty(Seq, toValidate.mapping.namespace)),
       ).flatMap { dns =>
         val foundDecentralizedNamespaceWithSameNamespace = dns.nonEmpty
         EitherTUtil.condUnitET(
@@ -813,6 +869,35 @@ class ValidatingTopologyMappingChecks(
 
     checkNoClashWithDecentralizedNamespaces()
   }
+
+  private def checkSynchronizerUpgradeAnnouncement(
+      effective: EffectiveTime,
+      toValidate: SignedTopologyTransaction[
+        TopologyChangeOp.Replace,
+        SynchronizerUpgradeAnnouncement,
+      ],
+  ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Unit] = for {
+    _ <- store.storeId.forSynchronizer match {
+      case Some(psid) =>
+        EitherTUtil.condUnitET[FutureUnlessShutdown][TopologyTransactionRejection](
+          psid < toValidate.mapping.successorSynchronizerId,
+          TopologyTransactionRejection.InvalidSynchronizerSuccessor(
+            psid,
+            toValidate.mapping.successorSynchronizerId,
+          ),
+        )
+      case None => EitherTUtil.unitUS
+    }
+    _ <- EitherTUtil.condUnitET[FutureUnlessShutdown][TopologyTransactionRejection](
+      toValidate.mapping.upgradeTime > effective.value,
+      TopologyTransactionRejection.InvalidUpgradeTime(
+        toValidate.mapping.successorSynchronizerId.logical,
+        effective = effective,
+        upgradeTime = toValidate.mapping.upgradeTime,
+      ),
+    )
+
+  } yield ()
 
   /** Checks whether the given PTP is considered an explicit admin party allocation. This is true if
     * all following conditions are met:

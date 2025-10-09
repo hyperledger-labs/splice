@@ -4,46 +4,43 @@
 package com.digitalasset.canton.participant.admin.grpc
 
 import cats.data.EitherT
+import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import cats.syntax.traverse.*
-import com.digitalasset.canton.LfPartyId
+import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction as LapiTopologyTransaction
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
-import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
+import com.digitalasset.canton.ledger.participant.state.{InternalIndexService, SynchronizerIndex}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.mapErrNewEUS
-import com.digitalasset.canton.participant.admin.data.ActiveContract as ActiveContractValueClass
 import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow.PartyReplicationArguments
 import com.digitalasset.canton.participant.admin.party.{
   PartyManagementServiceError,
+  PartyParticipantPermission,
   PartyReplicationAdminWorkflow,
 }
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SynchronizerOffset
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.{
-  EitherTUtil,
-  ErrorUtil,
-  GrpcStreamingUtils,
-  OptionUtil,
-  ResourceUtil,
-}
+import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils}
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.Sink
 
 import java.io.OutputStream
 import java.util.zip.GZIPOutputStream
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 /** grpc service to allow modifying party hosting on participants
@@ -54,7 +51,7 @@ class GrpcPartyManagementService(
     sync: CantonSyncService,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    ec: ExecutionContext,
+    ec: ExecutionContextExecutor,
     actorSystem: ActorSystem,
 ) extends v30.PartyManagementServiceGrpc.PartyManagementService
     with NamedLogging {
@@ -85,19 +82,33 @@ class GrpcPartyManagementService(
   ): Either[String, PartyReplicationArguments] =
     for {
       partyId <- convert(request.partyId, "party_id", PartyId(_))
-      sourceParticipantIdO <- Option
-        .when(request.sourceParticipantUid.nonEmpty)(request.sourceParticipantUid)
-        .traverse(convert(_, "source_participant_uid", ParticipantId(_)))
+      sourceParticipantId <- convert(
+        request.sourceParticipantUid,
+        "source_participant_uid",
+        ParticipantId(_),
+      )
       synchronizerId <- convert(
         request.synchronizerId,
         "synchronizer_id",
         SynchronizerId(_),
       )
-      serialO <- Option
-        .when(request.serial != 0)(request.serial)
-        .traverse(ProtoConverter.parsePositiveInt("serial", _).leftMap(_.message))
-
-    } yield PartyReplicationArguments(partyId, synchronizerId, sourceParticipantIdO, serialO)
+      serial <- ProtoConverter
+        .parsePositiveInt("topology_serial", request.topologySerial)
+        .leftMap(_.message)
+      participantPermission <- ProtoConverter
+        .parseEnum[ParticipantPermission, v30.ParticipantPermission](
+          PartyParticipantPermission.fromProtoV30,
+          "participant_permission",
+          request.participantPermission,
+        )
+        .leftMap(_.message)
+    } yield PartyReplicationArguments(
+      partyId,
+      synchronizerId,
+      sourceParticipantId,
+      serial,
+      participantPermission,
+    )
 
   private def convert[T](
       rawId: String,
@@ -108,9 +119,7 @@ class GrpcPartyManagementService(
 
   override def getAddPartyStatus(
       request: v30.GetAddPartyStatusRequest
-  ): Future[v30.GetAddPartyStatusResponse] = {
-    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-
+  ): Future[v30.GetAddPartyStatusResponse] =
     (for {
       adminWorkflow <- ensureAdminWorkflowIfOnlinePartyReplicationEnabled()
 
@@ -132,11 +141,13 @@ class GrpcPartyManagementService(
         synchronizerId = status.params.synchronizerId.toProtoPrimitive,
         sourceParticipantUid = status.params.sourceParticipantId.uid.toProtoPrimitive,
         targetParticipantUid = status.params.targetParticipantId.uid.toProtoPrimitive,
+        topologySerial = status.params.serial.unwrap,
+        participantPermission =
+          PartyParticipantPermission.toProtoPrimitive(status.params.participantPermission),
         status = Some(statusP),
       )
     })
       .fold(Future.failed, Future.successful)
-  }
 
   private def toStatusRuntimeException(status: Status)(err: String): StatusRuntimeException =
     status.withDescription(err).asRuntimeException()
@@ -150,246 +161,212 @@ class GrpcPartyManagementService(
   })
     .leftMap(toStatusRuntimeException(Status.UNIMPLEMENTED))
 
-  override def exportAcs(
-      request: v30.ExportAcsRequest,
-      responseObserver: StreamObserver[v30.ExportAcsResponse],
+  override def exportPartyAcs(
+      request: v30.ExportPartyAcsRequest,
+      responseObserver: StreamObserver[v30.ExportPartyAcsResponse],
   ): Unit = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
     GrpcStreamingUtils.streamToClient(
-      (out: OutputStream) => processExportAcsAtOffset(request, new GZIPOutputStream(out)),
+      (out: OutputStream) => processExportPartyAcsRequest(request, new GZIPOutputStream(out)),
       responseObserver,
-      byteString => v30.ExportAcsResponse(byteString),
+      byteString => v30.ExportPartyAcsResponse(byteString),
       processingTimeout.unbounded.duration,
       chunkSizeO = None,
     )
   }
 
-  private def processExportAcsAtOffset(
-      request: v30.ExportAcsRequest,
+  private def processExportPartyAcsRequest(
+      request: v30.ExportPartyAcsRequest,
       out: OutputStream,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val allSynchronizerIds = sync.syncPersistentStateManager.getAll.keySet
-
-    val ledgerEnd = sync.participantNodePersistentState.value.ledgerApiStore.ledgerEndCache
-      .apply()
-      .map(_.lastOffset)
 
     val res = for {
-      ledgerEnd <- EitherT.fromOption[FutureUnlessShutdown](
-        ledgerEnd,
-        PartyManagementServiceError.InternalError.Error("No ledger end found"),
+      ledgerEnd <- EitherT
+        .fromEither[FutureUnlessShutdown](ParticipantCommon.findLedgerEnd(sync))
+        .leftMap(PartyManagementServiceError.InvalidState.Error(_))
+      allLogicalSynchronizerIds = sync.syncPersistentStateManager.getAllLatest.keySet
+
+      validRequest <- validateExportPartyAcsRequest(request, ledgerEnd, allLogicalSynchronizerIds)
+      ValidExportPartyAcsRequest(
+        party,
+        synchronizerId,
+        targetParticipant,
+        beginOffsetExclusive,
+        waitForActivationTimeout,
+      ) = validRequest
+
+      indexService <- EitherT.fromOption[FutureUnlessShutdown](
+        sync.internalIndexService,
+        PartyManagementServiceError.InvalidState.Error("Unavailable internal index service"),
       )
-      validRequest <- EitherT.fromEither[FutureUnlessShutdown](
-        validateExportAcsAtOffsetRequest(request, ledgerEnd, allSynchronizerIds)
+
+      topologyTx <-
+        findSinglePartyActivationTopologyTransaction(
+          indexService,
+          party,
+          beginOffsetExclusive,
+          synchronizerId,
+          targetParticipant,
+          waitForActivationTimeout,
+        )
+
+      (activationOffset, activationTimestamp) = extractOffsetAndTimestamp(topologyTx)
+
+      client <- EitherT
+        .fromEither[FutureUnlessShutdown](findTopologyClient(synchronizerId, sync))
+        .leftMap(PartyManagementServiceError.InvalidState.Error(_))
+
+      partiesHostedByTargetParticipant <- EitherT.right(
+        client
+          .awaitSnapshot(activationTimestamp)
+          .flatMap(snapshot =>
+            snapshot.inspectKnownParties(
+              filterParty = "",
+              filterParticipant = targetParticipant.uid.toProtoPrimitive,
+            )
+          )
       )
-      snapshotResult <- createAcsSnapshot(validRequest, out)
-    } yield snapshotResult
+
+      otherPartiesHostedByTargetParticipant =
+        partiesHostedByTargetParticipant excl party excl targetParticipant.adminParty
+
+      snapshot <- ParticipantCommon
+        .writeAcsSnapshot(
+          indexService,
+          Set(party),
+          atOffset = activationOffset,
+          out,
+          excludedStakeholders = otherPartiesHostedByTargetParticipant,
+          Some(synchronizerId),
+        )(ec, traceContext, actorSystem)
+        .leftMap(msg =>
+          PartyManagementServiceError.IOStream.Error(msg): PartyManagementServiceError
+        )
+    } yield snapshot
 
     mapErrNewEUS(res.leftMap(_.toCantonRpcError))
   }
 
-  private def validateExportAcsAtOffsetRequest(
-      request: v30.ExportAcsRequest,
+  private def validateExportPartyAcsRequest(
+      request: v30.ExportPartyAcsRequest,
       ledgerEnd: Offset,
       synchronizerIds: Set[SynchronizerId],
   )(implicit
       elc: ErrorLoggingContext
-  ): Either[PartyManagementServiceError, ValidExportAcsRequest] = {
+  ): EitherT[FutureUnlessShutdown, PartyManagementServiceError, ValidExportPartyAcsRequest] = {
     val parsingResult = for {
-      parties <- request.partyIds.traverse(party =>
-        UniqueIdentifier.fromProtoPrimitive(party, "party_ids").map(PartyId(_).toLf)
+      party <- UniqueIdentifier
+        .fromProtoPrimitive(request.partyId, "party_id")
+        .map(PartyId(_))
+      parsedSynchronizerId <- SynchronizerId.fromProtoPrimitive(
+        request.synchronizerId,
+        "synchronizer_id",
       )
-      parsedFilterSynchronizerId <- OptionUtil
-        .emptyStringAsNone(request.synchronizerId)
-        .traverse(SynchronizerId.fromProtoPrimitive(_, "filter_synchronizer_id"))
-      filterSynchronizerId <- Either.cond(
-        parsedFilterSynchronizerId.forall(synchronizerIds.contains),
-        parsedFilterSynchronizerId,
-        OtherError(s"Filter synchronizer id $parsedFilterSynchronizerId is unknown"),
+      synchronizerId <- Either.cond(
+        synchronizerIds.contains(parsedSynchronizerId),
+        parsedSynchronizerId,
+        OtherError(s"Synchronizer ID $parsedSynchronizerId is unknown"),
       )
-      parsedOffset <- ProtoConverter
-        .parsePositiveLong("ledger_offset", request.ledgerOffset)
-      offset <- Offset.fromLong(parsedOffset.unwrap).leftMap(OtherError.apply)
-      ledgerOffset <- Either.cond(
-        offset <= ledgerEnd,
-        offset,
+      targetParticipantId <- UniqueIdentifier
+        .fromProtoPrimitive(
+          request.targetParticipantUid,
+          "target_participant_uid",
+        )
+        .map(ParticipantId(_))
+      parsedBeginOffsetExclusive <- ProtoConverter
+        .parseOffset("begin_offset_exclusive", request.beginOffsetExclusive)
+      beginOffsetExclusive <- Either.cond(
+        parsedBeginOffsetExclusive <= ledgerEnd,
+        parsedBeginOffsetExclusive,
         OtherError(
-          s"Ledger offset $offset needs to be smaller or equal to the ledger end $ledgerEnd"
+          s"Begin ledger offset $parsedBeginOffsetExclusive needs to be smaller or equal to the ledger end $ledgerEnd"
         ),
       )
-      contractSynchronizerRenames <- request.contractSynchronizerRenames.toList.traverse {
-        case (source, v30.ExportAcsTargetSynchronizer(target)) =>
-          for {
-            _ <- SynchronizerId.fromProtoPrimitive(source, "source synchronizer id")
-            _ <- SynchronizerId.fromProtoPrimitive(target, "target synchronizer id")
-          } yield (source, target)
-      }
-    } yield ValidExportAcsRequest(
-      parties.toSet,
-      filterSynchronizerId,
-      ledgerOffset,
-      contractSynchronizerRenames.toMap,
+      waitForActivationTimeout <- request.waitForActivationTimeout.traverse(
+        NonNegativeFiniteDuration.fromProtoPrimitive("wait_for_activation_timeout")(_)
+      )
+    } yield ValidExportPartyAcsRequest(
+      party,
+      synchronizerId,
+      targetParticipantId,
+      beginOffsetExclusive,
+      waitForActivationTimeout,
     )
-    parsingResult.leftMap(error => PartyManagementServiceError.InvalidArgument.Error(error.message))
+    EitherT.fromEither[FutureUnlessShutdown](
+      parsingResult.leftMap(error =>
+        PartyManagementServiceError.InvalidArgument.Error(error.message)
+      )
+    )
   }
 
-  private def createAcsSnapshot(
-      request: ValidExportAcsRequest,
-      out: OutputStream,
+  private def findSinglePartyActivationTopologyTransaction(
+      indexService: InternalIndexService,
+      party: PartyId,
+      beginOffsetExclusive: Offset,
+      synchronizerId: SynchronizerId,
+      targetParticipant: ParticipantId,
+      waitForActivationTimeout: Option[NonNegativeFiniteDuration],
   )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, PartyManagementServiceError, Unit] =
+      ec: ExecutionContextExecutor,
+      traceContext: TraceContext,
+      actorSystem: ActorSystem,
+  ): EitherT[FutureUnlessShutdown, PartyManagementServiceError, LapiTopologyTransaction] =
     for {
-      service <- EitherT.fromOption[FutureUnlessShutdown](
-        sync.internalStateService,
-        PartyManagementServiceError.InternalError.Error("Unavailable internal state service"),
-      )
-      _ <- EitherT
-        .apply[Future, PartyManagementServiceError, Unit](
-          ResourceUtil.withResourceFuture(out)(out =>
-            service
-              .activeContracts(request.parties, Some(request.offset))
-              .map(response => response.getActiveContract)
-              .filter(contract =>
-                request.filterSynchronizerId
-                  .forall(filterId => contract.synchronizerId == filterId.toProtoPrimitive)
-              )
-              .map { contract =>
-                if (request.contractSynchronizerRenames.contains(contract.synchronizerId)) {
-                  val synchronizerId = request.contractSynchronizerRenames
-                    .getOrElse(contract.synchronizerId, contract.synchronizerId)
-                  contract.copy(synchronizerId = synchronizerId)
-                } else {
-                  contract
-                }
+      topologyTx <- EitherT
+        .apply[Future, PartyManagementServiceError, LapiTopologyTransaction](
+          indexService
+            .topologyTransactions(party.toLf, beginOffsetExclusive)
+            .filter(_.synchronizerId == synchronizerId.toProtoPrimitive)
+            .filter { topologyTransaction =>
+              topologyTransaction.events.exists { event =>
+                event.event.isParticipantAuthorizationAdded &&
+                event.getParticipantAuthorizationAdded.participantId == targetParticipant.uid.toProtoPrimitive
               }
-              .map(ActiveContractValueClass.tryCreate)
-              .map {
-                _.writeDelimitedTo(out) match {
-                  // throwing intentionally to immediately interrupt any further Pekko source stream processing
-                  case Left(errorMessage) => throw new RuntimeException(errorMessage)
-                  case Right(_) => out.flush()
-                }
-              }
-              .run()
-              .transform {
-                case Failure(e) =>
-                  Success(Left(PartyManagementServiceError.IOStream.Error(e.getMessage)))
-                case Success(_) => Success(Right(()))
-              }
-          )
+            }
+            .take(1)
+            .completionTimeout(
+              waitForActivationTimeout.getOrElse(NonNegativeFiniteDuration.tryOfMinutes(2)).toScala
+            )
+            .runWith(Sink.head)
+            .transform {
+              case Success(tx) => Success(Right(tx))
+              case Failure(e) =>
+                val message = s"${e.getMessage} – Possibly missing party activation?"
+                Success(Left(PartyManagementServiceError.IOStream.Error(message)))
+            }
         )
         .mapK(FutureUnlessShutdown.outcomeK)
-    } yield ()
+    } yield topologyTx
 
-  override def exportAcsAtTimestamp(
-      request: v30.ExportAcsAtTimestampRequest,
-      responseObserver: StreamObserver[v30.ExportAcsAtTimestampResponse],
-  ): Unit = {
-    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-
-    GrpcStreamingUtils.streamToClient(
-      (out: OutputStream) => processExportAcsAtTimestamp(request, new GZIPOutputStream(out)),
-      responseObserver,
-      byteString => v30.ExportAcsAtTimestampResponse(byteString),
-      processingTimeout.unbounded.duration,
-      chunkSizeO = None,
+  private def extractOffsetAndTimestamp(
+      topologyTransaction: LapiTopologyTransaction
+  ): (Offset, CantonTimestamp) = (for {
+    offset <- ProtoConverter.parseOffset("offset", topologyTransaction.offset)
+    effectiveTime <- ProtoConverter.parseRequired(
+      CantonTimestamp.fromProtoTimestamp,
+      "record_time",
+      topologyTransaction.recordTime,
     )
-  }
+  } yield (offset, effectiveTime)).valueOr(error => throw new IllegalStateException(error.message))
 
-  private def processExportAcsAtTimestamp(
-      request: v30.ExportAcsAtTimestampRequest,
-      out: OutputStream,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    val res = for {
-      validRequest <- validateExportAcsAtTimestampRequest(request)
-      snapshotResult <- createAcsSnapshot(validRequest, out)
-    } yield snapshotResult
-
-    mapErrNewEUS(res.leftMap(_.toCantonRpcError))
-  }
-
-  private def validateExportAcsAtTimestampRequest(
-      request: v30.ExportAcsAtTimestampRequest
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, PartyManagementServiceError, ValidExportAcsRequest] = {
-
-    final case class ParsedRequest(
-        parties: Set[LfPartyId],
-        synchronizerId: SynchronizerId,
-        topologyTransactionEffectiveTime: CantonTimestamp,
-    )
-
-    def parseRequest(
-        request: v30.ExportAcsAtTimestampRequest
-    ): ParsingResult[ParsedRequest] =
-      for {
-        parties <- request.partyIds.traverse(party =>
-          UniqueIdentifier.fromProtoPrimitive(party, "party_ids").map(PartyId(_).toLf)
-        )
-        synchronizerId <- SynchronizerId.fromProtoPrimitive(
-          request.synchronizerId,
-          "synchronizer_id",
-        )
-        topologyTxEffectiveTime <- ProtoConverter.parseRequired(
-          CantonTimestamp.fromProtoTimestamp,
-          "topology_transaction_effective_time",
-          request.topologyTransactionEffectiveTime,
-        )
-      } yield ParsedRequest(
-        parties.toSet,
-        synchronizerId,
-        topologyTxEffectiveTime,
-      )
-
-    val allSynchronizerIds = sync.syncPersistentStateManager.getAll.keySet
-
+  private def findTopologyClient(
+      synchronizerId: SynchronizerId,
+      sync: CantonSyncService,
+  ): Either[String, SynchronizerTopologyClientWithInit] =
     for {
-      parsedRequest <- EitherT.fromEither[FutureUnlessShutdown](
-        parseRequest(request).leftMap(error =>
-          PartyManagementServiceError.InvalidArgument.Error(error.message)
-        )
-      )
-
-      synchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
-        Either.cond(
-          allSynchronizerIds.contains(parsedRequest.synchronizerId),
-          parsedRequest.synchronizerId,
-          PartyManagementServiceError.InvalidArgument.Error(
-            s"Synchronizer id ${parsedRequest.synchronizerId} for ACS export is unknown"
-          ),
-        )
-      )
-
-      topologyTransactionEffectiveOffset <- EitherT
-        .fromOptionF[FutureUnlessShutdown, PartyManagementServiceError, Offset](
-          FutureUnlessShutdown.outcomeF(
-            sync.participantNodePersistentState.value.ledgerApiStore
-              .topologyEventOffsetPublishedOnRecordTime(
-                synchronizerId,
-                parsedRequest.topologyTransactionEffectiveTime,
-              )
-          ),
-          PartyManagementServiceError.InvalidAcsSnapshotTimestamp
-            .Error(parsedRequest.topologyTransactionEffectiveTime, synchronizerId),
-        )
-
-    } yield ValidExportAcsRequest(
-      parsedRequest.parties,
-      Some(synchronizerId),
-      topologyTransactionEffectiveOffset,
-      Map.empty,
-    )
-  }
+      psid <- sync.syncPersistentStateManager
+        .latestKnownPSId(synchronizerId)
+        .toRight(s"Undefined physical synchronizer ID for given $synchronizerId")
+      topoClient <- sync.lookupTopologyClient(psid).toRight("Absent topology client")
+    } yield topoClient
 
   override def getHighestOffsetByTimestamp(
       request: v30.GetHighestOffsetByTimestampRequest
   ): Future[v30.GetHighestOffsetByTimestampResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
-    val allSynchronizerIds = sync.syncPersistentStateManager.getAll.keySet
+    val allSynchronizerIds = sync.syncPersistentStateManager.getAllLatest.keySet
 
     val res = for {
       synchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
@@ -490,13 +467,19 @@ object GrpcPartyManagementService {
   )(implicit
       elc: ErrorLoggingContext
   ): Either[PartyManagementServiceError, Offset] = {
-    val timestampCorrespondingToReturnedOffset =
+    val synchronizerTimestampBeforeOrAtRequestedTimestamp =
       CantonTimestamp(synchronizerOffsetBeforeOrAtRequestedTimestamp.recordTime)
-    ErrorUtil.requireState(
-      timestampCorrespondingToReturnedOffset <= requestedTimestamp,
-      s"Returned offset record time $timestampCorrespondingToReturnedOffset must be before or at the requested timestamp $requestedTimestamp.",
-    )
     for {
+      _ <- Either.cond(
+        synchronizerTimestampBeforeOrAtRequestedTimestamp <= requestedTimestamp,
+        (),
+        PartyManagementServiceError.InvalidTimestamp.Error(
+          synchronizerId,
+          requestedTimestamp,
+          forceFlag,
+          s"Coding bug: Returned offset record time $synchronizerTimestampBeforeOrAtRequestedTimestamp must be before or at the requested timestamp $requestedTimestamp.",
+        ),
+      )
       _ <- Either.cond(
         forceFlag || requestedTimestamp <= cleanSynchronizerTimestamp,
         (),
@@ -507,19 +490,32 @@ object GrpcPartyManagementService {
           s"Not all events have been processed fully and/or published to the Ledger API DB until the requested timestamp: $requestedTimestamp",
         ),
       )
-      offsetBeforeOrAtRequestedTimestamp =
+      offsetBeforeOrAtRequestedTimestamp <-
         // Use the ledger end offset only if the requested timestamp is at least
         // the clean synchronizer timestamp which caps the ledger end offset.
-        if (forceFlag && requestedTimestamp >= cleanSynchronizerTimestamp) ledgerEnd.lastOffset
-        else
-          synchronizerOffsetBeforeOrAtRequestedTimestamp.offset
+        if (forceFlag && requestedTimestamp >= cleanSynchronizerTimestamp)
+          ledgerEnd.lastOffset.asRight[PartyManagementServiceError]
+        else {
+          // Sanity check that the synchronizer offset is less than or equal to the ledger end offset.
+          Either.cond(
+            synchronizerOffsetBeforeOrAtRequestedTimestamp.offset <= ledgerEnd.lastOffset,
+            synchronizerOffsetBeforeOrAtRequestedTimestamp.offset,
+            PartyManagementServiceError.InvalidTimestamp.Error(
+              synchronizerId,
+              requestedTimestamp,
+              forceFlag,
+              s"The synchronizer offset ${synchronizerOffsetBeforeOrAtRequestedTimestamp.offset} is not less than or equal to the ledger end offset ${ledgerEnd.lastOffset}",
+            ),
+          )
+        }
     } yield offsetBeforeOrAtRequestedTimestamp
   }
 }
 
-private final case class ValidExportAcsRequest(
-    parties: Set[LfPartyId],
-    filterSynchronizerId: Option[SynchronizerId],
-    offset: Offset,
-    contractSynchronizerRenames: Map[String, String],
+private final case class ValidExportPartyAcsRequest(
+    party: PartyId,
+    synchronizerId: SynchronizerId,
+    targetParticipant: ParticipantId,
+    beginOffsetExclusive: Offset,
+    waitForActivationTimeout: Option[NonNegativeFiniteDuration],
 )

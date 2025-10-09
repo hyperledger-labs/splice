@@ -23,7 +23,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
 import com.digitalasset.canton.sequencing.SequencerConnections
-import com.digitalasset.canton.topology.{ForceFlag, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ForceFlag, PartyId, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SynchronizerAlias, config}
 
@@ -44,8 +44,8 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
   private val synchronizer1: SynchronizerAlias = SynchronizerAlias.tryCreate("bft-synchronizer1")
   private val synchronizer2: SynchronizerAlias = SynchronizerAlias.tryCreate("bft-synchronizer2")
 
-  private var synchronizerId1: SynchronizerId = _
-  private var synchronizerId2: SynchronizerId = _
+  private var synchronizerId1: PhysicalSynchronizerId = _
+  private var synchronizerId2: PhysicalSynchronizerId = _
   private var synchronizerOwnersD2: NonEmpty[Seq[InstanceReference]] = _
 
   private var alice: PartyId = _
@@ -115,10 +115,12 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       alice = participant1.parties.enable(
         "alice",
         synchronizeParticipants = Seq(participant2),
+        synchronizer = synchronizer1,
       )
       bob = participant2.parties.enable(
         "bob",
         synchronizeParticipants = Seq(participant1),
+        synchronizer = synchronizer1,
       )
     }
 
@@ -141,7 +143,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
           List.empty.asJava,
         ).create.commands.asScala.toSeq
         val iou = clue("create-iou") {
-          val tx = participant1.ledger_api.javaapi.commands.submit_flat(
+          val tx = participant1.ledger_api.javaapi.commands.submit(
             Seq(payer),
             createIouCmd,
             commandId = "create-Iou",
@@ -161,6 +163,17 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       clue(s"connect $participant2 to $synchronizer2") {
         participant2.synchronizers.connect_local(sequencer4, alias = synchronizer2)
       }
+      participant1.parties.enable(
+        "alice",
+        synchronizeParticipants = Seq(participant2),
+        synchronizer = synchronizer2,
+      )
+      participant2.parties.enable(
+        "bob",
+        synchronizeParticipants = Seq(participant1),
+        synchronizer = synchronizer2,
+      )
+
     }
 
     // We can add the new mediator group only after the participants have connected because they govern the synchronizer.
@@ -236,7 +249,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       clue(s"assignment on $synchronizer1") {
         participant2.ledger_api.commands.submit_assign(
           owner,
-          unassigned.unassignId,
+          unassigned.reassignmentId,
           synchronizerId1,
           synchronizerId2,
           submissionId = "assignment-synchronizer2-synchronizer1",
@@ -245,7 +258,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
 
       clue(s"use the contract on $synchronizer1") {
         val exerciseCallCmd = contractId.exerciseCall().commands.asScala.toSeq
-        participant2.ledger_api.javaapi.commands.submit_flat(
+        participant2.ledger_api.javaapi.commands.submit(
           Seq(owner),
           exerciseCallCmd,
           commandId = "exercise-Iou",

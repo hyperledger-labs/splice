@@ -7,7 +7,8 @@ import better.files.*
 import cats.implicits.*
 import com.daml.ledger.api.v2.state_service.ActiveContract as LapiActiveContract
 import com.daml.ledger.api.v2.state_service.ActiveContract.*
-import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TreeEvent}
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, Event, ExercisedEvent}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
@@ -27,7 +28,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.SuppressionRule.{Level, forLogger}
 import com.digitalasset.canton.participant.admin.data.{ActiveContract, ContractIdImportMode}
 import com.digitalasset.canton.participant.admin.repair.ContractIdsImportProcessor
-import com.digitalasset.canton.protocol.{LfContractId, LfContractInst, LfHash}
+import com.digitalasset.canton.protocol.{LfContractId, LfHash, LfThinContractInst}
 import com.digitalasset.canton.topology.ForceFlag.DisablePartyWithActiveContracts
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ForceFlags, PartyId}
@@ -38,7 +39,6 @@ import org.apache.pekko.stream.scaladsl.Sink
 import org.scalatest.Assertion
 import org.slf4j.event.Level.WARN
 
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 
 sealed trait ExportContractsIdRecomputationIntegrationTest
@@ -88,7 +88,7 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
       val updatedFatContract = FatContractInstance.fromCreateNode(
         updatedCreateNode.copy(coid = contractIdTransformation(updatedCreateNode.coid)),
         fatContract.createdAt,
-        fatContract.cantonData,
+        fatContract.authenticationData,
       )
 
       updatedActiveContract.update(
@@ -106,9 +106,11 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
   protected def rearrange(contracts: List[LapiActiveContract]): List[LapiActiveContract] = contracts
 
   /** For every combination of ways to make an export and rearrange its contents:
-    *   1. enable a fresh party on `participant1` 2. create a few contracts with the given `setup`
-    *      method 3. apply the `break` functions to the export, as well as the `rearrange` method 4.
-    *      apply the `f` function to the export, passing its size and the owning party
+    *
+    *   - enable a fresh party on `participant1`
+    *   - create a few contracts with the given `setup` method
+    *   - apply the `break` functions to the export, as well as the `rearrange` method
+    *   - apply the `f` function to the export, passing its size and the owning party
     */
   protected def withExport(break: List[LapiActiveContract] => List[LapiActiveContract] = identity)(
       f: (File, Long, PartyId) => Assertion
@@ -160,7 +162,7 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
 
       val result = File.temporaryFile(suffix = ".gz").map { brokenExportFile =>
         val source =
-          participant1.underlying.value.sync.internalStateService.value.activeContracts(
+          participant1.underlying.value.sync.internalIndexService.value.activeContracts(
             Set(alice.toLf),
             Offset.fromLong(aliceAddedOnP2Offset.unwrap).toOption,
           )
@@ -207,7 +209,7 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
       refs: Refs.ContractId*
   ): Seq[Refs.Contract] =
     participant.ledger_api.javaapi.commands
-      .submit_flat(Seq(party), Seq.fill(n)(createCommand(party, refs*)))
+      .submit(Seq(party), Seq.fill(n)(createCommand(party, refs*)))
       .getEvents
       .asScala
       .map {
@@ -222,11 +224,10 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
       ref: Refs.Contract,
   ): Unit =
     participant.ledger_api.javaapi.commands
-      .submit_flat(Seq(party), ref.id.exerciseArchive().commands.asScala.toSeq)
+      .submit(Seq(party), ref.id.exerciseArchive().commands.asScala.toSeq)
 
-  @nowarn("cat=deprecation")
-  private def extractNestedRefs(e: TreeEvent): Seq[Refs.ContractId] =
-    e.toProtoTreeEvent.getExercised.getExerciseResult.getList.getElementsList
+  private def extractNestedRefs(e: Event): Seq[Refs.ContractId] =
+    e.toProtoEvent.getExercised.getExerciseResult.getList.getElementsList
       .iterator()
       .asScala
       .map(e => new Refs.ContractId(e.getContractId))
@@ -243,10 +244,13 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
     else {
       val fetches = refs.flatMap(_.exerciseRefs_Fetch().commands().asScala)
       val results = participant.ledger_api.javaapi.commands
-        .submit(Seq(party), fetches)
-        .getEventsById
+        .submit(
+          actAs = Seq(party),
+          commands = fetches,
+          transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+        )
+        .getEvents
         .asScala
-        .valuesIterator
         .toSeq
       results should have size refs.length.toLong
       all(results) should matchPattern { case _: ExercisedEvent => }
@@ -271,7 +275,10 @@ sealed trait ExportContractsIdRecomputationIntegrationTest
   ): List[LapiActiveContract] = transformActiveContracts(zeroOutSuffix, contracts)
 
   private def zeroOutSuffix(contractId: LfContractId): LfContractId = {
-    val LfContractId.V1(discriminator, suffix) = contractId
+    val LfContractId.V1(discriminator, suffix) = contractId match {
+      case cid: LfContractId.V1 => cid
+      case _ => sys.error("ContractId V2 are not supported")
+    }
     val brokenSuffix = Bytes.fromByteArray(Array.ofDim[Byte](suffix.length))
     LfContractId.V1.assertBuild(discriminator, brokenSuffix)
   }
@@ -292,7 +299,7 @@ object ExportContractsIdRecomputationIntegrationTest {
             whileDisconnected(participant2, daName) {
               loggerFactory.assertThrowsAndLogs[CommandFailure](
                 participant2.repair.import_acs(brokenExportFile.canonicalPath),
-                _.errorMessage should include("malformed contract id"),
+                _.errorMessage should include("Malformed contract ID"),
               )
             }
             participant2.ledger_api.state.acs.of_party(alice) should have size 0
@@ -402,7 +409,7 @@ class ExportContractsIdRecomputationArchivedDependencyIntegrationTest
     refersToArchivedContract
   }
 
-  private def toContractInstance(contract: LapiActiveContract): LfContractInst = {
+  private def toContractInstance(contract: LapiActiveContract): LfThinContractInst = {
     val res = for {
       event <- Either.fromOption(
         contract.createdEvent,
@@ -415,7 +422,7 @@ class ExportContractsIdRecomputationArchivedDependencyIntegrationTest
           s"Unable to decode contract event payload: ${decodeError.errorMessage}"
         )
 
-    } yield LfContractInst(
+    } yield LfThinContractInst(
       fatContract.packageName,
       fatContract.templateId,
       transaction.Versioned(fatContract.version, fatContract.createArg),
@@ -464,7 +471,10 @@ class ExportContractsIdRecomputationDuplicateDiscriminatorIntegrationTest
     transformActiveContracts(zeroOutDiscriminators, contracts)
 
   private def zeroOutDiscriminators(contractId: LfContractId): LfContractId = {
-    val LfContractId.V1(discriminator, suffix) = contractId
+    val LfContractId.V1(discriminator, suffix) = contractId match {
+      case cid: LfContractId.V1 => cid
+      case _ => sys.error("ContractId V2 are not supported")
+    }
     val zeroes = Array.ofDim[Byte](discriminator.bytes.length)
     val brokenDiscriminator = LfHash.assertFromByteArray(zeroes)
     LfContractId.V1.assertBuild(brokenDiscriminator, suffix)

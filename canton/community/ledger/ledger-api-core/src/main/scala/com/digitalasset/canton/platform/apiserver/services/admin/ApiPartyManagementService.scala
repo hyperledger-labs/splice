@@ -30,16 +30,24 @@ import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.FieldValidator.*
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.requirePresence
-import com.digitalasset.canton.ledger.api.{IdentityProviderId, ObjectMeta, PartyDetails}
+import com.digitalasset.canton.ledger.api.{
+  IdentityProviderId,
+  ObjectMeta,
+  PartyDetails,
+  User,
+  UserRight,
+}
 import com.digitalasset.canton.ledger.error.groups.{
   PartyManagementServiceErrors,
   RequestValidationErrors,
 }
 import com.digitalasset.canton.ledger.localstore.api.{
+  ObjectMetaUpdate,
   PartyDetailsUpdate,
   PartyRecord,
   PartyRecordStore,
   PartyRecordUpdate,
+  UserManagementStore,
 }
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent
@@ -52,6 +60,7 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   withEnrichedLoggingContext,
 }
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiPartyManagementService.*
+import com.digitalasset.canton.platform.apiserver.services.admin.PartyAllocation
 import com.digitalasset.canton.platform.apiserver.services.logging
 import com.digitalasset.canton.platform.apiserver.services.tracking.StreamTracker
 import com.digitalasset.canton.platform.apiserver.update
@@ -74,10 +83,10 @@ import scala.util.{Failure, Try}
 
 private[apiserver] final class ApiPartyManagementService private (
     partyManagementService: IndexPartyManagementService,
+    userManagementStore: UserManagementStore,
     identityProviderExists: IdentityProviderExists,
     maxPartiesPageSize: PositiveInt,
     partyRecordStore: PartyRecordStore,
-    updateService: IndexUpdateService,
     syncService: state.PartySyncService,
     managementServiceTimeout: FiniteDuration,
     submissionIdGenerator: CreateSubmissionId,
@@ -250,15 +259,18 @@ private[apiserver] final class ApiPartyManagementService private (
             request.identityProviderId,
             "identity_provider_id",
           )
-        } yield (partyIdHintO, annotations, identityProviderId)
-      } { case (partyIdHintO, annotations, identityProviderId) =>
+          synchronizerIdO <- optionalSynchronizerId(request.synchronizerId, "synchronizer_id")
+          userId <- optionalUserId(request.userId, "user_id")
+
+        } yield (partyIdHintO, annotations, identityProviderId, synchronizerIdO, userId)
+      } { case (partyIdHintO, annotations, identityProviderId, synchronizerIdO, userId) =>
         val partyName = partyIdHintO.getOrElse(generatePartyName)
         val trackerKey = submissionIdGenerator(partyName)
-        withEnrichedLoggingContext(telemetry)(logging.submissionId(trackerKey.submissionId)) {
+        withEnrichedLoggingContext(logging.submissionId(trackerKey.submissionId)) {
           implicit loggingContext =>
             for {
               _ <- identityProviderExistsOrError(identityProviderId)
-              ledgerEndbeforeRequest <- updateService.currentLedgerEnd()
+              user <- getUserIfUserSpecified(userId, identityProviderId)
               allocated <- partyAllocationTracker
                 .track(
                   trackerKey,
@@ -268,6 +280,7 @@ private[apiserver] final class ApiPartyManagementService private (
                     result <- syncService.allocateParty(
                       partyName,
                       trackerKey.submissionId,
+                      synchronizerIdO,
                     )
                     _ <- checkSubmissionResult(result)
                   } yield ()
@@ -277,15 +290,14 @@ private[apiserver] final class ApiPartyManagementService private (
                 identityProviderId,
                 allocated.partyDetails.party,
               )
-              partyRecord <- partyRecordStore
-                .createPartyRecord(
-                  PartyRecord(
-                    party = allocated.partyDetails.party,
-                    metadata = ObjectMeta(resourceVersionO = None, annotations = annotations),
-                    identityProviderId = identityProviderId,
-                  )
-                )
-                .flatMap(handlePartyRecordStoreResult("creating a party record")(_))
+              existingPartyRecord <- partyRecordStore.getPartyRecordO(allocated.partyDetails.party)
+              partyRecord <- updateOrCreatePartyRecord(
+                existingPartyRecord,
+                allocated.partyDetails.party,
+                identityProviderId,
+                annotations,
+              )
+              _ <- updateUserInfoIfUserSpecified(allocated.partyDetails.party, user)
             } yield {
               val details = toProtoPartyDetails(
                 partyDetails = allocated.partyDetails,
@@ -296,6 +308,58 @@ private[apiserver] final class ApiPartyManagementService private (
             }
         }
       }
+    }
+
+  private def updateUserInfoIfUserSpecified(
+      party: Ref.Party,
+      user: Option[User],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] =
+    user.fold(Future.successful(())) { u =>
+      userManagementStore
+        .grantRights(
+          u.id,
+          Set(UserRight.CanActAs(party)),
+          u.identityProviderId,
+        )
+        .map(_.left.map {
+          case UserManagementStore.UserNotFound(id) =>
+            UserManagementStore.UserDeletedWhileUpdating(id)
+          case other => other
+        })
+        .flatMap(Utils.handleResult("granting user rights for a new party"))
+        .map(_ => ())
+    }
+
+  private def updateOrCreatePartyRecord(
+      existingPartyRecord: PartyRecordStore.Result[Option[PartyRecord]],
+      party: Ref.Party,
+      identityProviderId: IdentityProviderId,
+      annotations: Map[String, String],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[PartyRecord] =
+    if (existingPartyRecord.exists(_.nonEmpty)) {
+      partyRecordStore
+        .updatePartyRecord(
+          PartyRecordUpdate(
+            party = party,
+            identityProviderId = identityProviderId,
+            metadataUpdate = ObjectMetaUpdate(
+              resourceVersionO = None,
+              annotationsUpdateO = Some(annotations),
+            ),
+          ),
+          ledgerPartyIsLocal = true,
+        )
+        .flatMap(handlePartyRecordStoreResult("updating a party record")(_))
+    } else {
+      partyRecordStore
+        .createPartyRecord(
+          PartyRecord(
+            party = party,
+            metadata = ObjectMeta(resourceVersionO = None, annotations = annotations),
+            identityProviderId = identityProviderId,
+          )
+        )
+        .flatMap(handlePartyRecordStoreResult("creating a party record")(_))
     }
 
   private def checkSubmissionResult(r: state.SubmissionResult) = r match {
@@ -599,6 +663,16 @@ private[apiserver] final class ApiPartyManagementService private (
         Future.successful(t)
     }
 
+  private def getUserIfUserSpecified(
+      userId: Option[Ref.UserId],
+      identityProviderId: IdentityProviderId,
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Option[User]] =
+    userId.fold[Future[Option[User]]](Future.successful(None))(
+      userManagementStore
+        .getUser(_, identityProviderId)
+        .flatMap(result => Utils.handleResult("checking user's existence")(result).map(Some(_)))
+    )
+
   private def identityProviderExistsOrError(
       id: IdentityProviderId
   )(implicit
@@ -655,10 +729,10 @@ private[apiserver] object ApiPartyManagementService {
 
   def createApiService(
       partyManagementServiceBackend: IndexPartyManagementService,
+      userManagementStore: UserManagementStore,
       identityProviderExists: IdentityProviderExists,
       maxPartiesPageSize: PositiveInt,
       partyRecordStore: PartyRecordStore,
-      updateService: IndexUpdateService,
       writeBackend: state.PartySyncService,
       managementServiceTimeout: FiniteDuration,
       submissionIdGenerator: CreateSubmissionId,
@@ -671,10 +745,10 @@ private[apiserver] object ApiPartyManagementService {
   ): PartyManagementServiceGrpc.PartyManagementService & GrpcApiService =
     new ApiPartyManagementService(
       partyManagementServiceBackend,
+      userManagementStore,
       identityProviderExists,
       maxPartiesPageSize,
       partyRecordStore,
-      updateService,
       writeBackend,
       managementServiceTimeout,
       submissionIdGenerator,

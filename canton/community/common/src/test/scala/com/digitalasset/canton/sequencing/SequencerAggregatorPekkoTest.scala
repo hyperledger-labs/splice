@@ -64,11 +64,13 @@ class SequencerAggregatorPekkoTest
       )
     )(env => withFixture(test.toNoArgTest(env)))
 
-  private val synchronizerId = DefaultTestIdentities.synchronizerId
+  private val synchronizerId = DefaultTestIdentities.physicalSynchronizerId
 
   private def mkAggregatorPekko(
-      validator: SequencedEventValidator =
-        SequencedEventValidator.noValidation(DefaultTestIdentities.synchronizerId, warn = false)
+      validator: SequencedEventValidator = SequencedEventValidator.noValidation(
+        DefaultTestIdentities.physicalSynchronizerId,
+        warn = false,
+      )
   )(implicit fixture: FixtureParam): SequencerAggregatorPekko =
     new SequencerAggregatorPekko(
       synchronizerId,
@@ -89,7 +91,7 @@ class SequencerAggregatorPekkoTest
   private def normalize(event: SequencedSerializedEvent): SequencedSerializedEvent =
     event.copy(signedEvent =
       event.signedEvent.copy(signatures =
-        event.signedEvent.signatures.sortBy(_.signedBy.toProtoPrimitive)
+        event.signedEvent.signatures.sortBy(_.authorizingLongTermKey.toProtoPrimitive)
       )
     )(event.traceContext)
 
@@ -171,11 +173,8 @@ class SequencerAggregatorPekkoTest
         _.warningMessage should include(
           s"Sequencer subscription for $sequencerAlice failed with $UnretryableError"
         ),
-        _.errorMessage should include(
-          s"Sequencer subscription for synchronizer $synchronizerId is now stuck. Needs operator intervention to reconfigure the sequencer connections."
-        ),
         _.warningMessage should include(
-          s"'sequencer-subscription-da::default' is now in state Failed(Sequencer subscriptions have diverged and cannot reach the threshold 1 for synchronizer $synchronizerId any more.)."
+          s"'sequencer-subscription-da::default::${synchronizerId.suffix}' is now in state Failed(Sequencer subscriptions have diverged and cannot reach the threshold 1 for synchronizer $synchronizerId any more.)."
         ),
       )
       killSwitch.shutdown()
@@ -213,11 +212,8 @@ class SequencerAggregatorPekkoTest
           (handle, sink)
         },
         _.errorMessage should include(s"Sequencer subscription for $sequencerAlice failed"),
-        _.errorMessage should include(
-          s"Sequencer subscription for synchronizer $synchronizerId is now stuck. Needs operator intervention to reconfigure the sequencer connections."
-        ),
         _.warningMessage should include(
-          s"'sequencer-subscription-da::default' is now in state Failed(Sequencer subscriptions have diverged and cannot reach the threshold 1 for synchronizer $synchronizerId any more.)."
+          s"'sequencer-subscription-da::default::${synchronizerId.suffix}' is now in state Failed(Sequencer subscriptions have diverged and cannot reach the threshold 1 for synchronizer $synchronizerId any more.)."
         ),
       )
       killSwitch.shutdown()
@@ -285,9 +281,9 @@ class SequencerAggregatorPekkoTest
         val signatureCarlos = fakeSignatureFor("Carlos")
 
         val events = mkEvents(startingTimestampO = None, 3)
-        factoryAlice.add(events.take(1).map(_.copy(signatures = NonEmpty(Set, signatureAlice)))*)
-        factoryBob.add(events.slice(1, 2).map(_.copy(signatures = NonEmpty(Set, signatureBob)))*)
-        factoryCarlos.add(events.take(3).map(_.copy(signatures = NonEmpty(Set, signatureCarlos)))*)
+        factoryAlice.add(events.take(1).map(_.copy(signatures = NonEmpty(Seq, signatureAlice)))*)
+        factoryBob.add(events.slice(1, 2).map(_.copy(signatures = NonEmpty(Seq, signatureBob)))*)
+        factoryCarlos.add(events.take(3).map(_.copy(signatures = NonEmpty(Seq, signatureCarlos)))*)
 
         val config = OrderedBucketMergeConfig(
           PositiveInt.tryCreate(2),
@@ -311,13 +307,13 @@ class SequencerAggregatorPekkoTest
         normalize(sink.expectNext().value) shouldBe normalize(
           Event(
             timestamp = CantonTimestamp.Epoch,
-            NonEmpty(Set, signatureAlice, signatureCarlos),
+            NonEmpty(Seq, signatureAlice, signatureCarlos),
           ).asOrdinarySerializedEvent
         )
         normalize(sink.expectNext().value) shouldBe normalize(
           Event(
             timestamp = CantonTimestamp.Epoch.addMicros(1L),
-            NonEmpty(Set, signatureBob, signatureCarlos),
+            NonEmpty(Seq, signatureBob, signatureCarlos),
           ).asOrdinarySerializedEvent
         )
         sink.expectNoMessage()
@@ -330,8 +326,7 @@ class SequencerAggregatorPekkoTest
       import fixture.*
 
       val validator = new SequencedEventValidatorImpl(
-        defaultSynchronizerId,
-        testedProtocolVersion,
+        DefaultTestIdentities.physicalSynchronizerId,
         subscriberCryptoApi,
         loggerFactory,
         timeouts,
@@ -385,17 +380,17 @@ class SequencerAggregatorPekkoTest
       val events = mkEvents(Some(initialTimestamp), 4)
       val events1 = events.take(2)
       // alice reports events 10,11,12,13
-      factoryAlice.add(events.map(_.copy(signatures = NonEmpty(Set, signatureAlice)))*)
+      factoryAlice.add(events.map(_.copy(signatures = NonEmpty(Seq, signatureAlice)))*)
       // bob reports events 10,11
-      factoryBob.add(events1.map(_.copy(signatures = NonEmpty(Set, signatureBob)))*)
+      factoryBob.add(events1.map(_.copy(signatures = NonEmpty(Seq, signatureBob)))*)
 
       // events
       val events2 = events.drop(1)
       // bob reports events 12,13
-      factoryBob.add(events2.drop(1).map(_.copy(signatures = NonEmpty(Set, signatureBob)))*)
+      factoryBob.add(events2.drop(1).map(_.copy(signatures = NonEmpty(Seq, signatureBob)))*)
       // carlos reports events 11,12
       factoryCarlos.add(
-        events2.take(2).map(_.copy(signatures = NonEmpty(Set, signatureCarlos)))*
+        events2.take(2).map(_.copy(signatures = NonEmpty(Seq, signatureCarlos)))*
       )
 
       source.offer(config1) shouldBe QueueOfferResult.Enqueued
@@ -405,7 +400,7 @@ class SequencerAggregatorPekkoTest
       normalize(sink.expectNext().value) shouldBe normalize(
         Event(
           initialTimestamp.addMicros(1L),
-          NonEmpty(Set, signatureAlice, signatureBob),
+          NonEmpty(Seq, signatureAlice, signatureBob),
         ).asOrdinarySerializedEvent
       )
       sink.expectNoMessage()
@@ -420,7 +415,7 @@ class SequencerAggregatorPekkoTest
           val expected = Set(
             Left(ActiveSourceTerminated(sequencerBob, None)),
             Right(
-              Event(initialTimestamp.addMicros(2L), NonEmpty(Set, signatureAlice, signatureCarlos))
+              Event(initialTimestamp.addMicros(2L), NonEmpty(Seq, signatureAlice, signatureCarlos))
             ),
           ).map(_.map(event => normalize(event.asOrdinarySerializedEvent)))
           outputs shouldBe expected
@@ -615,15 +610,15 @@ class SequencerAggregatorPekkoTest
 
       factoryAlice1.add(
         mkEvents(startingTimestampO = None, 1)
-          .map(_.copy(signatures = NonEmpty(Set, signatureAlice)))*
+          .map(_.copy(signatures = NonEmpty(Seq, signatureAlice)))*
       )
       factoryBob1.add(
         mkEvents(startingTimestampO = None, 1)
-          .map(_.copy(signatures = NonEmpty(Set, signatureBob)))*
+          .map(_.copy(signatures = NonEmpty(Seq, signatureBob)))*
       )
       factoryCarlos.add(
         mkEvents(startingTimestampO = Some(CantonTimestamp.Epoch.addMicros(3L)), 1)
-          .map(_.copy(signatures = NonEmpty(Set, signatureCarlos)))*
+          .map(_.copy(signatures = NonEmpty(Seq, signatureCarlos)))*
       )
 
       val config1 = OrderedBucketMergeConfig(
@@ -651,7 +646,7 @@ class SequencerAggregatorPekkoTest
         normalize(
           Event(
             CantonTimestamp.Epoch,
-            NonEmpty(Set, signatureAlice, signatureBob),
+            NonEmpty(Seq, signatureAlice, signatureBob),
           ).asOrdinarySerializedEvent
         )
 
@@ -700,7 +695,7 @@ class SequencerAggregatorPekkoTest
             s"Sequencer subscriptions have diverged and cannot reach the threshold for synchronizer $synchronizerId any more."
           ),
           _.warningMessage should include(
-            s"'sequencer-subscription-da::default' is now in state Failed(Sequencer subscriptions have diverged and cannot reach the threshold 2 for synchronizer $synchronizerId any more.)."
+            s"'sequencer-subscription-da::default::${synchronizerId.suffix}' is now in state Failed(Sequencer subscriptions have diverged and cannot reach the threshold 2 for synchronizer $synchronizerId any more.)."
           ),
         )
       }
@@ -718,7 +713,7 @@ class SequencerAggregatorPekkoTest
         sink.expectNext().value shouldBe
           Event(
             CantonTimestamp.Epoch.addMicros(3L),
-            NonEmpty(Set, signatureCarlos),
+            NonEmpty(Seq, signatureCarlos),
           ).asOrdinarySerializedEvent
 
         eventually() {

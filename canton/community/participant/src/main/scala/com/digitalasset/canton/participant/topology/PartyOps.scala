@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.topology
 
 import cats.data.EitherT
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.*
@@ -16,6 +17,7 @@ import com.digitalasset.canton.topology.TopologyManagerError.{
   InvalidTopologyMapping,
   ParticipantErrorGroup,
 }
+import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   ParticipantPermission,
@@ -23,24 +25,29 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
 class PartyOps(
-    topologyManager: AuthorizedTopologyManager,
+    topologyManagerLookup: PhysicalSynchronizerId => Option[SynchronizerTopologyManager],
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
   def allocateParty(
       partyId: PartyId,
       participantId: ParticipantId,
-      protocolVersion: ProtocolVersion,
+      synchronizerId: PhysicalSynchronizerId,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] =
     for {
+      topologyManager <- EitherT.fromOption[FutureUnlessShutdown](
+        topologyManagerLookup(synchronizerId),
+        ParticipantTopologyManagerError.IdentityManagerParentError(
+          TopologyManagerError.TopologyStoreUnknown.Failure(SynchronizerStore(synchronizerId))
+        ),
+      )
       storedTransactions <- EitherT
         .right(
           topologyManager.store.findPositiveTransactions(
@@ -48,7 +55,7 @@ class PartyOps(
             asOfInclusive = false,
             isProposal = false,
             types = Seq(PartyToParticipant.code),
-            filterUid = Some(Seq(partyId.uid)),
+            filterUid = Some(NonEmpty(Seq, partyId.uid)),
             filterNamespace = None,
           )
         )
@@ -124,7 +131,7 @@ class PartyOps(
             updatedPTP,
             serial = nextSerial,
             signingKeys = Seq.empty,
-            protocolVersion,
+            synchronizerId.protocolVersion,
             expectFullAuthorization = true,
             waitToBecomeEffective = None,
           )

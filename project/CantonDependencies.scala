@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250624.13835.0.v78d74d4a"
+  val version: String = "3.4.0-snapshot.20250914.14200.0.v4c1522f4"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -133,7 +133,7 @@ object CantonDependencies {
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
-  lazy val grpc_netty = "io.grpc" % "grpc-netty" % grpc_version
+  lazy val grpc_netty_shaded = "io.grpc" % "grpc-netty-shaded" % grpc_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.

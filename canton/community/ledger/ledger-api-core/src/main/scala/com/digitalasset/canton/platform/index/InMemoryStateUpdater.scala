@@ -12,7 +12,7 @@ import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
-import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, Reassignment, Update}
+import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, Update}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
@@ -27,9 +27,10 @@ import com.digitalasset.canton.platform.store.cache.OffsetCheckpoint
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent.ReassignmentAccepted
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
-import com.digitalasset.canton.platform.{Contract, InMemoryState, Key, Party}
+import com.digitalasset.canton.platform.{FatContract, InMemoryState, Key, KeyWithMaintainers, Party}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.transaction.Node.{Create, Exercise}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.FlowShape
@@ -142,28 +143,14 @@ private[platform] object InMemoryStateUpdaterFlow {
                   case tx: Update.TransactionAccepted =>
                     Some((tx.synchronizerId, update.recordTime))
                   case reassignment: Update.ReassignmentAccepted =>
-                    reassignment.reassignment match {
-                      case _: Reassignment.Unassign =>
-                        Some(
-                          (
-                            reassignment.reassignmentInfo.sourceSynchronizer.unwrap,
-                            update.recordTime,
-                          )
-                        )
-                      case _: Reassignment.Assign =>
-                        Some(
-                          (
-                            reassignment.reassignmentInfo.targetSynchronizer.unwrap,
-                            update.recordTime,
-                          )
-                        )
-                    }
+                    Some((reassignment.synchronizerId, update.recordTime))
                   case commandRejected: Update.CommandRejected =>
                     Some((commandRejected.synchronizerId, commandRejected.recordTime))
                   case tt: Update.TopologyTransactionEffective =>
                     Some((tt.synchronizerId, tt.recordTime))
                   case sim: Update.SequencerIndexMoved => Some((sim.synchronizerId, sim.recordTime))
                   case _: Update.EmptyAcsPublicationRequired => None
+                  case _: Update.LogicalSynchronizerUpgradeTimeReached => None
                   case _: Update.CommitRepair => None
                 }
 
@@ -381,25 +368,39 @@ private[platform] object InMemoryStateUpdater {
 
   private[index] def convertLogToStateEvent
       : PartialFunction[TransactionLogUpdate.Event, ContractStateEvent] = {
-    case createdEvent: TransactionLogUpdate.CreatedEvent =>
+    case createdEvent: TransactionLogUpdate.CreatedEvent
+        // no state updates for participant divulged events and transient events as these events
+        // cannot lead to successful contract lookup and usage in interpretation anyway
+        if createdEvent.flatEventWitnesses.nonEmpty =>
       ContractStateEvent.Created(
-        contractId = createdEvent.contractId,
-        contract = Contract(
-          packageName = createdEvent.packageName,
-          template = createdEvent.templateId,
-          arg = createdEvent.createArgument,
+        contract = FatContract.fromCreateNode(
+          Create(
+            coid = createdEvent.contractId,
+            packageName = createdEvent.packageName,
+            templateId = createdEvent.templateId,
+            arg = createdEvent.createArgument.unversioned,
+            signatories = createdEvent.createSignatories,
+            stakeholders = createdEvent.flatEventWitnesses.map(Party.assertFromString),
+            keyOpt = (createdEvent.contractKey zip createdEvent.createKeyMaintainers).map {
+              case (k, maintainers) =>
+                KeyWithMaintainers.assertBuild(
+                  templateId = createdEvent.templateId,
+                  value = k.unversioned,
+                  maintainers = maintainers,
+                  packageName = createdEvent.packageName,
+                )
+            },
+            version = createdEvent.createArgument.version,
+          ),
+          createTime = CreationTime.CreatedAt(createdEvent.ledgerEffectiveTime),
+          authenticationData = createdEvent.authenticationData,
         ),
-        globalKey = createdEvent.contractKey.map(k =>
-          Key.assertBuild(createdEvent.templateId, k.unversioned, createdEvent.packageName)
-        ),
-        ledgerEffectiveTime = createdEvent.ledgerEffectiveTime,
-        stakeholders = createdEvent.flatEventWitnesses.map(Party.assertFromString),
         eventOffset = createdEvent.eventOffset,
-        signatories = createdEvent.createSignatories,
-        keyMaintainers = createdEvent.createKeyMaintainers,
-        driverMetadata = createdEvent.driverMetadata.toByteArray,
       )
-    case exercisedEvent: TransactionLogUpdate.ExercisedEvent if exercisedEvent.consuming =>
+    case exercisedEvent: TransactionLogUpdate.ExercisedEvent
+        // no state updates for participant divulged events and transient events as these events
+        // cannot lead to successful contract lookup and usage in interpretation anyway
+        if exercisedEvent.consuming && exercisedEvent.flatEventWitnesses.nonEmpty =>
       ContractStateEvent.Archived(
         contractId = exercisedEvent.contractId,
         globalKey = exercisedEvent.contractKey.map(k =>
@@ -454,7 +455,8 @@ private[platform] object InMemoryStateUpdater {
             com.digitalasset.daml.lf.transaction.Versioned(create.version, k.value)
           ),
           treeEventWitnesses = blinding.disclosure.getOrElse(nodeId, Set.empty),
-          flatEventWitnesses = create.stakeholders,
+          flatEventWitnesses =
+            if (txAccepted.isAcsDelta(create.coid)) create.stakeholders else Set.empty,
           submitters = txAccepted.completionInfoO
             .map(_.actAs.toSet)
             .getOrElse(Set.empty),
@@ -465,9 +467,11 @@ private[platform] object InMemoryStateUpdater {
           createKeyHash = create.keyOpt.map(_.globalKey.hash),
           createKey = create.keyOpt.map(_.globalKey),
           createKeyMaintainers = create.keyOpt.map(_.maintainers),
-          driverMetadata = txAccepted.contractMetadata.getOrElse(
+          authenticationData = txAccepted.contractAuthenticationData.getOrElse(
             create.coid,
-            throw new IllegalStateException(s"missing driver metadata for contract ${create.coid}"),
+            throw new IllegalStateException(
+              s"missing authentication data for contract ${create.coid}"
+            ),
           ),
         )
       case NodeInfo(nodeId, exercise: Exercise, lastDescendantNodeId) =>
@@ -486,7 +490,10 @@ private[platform] object InMemoryStateUpdater {
             com.digitalasset.daml.lf.transaction.Versioned(exercise.version, k.value)
           ),
           treeEventWitnesses = blinding.disclosure.getOrElse(nodeId, Set.empty),
-          flatEventWitnesses = if (exercise.consuming) exercise.stakeholders else Set.empty,
+          flatEventWitnesses =
+            if (exercise.consuming && txAccepted.isAcsDelta(exercise.targetCoid))
+              exercise.stakeholders
+            else Set.empty,
           submitters = txAccepted.completionInfoO
             .map(_.actAs.toSet)
             .getOrElse(Set.empty),
@@ -531,6 +538,7 @@ private[platform] object InMemoryStateUpdater {
       completionStreamResponse = completionStreamResponse,
       synchronizerId = txAccepted.synchronizerId.toProtoPrimitive,
       recordTime = txAccepted.recordTime.toLf,
+      externalTransactionHash = txAccepted.externalTransactionHash,
     )(txAccepted.traceContext)
   }
 
@@ -580,12 +588,7 @@ private[platform] object InMemoryStateUpdater {
           optDeduplicationOffset = deduplicationOffset,
           optDeduplicationDurationSeconds = deduplicationDurationSeconds,
           optDeduplicationDurationNanos = deduplicationDurationNanos,
-          synchronizerId = u.reassignment match {
-            case _: Reassignment.Assign =>
-              u.reassignmentInfo.targetSynchronizer.unwrap.toProtoPrimitive
-            case _: Reassignment.Unassign =>
-              u.reassignmentInfo.sourceSynchronizer.unwrap.toProtoPrimitive
-          },
+          synchronizerId = u.synchronizerId.toProtoPrimitive,
           traceContext = u.traceContext,
         )
       }
@@ -598,43 +601,8 @@ private[platform] object InMemoryStateUpdater {
       recordTime = u.recordTime.toLf,
       completionStreamResponse = completionStreamResponse,
       reassignmentInfo = u.reassignmentInfo,
-      reassignment = u.reassignment match {
-        case assign: Reassignment.Assign =>
-          val create = assign.createNode
-          TransactionLogUpdate.ReassignmentAccepted.Assigned(
-            TransactionLogUpdate.CreatedEvent(
-              eventOffset = offset,
-              updateId = u.updateId,
-              nodeId = 0, // set 0 for assign-created
-              eventSequentialId = 0L,
-              contractId = create.coid,
-              ledgerEffectiveTime = assign.ledgerEffectiveTime,
-              templateId = create.templateId,
-              packageName = create.packageName,
-              packageVersion = None,
-              commandId = u.optCompletionInfo.map(_.commandId).getOrElse(""),
-              workflowId = u.workflowId.getOrElse(""),
-              contractKey = create.keyOpt.map(k =>
-                com.digitalasset.daml.lf.transaction.Versioned(create.version, k.value)
-              ),
-              treeEventWitnesses = Set.empty,
-              flatEventWitnesses = create.stakeholders,
-              submitters = u.optCompletionInfo
-                .map(_.actAs.toSet)
-                .getOrElse(Set.empty),
-              createArgument =
-                com.digitalasset.daml.lf.transaction.Versioned(create.version, create.arg),
-              createSignatories = create.signatories,
-              createObservers = create.stakeholders.diff(create.signatories),
-              createKeyHash = create.keyOpt.map(_.globalKey.hash),
-              createKey = create.keyOpt.map(_.globalKey),
-              createKeyMaintainers = create.keyOpt.map(_.maintainers),
-              driverMetadata = assign.contractMetadata,
-            )
-          )
-        case unassign: Reassignment.Unassign =>
-          TransactionLogUpdate.ReassignmentAccepted.Unassigned(unassign)
-      },
+      reassignment = u.reassignment,
+      synchronizerId = u.synchronizerId.toProtoPrimitive,
     )(u.traceContext)
   }
 

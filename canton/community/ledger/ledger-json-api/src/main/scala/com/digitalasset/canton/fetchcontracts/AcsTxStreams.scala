@@ -154,6 +154,7 @@ object AcsTxStreams extends NoTracing {
     (ContractStreamStep.Txn(partitionInsertsDeletes(tx.events), offset), offset)
   }
 
+  // TODO(#23504) use EventFormat
   @nowarn("cat=deprecation")
   def transactionFilter[Pkg](
       parties: PartySet,

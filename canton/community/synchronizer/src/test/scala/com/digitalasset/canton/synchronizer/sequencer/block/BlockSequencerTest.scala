@@ -8,10 +8,11 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   BatchingConfig,
+  CachingConfigs,
   DefaultProcessingTimeouts,
   ProcessingTimeout,
 }
-import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerCryptoPureApi}
+import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.TracedLogger
@@ -33,8 +34,9 @@ import com.digitalasset.canton.synchronizer.block.update.{
   OrderedBlockUpdate,
 }
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequest
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.store.InMemorySequencerStore
 import com.digitalasset.canton.synchronizer.sequencer.{BlockSequencerConfig, SequencerIntegration}
@@ -90,7 +92,7 @@ class BlockSequencerTest
     private val actorSystem = ActorSystem()
     implicit val materializer: Materializer = Materializer(actorSystem)
 
-    private val synchronizerId = topologyTransactionFactory.synchronizerId1
+    private val synchronizerId = topologyTransactionFactory.synchronizerId1.toPhysical
     private val sequencer1 = topologyTransactionFactory.sequencer1
     private val topologyStore =
       new InMemoryTopologyStore(
@@ -117,7 +119,6 @@ class BlockSequencerTest
 
     private val topologyClient = new StoreBasedSynchronizerTopologyClient(
       mock[Clock],
-      synchronizerId,
       topologyStore,
       StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       DefaultProcessingTimeouts.testing,
@@ -132,15 +133,12 @@ class BlockSequencerTest
     )
     private val cryptoApi = SynchronizerCryptoClient.create(
       member = sequencer1,
-      synchronizerId,
+      synchronizerId.logical,
       topologyClient,
       defaultStaticSynchronizerParameters,
-      topologyTransactionFactory.cryptoApi.crypto,
-      new SynchronizerCryptoPureApi(
-        defaultStaticSynchronizerParameters,
-        topologyTransactionFactory.cryptoApi.crypto.pureCrypto,
-      ),
+      topologyTransactionFactory.syncCryptoClient.crypto,
       BatchingConfig().parallelism,
+      CachingConfigs.defaultPublicKeyConversionCache,
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
       loggerFactory,
@@ -149,12 +147,14 @@ class BlockSequencerTest
     private val balanceStore = new InMemoryTrafficPurchasedStore(loggerFactory)
 
     val fakeBlockOrderer = new FakeBlockOrderer(N)
+    val sequencerMetrics = SequencerMetrics.noop("block-sequencer-test")
     private val fakeBlockSequencerStateManager = new FakeBlockSequencerStateManager
     private val fakeDbSequencerStore = new InMemorySequencerStore(
       testedProtocolVersion,
       sequencer1,
       blockSequencerMode = true,
       loggerFactory,
+      sequencerMetrics = sequencerMetrics,
     )
     private val storage = new MemoryStorage(loggerFactory, timeouts)
     private val store =
@@ -164,6 +164,7 @@ class BlockSequencerTest
           sequencer1,
           blockSequencerMode = true,
           loggerFactory,
+          sequencerMetrics = sequencerMetrics,
         ),
         loggerFactory,
       )
@@ -171,7 +172,6 @@ class BlockSequencerTest
       new BlockSequencer(
         blockOrderer = fakeBlockOrderer,
         name = "test",
-        synchronizerId = synchronizerId,
         cryptoApi = cryptoApi,
         sequencerId = sequencer1,
         fakeBlockSequencerStateManager,
@@ -183,9 +183,10 @@ class BlockSequencerTest
         FutureSupervisor.Noop,
         health = None,
         clock = new SimClock(loggerFactory = loggerFactory),
-        protocolVersion = testedProtocolVersion,
         blockRateLimitManager = defaultRateLimiter,
         orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(
@@ -232,7 +233,7 @@ class BlockSequencerTest
     override def close(): Unit = ()
 
     // No need to implement these methods for the test
-    override def send(signedOrderingRequest: SignedOrderingRequest)(implicit
+    override def send(signedSubmissionRequest: SignedSubmissionRequest)(implicit
         traceContext: TraceContext
     ): EitherT[Future, SequencerDeliverError, Unit] = ???
     override def health(implicit traceContext: TraceContext): Future[SequencerDriverHealthStatus] =

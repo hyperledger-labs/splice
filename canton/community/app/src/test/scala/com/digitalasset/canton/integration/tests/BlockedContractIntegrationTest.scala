@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration.tests
 
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.daml.ledger.javaapi.data.Command
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.config.DbConfig
@@ -90,6 +91,7 @@ sealed trait BlockedContractIntegrationTest
         bob,
         removes = List(participant2),
         forceFlags = ForceFlags(DisablePartyWithActiveContracts),
+        store = daId,
       )
 
     // Wait until participant1 observes Bob having been disabled
@@ -124,15 +126,20 @@ sealed trait BlockedContractIntegrationTest
   ): Iou.Contract =
     if (autoSync)
       JavaDecodeUtil
-        .decodeAllCreatedTree(Iou.COMPANION)(
+        .decodeAllCreated(Iou.COMPANION)(
           participantRef.ledger_api.javaapi.commands.submit(Seq(submitter), Seq(command))
         )
         .loneElement
     else
       JavaDecodeUtil
-        .decodeAllCreatedTree(Iou.COMPANION)(
+        .decodeAllCreated(Iou.COMPANION)(
           participantRef.ledger_api.javaapi.commands
-            .submit(Seq(submitter), Seq(command), optTimeout = None)
+            .submit(
+              Seq(submitter),
+              Seq(command),
+              optTimeout = None,
+              transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+            )
         )
         .loneElement
 }

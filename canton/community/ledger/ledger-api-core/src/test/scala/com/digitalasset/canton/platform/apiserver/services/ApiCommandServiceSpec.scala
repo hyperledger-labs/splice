@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
+// TODO(#23504) remove TransactionTree related methods when TransactionTree is removed from the API
 @nowarn("cat=deprecation")
 class ApiCommandServiceSpec
     extends AsyncWordSpec
@@ -160,6 +161,7 @@ class ApiCommandServiceSpec
   }
 }
 
+// TODO(#23504) remove TransactionTree related methods when TransactionTree is removed from the API
 @nowarn("cat=deprecation")
 object ApiCommandServiceSpec {
   private val aCommand = Command.of(

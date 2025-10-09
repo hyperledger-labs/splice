@@ -4,37 +4,41 @@
 package com.digitalasset.canton.time
 
 import cats.syntax.option.*
+import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.{Batch, Deliver, SignedContent, TimeProof}
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
-import com.digitalasset.canton.topology.{DefaultTestIdentities, SynchronizerId}
+import com.digitalasset.canton.topology.{DefaultTestIdentities, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.Target
-import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{BaseTest, SequencerCounter}
 
 object TimeProofTestUtil {
   def mkTimeProof(
       timestamp: CantonTimestamp,
       previousEventTimestamp: Option[CantonTimestamp] = None,
       counter: Long = 0L,
-      targetSynchronizer: Target[SynchronizerId] = Target(DefaultTestIdentities.synchronizerId),
-      protocolVersion: ProtocolVersion = BaseTest.testedProtocolVersion,
+      targetSynchronizer: Target[PhysicalSynchronizerId] = Target(
+        DefaultTestIdentities.physicalSynchronizerId
+      ),
   ): TimeProof = {
     val deliver = Deliver.create(
       previousEventTimestamp,
       timestamp,
       targetSynchronizer.unwrap,
       TimeProof.mkTimeProofRequestMessageId.some,
-      Batch.empty(protocolVersion),
+      Batch.empty(targetSynchronizer.unwrap.protocolVersion),
       None,
-      protocolVersion,
       Option.empty[TrafficReceipt],
     )
     val signedContent =
-      SignedContent(deliver, SymbolicCrypto.emptySignature, None, protocolVersion)
+      SignedContent(
+        deliver,
+        SymbolicCrypto.emptySignature,
+        None,
+        targetSynchronizer.unwrap.protocolVersion,
+      )
     val event = OrdinarySequencedEvent(SequencerCounter(counter), signedContent)(TraceContext.empty)
     TimeProof
       .fromEvent(event)

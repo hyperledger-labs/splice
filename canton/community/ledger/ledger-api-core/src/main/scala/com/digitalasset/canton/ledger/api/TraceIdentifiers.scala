@@ -33,6 +33,7 @@ object TraceIdentifiers {
 
   /** Extract identifiers from a transaction tree message.
     */
+  // TODO(#23504) remove this method once TransactionTrees are removed from the API
   @nowarn("cat=deprecation")
   def fromTransactionTree(transactionTree: TransactionTree): Map[SpanAttribute, String] = {
     val attributes = Map.newBuilder[SpanAttribute, String]

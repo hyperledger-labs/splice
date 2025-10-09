@@ -32,7 +32,7 @@ import scala.collection.mutable
 
 class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExecutionContext {
 
-  private val synchronizerId = DefaultTestIdentities.synchronizerId
+  private val synchronizerId = DefaultTestIdentities.physicalSynchronizerId
   private val participantId = DefaultTestIdentities.participant1
 
   private val ts1 = CantonTimestamp.ofEpochSecond(1)
@@ -54,25 +54,22 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
   private lazy val topoTx: TopologyTransactionsBroadcast = TopologyTransactionsBroadcast(
     synchronizerId,
     List(factory.ns1k1_k1),
-    testedProtocolVersion,
   )
 
   private def mkSetTrafficPurchased(
       signatureO: Option[Signature] = None
   ): SignedProtocolMessage[SetTrafficPurchasedMessage] = {
-    val setTrafficPurchased = SetTrafficPurchasedMessage(
+    val setTrafficPurchased: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage(
       participantId,
       PositiveInt.one,
       NonNegativeLong.tryCreate(100),
       synchronizerId,
-      testedProtocolVersion,
     )
 
     signatureO match {
       case Some(signature) =>
         SignedProtocolMessage.from(
           setTrafficPurchased,
-          testedProtocolVersion,
           signature,
         )
 
@@ -81,7 +78,6 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
           .trySignAndCreate(
             setTrafficPurchased,
             synchronizerCrypto.currentSnapshotApproximation,
-            testedProtocolVersion,
           )
           .failOnShutdown
           .futureValue
@@ -131,7 +127,6 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
       None,
       batch,
       None,
-      testedProtocolVersion,
       Option.empty[TrafficReceipt],
     )
 
@@ -144,7 +139,6 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
       synchronizerId,
       MessageId.fromUuid(new UUID(0, 1)),
       SequencerErrors.SubmissionRequestRefused("Some error"),
-      testedProtocolVersion,
       Option.empty[TrafficReceipt],
     )
 

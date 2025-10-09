@@ -77,6 +77,7 @@ abstract class ConsumesCancellableGrpcStreamObserver[
 
   protected def callHandler: Traced[R] => EitherT[FutureUnlessShutdown, E, Unit]
   protected def onCompleteCloseReason: SubscriptionCloseReason[E]
+  protected def request: String
 
   locally {
     import TraceContext.Implicits.Empty.*
@@ -157,7 +158,7 @@ abstract class ConsumesCancellableGrpcStreamObserver[
     )
   }
 
-  private[client] val observer = new StreamObserver[R] {
+  private[sequencing] val observer = new StreamObserver[R] {
     override def onNext(value: R): Unit = {
       // we take the unusual step of immediately trying to deserialize the trace-context
       // so it is available here for logging
@@ -171,7 +172,7 @@ abstract class ConsumesCancellableGrpcStreamObserver[
       logger.debug("Received a message from the sequencer.")
 
       val current = Promise[Unit]()
-      val closeReasonOO = performUnlessClosing(functionFullName) {
+      val closeReasonOO = synchronizeWithClosingSync(functionFullName) {
         try {
           appendToCurrentProcessing(_ => current.future)
 
@@ -219,7 +220,7 @@ abstract class ConsumesCancellableGrpcStreamObserver[
         case s: StatusRuntimeException if s.getStatus.getCode == CANCELLED =>
           if (cancelledByClient.get()) {
             logger.info(
-              "GRPC subscription successfully closed due to client shutdown.",
+              "gRPC subscription successfully closed due to client shutdown.",
               s.getStatus.getCause,
             )
             complete(SubscriptionCloseReason.Closed)
@@ -227,7 +228,7 @@ abstract class ConsumesCancellableGrpcStreamObserver[
             // As the client has not cancelled the subscription, the problem must be on the server side.
             val grpcError =
               GrpcServiceUnavailable(
-                "subscription",
+                request,
                 "sequencer",
                 s.getStatus,
                 Option(s.getTrailers),
@@ -236,7 +237,7 @@ abstract class ConsumesCancellableGrpcStreamObserver[
             complete(GrpcSubscriptionError(grpcError))
           }
         case s: StatusRuntimeException =>
-          val grpcError = GrpcError("subscription", "sequencer", s)
+          val grpcError = GrpcError(request, "sequencer", s)
           complete(
             if (s.getStatus.getCode == Status.Code.PERMISSION_DENIED)
               GrpcPermissionDeniedError(grpcError)
@@ -274,7 +275,7 @@ class GrpcSequencerSubscription[E, R: HasProtoTraceContext] private[transports] 
 
   override protected lazy val onCompleteCloseReason = GrpcSubscriptionError(
     GrpcError(
-      "subscription",
+      request,
       "sequencer",
       Status.UNAVAILABLE
         .withDescription("Connection terminated by the server.")
@@ -282,6 +283,7 @@ class GrpcSequencerSubscription[E, R: HasProtoTraceContext] private[transports] 
     )
   )
 
+  override protected def request: String = "subscription"
 }
 
 object GrpcSequencerSubscription {

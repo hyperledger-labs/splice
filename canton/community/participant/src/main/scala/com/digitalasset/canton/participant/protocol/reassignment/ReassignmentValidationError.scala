@@ -11,10 +11,10 @@ import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentPro
   ReassignmentProcessorError,
   SubmissionValidationError,
 }
-import com.digitalasset.canton.protocol.{LfContractId, Stakeholders}
+import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId, Stakeholders}
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.util.ReassignmentTag
-import com.digitalasset.daml.lf.engine
 
 trait ReassignmentValidationError extends Serializable with Product with PrettyPrinting {
   override protected def pretty: Pretty[ReassignmentValidationError.this.type] =
@@ -37,6 +37,14 @@ object ReassignmentValidationError {
       extends ReassignmentValidationError {
     override def message: String =
       s"For `$reassignmentRef`: reinterpretation failed for reason `$reason`"
+  }
+
+  final case class MediatorInactive(
+      reassignmentId: ReassignmentId,
+      mediator: MediatorGroupRecipient,
+  ) extends ReassignmentValidationError {
+    override def message: String =
+      s"For `$reassignmentId`: $mediator has been deactivated while processing the request"
   }
 
   final case class StakeholdersMismatch(
@@ -74,11 +82,7 @@ object ReassignmentValidationError {
       stakeholders: Set[LfPartyId],
   ) extends ReassignmentValidationError {
     override def message: String =
-      s"For $reference: submitter `$submittingParty` is not a stakeholder"
-  }
-
-  final case class MetadataNotFound(err: engine.Error) extends ReassignmentValidationError {
-    override def message: String = s"Contract metadata not found: ${err.message}"
+      s"For $reference: submitter `$submittingParty` is not a stakeholder. "
   }
 
   final case class StakeholderHostingErrors(message: String) extends ReassignmentValidationError

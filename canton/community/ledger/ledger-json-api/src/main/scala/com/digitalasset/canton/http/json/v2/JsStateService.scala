@@ -4,7 +4,8 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.{reassignment, state_service}
+import com.daml.ledger.api.v2.{reassignment, state_service, transaction_filter}
+import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
@@ -19,8 +20,8 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Codec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
-import io.circe.{Codec, Decoder, Encoder}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Flow
@@ -32,6 +33,8 @@ import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, query, webSocketBody}
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
+// TODO(#23504) remove deprecation suppression
+@nowarn("cat=deprecation")
 class JsStateService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
@@ -41,6 +44,7 @@ class JsStateService(
     val esf: ExecutionSequencerFactory,
     materializer: Materializer,
     wsConfig: WebsocketConfig,
+    val authInterceptor: AuthInterceptor,
 ) extends Endpoints
     with NamedLogging {
 
@@ -73,7 +77,7 @@ class JsStateService(
 
   private def getConnectedSynchronizers(
       callerContext: CallerContext
-  ): TracedInput[(String, Option[String])] => Future[
+  ): TracedInput[(String, Option[String], Option[String])] => Future[
     Either[JsCantonError, state_service.GetConnectedSynchronizersResponse]
   ] = req =>
     stateServiceClient(callerContext.token())(req.traceContext)
@@ -82,6 +86,7 @@ class JsStateService(
           .GetConnectedSynchronizersRequest(
             party = req.in._1,
             participantId = req.in._2.getOrElse(""),
+            identityProviderId = req.in._2.getOrElse(""),
           )
       )
       .resultToRight
@@ -107,22 +112,34 @@ class JsStateService(
   private def getActiveContractsStream(
       caller: CallerContext
   ): TracedInput[Unit] => Flow[
-    state_service.GetActiveContractsRequest,
+    LegacyDTOs.GetActiveContractsRequest,
     JsGetActiveContractsResponse,
     NotUsed,
   ] =
     req => {
       implicit val tc = req.traceContext
-      prepareSingleWsStream(
-        stateServiceClient(caller.token())(TraceContext.empty).getActiveContracts,
-        (r: state_service.GetActiveContractsResponse) =>
-          protocolConverters.GetActiveContractsResponse.toJson(r),
-      )
+      Flow[LegacyDTOs.GetActiveContractsRequest].map { request =>
+        state_service.GetActiveContractsRequest(
+          filter = request.filter.map(f =>
+            transaction_filter.TransactionFilter(
+              filtersByParty = f.filtersByParty,
+              filtersForAnyParty = f.filtersForAnyParty,
+            )
+          ),
+          verbose = request.verbose,
+          activeAtOffset = request.activeAtOffset,
+          eventFormat = request.eventFormat,
+        )
+      } via
+        prepareSingleWsStream(
+          stateServiceClient(caller.token())(TraceContext.empty).getActiveContracts,
+          (r: state_service.GetActiveContractsResponse) =>
+            protocolConverters.GetActiveContractsResponse.toJson(r),
+        )
     }
 
 }
 
-@nowarn("cat=deprecation")
 object JsStateService extends DocumentationEndpoints {
   import Endpoints.*
   import JsStateServiceCodecs.*
@@ -133,7 +150,7 @@ object JsStateService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("active-contracts"))
     .out(
       webSocketBody[
-        state_service.GetActiveContractsRequest,
+        LegacyDTOs.GetActiveContractsRequest,
         CodecFormat.Json,
         Either[JsCantonError, JsGetActiveContractsResponse],
         CodecFormat.Json,
@@ -143,15 +160,23 @@ object JsStateService extends DocumentationEndpoints {
 
   val activeContractsListEndpoint = state.post
     .in(sttp.tapir.stringToPath("active-contracts"))
-    .in(jsonBody[state_service.GetActiveContractsRequest])
+    .in(jsonBody[LegacyDTOs.GetActiveContractsRequest])
     .out(jsonBody[Seq[JsGetActiveContractsResponse]])
-    .inStreamListParams()
-    .description("Query active contracts list (blocking call)")
+    .description(
+      """Query active contracts list (blocking call).
+        |Querying active contracts is an expensive operation and if possible should not be repeated often.
+        |Consider querying active contracts initially (for a given offset)
+        |and then repeatedly call one of `/v2/updates/...`endpoints  to get subsequent modifications.
+        |You can also use websockets to get updates with better performance.
+        |""".stripMargin
+    )
+    .inStreamListParamsAndDescription()
 
   val getConnectedSynchronizersEndpoint = state.get
     .in(sttp.tapir.stringToPath("connected-synchronizers"))
     .in(query[String]("party"))
     .in(query[Option[String]]("participantId"))
+    .in(query[Option[String]]("identityProviderId"))
     .out(jsonBody[state_service.GetConnectedSynchronizersResponse])
     .description("Get connected synchronizers")
 
@@ -194,7 +219,7 @@ object JsContractEntry {
 final case class JsAssignedEvent(
     source: String,
     target: String,
-    unassignId: String,
+    reassignmentId: String,
     submitter: String,
     reassignmentCounter: Long,
     createdEvent: JsEvent.CreatedEvent,
@@ -205,6 +230,7 @@ final case class JsGetActiveContractsResponse(
     contractEntry: JsContractEntry,
 )
 
+// TODO(#23504) remove deprecation suppression
 @nowarn("cat=deprecation")
 object JsStateServiceCodecs {
 
@@ -212,6 +238,9 @@ object JsStateServiceCodecs {
   import JsSchema.JsServicesCommonCodecs.*
 
   implicit val getActiveContractsRequestRW: Codec[state_service.GetActiveContractsRequest] =
+    deriveRelaxedCodec
+
+  implicit val getActiveContractsRequestLegacyRW: Codec[LegacyDTOs.GetActiveContractsRequest] =
     deriveRelaxedCodec
 
   implicit val jsGetActiveContractsResponseRW: Codec[JsGetActiveContractsResponse] =
@@ -233,11 +262,6 @@ object JsStateServiceCodecs {
   implicit val connectedSynchronizerRW
       : Codec[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
     deriveRelaxedCodec
-  implicit val participantPermissionEncoder: Encoder[state_service.ParticipantPermission] =
-    stringEncoderForEnum()
-
-  implicit val participantPermissionDecoder: Decoder[state_service.ParticipantPermission] =
-    stringDecoderForEnum()
 
   implicit val getLedgerEndRequestRW: Codec[state_service.GetLedgerEndRequest] = deriveRelaxedCodec
 
@@ -252,11 +276,10 @@ object JsStateServiceCodecs {
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   implicit val jsContractEntrySchema: Schema[JsContractEntry] = Schema.oneOfWrapped
 
-  implicit val participantPermissionRecognizedSchema
-      : Schema[state_service.ParticipantPermission.Recognized] =
-    Schema.oneOfWrapped
+  implicit val connectedSynchronizerSchema
+      : Schema[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
+    Schema.derived
 
-  implicit val participantPermissionSchema: Schema[state_service.ParticipantPermission] =
-    Schema.string
-
+  implicit val getConnectedSynchronizersRequestSchema
+      : Schema[state_service.GetConnectedSynchronizersRequest] = Schema.derived
 }

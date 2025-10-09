@@ -9,7 +9,7 @@ import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi}
+import com.digitalasset.canton.crypto.{CryptoPureApi, SynchronizerCrypto}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.PackageDependencyResolver
@@ -18,12 +18,17 @@ import com.digitalasset.canton.participant.store.{
   AcsCounterParticipantConfigStore,
   AcsInspection,
   ContractStore,
-  SyncPersistentState,
+  LogicalSyncPersistentState,
+  PhysicalSyncPersistentState,
 }
 import com.digitalasset.canton.participant.topology.ParticipantTopologyValidation
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.store.memory.{InMemorySendTrackerStore, InMemorySequencedEventStore}
-import com.digitalasset.canton.store.{IndexedStringStore, IndexedSynchronizer}
+import com.digitalasset.canton.store.{
+  IndexedPhysicalSynchronizer,
+  IndexedStringStore,
+  IndexedSynchronizer,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
@@ -41,49 +46,73 @@ import com.digitalasset.canton.util.ReassignmentTag.Target
 
 import scala.concurrent.ExecutionContext
 
-class InMemorySyncPersistentState(
-    participantId: ParticipantId,
-    clock: Clock,
-    crypto: Crypto,
-    override val indexedSynchronizer: IndexedSynchronizer,
-    val staticSynchronizerParameters: StaticSynchronizerParameters,
+class InMemoryLogicalSyncPersistentState(
+    override val synchronizerIdx: IndexedSynchronizer,
     override val enableAdditionalConsistencyChecks: Boolean,
     indexedStringStore: IndexedStringStore,
     contractStore: ContractStore,
     acsCounterParticipantConfigStore: AcsCounterParticipantConfigStore,
-    exitOnFatalFailures: Boolean,
-    packageDependencyResolver: PackageDependencyResolver,
     ledgerApiStore: Eval[LedgerApiStore],
     val loggerFactory: NamedLoggerFactory,
-    val timeouts: ProcessingTimeout,
-    val futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext)
-    extends SyncPersistentState {
+    extends LogicalSyncPersistentState {
 
-  override val pureCryptoApi: CryptoPureApi = crypto.pureCrypto
-
-  val activeContractStore =
+  override val activeContractStore =
     new InMemoryActiveContractStore(
       indexedStringStore,
       loggerFactory,
     )
-  val reassignmentStore =
-    new InMemoryReassignmentStore(Target(indexedSynchronizer.item), loggerFactory)
-  val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory, timeouts)
-  val requestJournalStore = new InMemoryRequestJournalStore(loggerFactory)
+
   val acsCommitmentStore =
     new InMemoryAcsCommitmentStore(
-      indexedSynchronizer.synchronizerId,
+      synchronizerIdx.synchronizerId,
       acsCounterParticipantConfigStore,
       loggerFactory,
     )
+
+  override val acsInspection: AcsInspection =
+    new AcsInspection(
+      synchronizerIdx.synchronizerId,
+      activeContractStore,
+      contractStore,
+      ledgerApiStore,
+    )
+
+  override val reassignmentStore =
+    new InMemoryReassignmentStore(Target(synchronizerIdx.item), loggerFactory)
+
+  override def close(): Unit = ()
+}
+
+class InMemoryPhysicalSyncPersistentState(
+    participantId: ParticipantId,
+    clock: Clock,
+    crypto: SynchronizerCrypto,
+    override val physicalSynchronizerIdx: IndexedPhysicalSynchronizer,
+    val staticSynchronizerParameters: StaticSynchronizerParameters,
+    exitOnFatalFailures: Boolean,
+    disableUpgradeValidation: Boolean,
+    packageDependencyResolver: PackageDependencyResolver,
+    ledgerApiStore: Eval[LedgerApiStore],
+    logicalSyncPersistentState: LogicalSyncPersistentState,
+    packageMetadataView: Eval[PackageMetadataView],
+    val loggerFactory: NamedLoggerFactory,
+    val timeouts: ProcessingTimeout,
+    val futureSupervisor: FutureSupervisor,
+)(implicit ec: ExecutionContext)
+    extends PhysicalSyncPersistentState {
+
+  override val pureCryptoApi: CryptoPureApi = crypto.pureCrypto
+
+  val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory, timeouts)
+  val requestJournalStore = new InMemoryRequestJournalStore(loggerFactory)
   val parameterStore = new InMemorySynchronizerParameterStore()
   val sendTrackerStore = new InMemorySendTrackerStore()
   val submissionTrackerStore = new InMemorySubmissionTrackerStore(loggerFactory)
 
   override val topologyStore =
     new InMemoryTopologyStore(
-      SynchronizerStore(indexedSynchronizer.synchronizerId),
+      SynchronizerStore(physicalSynchronizerIdx.synchronizerId),
       staticSynchronizerParameters.protocolVersion,
       loggerFactory,
       timeouts,
@@ -113,9 +142,12 @@ class InMemorySyncPersistentState(
       validatePackageVetting(
         currentlyVettedPackages,
         nextPackageIds,
+        Some(packageMetadataView.value),
         packageDependencyResolver,
-        acsInspections = () => Map(indexedSynchronizer.synchronizerId -> acsInspection),
+        acsInspections =
+          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
         forceFlags,
+        disableUpgradeValidation = disableUpgradeValidation,
       )
     override def checkCannotDisablePartyWithActiveContracts(
         partyId: PartyId,
@@ -126,7 +158,8 @@ class InMemorySyncPersistentState(
       checkCannotDisablePartyWithActiveContracts(
         partyId,
         forceFlags,
-        acsInspections = () => Map(indexedSynchronizer.synchronizerId -> acsInspection),
+        acsInspections =
+          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
       )
 
     override def checkInsufficientSignatoryAssigningParticipantsForParty(
@@ -144,7 +177,7 @@ class InMemorySyncPersistentState(
         nextThreshold,
         nextConfirmingParticipants,
         forceFlags,
-        () => Map(indexedSynchronizer.synchronizerId -> reassignmentStore),
+        () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.reassignmentStore),
         () => ledgerApiStore.value.ledgerEnd,
       )
 
@@ -157,7 +190,8 @@ class InMemorySyncPersistentState(
       checkInsufficientParticipantPermissionForSignatoryParty(
         partyId,
         forceFlags,
-        acsInspections = () => Map(indexedSynchronizer.synchronizerId -> acsInspection),
+        acsInspections =
+          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
       )
 
   }
@@ -166,11 +200,4 @@ class InMemorySyncPersistentState(
 
   override def close(): Unit = ()
 
-  override def acsInspection: AcsInspection =
-    new AcsInspection(
-      indexedSynchronizer.synchronizerId,
-      activeContractStore,
-      contractStore,
-      ledgerApiStore,
-    )
 }

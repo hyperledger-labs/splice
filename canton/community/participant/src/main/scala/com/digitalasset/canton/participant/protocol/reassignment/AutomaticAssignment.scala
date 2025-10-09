@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 private[participant] object AutomaticAssignment {
   def perform(
       id: ReassignmentId,
-      targetSynchronizer: Target[SynchronizerId],
+      targetSynchronizer: Target[PhysicalSynchronizerId],
       targetStaticSynchronizerParameters: Target[StaticSynchronizerParameters],
       reassignmentCoordination: ReassignmentCoordination,
       stakeholders: Set[LfPartyId],
@@ -63,7 +63,10 @@ private[participant] object AutomaticAssignment {
         : EitherT[FutureUnlessShutdown, ReassignmentProcessorError, com.google.rpc.status.Status] =
       for {
         targetIps <- reassignmentCoordination
-          .getTimeProofAndSnapshot(targetSynchronizer, targetStaticSynchronizerParameters)
+          .getTimeProofAndSnapshot(
+            targetSynchronizer,
+            targetStaticSynchronizerParameters,
+          )
           .map(_._2)
         possibleSubmittingParties <- EitherT.right(hostedStakeholders(targetIps.map(_.ipsSnapshot)))
         assignmentSubmitter <- EitherT.fromOption[FutureUnlessShutdown](
@@ -152,7 +155,7 @@ private[participant] object AutomaticAssignment {
                 case NoReassignmentData(_, ReassignmentCompleted(_, _)) =>
                   Either.unit
                 // Filter out the case that the participant has disconnected from the target synchronizer in the meantime.
-                case UnknownSynchronizer(synchronizer, _)
+                case UnknownPhysicalSynchronizer(synchronizer, _)
                     if synchronizer == targetSynchronizer.unwrap =>
                   Either.unit
                 case SynchronizerNotReady(synchronizer, _)

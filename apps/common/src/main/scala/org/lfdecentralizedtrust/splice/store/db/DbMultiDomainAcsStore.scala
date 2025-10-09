@@ -7,7 +7,7 @@ import cats.data.{NonEmptyList, OptionT}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Transaction}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -515,7 +515,7 @@ final class DbMultiDomainAcsStore[TXE](
       private def doInsertEntries(
           migrationId: Long,
           synchronizerId: SynchronizerId,
-          treesWithEntries: Seq[(TransactionTree, TXE)],
+          treesWithEntries: Seq[(Transaction, TXE)],
       ) = {
         treesWithEntries.headOption match {
           case None =>
@@ -1424,7 +1424,7 @@ final class DbMultiDomainAcsStore[TXE](
     private def ingestTransactionTree(
         synchronizerId: SynchronizerId,
         offset: Long,
-        tree: TransactionTree,
+        tree: Transaction,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
       val summary = MutableIngestionSummary.empty
 

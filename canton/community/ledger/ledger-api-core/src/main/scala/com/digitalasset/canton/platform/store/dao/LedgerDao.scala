@@ -40,12 +40,14 @@ private[platform] trait LedgerDaoUpdateReader {
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdatesResponse), NotUsed]
 
+  // TODO(#23504) remove when getTransactionById is removed
   @nowarn("cat=deprecation")
   def lookupTransactionById(
       updateId: UpdateId,
       internalTransactionFormat: InternalTransactionFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]]
 
+  // TODO(#23504) remove when getTransactionByOffset is removed
   @nowarn("cat=deprecation")
   def lookupTransactionByOffset(
       offset: Offset,
@@ -57,6 +59,7 @@ private[platform] trait LedgerDaoUpdateReader {
       internalUpdateFormat: InternalUpdateFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetUpdateResponse]]
 
+  // TODO(#23504) remove when getTransactionById is removed
   @nowarn("cat=deprecation")
   def getTransactionTrees(
       startInclusive: Offset,
@@ -67,6 +70,7 @@ private[platform] trait LedgerDaoUpdateReader {
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdateTreesResponse), NotUsed]
 
+  // TODO(#23504) remove when getTransactionById is removed
   @nowarn("cat=deprecation")
   def lookupTransactionTreeById(
       updateId: UpdateId,
@@ -74,6 +78,7 @@ private[platform] trait LedgerDaoUpdateReader {
       eventProjectionProperties: EventProjectionProperties,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionTreeResponse]]
 
+  // TODO(#23504) remove when getTransactionById is removed
   @nowarn("cat=deprecation")
   def lookupTransactionTreeByOffset(
       offset: Offset,
@@ -155,19 +160,17 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
     */
   def prune(
       pruneUpToInclusive: Offset,
-      pruneAllDivulgedContracts: Boolean,
       incompletReassignmentOffsets: Vector[Offset],
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Unit]
 
-  /** Return the pruned offsets from the parameters table (if defined) as a tuple of
-    * (participant_all_divulged_contracts_pruned_up_to_inclusive,
-    * participant_pruned_up_to_inclusive)
+  /** Return the latest pruned offset inclusive (participant_pruned_up_to_inclusive) from the
+    * parameters table (if defined)
     */
-  def pruningOffsets(implicit
+  def pruningOffset(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[(Option[Offset], Option[Offset])]
+  ): Future[Option[Offset]]
 }
 
 // TODO(i12285) sandbox-classic clean-up: This interface and its implementation is only used in the JdbcLedgerDao suite
@@ -219,6 +222,7 @@ private[platform] trait LedgerWriteDaoForTests extends ReportsHealth {
       offset: Offset,
       transaction: CommittedTransaction,
       recordTime: Timestamp,
+      contractActivenessChanged: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse]

@@ -3,7 +3,11 @@
 
 package com.digitalasset.canton.platform.store.backend
 
+import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
+import com.digitalasset.canton.crypto.{Hash, HashPurpose}
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
+import com.google.protobuf.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -70,7 +74,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       "synchronizer8",
       "synchronizer9",
     ).sorted
-    iterators.packageNames.toList.sorted shouldBe List(
+    iterators.packageIds.toList.sorted shouldBe List(
       "25.1",
       "50.1",
       "87.1",
@@ -80,6 +84,12 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
 
   private val serializableTraceContext =
     SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
+
+  private val externalTransactionHash =
+    Hash
+      .digest(HashPurpose.PreparedSubmission, ByteString.copyFromUtf8("mock_hash"), Sha256)
+      .unwrap
+      .toByteArray
 
   private def fixture: List[DbDto] = List(
     DbDto.PartyEntry(
@@ -106,7 +116,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       node_id = 1,
       contract_id = Array(24),
       template_id = "25",
-      package_name = "25.1",
+      package_id = "25.1",
       flat_event_witnesses = Set("26", "27", "28"),
       tree_event_witnesses = Set("29", "30", "31"),
       create_argument = Array.empty,
@@ -118,10 +128,11 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       create_argument_compression = Some(1),
       create_key_value_compression = Some(1),
       event_sequential_id = 1,
-      driver_metadata = Array.empty,
+      authentication_data = Array.empty,
       synchronizer_id = "synchronizer2",
       trace_context = serializableTraceContext,
       record_time = 1,
+      external_transaction_hash = Some(externalTransactionHash),
     ),
     DbDto.EventExercise(
       consuming = true,
@@ -135,14 +146,12 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       node_id = 1,
       contract_id = Array(49),
       template_id = "50",
-      package_name = "50.1",
+      package_id = "50.1",
       flat_event_witnesses = Set("51", "52", "53"),
       tree_event_witnesses = Set("54", "55", "56"),
       exercise_argument = Array.empty,
       exercise_actors = Set("57", "58", "59"),
-      create_key_value = None,
       exercise_argument_compression = Some(1),
-      create_key_value_compression = Some(1),
       event_sequential_id = 1,
       exercise_choice = "60",
       exercise_result = None,
@@ -151,6 +160,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       synchronizer_id = "synchronizer3",
       trace_context = serializableTraceContext,
       record_time = 1,
+      external_transaction_hash = Some(externalTransactionHash),
     ),
     DbDto.CommandCompletion(
       completion_offset = 64,
@@ -181,7 +191,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       node_id = 0,
       contract_id = Array(114),
       template_id = "87",
-      package_name = "87.1",
+      package_id = "87.1",
       flat_event_witnesses = Set("88", "89"),
       create_argument = Array.empty,
       create_signatories = Set("90", "91"),
@@ -193,10 +203,10 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       create_key_value_compression = None,
       event_sequential_id = 0,
       ledger_effective_time = 0,
-      driver_metadata = Array.empty,
+      authentication_data = Array.empty,
       source_synchronizer_id = "synchronizer5",
       target_synchronizer_id = "synchronizer6",
-      unassign_id = "",
+      reassignment_id = "",
       reassignment_counter = 0,
       trace_context = serializableTraceContext,
       record_time = 0,
@@ -210,12 +220,12 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       node_id = 0,
       contract_id = Array(115),
       template_id = "94",
-      package_name = "94.1",
+      package_id = "94.1",
       flat_event_witnesses = Set("95", "96"),
       event_sequential_id = 0,
       source_synchronizer_id = "synchronizer7",
       target_synchronizer_id = "synchronizer8",
-      unassign_id = "",
+      reassignment_id = "",
       reassignment_counter = 0,
       assignment_exclusivity = None,
       trace_context = serializableTraceContext,

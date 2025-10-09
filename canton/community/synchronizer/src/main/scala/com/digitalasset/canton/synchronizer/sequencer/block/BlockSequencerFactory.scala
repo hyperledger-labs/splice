@@ -8,16 +8,14 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator
+import com.digitalasset.canton.synchronizer.block.BlockSequencerStateManager
 import com.digitalasset.canton.synchronizer.block.data.SequencerBlockStore
-import com.digitalasset.canton.synchronizer.block.{
-  BlockSequencerStateManager,
-  UninitializedBlockHeight,
-}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.DatabaseSequencerConfig.TestingInterceptor
@@ -34,7 +32,7 @@ import com.digitalasset.canton.synchronizer.sequencing.traffic.{
   TrafficPurchasedManager,
 }
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
@@ -66,6 +64,7 @@ abstract class BlockSequencerFactory(
       protocolVersion,
       sequencerId,
       blockSequencerMode = true,
+      metrics,
     )
     with NamedLogging {
 
@@ -83,6 +82,7 @@ abstract class BlockSequencerFactory(
     nodeParameters.processingTimeouts,
     loggerFactory,
     nodeParameters.batchingConfig.aggregator,
+    sequencerStore,
   )
 
   private val trafficConsumedStore = TrafficConsumedStore(
@@ -90,6 +90,7 @@ abstract class BlockSequencerFactory(
     nodeParameters.processingTimeouts,
     loggerFactory,
     nodeParameters.batchingConfig,
+    sequencerStore,
   )
 
   protected val name: String
@@ -98,7 +99,6 @@ abstract class BlockSequencerFactory(
 
   protected def createBlockSequencer(
       name: String,
-      synchronizerId: SynchronizerId,
       cryptoApi: SynchronizerCryptoClient,
       stateManager: BlockSequencerStateManager,
       store: SequencerBlockStore,
@@ -108,9 +108,9 @@ abstract class BlockSequencerFactory(
       health: Option[SequencerHealthConfig],
       clock: Clock,
       driverClock: Clock,
-      protocolVersion: ProtocolVersion,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       initialBlockHeight: Option[Long],
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
@@ -176,13 +176,13 @@ abstract class BlockSequencerFactory(
     )
 
   override final def create(
-      synchronizerId: SynchronizerId,
       sequencerId: SequencerId,
       clock: Clock,
       driverClock: Clock,
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot] = None,
       authenticationServices: Option[AuthenticationServices] = None,
@@ -191,19 +191,14 @@ abstract class BlockSequencerFactory(
       tracer: trace.Tracer,
       actorMaterializer: Materializer,
   ): FutureUnlessShutdown[Sequencer] = {
-    val initialBlockHeight = {
-      val last = nodeParameters.processingTimeouts.unbounded
+    val initialBlockHeight =
+      nodeParameters.processingTimeouts.unbounded
         .awaitUS(s"Reading the $name store head to get the initial block height")(
           store.readHead
         )
         .map(
-          _.latestBlock.height
+          _.map(_.latestBlock.height + 1)
         )
-      last.map {
-        case result if result == UninitializedBlockHeight => None
-        case result => Some(result + 1)
-      }
-    }
 
     initialBlockHeight match {
       case UnlessShutdown.Outcome(result) =>
@@ -232,14 +227,15 @@ abstract class BlockSequencerFactory(
       trafficConfig,
     )
 
-    val synchronizerLoggerFactory = loggerFactory.append("synchronizerId", synchronizerId.toString)
+    val synchronizerLoggerFactory =
+      loggerFactory.append("synchronizerId", synchronizerSyncCryptoApi.psid.toString)
 
     for {
       initialBlockHeight <- FutureUnlessShutdown(Future.successful(initialBlockHeight))
       _ <- balanceManager.initialize
       stateManager <- FutureUnlessShutdown.lift(
         BlockSequencerStateManager.create(
-          synchronizerId,
+          synchronizerSyncCryptoApi.psid,
           store,
           trafficConsumedStore,
           nodeParameters.enableAdditionalConsistencyChecks,
@@ -252,7 +248,6 @@ abstract class BlockSequencerFactory(
     } yield {
       val sequencer = createBlockSequencer(
         name,
-        synchronizerId,
         synchronizerSyncCryptoApi,
         stateManager,
         store,
@@ -262,9 +257,9 @@ abstract class BlockSequencerFactory(
         health,
         clock,
         driverClock,
-        protocolVersion,
         rateLimitManager,
         orderingTimeFixMode,
+        sequencingTimeLowerBoundExclusive,
         initialBlockHeight,
         sequencerSnapshot,
         authenticationServices,

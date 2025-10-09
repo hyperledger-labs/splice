@@ -7,7 +7,8 @@ import better.files.File
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
-import com.digitalasset.canton.admin.participant.v30.ExportAcsOldResponse
+import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, ExportAcsResponse}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
@@ -26,8 +27,8 @@ import com.digitalasset.canton.participant.admin.data.{
   RepairContract,
 }
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.version.ProtocolVersion
@@ -66,7 +67,7 @@ class ParticipantRepairAdministration(
       synchronizerAlias: SynchronizerAlias,
       contractIds: Seq[LfContractId],
       ignoreAlreadyPurged: Boolean = true,
-  ): Unit =
+  ): Unit = check(FeatureFlag.Repair) {
     consoleEnvironment.run {
       runner.adminCommand(
         ParticipantAdminCommands.ParticipantRepairManagement.PurgeContracts(
@@ -76,8 +77,9 @@ class ParticipantRepairAdministration(
         )
       )
     }
+  }
 
-  @Help.Summary("Migrate contracts from one synchronizer to another one.")
+  @Help.Summary("Migrate contracts from one synchronizer to another one.", FeatureFlag.Repair)
   @Help.Description(
     """Migrates all contracts associated with a synchronizer to a new synchronizer.
         |This method will register the new synchronizer, connect to it and then re-associate all contracts from the source
@@ -101,11 +103,13 @@ class ParticipantRepairAdministration(
       target: SynchronizerConnectionConfig,
       force: Boolean = false,
   ): Unit =
-    consoleEnvironment.run {
-      runner.adminCommand(
-        ParticipantAdminCommands.ParticipantRepairManagement
-          .MigrateSynchronizer(source, target, force = force)
-      )
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement
+            .MigrateSynchronizer(source, target, force = force)
+        )
+      }
     }
 
   @Help.Summary("Change assignation of contracts from one synchronizer to another.")
@@ -272,6 +276,58 @@ class ParticipantRepairAdministration(
       }
     }
 
+  @Help.Summary("Export active contracts for the given set of parties to a file.")
+  @Help.Description(
+    """This command exports the current Active Contract Set (ACS) of a given set of parties to a
+      |GZIP compressed ACS snapshot file. Afterwards, the `import_acs` repair command imports it
+      |into a participant's ACS again.
+      |
+      |The arguments are:
+      |- parties: Identifying contracts having at least one stakeholder from the given set.
+      |- ledgerOffset: The offset at which the ACS snapshot is exported.
+      |- exportFilePath: The path denoting the file where the ACS snapshot will be stored.
+      |- excludedStakeholders: When defined, any contract that has one or more of these parties as
+      |                        a stakeholder will be omitted from the ACS snapshot.
+      |- synchronizerId: When defined, restricts the export to the given synchronizer.
+      |- contractSynchronizerRenames: Changes the associated synchronizer id of contracts from
+      |                               one synchronizer to another based on the mapping.
+      |- timeout: A timeout for this operation to complete.
+      """
+  )
+  def export_acs(
+      parties: Set[PartyId],
+      ledgerOffset: NonNegativeLong,
+      exportFilePath: String = "canton-acs-export.gz",
+      excludedStakeholders: Set[PartyId] = Set.empty,
+      synchronizerId: Option[SynchronizerId] = None,
+      contractSynchronizerRenames: Map[SynchronizerId, SynchronizerId] = Map.empty,
+      timeout: NonNegativeDuration = timeouts.unbounded,
+  ): Unit =
+    consoleEnvironment.run {
+      val file = File(exportFilePath)
+      val responseObserver = new FileStreamObserver[ExportAcsResponse](file, _.chunk)
+
+      def call: ConsoleCommandResult[Context.CancellableContext] =
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
+            parties,
+            synchronizerId,
+            ledgerOffset,
+            responseObserver,
+            contractSynchronizerRenames,
+            excludedStakeholders,
+          )
+        )
+
+      processResult(
+        call,
+        responseObserver.result,
+        timeout,
+        request = "exporting acs",
+        cleanupOnError = () => file.delete(),
+      )
+    }
+
   @Help.Summary("Import active contracts from an Active Contract Set (ACS) snapshot file.")
   @Help.Description(
     """This command imports contracts from an ACS snapshot file into the participant's ACS. It
@@ -312,12 +368,15 @@ class ParticipantRepairAdministration(
       |                  "import-<random_UUID>" when undefined.
       |- contractIdImportMode: Governs contract ID processing on import. Options include
       |                        Validation (default), [Accept, Recomputation].
+      |- excludedStakeholders: When defined, any contract that has one or more of these
+      |                        parties as a stakeholder will be omitted from the import.
       """
   )
   def import_acs(
       importFilePath: String = "canton-acs-export.gz",
       workflowIdPrefix: String = "",
       contractIdImportMode: ContractIdImportMode = ContractIdImportMode.Validation,
+      excludedStakeholders: Set[PartyId] = Set.empty,
   ): Map[LfContractId, LfContractId] =
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
@@ -326,6 +385,7 @@ class ParticipantRepairAdministration(
             ByteString.copyFrom(File(importFilePath).loadBytes),
             if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
             contractIdImportMode = contractIdImportMode,
+            excludedStakeholders,
           )
         )
       }
@@ -362,11 +422,15 @@ class ParticipantRepairAdministration(
     ResourceUtil.withResource(outputStream) { outputStream =>
       contracts
         .traverse_ { repairContract =>
-          val activeContract = ActiveContractOld
-            .create(synchronizerId, repairContract.contract, repairContract.reassignmentCounter)(
-              protocolVersion
-            )
-          activeContract.writeDelimitedTo(outputStream).map(_ => outputStream.flush())
+          for {
+            serializableContract <- ContractInstance.toSerializableContract(repairContract.contract)
+            activeContract = ActiveContractOld.create(
+              synchronizerId,
+              serializableContract,
+              repairContract.reassignmentCounter,
+            )(protocolVersion)
+            _ <- activeContract.writeDelimitedTo(outputStream)
+          } yield outputStream.flush()
         }
         .valueOr(err => throw new RuntimeException(s"Unable to add contract data to stream: $err"))
     }
@@ -422,7 +486,7 @@ class ParticipantRepairAdministration(
       |(Ignoring such events would normally have no effect, as they have already been processed.)"""
   )
   def ignore_events(
-      synchronizerId: SynchronizerId,
+      physicalSynchronizerId: PhysicalSynchronizerId,
       fromInclusive: SequencerCounter,
       toInclusive: SequencerCounter,
       force: Boolean = false,
@@ -431,7 +495,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement
-            .IgnoreEvents(synchronizerId, fromInclusive, toInclusive, force)
+            .IgnoreEvents(physicalSynchronizerId, fromInclusive, toInclusive, force)
         )
       }
     }
@@ -450,7 +514,7 @@ class ParticipantRepairAdministration(
       |(Unignoring such events would normally have no effect, as they have already been processed.)"""
   )
   def unignore_events(
-      synchronizerId: SynchronizerId,
+      physicalSynchronizerId: PhysicalSynchronizerId,
       fromInclusive: SequencerCounter,
       toInclusive: SequencerCounter,
       force: Boolean = false,
@@ -458,7 +522,7 @@ class ParticipantRepairAdministration(
     consoleEnvironment.run {
       runner.adminCommand(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .UnignoreEvents(synchronizerId, fromInclusive, toInclusive, force)
+          .UnignoreEvents(physicalSynchronizerId, fromInclusive, toInclusive, force)
       )
     }
   }
@@ -467,12 +531,12 @@ class ParticipantRepairAdministration(
   @Help.Description(
     """This is a last resort command to recover from an unassignment that cannot be completed on the target synchronizer.
         Arguments:
-        - unassignId - set of contract ids that should change assignation to the new synchronizer
+        - reassignmentId - set of contract ids that should change assignation to the new synchronizer
         - source - the source synchronizer id
         - target - alias of the target synchronizer"""
   )
   def rollback_unassignment(
-      unassignId: String,
+      reassignmentId: String,
       source: SynchronizerId,
       target: SynchronizerId,
   ): Unit =
@@ -480,7 +544,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement
-            .RollbackUnassignment(unassignId = unassignId, source = source, target = target)
+            .RollbackUnassignment(reassignmentId = reassignmentId, source = source, target = target)
         )
       }
     }

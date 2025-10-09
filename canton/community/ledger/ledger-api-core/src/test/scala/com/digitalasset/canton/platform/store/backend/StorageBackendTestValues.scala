@@ -17,9 +17,11 @@ import com.digitalasset.canton.platform.store.backend.Conversions.{
 }
 import com.digitalasset.canton.platform.store.dao.JdbcLedgerDao
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.archive.DamlLf
 import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Ref.{NameTypeConRef, NameTypeConRefConverter}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -48,10 +50,10 @@ private[store] object StorageBackendTestValues {
   val someParticipantId: ParticipantId = ParticipantId(
     Ref.ParticipantId.assertFromString("participant")
   )
-  val someTemplateId: Ref.Identifier = Ref.Identifier.assertFromString("pkg:Mod:Template")
-  val someTemplateId2: Ref.Identifier = Ref.Identifier.assertFromString("pkg:Mod:Template2")
-  val someTemplateId3: Ref.Identifier = Ref.Identifier.assertFromString("pkg:Mod:Template3")
-  val somePackageName: Ref.PackageName = Ref.PackageName.assertFromString("pkg-name")
+  val somePackageId: Ref.PackageId = Ref.PackageId.assertFromString("pkg")
+  val someTemplateId: NameTypeConRef = NameTypeConRef.assertFromString("#pkg-name:Mod:Template")
+  val someTemplateIdFull: Ref.FullIdentifier = someTemplateId.toFullIdentifier(somePackageId)
+  val someTemplateId2: NameTypeConRef = NameTypeConRef.assertFromString("#pkg-name:Mod:Template2")
   val someIdentityParams: ParameterStorageBackend.IdentityParams =
     ParameterStorageBackend.IdentityParams(someParticipantId)
   val someParty: Ref.Party = Ref.Party.assertFromString("party")
@@ -59,8 +61,8 @@ private[store] object StorageBackendTestValues {
   val someParty3: Ref.Party = Ref.Party.assertFromString("party3")
   val someUserId: Ref.UserId = Ref.UserId.assertFromString("user_id")
   val someSubmissionId: Ref.SubmissionId = Ref.SubmissionId.assertFromString("submission_id")
-  val someDriverMetadata: Bytes = Bytes.assertFromString("00abcd")
-  val someDriverMetadataBytes: Array[Byte] = someDriverMetadata.toByteArray
+  val someAuthenticationData: Bytes = Bytes.assertFromString("00abcd")
+  val someAuthenticationDataBytes: Array[Byte] = someAuthenticationData.toByteArray
 
   val someArchive: DamlLf.Archive = DamlLf.Archive.newBuilder
     .setHash("00001")
@@ -102,13 +104,15 @@ private[store] object StorageBackendTestValues {
       nonStakeholderInformees: Set[String] = Set.empty,
       commandId: String = UUID.randomUUID().toString,
       ledgerEffectiveTime: Timestamp = someTime,
-      driverMetadata: Array[Byte] = Array.empty,
+      authenticationData: Array[Byte] = Array.empty,
       keyHash: Option[String] = None,
       synchronizerId: String = "x::sourcesynchronizer",
       createKey: Option[Array[Byte]] = None,
       createKeyMaintainer: Option[String] = None,
       traceContext: Array[Byte] = serializableTraceContext,
       recordTime: Timestamp = someTime,
+      externalTransactionHash: Option[Array[Byte]] = None,
+      emptyFlatEventWitnesses: Boolean = false,
   ): DbDto.EventCreate = {
     val updateId = updateIdFromOffset(offset)
     val stakeholders = Set(signatory, observer)
@@ -124,8 +128,8 @@ private[store] object StorageBackendTestValues {
       node_id = 0,
       contract_id = contractId.toBytes.toByteArray,
       template_id = someTemplateId.toString,
-      package_name = somePackageName.toString,
-      flat_event_witnesses = stakeholders,
+      package_id = somePackageId.toString,
+      flat_event_witnesses = if (!emptyFlatEventWitnesses) stakeholders else Set.empty,
       tree_event_witnesses = informees,
       create_argument = someSerializedDamlLfValue,
       create_signatories = Set(signatory),
@@ -136,10 +140,11 @@ private[store] object StorageBackendTestValues {
       create_argument_compression = None,
       create_key_value_compression = None,
       event_sequential_id = eventSequentialId,
-      driver_metadata = driverMetadata,
+      authentication_data = authenticationData,
       synchronizer_id = synchronizerId,
       trace_context = traceContext,
       record_time = recordTime.micros,
+      external_transaction_hash = externalTransactionHash,
     )
   }
 
@@ -161,6 +166,8 @@ private[store] object StorageBackendTestValues {
       synchronizerId: String = "x::sourcesynchronizer",
       traceContext: Array[Byte] = serializableTraceContext,
       recordTime: Timestamp = someTime,
+      externalTransactionHash: Option[Array[Byte]] = None,
+      emptyFlatEventWitnesses: Boolean = false,
   ): DbDto.EventExercise = {
     val updateId = updateIdFromOffset(offset)
     DbDto.EventExercise(
@@ -175,22 +182,22 @@ private[store] object StorageBackendTestValues {
       node_id = 0,
       contract_id = contractId.toBytes.toByteArray,
       template_id = someTemplateId.toString,
-      package_name = somePackageName,
-      flat_event_witnesses = if (consuming) Set(signatory) else Set.empty,
+      package_id = somePackageId,
+      flat_event_witnesses =
+        if (consuming && !emptyFlatEventWitnesses) Set(signatory) else Set.empty,
       tree_event_witnesses = Set(signatory, actor),
-      create_key_value = None,
       exercise_choice = "exercise_choice",
       exercise_argument = someSerializedDamlLfValue,
       exercise_result = Some(someSerializedDamlLfValue),
       exercise_actors = Set(actor),
       exercise_last_descendant_node_id = 0,
-      create_key_value_compression = None,
       exercise_argument_compression = None,
       exercise_result_compression = None,
       event_sequential_id = eventSequentialId,
       synchronizer_id = synchronizerId,
       trace_context = traceContext,
       record_time = recordTime.micros,
+      external_transaction_hash = externalTransactionHash,
     )
   }
 
@@ -201,7 +208,7 @@ private[store] object StorageBackendTestValues {
       signatory: String = "signatory",
       observer: String = "observer",
       commandId: String = UUID.randomUUID().toString,
-      driverMetadata: Bytes = someDriverMetadata,
+      authenticationData: Bytes = someAuthenticationData,
       sourceSynchronizerId: String = "x::sourcesynchronizer",
       targetSynchronizerId: String = "x::targetsynchronizer",
       traceContext: Array[Byte] = serializableTraceContext,
@@ -218,7 +225,7 @@ private[store] object StorageBackendTestValues {
       node_id = nodeId,
       contract_id = contractId.toBytes.toByteArray,
       template_id = someTemplateId.toString,
-      package_name = somePackageName.toString,
+      package_id = somePackageId.toString,
       flat_event_witnesses = Set(signatory, observer),
       create_argument = someSerializedDamlLfValue,
       create_signatories = Set(signatory),
@@ -230,10 +237,10 @@ private[store] object StorageBackendTestValues {
       create_key_value_compression = Some(456),
       event_sequential_id = eventSequentialId,
       ledger_effective_time = someTime.micros,
-      driver_metadata = driverMetadata.toByteArray,
+      authentication_data = authenticationData.toByteArray,
       source_synchronizer_id = sourceSynchronizerId,
       target_synchronizer_id = targetSynchronizerId,
-      unassign_id = "123456789",
+      reassignment_id = "123456789",
       reassignment_counter = 1000L,
       trace_context = traceContext,
       record_time = recordTime.micros,
@@ -263,12 +270,12 @@ private[store] object StorageBackendTestValues {
       node_id = nodeId,
       contract_id = contractId.toBytes.toByteArray,
       template_id = someTemplateId.toString,
-      package_name = somePackageName,
+      package_id = somePackageId,
       flat_event_witnesses = Set(signatory, observer),
       event_sequential_id = eventSequentialId,
       source_synchronizer_id = sourceSynchronizerId,
       target_synchronizer_id = targetSynchronizerId,
-      unassign_id = "123456789",
+      reassignment_id = "123456789",
       reassignment_counter = 1000L,
       assignment_exclusivity = Some(11111),
       trace_context = traceContext,
@@ -359,7 +366,7 @@ private[store] object StorageBackendTestValues {
 
   def dtoCreateFilter(
       event_sequential_id: Long,
-      template_id: Ref.Identifier,
+      template_id: NameTypeConRef,
       party_id: String,
   ): DbDto.IdFilterCreateStakeholder =
     DbDto.IdFilterCreateStakeholder(event_sequential_id, template_id.toString, party_id)

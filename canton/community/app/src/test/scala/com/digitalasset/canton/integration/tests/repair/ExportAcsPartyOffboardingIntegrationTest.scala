@@ -34,7 +34,7 @@ from the ACS. Since we don't have the tooling to do that and since it would open
 other cans of worms (contract key journal), we make sure that the export_acs_old endpoint
 refuses to serve such a request.
  */
-class ExportAcsPartyOffboardingIntegrationTest
+final class ExportAcsPartyOffboardingIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with AcsInspection {
@@ -90,7 +90,7 @@ class ExportAcsPartyOffboardingIntegrationTest
               outputFile = file.canonicalPath,
             ),
             _.commandFailureMessage should (include(
-              s"Parties offboarding on synchronizer $daId"
+              s"Parties offboarding on synchronizer ${daId.logical}"
             ) and
               include(
                 s"Cannot take snapshot to offboard parties ${List(alice.toProtoPrimitive)}"

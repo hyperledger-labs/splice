@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
@@ -78,7 +78,7 @@ trait SvTestUtil extends TestCommon {
   def confirmActionByAllSvs(
       confirmingSvs: Seq[ConfirmingSv],
       action: ActionRequiringConfirmation,
-  )(implicit env: SpliceTestConsoleEnvironment): Seq[TransactionTree] = {
+  )(implicit env: SpliceTestConsoleEnvironment): Seq[Transaction] = {
     confirmingSvs.map { case ConfirmingSv(participantClient, svPartyId) =>
       confirmAction(participantClient, svPartyId, action)
     }
@@ -193,7 +193,7 @@ trait SvTestUtil extends TestCommon {
       participantClient: ParticipantClientReference,
       svPartyId: PartyId,
       action: ActionRequiringConfirmation,
-  )(implicit env: SpliceTestConsoleEnvironment): TransactionTree = {
+  )(implicit env: SpliceTestConsoleEnvironment): Transaction = {
     eventuallySucceeds() {
       val dsoRulesCid = participantClient.ledger_api_extensions.acs
         .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)

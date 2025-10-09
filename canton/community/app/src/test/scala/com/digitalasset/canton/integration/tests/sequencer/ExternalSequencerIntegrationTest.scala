@@ -39,7 +39,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftSequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing.BftSequencerFactory
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
@@ -183,48 +183,16 @@ private[tests] final case class QuickSequencerReconnection(
 }
 
 class ExternalReferenceSequencerIntegrationTest
-    extends ExternalSequencerIntegrationTest("reference")
-    with SequencerRestartTest {
+    extends ExternalSequencerIntegrationTest("reference") {
 
   override protected lazy val sequencerPlugin
       : UseCommunityReferenceBlockSequencer[DbConfig.Postgres] =
     new UseCommunityReferenceBlockSequencer[Postgres](loggerFactory)
 }
 
-// The BFT Orderer currently does not fully support crash tolerance, therefore it cannot be
-// reliably tested for that. So for now we only test BasicSequencerTest (ping and bong).
-// When crash tolerance is supported the test below can be uncommented out and the following one removed.
-// TODO(#16761): re-enable the test below (and remove the replacement) once crash recovery is implemented
-
-//class ExternalBftOrderingSequencerIntegrationTest
-//    extends ExternalSequencerIntegrationTest(BftOrderingBlockSequencerFactory.ShortName)
-//    with SequencerRestartTest {
-//
-//  override protected lazy val sequencerPlugin
-//      : UseBftOrderingBlockSequencer =
-//    new UseBftOrderingBlockSequencer(loggerFactory)
-//}
-
 class ExternalBftOrderingSequencerIntegrationTest
-    extends CommunityIntegrationTest
-    with SharedEnvironment[CantonConfig, CantonEnvironment]
-    with HasExecutionContext
-    with BasicSequencerTest {
+    extends ExternalSequencerIntegrationTest(BftSequencerFactory.ShortName) {
 
-  registerPlugin(new UseBftSequencer(loggerFactory))
-  override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P2_S2M1.withSetup { implicit env =>
-      import env.*
-      // wait for the synchronizer to have fully started
-      sequencer1.health.wait_for_initialized()
-      sequencer2.health.wait_for_initialized()
-      logger.info(s"synchronizer on $name external sequencer has started")
-      logger.info(s"$name external sequencer environment: connecting participants to sequencers")
-      participant1.synchronizers.connect_local(sequencer1, daName)
-      participant2.synchronizers.connect_local(sequencer2, daName)
-      sequencer1.health.status.trySuccess.connectedParticipants should contain(participant1.id)
-      sequencer2.health.status.trySuccess.connectedParticipants should contain(participant2.id)
-      logger.info(s"$name external sequencer environment is ready")
-    }
-  override def name: String = BftSequencerFactory.ShortName
+  override protected lazy val sequencerPlugin: UseBftSequencer =
+    new UseBftSequencer(loggerFactory)
 }

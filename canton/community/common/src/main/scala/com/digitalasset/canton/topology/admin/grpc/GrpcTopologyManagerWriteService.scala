@@ -16,9 +16,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
-import com.digitalasset.canton.protocol.v30.TopologyMapping.Mapping
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId as AdminTopologyStoreId
 import com.digitalasset.canton.topology.admin.v30
@@ -38,8 +36,17 @@ import io.grpc.stub.StreamObserver
 
 import scala.concurrent.{ExecutionContext, Future}
 
+/** @param managers
+  *   A sequence of topology managers. The type [[com.digitalasset.canton.crypto.BaseCrypto]] is
+  *   used to accommodate various implementations of
+  *   [[com.digitalasset.canton.topology.TopologyManager]], including
+  *   [[com.digitalasset.canton.topology.LocalTopologyManager]] and
+  *   [[com.digitalasset.canton.topology.SynchronizerTopologyManager]], which depend on different
+  *   crypto types.
+  */
 class GrpcTopologyManagerWriteService(
-    managers: => Seq[TopologyManager[TopologyStoreId]],
+    managers: => Seq[TopologyManager[TopologyStoreId, BaseCrypto]],
+    physicalSynchronizerIdLookup: PSIdLookup,
     temporaryStoreRegistry: TemporaryStoreRegistry,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
@@ -106,7 +113,7 @@ class GrpcTopologyManagerWriteService(
           mapping <- ProtoConverter.required("AuthorizeRequest.mapping", mapping)
           signingKeys <- signedBy.traverse(Fingerprint.fromProtoPrimitive)
           forceFlags <- ForceFlags.fromProtoV30(forceChanges)
-          validatedMapping <- deserializeTopologyMapping(mapping.mapping)
+          validatedMapping <- TopologyMapping.fromProtoV30(mapping)
         } yield {
           (op, serial, validatedMapping, signingKeys, forceFlags)
         }
@@ -138,39 +145,6 @@ class GrpcTopologyManagerWriteService(
     }
     CantonGrpcUtil.mapErrNewEUS(result.map(tx => v30.AuthorizeResponse(Some(tx.toProtoV30))))
   }
-
-  private def deserializeTopologyMapping(mapping: Mapping): ParsingResult[TopologyMapping] =
-    mapping match {
-      case Mapping.Empty => FieldNotSet("mapping").asLeft
-      case Mapping.DecentralizedNamespaceDefinition(mapping) =>
-        DecentralizedNamespaceDefinition.fromProtoV30(mapping)
-      case Mapping.NamespaceDelegation(mapping) =>
-        NamespaceDelegation.fromProtoV30(mapping)
-      case Mapping.SynchronizerParametersState(mapping) =>
-        SynchronizerParametersState.fromProtoV30(mapping)
-      case Mapping.SequencingDynamicParametersState(mapping) =>
-        DynamicSequencingParametersState.fromProtoV30(mapping)
-      case Mapping.MediatorSynchronizerState(mapping) =>
-        MediatorSynchronizerState.fromProtoV30(mapping)
-      case Mapping.SequencerSynchronizerState(mapping) =>
-        SequencerSynchronizerState.fromProtoV30(mapping)
-      case Mapping.PartyToParticipant(mapping) =>
-        PartyToParticipant.fromProtoV30(mapping)
-      case Mapping.SynchronizerTrustCertificate(mapping) =>
-        SynchronizerTrustCertificate.fromProtoV30(mapping)
-      case Mapping.OwnerToKeyMapping(mapping) =>
-        OwnerToKeyMapping.fromProtoV30(mapping)
-      case Mapping.VettedPackages(mapping) =>
-        VettedPackages.fromProtoV30(mapping)
-      case Mapping.ParticipantPermission(mapping) =>
-        ParticipantSynchronizerPermission.fromProtoV30(mapping)
-      case Mapping.PartyHostingLimits(mapping) =>
-        PartyHostingLimits.fromProtoV30(mapping)
-      case Mapping.PurgeTopologyTxs(mapping) =>
-        PurgeTopologyTransaction.fromProtoV30(mapping)
-      case Mapping.PartyToKeyMapping(mapping) =>
-        PartyToKeyMapping.fromProtoV30(mapping)
-    }
 
   override def signTransactions(
       requestP: v30.SignTransactionsRequest
@@ -302,11 +276,18 @@ class GrpcTopologyManagerWriteService(
       }
     } yield ()
 
+  /** @return
+    *   the appropriate [[com.digitalasset.canton.topology.TopologyManager]] corresponding to the
+    *   provided store ID. The manager uses [[com.digitalasset.canton.crypto.BaseCrypto]] to
+    *   abstract over different types of topology managers that rely on distinct crypto types, such
+    *   as [[com.digitalasset.canton.topology.LocalTopologyManager]] or
+    *   [[com.digitalasset.canton.topology.SynchronizerTopologyManager]].
+    */
   private def targetManagerET(
       store: Option[v30.StoreId]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, RpcError, TopologyManager[TopologyStoreId]] =
+  ): EitherT[FutureUnlessShutdown, RpcError, TopologyManager[TopologyStoreId, BaseCrypto]] =
     for {
       targetStore <- EitherT.fromEither[FutureUnlessShutdown](
         ProtoConverter
@@ -317,10 +298,13 @@ class GrpcTopologyManagerWriteService(
           )
           .leftMap(ProtoDeserializationFailure.Wrap(_))
       )
+      targetStoreInternal <- EitherT
+        .fromEither[FutureUnlessShutdown](targetStore.toInternal(physicalSynchronizerIdLookup))
+        .leftMap(TopologyManagerError.InvalidSynchronizer.Failure(_))
       manager <- EitherT
         .fromOption[FutureUnlessShutdown](
-          managers.find(_.store.storeId == targetStore.toInternal),
-          TopologyManagerError.TopologyStoreUnknown.Failure(targetStore.toInternal),
+          managers.find(_.store.storeId == targetStoreInternal),
+          TopologyManagerError.TopologyStoreUnknown.Failure(targetStoreInternal),
         )
         .leftWiden[RpcError]
     } yield manager
@@ -339,7 +323,7 @@ class GrpcTopologyManagerWriteService(
           .traverse(ProtoConverter.parsePositiveInt("serial", _))
         op <- ProtoConverter.parseEnum(TopologyChangeOp.fromProtoV30, "operation", opP)
         mappingP <- ProtoConverter.required("mapping", mappingPO)
-        mapping <- deserializeTopologyMapping(mappingP.mapping)
+        mapping <- TopologyMapping.fromProtoV30(mappingP)
       } yield (serial, op, mapping)
 
       for {
@@ -409,7 +393,7 @@ class GrpcTopologyManagerWriteService(
         )
         .leftMap(ProtoDeserializationFailure.Wrap(_))
       tempStoreId = grpcStore match {
-        case temp @ AdminTopologyStoreId.Temporary(_) => temp.toInternal
+        case AdminTopologyStoreId.Temporary(name) => TopologyStoreId.TemporaryStore(name)
         case AdminTopologyStoreId.Synchronizer(_) | AdminTopologyStoreId.Authorized =>
           ErrorUtil.invalidArgument("Cannot drop authorized store or synchronizer stores")
       }

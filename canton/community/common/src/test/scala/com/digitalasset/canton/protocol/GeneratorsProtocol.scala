@@ -3,35 +3,48 @@
 
 package com.digitalasset.canton.protocol
 
-import com.digitalasset.canton.LfPartyId
+import cats.syntax.either.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
-import com.digitalasset.canton.data.{CantonTimestamp, ViewPosition}
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
+import com.digitalasset.canton.data.{CantonTimestamp, ContractsReassignmentBatch, ViewPosition}
+import com.digitalasset.canton.protocol.ContractIdAbsolutizer.{
+  ContractIdAbsolutizationDataV1,
+  ContractIdAbsolutizationDataV2,
+}
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.pruning.CounterParticipantIntervalsBehind
 import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.topology.transaction.ParticipantSynchronizerLimits
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  GeneratorsTopology,
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
-import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.canton.{GeneratorsLf, LfPartyId, ReassignmentCounter}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
 import com.google.protobuf.ByteString
 import magnolify.scalacheck.auto.*
 import org.scalacheck.{Arbitrary, Gen}
 
+import scala.jdk.CollectionConverters.*
+
 final class GeneratorsProtocol(
-    protocolVersion: ProtocolVersion
+    protocolVersion: ProtocolVersion,
+    generatorsLf: GeneratorsLf,
+    generatorsTopology: GeneratorsTopology,
 ) {
   import com.digitalasset.canton.Generators.*
-  import com.digitalasset.canton.GeneratorsLf.*
+  import generatorsLf.*
   import com.digitalasset.canton.config.GeneratorsConfig.*
   import com.digitalasset.canton.crypto.GeneratorsCrypto.*
   import com.digitalasset.canton.time.GeneratorsTime.*
-  import com.digitalasset.canton.topology.GeneratorsTopology.*
+  import generatorsTopology.*
   import org.scalatest.EitherValues.*
 
   implicit val staticSynchronizerParametersArb: Arbitrary[StaticSynchronizerParameters] =
@@ -44,6 +57,8 @@ final class GeneratorsProtocol(
       requiredHashAlgorithms <- nonEmptySetGen[HashAlgorithm]
       requiredCryptoKeyFormats <- nonEmptySetGen[CryptoKeyFormat]
       requiredSignatureFormats <- nonEmptySetGen[SignatureFormat]
+      enableTransparencyChecks <- Arbitrary.arbitrary[Boolean]
+      serial <- Arbitrary.arbitrary[NonNegativeInt]
 
       parameters = StaticSynchronizerParameters(
         RequiredSigningSpecs(requiredSigningAlgorithmSpecs, requiredSigningKeySpecs),
@@ -52,7 +67,9 @@ final class GeneratorsProtocol(
         requiredHashAlgorithms,
         requiredCryptoKeyFormats,
         requiredSignatureFormats,
+        enableTransparencyChecks,
         protocolVersion,
+        serial,
       )
 
     } yield parameters)
@@ -168,66 +185,151 @@ final class GeneratorsProtocol(
     Arbitrary(SerializableRawContractInstance.create(contractInstance).value)
   }
 
-  private lazy val unicumGenerator: UnicumGenerator = new UnicumGenerator(new SymbolicPureCrypto())
+  private lazy val symbolicCrypto: CryptoPureApi = new SymbolicPureCrypto()
 
-  {
-    // If this pattern match is not exhaustive anymore, update the method below
-    ((_: CantonContractIdVersion) match {
-      case AuthenticatedContractIdVersionV10 => ()
-      case AuthenticatedContractIdVersionV11 => ()
-    }).discard
-  }
   def serializableContractArb(
-      canHaveEmptyKey: Boolean
-  ): Arbitrary[SerializableContract] = {
-    val contractIdVersion = AuthenticatedContractIdVersionV11
-
-    Arbitrary(
+      metadata: ContractMetadata
+  ): Arbitrary[SerializableContract] =
+    Arbitrary {
+      val contractInst =
+        metadata.maybeKeyWithMaintainers.fold(ExampleTransactionFactory.contractInstance())(key =>
+          ExampleTransactionFactory.contractInstance(
+            templateId = key.globalKey.templateId,
+            packageName = key.globalKey.packageName,
+          )
+        )
+      val rawContractInstance = SerializableRawContractInstance.create(contractInst).value
       for {
-        rawContractInstance <- Arbitrary.arbitrary[SerializableRawContractInstance]
-        metadata <- contractMetadataArb(canHaveEmptyKey).arbitrary
-        ledgerCreateTime <- Arbitrary.arbitrary[LedgerCreateTime]
-
-        synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
-        mediatorGroup <- Arbitrary.arbitrary[MediatorGroupRecipient]
+        ledgerCreateTime <- Arbitrary.arbitrary[CreationTime.CreatedAt]
 
         saltIndex <- Gen.choose(Int.MinValue, Int.MaxValue)
         transactionUUID <- Gen.uuid
 
-        (computedSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
-          synchronizerId = synchronizerId,
-          mediator = mediatorGroup,
-          transactionUuid = transactionUUID,
-          viewPosition = ViewPosition(List.empty),
-          viewParticipantDataSalt = TestSalt.generateSalt(saltIndex),
-          createIndex = 0,
-          ledgerCreateTime = ledgerCreateTime,
-          metadata = metadata,
-          suffixedContractInstance = rawContractInstance,
-          cantonContractIdVersion = contractIdVersion,
-        )
+        contractIdVersion <- Gen.oneOf(CantonContractIdVersion.all)
+        contractIdSuffixer = new ContractIdSuffixer(symbolicCrypto, contractIdVersion)
 
-        index <- Gen.posNum[Int]
-        contractIdDiscriminator = ExampleTransactionFactory.lfHash(index)
-
-        contractId = contractIdVersion.fromDiscriminator(
-          contractIdDiscriminator,
-          unicum,
+        unsuffixedContractIdAndSaltAndAbsolutizationData <- contractIdVersion match {
+          case _: CantonContractIdV1Version =>
+            for {
+              psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
+              mediatorGroup <- Arbitrary.arbitrary[MediatorGroupRecipient]
+              index <- Gen.posNum[Int]
+            } yield {
+              val contractIdDiscriminator = ExampleTransactionFactory.lfHash(index)
+              val salt = ContractSalt.createV1(symbolicCrypto)(
+                transactionUUID,
+                psid,
+                mediatorGroup,
+                TestSalt.generateSalt(saltIndex),
+                createIndex = 0,
+                ViewPosition(List.empty),
+              )
+              (LfContractId.V1(contractIdDiscriminator), salt, ContractIdAbsolutizationDataV1)
+            }
+          case _: CantonContractIdV2Version =>
+            for {
+              index <- Gen.posNum[Int]
+              time <- Arbitrary.arbitrary[CantonTimestamp]
+              transactionId <- Arbitrary.arbitrary[TransactionId]
+            } yield {
+              val discriminator = ExampleTransactionFactory.lfHash(index)
+              val salt = ContractSalt.createV2(symbolicCrypto)(
+                TestSalt.generateSalt(saltIndex),
+                createIndex = 0,
+                ViewPosition(List.empty),
+              )
+              val absolutizationData = ContractIdAbsolutizationDataV2(
+                transactionId,
+                CantonTimestamp(ledgerCreateTime.time),
+              )
+              (LfContractId.V2.unsuffixed(time.toLf, discriminator), salt, absolutizationData)
+            }
+        }
+        (unsuffixedContractId, salt, absolutizationData) =
+          unsuffixedContractIdAndSaltAndAbsolutizationData
+        unsuffixedCreateNode = LfNodeCreate(
+          unsuffixedContractId,
+          rawContractInstance.contractInstance,
+          metadata.signatories,
+          metadata.stakeholders,
+          metadata.maybeKeyWithMaintainers,
         )
-      } yield SerializableContract(
-        contractId,
-        rawContractInstance,
-        metadata,
-        ledgerCreateTime,
-        contractSalt = computedSalt.unwrap,
-      )
+        relativeLedgerCreateTime = contractIdVersion match {
+          case _: CantonContractIdV1Version => ledgerCreateTime
+          case _: CantonContractIdV2Version => CreationTime.Now
+        }
+        ContractIdSuffixer
+          .RelativeSuffixResult(relativeCreateNode, _, _, relativeAuthenticationData) =
+          contractIdSuffixer
+            .relativeSuffixForLocalContract(
+              salt,
+              relativeLedgerCreateTime,
+              unsuffixedCreateNode,
+            )
+            .valueOr(err => throw new IllegalArgumentException(s"Failed to suffix contract: $err"))
+        relativeFci = FatContractInstance.fromCreateNode(
+          relativeCreateNode,
+          relativeLedgerCreateTime,
+          relativeAuthenticationData.toLfBytes,
+        )
+        fci = {
+          val absolutizer = new ContractIdAbsolutizer(symbolicCrypto, absolutizationData)
+          absolutizer
+            .absolutizeFci(relativeFci)
+            .valueOr(err =>
+              throw new IllegalArgumentException(s"Failed to absolutize contract: $err")
+            )
+        }
+      } yield SerializableContract
+        .fromLfFatContractInst(fci)
+        .valueOr(err =>
+          throw new IllegalArgumentException(s"failed to create serializable contract: $err")
+        )
+    }
+
+  def serializableContractArb(
+      canHaveEmptyKey: Boolean
+  ): Arbitrary[SerializableContract] = Arbitrary(
+    for {
+      metadata <- contractMetadataArb(canHaveEmptyKey).arbitrary
+      contract <- serializableContractArb(metadata).arbitrary
+    } yield contract
+  )
+
+  def contractInstanceArb[Time <: CreationTime](
+      canHaveEmptyKey: Boolean,
+      genTime: Gen[Time],
+      overrideContractId: Option[LfContractId] = None,
+  ): Arbitrary[GenContractInstance { type InstCreatedAtTime <: Time }] = Arbitrary(
+    for {
+      metadata <- contractMetadataArb(canHaveEmptyKey).arbitrary
+      createdAt <- genTime
+    } yield ExampleContractFactory.build[Time](
+      createdAt = createdAt,
+      signatories = metadata.signatories,
+      stakeholders = metadata.stakeholders,
+      keyOpt = metadata.maybeKeyWithMaintainers,
+      overrideContractId = overrideContractId,
     )
-  }
+  )
+
+  def contractInstanceWithMetadataArb(
+      metadata: ContractMetadata
+  ): Arbitrary[ContractInstance] = Arbitrary(
+    for {
+      createdAt <- Arbitrary.arbitrary[CreationTime.CreatedAt]
+    } yield ExampleContractFactory.build(
+      createdAt = createdAt,
+      signatories = metadata.signatories,
+      stakeholders = metadata.stakeholders,
+      keyOpt = metadata.maybeKeyWithMaintainers,
+    )
+  )
 
   implicit val globalKeyWithMaintainersArb: Arbitrary[Versioned[LfGlobalKeyWithMaintainers]] =
     Arbitrary(
       for {
-        maintainers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+        maintainers <- nonEmptySetGen[LfPartyId]
         key <- Arbitrary.arbitrary[LfGlobalKey]
       } yield ExampleTransactionFactory.globalKeyWithMaintainers(
         key,
@@ -242,8 +344,8 @@ final class GeneratorsProtocol(
         else Gen.some(globalKeyWithMaintainersArb.arbitrary)
       maintainers = maybeKeyWithMaintainers.fold(Set.empty[LfPartyId])(_.unversioned.maintainers)
 
-      signatories <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
-      observers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      signatories <- nonEmptySetGen[LfPartyId]
+      observers <- boundedSetGen[LfPartyId]
 
       allSignatories = maintainers ++ signatories
       allStakeholders = allSignatories ++ observers
@@ -258,8 +360,8 @@ final class GeneratorsProtocol(
 
   implicit val stakeholdersArb: Arbitrary[Stakeholders] = Arbitrary(
     for {
-      signatories <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
-      observers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      signatories <- boundedSetGen[LfPartyId]
+      observers <- boundedSetGen[LfPartyId]
     } yield Stakeholders.withSignatoriesAndObservers(
       signatories = signatories,
       observers = observers,
@@ -269,27 +371,43 @@ final class GeneratorsProtocol(
   implicit val requestIdArb: Arbitrary[RequestId] = genArbitrary
 
   implicit val rollbackContextArb: Arbitrary[RollbackContext] =
-    Arbitrary(Gen.listOf(Arbitrary.arbitrary[PositiveInt]).map(RollbackContext.apply))
+    Arbitrary(boundedListGen[PositiveInt].map(RollbackContext.apply))
 
   implicit val createdContractArb: Arbitrary[CreatedContract] = Arbitrary(
     for {
-      contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
+      contract <- contractInstanceArb(
+        canHaveEmptyKey = true,
+        genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+      ).arbitrary
       consumedInCore <- Gen.oneOf(true, false)
       rolledBack <- Gen.oneOf(true, false)
-    } yield CreatedContract
-      .create(
-        contract,
-        consumedInCore,
-        rolledBack,
+    } yield CreatedContract.create(contract, consumedInCore, rolledBack).value
+  )
+
+  implicit val contractReassignmentBatch: Arbitrary[ContractsReassignmentBatch] = Arbitrary(
+    for {
+      metadata <- contractMetadataArb(canHaveEmptyKey = true).arbitrary
+      contracts <- nonEmptyListGen[ContractInstance](
+        Arbitrary(contractInstanceWithMetadataArb(metadata).arbitrary)
       )
-      .value
+      reassignmentCounters <- Gen
+        .containerOfN[Seq, ReassignmentCounter](contracts.length, reassignmentCounterGen)
+      contractCounters = contracts.zip(reassignmentCounters)
+    } yield ContractsReassignmentBatch.create(contractCounters).value
   )
 
   implicit val externalAuthorizationArb: Arbitrary[ExternalAuthorization] = Arbitrary(
     for {
-      signatures <- Arbitrary.arbitrary[Map[PartyId, Seq[Signature]]]
+      parties <- boundedListGen[PartyId]
+      signatures <- Gen.sequence(
+        parties.map(p => boundedListGen[Signature].map(p -> _))
+      )
       hashingSchemeVersion <- Arbitrary.arbitrary[HashingSchemeVersion]
-    } yield ExternalAuthorization.create(signatures, hashingSchemeVersion, protocolVersion)
+    } yield ExternalAuthorization.create(
+      signatures.asScala.toMap,
+      hashingSchemeVersion,
+      protocolVersion,
+    )
   )
 
   implicit val protocolSymmetricKeyArb: Arbitrary[ProtocolSymmetricKey] =
@@ -298,5 +416,4 @@ final class GeneratorsProtocol(
         key <- Arbitrary.arbitrary[SymmetricKey]
       } yield ProtocolSymmetricKey(key, protocolVersion)
     )
-
 }

@@ -153,7 +153,7 @@
                 "choice" : "TransferPreapprovalProposal_Accept",
                 "choiceArgument" : {
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -234,7 +234,7 @@
                 "choice" : "AmuletRules_CreateTransferPreapproval",
                 "choiceArgument" : {
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -255,7 +255,7 @@
                   "receiver" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "amuletPaid" : "49.3200000000",
                   "meta" : {
@@ -664,7 +664,7 @@
                 "choiceArgument" : {
                   "amount" : "200.0000000000",
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -785,7 +785,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -1093,7 +1093,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -1173,7 +1173,7 @@
                 "choiceArgument" : {
                   "amount" : "100.0000000000",
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -1292,7 +1292,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -1595,7 +1595,7 @@
                 "choice" : "WalletAppInstall_ExecuteBatch",
                 "choiceArgument" : {
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -1655,7 +1655,7 @@
                 "choiceArgument" : {
                   "amount" : "10.0000000000",
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -1774,7 +1774,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -2077,7 +2077,7 @@
                 "choice" : "WalletAppInstall_ExecuteBatch",
                 "choiceArgument" : {
                   "context" : {
-                    "amuletRules" : "1",
+                    "amuletRules" : "0",
                     "context" : {
                       "issuingMiningRounds" : [
                       ],
@@ -2138,7 +2138,7 @@
                   "receiver" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "amuletSum" : {
                     "amulet" : "31",
@@ -2180,7 +2180,7 @@
                   "receiver" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "amuletSum" : {
                     "amulet" : "31",
@@ -2294,7 +2294,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -2385,7 +2385,7 @@
                   "sender" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "fees" : [
                     "16.0000000000"
@@ -2450,7 +2450,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -2884,7 +2884,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -2974,7 +2974,7 @@
                   "sender" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "fees" : [
                     "16.0000000000"
@@ -3035,7 +3035,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -3440,7 +3440,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -3530,7 +3530,7 @@
                   "sender" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "fees" : [
                     "16.0000000000"
@@ -3591,7 +3591,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -3996,7 +3996,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -4086,7 +4086,7 @@
                   "sender" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "fees" : [
                     "16.0000000000"
@@ -4147,7 +4147,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -4552,7 +4552,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -4642,7 +4642,7 @@
                   "sender" : "alice::normalized"
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "fees" : [
                     "16.0000000000"
@@ -4703,12 +4703,12 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
                       "tag" : "TransferResultLockedAmulet",
-                      "value" : "0"
+                      "value" : "1"
                     }
                   ],
                   "meta" : {
@@ -4855,7 +4855,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "0",
+                "contractId" : "1",
                 "contractKey" : null,
                 "createArgument" : {
                   "amulet" : {
@@ -4994,12 +4994,12 @@
                 "contractId" : "52",
                 "contractKey" : null,
                 "createArgument" : {
-                  "lockedAmulet" : "0",
+                  "lockedAmulet" : "1",
                   "transfer" : {
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "0"
+                      "1"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -5043,7 +5043,7 @@
                         "amount" : "1000.0000000000",
                         "executeBefore" : "2025-06-18T00:00:00.000000Z",
                         "inputHoldingCids" : [
-                          "0"
+                          "1"
                         ],
                         "instrumentId" : {
                           "admin" : "dso::normalized",
@@ -5107,7 +5107,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "expire-lock" : {
                           "tag" : "AV_Bool",
@@ -5296,7 +5296,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -5603,7 +5603,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "expire-lock" : {
                           "tag" : "AV_Bool",
@@ -5785,7 +5785,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "expire-lock" : {
                           "tag" : "AV_Bool",
@@ -6434,7 +6434,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "expire-lock" : {
                           "tag" : "AV_Bool",
@@ -6623,7 +6623,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {
@@ -6930,7 +6930,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "expire-lock" : {
                           "tag" : "AV_Bool",
@@ -7112,7 +7112,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "expire-lock" : {
                           "tag" : "AV_Bool",
@@ -7295,7 +7295,7 @@
                       "values" : {
                         "amulet-rules" : {
                           "tag" : "AV_ContractId",
-                          "value" : "1"
+                          "value" : "0"
                         },
                         "open-round" : {
                           "tag" : "AV_ContractId",
@@ -7521,7 +7521,7 @@
                   }
                 },
                 "consuming" : false,
-                "contractId" : "1",
+                "contractId" : "0",
                 "exerciseResult" : {
                   "createdAmulets" : [
                     {

@@ -63,21 +63,17 @@ class ScanAppBootstrap(
 
   override def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit] =
     startInstanceUnlessClosing {
-      EitherT.fromEither(
-        Right(
-          new ScanApp(
-            name,
-            config,
-            scanAppParameters,
-            storage,
-            clock,
-            loggerFactory,
-            tracerProvider,
-            futureSupervisor,
-            metrics,
-            adminRoutes,
-          )
-        )
+      new ScanApp(
+        name,
+        config,
+        scanAppParameters,
+        storage,
+        clock,
+        loggerFactory,
+        tracerProvider,
+        futureSupervisor,
+        metrics,
+        adminRoutes,
       )
     }
 

@@ -48,7 +48,7 @@ import com.digitalasset.canton.store.SequencedEventStore.{
   SequencedEventWithTraceContext,
 }
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
@@ -64,8 +64,10 @@ object SequencedEventValidationError {
       extends SequencedEventValidationError[E] {
     override protected def pretty: Pretty[this.type] = prettyOfParam(_.error)
   }
-  final case class BadSynchronizerId(expected: SynchronizerId, received: SynchronizerId)
-      extends SequencedEventValidationError[Nothing] {
+  final case class BadSynchronizerId(
+      expected: PhysicalSynchronizerId,
+      received: PhysicalSynchronizerId,
+  ) extends SequencedEventValidationError[Nothing] {
     override protected def pretty: Pretty[BadSynchronizerId] = prettyOfClass(
       param("expected", _.expected),
       param("received", _.received),
@@ -236,7 +238,7 @@ object SequencedEventValidator extends HasLoggerName {
     *   whether to log a warning when used
     */
   def noValidation(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       warn: Boolean = true,
   )(implicit
       loggingContext: NamedLoggingContext
@@ -295,7 +297,7 @@ object SequencedEventValidator extends HasLoggerName {
         snapshot: SyncCryptoApi
     ): FutureUnlessShutdown[Either[TopologyTimestampVerificationError, SyncCryptoApi]] =
       closeContext.context
-        .performUnlessClosingUSF("get-dynamic-parameters")(
+        .synchronizeWithClosing("get-dynamic-parameters")(
           snapshot.ipsSnapshot.findDynamicSynchronizerParameters()(traceContext)
         )
         .map { dynamicSynchronizerParametersE =>
@@ -367,7 +369,7 @@ object SequencedEventValidatorFactory {
     *   whether to log a warning
     */
   def noValidation(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       warn: Boolean = true,
   ): SequencedEventValidatorFactory = new SequencedEventValidatorFactory {
     override def create(loggerFactory: NamedLoggerFactory)(implicit
@@ -381,8 +383,7 @@ object SequencedEventValidatorFactory {
 
 /** Validate whether a received event is valid for processing. */
 class SequencedEventValidatorImpl(
-    synchronizerId: SynchronizerId,
-    protocolVersion: ProtocolVersion,
+    psid: PhysicalSynchronizerId,
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
     protected val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
@@ -461,7 +462,7 @@ class SequencedEventValidatorImpl(
       // Otherwise, this is a fresh subscription and we will get the topology state with the first transaction
       // TODO(#4933) Upon a fresh subscription, retrieve the keys via the topology API and validate immediately or
       //  validate the signature after processing the initial event
-      _ <- verifySignature(priorEventO, event, sequencerId, protocolVersion)
+      _ <- verifySignature(priorEventO, event, sequencerId, psid.protocolVersion)
       _ = logger.debug("Successfully verified signature")
     } yield ()
   }
@@ -526,7 +527,12 @@ class SequencedEventValidatorImpl(
       _ <- EitherT.fromEither[FutureUnlessShutdown](
         checkFork
       )
-      _ <- verifySignature(Some(priorEvent), reconnectEvent, sequencerId, protocolVersion)
+      _ <- verifySignature(
+        Some(priorEvent),
+        reconnectEvent,
+        sequencerId,
+        psid.protocolVersion,
+      )
     } yield ()
     // do not update the priorEvent because if it was ignored, then it was ignored for a reason.
   }
@@ -534,9 +540,9 @@ class SequencedEventValidatorImpl(
   private def checkSynchronizerId(event: SequencedSerializedEvent): ValidationResult = {
     val receivedSynchronizerId = event.signedEvent.content.synchronizerId
     Either.cond(
-      receivedSynchronizerId == synchronizerId,
+      receivedSynchronizerId == psid,
       (),
-      BadSynchronizerId(synchronizerId, receivedSynchronizerId),
+      BadSynchronizerId(psid, receivedSynchronizerId),
     )
   }
 

@@ -6,26 +6,31 @@ package com.digitalasset.canton.participant.admin
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.parallel.*
-import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.caching.ScaffeineCache.TracedAsyncLoadingCache
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config
+import com.digitalasset.canton.config.RequireTypes.{PositiveInt, PositiveLong}
+import com.digitalasset.canton.config.{CacheConfig, ProcessingTimeout}
 import com.digitalasset.canton.ledger.participant.state.PackageDescription
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.DamlPackageStore
 import com.digitalasset.canton.topology.store.PackageDependencyResolverUS
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
-import com.github.blemale.scaffeine.Scaffeine
 
-import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class PackageDependencyResolver(
     val damlPackageStore: DamlPackageStore,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
+    fetchPackageParallelism: PositiveInt = PositiveInt.tryCreate(8),
+    packageDependencyCacheConfig: CacheConfig = CacheConfig(
+      maximumSize = PositiveLong.tryCreate(10000),
+      expireAfterAccess = config.NonNegativeFiniteDuration.ofMinutes(15L),
+    ),
 )(implicit
     ec: ExecutionContext
 ) extends NamedLogging
@@ -38,7 +43,7 @@ class PackageDependencyResolver(
     Set[PackageId],
   ] = ScaffeineCache
     .buildTracedAsync[EitherT[FutureUnlessShutdown, PackageId, *], PackageId, Set[PackageId]](
-      cache = Scaffeine().maximumSize(10000).expireAfterAccess(15.minutes).executor(ec.execute(_)),
+      cache = packageDependencyCacheConfig.buildScaffeine(),
       loader = implicit tc => loadPackageDependencies _,
       allLoader = None,
     )(logger, "dependencyCache")
@@ -67,31 +72,22 @@ class PackageDependencyResolver(
         packageIds: List[PackageId]
     ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
       for {
-        directDependenciesByPackage <- packageIds.parTraverse { packageId =>
+        directDependenciesByPackage <- MonadUtil.parTraverseWithLimit(
+          fetchPackageParallelism
+        )(packageIds) { packageId =>
           for {
-            pckg <- OptionT(
-              performUnlessClosingUSF(functionFullName)(damlPackageStore.getPackage(packageId))
-            )
-              .toRight(packageId)
-            directDependencies <- EitherT(
-              performUnlessClosingF(functionFullName)(
-                Future(
-                  Either
-                    .catchOnly[Exception](
-                      com.digitalasset.daml.lf.archive.Decode
-                        .assertDecodeArchive(pckg)
-                        ._2
-                        .directDeps
-                    )
-                    .leftMap { e =>
-                      logger.error(
-                        s"Failed to decode package with id $packageId while trying to determine dependencies",
-                        e,
-                      )
-                      packageId
-                    }
-                )
-              )
+            pckg <- OptionT(damlPackageStore.getPackage(packageId)).toRight(packageId)
+            directDependencies <- EitherT.fromEither[FutureUnlessShutdown](
+              com.digitalasset.daml.lf.archive.Decode
+                .decodeArchive(pckg)
+                .map { case (_, packageAst) => packageAst.directDeps }
+                .leftMap { e =>
+                  logger.error(
+                    s"Failed to decode package with id $packageId while trying to determine dependencies",
+                    e,
+                  )
+                  packageId
+                }
             )
           } yield directDependencies
         }
@@ -103,7 +99,11 @@ class PackageDependencyResolver(
         packageIds: List[PackageId],
         knownDependencies: Set[PackageId],
     ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
-      if (packageIds.isEmpty) EitherT.rightT(knownDependencies)
+      if (isClosing)
+        EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]](
+          FutureUnlessShutdown.abortedDueToShutdown
+        )
+      else if (packageIds.isEmpty) EitherT.rightT(knownDependencies)
       else {
         for {
           directDependencies <- computeDirectDependencies(packageIds)
@@ -116,5 +116,9 @@ class PackageDependencyResolver(
 
   }
 
-  override def onClosed(): Unit = LifeCycle.close(damlPackageStore)(logger)
+  override def onClosed(): Unit = {
+    dependencyCache.invalidateAll()
+    dependencyCache.cleanUp()
+    LifeCycle.close(damlPackageStore)(logger)
+  }
 }

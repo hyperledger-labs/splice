@@ -12,14 +12,14 @@ import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.store.db.DbDeserializationException
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.{
+  PekkoEnv,
+  PekkoFutureUnlessShutdown,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.AvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochNumber
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.OrderingRequestBatch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.BatchId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.pekko.PekkoModuleSystem.{
-  PekkoEnv,
-  PekkoFutureUnlessShutdown,
-}
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
@@ -84,7 +84,7 @@ class DbAvailabilityStore(
   ): PekkoFutureUnlessShutdown[Unit] = {
     val name = addBatchActionName(batchId)
     val future = () =>
-      storage.performUnlessClosingUSF(name) {
+      storage.synchronizeWithClosing(name) {
 
         storage.update_(
           profile match {
@@ -103,14 +103,13 @@ class DbAvailabilityStore(
           functionFullName,
         )
       }
-    PekkoFutureUnlessShutdown(name, future)
+    PekkoFutureUnlessShutdown(name, future, orderingStage = Some(functionFullName))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Return"))
   override def fetchBatches(batches: Seq[BatchId])(implicit
       traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[AvailabilityStore.FetchBatchesResult] = {
-
     val name = fetchBatchesActionName
     if (batches.isEmpty) {
       return PekkoFutureUnlessShutdown(
@@ -121,7 +120,7 @@ class DbAvailabilityStore(
 
     val future: () => FutureUnlessShutdown[AvailabilityStore.FetchBatchesResult] =
       () =>
-        storage.performUnlessClosingUSF(name) {
+        storage.synchronizeWithClosing(name) {
           storage
             .query(
               sql"""select id
@@ -151,7 +150,7 @@ class DbAvailabilityStore(
               }
             }
         }
-    PekkoFutureUnlessShutdown(name, future)
+    PekkoFutureUnlessShutdown(name, future, orderingStage = Some(functionFullName))
   }
 
   override def gc(staleBatchIds: Seq[BatchId])(implicit
@@ -167,6 +166,7 @@ class DbAvailabilityStore(
             functionFullName,
           )
         } else FutureUnlessShutdown.unit,
+      orderingStage = Some(functionFullName),
     )
 
   override def loadNumberOfRecords(implicit
@@ -181,20 +181,23 @@ class DbAvailabilityStore(
           } yield AvailabilityStore.NumberOfRecords(numberOfBatches)),
           functionFullName,
         ),
+      orderingStage = Some(functionFullName),
     )
 
   override def prune(epochNumberExclusive: EpochNumber)(implicit
       traceContext: TraceContext
-  ): PekkoFutureUnlessShutdown[AvailabilityStore.NumberOfRecords] = PekkoFutureUnlessShutdown(
-    pruneName(epochNumberExclusive),
-    () =>
-      for {
-        batchesDeleted <- storage.update(
-          sqlu""" delete from ord_availability_batch where epoch_number < $epochNumberExclusive """,
-          functionFullName,
-        )
-      } yield AvailabilityStore.NumberOfRecords(
-        batchesDeleted.toLong
-      ),
-  )
+  ): PekkoFutureUnlessShutdown[AvailabilityStore.NumberOfRecords] =
+    PekkoFutureUnlessShutdown(
+      pruneName(epochNumberExclusive),
+      () =>
+        for {
+          batchesDeleted <- storage.update(
+            sqlu""" delete from ord_availability_batch where epoch_number < $epochNumberExclusive """,
+            functionFullName,
+          )
+        } yield AvailabilityStore.NumberOfRecords(
+          batchesDeleted.toLong
+        ),
+      orderingStage = Some(functionFullName),
+    )
 }

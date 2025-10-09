@@ -23,16 +23,18 @@ import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFa
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.RollbackContext.RollbackScope
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
-import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
+import com.digitalasset.canton.protocol.WellFormedTransaction.{
+  WithAbsoluteSuffixes,
+  WithoutSuffixes,
+}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{ErrorUtil, LfTransactionUtil, MapsUtil, MonadUtil}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.util.collection.MapsUtil
+import com.digitalasset.canton.util.{ErrorUtil, LfTransactionUtil, MonadUtil}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.transaction.ContractStateMachine.KeyInactive
 import com.digitalasset.daml.lf.transaction.Transaction.{
@@ -41,7 +43,11 @@ import com.digitalasset.daml.lf.transaction.Transaction.{
   KeyInput,
   NegativeKeyLookup,
 }
-import com.digitalasset.daml.lf.transaction.{ContractKeyUniquenessMode, ContractStateMachine}
+import com.digitalasset.daml.lf.transaction.{
+  ContractKeyUniquenessMode,
+  ContractStateMachine,
+  CreationTime,
+}
 import io.scalaland.chimney.dsl.*
 
 import java.util.UUID
@@ -62,17 +68,17 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class TransactionTreeFactoryImpl(
     participantId: ParticipantId,
-    synchronizerId: SynchronizerId,
-    protocolVersion: ProtocolVersion,
-    contractSerializer: LfContractInst => SerializableRawContractInstance,
+    synchronizerId: PhysicalSynchronizerId,
+    override val cantonContractIdVersion: CantonContractIdVersion,
     cryptoOps: HashOps & HmacOps,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends TransactionTreeFactory
     with NamedLogging {
 
-  private val unicumGenerator = new UnicumGenerator(cryptoOps)
-  private val cantonContractIdVersion = AuthenticatedContractIdVersionV11
+  private val protocolVersion = synchronizerId.protocolVersion
+  private val contractIdSuffixer: ContractIdSuffixer =
+    new ContractIdSuffixer(cryptoOps, cantonContractIdVersion)
   private val transactionViewDecompositionFactory = TransactionViewDecompositionFactory
 
   override def createTransactionTree(
@@ -83,7 +89,7 @@ class TransactionTreeFactoryImpl(
       transactionSeed: SaltSeed,
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
       keyResolver: LfKeyResolver,
       maxSequencingTime: CantonTimestamp,
       validatePackageVettings: Boolean,
@@ -122,7 +128,7 @@ class TransactionTreeFactoryImpl(
       )
 
     val commonMetadata = CommonMetadata
-      .create(cryptoOps, protocolVersion)(
+      .create(cryptoOps)(
         synchronizerId,
         mediator,
         commonMetadataSalt,
@@ -242,7 +248,7 @@ class TransactionTreeFactoryImpl(
 
     def viewPartyPackages(view: TransactionView): Map[LfPartyId, Set[PackageId]] = {
       val inputPackages = checked(view.viewParticipantData.tryUnwrap).coreInputs.values
-        .map(_.contract.contractInstance.unversioned.template.packageId)
+        .map(_.contract.templateId.packageId)
         .toSet
       val informees = checked(view.viewCommonData.tryUnwrap).viewConfirmationParameters.informees
       val viewMap = informees.map(_ -> inputPackages).toMap
@@ -262,7 +268,7 @@ class TransactionTreeFactoryImpl(
   private def createRootViews(
       decompositions: Seq[TransactionViewDecomposition.NewView],
       state: State,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransactionTreeConversionError, Seq[TransactionView]] = {
@@ -296,7 +302,7 @@ class TransactionTreeFactoryImpl(
       .flatMap { preloaded =>
         def fromPreloaded(
             cid: LfContractId
-        ): EitherT[Future, ContractLookupError, SerializableContract] =
+        ): EitherT[Future, ContractLookupError, GenContractInstance] =
           preloaded.get(cid) match {
             case Some(value) => EitherT.fromEither(value)
             case None =>
@@ -318,7 +324,7 @@ class TransactionTreeFactoryImpl(
       view: TransactionViewDecomposition.NewView,
       viewPosition: ViewPosition,
       state: State,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransactionTreeConversionError, TransactionView] = {
@@ -506,61 +512,72 @@ class TransactionTreeFactoryImpl(
       createIndex: Int,
       state: State,
   )(implicit traceContext: TraceContext): LfNodeCreate = {
+
     val cantonContractInst = checked(
       LfTransactionUtil
-        .suffixContractInst(state.unicumOfCreatedContract, cantonContractIdVersion)(
-          createNode.versionedCoinst
+        .suffixContractInst(state.suffixOfCreatedContract)(createNode.versionedCoinst)
+        .valueOr(cid =>
+          throw new IllegalStateException(
+            s"Invalid contract id $cid found in contract instance of create node"
+          )
         )
-        .fold(
-          cid =>
-            throw new IllegalStateException(
-              s"Invalid contract id $cid found in contract instance of create node"
-            ),
-          Predef.identity,
-        )
-    )
-    val serializedCantonContractInst = contractSerializer(cantonContractInst)
+    ).unversioned
+    val createNodeWithSuffixedArg = createNode.copy(arg = cantonContractInst.arg)
 
-    val discriminator = createNode.coid match {
-      case LfContractId.V1(discriminator, suffix) if suffix.isEmpty =>
-        discriminator
-      case _: LfContractId =>
-        throw new IllegalStateException(
-          s"Invalid contract id for created contract ${createNode.coid}"
+    val contractSalt = cantonContractIdVersion match {
+      case _: CantonContractIdV1Version =>
+        ContractSalt.createV1(cryptoOps)(
+          state.transactionUUID,
+          synchronizerId,
+          state.mediator,
+          viewParticipantDataSalt,
+          createIndex,
+          viewPosition,
+        )
+      case _: CantonContractIdV2Version =>
+        ContractSalt.createV2(cryptoOps)(
+          viewParticipantDataSalt,
+          createIndex,
+          viewPosition,
         )
     }
-    val contractMetadata = LfTransactionUtil.metadataFromCreate(createNode)
-    val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
-      synchronizerId,
-      state.mediator,
-      state.transactionUUID,
-      viewPosition,
-      viewParticipantDataSalt,
-      createIndex,
-      LedgerCreateTime(state.ledgerTime),
-      contractMetadata,
-      serializedCantonContractInst,
-      cantonContractIdVersion,
+    val creationTime = cantonContractIdVersion match {
+      case _: CantonContractIdV1Version =>
+        CreationTime.CreatedAt(state.ledgerTime.toLf)
+      case _: CantonContractIdV2Version =>
+        CreationTime.Now
+    }
+    val ContractIdSuffixer.RelativeSuffixResult(
+      suffixedCreateNode,
+      localContractId,
+      relativeSuffix,
+      authenticationData,
+    ) = contractIdSuffixer
+      .relativeSuffixForLocalContract(
+        contractSalt,
+        creationTime,
+        createNodeWithSuffixedArg,
+      )
+      .valueOr(err => throw new IllegalArgumentException(s"Failed to compute contract ID: $err"))
+
+    state.setSuffixFor(localContractId, relativeSuffix)
+
+    val inst = LfFatContractInst.fromCreateNode(
+      create = suffixedCreateNode,
+      createTime = creationTime,
+      authenticationData = authenticationData.toLfBytes,
     )
+    val createdInfo = ContractInstance
+      .create(inst)
+      .valueOr(err =>
+        throw new IllegalArgumentException(
+          s"Failed to create contract instance well formed instrument: $err"
+        )
+      )
 
-    val contractId = cantonContractIdVersion.fromDiscriminator(discriminator, unicum)
-
-    state.setUnicumFor(discriminator, unicum)
-
-    val createdInfo = SerializableContract(
-      contractId = contractId,
-      rawContractInstance = serializedCantonContractInst,
-      metadata = contractMetadata,
-      ledgerCreateTime = LedgerCreateTime(state.ledgerTime),
-      contractSalt = contractSalt.unwrap,
-    )
-    state.setCreatedContractInfo(contractId, createdInfo)
-
-    // No need to update the key because the key does not contain contract ids
-    val suffixedNode =
-      createNode.copy(coid = contractId, arg = cantonContractInst.unversioned.arg)
-    state.addSuffixedNode(nodeId, suffixedNode)
-    suffixedNode
+    state.setCreatedContractInfo(suffixedCreateNode.coid, createdInfo)
+    state.addSuffixedNode(nodeId, suffixedCreateNode)
+    suffixedCreateNode
   }
 
   private def trySuffixNode(
@@ -568,11 +585,8 @@ class TransactionTreeFactoryImpl(
   )(idAndNode: (LfNodeId, LfActionNode)): LfActionNode = {
     val (nodeId, node) = idAndNode
     val suffixedNode = LfTransactionUtil
-      .suffixNode(state.unicumOfCreatedContract, cantonContractIdVersion)(node)
-      .fold(
-        cid => throw new IllegalArgumentException(s"Invalid contract id $cid found"),
-        Predef.identity,
-      )
+      .suffixNode(state.suffixOfCreatedContract)(node)
+      .valueOr(cid => throw new IllegalArgumentException(s"Invalid contract id $cid found"))
     state.addSuffixedNode(nodeId, suffixedNode)
     suffixedNode
   }
@@ -706,11 +720,11 @@ class TransactionTreeFactoryImpl(
       coreCreatedNodes: List[(LfNodeCreate, RollbackScope)],
       coreOtherNodes: List[(LfActionNode, RollbackScope)],
       childViews: Seq[TransactionView],
-      createdContractInfo: collection.Map[LfContractId, SerializableContract],
+      createdContractInfo: collection.Map[LfContractId, NewContractInstance],
       resolvedKeys: collection.Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]],
       actionDescription: ActionDescription,
       salt: Salt,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
       rbContextCore: RollbackContext,
   ): EitherT[Future, TransactionTreeConversionError, ViewParticipantData] = {
 
@@ -825,21 +839,20 @@ class TransactionTreeFactoryImpl(
       viewSalts: Iterable[Salt],
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
-      contractOfId: SerializableContractOfId,
+      contractOfId: ContractInstanceOfId,
       rbContext: RollbackContext,
       keyResolver: LfKeyResolver,
+      absolutizer: ContractIdAbsolutizer,
   )(implicit traceContext: TraceContext): EitherT[
     FutureUnlessShutdown,
     TransactionTreeConversionError,
-    (TransactionView, WellFormedTransaction[WithSuffixes]),
+    (TransactionView, WellFormedTransaction[WithAbsoluteSuffixes]),
   ] = {
     /* We ship the root node of the view with suffixed contract IDs.
      * If this is a create node, reinterpretation will allocate an unsuffixed contract id instead of the one given in the node.
      * If this is an exercise node, the exercise result may contain unsuffixed contract ids created in the body of the exercise.
      * Accordingly, the reinterpreted transaction must first be suffixed before we can compare it against
      * the shipped views.
-     * Ideally we'd ship only the inputs needed to reconstruct the transaction rather than computed data
-     * such as exercise results and created contract IDs.
      */
 
     ErrorUtil.requireArgument(
@@ -868,8 +881,7 @@ class TransactionTreeFactoryImpl(
       decomposition = checked(decompositions.head)
       view <- createView(decomposition, rootPosition, state, contractOfId)
         .mapK(FutureUnlessShutdown.outcomeK)
-    } yield {
-      val suffixedNodes = state.suffixedNodes() transform {
+      suffixedNodes = state.suffixedNodes() transform {
         // Recover the children
         case (nodeId, ne: LfNodeExercises) =>
           checked(subaction.unwrap.nodes(nodeId)) match {
@@ -884,16 +896,22 @@ class TransactionTreeFactoryImpl(
       }
 
       // keep around the rollback nodes (not suffixed as they don't have a contract id), so that we don't orphan suffixed nodes.
-      val rollbackNodes = subaction.unwrap.nodes.collect { case tuple @ (_, _: LfNodeRollback) =>
+      rollbackNodes = subaction.unwrap.nodes.collect { case tuple @ (_, _: LfNodeRollback) =>
         tuple
       }
 
-      val suffixedTx = LfVersionedTransaction(
+      suffixedTx = LfVersionedTransaction(
         subaction.unwrap.version,
         suffixedNodes ++ rollbackNodes,
         subaction.unwrap.roots,
       )
-      view -> checked(WellFormedTransaction.normalizeAndAssert(suffixedTx, metadata, WithSuffixes))
+      absolutizedTx <- EitherT
+        .fromEither[FutureUnlessShutdown](absolutizer.absolutizeTransaction(suffixedTx))
+        .leftMap(ContractIdAbsolutizationError(_): TransactionTreeConversionError)
+    } yield {
+      view -> checked(
+        WellFormedTransaction.checkOrThrow(absolutizedTx, metadata, WithAbsoluteSuffixes)
+      )
     }
   }
 
@@ -937,31 +955,18 @@ object TransactionTreeFactoryImpl {
   /** Creates a `TransactionTreeFactory`. */
   def apply(
       submittingParticipant: ParticipantId,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
+      synchronizerId: PhysicalSynchronizerId,
+      cantonContractIdVersion: CantonContractIdVersion,
       cryptoOps: HashOps & HmacOps,
       loggerFactory: NamedLoggerFactory,
   )(implicit ex: ExecutionContext): TransactionTreeFactoryImpl =
     new TransactionTreeFactoryImpl(
       submittingParticipant,
       synchronizerId,
-      protocolVersion,
-      contractSerializer,
+      cantonContractIdVersion,
       cryptoOps,
       loggerFactory,
     )
-
-  private[submission] def contractSerializer(
-      contractInst: LfContractInst
-  ): SerializableRawContractInstance =
-    SerializableRawContractInstance
-      .create(contractInst)
-      .leftMap { err =>
-        throw new IllegalArgumentException(
-          s"Unable to serialize contract instance, although it is contained in a well-formed transaction.\n$err\n$contractInst"
-        )
-      }
-      .merge
 
   private val initialCsmState: ContractStateMachine.State[Unit] =
     ContractStateMachine.initial[Unit](ContractKeyUniquenessMode.Off)
@@ -991,28 +996,28 @@ object TransactionTreeFactoryImpl {
     def addSuffixedNode(nodeId: LfNodeId, suffixedNode: LfActionNode): Unit =
       suffixedNodesBuilder += nodeId -> suffixedNode
 
-    private val unicumOfCreatedContractMap: mutable.Map[LfHash, Unicum] = mutable.Map.empty
+    private val suffixOfCreatedContractMap: mutable.Map[LocalContractId, RelativeContractIdSuffix] =
+      mutable.Map.empty
 
-    def unicumOfCreatedContract: LfHash => Option[Unicum] = unicumOfCreatedContractMap.get
+    def suffixOfCreatedContract: LocalContractId => Option[RelativeContractIdSuffix] =
+      suffixOfCreatedContractMap.get
 
-    def setUnicumFor(discriminator: LfHash, unicum: Unicum)(implicit
+    def setSuffixFor(prefix: LocalContractId, suffix: RelativeContractIdSuffix)(implicit
         loggingContext: ErrorLoggingContext
     ): Unit =
-      unicumOfCreatedContractMap.put(discriminator, unicum).foreach { _ =>
+      suffixOfCreatedContractMap.put(prefix, suffix).foreach { _ =>
         ErrorUtil.internalError(
-          new IllegalStateException(
-            s"Two contracts have the same discriminator: $discriminator"
-          )
+          new IllegalStateException(s"Two contracts have the same prefix: $prefix")
         )
       }
 
     /** All contracts created by a node that has already been processed. */
-    val createdContractInfo: mutable.Map[LfContractId, SerializableContract] =
+    val createdContractInfo: mutable.Map[LfContractId, NewContractInstance] =
       mutable.Map.empty
 
     def setCreatedContractInfo(
         contractId: LfContractId,
-        createdInfo: SerializableContract,
+        createdInfo: NewContractInstance,
     )(implicit loggingContext: ErrorLoggingContext): Unit =
       createdContractInfo.put(contractId, createdInfo).foreach { _ =>
         ErrorUtil.internalError(

@@ -3,8 +3,9 @@
 
 package com.digitalasset.canton.data
 
+import cats.syntax.functor.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{GeneratorsCrypto, Salt, SigningKeyUsage, TestHash}
+import com.digitalasset.canton.crypto.{Salt, TestHash}
 import com.digitalasset.canton.data.ActionDescription.{
   CreateActionDescription,
   ExerciseActionDescription,
@@ -15,18 +16,14 @@ import com.digitalasset.canton.data.MerkleTree.VersionedMerkleTree
 import com.digitalasset.canton.data.ViewPosition.{MerklePathElement, MerkleSeqIndex}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.messages.{
-  ConfirmationResultMessage,
-  DeliveredUnassignmentResult,
-  SignedProtocolMessage,
-  Verdict,
-}
-import com.digitalasset.canton.sequencing.protocol.{Batch, MediatorGroupRecipient, SignedContent}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, TimeProof}
+import com.digitalasset.canton.time.TimeProofTestUtil
+import com.digitalasset.canton.topology.{GeneratorsTopology, ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.SeqUtil
+import com.digitalasset.canton.util.collection.SeqUtil
 import com.digitalasset.canton.version.{ProtocolVersion, RepresentativeProtocolVersion}
-import com.digitalasset.canton.{LfInterfaceId, LfPackageId, LfPartyId, LfVersioned}
+import com.digitalasset.canton.{GeneratorsLf, LfInterfaceId, LfPackageId, LfPartyId, LfVersioned}
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.value.Value.ValueInt64
 import magnolify.scalacheck.auto.*
 import org.scalacheck.{Arbitrary, Gen}
@@ -36,16 +33,17 @@ import scala.util.Random
 
 final class GeneratorsData(
     protocolVersion: ProtocolVersion,
+    generatorsLf: GeneratorsLf,
     generatorsProtocol: GeneratorsProtocol,
+    generatorsTopology: GeneratorsTopology,
 ) {
   import com.digitalasset.canton.Generators.*
-  import com.digitalasset.canton.GeneratorsLf.*
+  import generatorsLf.*
   import com.digitalasset.canton.config.GeneratorsConfig.*
   import com.digitalasset.canton.crypto.GeneratorsCrypto.*
   import com.digitalasset.canton.data.GeneratorsDataTime.*
   import com.digitalasset.canton.ledger.api.GeneratorsApi.*
-  import com.digitalasset.canton.sequencing.protocol.GeneratorsProtocol.*
-  import com.digitalasset.canton.topology.GeneratorsTopology.*
+  import generatorsTopology.*
   import generatorsProtocol.*
   import org.scalatest.OptionValues.*
 
@@ -62,12 +60,12 @@ final class GeneratorsData(
   )
 
   implicit val viewPositionArb: Arbitrary[ViewPosition] = Arbitrary(
-    Gen.listOf(merklePathElementArg.arbitrary).map(ViewPosition(_))
+    boundedListGen[MerklePathElement].map(ViewPosition(_))
   )
 
   implicit val commonMetadataArb: Arbitrary[CommonMetadata] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
 
       mediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
@@ -76,8 +74,8 @@ final class GeneratorsData(
 
       hashOps = TestHash // Not used for serialization
     } yield CommonMetadata
-      .create(hashOps, protocolVersion)(
-        synchronizerId,
+      .create(hashOps)(
+        psid,
         mediator,
         salt,
         uuid,
@@ -129,11 +127,9 @@ final class GeneratorsData(
 
   implicit val viewConfirmationParametersArb: Arbitrary[ViewConfirmationParameters] = Arbitrary(
     for {
-      informees <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
-      viewConfirmationParameters <-
-        Gen
-          .containerOf[Seq, Quorum](Arbitrary.arbitrary[Quorum](quorumArb(informees.toSeq)))
-          .map(ViewConfirmationParameters.tryCreate(informees, _))
+      informees <- boundedSetGen[LfPartyId]
+      viewConfirmationParameters <- boundedListGen(quorumArb(informees.toSeq).arbitrary)
+        .map(ViewConfirmationParameters.tryCreate(informees, _))
     } yield viewConfirmationParameters
   )
 
@@ -170,7 +166,8 @@ final class GeneratorsData(
       rpv: RepresentativeProtocolVersion[ActionDescription.type]
   ): Gen[CreateActionDescription] =
     for {
-      contractId <- Arbitrary.arbitrary[LfContractId]
+      // Contract IDs in action descriptions are always relative
+      contractId <- relativeLfContractIdArb.arbitrary
       seed <- Arbitrary.arbitrary[LfHash]
     } yield CreateActionDescription(contractId, seed)(rpv)
 
@@ -178,7 +175,8 @@ final class GeneratorsData(
       rpv: RepresentativeProtocolVersion[ActionDescription.type]
   ): Gen[ExerciseActionDescription] =
     for {
-      inputContractId <- Arbitrary.arbitrary[LfContractId]
+      // Input contract IDs in exercise descriptions are always suffixed, but not necessarily absolute
+      inputContractId <- suffixedLfContractIdArb.arbitrary
 
       templateId <- Arbitrary.arbitrary[LfTemplateId]
 
@@ -186,13 +184,13 @@ final class GeneratorsData(
 
       interfaceId <- Gen.option(Arbitrary.arbitrary[LfInterfaceId])
 
-      packagePreference <- Gen.containerOf[Set, LfPackageId](Arbitrary.arbitrary[LfPackageId])
+      packagePreference <- boundedSetGen[LfPackageId]
 
       // We consider only this specific value because the goal is not exhaustive testing of LF (de)serialization
       chosenValue <- Gen.long.map(ValueInt64.apply)
       version <- Arbitrary.arbitrary[LfLanguageVersion]
 
-      actors <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      actors <- boundedSetGen[LfPartyId]
       seed <- Arbitrary.arbitrary[LfHash]
       byKey <- Gen.oneOf(true, false)
       failed <- Gen.oneOf(true, false)
@@ -215,8 +213,9 @@ final class GeneratorsData(
       rpv: RepresentativeProtocolVersion[ActionDescription.type]
   ): Gen[FetchActionDescription] =
     for {
-      inputContractId <- Arbitrary.arbitrary[LfContractId]
-      actors <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      // Input contract IDs in fetch action descriptions are always suffixed, but not necessarily absolute
+      inputContractId <- suffixedLfContractIdArb.arbitrary
+      actors <- boundedSetGen[LfPartyId]
       byKey <- Gen.oneOf(true, false)
       templateId <- Arbitrary.arbitrary[LfTemplateId]
       interfaceId <- Gen.option(Arbitrary.arbitrary[LfInterfaceId])
@@ -251,7 +250,7 @@ final class GeneratorsData(
   }
 
   private implicit val freeKeyArb: Arbitrary[FreeKey] = Arbitrary(for {
-    maintainers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+    maintainers <- boundedSetGen[LfPartyId]
   } yield FreeKey(maintainers))
 
   implicit val viewParticipantDataArb: Arbitrary[ViewParticipantData] = Arbitrary(
@@ -264,20 +263,27 @@ final class GeneratorsData(
             c <- Gen
               .zip(
                 generatorsProtocol
-                  .serializableContractArb(canHaveEmptyKey = false)
-                  .arbitrary
-                  .map(_.copy(contractId = ex.inputContractId)),
+                  .contractInstanceArb(
+                    canHaveEmptyKey = false,
+                    genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+                    overrideContractId = Some(ex.inputContractId),
+                  )
+                  .arbitrary,
                 Gen.oneOf(true, false),
               )
               .map(InputContract.apply tupled)
 
-            others <- Gen
-              .listOf(
-                Gen.zip(
-                  generatorsProtocol.serializableContractArb(canHaveEmptyKey = false).arbitrary,
-                  Gen.oneOf(true, false),
-                )
+            others <- boundedListGen(
+              Gen.zip(
+                generatorsProtocol
+                  .contractInstanceArb(
+                    canHaveEmptyKey = false,
+                    genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+                  )
+                  .arbitrary,
+                Gen.oneOf(true, false),
               )
+            )
               .map(_.map(InputContract.apply tupled))
           } yield (c +: others).groupBy(_.contractId).flatMap { case (_, contracts) =>
             contracts.headOption
@@ -285,11 +291,13 @@ final class GeneratorsData(
 
         case fetch: FetchActionDescription =>
           generatorsProtocol
-            .serializableContractArb(canHaveEmptyKey = false)
-            .arbitrary
-            .map(c =>
-              List(InputContract(c.copy(contractId = fetch.inputContractId), consumed = false))
+            .contractInstanceArb(
+              canHaveEmptyKey = false,
+              genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+              overrideContractId = Some(fetch.inputContractId),
             )
+            .arbitrary
+            .map(c => List(InputContract(c, consumed = false)))
         case _: CreateActionDescription | _: LookupByKeyActionDescription => Gen.const(List.empty)
       }
 
@@ -298,14 +306,18 @@ final class GeneratorsData(
           Gen
             .zip(
               generatorsProtocol
-                .serializableContractArb(canHaveEmptyKey = false)
+                .contractInstanceArb(
+                  canHaveEmptyKey = false,
+                  genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+                  overrideContractId = Some(created.contractId),
+                )
                 .arbitrary,
               Gen.oneOf(true, false),
             )
             .map { case (c, rolledBack) =>
               List(
                 CreatedContract.tryCreate(
-                  c.copy(contractId = created.contractId),
+                  c,
                   consumedInCore = false,
                   rolledBack = rolledBack,
                 )
@@ -313,14 +325,18 @@ final class GeneratorsData(
             }
 
         case _: ExerciseActionDescription =>
-          Gen
-            .listOf(
-              Gen.zip(
-                generatorsProtocol.serializableContractArb(canHaveEmptyKey = false).arbitrary,
-                Gen.oneOf(true, false),
-                Gen.oneOf(true, false),
-              )
+          boundedListGen(
+            Gen.zip(
+              generatorsProtocol
+                .contractInstanceArb(
+                  canHaveEmptyKey = false,
+                  genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+                )
+                .arbitrary,
+              Gen.oneOf(true, false),
+              Gen.oneOf(true, false),
             )
+          )
             .map(_.map(CreatedContract.tryCreate tupled))
             // Deduplicating on contract id
             .map(
@@ -334,10 +350,7 @@ final class GeneratorsData(
 
       notTransient = (createdCore.map(_.contract.contractId) ++ coreInputs.map(_.contractId)).toSet
 
-      createdInSubviewArchivedInCore <- Gen
-        .containerOf[Set, LfContractId](
-          Arbitrary.arbitrary[LfContractId]
-        )
+      createdInSubviewArchivedInCore <- boundedSetGen[LfContractId]
         // createdInSubviewArchivedInCore and notTransient should be disjoint
         .map(_ -- notTransient)
 
@@ -360,10 +373,7 @@ final class GeneratorsData(
         case _: CreateActionDescription | _: FetchActionDescription => Gen.const(List.empty)
 
         case _: ExerciseActionDescription =>
-          Gen.listOf(
-            Gen
-              .zip(Arbitrary.arbitrary[LfGlobalKey], Arbitrary.arbitrary[LfVersioned[FreeKey]])
-          )
+          boundedListGen[(LfGlobalKey, LfVersioned[FreeKey])]
 
         case LookupByKeyActionDescription(key) =>
           Arbitrary.arbitrary[LfVersioned[FreeKey]].map(res => List(key.unversioned -> res))
@@ -478,12 +488,19 @@ final class GeneratorsData(
   implicit val merkleSeqArb: Arbitrary[MerkleSeq[VersionedMerkleTree[?]]] =
     Arbitrary(
       for {
-        submitterMetadataSeq <- Gen.listOf(submitterMetadataArb.arbitrary)
+        submitterMetadataSeq <- boundedListGen[SubmitterMetadata]
       } yield MerkleSeq.fromSeq(TestHash, protocolVersion)(submitterMetadataSeq)
     )
 
   private val sourceProtocolVersion = Source(protocolVersion)
   private val targetProtocolVersion = Target(protocolVersion)
+
+  implicit val reassignmentIdArb: Arbitrary[ReassignmentId] = Arbitrary {
+    val hexChars: Seq[Char] = "0123456789abcdefABCDEF".toIndexedSeq
+    Gen.stringOfN(32, Gen.oneOf(hexChars)).map { payload =>
+      ReassignmentId.tryCreate(s"00$payload")
+    }
+  }
 
   implicit val reassignmentSubmitterMetadataArb: Arbitrary[ReassignmentSubmitterMetadata] =
     Arbitrary(
@@ -508,7 +525,8 @@ final class GeneratorsData(
   implicit val assignmentCommonDataArb: Arbitrary[AssignmentCommonData] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      targetSynchronizerId <- Arbitrary.arbitrary[Target[SynchronizerId]]
+      sourcePSId <- Arbitrary.arbitrary[Source[PhysicalSynchronizerId]]
+      targetPSId <- Arbitrary.arbitrary[Target[PhysicalSynchronizerId]]
 
       targetMediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
@@ -517,32 +535,34 @@ final class GeneratorsData(
       uuid <- Gen.uuid
 
       submitterMetadata <- Arbitrary.arbitrary[ReassignmentSubmitterMetadata]
-      reassigningParticipants <- Arbitrary.arbitrary[Set[ParticipantId]]
+      reassigningParticipants <- boundedSetGen[ParticipantId]
+      unassignmentTs <- Arbitrary.arbitrary[CantonTimestamp]
 
       hashOps = TestHash // Not used for serialization
 
     } yield AssignmentCommonData
       .create(hashOps)(
         salt,
-        targetSynchronizerId,
+        sourcePSId,
+        targetPSId,
         targetMediator,
         stakeholders,
         uuid,
         submitterMetadata,
-        targetProtocolVersion,
         reassigningParticipants,
+        unassignmentTs,
       )
   )
 
   implicit val unassignmentCommonData: Arbitrary[UnassignmentCommonData] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      sourceSynchronizerId <- Arbitrary.arbitrary[Source[SynchronizerId]]
+      sourceSynchronizerId <- Arbitrary.arbitrary[Source[PhysicalSynchronizerId]]
 
       sourceMediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
       stakeholders <- Arbitrary.arbitrary[Stakeholders]
-      reassigningParticipants <- Arbitrary.arbitrary[Set[ParticipantId]]
+      reassigningParticipants <- boundedSetGen[ParticipantId]
 
       uuid <- Gen.uuid
 
@@ -563,100 +583,57 @@ final class GeneratorsData(
       )
   )
 
-  private def deliveryUnassignmentResultGen(
-      sourceProtocolVersion: Source[ProtocolVersion]
-  ): Gen[DeliveredUnassignmentResult] =
-    for {
-      sourceSynchronizerId <- Arbitrary.arbitrary[Source[SynchronizerId]]
-      requestId <- Arbitrary.arbitrary[RequestId]
-      rootHash <- Arbitrary.arbitrary[RootHash]
-      protocolVersion = sourceProtocolVersion.unwrap
-      verdict = Verdict.Approve(protocolVersion)
-
-      result = ConfirmationResultMessage.create(
-        sourceSynchronizerId.unwrap,
-        ViewType.UnassignmentViewType,
-        requestId,
-        rootHash,
-        verdict,
-        protocolVersion,
-      )
-
-      signedResult =
-        SignedProtocolMessage.from(
-          result,
-          protocolVersion,
-          GeneratorsCrypto.sign(
-            GeneratorsCrypto.testSigningKey.fingerprint,
-            "UnassignmentResult-mediator",
-            TestHash.testHashPurpose,
-            SigningKeyUsage.ProtocolOnly,
-          ),
-        )
-
-      recipients <- recipientsArb.arbitrary
-
-      batch = Batch.of(protocolVersion, signedResult -> recipients)
-      deliver <- deliverGen(sourceSynchronizerId.unwrap, batch, protocolVersion)
-
-      unassignmentTs <- Arbitrary.arbitrary[CantonTimestamp]
-    } yield DeliveredUnassignmentResult
-      .create(
-        SignedContent(
-          deliver,
-          sign(
-            GeneratorsCrypto.testSigningKey.fingerprint,
-            "UnassignmentResult-sequencer",
-            TestHash.testHashPurpose,
-            SigningKeyUsage.ProtocolOnly,
-          ),
-          Some(unassignmentTs),
-          protocolVersion,
-        )
-      )
-      .value
-
   implicit val assignmentViewArb: Arbitrary[AssignmentView] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
-      unassignmentResultEvent <- deliveryUnassignmentResultGen(sourceProtocolVersion)
-      reassignmentCounter <- reassignmentCounterGen
-
+      contracts <- Arbitrary.arbitrary[ContractsReassignmentBatch]
+      reassignmentId <- Arbitrary.arbitrary[ReassignmentId]
       hashOps = TestHash // Not used for serialization
 
     } yield AssignmentView
       .create(hashOps)(
         salt,
-        contract,
-        unassignmentResultEvent,
+        reassignmentId,
+        contracts,
         targetProtocolVersion,
-        reassignmentCounter,
       )
       .value
+  )
+
+  private val timeProofArb: Arbitrary[TimeProof] = Arbitrary(
+    for {
+      timestamp <- Arbitrary.arbitrary[CantonTimestamp]
+      previousEventTimestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
+      counter <- nonNegativeLongArb.arbitrary.map(_.unwrap)
+      targetSynchronizerId <- Arbitrary.arbitrary[Target[PhysicalSynchronizerId]]
+    } yield TimeProofTestUtil.mkTimeProof(
+      timestamp,
+      previousEventTimestamp,
+      counter,
+      targetSynchronizerId,
+    )
   )
 
   implicit val unassignmentViewArb: Arbitrary[UnassignmentView] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
 
-      contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
+      contracts <- Arbitrary.arbitrary[ContractsReassignmentBatch]
 
-      targetSynchronizerId <- Arbitrary.arbitrary[Target[SynchronizerId]]
-      timeProof <- timeProofArb(protocolVersion).arbitrary
-      reassignmentCounter <- reassignmentCounterGen
+      targetSynchronizerId <- Arbitrary
+        .arbitrary[Target[PhysicalSynchronizerId]]
+        .map(_.map(_.copy(protocolVersion = protocolVersion)))
+      timeProof <- timeProofArb.arbitrary
 
       hashOps = TestHash // Not used for serialization
 
     } yield UnassignmentView
       .create(hashOps)(
         salt,
-        contract,
+        contracts,
         targetSynchronizerId,
         timeProof,
         sourceProtocolVersion,
-        targetProtocolVersion,
-        reassignmentCounter,
       )
   )
 
@@ -683,6 +660,26 @@ final class GeneratorsData(
       unassignmentView.blindFully,
       Source(protocolVersion),
       hash,
+    )
+  )
+
+  implicit val unassignmentDataArb: Arbitrary[UnassignmentData] = Arbitrary(
+    for {
+      submitterMetadata <- Arbitrary.arbitrary[ReassignmentSubmitterMetadata]
+      contracts <- Arbitrary.arbitrary[ContractsReassignmentBatch]
+      reassigningParticipants <- boundedSetGen[ParticipantId]
+      sourceSynchronizer <- Arbitrary.arbitrary[PhysicalSynchronizerId].map(Source(_))
+      targetSynchronizer <- Arbitrary.arbitrary[PhysicalSynchronizerId].map(Target(_))
+      targetTimestamp <- Arbitrary.arbitrary[CantonTimestamp]
+      unassignmentTs <- Arbitrary.arbitrary[CantonTimestamp]
+    } yield UnassignmentData(
+      submitterMetadata,
+      contracts,
+      reassigningParticipants,
+      sourceSynchronizer,
+      targetSynchronizer,
+      targetTimestamp,
+      unassignmentTs,
     )
   )
 

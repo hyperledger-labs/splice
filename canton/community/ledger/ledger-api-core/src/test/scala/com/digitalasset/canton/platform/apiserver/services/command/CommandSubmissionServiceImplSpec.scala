@@ -233,7 +233,7 @@ class CommandSubmissionServiceImplSpec
         contractId = TransactionBuilder.newCid,
         argument = Value.ValueNil,
         createdAt = Timestamp.Epoch,
-        driverMetadata = Bytes.Empty,
+        authenticationData = Bytes.Empty,
         signatories = Set(alice),
         stakeholders = Set(alice),
         keyOpt = None,
@@ -295,7 +295,8 @@ class CommandSubmissionServiceImplSpec
       globalKeyMapping = Map.empty,
       processedDisclosedContracts = processedDisclosedContracts,
     )
-    val synchronizerRank = SynchronizerRank.single(SynchronizerId.tryFromString("da::test"))
+    val synchronizerRank =
+      SynchronizerRank.single(SynchronizerId.tryFromString("da::test").toPhysical)
     val routingSynchronizerState = mock[RoutingSynchronizerState]
     val commandExecutionResult = CommandExecutionResult(
       commandInterpretationResult = commandInterpretationResult,

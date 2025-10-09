@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.admin
 
 import cats.Eval
 import cats.data.EitherT
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
@@ -15,6 +16,8 @@ import com.digitalasset.canton.participant.admin.PackageService.{DarDescription,
 import com.digitalasset.canton.participant.store.{
   ActiveContractStore,
   ContractStore,
+  LogicalSyncPersistentState,
+  PhysicalSyncPersistentState,
   SyncPersistentState,
 }
 import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
@@ -23,7 +26,7 @@ import com.digitalasset.canton.participant.topology.{
   PackageOpsImpl,
   TopologyComponentFactory,
 }
-import com.digitalasset.canton.store.IndexedSynchronizer
+import com.digitalasset.canton.store.{IndexedPhysicalSynchronizer, IndexedSynchronizer}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
@@ -96,13 +99,13 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
           when(activeContractStore.packageUsage(eqTo(pkgId1), eqTo(contractStore))(anyTraceContext))
             .thenReturn(FutureUnlessShutdown.pure(Some(contractId)))
           val indexedSynchronizer = IndexedSynchronizer.tryCreate(synchronizerId1, 1)
-          when(syncPersistentState.indexedSynchronizer).thenReturn(indexedSynchronizer)
+          when(syncPersistentState.synchronizerIdx).thenReturn(indexedSynchronizer)
 
           packageOps.checkPackageUnused(pkgId1).leftOrFail("active contract with package id").map {
             err =>
               err.pkg shouldBe pkgId1
               err.contract shouldBe contractId
-              err.synchronizerId shouldBe synchronizerId1
+              err.synchronizerId shouldBe synchronizerId1.logical
           }
       }.failOnShutdown
     }
@@ -115,35 +118,48 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
     val participantId = ParticipantId(UniqueIdentifier.tryCreate("participant", "one"))
 
     val headAuthorizedTopologySnapshot = mock[TopologySnapshot]
-    val anotherSynchronizerTopologySnapshot = mock[TopologySnapshot]
+    private val anotherSynchronizerTopologySnapshot = mock[TopologySnapshot]
 
     val pkgId1 = LfPackageId.assertFromString("pkgId1")
     val pkgId2 = LfPackageId.assertFromString("pkgId2")
     val pkgId3 = LfPackageId.assertFromString("pkgId3")
 
-    val packagesToBeVetted = Seq(pkgId1, pkgId2)
-    val packagesToBeUnvetted = List(pkgId1, pkgId2)
+    val synchronizerId1 = SynchronizerId(
+      UniqueIdentifier.tryCreate("synchronizer", "one")
+    ).toPhysical
+    private val synchronizerId2 = SynchronizerId(
+      UniqueIdentifier.tryCreate("synchronizer", "two")
+    ).toPhysical
 
-    val missingPkgId = LfPackageId.assertFromString("missing")
-    val synchronizerId1 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer", "one"))
-    val synchronizerId2 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer", "two"))
+    val physicalSyncPersistentState = mock[PhysicalSyncPersistentState]
+    val logicalSyncPersistentState = mock[LogicalSyncPersistentState]
+    val syncPersistentState: SyncPersistentState =
+      new SyncPersistentState(
+        logicalSyncPersistentState,
+        physicalSyncPersistentState,
+        loggerFactory,
+      )
+    when(physicalSyncPersistentState.physicalSynchronizerIdx).thenReturn(
+      IndexedPhysicalSynchronizer.tryCreate(synchronizerId1, index = 1)
+    )
 
-    val syncPersistentState: SyncPersistentState = mock[SyncPersistentState]
     when(stateManager.getAll).thenReturn(Map(synchronizerId1 -> syncPersistentState))
-    val topologyComponentFactory = mock[TopologyComponentFactory]
+    when(stateManager.getAllLatest).thenReturn(Map(synchronizerId1.logical -> syncPersistentState))
+
+    private val topologyComponentFactory = mock[TopologyComponentFactory]
     when(topologyComponentFactory.createHeadTopologySnapshot()(any[ExecutionContext]))
       .thenReturn(anotherSynchronizerTopologySnapshot)
 
     val contractStore = mock[ContractStore]
 
-    when(stateManager.topologyFactoryFor(synchronizerId1, testedProtocolVersion))
+    when(stateManager.topologyFactoryFor(synchronizerId1))
       .thenReturn(Some(topologyComponentFactory))
-    when(stateManager.topologyFactoryFor(synchronizerId2, testedProtocolVersion)).thenReturn(None)
+    when(stateManager.topologyFactoryFor(synchronizerId2)).thenReturn(None)
     when(stateManager.contractStore).thenReturn(Eval.now(contractStore))
 
     val activeContractStore = mock[ActiveContractStore]
 
-    when(syncPersistentState.activeContractStore).thenReturn(activeContractStore)
+    when(logicalSyncPersistentState.activeContractStore).thenReturn(activeContractStore)
     when(activeContractStore.packageUsage(eqTo(pkgId1), eqTo(contractStore))(anyTraceContext))
       .thenReturn(FutureUnlessShutdown.pure(None))
 
@@ -296,7 +312,7 @@ class PackageOpsTest extends PackageOpsTestBase {
           eqTo(true),
           eqTo(false),
           eqTo(Seq(VettedPackages.code)),
-          eqTo(Some(Seq(nodeId))),
+          eqTo(Some(NonEmpty(Seq, nodeId))),
           eqTo(None),
         )(anyTraceContext)
       ).thenReturn(FutureUnlessShutdown.pure(packagesVettedStoredTx(currentlyVettedPackages)))
@@ -336,7 +352,7 @@ class PackageOpsTest extends PackageOpsTestBase {
       )
 
     private def signedTopologyTransaction(vettedPackages: List[LfPackageId]) =
-      SignedTopologyTransaction.tryCreate(
+      SignedTopologyTransaction.withSignatures(
         transaction = TopologyTransaction(
           op = TopologyChangeOp.Replace,
           serial = txSerial,
@@ -346,10 +362,7 @@ class PackageOpsTest extends PackageOpsTestBase {
         ),
         signatures = Signature.noSignatures,
         isProposal = false,
-      )(
-        SignedTopologyTransaction.versioningTable.protocolVersionRepresentativeFor(
-          testedProtocolVersion
-        )
+        testedProtocolVersion,
       )
   }
 }

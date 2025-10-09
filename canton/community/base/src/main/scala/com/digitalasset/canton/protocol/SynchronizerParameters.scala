@@ -26,7 +26,6 @@ import com.digitalasset.canton.time.{
   RemoteClock,
   SimClock,
 }
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.ParticipantSynchronizerLimits
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.version.*
@@ -69,7 +68,9 @@ final case class StaticSynchronizerParameters(
     requiredHashAlgorithms: NonEmpty[Set[HashAlgorithm]],
     requiredCryptoKeyFormats: NonEmpty[Set[CryptoKeyFormat]],
     requiredSignatureFormats: NonEmpty[Set[SignatureFormat]],
+    enableTransparencyChecks: Boolean,
     protocolVersion: ProtocolVersion,
+    serial: NonNegativeInt,
 ) extends HasProtocolVersionedWrapper[StaticSynchronizerParameters]
     with PrettyPrinting {
 
@@ -88,7 +89,9 @@ final case class StaticSynchronizerParameters(
       requiredHashAlgorithms = requiredHashAlgorithms.toSeq.map(_.toProtoEnum),
       requiredCryptoKeyFormats = requiredCryptoKeyFormats.toSeq.map(_.toProtoEnum),
       requiredSignatureFormats = requiredSignatureFormats.toSeq.map(_.toProtoEnum),
+      enableTransparencyChecks = enableTransparencyChecks,
       protocolVersion = protocolVersion.toProtoPrimitive,
+      serial = serial.value,
     )
 
   override protected def pretty: Pretty[StaticSynchronizerParameters] = prettyOfClass(
@@ -97,7 +100,9 @@ final case class StaticSynchronizerParameters(
     param("required symmetric key schemes", _.requiredSymmetricKeySchemes),
     param("required hash algorithms", _.requiredHashAlgorithms),
     param("required crypto key formats", _.requiredCryptoKeyFormats),
+    param("enable transparency checks", _.enableTransparencyChecks),
     param("protocol version", _.protocolVersion),
+    param("serial", _.serial),
   )
 }
 
@@ -108,7 +113,7 @@ object StaticSynchronizerParameters
   // Note: if you need static synchronizer parameters for testing, look at BaseTest.defaultStaticSynchronizerParametersWith
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.StaticSynchronizerParameters
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -136,6 +141,8 @@ object StaticSynchronizerParameters
       requiredCryptoKeyFormatsP,
       requiredSignatureFormatsP,
       protocolVersionP,
+      serialP,
+      enableTransparencyChecks,
     ) = synchronizerParametersP
 
     for {
@@ -172,6 +179,7 @@ object StaticSynchronizerParameters
         SignatureFormat.fromProtoEnum,
       )
       protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
+      serial <- ProtoConverter.parseNonNegativeInt("serial", serialP)
     } yield StaticSynchronizerParameters(
       requiredSigningSpecs,
       requiredEncryptionSpecs,
@@ -179,7 +187,9 @@ object StaticSynchronizerParameters
       requiredHashAlgorithms,
       requiredCryptoKeyFormats,
       requiredSignatureFormats,
+      enableTransparencyChecks,
       protocolVersion,
+      serial,
     )
   }
 }
@@ -304,7 +314,7 @@ object OnboardingRestriction {
   *   minimal value, unless you plan to subsequently increase `preparationTimeRecordTimeTolerance.`
   * @param reconciliationInterval
   *   The size of the reconciliation interval (minimum duration between two ACS commitments). Note:
-  *   default to [[StaticSynchronizerParameters.defaultReconciliationInterval]] for backward
+  *   default to [[DynamicSynchronizerParameters.defaultReconciliationInterval]] for backward
   *   compatibility. Should be significantly longer than the period of time it takes to compute the
   *   commitment and have it sequenced of the synchronizer. Otherwise, ACS commitments will keep
   *   being exchanged continuously on an idle synchronizer.
@@ -403,6 +413,12 @@ final case class DynamicSynchronizerParameters private (
   def submissionCostTimestampTopologyTolerance: NonNegativeFiniteDuration =
     sequencerTopologyTimestampTolerance
 
+  /** Participants will time out confirmation requests after this period has elapsed past the
+    * observed sequencing time of the confirmation request.
+    */
+  def decisionTimeout: NonNegativeFiniteDuration =
+    confirmationResponseTimeout + mediatorReactionTimeout
+
   def automaticAssignmentEnabled: Boolean =
     assignmentExclusivityTimeout > NonNegativeFiniteDuration.Zero
 
@@ -495,7 +511,7 @@ final case class DynamicSynchronizerParameters private (
 object DynamicSynchronizerParameters extends VersioningCompanion[DynamicSynchronizerParameters] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.DynamicSynchronizerParameters
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -681,9 +697,10 @@ object DynamicSynchronizerParameters extends VersioningCompanion[DynamicSynchron
         defaultSequencerAggregateSubmissionTimeout,
       preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration =
         defaultPreparationTimeRecordTimeTolerance,
-  ) =
+      confirmationResponseTimeout: NonNegativeFiniteDuration = defaultConfirmationResponseTimeout,
+  ): DynamicSynchronizerParameters =
     DynamicSynchronizerParameters.tryCreate(
-      confirmationResponseTimeout = defaultConfirmationResponseTimeout,
+      confirmationResponseTimeout = confirmationResponseTimeout,
       mediatorReactionTimeout = mediatorReactionTimeout,
       assignmentExclusivityTimeout = defaultAssignmentExclusivityTimeout,
       topologyChangeDelay = topologyChangeDelay,
@@ -842,7 +859,6 @@ final case class DynamicSynchronizerParametersWithValidity(
     parameters: DynamicSynchronizerParameters,
     validFrom: CantonTimestamp,
     validUntil: Option[CantonTimestamp],
-    synchronizerId: SynchronizerId,
 ) {
   def map[T](f: DynamicSynchronizerParameters => T): SynchronizerParameters.WithValidity[T] =
     SynchronizerParameters.WithValidity(validFrom, validUntil, f(parameters))

@@ -4,19 +4,18 @@
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
-import com.digitalasset.canton.ReassignmentCounter
+import cats.syntax.functor.*
 import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt, SaltSeed}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentValidationError.PackageIdUnknownOrUnvetted
 import com.digitalasset.canton.participant.protocol.submission.UsableSynchronizers
-import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.ReassignmentId
 import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, TimeProof}
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.version.ProtocolVersion
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -28,21 +27,24 @@ import scala.concurrent.ExecutionContext
   * @param targetTimeProof
   *   a sequenced event that the submitter has recently observed on the target synchronizer.
   *   Determines the timestamp of the topology at the target synchronizer.
-  * @param reassignmentCounter
-  *   The new reassignment counter (incremented value compared to the one in the ACS).
   */
 final case class UnassignmentRequest(
     submitterMetadata: ReassignmentSubmitterMetadata,
     reassigningParticipants: Set[ParticipantId],
-    contract: SerializableContract,
-    sourceSynchronizer: Source[SynchronizerId],
-    sourceProtocolVersion: Source[ProtocolVersion],
+    contracts: ContractsReassignmentBatch,
+    sourceSynchronizer: Source[PhysicalSynchronizerId],
     sourceMediator: MediatorGroupRecipient,
-    targetSynchronizer: Target[SynchronizerId],
-    targetProtocolVersion: Target[ProtocolVersion],
+    targetSynchronizer: Target[PhysicalSynchronizerId],
     targetTimeProof: TimeProof,
-    reassignmentCounter: ReassignmentCounter,
 ) {
+  private val sourceProtocolVersion = sourceSynchronizer.map(_.protocolVersion)
+
+  def mkReassignmentId(unassignmentTs: CantonTimestamp) = ReassignmentId(
+    sourceSynchronizer.map(_.logical),
+    targetSynchronizer.map(_.logical),
+    unassignmentTs,
+    contracts.contractIdCounters,
+  )
 
   def toFullUnassignmentTree(
       hashOps: HashOps,
@@ -58,7 +60,7 @@ final case class UnassignmentRequest(
         commonDataSalt,
         sourceSynchronizer,
         sourceMediator,
-        stakeholders = Stakeholders(contract.metadata),
+        stakeholders = contracts.stakeholders,
         reassigningParticipants,
         uuid = uuid,
         submitterMetadata,
@@ -68,12 +70,10 @@ final case class UnassignmentRequest(
     val view = UnassignmentView
       .create(hashOps)(
         viewSalt,
-        contract,
+        contracts,
         targetSynchronizer,
         targetTimeProof,
         sourceProtocolVersion,
-        targetProtocolVersion,
-        reassignmentCounter,
       )
 
     FullUnassignmentTree(UnassignmentViewTree(commonData, view, sourceProtocolVersion, hashOps))
@@ -85,16 +85,13 @@ object UnassignmentRequest {
   def validated(
       participantId: ParticipantId,
       timeProof: TimeProof,
-      contract: SerializableContract,
+      contracts: ContractsReassignmentBatch,
       submitterMetadata: ReassignmentSubmitterMetadata,
-      sourceSynchronizer: Source[SynchronizerId],
-      sourceProtocolVersion: Source[ProtocolVersion],
+      sourcePSId: Source[PhysicalSynchronizerId],
       sourceMediator: MediatorGroupRecipient,
-      targetSynchronizer: Target[SynchronizerId],
-      targetProtocolVersion: Target[ProtocolVersion],
+      targetPSId: Target[PhysicalSynchronizerId],
       sourceTopology: Source[TopologySnapshot],
       targetTopology: Target[TopologySnapshot],
-      reassignmentCounter: ReassignmentCounter,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -103,14 +100,14 @@ object UnassignmentRequest {
     ReassignmentValidationError,
     UnassignmentRequestValidated,
   ] = {
-    val contractId = contract.contractId
-    val templateId = contract.contractInstance.unversioned.template
-    val stakeholders = Stakeholders(contract.metadata)
+    val contractIds = contracts.contractIds.toSet
+    val packageIds = contracts.contracts.view.map(_.templateId.packageId).toSet
+    val stakeholders = contracts.stakeholders
 
     for {
       _ <- ReassignmentValidation
         .checkSubmitter(
-          ReassignmentRef(contractId),
+          ReassignmentRef.ContractIdRef(contractIds),
           sourceTopology,
           submitterMetadata.submitter,
           participantId,
@@ -133,26 +130,23 @@ object UnassignmentRequest {
 
       _ <- UsableSynchronizers
         .checkPackagesVetted(
-          targetSynchronizer.unwrap,
+          targetPSId.unwrap,
           targetTopology.unwrap,
-          stakeholders.all.view.map(_ -> Set(templateId.packageId)).toMap,
+          stakeholders.all.view.map(_ -> packageIds).toMap,
           targetTopology.unwrap.referenceTime,
         )
         .leftMap[ReassignmentValidationError](unknownPackage =>
-          PackageIdUnknownOrUnvetted(contractId, unknownPackage.unknownTo)
+          PackageIdUnknownOrUnvetted(contractIds, unknownPackage.unknownTo)
         )
     } yield {
       val unassignmentRequest = UnassignmentRequest(
         submitterMetadata,
         reassigningParticipants,
-        contract,
-        sourceSynchronizer,
-        sourceProtocolVersion,
+        contracts,
+        sourcePSId,
         sourceMediator,
-        targetSynchronizer,
-        targetProtocolVersion,
+        targetPSId,
         timeProof,
-        reassignmentCounter,
       )
 
       UnassignmentRequestValidated(

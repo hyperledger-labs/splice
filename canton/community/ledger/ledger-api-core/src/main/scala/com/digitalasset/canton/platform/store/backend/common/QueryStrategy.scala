@@ -4,6 +4,7 @@
 package com.digitalasset.canton.platform.store.backend.common
 
 import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
   SqlStringInterpolation,
@@ -120,11 +121,6 @@ object QueryStrategy {
 
 trait QueryStrategy {
 
-  /** Predicate which tests if the element referenced by the `elementColumnName` is in the array
-    * from column `arrayColumnName`
-    */
-  def arrayContains(arrayColumnName: String, elementColumnName: String): String
-
   /** ANY SQL clause generation for a number of Long values
     */
   def anyOf(longs: Iterable[Long]): CompositeSql = {
@@ -147,6 +143,15 @@ trait QueryStrategy {
     val binaryArray: Array[Array[Byte]] =
       binaries.toArray
     cSQL"= ANY($binaryArray)"
+  }
+
+  /** SQL clause to check if an element is in a given batch whether the batch is defined as a range
+    * or a list of numbers
+    */
+  def inBatch(colName: String, batch: SequentialIdBatch): CompositeSql = batch match {
+    case SequentialIdBatch.IdRange(fromInclusive, toInclusive) =>
+      cSQL"(#$colName >= $fromInclusive AND #$colName <= $toInclusive)"
+    case SequentialIdBatch.Ids(ids) => cSQL"#$colName ${anyOf(ids)}"
   }
 
   def analyzeTable(tableName: String): CompositeSql

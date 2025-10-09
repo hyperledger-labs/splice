@@ -338,7 +338,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class SynchronizerParametersState(
+    final case class ListSynchronizerParametersState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -350,7 +350,7 @@ object TopologyAdminCommands {
       override protected def createRequest()
           : Either[String, v30.ListSynchronizerParametersStateRequest] =
         Right(
-          new v30.ListSynchronizerParametersStateRequest(
+          v30.ListSynchronizerParametersStateRequest(
             baseQuery = Some(query.toProtoV1),
             filterSynchronizerId = filterSynchronizerId,
           )
@@ -370,7 +370,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class MediatorSynchronizerState(
+    final case class ListMediatorSynchronizerState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -402,7 +402,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class SequencerSynchronizerState(
+    final case class ListSequencerSynchronizerState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -434,19 +434,19 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class PurgeTopologyTransaction(
+    final case class ListSynchronizerUpgradeAnnouncement(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListPurgeTopologyTransactionRequest,
-          v30.ListPurgeTopologyTransactionResponse,
-          Seq[ListPurgeTopologyTransactionResult],
+          v30.ListSynchronizerUpgradeAnnouncementRequest,
+          v30.ListSynchronizerUpgradeAnnouncementResponse,
+          Seq[ListSynchronizerUpgradeAnnouncementResult],
         ] {
 
       override protected def createRequest()
-          : Either[String, v30.ListPurgeTopologyTransactionRequest] =
+          : Either[String, v30.ListSynchronizerUpgradeAnnouncementRequest] =
         Right(
-          new v30.ListPurgeTopologyTransactionRequest(
+          new ListSynchronizerUpgradeAnnouncementRequest(
             baseQuery = Some(query.toProtoV1),
             filterSynchronizerId = filterSynchronizerId,
           )
@@ -454,15 +454,47 @@ object TopologyAdminCommands {
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListPurgeTopologyTransactionRequest,
-      ): Future[v30.ListPurgeTopologyTransactionResponse] =
-        service.listPurgeTopologyTransaction(request)
+          request: v30.ListSynchronizerUpgradeAnnouncementRequest,
+      ): Future[v30.ListSynchronizerUpgradeAnnouncementResponse] =
+        service.listSynchronizerUpgradeAnnouncement(request)
 
       override protected def handleResponse(
-          response: v30.ListPurgeTopologyTransactionResponse
-      ): Either[String, Seq[ListPurgeTopologyTransactionResult]] =
+          response: v30.ListSynchronizerUpgradeAnnouncementResponse
+      ): Either[String, Seq[ListSynchronizerUpgradeAnnouncementResult]] =
         response.results
-          .traverse(ListPurgeTopologyTransactionResult.fromProtoV30)
+          .traverse(ListSynchronizerUpgradeAnnouncementResult.fromProtoV30)
+          .leftMap(_.toString)
+    }
+
+    final case class ListSequencerConnectionSuccessor(
+        query: BaseQuery,
+        filterSequencerId: String,
+    ) extends BaseCommand[
+          v30.ListSequencerConnectionSuccessorRequest,
+          v30.ListSequencerConnectionSuccessorResponse,
+          Seq[ListSequencerConnectionSuccessorResult],
+        ] {
+
+      override protected def createRequest()
+          : Either[String, v30.ListSequencerConnectionSuccessorRequest] =
+        Right(
+          new ListSequencerConnectionSuccessorRequest(
+            baseQuery = Some(query.toProtoV1),
+            filterSequencerId = filterSequencerId,
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.ListSequencerConnectionSuccessorRequest,
+      ): Future[v30.ListSequencerConnectionSuccessorResponse] =
+        service.listSequencerConnectionSuccessor(request)
+
+      override protected def handleResponse(
+          response: v30.ListSequencerConnectionSuccessorResponse
+      ): Either[String, Seq[ListSequencerConnectionSuccessorResult]] =
+        response.results
+          .traverse(ListSequencerConnectionSuccessorResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
@@ -578,6 +610,35 @@ object TopologyAdminCommands {
       ): Future[CancellableContext] = {
         val context = Context.current().withCancellation()
         context.run(() => service.genesisState(request, observer))
+        Future.successful(context)
+      }
+
+      override protected def handleResponse(
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
+    final case class LogicalUpgradeState(
+        observer: StreamObserver[LogicalUpgradeStateResponse]
+    ) extends BaseCommand[
+          v30.LogicalUpgradeStateRequest,
+          CancellableContext,
+          CancellableContext,
+        ] {
+      override protected def createRequest(): Either[String, v30.LogicalUpgradeStateRequest] =
+        Right(
+          v30.LogicalUpgradeStateRequest()
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.LogicalUpgradeStateRequest,
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.logicalUpgradeState(request, observer))
         Future.successful(context)
       }
 

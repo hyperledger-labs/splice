@@ -4,7 +4,11 @@
 package com.digitalasset.canton.topology
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.base.error.ErrorCategory.InvalidGivenCurrentSystemStateResourceExists
+import com.digitalasset.base.error.ErrorCategory.{
+  InvalidGivenCurrentSystemStateOther,
+  InvalidGivenCurrentSystemStateResourceExists,
+  InvalidIndependentOfSystemState,
+}
 import com.digitalasset.base.error.{
   Alarm,
   AlarmErrorCode,
@@ -17,6 +21,7 @@ import com.digitalasset.base.error.{
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonErrorGroups.TopologyManagementErrorGroup.TopologyManagerErrorGroup
 import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -29,7 +34,8 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.ReferencedAuthorizations
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
-import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.language.Util
 import com.digitalasset.daml.lf.value.Value.ContractId
 
 sealed trait TopologyManagerError extends ContextualizedCantonError
@@ -49,6 +55,14 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"Assumption violation: $description"
+        )
+        with TopologyManagerError
+
+    final case class Unhandled(description: String, throwable: Throwable)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"Unhandled error: $description",
+          throwableO = Some(throwable),
         )
         with TopologyManagerError
 
@@ -231,10 +245,11 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         )
         with TopologyManagerError
 
-    final case class MultipleSynchronizerStoresFound(storeId: TopologyStoreId)(implicit
+    final case class MultipleSynchronizerStoresFound(storeIds: Seq[TopologyStoreId])(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"Multiple synchronizer stores found for the provided storeId: $storeId."
+          cause =
+            s"Multiple synchronizer stores found for the provided storeId: ${storeIds.mkString(", ")}."
         )
         with TopologyManagerError
   }
@@ -770,6 +785,82 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         with TopologyManagerError
   }
 
+  @Explanation(
+    "This error indicates that a synchronizer upgrade is ongoing and only mappings related to synchronizer upgrade are permitted."
+  )
+  @Resolution(
+    "Contact the owners of the synchronizer about the ongoing synchronizer upgrade."
+  )
+  object OngoingSynchronizerUpgrade
+      extends ErrorCode(
+        id = "TOPOLOGY_ONGOING_SYNCHRONIZER_UPGRADE",
+        InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Reject(synchronizerId: SynchronizerId)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"The topology state of synchronizer $synchronizerId is frozen due to an ongoing synchronizer upgrade and no more topology changes are allowed."
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    "This error indicates that a synchronizer upgrade is not ongoing, which prevents some upgrade operations from being performed."
+  )
+  @Resolution(
+    "Contact the owners of the synchronizer about the ongoing synchronizer upgrade."
+  )
+  object NoOngoingSynchronizerUpgrade
+      extends ErrorCode(
+        id = "TOPOLOGY_NO_ONGOING_SYNCHRONIZER_UPGRADE",
+        InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Failure()(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"The operation cannot be performed because no upgrade is ongoing"
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation("This error indicates that the successor synchronizer id is not valid.")
+  @Resolution(
+    "Change the successor synchronizer ID to have a protocol version that is the same as or newer than the current synchronizer's."
+  )
+  object InvalidSynchronizerSuccessor
+      extends ErrorCode(id = "TOPOLOGY_INVALID_SUCCESSOR", InvalidIndependentOfSystemState) {
+    final case class Reject(
+        currentSynchronizerId: PhysicalSynchronizerId,
+        successorSynchronizerId: PhysicalSynchronizerId,
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause =
+            s"The declared successor $successorSynchronizerId of synchronizer $currentSynchronizerId is not valid."
+        )
+        with TopologyManagerError
+
+  }
+  @Explanation(
+    "This error indicates that the synchronizer upgrade announcement specified an invalid upgrade time."
+  )
+  @Resolution(
+    "Resubmit the synchronizer announcement with an upgrade time sufficiently in the future."
+  )
+  object InvalidUpgradeTime
+      extends ErrorCode(id = "TOPOLOGY_INVALID_UPGRADE_TIME", InvalidGivenCurrentSystemStateOther) {
+    final case class Reject(
+        synchronizerId: SynchronizerId,
+        effective: EffectiveTime,
+        upgradeTime: CantonTimestamp,
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause =
+            s"The upgrade time $upgradeTime must be after the effective ${effective.value} of the synchronizer upgrade announcement for synchronizer $synchronizerId."
+        )
+        with TopologyManagerError
+
+  }
   abstract class SynchronizerErrorGroup extends ErrorGroup()
 
   abstract class ParticipantErrorGroup extends ErrorGroup()
@@ -806,7 +897,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           id = "TOPOLOGY_DEPENDENCIES_NOT_VETTED",
           ErrorCategory.InvalidGivenCurrentSystemStateOther,
         ) {
-      final case class Reject(unvetted: Set[PackageId])(implicit
+      final case class Reject(unvetted: Set[Ref.PackageId])(implicit
           val loggingContext: ErrorLoggingContext
       ) extends CantonError.Impl(
             cause = "Package vetting failed due to dependencies not being vetted"
@@ -828,7 +919,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           id = "TOPOLOGY_CANNOT_VET_DUE_TO_MISSING_PACKAGES",
           ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
-      final case class Missing(packages: PackageId)(implicit
+      final case class Missing(packages: Ref.PackageId)(implicit
           val loggingContext: ErrorLoggingContext
       ) extends CantonError.Impl(
             cause = "Package vetting failed due to packages not existing on the local node"
@@ -845,7 +936,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           ErrorCategory.InvalidGivenCurrentSystemStateOther,
         ) {
       final case class Reject(
-          used: PackageId,
+          used: Ref.PackageId,
           contract: ContractId,
           synchronizerId: SynchronizerId,
       )(implicit
@@ -968,5 +1059,69 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           with TopologyManagerError
     }
 
+    @Explanation(
+      "This error indicates that the package to be vetted is invalid because it doesn't upgrade the vetted packages it claims to upgrade."
+    )
+    @Resolution(
+      "Contact the supplier of the DAR or ensure the vetting state change does not lead to simultaneously-vetted upgrade-incompatible packages."
+    )
+    object Upgradeability
+        extends ErrorCode(
+          id = "NOT_VALID_UPGRADE_PACKAGE",
+          ErrorCategory.InvalidIndependentOfSystemState,
+        ) {
+      final case class Error(
+          oldPackage: Util.PkgIdWithNameAndVersion,
+          newPackage: Util.PkgIdWithNameAndVersion,
+          upgradeError: String,
+      )(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            s"Upgrade checks indicate that $newPackage cannot be an upgrade of $oldPackage. Reason: $upgradeError"
+          )
+          with TopologyManagerError
+    }
+
+    @Explanation(
+      "This error indicates that a package with name `daml-prim` or `daml-std-lib` that isn't a utility package was being vetted. All `daml-prim` and `daml-std-lib` packages should be utility packages."
+    )
+    @Resolution("Contact the supplier of the Dar.")
+    object UpgradeDamlPrimIsNotAUtilityPackage
+        extends ErrorCode(
+          id = "DAML_PRIM_NOT_UTILITY_PACKAGE",
+          ErrorCategory.InvalidIndependentOfSystemState,
+        ) {
+      final case class Error(
+          packageToBeVetted: Util.PkgIdWithNameAndVersion
+      )(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause =
+              s"Tried to vet a package $packageToBeVetted, but this package is not a utility package. All packages named `daml-prim` or `daml-std-lib` must be a utility package."
+          )
+          with TopologyManagerError
+    }
+
+    @Explanation(
+      "This error indicates that the upgrade checks failed on a package because another package with the same name and version has been previously vetted."
+    )
+    @Resolution("Inspect the error message and contact support.")
+    object UpgradeVersion
+        extends ErrorCode(
+          id = "KNOWN_PACKAGE_VERSION",
+          ErrorCategory.InvalidIndependentOfSystemState,
+        ) {
+      @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
+      final case class Error(
+          firstPackage: Util.PkgIdWithNameAndVersion,
+          secondPackage: Util.PkgIdWithNameAndVersion,
+      )(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause =
+              s"Tried to vet two packages with the same name and version: $firstPackage and $secondPackage."
+          )
+          with TopologyManagerError
+    }
   }
 }

@@ -4,67 +4,67 @@
 package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.BigDecimalImplicits.*
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DbConfig, SynchronizerTimeTrackerConfig}
-import com.digitalasset.canton.console.{
-  CommandFailure,
-  LocalParticipantReference,
-  ParticipantReference,
-}
-import com.digitalasset.canton.crypto.LtHash16
+import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
   UseCommunityReferenceBlockSequencer,
-  UseH2,
   UsePostgres,
+  UseProgrammableSequencer,
 }
-import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.util.AcsInspection.assertInAcsSync
+import com.digitalasset.canton.integration.tests.util.{CommitmentTestUtil, IntervalDuration}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
-  TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.participant.admin.grpc.ParticipantInspectionServiceError
 import com.digitalasset.canton.participant.pruning.*
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.Errors.MismatchError.{
   CommitmentsMismatch,
   NoSharedContracts,
 }
-import com.digitalasset.canton.participant.store.ReassignmentStore
-import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceSynchronizerDisabledUs
+import com.digitalasset.canton.participant.sync.SyncServiceError.{
+  SyncServiceSynchronizerDisabledUs,
+  SyncServiceSynchronizerDisconnect,
+}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
-import com.digitalasset.canton.protocol.messages.{AcsCommitment, CommitmentPeriod}
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.MemberAccessDisabled
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.sequencing.protocol.{MemberRecipient, SubmissionRequest}
+import com.digitalasset.canton.synchronizer.sequencer.{
+  HasProgrammableSequencer,
+  ProgrammableSequencerPolicies,
+  SendDecision,
+}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
-import com.digitalasset.canton.{HasExecutionContext, config}
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 import java.time.{Duration as JDuration, Instant}
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
+import scala.concurrent.Promise
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
-import scala.jdk.DurationConverters.*
 
-trait AcsCommitmentProcessorIntegrationTest
+sealed trait AcsCommitmentProcessorIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with SortedReconciliationIntervalsHelpers
-    with HasExecutionContext {
+    with HasProgrammableSequencer
+    with CommitmentTestUtil {
 
   private val iouContract = new AtomicReference[Iou.Contract]
-  private val interval = JDuration.ofSeconds(5)
+  private val interval: JDuration = JDuration.ofSeconds(5)
+  private implicit val duration: IntervalDuration = IntervalDuration(interval)
   private val minObservationDuration1 = NonNegativeFiniteDuration.tryOfHours(1)
   // Participant2 has a longer minObservationDuration than participant1
   private val minObservationDuration2 = minObservationDuration1 * NonNegativeInt.tryCreate(2)
@@ -73,19 +73,10 @@ trait AcsCommitmentProcessorIntegrationTest
 
   private var lastCommTick: CantonTimestampSecond = _
 
-  lazy val maxDedupDuration = java.time.Duration.ofHours(1)
-  private val confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfHours(1)
-  private val mediatorReactionTimeout = NonNegativeFiniteDuration.tryOfHours(1)
-  private val pruningTimeout =
-    Ordering[JDuration].max(
-      interval
-        .plus(confirmationResponseTimeout.duration)
-        .plus(mediatorReactionTimeout.duration),
-      maxDedupDuration,
-    )
+  private lazy val maxDedupDuration = java.time.Duration.ofHours(1)
 
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P2_S1M1_S1M1
+    EnvironmentDefinition.P3_S1M1_S1M1
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
         ConfigTransforms.updateMaxDeduplicationDurations(maxDedupDuration),
@@ -127,61 +118,17 @@ trait AcsCommitmentProcessorIntegrationTest
 
         connect(participant1, minObservationDuration1)
         connect(participant2, minObservationDuration2)
+        connect(participant3, minObservationDuration2)
         participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
         participants.all.foreach(_.dars.upload(CantonExamplesPath))
         passTopologyRegistrationTimeout(env)
       }
 
-  // advance the time sufficiently past the topology transaction registration timeout,
-  // so that the ticks to detect a timeout for topology submissions does not seep into the following tests
-  private def passTopologyRegistrationTimeout(environment: TestConsoleEnvironment): Unit =
-    environment.environment.simClock.value.advance(
-      (environment.participant1.config.topology.topologyTransactionRegistrationTimeout).asFiniteApproximation.toJava
-    )
-  private def deployAndCheckContract(synchronizerId: SynchronizerId)(implicit
-      env: TestConsoleEnvironment
-  ): Iou.Contract = {
-    import env.*
-
-    logger.info(s"Deploying the iou contract on both participants")
-    val iou = IouSyntax
-      .createIou(participant1, Some(synchronizerId))(
-        participant1.adminParty,
-        participant2.adminParty,
-      )
-
-    iouContract.set(iou)
-
-    logger.info(s"Waiting for the participants to see the contract in their ACS")
-    eventually() {
-      participants.all.foreach(p =>
-        p.ledger_api.state.acs
-          .of_all()
-          .filter(_.contractId == iou.id.contractId) should not be empty
-      )
-    }
-
-    iou
-  }
-
-  private def tickBeforeOrAt(timestamp: CantonTimestamp): CantonTimestampSecond =
-    SortedReconciliationIntervals
-      .create(
-        Seq(mkParameters(CantonTimestamp.MinValue, interval.getSeconds)),
-        CantonTimestamp.MaxValue,
-      )
-      .value
-      .tickBeforeOrAt(timestamp)
-      .value
-
-  private def tickAfter(timestamp: CantonTimestamp): CantonTimestampSecond =
-    tickBeforeOrAt(timestamp) + PositiveSeconds.tryOfSeconds(interval.getSeconds)
-
   "Participants can compute and receive ACS commitments" in { implicit env =>
     import env.*
 
     val simClock = environment.simClock.value
-    deployAndCheckContract(daId)
+    deployOnP1P2AndCheckContract(daId, iouContract)
 
     val tick1 = tickAfter(simClock.uniqueTime())
     val tick2 = tickAfter(tick1.forgetRefinement)
@@ -326,7 +273,7 @@ trait AcsCommitmentProcessorIntegrationTest
           s"""Disconnect both participants from the synchronizer. We disconnect participant1 because we don't
             want it to observe time advancing, and participant2 because we want to purge a contract."""
         )
-        participants.all.foreach(p => p.synchronizers.disconnect_all())
+        Seq(participant1, participant2).foreach(p => p.synchronizers.disconnect_all())
         participant2.repair.purge(daName, Seq(iouContract.get().id.toLf))
 
         logger.info(
@@ -446,7 +393,7 @@ trait AcsCommitmentProcessorIntegrationTest
           participant1.commitments
             .received(
               daName,
-              lastCommTick.toInstant,
+              lastCommTick.toInstant.minusMillis(1),
               lastCommTick.toInstant,
               Some(participant2),
             )
@@ -457,7 +404,7 @@ trait AcsCommitmentProcessorIntegrationTest
           participant2.commitments
             .received(
               daName,
-              lastCommTick.toInstant,
+              lastCommTick.toInstant.minusMillis(1),
               lastCommTick.toInstant,
               Some(participant1),
             )
@@ -480,7 +427,10 @@ trait AcsCommitmentProcessorIntegrationTest
         eventually() {
           participants.all.foreach(p =>
             p.testing
-              .await_synchronizer_time(daId, firstNoCommTick.forgetRefinement.immediateSuccessor)
+              .await_synchronizer_time(
+                daId,
+                firstNoCommTick.forgetRefinement.immediateSuccessor,
+              )
           )
         }
 
@@ -505,22 +455,34 @@ trait AcsCommitmentProcessorIntegrationTest
         }
       },
       logs => {
-        forExactly(1, logs) { m =>
+        // Because we disconnect participant 1 to purge contracts, it can happen that the clean request counter hasn't
+        // advanced to after processing the incoming commitment, therefore participant 1 processes it again and
+        // issues the mismatch warning again. This should happen at least once and at most twice
+        forAtLeast(1, logs) { m =>
           m.toString should (include(s"toInclusive = $lastCommTick") and include(
-            CommitmentsMismatch.id
-          ))
+            "sender = PAR::participant2"
+          ) and
+            include("counterParticipant = PAR::participant1") and include(
+              CommitmentsMismatch.id
+            ))
         }
         forExactly(1, logs) { m =>
-          m.toString should (include(s"toInclusive = $lastCommTick") and include(
-            NoSharedContracts.id
-          ))
+          m.toString should (include(s"toInclusive = $lastCommTick")
+            and include(
+              "sender = PAR::participant1"
+            ) and
+            include("counterParticipant = PAR::participant2")
+            and include(
+              NoSharedContracts.id
+            ))
         }
       },
       timeUntilSuccess = 60.seconds,
     )
 
     logger.info(s"We deploy the IOU again for following tests.")
-    alreadyDeployedContracts = alreadyDeployedContracts.appended(deployAndCheckContract(daId))
+    alreadyDeployedContracts =
+      alreadyDeployedContracts.appended(deployOnP1P2AndCheckContract(daId, iouContract))
   }
 
   "Periodic synchronizer time proofs trigger commitment computations" in { implicit env =>
@@ -556,626 +518,152 @@ trait AcsCommitmentProcessorIntegrationTest
     }
   }
 
-  "Commitment and mismatch inspection" should {
-
-    def deployThreeAndCheck(synchronizerId: SynchronizerId)(implicit
-        env: FixtureParam
-    ): (Seq[Iou.Contract], CommitmentPeriod, AcsCommitment.HashedCommitmentType) =
-      deployManyAndCheck(synchronizerId, PositiveInt.three)
-
-    def deployManyAndCheck(synchronizerId: SynchronizerId, nContracts: PositiveInt)(implicit
-        env: FixtureParam
-    ): (Seq[Iou.Contract], CommitmentPeriod, AcsCommitment.HashedCommitmentType) = {
-      import env.*
-
-      val simClock = environment.simClock.value
-
-      val createdCids = (1 to nContracts.value).map(_ => deployAndCheckContract(synchronizerId))
-
-      val tick1 = tickAfter(simClock.uniqueTime())
-      simClock.advanceTo(tick1.forgetRefinement.immediateSuccessor)
-      participant1.testing.fetch_synchronizer_times()
-
-      val p1Computed = eventually() {
-        val p1Computed = participant1.commitments
-          .computed(
-            daName,
-            tick1.toInstant,
-            tick1.toInstant,
-            Some(participant2),
-          )
-        p1Computed.size shouldBe 1
-        p1Computed
-      }
-
-      val (period, participant, commitment) = p1Computed.loneElement
-      alreadyDeployedContracts = alreadyDeployedContracts.concat(createdCids)
-      (createdCids, period, commitment)
-    }
-
-    "participant can open a commitment it previously sent" in { implicit env =>
-      import env.*
-
-      val (createdCids, period, commitment) = deployThreeAndCheck(daId)
-
-      val contractsAndTransferCounters = participant1.commitments.open_commitment(
-        commitment,
-        daId,
-        period.toInclusive.forgetRefinement,
-        participant2,
-      )
-
-      val returnedCids = contractsAndTransferCounters.map(c => c.cid)
-      returnedCids should contain theSameElementsAs alreadyDeployedContracts.map(c => c.id.toLf)
-    }
-
-    "participant can open a commitment spanning multiple intervals" in { implicit env =>
-      import env.*
-
-      val simClock = environment.simClock.value
-
-      deployThreeAndCheck(daId)
-
-      logger.info(
-        "Advance time five reconciliation intervals, remembering the tick after three reconciliation intervals."
-      )
-      simClock.advance(interval.multipliedBy(3))
-      val midTick = tickAfter(simClock.uniqueTime())
-      simClock.advanceTo(midTick.forgetRefinement.immediateSuccessor)
-      simClock.advance(interval.multipliedBy(2))
-      val cmtTick = tickAfter(simClock.uniqueTime())
-      simClock.advanceTo(cmtTick.forgetRefinement.immediateSuccessor)
-
-      logger.info("Send a commitment, which will cover the five intervals.")
-      participant1.testing.fetch_synchronizer_times()
-
-      val (_period, _pId, cmtOverFiveIntervals) = eventually() {
-        val p1Computed = participant1.commitments
-          .computed(
-            daName,
-            cmtTick.toInstant,
-            cmtTick.toInstant,
-            Some(participant2),
-          )
-        p1Computed.size shouldBe 1
-        p1Computed
-      }.loneElement
-
-      val contractsAndTransferCounters = participant1.commitments.open_commitment(
-        cmtOverFiveIntervals,
-        daId,
-        midTick.forgetRefinement,
-        participant2,
-      )
-
-      val returnedCids = contractsAndTransferCounters.map(c => c.cid)
-      returnedCids should contain theSameElementsAs alreadyDeployedContracts.map(c => c.id.toLf)
-    }
-
-    "opening a commitment fails when" should {
-      "the participant didn't send the given commitment" in { implicit env =>
-        import env.*
-
-        val (_createdCids, period, commitment) = deployThreeAndCheck(daId)
-        val notSentCmt = LtHash16().getByteString()
-        val hashedNotSentCmd = AcsCommitment.hashCommitment(notSentCmt)
-
-        // give wrong commitment but correct timestamp and counter-participant
-        loggerFactory.assertThrowsAndLogs[CommandFailure](
-          participant1.commitments.open_commitment(
-            hashedNotSentCmd,
-            daId,
-            period.toInclusive.forgetRefinement,
-            participant2,
-          ),
-          logEntry => {
-            logEntry.errorMessage should (include(
-              "The participant cannot open commitment"
-            ) and include(
-              "because the participant has not computed such a commitment at the given tick timestamp for the given counter participant"
-            ))
-            logEntry.shouldBeCantonErrorCode(ParticipantInspectionServiceError.IllegalArgumentError)
-          },
-        )
-      }
-
-      "the participant sent the commitment but not at the given tick" in { implicit env =>
-        import env.*
-
-        val (_createdCids, period, commitment) = deployThreeAndCheck(daId)
-
-        // give wrong timestamp but a computed commitment and correct counter-participant
-        loggerFactory.assertThrowsAndLogs[CommandFailure](
-          participant1.commitments.open_commitment(
-            commitment,
-            daId,
-            CantonTimestamp.MinValue,
-            participant2,
-          ),
-          logEntry => {
-            logEntry.errorMessage should (include(
-              "The participant cannot open commitment"
-            ) and include(
-              "because the participant has not computed such a commitment at the given tick timestamp for the given counter participant"
-            ))
-            logEntry.shouldBeCantonErrorCode(ParticipantInspectionServiceError.IllegalArgumentError)
-          },
-        )
-      }
-
-      "the given counter-participant is incorrect" in { implicit env =>
-        import env.*
-
-        val (_createdCids, period, commitment) = deployThreeAndCheck(daId)
-
-        // give wrong counter-participant but a computed commitment and its correct timestamp
-        loggerFactory.assertThrowsAndLogs[CommandFailure](
-          participant1.commitments.open_commitment(
-            commitment,
-            daId,
-            period.toInclusive.forgetRefinement,
-            participant1,
-          ),
-          logEntry => {
-            logEntry.errorMessage should (include(
-              "The participant cannot open commitment"
-            ) and include(
-              "because the participant has not computed such a commitment at the given tick timestamp for the given counter participant"
-            ))
-            logEntry.shouldBeCantonErrorCode(ParticipantInspectionServiceError.IllegalArgumentError)
-          },
-        )
-      }
-
-      "the given timestamp is not a reconciliation interval tick" in { implicit env =>
-        import env.*
-
-        val (_createdCids, period, commitment) = deployThreeAndCheck(daId)
-
-        // this test assumes that the reconciliation interval is not 1 second for the given opening commitment
-        // timestamp to not fall on a reconciliation interval boundary
-        assert(interval.getSeconds != 1)
-
-        // give timestamp that does not correspond to a reconciliation interval boundary
-        loggerFactory.assertThrowsAndLogs[CommandFailure](
-          participant1.commitments.open_commitment(
-            commitment,
-            daId,
-            // this test assumes that the reconciliation interval is not 1 second for the timestamp below to not fall
-            // on an interval reconciliation boundary
-            period.toInclusive.forgetRefinement.minus(JDuration.ofSeconds(1)),
-            participant1,
-          ),
-          logEntry => {
-            logEntry.errorMessage should (include(
-              "The participant cannot open commitment"
-            ) and include(
-              "is not a valid reconciliation interval tick"
-            ))
-            logEntry.shouldBeCantonErrorCode(ParticipantInspectionServiceError.IllegalArgumentError)
-          },
-        )
-      }
-    }
-
-    "acs pruning beyond the timestamp prevents opening a commitment" in { implicit env =>
-      import env.*
-      import cats.syntax.either.*
-
-      val simClock = environment.simClock.value
-
-      val (_createdCids, period, commitment) = deployThreeAndCheck(daId)
-
-      logger.info(
-        "Participant1 waits to receive counter-commitment, so that it can prune past data"
-      )
-      eventually() {
-        participant1.commitments
-          .received(
-            daName,
-            period.toInclusive.toInstant,
-            period.toInclusive.toInstant,
-            Some(participant2),
-          )
-          .size shouldBe 1
-      }
-
-      simClock.advance(pruningTimeout)
-      logger.info(
-        "Participant1 deploy some more contracts to advance the clean replay, so that it can prune past data"
-      )
-      deployThreeAndCheck(daId)
-
-      logger.info("Wait that ACS background pruning advanced past the timestamp of the commitment")
-      eventually() {
-        val pruningTs = participant1.testing.state_inspection.acsPruningStatus(daName)
-        pruningTs.map(_.lastSuccess.forall(_ >= period.toInclusive)) shouldBe Some(true)
-      }
-
-      loggerFactory.assertLoggedWarningsAndErrorsSeq(
-        Either
-          .catchOnly[CommandFailure] {
-            participant1.commitments.open_commitment(
-              commitment,
-              daId,
-              period.toInclusive.forgetRefinement,
-              participant2,
-            )
-          }
-          .left
-          .value
-          .getMessage should include("Command execution failed"),
-        logs => {
-          forExactly(1, logs)(m =>
-            m.message should (include(
-              s"Active contract store for synchronizer"
-            ) and include(
-              "which is after the requested time of change"
-            ))
-          )
-        },
-      )
-    }
-
-    "inspect commitment contracts" should {
-      def getCleanReqTs(
-          participant: LocalParticipantReference,
-          synchronizerId: SynchronizerId,
-      ): Option[CantonTimestamp] = {
-        val cleanReqTs = eventually() {
-          participant.underlying.value.sync.participantNodePersistentState.value.ledgerApiStore
-            .cleanSynchronizerIndex(synchronizerId)
-            .futureValueUS
-            .flatMap(_.sequencerIndex)
-        }.map(_.sequencerTimestamp)
-        cleanReqTs
-      }
-
-      "inspect created and archived contracts at the current timestamp" in { implicit env =>
-        import env.*
-
-        logger.info("Create three contracts on synchronizer da")
-        val (createdCidsDa, _per, _cmt) = deployThreeAndCheck(daId)
-
-        // archive one of these created contracts
-        logger.info("Archive one of these contaracts")
-        val archivedCid = createdCidsDa.headOption.getOrElse(fail("No created contract found")).id
-        participant1.ledger_api.javaapi.commands.submit_flat(
-          Seq(participant1.id.adminParty),
-          archivedCid.exerciseArchive().commands.asScala.toSeq,
-          Some(daId),
-        )
-
-        eventually() {
-          participants.all.foreach(p =>
-            p.ledger_api.state.acs.of_all().map(_.contractId) should not contain archivedCid
-          )
-        }
-
-        val tsAfterArchival =
-          getCleanReqTs(participant1, daId).getOrElse(fail("No clean request timestamp found"))
-
-        val queriedCids = createdCidsDa.map(_.id.toLf)
-        val inspectContracts = participant1.commitments.inspect_commitment_contracts(
-          queriedCids,
-          tsAfterArchival,
-          daId,
-          downloadPayload = true,
-        )
-
-        logger.info(
-          s"Inspect the contract state after archival timestamp $tsAfterArchival valid on synchronizer da"
-        )
-
-        logger.info(s"The result contains exactly one entry per contract")
-        inspectContracts.size shouldBe queriedCids.size
-        inspectContracts.map(_.cid) should contain theSameElementsAs queriedCids
-
-        logger.info(s"The result contains a payload for all contracts")
-        inspectContracts.map(
-          _.contract.map(_.contractId)
-        ) should contain theSameElementsAs queriedCids.map(c => Some(c))
-
-        logger.info(s"Non-archived contracts have a single state (created) and are active on da")
-        inspectContracts.filter { e =>
-          e.activeOnExpectedSynchronizer &&
-          e.state.sizeIs == 1 && e.state.forall(_.contractState.isInstanceOf[ContractCreated])
-        } should have size (queriedCids.size - 1).toLong
-
-        logger.info(
-          s"The archived contract has two states (created and archived) and is not active on da"
-        )
-        inspectContracts.filter { e =>
-          e.cid == archivedCid.toLf && !e.activeOnExpectedSynchronizer &&
-          e.state.sizeIs == 2 && e.state.count(
-            _.contractState.isInstanceOf[ContractArchived]
-          ) == 1 && e.state.count(
-            _.contractState.isInstanceOf[ContractCreated]
-          ) == 1
-        } should have size 1
-      }
-
-      "do not retrieve payloads works" in { implicit env =>
-        import env.*
-
-        logger.info("Create three contracts on synchronizer da")
-        val (createdCidsDa, _per, _cmt) = deployThreeAndCheck(daId)
-
-        val ts =
-          getCleanReqTs(participant1, daId).getOrElse(fail("No clean request timestamp found"))
-
-        val queriedCids = createdCidsDa.map(_.id.toLf)
-        val inspectContracts = participant1.commitments.inspect_commitment_contracts(
-          queriedCids,
-          ts,
-          daId,
-          downloadPayload = false,
-        )
-
-        logger.info(
-          s"Inspect the contract state after creation timestamp $ts valid on synchronizer da"
-        )
-
-        logger.info(s"The result contains exactly one entry per contract")
-        inspectContracts.size shouldBe queriedCids.size
-        inspectContracts.map(_.cid) should contain theSameElementsAs queriedCids
-
-        logger.info(s"The result does not contains a payload for any contracts")
-        forAll(inspectContracts)(inspectContract => inspectContract.contract shouldBe None)
-      }
-
-      "inspect contract state for a past unpruned timestamp and more synchronizers" in {
-        implicit env =>
-          import env.*
-
-          participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
-
-          logger.info("Create three contracts on synchronizer da")
-          val (createdCidsDa, _per, _cmt) = deployThreeAndCheck(daId)
-
-          val tsBeforeReassign =
-            getCleanReqTs(participant1, daId).getOrElse(fail("No clean request timestamp found"))
-
-          logger.info("Reassign one contract from da to acme")
-          val reassignedCid =
-            createdCidsDa.headOption.getOrElse(fail("No created contract found")).id.toLf
-          val unassignedWrapper =
-            participant1.ledger_api.commands
-              .submit_unassign(
-                participant1.id.adminParty,
-                Seq(reassignedCid),
-                daId,
-                acmeId,
-              )
-
-          def reassignmentStore(
-              participant: LocalParticipantReference,
-              synchronizerId: SynchronizerId,
-          ): ReassignmentStore =
-            participant.underlying.value.sync.syncPersistentStateManager
-              .get(synchronizerId)
-              .value
-              .reassignmentStore
-
-          // Retrieve the reassignment data
-          val reassignmentStoreP1Acme = reassignmentStore(participant1, acmeId)
-          val incompleteUnassignment = eventually() {
-            reassignmentStoreP1Acme
-              .lookup(unassignedWrapper.reassignmentId)
-              .value
-              .futureValueUS
-              .value
-          }
-
-          participant1.ledger_api.commands.submit_assign(
-            participant1.id.adminParty,
-            unassignedWrapper.unassignId,
-            daId,
-            acmeId,
-          )
-
-          logger.info("Check that reassignment has completed")
-          assertInAcsSync(Seq(participant1), acmeName, reassignedCid)
-
-          // We do the following pings to ensure that the clean request timestamp on the two synchronizers is past the "common time"
-          // when the assignment happens on the destination synchronizer.
-          participant1.health.ping(participant2, synchronizerId = Some(daId))
-          participant1.health.ping(participant2, synchronizerId = Some(acmeId))
-
-          logger.info("Create three contracts on synchronizer acme")
-          val c1 = deployAndCheckContract(acmeId)
-          val c2 = deployAndCheckContract(acmeId)
-          val c3 = deployAndCheckContract(acmeId)
-          val createdCidsAcme = Seq(c1, c2, c3)
-
-          logger.info(
-            s"Inspect the states of the contracts on acme and the reassigned contract w.r.t. timestamp before" +
-              s"the reassign $tsBeforeReassign and synchronizer da"
-          )
-          val queriedContracts = createdCidsAcme.map(_.id.toLf) ++ Seq(reassignedCid)
-          val inspectContracts = participant1.commitments.inspect_commitment_contracts(
-            queriedContracts,
-            tsBeforeReassign,
-            daId,
-            downloadPayload = true,
-          )
-
-          logger.info(
-            s"The result contains one entry per acme contracts and two entries for the reassigned contract (one per synchronizer)"
-          )
-          inspectContracts.size shouldBe createdCidsAcme.size + Seq(reassignedCid).size * 2
-
-          logger.info(
-            s"All acme contracts have one state (created), have a payload, and do not exist on da"
-          )
-          inspectContracts.filter(s =>
-            !s.activeOnExpectedSynchronizer &&
-              s.contract.isDefined &&
-              s.state.sizeIs == 1 &&
-              s.state.count(cs =>
-                cs.contractState.isInstanceOf[ContractCreated] && cs.synchronizerId == acmeId
-              ) == 1
-          ) should have size (createdCidsAcme.size).toLong
-
-          logger.info(
-            s"The reassigned contract has two states (created and unassigned) on da, has a payload, and is" +
-              s"active on da at the queried time"
-          )
-          val reassigned = inspectContracts.filter(c => c.cid == reassignedCid)
-          reassigned.size shouldBe 2
-          reassigned.filter(states =>
-            states.activeOnExpectedSynchronizer &&
-              states.state.count(s =>
-                s.contractState.isInstanceOf[ContractCreated] && s.synchronizerId == daId
-              ) == 1 &&
-              states.state.count(s =>
-                s.contractState.isInstanceOf[ContractUnassigned] && s.synchronizerId == daId &&
-                  s.contractState
-                    .asInstanceOf[ContractUnassigned]
-                    .reassignmentId
-                    .contains(incompleteUnassignment.reassignmentId) &&
-                  s.contractState
-                    .asInstanceOf[ContractUnassigned]
-                    .reassignmentCounterSrc == incompleteUnassignment.reassignmentCounter - 1
-              ) == 1 &&
-              states.state.sizeIs == 2
-          ) should have size 1
-
-          logger.info(
-            s"The reassigned contract has one state (assigned) on acme, has a payload, and is" +
-              s"active on da at the queried time"
-          )
-          reassigned.filter(states =>
-            states.activeOnExpectedSynchronizer &&
-              states.state.count(s =>
-                s.contractState.isInstanceOf[ContractAssigned] && s.synchronizerId == acmeId &&
-                  s.contractState
-                    .asInstanceOf[ContractAssigned]
-                    .reassignmentId
-                    .contains(incompleteUnassignment.reassignmentId) &&
-                  s.contractState
-                    .asInstanceOf[ContractAssigned]
-                    .reassignmentCounterTarget == incompleteUnassignment.reassignmentCounter
-              ) == 1 &&
-              states.state.sizeIs == 1
-          ) should have size 1
-          reassigned.filter(c => c.contract.isDefined) should have size 2
-
-          logger.info(
-            s"Inspect the states of the reassigned contract w.r.t. timestamp after unassign and before assign" +
-              s"${incompleteUnassignment.unassignmentTs} and synchronizer da"
-          )
-          val inspectContracts2 = participant1.commitments.inspect_commitment_contracts(
-            Seq(reassignedCid),
-            incompleteUnassignment.unassignmentTs,
-            daId,
-            downloadPayload = true,
-          )
-
-          logger.info(
-            s"The reassigned contract has two states (created and unassigned) on da, has a payload, and is" +
-              s"not active on da at the queried time"
-          )
-          val reassigned2 = inspectContracts2.filter(c => c.cid == reassignedCid)
-
-          reassigned2.size shouldBe 2
-          reassigned2.filter(states =>
-            !states.activeOnExpectedSynchronizer &&
-              states.state.count(s =>
-                s.contractState.isInstanceOf[ContractCreated] && s.synchronizerId == daId
-              ) == 1 &&
-              states.state.count(s =>
-                s.contractState.isInstanceOf[ContractUnassigned] && s.synchronizerId == daId
-              ) == 1 &&
-              states.state.sizeIs == 2
-          ) should have size 1
-
-          logger.info(
-            s"The reassigned contract has one state (assigned) on acme, has a payload, and is" +
-              s"not active on da at the queried time"
-          )
-          reassigned2.filter(states =>
-            !states.activeOnExpectedSynchronizer &&
-              states.state.count(s =>
-                s.contractState.isInstanceOf[ContractAssigned] && s.synchronizerId == acmeId
-              ) == 1 &&
-              states.state.sizeIs == 1
-          ) should have size 1
-          reassigned2.filter(c => c.contract.isDefined) should have size 2
-      }
-    }
-  }
-
-  "Removed participant should not trigger commitment computations" in { implicit env =>
+  "retry send commitments only to the registered members" in { implicit env =>
     import env.*
 
     val simClock = environment.simClock.value
 
-    val cmd =
-      new Iou(
-        participant1.adminParty.toProtoPrimitive,
-        participant2.adminParty.toProtoPrimitive,
-        new Amount(3.50.toBigDecimal, "CHF"),
-        List().asJava,
-      ).create.commands.asScala.toSeq
-    participant1.ledger_api.javaapi.commands.submit_flat(
-      Seq(participant1.id.adminParty),
-      cmd,
-      Some(daId),
+    deployOnP1P2AndCheckContract(daId, iouContract, observers = Seq(participant3))
+
+    val seq = getProgrammableSequencer(sequencer1.name)
+    val p1RevokedP = Promise[Unit]()
+
+    val fromP2ToAll = new AtomicInteger()
+    val fromP3ToAll = new AtomicInteger()
+    val fromP2ToP3Only = new AtomicInteger()
+    val fromP3ToP2Only = new AtomicInteger()
+
+    def checkSequencedMessage(
+        submissionRequest: SubmissionRequest,
+        expectedSender: ParticipantReference,
+        firstReceiver: ParticipantReference,
+        otherReceivers: ParticipantReference*
+    ): Boolean = {
+      val expectedReceivers =
+        (firstReceiver +: otherReceivers).map(ref => MemberRecipient(ref.member)).toSet
+      submissionRequest.sender == expectedSender.member && submissionRequest.batch.allRecipients == expectedReceivers
+    }
+    // Hold back all ACS commitment messages until participant 2 pinged participants 1 and 3, so all see time advance,
+    // and participant 1 has been revoked
+    logger.info("Set policy: wait for revocation of participant 1")
+    seq.setPolicy_("delay ACS commitments until revocation of participant 1") { submissionRequest =>
+      if (ProgrammableSequencerPolicies.isAcsCommitment(submissionRequest)) {
+        if (checkSequencedMessage(submissionRequest, participant2, participant1, participant3))
+          fromP2ToAll.getAndIncrement()
+        if (checkSequencedMessage(submissionRequest, participant2, participant3))
+          fromP2ToP3Only.getAndIncrement()
+        if (checkSequencedMessage(submissionRequest, participant3, participant1, participant2))
+          fromP3ToAll.getAndIncrement()
+        if (checkSequencedMessage(submissionRequest, participant3, participant2))
+          fromP3ToP2Only.getAndIncrement()
+        SendDecision.HoldBack(p1RevokedP.future)
+      } else SendDecision.Process
+    }
+
+    val periodBegin = tickAfter(simClock.now)
+    simClock.advanceTo(periodBegin.forgetRefinement)
+
+    logger.info("Participant 2 pings participants 1 and 3, so that all see time advance")
+    participant2.testing.maybe_bong(
+      targets = Set(participant1, participant3),
+      validators = Set(participant2),
+      levels = 0,
+    ) shouldBe defined
+
+    def commitmentStatus()
+        : Map[LocalParticipantReference, Set[(LocalParticipantReference, Int, Int)]] = {
+      val allParticipants = Set(participant1, participant2, participant3)
+      allParticipants
+        .map(p =>
+          p -> allParticipants.excl(p).map { c =>
+            val computed =
+              p.commitments.computed(
+                daName,
+                periodBegin.toInstant.minusMillis(1),
+                periodBegin.toInstant,
+                Some(c),
+              )
+            val received =
+              p.commitments.received(
+                daName,
+                periodBegin.toInstant.minusMillis(1),
+                periodBegin.toInstant,
+                Some(c),
+              )
+            (c, computed.size, received.size)
+          }
+        )
+        .toMap
+    }
+
+    logger.info(
+      "Until we disconnect participant 1, no commitments should be received, because the sequencer blocks delivery."
     )
+    eventually() {
+      commitmentStatus() shouldBe Map(
+        participant2 -> Set((participant1, 1, 0), (participant3, 1, 0)),
+        participant3 -> Set((participant1, 1, 0), (participant2, 1, 0)),
+        participant1 -> Set((participant2, 1, 0), (participant3, 1, 0)),
+      )
+    }
+
     loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {
-        logger.info("Removing participant1 on synchronizer da")
+        logger.info(
+          "Revoke the certificate of participant 1 on da. This means that participant 1 cannot receive commitments."
+        )
         participant1.topology.synchronizer_trust_certificates.propose(
           participantId = participant1.id,
-          synchronizerId = initializedSynchronizers(daName).synchronizerId,
+          synchronizerId = daId,
           change = TopologyChangeOp.Remove,
         )
+        // wait until the topology states on the sequencer, participant 2 and participant 3 see participant1
+        // removed from the daId synchronizer
         eventually() {
+          sequencer1.topology.participant_synchronizer_states
+            .active(daId, participant1.id) shouldBe false
+          participant2.topology.participant_synchronizer_states
+            .active(daId, participant1.id) shouldBe false
+          participant3.topology.participant_synchronizer_states
+            .active(daId, participant1.id) shouldBe false
+        }
+
+        p1RevokedP.trySuccess(())
+
+        logger.info(
+          "Once we are ready to release the stalled commitments on the sequencer, we should see the retry policies kick in."
+        )
+
+        logger.info(
+          "Participant 2 computes commitments for all, but receives only from participant 3." +
+            "Participant 3 computes commitments for all, but receives only from participant 2." +
+            "Participant 1 computes commitments for all, but receives none."
+        )
+        eventually() {
+          commitmentStatus() shouldBe Map(
+            participant2 -> Set((participant1, 1, 0), (participant3, 1, 1)),
+            participant3 -> Set((participant1, 1, 0), (participant2, 1, 1)),
+            participant1 -> Set((participant2, 1, 0), (participant3, 1, 0)),
+          )
+
+          fromP2ToAll.get() shouldBe 1
+          fromP3ToAll.get() shouldBe 1
+          fromP2ToP3Only.get() shouldBe 1
+          fromP3ToP2Only.get() shouldBe 1
+        }
+
+        // When sequencer1 processes the removal of participant1's trust certificate, it will close participant1's
+        // subscription. participant1 will try to reconnect, but as sequencer1 answers with `CLIENT_AUTHENTICATION_REJECTED`,
+        // participant1 will eventually disconnect from this synchronizer.
+        // Wait for this disconnection to happen.
+        eventually() {
+          // The sequencer connection pool internal mechanisms to restart connections rely on the clock time advancing.
+          simClock.advance(JDuration.ofSeconds(1))
+
           participant1.synchronizers.is_connected(
             initializedSynchronizers(daName).synchronizerId
           ) shouldBe false
         }
-        logger.info("Successfully disconnected participant1 from synchronizer da")
-
-        // Sit out for a full commitment period, so that we can later check that the participants don't exchange
-        // messages for this period
-        val tickNoCommitments1 = tickAfter(simClock.uniqueTime())
-        val tickNoCommitments2 = tickAfter(tickNoCommitments1.forgetRefinement)
-        simClock.advanceTo(tickNoCommitments2.forgetRefinement.immediateSuccessor)
-
-        simClock.advance(interval.plus(JDuration.ofSeconds(1)))
-        participants.local.foreach(_.testing.fetch_synchronizer_times())
-
-        val startNoCommitment = tickNoCommitments1.toInstant
-        participant1.commitments
-          .computed(
-            daName,
-            startNoCommitment,
-            Instant.now(),
-            Some(participant1),
-          ) shouldBe empty
-        participant1.commitments
-          .received(
-            daName,
-            startNoCommitment,
-            Instant.now(),
-            Some(participant2),
-          ) shouldBe empty
-        participant2.commitments
-          .received(
-            daName,
-            startNoCommitment,
-            Instant.now(),
-            Some(participant1),
-          ) shouldBe empty
-        participant2.commitments
-          .computed(
-            daName,
-            startNoCommitment,
-            Instant.now(),
-            Some(participant1),
-          ) shouldBe empty
       },
       forEvery(_) { entry =>
         entry.message should (include(
@@ -1186,7 +674,115 @@ trait AcsCommitmentProcessorIntegrationTest
           // is processed by the sequencer after the participant is disabled
           include(
             "Health-check service responded NOT_SERVING for"
-          ))
+          ) or include("Token refresh aborted due to shutdown")
+          // the participant might not actually get the dispatched transaction delivered,
+          // because the sequencer may cut the participant's connection before delivering the topology broadcast
+          or include regex ("Waiting for transaction .* to be observed")
+          or include("Unknown recipients: PAR::participant1")
+          or include("(Eligible) Senders are unknown: PAR::participant1")
+          or include("UNAVAILABLE/Channel shutdownNow invoked"))
+      },
+    )
+  }
+
+  "Removed participant should not trigger commitment computations" in { implicit env =>
+    import env.*
+
+    val simClock = environment.simClock.value
+
+    participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
+    eventually() {
+      participant1.synchronizers.is_connected(
+        initializedSynchronizers(acmeName).synchronizerId
+      ) shouldBe true
+      participant2.synchronizers.is_connected(
+        initializedSynchronizers(acmeName).synchronizerId
+      ) shouldBe true
+    }
+
+    val cmd =
+      new Iou(
+        participant2.adminParty.toProtoPrimitive,
+        participant3.adminParty.toProtoPrimitive,
+        new Amount(3.50.toBigDecimal, "CHF"),
+        List().asJava,
+      ).create.commands.asScala.toSeq
+    participant2.ledger_api.javaapi.commands.submit(
+      Seq(participant2.id.adminParty),
+      cmd,
+      Some(acmeId),
+    )
+    loggerFactory.assertLoggedWarningsAndErrorsSeq(
+      {
+        logger.debug("Removing participant2 on synchronizer da")
+        participant2.topology.synchronizer_trust_certificates.propose(
+          participantId = participant2.id,
+          synchronizerId = initializedSynchronizers(acmeName).synchronizerId,
+          change = TopologyChangeOp.Remove,
+        )
+        eventually() {
+          // The sequencer connection pool internal mechanisms to restart connections rely on the clock time advancing.
+          simClock.advance(JDuration.ofSeconds(1))
+
+          participant2.synchronizers.is_connected(
+            initializedSynchronizers(acmeName).synchronizerId
+          ) shouldBe false
+        }
+        logger.info("Successfully disconnected participant2 from synchronizer acme")
+
+        // Sit out for a full commitment period, so that we can later check that the participants don't exchange
+        // messages for this period
+        val tickNoCommitments1 = tickAfter(simClock.uniqueTime())
+        val tickNoCommitments2 = tickAfter(tickNoCommitments1.forgetRefinement)
+        simClock.advanceTo(tickNoCommitments2.forgetRefinement.immediateSuccessor)
+
+        simClock.advance(interval.plus(JDuration.ofSeconds(1)))
+        Seq(participant2, participant3).foreach(_.testing.fetch_synchronizer_times())
+
+        val startNoCommitment = tickNoCommitments1.toInstant
+        participant2.commitments
+          .computed(
+            acmeName,
+            startNoCommitment,
+            Instant.now(),
+            Some(participant3),
+          ) shouldBe empty
+        participant2.commitments
+          .received(
+            acmeName,
+            startNoCommitment,
+            Instant.now(),
+            Some(participant3),
+          ) shouldBe empty
+        participant3.commitments
+          .received(
+            acmeName,
+            startNoCommitment,
+            Instant.now(),
+            Some(participant2),
+          ) shouldBe empty
+        participant3.commitments
+          .computed(
+            acmeName,
+            startNoCommitment,
+            Instant.now(),
+            Some(participant1),
+          ) shouldBe empty
+      },
+      forEvery(_) { entry =>
+        entry.message should (include(
+          MemberAccessDisabled(participant2.id).reason
+        ) or include(
+          MemberAccessDisabled(participant1.id).reason
+        ) or include(
+          SyncServiceSynchronizerDisabledUs.id
+        ) or // The participant might have started to refresh the token before being disabled, but the refresh request
+          // is processed by the sequencer after the participant is disabled
+          include(
+            "Health-check service responded NOT_SERVING for"
+          )
+          // Added due to pool not propagating the "disabled us" error
+          or include(SyncServiceSynchronizerDisconnect.id))
       },
     )
   }
@@ -1206,21 +802,22 @@ class AcsCommitmentProcessorReferenceIntegrationTestPostgres
       ),
     )
   )
+  registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }
 
-class AcsCommitmentProcessorReferenceIntegrationTestH2
-    extends AcsCommitmentProcessorIntegrationTest {
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.H2](
-      loggerFactory,
-      sequencerGroups = MultiSynchronizer(
-        Seq(
-          Set(InstanceName.tryCreate("sequencer1")),
-          Set(InstanceName.tryCreate("sequencer2")),
-        )
-      ),
-    )
-  )
-
-}
+//class AcsCommitmentProcessorReferenceIntegrationTestH2
+//    extends AcsCommitmentProcessorIntegrationTest {
+//  registerPlugin(new UseH2(loggerFactory))
+//  registerPlugin(
+//    new UseCommunityReferenceBlockSequencer[DbConfig.H2](
+//      loggerFactory,
+//      sequencerGroups = MultiSynchronizer(
+//        Seq(
+//          Set(InstanceName.tryCreate("sequencer1")),
+//          Set(InstanceName.tryCreate("sequencer2")),
+//        )
+//      ),
+//    )
+//  )
+//  registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
+//}

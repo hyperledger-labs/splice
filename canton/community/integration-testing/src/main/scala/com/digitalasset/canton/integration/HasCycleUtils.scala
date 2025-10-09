@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration
 
+import com.daml.ledger.api.v2.commands.Command
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedCreatedEvent
 import com.digitalasset.canton.config
@@ -10,7 +11,9 @@ import com.digitalasset.canton.config.{ConsoleCommandTimeout, CantonConfig}
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.cycle as M
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.examples.java.cycle.Cycle
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
+import com.digitalasset.canton.topology.{Party, PartyId}
 
 /** Adds the ability to run cycles to integration tests
   */
@@ -59,10 +62,36 @@ trait HasCycleUtils {
     }
   }
 
+  def createCycleCommand(party: Party, id: String): Command =
+    Command.fromJavaProto(
+      new Cycle(id, party.toProtoPrimitive)
+        .create()
+        .commands
+        .loneElement
+        .toProtoCommand
+    )
+
   def createCycleContract(
       participant: ParticipantReference,
-      partyId: PartyId,
+      party: Party,
       id: String,
+      commandId: String = "",
+      optTimeout: Option[config.NonNegativeDuration] = Some(
+        ConsoleCommandTimeout.defaultLedgerCommandsTimeout
+      ),
+  ): Cycle.Contract = {
+    val cycle = new M.Cycle(id, party.toProtoPrimitive).create.commands.loneElement
+
+    val tx = participant.ledger_api.javaapi.commands
+      .submit(Seq(party), Seq(cycle), commandId = commandId, optTimeout = optTimeout)
+
+    JavaDecodeUtil.decodeAllCreated(Cycle.COMPANION)(tx).loneElement
+  }
+
+  def createCycleContracts(
+      participant: ParticipantReference,
+      partyId: PartyId,
+      ids: Seq[String],
       commandId: String = "",
       optTimeout: Option[config.NonNegativeDuration] = Some(
         ConsoleCommandTimeout.defaultLedgerCommandsTimeout
@@ -71,8 +100,8 @@ trait HasCycleUtils {
     if (participant.packages.find_by_module("Cycle").isEmpty) {
       participant.dars.upload(CantonExamplesPath)
     }
-    val cycle = new M.Cycle(id, partyId.toProtoPrimitive).create.commands.loneElement
+    val cycles = ids.map(new M.Cycle(_, partyId.toProtoPrimitive).create.commands.loneElement)
     participant.ledger_api.javaapi.commands
-      .submit(Seq(partyId), Seq(cycle), commandId = commandId, optTimeout = optTimeout)
+      .submit(Seq(partyId), cycles, commandId = commandId, optTimeout = optTimeout)
   }
 }

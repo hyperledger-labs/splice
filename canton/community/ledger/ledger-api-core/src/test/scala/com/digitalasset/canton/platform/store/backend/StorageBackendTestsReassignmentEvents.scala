@@ -3,11 +3,16 @@
 
 package com.digitalasset.canton.platform.store.backend
 
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.{
+  IdRange,
+  Ids,
+}
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
   RawCreatedEvent,
   UnassignProperties,
 }
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Ref, Time}
@@ -280,25 +285,12 @@ private[backend] trait StorageBackendTestsReassignmentEvents
 
     val result = executeSql(
       backend.event.assignEventBatch(
-        eventSequentialIds = List(1L, 2L),
+        eventSequentialIds = Ids(List(1L, 2L)),
         allFilterParties = Some(Set(Ref.Party.assertFromString("signatory"), someParty)),
       )
-    )
+    ).map(sanitize)
 
-    result
-      .map(original =>
-        original.copy(
-          event = original.event.copy(
-            rawCreatedEvent = rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
-              original.event.rawCreatedEvent,
-              someSerializedDamlLfValue,
-              someDriverMetadataBytes,
-            )
-          ),
-          traceContext = hasSameTraceContext(original.traceContext, Some(emptyTraceContext)),
-          eventSequentialId = 0L,
-        )
-      ) shouldBe (
+    result shouldBe (
       Vector(
         Entry(
           commandId = Some("command id 1"),
@@ -313,7 +305,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           event = EventStorageBackend.RawAssignEvent(
             sourceSynchronizerId = "x::sourcesynchronizer",
             targetSynchronizerId = "x::targetsynchronizer",
-            unassignId = "123456789",
+            reassignmentId = "123456789",
             submitter = Option(someParty),
             reassignmentCounter = 1000L,
             rawCreatedEvent = RawCreatedEvent(
@@ -321,9 +313,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               offset = 1,
               nodeId = 24,
               contractId = hashCid("#1"),
-              templateId = someTemplateId,
-              packageName = somePackageName,
+              templateId = someTemplateIdFull,
               witnessParties = Set("signatory"),
+              flatEventWitnesses = Set("signatory"),
               signatories = Set("signatory"),
               observers = Set("observer"),
               createArgument = someSerializedDamlLfValue,
@@ -333,9 +325,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               createKeyValueCompression = Some(456),
               ledgerEffectiveTime = someTime,
               createKeyHash = None,
-              driverMetadata = someDriverMetadataBytes,
+              authenticationData = someAuthenticationDataBytes,
             ),
           ),
+          externalTransactionHash = None,
         ),
         Entry(
           commandId = Some("command id 2"),
@@ -350,7 +343,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           event = EventStorageBackend.RawAssignEvent(
             sourceSynchronizerId = "x::sourcesynchronizer",
             targetSynchronizerId = "x::targetsynchronizer",
-            unassignId = "123456789",
+            reassignmentId = "123456789",
             submitter = Option(someParty),
             reassignmentCounter = 1000L,
             rawCreatedEvent = RawCreatedEvent(
@@ -358,9 +351,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               offset = 2,
               nodeId = 42,
               contractId = hashCid("#2"),
-              templateId = someTemplateId,
-              packageName = somePackageName,
+              templateId = someTemplateIdFull,
               witnessParties = Set("signatory"),
+              flatEventWitnesses = Set("signatory"),
               signatories = Set("signatory"),
               observers = Set("observer"),
               createArgument = someSerializedDamlLfValue,
@@ -370,12 +363,22 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               createKeyValueCompression = Some(456),
               ledgerEffectiveTime = someTime,
               createKeyHash = None,
-              driverMetadata = someDriverMetadataBytes,
+              authenticationData = someAuthenticationDataBytes,
             ),
           ),
+          externalTransactionHash = None,
         ),
       )
     )
+
+    val resultRange = executeSql(
+      backend.event.assignEventBatch(
+        eventSequentialIds = IdRange(1L, 2L),
+        allFilterParties = Some(Set(Ref.Party.assertFromString("signatory"), someParty)),
+      )
+    )
+    resultRange.map(sanitize) shouldBe result
+
   }
 
   it should "return the correct unassign events" in {
@@ -400,9 +403,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
     executeSql(ingest(dbDtos, _))
     executeSql(updateLedgerEnd(offset(2), 2L))
 
-    executeSql(
+    val result = executeSql(
       backend.event.unassignEventBatch(
-        eventSequentialIds = List(1L, 2L),
+        eventSequentialIds = Ids(List(1L, 2L)),
         allFilterParties = Some(Set(Ref.Party.assertFromString("signatory"), someParty)),
       )
     ).map(original =>
@@ -410,7 +413,8 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         traceContext = hasSameTraceContext(original.traceContext, Some(emptyTraceContext)),
         eventSequentialId = 0L,
       )
-    ) shouldBe Vector(
+    )
+    result shouldBe Vector(
       Entry(
         commandId = Some("command id 1"),
         workflowId = Some("workflow_id"),
@@ -424,16 +428,16 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         event = EventStorageBackend.RawUnassignEvent(
           sourceSynchronizerId = "x::sourcesynchronizer",
           targetSynchronizerId = "x::targetsynchronizer",
-          unassignId = "123456789",
+          reassignmentId = "123456789",
           submitter = Option(someParty),
           reassignmentCounter = 1000L,
           contractId = hashCid("#1"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("signatory"),
           assignmentExclusivity = Some(Time.Timestamp.assertFromLong(11111)),
           nodeId = 24,
         ),
+        externalTransactionHash = None,
       ),
       Entry(
         commandId = Some("command id 2"),
@@ -448,22 +452,36 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         event = EventStorageBackend.RawUnassignEvent(
           sourceSynchronizerId = "x::sourcesynchronizer",
           targetSynchronizerId = "x::targetsynchronizer",
-          unassignId = "123456789",
+          reassignmentId = "123456789",
           submitter = Option(someParty),
           reassignmentCounter = 1000L,
           contractId = hashCid("#2"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("signatory"),
           assignmentExclusivity = Some(Time.Timestamp.assertFromLong(11111)),
           nodeId = 42,
         ),
+        externalTransactionHash = None,
       ),
     )
+
+    val resultRange = executeSql(
+      backend.event.unassignEventBatch(
+        eventSequentialIds = IdRange(1L, 2L),
+        allFilterParties = Some(Set(Ref.Party.assertFromString("signatory"), someParty)),
+      )
+    ).map(original =>
+      original.copy(
+        traceContext = hasSameTraceContext(original.traceContext, Some(emptyTraceContext)),
+        eventSequentialId = 0L,
+      )
+    )
+    resultRange shouldBe result
+
   }
 
   it should "return the correct trace context for assign events" in {
-    TraceContext.withNewTraceContext { aTraceContext =>
+    TraceContext.withNewTraceContext("test") { aTraceContext =>
       val serializableTraceContext = SerializableTraceContext(aTraceContext).toDamlProto.toByteArray
       val dbDtos = Vector(
         dtoAssign(
@@ -488,7 +506,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
 
       val assignments = executeSql(
         backend.event.assignEventBatch(
-          eventSequentialIds = List(1L, 2L),
+          eventSequentialIds = Ids(List(1L, 2L)),
           allFilterParties = Some(Set(Ref.Party.assertFromString("signatory"), someParty)),
         )
       )
@@ -498,7 +516,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
   }
 
   it should "return the correct trace context for unassign events" in {
-    TraceContext.withNewTraceContext { aTraceContext =>
+    TraceContext.withNewTraceContext("test") { aTraceContext =>
       val serializableTraceContext = SerializableTraceContext(aTraceContext).toDamlProto.toByteArray
       val dbDtos = Vector(
         dtoUnassign(
@@ -523,7 +541,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
 
       val unassignments = executeSql(
         backend.event.unassignEventBatch(
-          eventSequentialIds = List(1L, 2L),
+          eventSequentialIds = Ids(List(1L, 2L)),
           allFilterParties = Some(Set(Ref.Party.assertFromString("signatory"), someParty)),
         )
       )
@@ -542,7 +560,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#1"),
         commandId = "command id 1",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoCreate(
         offset = offset(2),
@@ -550,7 +568,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#2"),
         commandId = "command id 2",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoExercise(
         offset = offset(3),
@@ -592,10 +610,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
       )
     ).map(activeContract =>
       activeContract.copy(rawCreatedEvent =
-        rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+        rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
           activeContract.rawCreatedEvent,
           someSerializedDamlLfValue,
-          someDriverMetadataBytes,
+          someAuthenticationDataBytes,
         )
       )
     ) shouldBe Vector(
@@ -608,9 +626,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 1,
           nodeId = 0,
           contractId = hashCid("#1"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -620,7 +638,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = None,
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 1L,
       ),
@@ -633,9 +651,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 2,
           nodeId = 0,
           contractId = hashCid("#2"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -645,7 +663,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = None,
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 2L,
       ),
@@ -741,10 +759,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
       )
     ).map(activeContract =>
       activeContract.copy(rawCreatedEvent =
-        rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+        rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
           activeContract.rawCreatedEvent,
           someSerializedDamlLfValue,
-          someDriverMetadataBytes,
+          someAuthenticationDataBytes,
         )
       )
     ) shouldBe Vector(
@@ -757,9 +775,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 2,
           nodeId = 0,
           contractId = hashCid("#1"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -769,7 +787,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = Some(456),
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 2L,
       ),
@@ -782,9 +800,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 3,
           nodeId = 0,
           contractId = hashCid("#2"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -794,7 +812,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = Some(456),
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 3L,
       ),
@@ -848,7 +866,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#1"),
         commandId = "command id 1",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoCreate(
         offset = offset(2),
@@ -856,7 +874,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#2"),
         commandId = "command id 2",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoExercise(
         offset = offset(3),
@@ -1006,18 +1024,33 @@ private[backend] trait StorageBackendTestsReassignmentEvents
     ) shouldBe Vector(1L, 2L)
   }
 
-  def rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+  def rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
       rawCreatedEvent: RawCreatedEvent,
       createArgument: Array[Byte],
-      driverMetadata: Array[Byte],
+      authenticationData: Array[Byte],
   ): RawCreatedEvent = {
     rawCreatedEvent.createArgument.toList shouldBe createArgument.toList
-    rawCreatedEvent.driverMetadata.toList shouldBe driverMetadata.toList
+    rawCreatedEvent.authenticationData.toList shouldBe authenticationData.toList
     rawCreatedEvent.copy(
       createArgument = createArgument,
-      driverMetadata = driverMetadata,
+      authenticationData = authenticationData,
     )
   }
+
+  private def sanitize(
+      original: Entry[EventStorageBackend.RawAssignEvent]
+  ): Entry[EventStorageBackend.RawAssignEvent] =
+    original.copy(
+      event = original.event.copy(
+        rawCreatedEvent = rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
+          original.event.rawCreatedEvent,
+          someSerializedDamlLfValue,
+          someAuthenticationDataBytes,
+        )
+      ),
+      traceContext = hasSameTraceContext(original.traceContext, Some(emptyTraceContext)),
+      eventSequentialId = 0L,
+    )
 
   def hasSameTraceContext(
       actual: Option[Array[Byte]],

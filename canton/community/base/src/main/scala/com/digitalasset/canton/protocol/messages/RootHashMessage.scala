@@ -12,8 +12,9 @@ import com.digitalasset.canton.protocol.messages.RootHashMessage.RootHashMessage
 import com.digitalasset.canton.protocol.{RootHash, v30}
 import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.version.{
+  HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
@@ -31,20 +32,23 @@ import com.google.protobuf.ByteString
   */
 final case class RootHashMessage[+Payload <: RootHashMessagePayload](
     rootHash: RootHash,
-    override val synchronizerId: SynchronizerId,
+    override val synchronizerId: PhysicalSynchronizerId,
     viewType: ViewType,
     submissionTopologyTimestamp: CantonTimestamp,
     payload: Payload,
-)(override val representativeProtocolVersion: RepresentativeProtocolVersion[RootHashMessage.type])
-    extends UnsignedProtocolMessage
-    with PrettyPrinting {
+) extends UnsignedProtocolMessage
+    with PrettyPrinting
+    with HasProtocolVersionedWrapper[RootHashMessage[RootHashMessagePayload]] {
+
+  override val representativeProtocolVersion: RepresentativeProtocolVersion[RootHashMessage.type] =
+    RootHashMessage.protocolVersionRepresentativeFor(synchronizerId.protocolVersion)
 
   override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
     v30.EnvelopeContent.SomeEnvelopeContent.RootHashMessage(toProtoV30)
 
   def toProtoV30: v30.RootHashMessage = v30.RootHashMessage(
     rootHash = rootHash.toProtoPrimitive,
-    synchronizerId = synchronizerId.toProtoPrimitive,
+    physicalSynchronizerId = synchronizerId.toProtoPrimitive,
     viewType = viewType.toProtoEnum,
     submissionTopologyTime = submissionTopologyTimestamp.toProtoPrimitive,
     payload = payload.getCryptographicEvidence,
@@ -84,7 +88,7 @@ final case class RootHashMessage[+Payload <: RootHashMessagePayload](
       viewType,
       submissionTopologyTime,
       payload,
-    )(representativeProtocolVersion)
+    )
 
   @transient override protected lazy val companionObj: RootHashMessage.type = RootHashMessage
 }
@@ -95,26 +99,11 @@ object RootHashMessage
     ], ByteString => ParsingResult[RootHashMessagePayload]] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.RootHashMessage)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.RootHashMessage)(
       supportedProtoVersion(_)((deserializer, proto) => fromProtoV30(deserializer)(proto)),
       _.toProtoV30,
     )
   )
-
-  def apply[Payload <: RootHashMessagePayload](
-      rootHash: RootHash,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
-      viewType: ViewType,
-      submissionTopologyTime: CantonTimestamp,
-      payload: Payload,
-  ): RootHashMessage[Payload] = RootHashMessage(
-    rootHash,
-    synchronizerId,
-    viewType,
-    submissionTopologyTime,
-    payload,
-  )(protocolVersionRepresentativeFor(protocolVersion))
 
   def fromProtoV30[Payload <: RootHashMessagePayload](
       payloadDeserializer: ByteString => ParsingResult[Payload]
@@ -131,18 +120,20 @@ object RootHashMessage
       rootHashMessageP
     for {
       rootHash <- RootHash.fromProtoPrimitive(rootHashP)
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+        synchronizerIdP,
+        "physical_synchronizer_id",
+      )
       viewType <- ViewType.fromProtoEnum(viewTypeP)
       submissionTopologyTime <- CantonTimestamp.fromProtoPrimitive(submissionTopologyTimeP)
       payloadO <- payloadDeserializer(payloadP)
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield RootHashMessage(
       rootHash,
       synchronizerId,
       viewType,
       submissionTopologyTime,
       payloadO,
-    )(rpv)
+    )
   }
 
   implicit def rootHashMessageProtocolMessageContentCast[Payload <: RootHashMessagePayload](implicit

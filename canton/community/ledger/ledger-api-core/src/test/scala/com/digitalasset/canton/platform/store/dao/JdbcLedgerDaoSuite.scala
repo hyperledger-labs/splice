@@ -12,14 +12,21 @@ import com.digitalasset.canton.testing.utils.TestModels
 import com.digitalasset.canton.util.JarResourceUtils
 import com.digitalasset.daml.lf.archive.{DamlLf, DarParser, Decode}
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageId, PackageName, PackageVersion, Party}
+import com.digitalasset.daml.lf.data.Ref.{
+  Identifier,
+  IdentifierConverter,
+  PackageId,
+  PackageName,
+  PackageVersion,
+  Party,
+}
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.data.{FrontStack, ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.data.{Bytes, FrontStack, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.transaction.test.{NodeIdTransactionBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.value.Value as LfValue
-import com.digitalasset.daml.lf.value.Value.{ContractId, ContractInstance, ValueText}
+import com.digitalasset.daml.lf.value.Value.{ContractId, ThinContractInstance, ValueText}
 import org.apache.pekko.stream.scaladsl.Sink
 import org.scalatest.{AsyncTestSuite, OptionValues}
 
@@ -85,10 +92,11 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
   )
 
   protected final val someTemplateId = testIdentifier("ParameterShowcase")
-  protected final val somePackageName = PackageName.assertFromString("pkg-name")
+  protected final val somePackageName = PackageName.assertFromString("model-tests")
+  protected final val someTemplateIdFull = someTemplateId.toFullIdentifier(somePackageName)
   protected final val somePackageVersion = PackageVersion.assertFromString("1.0")
   protected final val someTemplateIdFilter =
-    TemplateFilter(someTemplateId, includeCreatedEventBlob = false)
+    TemplateFilter(someTemplateId.toRef, includeCreatedEventBlob = false)
   protected final val someValueText = LfValue.ValueText("some text")
   protected final val someValueInt = LfValue.ValueInt64(1)
   protected final val someValueNumeric =
@@ -132,7 +140,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
     ),
   )
   protected final val someChoiceResult =
-    LfValue.ValueContractId(ContractId.V1(Hash.hashPrivateKey("#1")))
+    LfValue.ValueContractId(ContractId.V1(Hash.hashPrivateKey("#1"), Bytes.assertFromString("00")))
 
   protected final def someContractKey(party: Party, value: String): LfValue.ValueRecord =
     LfValue.ValueRecord(
@@ -143,11 +151,11 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
       ),
     )
 
-  private[this] val txVersion = LanguageVersion.StableVersions(LanguageVersion.Major.V2).min
+  private[this] val txVersion = LanguageVersion.Major.V2.maxStableVersion
   private[this] def newBuilder(): NodeIdTransactionBuilder = new NodeIdTransactionBuilder
 
   protected final val someContractInstance =
-    ContractInstance(
+    ThinContractInstance(
       packageName = somePackageName,
       template = someTemplateId,
       arg = someContractArgument,
@@ -155,18 +163,28 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
   protected final val someVersionedContractInstance = Versioned(txVersion, someContractInstance)
 
   protected final val otherTemplateId = testIdentifier("Dummy")
+  protected final val otherTemplateIdFull =
+    otherTemplateId.toFullIdentifier(Ref.PackageName.assertFromString("model-tests"))
   protected final val otherTemplateIdFilter =
-    TemplateFilter(otherTemplateId, includeCreatedEventBlob = false)
+    TemplateFilter(otherTemplateId.toRef, includeCreatedEventBlob = false)
   protected final val otherContractArgument = LfValue.ValueRecord(
     None,
     ImmArray(None -> LfValue.ValueParty(alice)),
   )
 
   protected final val otherTemplateId2 = testIdentifier("DummyFactory")
+  protected final val otherTemplateId2Full =
+    otherTemplateId2.toFullIdentifier(Ref.PackageName.assertFromString("model-tests"))
   protected final val otherTemplateId3 = testIdentifier("DummyContractFactory")
+  protected final val otherTemplateId3Full =
+    otherTemplateId3.toFullIdentifier(Ref.PackageName.assertFromString("model-tests"))
   protected final val otherTemplateId4 = testIdentifier("DummyWithParam")
+  protected final val otherTemplateId4Full =
+    otherTemplateId4.toFullIdentifier(Ref.PackageName.assertFromString("model-tests"))
 
   protected final val otherTemplateId5 = testIdentifier("DummyWithAnnotation")
+  protected final val otherTemplateId5Full =
+    otherTemplateId5.toFullIdentifier(Ref.PackageName.assertFromString("model-tests"))
   protected final val otherContractArgument5 = LfValue.ValueRecord(
     None,
     ImmArray(None -> LfValue.ValueParty(alice), None -> someValueText),
@@ -176,6 +194,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
       completionInfo: Option[state.CompletionInfo],
       tx: LedgerEntry.Transaction,
       offset: Offset,
+      contractActivenessChanged: Boolean,
   ): Future[(Offset, LedgerEntry.Transaction)] =
     for {
       _ <- ledgerDao.storeTransaction(
@@ -186,6 +205,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
         offset = offset,
         transaction = tx.transaction,
         recordTime = tx.recordedAt,
+        contractActivenessChanged = contractActivenessChanged,
       )
     } yield offset -> tx
 
@@ -357,6 +377,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
       stakeholders: Set[Party],
       key: Option[GlobalKeyWithMaintainers],
       contractArgument: LfValue = someContractArgument,
+      contractActivenessChanged: Boolean = true,
   ): Future[(Offset, LedgerEntry.Transaction)] =
     store(
       singleCreate(
@@ -370,7 +391,8 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
           )
         },
         actAs = submittingParties.toList,
-      )
+      ),
+      contractActivenessChanged = contractActivenessChanged,
     )
 
   protected def singleExercise(
@@ -613,11 +635,12 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
   }
 
   protected final def store(
-      offsetAndTx: (Offset, LedgerEntry.Transaction)
+      offsetAndTx: (Offset, LedgerEntry.Transaction),
+      contractActivenessChanged: Boolean = true,
   ): Future[(Offset, LedgerEntry.Transaction)] = {
     val (offset, entry) = offsetAndTx
     val info = completionInfoFrom(entry)
-    store(info, entry, offset)
+    store(info, entry, offset, contractActivenessChanged)
   }
 
   protected def completionInfoFrom(entry: LedgerEntry.Transaction): Option[state.CompletionInfo] =
@@ -644,7 +667,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
 
     // force synchronous future processing with Free monad
     // to provide the guarantees that all transactions persisted in the specified order
-    commands traverseFM store
+    commands traverseFM (store(_))
   }
 
   /** A transaction that creates the given key */

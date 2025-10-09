@@ -25,14 +25,17 @@ import com.digitalasset.canton.ledger.error.PackageServiceErrors.Validation.Vali
 import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.Package.AllowedLanguageVersions
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode
 import com.digitalasset.canton.participant.admin.PackageService.{DarDescription, DarMainPackageId}
-import com.digitalasset.canton.participant.admin.PackageTestUtils.ArchiveOps
-import com.digitalasset.canton.participant.admin.{PackageServiceTest, PackageTestUtils}
+import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PackageServiceTest}
+import com.digitalasset.canton.platform.apiserver.services.admin.PackageTestUtils
+import com.digitalasset.canton.platform.apiserver.services.admin.PackageTestUtils.ArchiveOps
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.daml.lf.archive.{DarParser, DarReader}
 import com.digitalasset.daml.lf.testing.parser.Implicits.SyntaxHelper
 import com.google.protobuf.ByteString
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.time.{Seconds, Span}
 
 import java.util.zip.ZipInputStream
 import scala.concurrent.Future
@@ -365,7 +368,7 @@ trait PackageUploadIntegrationTest
         .map(_.map(_.success.value))
 
       // If we reach this code, uploadedPackages should contain all the packages that we uploaded
-      val uploadedPackages = testParallelUploads().futureValue
+      val uploadedPackages = testParallelUploads().futureValue(Timeout(Span(30, Seconds)))
       uploadedPackages should have size darsDiscriminatorList.size.toLong
 
       if (!vettingSyncEnabled) {
@@ -453,7 +456,7 @@ trait PackageUploadIntegrationTest
       val prim = participant1.packages.list(filterName = "daml-prim").headOption.value
       // just test whether we correctly can find the references for a given package
       participant1.packages.get_references(prim.packageId).map(_.name).toSet shouldBe Set(
-        "AdminWorkflows",
+        AdminWorkflowServices.PingDarResourceName,
         "CantonTests",
         "CantonExamples",
       )
@@ -484,9 +487,9 @@ trait PackageUploadIntegrationTest
           PackageRemovalErrorCode.code,
           s"The DAR ${DarDescription(
               DarMainPackageId.tryCreate(cantonTestsMainPackageId),
-              String255.tryCreate("CantonTests-3.3.0"),
+              String255.tryCreate("CantonTests-3.4.0"),
               String255.tryCreate("CantonTests"),
-              String255.tryCreate("3.3.0"),
+              String255.tryCreate("3.4.0"),
             )} cannot be removed because its main package $cantonTestsMainPackageId is in-use",
         ),
       )
@@ -533,8 +536,8 @@ trait PackageUploadIntegrationTest
           adds = Seq(
             VettedPackage(
               cantonExamplesMainPkgId,
-              validFrom = Some(CantonTimestamp.now().plusSeconds(60)),
-              validUntil = None,
+              validFromInclusive = Some(CantonTimestamp.now().plusSeconds(60)),
+              validUntilExclusive = None,
             )
           ),
         )
@@ -547,7 +550,7 @@ trait PackageUploadIntegrationTest
           .packages
           .find(vp => vp.packageId == cantonExamplesMainPkgId)
           .value
-          .validFrom should not be empty
+          .validFromInclusive should not be empty
       }
 
       // Upload CantonTests that depends on the CantonExamples main package-id
@@ -561,7 +564,7 @@ trait PackageUploadIntegrationTest
           .packages
           .find(vp => vp.packageId == cantonExamplesMainPkgId)
           .value
-          .validFrom shouldBe empty
+          .validFromInclusive shouldBe empty
 
       }
 

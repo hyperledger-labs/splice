@@ -54,15 +54,27 @@ final case class StaticSynchronizerParameters(
     requiredHashAlgorithms: NonEmpty[Set[HashAlgorithm]],
     requiredCryptoKeyFormats: NonEmpty[Set[CryptoKeyFormat]],
     requiredSignatureFormats: NonEmpty[Set[SignatureFormat]],
+    enableTransparencyChecks: Boolean,
     protocolVersion: ProtocolVersion,
-) {
+    serial: NonNegativeInt,
+) extends PrettyPrinting {
   def writeToFile(outputFile: String): Unit =
     BinaryFileUtil.writeByteStringToFile(outputFile, toInternal.toByteString)
 
-  private[canton] def toInternal: StaticSynchronizerParametersInternal =
+  def toInternal: StaticSynchronizerParametersInternal =
     this.transformInto[StaticSynchronizerParametersInternal]: @nowarn(
       "msg=Der in object CryptoKeyFormat is deprecated"
     )
+
+  override protected def pretty: Pretty[StaticSynchronizerParameters] = prettyOfClass(
+    param("required signing specs", _.requiredSigningSpecs),
+    param("required encryption specs", _.requiredEncryptionSpecs),
+    param("required symmetric key schemes", _.requiredSymmetricKeySchemes),
+    param("required hash algorithms", _.requiredHashAlgorithms),
+    param("required crypto key formats", _.requiredCryptoKeyFormats),
+    param("protocol version", _.protocolVersion),
+    param("serial", _.serial),
+  )
 }
 
 object StaticSynchronizerParameters {
@@ -72,9 +84,10 @@ object StaticSynchronizerParameters {
       config: SynchronizerParametersConfig,
       cryptoConfig: CryptoConfig,
       protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
   ): StaticSynchronizerParameters = {
     val internal = config
-      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion)
+      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion, serial)
       .valueOr(err =>
         throw new IllegalArgumentException(
           s"Cannot instantiate static synchronizer parameters: $err"
@@ -84,16 +97,20 @@ object StaticSynchronizerParameters {
     StaticSynchronizerParameters(internal)
   }
 
-  def defaultsWithoutKMS(protocolVersion: ProtocolVersion): StaticSynchronizerParameters =
-    defaults(CryptoConfig(), protocolVersion)
+  def defaultsWithoutKMS(
+      protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
+  ): StaticSynchronizerParameters =
+    defaults(CryptoConfig(), protocolVersion, serial)
 
   // This method is unsafe. Not prefixing by `try` to have nicer docs snippets.
   def defaults(
       cryptoConfig: CryptoConfig,
       protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
   ): StaticSynchronizerParameters = {
     val internal = SynchronizerParametersConfig()
-      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion)
+      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion, serial)
       .valueOr(err =>
         throw new IllegalArgumentException(
           s"Cannot instantiate static synchronizer parameters: $err"
@@ -140,6 +157,8 @@ object StaticSynchronizerParameters {
       requiredCryptoKeyFormatsP,
       requiredSignatureFormatsP,
       protocolVersionP,
+      serialP,
+      enableTransparencyChecks,
     ) = synchronizerParametersP
 
     for {
@@ -195,6 +214,7 @@ object StaticSynchronizerParameters {
       )
       // Data in the console is not really validated, so we allow for deleted
       protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP, allowDeleted = true)
+      serial <- ProtoConverter.parseNonNegativeInt("serial", serialP)
     } yield StaticSynchronizerParameters(
       StaticSynchronizerParametersInternal(
         SynchronizerCrypto
@@ -205,7 +225,9 @@ object StaticSynchronizerParameters {
         requiredHashAlgorithms,
         requiredCryptoKeyFormats,
         requiredSignatureFormats,
+        enableTransparencyChecks,
         protocolVersion,
+        serial,
       )
     )
   }

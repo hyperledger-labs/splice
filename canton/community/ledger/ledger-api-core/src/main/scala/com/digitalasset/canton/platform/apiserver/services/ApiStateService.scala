@@ -56,6 +56,7 @@ final class ApiStateService(
     with GrpcApiService
     with NamedLogging {
 
+  // TODO(#23504) remove matching on filter and verbose when they are removed from GetActiveContractsRequest
   @nowarn("cat=deprecation")
   override def getActiveContracts(
       request: GetActiveContractsRequest,
@@ -160,7 +161,8 @@ final class ApiStateService(
                   permissions.map(permission =>
                     GetConnectedSynchronizersResponse.ConnectedSynchronizer(
                       synchronizerAlias = connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
-                      synchronizerId = connectedSynchronizer.synchronizerId.toProtoPrimitive,
+                      synchronizerId =
+                        connectedSynchronizer.synchronizerId.logical.toProtoPrimitive,
                       permission = permission,
                     )
                   )
@@ -190,11 +192,11 @@ final class ApiStateService(
     implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
 
     updateService
-      .latestPrunedOffsets()
-      .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
+      .latestPrunedOffset()
+      .map { prunedUptoInclusive =>
         GetLatestPrunedOffsetsResponse(
           participantPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
-          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive.fold(0L)(_.unwrap),
+          allDivulgedContractsPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
         )
       }
       .thereafter(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])

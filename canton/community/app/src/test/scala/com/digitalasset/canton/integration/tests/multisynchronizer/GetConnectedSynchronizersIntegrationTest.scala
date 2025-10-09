@@ -55,17 +55,30 @@ abstract class GetConnectedSynchronizerIntegrationTest
         participant1.synchronizers.connect_local(sequencer3, alias = acmeName)
         participant2.synchronizers.connect_local(sequencer4, alias = acmeName)
 
-        participant2.synchronizers.disconnect(acmeName)
-
         // Allocate parties
         party1 = participant1.parties.enable(
           party1Name,
           synchronizeParticipants = Seq(participant2),
+          synchronizer = daName,
         )
+        participant1.parties.enable(
+          party1Name,
+          synchronizeParticipants = Seq(participant2),
+          synchronizer = acmeName,
+        )
+
         party2 = participant2.parties.enable(
           party2Name,
           synchronizeParticipants = Seq(participant1),
+          synchronizer = daName,
         )
+        participant2.parties.enable(
+          party2Name,
+          synchronizeParticipants = Seq(participant1),
+          synchronizer = acmeName,
+        )
+
+        participant2.synchronizers.disconnect(acmeName)
       }
 
   protected def getConnectedSynchronizers(
@@ -76,7 +89,11 @@ abstract class GetConnectedSynchronizerIntegrationTest
       .runLapiAdminCommand(
         StateService.getConnectedSynchronizers(
           proto.state_service
-            .GetConnectedSynchronizersRequest(party = party.toLf, participantId = "")
+            .GetConnectedSynchronizersRequest(
+              party = party.toLf,
+              participantId = "",
+              identityProviderId = "",
+            )
         )
       )
       .tryResult
@@ -87,12 +104,14 @@ abstract class GetConnectedSynchronizerIntegrationTest
 
       val responseP1 = getConnectedSynchronizers(party1, participant1)
       responseP1.connectedSynchronizers.map(_.synchronizerId) should contain theSameElementsAs Seq(
-        daId.toProtoPrimitive,
-        acmeId.toProtoPrimitive,
+        daId.logical.toProtoPrimitive,
+        acmeId.logical.toProtoPrimitive,
       )
 
       val responseP2 = getConnectedSynchronizers(party2, participant2)
-      responseP2.connectedSynchronizers.map(_.synchronizerId) shouldBe Seq(daId.toProtoPrimitive)
+      responseP2.connectedSynchronizers.map(_.synchronizerId) shouldBe Seq(
+        daId.logical.toProtoPrimitive
+      )
       responseP2.connectedSynchronizers.map(_.permission) shouldBe Seq(
         proto.state_service.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION
       )

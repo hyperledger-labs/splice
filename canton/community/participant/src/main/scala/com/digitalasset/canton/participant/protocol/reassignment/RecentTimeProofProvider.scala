@@ -16,7 +16,7 @@ import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentPro
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.protocol.TimeProof
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.Target
 
@@ -24,7 +24,7 @@ import scala.concurrent.ExecutionContext
 
 /** Returns a recent time proof received from the given synchronizer. */
 private[reassignment] class RecentTimeProofProvider(
-    submissionHandles: SynchronizerId => Option[ReassignmentSubmissionHandle],
+    submissionHandles: PhysicalSynchronizerId => Option[ReassignmentSubmissionHandle],
     syncCryptoApi: SyncCryptoApiParticipantProvider,
     override val loggerFactory: NamedLoggerFactory,
     reassignmentTimeProofFreshnessProportion: NonNegativeInt,
@@ -40,7 +40,7 @@ private[reassignment] class RecentTimeProofProvider(
       exclusivityTimeout / reassignmentTimeProofFreshnessProportion
 
   def get(
-      targetSynchronizerId: Target[SynchronizerId],
+      targetSynchronizerId: Target[PhysicalSynchronizerId],
       staticSynchronizerParameters: Target[StaticSynchronizerParameters],
   )(implicit
       traceContext: TraceContext
@@ -72,7 +72,6 @@ private[reassignment] class RecentTimeProofProvider(
             )
           )
       )
-
       exclusivityTimeout = parameters.assignmentExclusivityTimeout
       desiredTimeProofFreshness = calculateFreshness(exclusivityTimeout)
       timeProof <- EitherT.right(handle.timeTracker.fetchTimeProof(desiredTimeProofFreshness))

@@ -20,11 +20,11 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission as PP
-import com.digitalasset.canton.{HasTempDirectory, ReassignmentCounter, config}
+import com.digitalasset.canton.{HasTempDirectory, config}
 
 import scala.jdk.CollectionConverters.*
 
-trait OfflinePartyReplicationRepairMacroIntegrationTest
+sealed trait OfflinePartyReplicationRepairMacroIntegrationTest
     extends UseSilentSynchronizerInTest
     with AcsInspection
     with HasTempDirectory {
@@ -37,6 +37,7 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
   private var bob: PartyId = _
   private var charlie: PartyId = _
 
+  // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
   // Party replication to the target participant may trigger ACS commitment mismatch warnings.
   // This is expected behavior. To reduce the frequency of these warnings and avoid associated
   // test flakes, `reconciliationInterval` is set to one year.
@@ -62,14 +63,34 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
         alice = participant1.parties.enable(
           aliceName,
           synchronizeParticipants = Seq(participant2, participant3),
+          synchronizer = daName,
         )
+        participant1.parties.enable(
+          aliceName,
+          synchronizeParticipants = Seq(participant2, participant3),
+          synchronizer = acmeName,
+        )
+
         bob = participant2.parties.enable(
           bobName,
           synchronizeParticipants = Seq(participant1, participant3),
+          synchronizer = daName,
         )
+        participant2.parties.enable(
+          bobName,
+          synchronizeParticipants = Seq(participant1, participant3),
+          synchronizer = acmeName,
+        )
+
         charlie = participant3.parties.enable(
           charlieName,
           synchronizeParticipants = Seq(participant1, participant2),
+          synchronizer = daName,
+        )
+        participant3.parties.enable(
+          charlieName,
+          synchronizeParticipants = Seq(participant1, participant2),
+          synchronizer = acmeName,
         )
 
         adjustTimeouts(sequencer1)
@@ -93,7 +114,7 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
         // create one contract via create & exercise
         val iou = IouSyntax.createIou(participant, Some(daId))(obligor, obligor)
         participant.ledger_api.javaapi.commands
-          .submit_flat(
+          .submit(
             Seq(obligor),
             iou.id.exerciseTransfer(owner.toProtoPrimitive).commands.asScala.toSeq,
             Some(daId),
@@ -104,7 +125,9 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
   }
 
   private var reassignedContractCid: LfContractId = _
-  "setup our test scenario: reassign Alice's active contract to another synchronizer, and back again to increment its reassignment counter" in {
+
+  // TODO(#23073) - Un-ignore this test once #27325 has been re-implemented
+  "setup our test scenario: reassign Alice's active contract to another synchronizer, and back again to increment its reassignment counter" ignore {
     implicit env =>
       import env.*
 
@@ -138,6 +161,7 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
 
     val simClock = Some(env.environment.simClock.value)
 
+    // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
     // disable ACS commitments by having a large reconciliation interval
     // do this on all synchronizers with participants connected that perform party migrations
     // TODO(#8583) remove when repair service can be fed with the timestamp of the ACS upload
@@ -204,6 +228,7 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
 
     contracts should have length 6
 
+    /* TODO(#23073) - Un-comment this test part once #27325 has been re-implemented
     val acs = participant3.underlying.value.sync.stateInspection
       .findAcs(daName)
       .valueOrFail(s"get ACS on $daName for $participant3")
@@ -215,12 +240,19 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
     withClue("Reassignment counter should be two after two reassignments") {
       counter shouldBe ReassignmentCounter(2)
     }
+     */
 
     val transfer = findIOU(participant3, alice, _.data.owner == alice.toProtoPrimitive)
 
     val boris = participant1.parties.enable(
       "Boris",
       synchronizeParticipants = Seq(participant3),
+      synchronizer = daName,
+    )
+    participant1.parties.enable(
+      "Boris",
+      synchronizeParticipants = Seq(participant3),
+      synchronizer = acmeName,
     )
 
     PartyToParticipantDeclarative.forParty(Set(participant1, participant3), daId)(
@@ -234,7 +266,7 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
     )
 
     participant3.ledger_api.javaapi.commands
-      .submit_flat(
+      .submit(
         Seq(alice),
         transfer.id.exerciseTransfer(boris.toProtoPrimitive).commands.asScala.toSeq,
         Some(daId),
@@ -244,7 +276,7 @@ trait OfflinePartyReplicationRepairMacroIntegrationTest
   }
 }
 
-class OfflinePartyReplicationRepairMactroIntegrationTestPostgres
+final class OfflinePartyReplicationRepairMacroIntegrationTestPostgres
     extends OfflinePartyReplicationRepairMacroIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(

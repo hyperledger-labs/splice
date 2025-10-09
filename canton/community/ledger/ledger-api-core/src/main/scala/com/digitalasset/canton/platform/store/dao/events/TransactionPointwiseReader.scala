@@ -13,6 +13,7 @@ import com.digitalasset.canton.ledger.api.TransactionShape
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.IdRange
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
   RawEvent,
@@ -80,7 +81,7 @@ sealed trait TransactionPointwiseReaderLegacy {
       // Fetching event sequential id range corresponding to the requested transaction id
       eventSeqIdRangeO <- dbDispatcher.executeSql(dbMetric)(
         eventStorageBackend.updatePointwiseQueries
-          .fetchIdsFromTransactionMeta(
+          .fetchIdsFromUpdateMeta(
             lookupKey = lookupKey
           )
       )
@@ -120,6 +121,7 @@ sealed trait TransactionPointwiseReaderLegacy {
   }
 }
 
+// TODO(#23504) remove when TransactionTrees are removed
 @nowarn("cat=deprecation")
 final class TransactionTreePointwiseReader(
     override val dbDispatcher: DbDispatcher,
@@ -188,7 +190,7 @@ final class TransactionPointwiseReader(
       eventStorageBackend.fetchEventPayloadsAcsDelta(target =
         EventPayloadSourceForUpdatesAcsDelta.Create
       )(
-        eventSequentialIds = firstEventSequentialId to lastEventSequentialId,
+        eventSequentialIds = IdRange(firstEventSequentialId, lastEventSequentialId),
         requestingParties = requestingParties,
       )
     )
@@ -200,7 +202,7 @@ final class TransactionPointwiseReader(
         eventStorageBackend.fetchEventPayloadsAcsDelta(target =
           EventPayloadSourceForUpdatesAcsDelta.Consuming
         )(
-          eventSequentialIds = firstEventSequentialId to lastEventSequentialId,
+          eventSequentialIds = (IdRange(firstEventSequentialId, lastEventSequentialId)),
           requestingParties = requestingParties,
         )
       )
@@ -223,7 +225,7 @@ final class TransactionPointwiseReader(
         eventStorageBackend.fetchEventPayloadsLedgerEffects(target =
           EventPayloadSourceForUpdatesLedgerEffects.Create
         )(
-          eventSequentialIds = firstEventSequentialId to lastEventSequentialId,
+          eventSequentialIds = IdRange(firstEventSequentialId, lastEventSequentialId),
           requestingParties = requestingParties,
         )
       )
@@ -235,7 +237,7 @@ final class TransactionPointwiseReader(
         eventStorageBackend.fetchEventPayloadsLedgerEffects(target =
           EventPayloadSourceForUpdatesLedgerEffects.Consuming
         )(
-          eventSequentialIds = firstEventSequentialId to lastEventSequentialId,
+          eventSequentialIds = IdRange(firstEventSequentialId, lastEventSequentialId),
           requestingParties = requestingParties,
         )
       )
@@ -247,7 +249,7 @@ final class TransactionPointwiseReader(
         eventStorageBackend.fetchEventPayloadsLedgerEffects(target =
           EventPayloadSourceForUpdatesLedgerEffects.NonConsuming
         )(
-          eventSequentialIds = firstEventSequentialId to lastEventSequentialId,
+          eventSequentialIds = IdRange(firstEventSequentialId, lastEventSequentialId),
           requestingParties = requestingParties,
         )
       )

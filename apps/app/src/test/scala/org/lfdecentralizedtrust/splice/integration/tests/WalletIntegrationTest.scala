@@ -193,9 +193,9 @@ class WalletIntegrationTest
               beginOffset = offsetBefore,
             )
         val createdAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.Amulet.COMPANION)(_).size)
         val createdLockedAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.LockedAmulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.LockedAmulet.COMPANION)(_).size)
 
         // in rare cases all 3 commands get batched in one transaction,
         // so we only check if the 3 commands are included in the 2 transactions
@@ -250,9 +250,9 @@ class WalletIntegrationTest
               beginOffset = offsetBefore,
             )
         val createdAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.Amulet.COMPANION)(_).size)
         val createdLockedAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.LockedAmulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.LockedAmulet.COMPANION)(_).size)
 
         // all operations are contained in at most 3 transactions
         createdAmuletsInTx.sum shouldBe (batchSize.toLong + 2)

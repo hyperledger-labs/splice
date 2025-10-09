@@ -15,13 +15,13 @@ import com.daml.jwt.{
 import com.daml.ledger.api.v2 as lav2
 import com.daml.logging.LoggingContextOf
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.http.json.v1.CommandService
 import com.digitalasset.canton.http.util.Logging as HLogging
 import com.digitalasset.canton.tracing.NoTracing
 import org.scalatest.Inside
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import scalaz.syntax.foldable.*
-import scalaz.syntax.show.*
 import scalaz.syntax.tag.*
 import scalaz.{NonEmptyList, \/-}
 import spray.json.*
@@ -85,6 +85,7 @@ class CommandServiceTest extends AsyncWordSpec with Matchers with Inside with No
   }
 }
 
+// TODO(#23504) remove suppression of deprecation warnings
 @nowarn("cat=deprecation")
 object CommandServiceTest extends BaseTest {
   private val multiPartyJwp = JwtWritePayload(
@@ -128,7 +129,10 @@ object CommandServiceTest extends BaseTest {
         ),
         "secret",
       )
-      .fold(e => throw new IllegalArgumentException(s"cannot sign a JWT: ${e.shows}"), identity)
+      .fold(
+        e => throw new IllegalArgumentException(s"cannot sign a JWT: ${e.prettyPrint}"),
+        identity,
+      )
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))

@@ -26,7 +26,7 @@ class UpdatePointwiseQueries(
   import EventStorageBackendTemplate.*
 
   /** Fetches a matching event sequential id range. */
-  def fetchIdsFromTransactionMeta(
+  def fetchIdsFromUpdateMeta(
       lookupKey: LookupKey
   )(connection: Connection): Option[(Long, Long)] = {
     import com.digitalasset.canton.platform.store.backend.Conversions.ledgerStringToStatement
@@ -49,7 +49,7 @@ class UpdatePointwiseQueries(
             t.event_sequential_id_first,
             t.event_sequential_id_last
          FROM
-            lapi_transaction_meta t
+            lapi_update_meta t
          WHERE
             $lookupKeyClause
            AND
@@ -77,12 +77,14 @@ class UpdatePointwiseQueries(
         SelectTable(
           tableName = "lapi_events_consuming_exercise",
           selectColumns =
-            s"$selectColumnsForTransactionTreeExercise, ${QueryStrategy.constBooleanSelect(true)} as exercise_consuming",
+            s"${selectColumnsForTransactionTreeExercise(includeFlatEventWitnesses = true)}, ${QueryStrategy
+                .constBooleanSelect(true)} as exercise_consuming",
         ),
         SelectTable(
           tableName = "lapi_events_non_consuming_exercise",
           selectColumns =
-            s"$selectColumnsForTransactionTreeExercise, ${QueryStrategy.constBooleanSelect(false)} as exercise_consuming",
+            s"${selectColumnsForTransactionTreeExercise(includeFlatEventWitnesses = false)}, ${QueryStrategy
+                .constBooleanSelect(false)} as exercise_consuming",
         ),
       ),
       requestingParties = requestingParties,

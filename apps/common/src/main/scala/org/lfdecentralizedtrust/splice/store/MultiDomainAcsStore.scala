@@ -5,10 +5,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v2.transaction_filter.{
-  CumulativeFilter,
-  TransactionFilter as LapiTransactionFilter,
-}
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.{
   Interface,
   Template as TemplateCompanion,
@@ -359,7 +356,8 @@ object MultiDomainAcsStore extends StoreErrors {
     override val ingestionFilter =
       IngestionFilter(
         primaryParty,
-        interfaceFilters.values.map(_.interfaceId).toSeq,
+        // In interface filters the ledger API warns when using a package id so we convert to a package name here.
+        interfaceFilters.keys.map(PackageQualifiedName.getFromResources(_)).toSeq,
       )
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
@@ -502,12 +500,12 @@ object MultiDomainAcsStore extends StoreErrors {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
-      includeInterfaces: Seq[Identifier],
+      includeInterfaces: Seq[PackageQualifiedName],
       includeCreatedEventBlob: Boolean = true,
   ) {
 
-    def toTransactionFilter: LapiTransactionFilter =
-      LapiTransactionFilter(
+    def toEventFormat: EventFormat =
+      EventFormat(
         filtersByParty = Map(
           primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
             CumulativeFilter(
@@ -520,9 +518,9 @@ object MultiDomainAcsStore extends StoreErrors {
                   com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
                     Some(
                       com.daml.ledger.api.v2.value.Identifier(
-                        packageId = interfaceId.getPackageId,
-                        moduleName = interfaceId.getModuleName,
-                        entityName = interfaceId.getEntityName,
+                        packageId = s"#${interfaceId.packageName}",
+                        moduleName = interfaceId.qualifiedName.moduleName,
+                        entityName = interfaceId.qualifiedName.entityName,
                       )
                     ),
                     includeInterfaceView = true,

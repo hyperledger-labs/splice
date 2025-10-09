@@ -9,8 +9,10 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawTreeEvent,
   SynchronizerOffset,
 }
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.NameTypeConRef
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
@@ -175,7 +177,7 @@ private[backend] trait StorageBackendTestsEvents
     val partySignatory = Ref.Party.assertFromString("signatory")
     val partyObserver1 = Ref.Party.assertFromString("observer1")
     val partyObserver2 = Ref.Party.assertFromString("observer2")
-    val otherTemplate = Ref.Identifier.assertFromString("pkg:Mod:Template2")
+    val otherTemplate = NameTypeConRef.assertFromString("#pkg-name:Mod:Template2")
 
     val dtos = Vector(
       dtoCreate(
@@ -248,7 +250,7 @@ private[backend] trait StorageBackendTestsEvents
     val partySignatory = Ref.Party.assertFromString("signatory")
     val partyObserver = Ref.Party.assertFromString("observer")
     val partyUnknown = Ref.Party.assertFromString("unknown")
-    val unknownTemplate = Ref.Identifier.assertFromString("unknown:unknown:unknown")
+    val unknownTemplate = NameTypeConRef.assertFromString("#unknown:unknown:unknown")
 
     val dtos = Vector(
       dtoCreate(
@@ -422,7 +424,7 @@ private[backend] trait StorageBackendTestsEvents
 
   it should "return the correct trace context for create events" in {
     val traceContexts = (1 to 3)
-      .flatMap(_ => List(TraceContext.empty, TraceContext.withNewTraceContext(identity)))
+      .flatMap(_ => List(TraceContext.empty, TraceContext.withNewTraceContext("test")(identity)))
       .map(SerializableTraceContext(_).toDamlProto.toByteArray)
     val dbDtos = Vector(
       dtoCreate(
@@ -701,7 +703,7 @@ private[backend] trait StorageBackendTestsEvents
           executeSql(
             backend.event.firstSynchronizerOffsetAfterOrAt(
               synchronizerId = synchronizerId,
-              afterOrAtRecordTime = afterOrAtRecordTimeInclusive,
+              afterOrAtRecordTimeInclusive = afterOrAtRecordTimeInclusive,
             )
           ) shouldBe expectation
         }
@@ -900,7 +902,7 @@ private[backend] trait StorageBackendTestsEvents
           executeSql(
             backend.event.lastSynchronizerOffsetBeforeOrAt(
               synchronizerIdO = synchronizerIdO,
-              beforeOrAtOffset = beforeOrAtOffsetInclusive,
+              beforeOrAtOffsetInclusive = beforeOrAtOffsetInclusive,
             )
           ) shouldBe expectation
         }
@@ -984,7 +986,7 @@ private[backend] trait StorageBackendTestsEvents
       ) {
         executeSql(
           backend.event.firstSynchronizerOffsetAfterOrAtPublicationTime(
-            afterOrAtPublicationTime = afterOrAtPublicationTimeInclusive
+            afterOrAtPublicationTimeInclusive = afterOrAtPublicationTimeInclusive
           )
         ) shouldBe expectation
       }
@@ -1047,7 +1049,7 @@ private[backend] trait StorageBackendTestsEvents
       ) {
         executeSql(
           backend.event.lastSynchronizerOffsetBeforeOrAtPublicationTime(
-            beforeOrAtPublicationTime = beforeOrAtPublicationTimeInclusive
+            beforeOrAtPublicationTimeInclusive = beforeOrAtPublicationTimeInclusive
           )
         ) shouldBe expectation
       }
@@ -1095,12 +1097,13 @@ private[backend] trait StorageBackendTestsEvents
           publicationTime = startPublicationTime.addMicros(1000),
         )
       ),
+      // never return an synchronizer offset with an offset greater than the ledger end
       startRecordTimeSynchronizer2.addMicros(4000) -> Some(
         SynchronizerOffset(
-          offset = offset(15),
+          offset = offset(11),
           synchronizerId = someSynchronizerId2,
-          recordTime = startRecordTimeSynchronizer2.addMicros(3000),
-          publicationTime = startPublicationTime.addMicros(2000),
+          recordTime = startRecordTimeSynchronizer2.addMicros(2000),
+          publicationTime = startPublicationTime.addMicros(1000),
         )
       ),
     ).zipWithIndex.foreach { case ((beforeOrAtRecordTime, expectation), index) =>
@@ -1110,7 +1113,7 @@ private[backend] trait StorageBackendTestsEvents
         executeSql(
           backend.event.lastSynchronizerOffsetBeforeOrAtRecordTime(
             synchronizerId = someSynchronizerId2,
-            beforeOrAtRecordTime = beforeOrAtRecordTime,
+            beforeOrAtRecordTimeInclusive = beforeOrAtRecordTime,
           )
         ) shouldBe expectation
       }
@@ -1173,13 +1176,13 @@ private[backend] trait StorageBackendTestsEvents
     executeSql(
       backend.event.firstSynchronizerOffsetAfterOrAt(
         synchronizerId = someSynchronizerId,
-        afterOrAtRecordTime = startRecordTimeSynchronizer.addMicros(540),
+        afterOrAtRecordTimeInclusive = startRecordTimeSynchronizer.addMicros(540),
       )
     ).value.offset shouldBe offset(5)
     executeSql(
       backend.event.firstSynchronizerOffsetAfterOrAt(
         synchronizerId = someSynchronizerId,
-        afterOrAtRecordTime = startRecordTimeSynchronizer.addMicros(550),
+        afterOrAtRecordTimeInclusive = startRecordTimeSynchronizer.addMicros(550),
       )
     ).value.offset shouldBe offset(5)
   }
@@ -1230,13 +1233,13 @@ private[backend] trait StorageBackendTestsEvents
     executeSql(
       backend.event.firstSynchronizerOffsetAfterOrAt(
         synchronizerId = someSynchronizerId,
-        afterOrAtRecordTime = startRecordTimeSynchronizer.addMicros(540),
+        afterOrAtRecordTimeInclusive = startRecordTimeSynchronizer.addMicros(540),
       )
     ).value.offset shouldBe offset(5)
     executeSql(
       backend.event.firstSynchronizerOffsetAfterOrAt(
         synchronizerId = someSynchronizerId,
-        afterOrAtRecordTime = startRecordTimeSynchronizer.addMicros(550),
+        afterOrAtRecordTimeInclusive = startRecordTimeSynchronizer.addMicros(550),
       )
     ).value.offset shouldBe offset(5)
   }

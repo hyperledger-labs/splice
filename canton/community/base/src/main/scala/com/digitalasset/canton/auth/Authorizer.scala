@@ -224,6 +224,8 @@ final class Authorizer(
 
       case RequiredClaim.ActAs(party) => claims.canActAs(party).map(_ => req)
 
+      case RequiredClaim.ExecuteAs(party) => claims.canExecuteAs(party).map(_ => req)
+
       case RequiredClaim.MatchIdentityProviderId(_) =>
         val identityProviderIdL = requiredClaim.requestStringL
         val modifiedRequest = implyIdentityProviderIdFromClaims(identityProviderIdL, claims, req)
@@ -257,6 +259,17 @@ final class Authorizer(
       case RequiredClaim.Admin() => claims.isAdmin.map(_ => req)
 
       case RequiredClaim.AdminOrIdpAdmin() => claims.isAdminOrIDPAdmin.map(_ => req)
+
+      case RequiredClaim.AdminOrIdpAdminOrReadAsParty(party) =>
+        (claims.isAdminOrIDPAdmin match {
+          case Left(_) =>
+            claims.canReadAs(party) match {
+              case Left(_) =>
+                Left(AuthorizationError.MissingAdminOrIdpAdminOrReadClaim(party))
+              case x => x
+            }
+          case x => x
+        }).map(_ => req)
     }
 
   @tailrec
@@ -332,6 +345,7 @@ object RequiredClaim {
   final case class ReadAs[Req](party: String) extends RequiredClaim[Req]
   final case class ReadAsAnyParty[Req]() extends RequiredClaim[Req]
   final case class ActAs[Req](party: String) extends RequiredClaim[Req]
+  final case class ExecuteAs[Req](party: String) extends RequiredClaim[Req]
   final case class MatchIdentityProviderId[Req](override val requestStringL: Lens[Req, String])
       extends RequiredClaim[Req]
   final case class MatchUserId[Req](
@@ -342,4 +356,5 @@ object RequiredClaim {
       extends RequiredClaim[Req]
   final case class Admin[Req]() extends RequiredClaim[Req]
   final case class AdminOrIdpAdmin[Req]() extends RequiredClaim[Req]
+  final case class AdminOrIdpAdminOrReadAsParty[Req](party: String) extends RequiredClaim[Req]
 }

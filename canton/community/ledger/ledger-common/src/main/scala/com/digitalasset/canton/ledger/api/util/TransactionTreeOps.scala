@@ -8,6 +8,7 @@ import com.daml.ledger.api.v2.transaction.TransactionTree
 
 import scala.annotation.{nowarn, tailrec}
 
+//TODO(#23504) remove when transaction trees are removed
 @nowarn("cat=deprecation")
 object TransactionTreeOps {
 

@@ -19,6 +19,7 @@ import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentPro
   UnknownSynchronizer,
 }
 import com.digitalasset.canton.participant.store.memory.InMemoryReassignmentStore
+import com.digitalasset.canton.participant.sync.StaticSynchronizerParametersGetter
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.time.TimeProofTestUtil
@@ -27,8 +28,13 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
   Observation,
   Submission,
 }
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, TestingTopology}
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  TestingTopology,
+}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{ReassignmentTag, SameReassignmentType, SingletonTraverse}
 import com.digitalasset.canton.{BaseTest, LfPackageId}
@@ -40,11 +46,12 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
 private[reassignment] object TestReassignmentCoordination {
-  val pendingUnassignments: TrieMap[Source[SynchronizerId], ReassignmentSynchronizer] =
+
+  private val pendingUnassignments: TrieMap[Source[SynchronizerId], ReassignmentSynchronizer] =
     TrieMap.empty[Source[SynchronizerId], ReassignmentSynchronizer]
 
   def apply(
-      synchronizers: Set[Target[SynchronizerId]],
+      synchronizers: Set[Target[PhysicalSynchronizerId]],
       timeProofTimestamp: CantonTimestamp,
       snapshotOverride: Option[SynchronizerSnapshotSyncCryptoApi] = None,
       awaitTimestampOverride: Option[Option[Future[Unit]]] = None,
@@ -55,7 +62,7 @@ private[reassignment] object TestReassignmentCoordination {
     val recentTimeProofProvider = mock[RecentTimeProofProvider]
     when(
       recentTimeProofProvider.get(
-        any[Target[SynchronizerId]],
+        any[Target[PhysicalSynchronizerId]],
         any[Target[StaticSynchronizerParameters]],
       )(
         any[TraceContext]
@@ -66,18 +73,28 @@ private[reassignment] object TestReassignmentCoordination {
     val reassignmentStores =
       synchronizers
         .map(synchronizer =>
-          synchronizer -> new InMemoryReassignmentStore(synchronizer, loggerFactory)
+          synchronizer.map(_.logical) -> new InMemoryReassignmentStore(
+            synchronizer.map(_.logical),
+            loggerFactory,
+          )
         )
         .toMap
-    val assignmentBySubmission = { (_: SynchronizerId) => None }
-    val protocolVersionGetter = (_: Traced[SynchronizerId]) =>
-      Some(BaseTest.testedStaticSynchronizerParameters)
+    val assignmentBySubmission = { (_: PhysicalSynchronizerId) => None }
+
+    val staticSynchronizerParametersGetter = new StaticSynchronizerParametersGetter {
+      override def staticSynchronizerParameters(
+          synchronizerId: PhysicalSynchronizerId
+      ): Option[StaticSynchronizerParameters] = Some(BaseTest.testedStaticSynchronizerParameters)
+
+      override def latestKnownPSId(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId] =
+        ???
+    }
 
     val reassignmentSynchronizer = { (id: Source[SynchronizerId]) =>
       pendingUnassignments.getOrElse(
         id, {
           val reassignmentSynchronizer =
-            new ReassignmentSynchronizer(id, loggerFactory, new ProcessingTimeout)
+            new ReassignmentSynchronizer(loggerFactory, new ProcessingTimeout)
           pendingUnassignments.put(id, reassignmentSynchronizer)
           reassignmentSynchronizer
         },
@@ -90,32 +107,14 @@ private[reassignment] object TestReassignmentCoordination {
       recentTimeProofFor = recentTimeProofProvider,
       reassignmentSubmissionFor = assignmentBySubmission,
       pendingUnassignments = reassignmentSynchronizer.map(Option(_)),
-      staticSynchronizerParameterFor = protocolVersionGetter,
+      staticSynchronizerParametersGetter = staticSynchronizerParametersGetter,
       syncCryptoApi =
         defaultSyncCryptoApi(synchronizers.toSeq.map(_.unwrap), packages, loggerFactory),
       loggerFactory,
     ) {
 
-      override def awaitUnassignmentTimestamp(
-          sourceSynchronizer: Source[SynchronizerId],
-          staticSynchronizerParameters: Source[StaticSynchronizerParameters],
-          timestamp: CantonTimestamp,
-      )(implicit
-          traceContext: TraceContext
-      ): EitherT[FutureUnlessShutdown, UnknownSynchronizer, Unit] =
-        awaitTimestampOverride match {
-          case None =>
-            super.awaitUnassignmentTimestamp(
-              sourceSynchronizer,
-              staticSynchronizerParameters,
-              timestamp,
-            )
-          case Some(overridden) =>
-            EitherT.right(overridden.fold(FutureUnlessShutdown.unit)(FutureUnlessShutdown.outcomeF))
-        }
-
       override def awaitTimestamp[T[X] <: ReassignmentTag[X]: SameReassignmentType](
-          synchronizerId: T[SynchronizerId],
+          synchronizerId: T[PhysicalSynchronizerId],
           staticSynchronizerParameters: T[StaticSynchronizerParameters],
           timestamp: CantonTimestamp,
       )(implicit
@@ -131,7 +130,7 @@ private[reassignment] object TestReassignmentCoordination {
       override def cryptoSnapshot[
           T[X] <: ReassignmentTag[X]: SameReassignmentType: SingletonTraverse
       ](
-          synchronizerId: T[SynchronizerId],
+          synchronizerId: T[PhysicalSynchronizerId],
           staticSynchronizerParameters: T[StaticSynchronizerParameters],
           timestamp: CantonTimestamp,
       )(implicit
@@ -150,7 +149,7 @@ private[reassignment] object TestReassignmentCoordination {
   }
 
   private def defaultSyncCryptoApi(
-      synchronizers: Seq[SynchronizerId],
+      synchronizers: Seq[PhysicalSynchronizerId],
       packages: Seq[LfPackageId],
       loggerFactory: NamedLoggerFactory,
   ): SyncCryptoApiParticipantProvider =

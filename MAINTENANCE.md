@@ -14,17 +14,16 @@
 ## Bumping Canton
 
 1. Generate a patch file of the JSON API v2 OpenAPI definition by running `diff-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
-2. Choose the Canton version you wish to upgrade to. The currently published versions on
+2. Update the Canton Enterprise `version` in `nix/canton-sources.json`. The currently published versions on
    Artifactory can be found [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
-3. Compute the hashes of the corresponding enterprise and oss versions by running:
-   `nix store prefetch-file --json --hash-type sha256 https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-<version>.tar.gz | jq -r '.hash'` and
-   `nix store prefetch-file --json --hash-type sha256  https://www.canton.io/releases/canton-open-source-<version>.tar.gz | jq -r '.hash'`
-4. Update the Canton version and hashes of the oss and enterprise versions in `nix/canton-sources.json`.
-5. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
+3. Update the `sha256` hash in the same file by first running `direnv reload` to make the hash validation fail
+   and using the 'got' hash printed by nix. This is usually easier and more accurate than copying the sha256 hash
+   displayed for the release version in Artifactory.
+4. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
    changes on scratchnet first.
-6. Update the OpenAPI definitions from step 1 by running `update-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
-7. Cleanup the `openapi.patch` file.
+5. Update the OpenAPI definitions from step 1 by running `update-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
+6. Cleanup the `openapi.patch` file.
    Check `token-standard/dependencies/canton-json-api-v2/openapi/CHANGES.md` and apply any changes manually if CI breaks due to
    token standard CLI issues that look caused by bad OpenAPI definitions.
 
@@ -47,7 +46,7 @@ Initial setup:
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
 2. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`. This can be added to your private env vars.
 
-Current Canton commit: `0a6f8be68dabdcea4ff3dad54827b6d0d508d23e`
+Current Canton commit: `0467621f75718cedee33887a535fab598954b639`
 
 1. Checkout the **current Canton commit listed above** in the Canton open source repo from above, so we can diff our current fork against this checkout.
 2. Change to your checkout of the Splice repo and execute the following steps:
@@ -67,11 +66,9 @@ Current Canton commit: `0a6f8be68dabdcea4ff3dad54827b6d0d508d23e`
       1. The current Canton commit in this `README.md`
       2. If we're also updating the sdk version (this can lead to dar changes so we might skip it)
         1. Set `version` in `CantonDependencies.scala` to the SDK version from Step 3.1
-        2. Set `tooling_sdk_version` in `nix/canton-sources.json` to the SDK release version from Step 3.1.
-        3. Find in [Daml releases](https://github.com/digital-asset/daml/releases) the daml release that is "based on SDK" with the SDK from Step 3.1.
-           Set `daml_release` in `nix/cantno-sources.json` to that release.
-        4. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same Daml SDK version.
-        5. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
+        2. Set `sdk_version` in `nix/canton-sources.json` to the SDK release version from Step 3.1.
+        3. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same Daml SDK version.
+        4. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
            and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
            Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -s -m"Bump Canton commit and Canton/SDK versions" --no-verify`

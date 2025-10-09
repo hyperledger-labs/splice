@@ -13,9 +13,8 @@ import com.digitalasset.canton.admin.api.client.data.DarDescription
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.{VettedPackage, VettedPackages}
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -72,7 +71,7 @@ trait ParticipantAdminDarsConnection {
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
       _ <- MonadUtil.sequentialTraverse(domains) { domainId =>
-        vetDars(domainId, Seq(darResource), None, maxVettingDelay = None)
+        vetDars(domainId.logical, Seq(darResource), None, maxVettingDelay = None)
       }
     } yield ()
 
@@ -87,7 +86,7 @@ trait ParticipantAdminDarsConnection {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
     ensureTopologyMapping[VettedPackages](
       // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
-      AuthorizedStore,
+      TopologyStoreId.Authorized,
       s"dars ${dars.map(_.packageId)} are vetted in the authorized store with from $fromDate",
       topologyTransactionType =>
         EitherT(
@@ -164,7 +163,7 @@ trait ParticipantAdminDarsConnection {
           packages.find(_.packageId == packageId) match {
             case Some(existingVettingState) =>
               if (
-                existingVettingState.validFrom
+                existingVettingState.validFromInclusive
                   .exists(existingValidFrom =>
                     existingValidFrom.isAfter(CantonTimestamp.now()) &&
                       packageValidFrom.forall(_ isBefore existingValidFrom)
@@ -206,8 +205,8 @@ trait ParticipantAdminDarsConnection {
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[VettedPackages]]] = {
     runCommand(
       domainId
-        .map(TopologyStoreId.SynchronizerStore(_))
-        .getOrElse(TopologyStoreId.AuthorizedStore),
+        .map(TopologyStoreId.Synchronizer(_))
+        .getOrElse(TopologyStoreId.Authorized),
       topologyTransactionType,
     )(
       TopologyAdminCommands.Read.ListVettedPackages(

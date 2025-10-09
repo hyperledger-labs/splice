@@ -12,29 +12,30 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.store.db.DbContractStore
 import com.digitalasset.canton.participant.store.memory.InMemoryContractStore
-import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.store.Purgeable
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ReleaseProtocolVersion
+import com.digitalasset.daml.lf.transaction.CreationTime
 
 import scala.concurrent.ExecutionContext
 
 trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
 
+  override type ContractsCreatedAtTime = CreationTime.CreatedAt
+
   /** Stores contracts created by a request. Assumes the contract data has been authenticated
-    * against the contract id using
-    * [[com.digitalasset.canton.participant.protocol.ContractAuthenticator]].
+    * against the contract id using [[com.digitalasset.canton.util.ContractAuthenticator]].
     *
     * @param contracts
     *   The created contracts to be stored
     */
-  def storeContracts(contracts: Seq[SerializableContract])(implicit
+  def storeContracts(contracts: Seq[ContractInstance])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit]
 
-  def storeContract(contract: SerializableContract)(implicit
+  def storeContract(contract: ContractInstance)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = storeContracts(Seq(contract))
 
@@ -45,16 +46,15 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
       filterPackage: Option[String],
       filterTemplate: Option[String],
       limit: Int,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[SerializableContract]]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[ContractInstance]]
 
   /** Debug find utility to search pcs. Omits contracts that are not found.
     */
   def findWithPayload(
-      contractIds: NonEmpty[Seq[LfContractId]],
-      limit: Int,
+      contractIds: NonEmpty[Seq[LfContractId]]
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[LfContractId, SerializableContract]]
+  ): FutureUnlessShutdown[Map[LfContractId, ContractInstance]]
 
   /** Deletes multiple contracts from the contract store.
     *
@@ -115,7 +115,6 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
 object ContractStore {
   def create(
       storage: Storage,
-      releaseProtocolVersion: ReleaseProtocolVersion,
       parameters: ParticipantNodeParameters,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): ContractStore =
@@ -126,7 +125,6 @@ object ContractStore {
       case dbStorage: DbStorage =>
         new DbContractStore(
           dbStorage,
-          releaseProtocolVersion,
           cacheConfig = parameters.cachingConfigs.contractStore,
           dbQueryBatcherConfig = parameters.batchingConfig.aggregator,
           insertBatchAggregatorConfig = parameters.batchingConfig.aggregator,
@@ -147,4 +145,7 @@ final case class UnknownContracts(contractIds: Set[LfContractId]) extends Contra
   override protected def pretty: Pretty[UnknownContracts] = prettyOfClass(
     unnamedParam(_.contractIds)
   )
+}
+final case class FailedConvert(contractId: LfContractId) extends ContractLookupError {
+  override protected def pretty: Pretty[FailedConvert] = prettyOfClass(unnamedParam(_.contractId))
 }

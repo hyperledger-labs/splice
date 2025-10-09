@@ -11,19 +11,23 @@ import com.digitalasset.canton.sequencing.InternalSequencerConnectionX.{
   ConnectionAttributes,
   SequencerConnectionXHealth,
 }
-import com.digitalasset.canton.sequencing.SequencerConnectionXStub.SequencerConnectionXStubError
-import com.digitalasset.canton.sequencing.client.SequencerSubscription
+import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
+import com.digitalasset.canton.sequencing.client.{
+  SequencerSubscription,
+  SubscriptionErrorRetryPolicy,
+}
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
   GetTrafficStateForMemberRequest,
   GetTrafficStateForMemberResponse,
   SignedContent,
   SubmissionRequest,
-  SubscriptionRequestV2,
+  SubscriptionRequest,
   TopologyStateForInitRequest,
   TopologyStateForInitResponse,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.duration.Duration
 
@@ -51,29 +55,32 @@ trait SequencerConnectionX extends FlagCloseable with NamedLogging {
       timeout: Duration,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, Unit]
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit]
 
   def acknowledgeSigned(signedRequest: SignedContent[AcknowledgeRequest], timeout: Duration)(
       implicit traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, Boolean]
+  ): EitherT[FutureUnlessShutdown, String, Boolean]
 
   def getTrafficStateForMember(request: GetTrafficStateForMemberRequest, timeout: Duration)(implicit
       traceContext: TraceContext
-  ): EitherT[
-    FutureUnlessShutdown,
-    SequencerConnectionXStubError,
-    GetTrafficStateForMemberResponse,
-  ]
+  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse]
+
+  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit]
 
   def downloadTopologyStateForInit(request: TopologyStateForInitRequest, timeout: Duration)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, TopologyStateForInitResponse]
+  ): EitherT[FutureUnlessShutdown, String, TopologyStateForInitResponse]
 
   def subscribe[E](
-      request: SubscriptionRequestV2,
+      request: SubscriptionRequest,
       handler: SequencedEventHandler[E],
       timeout: Duration,
   )(implicit
       traceContext: TraceContext
-  ): SequencerSubscription[E]
+  ): Either[String, SequencerSubscription[E]]
+
+  /** Determine which errors will cause the sequencer client to not try to reestablish a
+    * subscription
+    */
+  def subscriptionRetryPolicy: SubscriptionErrorRetryPolicy
 }

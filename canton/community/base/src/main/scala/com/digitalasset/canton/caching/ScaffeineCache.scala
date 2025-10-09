@@ -90,7 +90,7 @@ object ScaffeineCache {
       tracedLogger: TracedLogger,
       allLoader: TraceContext => Iterable[K] => F[Map[K, V]],
   )(implicit F: Functor[F]): Iterable[Traced[K]] => F[Map[Traced[K], V]] = { tracedKeys =>
-    val traceContext = TraceContext.ofBatch(tracedKeys)(tracedLogger)
+    val traceContext = TraceContext.ofBatch("cache_batch_load")(tracedKeys)(tracedLogger)
     val keys = tracedKeys.map(_.unwrap)
     F.map(allLoader(traceContext)(keys))(_.map { case (key, value) =>
       Traced(key)(traceContext) -> value
@@ -118,6 +118,8 @@ object ScaffeineCache {
     def invalidateAll(keys: Iterable[K]): Unit = underlying.synchronous().invalidateAll(keys)
 
     def invalidateAll(): Unit = underlying.synchronous().invalidateAll()
+
+    def cleanUp(): Unit = underlying.synchronous().cleanUp()
   }
 
   class TunnelledAsyncLoadingCache[F[_], K, V] private[ScaffeineCache] (
@@ -162,6 +164,9 @@ object ScaffeineCache {
 
     /** @see com.github.blemale.scaffeine.Cache.invalidateAll */
     def invalidateAll(): Unit = underlying.synchronous().invalidateAll()
+
+    /** @see com.github.blemale.scaffeine.Cache.cleanUp */
+    def cleanUp(): Unit = underlying.synchronous().cleanUp()
 
     /** @see com.github.benmanes.caffeine.cache.AsyncCache.asMap */
     // Note: We cannot use compute to remove keys conditionally on the previous value because we'd have to distribute the Option out of the Future.
@@ -228,6 +233,8 @@ object ScaffeineCache {
       underlying.invalidate(Traced(key)(TraceContext.empty))
 
     def invalidateAll(): Unit = underlying.invalidateAll()
+
+    def cleanUp(): Unit = underlying.cleanUp()
 
     // We intentionally do not pass the trace context found in the cache to the remapper
     // so that the remapper by default takes the trace context of the caller of compute.

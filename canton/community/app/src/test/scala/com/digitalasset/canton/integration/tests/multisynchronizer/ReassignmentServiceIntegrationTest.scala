@@ -30,6 +30,7 @@ import com.digitalasset.canton.integration.util.HasCommandRunnersHelpers.{
   userId as defaultUserId,
   workflowId as defaultWorkflowId,
 }
+import com.digitalasset.canton.integration.util.UpdateFormatHelpers.getUpdateFormat
 import com.digitalasset.canton.integration.util.{
   AcsInspection,
   HasCommandRunnersHelpers,
@@ -41,6 +42,11 @@ import com.digitalasset.canton.integration.{
   EnvironmentSetupPlugin,
   SharedEnvironment,
   TestConsoleEnvironment,
+}
+import com.digitalasset.canton.ledger.participant.state.ReassignmentCommandsBatch.{
+  DifferingSynchronizers,
+  MixedAssignWithOtherCommands,
+  NoCommands,
 }
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentProcessorError.{
@@ -55,11 +61,9 @@ import com.google.rpc.status.Status
 import monocle.macros.syntax.lens.*
 import org.scalatest.Tag
 
-import scala.annotation.nowarn
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 
-@nowarn("cat=deprecation")
 abstract class ReassignmentServiceIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
@@ -85,17 +89,17 @@ abstract class ReassignmentServiceIntegrationTest
   private var party2: PartyId = _
 
   override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P3_S2M1_S2M1
+    EnvironmentDefinition.P3_S1M1_S1M1_S1M1
       .withSetup { implicit env =>
         import env.*
 
         participant1.synchronizers.connect_local(sequencer1, alias = daName)
-        participant2.synchronizers.connect_local(sequencer2, alias = daName)
-        participant3.synchronizers.connect_local(sequencer2, alias = daName)
+        participant2.synchronizers.connect_local(sequencer1, alias = daName)
+        participant3.synchronizers.connect_local(sequencer1, alias = daName)
 
-        participant1.synchronizers.connect_local(sequencer3, alias = acmeName)
-        participant2.synchronizers.connect_local(sequencer4, alias = acmeName)
-        participant3.synchronizers.connect_local(sequencer4, alias = acmeName)
+        participant1.synchronizers.connect_local(sequencer2, alias = acmeName)
+        participant2.synchronizers.connect_local(sequencer2, alias = acmeName)
+        participant3.synchronizers.connect_local(sequencer2, alias = acmeName)
 
         participants.all.dars.upload(CantonExamplesPath)
 
@@ -103,14 +107,34 @@ abstract class ReassignmentServiceIntegrationTest
         party1a = participant1.parties.enable(
           party1aName,
           synchronizeParticipants = Seq(participant2),
+          synchronizer = daName,
         )
+        participant1.parties.enable(
+          party1aName,
+          synchronizeParticipants = Seq(participant2),
+          synchronizer = acmeName,
+        )
+
         party1b = participant1.parties.enable(
           party1bName,
           synchronizeParticipants = Seq(participant2),
+          synchronizer = daName,
         )
+        participant1.parties.enable(
+          party1bName,
+          synchronizeParticipants = Seq(participant2),
+          synchronizer = acmeName,
+        )
+
         party2 = participant2.parties.enable(
           party2Name,
           synchronizeParticipants = Seq(participant1),
+          synchronizer = daName,
+        )
+        participant2.parties.enable(
+          party2Name,
+          synchronizeParticipants = Seq(participant1),
+          synchronizer = acmeName,
         )
 
         synchronizerOwners2.foreach(
@@ -178,15 +202,17 @@ abstract class ReassignmentServiceIntegrationTest
       val finalLedgerEnd1 = participant1.ledger_api.state.end()
       val finalLedgerEnd2 = participant2.ledger_api.state.end()
 
-      val updatesP1 = participant1.ledger_api.updates.flat(
-        partyIds = Set(signatory),
+      val updateFormat = getUpdateFormat(Set(signatory), includeReassignments = true)
+
+      val updatesP1 = participant1.ledger_api.updates.updates(
+        updateFormat = updateFormat,
         completeAfter = Int.MaxValue,
         beginOffsetExclusive = initialLedgerEnd1,
         endOffsetInclusive = Some(finalLedgerEnd1),
       )
 
-      val updatesP2 = participant2.ledger_api.updates.flat(
-        partyIds = Set(signatory),
+      val updatesP2 = participant2.ledger_api.updates.updates(
+        updateFormat = updateFormat,
         completeAfter = Int.MaxValue,
         beginOffsetExclusive = initialLedgerEnd2,
         endOffsetInclusive = Some(finalLedgerEnd2),
@@ -203,7 +229,7 @@ abstract class ReassignmentServiceIntegrationTest
         participant2,
         signatoryOnParticipant2.toLf,
         ledgerEndP2,
-        filterBy = _.synchronizerTime.value.synchronizerId == daId.toProtoPrimitive,
+        filterBy = _.synchronizerTime.value.synchronizerId == daId.logical.toProtoPrimitive,
       ) should be(empty)
 
       // but can see the updates
@@ -214,7 +240,7 @@ abstract class ReassignmentServiceIntegrationTest
         participant1,
         observer,
         ledgerEndP1,
-        filterBy = _.synchronizerTime.value.synchronizerId == daId.toProtoPrimitive,
+        filterBy = _.synchronizerTime.value.synchronizerId == daId.logical.toProtoPrimitive,
       ) should be(empty)
 
       // a submitting party on a submitting participant should see the completion
@@ -222,7 +248,7 @@ abstract class ReassignmentServiceIntegrationTest
         participant1,
         signatory,
         ledgerEndP1,
-        filterBy = _.synchronizerTime.value.synchronizerId == daId.toProtoPrimitive,
+        filterBy = _.synchronizerTime.value.synchronizerId == daId.logical.toProtoPrimitive,
       ) should not be empty
 
       // but and the updates
@@ -246,8 +272,8 @@ abstract class ReassignmentServiceIntegrationTest
         participant2.ledger_api.state.end()
       val updates = eventually() {
 
-        participant1.ledger_api.updates.flat(
-          partyIds = Set(notAStakeholder),
+        participant1.ledger_api.updates.updates(
+          updateFormat = getUpdateFormat(Set(notAStakeholder), includeReassignments = true),
           completeAfter = Int.MaxValue,
           beginOffsetExclusive = startOffsetP1,
           endOffsetInclusive = Some(endOffsetP1),
@@ -257,8 +283,8 @@ abstract class ReassignmentServiceIntegrationTest
       updates shouldBe empty
 
       val updatesForObserver = eventually() {
-        participant2.ledger_api.updates.flat(
-          partyIds = Set(observer),
+        participant2.ledger_api.updates.updates(
+          updateFormat = getUpdateFormat(Set(observer), includeReassignments = true),
           completeAfter = Int.MaxValue,
           beginOffsetExclusive = startOffsetP2,
           endOffsetInclusive = Some(endOffsetP2),
@@ -295,7 +321,7 @@ abstract class ReassignmentServiceIntegrationTest
         getAssignmentCmd(
           source = daId,
           target = acmeId,
-          unassignmentId = unassignedEvent.unassignId,
+          reassignmentId = unassignedEvent.reassignmentId,
         ),
         submittingParty = signatory.toLf,
       )
@@ -335,12 +361,11 @@ abstract class ReassignmentServiceIntegrationTest
         )
 
       // Assign contract
-      val reassignmentId = getReassignmentId(unassignedEvent)
       val assignmentCmd = getReassignmentCommand(
         getAssignmentCmd(
           source = daId,
           target = acmeId,
-          unassignmentId = unassignedEvent.unassignId,
+          reassignmentId = unassignedEvent.reassignmentId,
         ),
         submittingParty = signatory.toLf,
       )
@@ -352,7 +377,7 @@ abstract class ReassignmentServiceIntegrationTest
       )
 
       inside(res) { case error: GenericCommandError =>
-        error.cause should include(reassignmentId.toString)
+        error.cause should include(unassignedEvent.reassignmentId.toString)
         error.cause should include("unknown reassignment id")
       }
 
@@ -394,7 +419,7 @@ abstract class ReassignmentServiceIntegrationTest
 
       inside(submitReassignment(unassignmentCmd)) { case error: GenericCommandError =>
         error.cause should include(
-          TargetSynchronizerIsSourceSynchronizer(daId, cid).message
+          TargetSynchronizerIsSourceSynchronizer(daId, Seq(cid)).message
         )
       }
 
@@ -425,7 +450,7 @@ abstract class ReassignmentServiceIntegrationTest
             .SubmitterMustBeStakeholder(
               ReassignmentRef(cid),
               submittingParty = otherParty.toLf,
-              stakeholders = Set(signatory.toLf),
+              stakeholders = Set(signatory.toLf, observer.toLf),
             )
             .message
         )
@@ -433,6 +458,159 @@ abstract class ReassignmentServiceIntegrationTest
 
       // Cleaning
       IouSyntax.archive(participant1)(contract, signatory)
+    }
+
+    "fail when no commands are provided" in { implicit env =>
+      import env.*
+
+      val signatory = party1a
+
+      val noCommands = getReassignmentCommands(Seq.empty, submittingParty = signatory.toLf)
+
+      inside(submitReassignment(noCommands)) { case error: GenericCommandError =>
+        error.cause should include(NoCommands.error)
+      }
+    }
+
+    "fail when assignment and unassignment commands are mixed" in { implicit env =>
+      import env.*
+
+      val signatory = party1a
+      val observer = party2
+
+      val contract1 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+      val cid1 = contract1.id.toLf
+
+      val (unassignedEvent, _) =
+        unassign(cid = cid1, source = daId, target = acmeId, submittingParty = signatory.toLf)
+
+      val contract2 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+
+      // In the same request, assign contract 1 and unassign contract 2
+      val mixedReassignmentCmds = getReassignmentCommands(
+        Seq(
+          getAssignmentCmd(
+            source = daId,
+            target = acmeId,
+            reassignmentId = unassignedEvent.reassignmentId,
+          ),
+          getUnassignmentCmd(cid = contract2.id.toLf, source = daId, target = acmeId),
+        ),
+        submittingParty = signatory.toLf,
+      )
+
+      inside(submitReassignment(mixedReassignmentCmds)) { case error: GenericCommandError =>
+        error.cause should include(MixedAssignWithOtherCommands.error)
+      }
+
+      // Cleaning
+      assign(unassignedEvent.reassignmentId, daId, acmeId, signatory.toLf)
+      IouSyntax.archive(participant1)(contract1, signatory)
+      IouSyntax.archive(participant1)(contract2, signatory)
+    }
+
+    "fail when there are multiple assignment commands" in { implicit env =>
+      import env.*
+
+      val signatory = party1a
+      val observer = party2
+
+      val contract1 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+      val contract2 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+
+      val (unassignedEvent1, _) = unassign(
+        cid = contract1.id.toLf,
+        source = daId,
+        target = acmeId,
+        submittingParty = signatory.toLf,
+      )
+      val (unassignedEvent2, _) = unassign(
+        cid = contract2.id.toLf,
+        source = daId,
+        target = acmeId,
+        submittingParty = signatory.toLf,
+      )
+
+      // In the same request, assign contract 1 and contract 2
+      val multipleAssignmentCmds = getReassignmentCommands(
+        Seq(
+          getAssignmentCmd(
+            source = daId,
+            target = acmeId,
+            reassignmentId = unassignedEvent1.reassignmentId,
+          ),
+          getAssignmentCmd(
+            source = daId,
+            target = acmeId,
+            reassignmentId = unassignedEvent2.reassignmentId,
+          ),
+        ),
+        submittingParty = signatory.toLf,
+      )
+
+      inside(submitReassignment(multipleAssignmentCmds)) { case error: GenericCommandError =>
+        error.cause should include(MixedAssignWithOtherCommands.error)
+      }
+
+      // Cleaning
+      assign(unassignedEvent1.reassignmentId, daId, acmeId, signatory.toLf)
+      assign(unassignedEvent2.reassignmentId, daId, acmeId, signatory.toLf)
+      IouSyntax.archive(participant1)(contract1, signatory)
+      IouSyntax.archive(participant1)(contract2, signatory)
+    }
+
+    "fail when unassignment commands have different targets" in { implicit env =>
+      import env.*
+
+      val signatory = party1a
+      val observer = party2
+
+      val contract1 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+      val contract2 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+
+      // In the same request, unassign contracts 1 and 2, but to different targets.
+      val commandsWithDifferentTargets = getReassignmentCommands(
+        Seq(
+          getUnassignmentCmd(cid = contract1.id.toLf, source = daId, target = acmeId),
+          getUnassignmentCmd(cid = contract2.id.toLf, source = daId, target = synchronizer3Id),
+        ),
+        submittingParty = signatory.toLf,
+      )
+
+      inside(submitReassignment(commandsWithDifferentTargets)) { case error: GenericCommandError =>
+        error.cause should include(DifferingSynchronizers.error)
+      }
+
+      // Cleaning
+      IouSyntax.archive(participant1)(contract1, signatory)
+      IouSyntax.archive(participant1)(contract2, signatory)
+    }
+
+    "fail when unassignment commands have different sources" in { implicit env =>
+      import env.*
+
+      val signatory = party1a
+      val observer = party2
+
+      val contract1 = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
+      val contract2 = IouSyntax.createIou(participant1, Some(acmeId))(signatory, observer)
+
+      // In the same request, unassign contracts 1 and 2, but to different targets.
+      val commandsWithDifferentTargets = getReassignmentCommands(
+        Seq(
+          getUnassignmentCmd(cid = contract1.id.toLf, source = daId, target = synchronizer3Id),
+          getUnassignmentCmd(cid = contract2.id.toLf, source = acmeId, target = synchronizer3Id),
+        ),
+        submittingParty = signatory.toLf,
+      )
+
+      inside(submitReassignment(commandsWithDifferentTargets)) { case error: GenericCommandError =>
+        error.cause should include(DifferingSynchronizers.error)
+      }
+
+      // Cleaning
+      IouSyntax.archive(participant1)(contract1, signatory)
+      IouSyntax.archive(participant1)(contract2, signatory)
     }
   }
 
@@ -455,10 +633,7 @@ abstract class ReassignmentServiceIntegrationTest
       IouSyntax.createIouComplete(participant1, Some(daId))(signatory, observer)
     createCompletion.status.value shouldBe Status()
 
-    val createdEvent = createUpdateEvent.eventsById.headOption
-      .map { case (_, event) => event }
-      .value
-      .getCreated
+    val createdEvent = createUpdateEvent.events.headOption.value.getCreated
 
     /*
       During the unassignment below, we wait for the update to be published and expect a unassigned event.
@@ -470,7 +645,7 @@ abstract class ReassignmentServiceIntegrationTest
       eventually() {
         val endOffset = submittingParticipantOverride.ledger_api.state.end()
 
-        val updates = submittingParticipantOverride.ledger_api.updates.flat(
+        val updates = submittingParticipantOverride.ledger_api.updates.transactions(
           partyIds = Set(submittingParty.toLf),
           completeAfter = Int.MaxValue,
           beginOffsetExclusive = ledgerEndSubmitterUnassignment,
@@ -504,11 +679,11 @@ abstract class ReassignmentServiceIntegrationTest
 
     val expectedUnassignedEvent = proto.reassignment.UnassignedEvent(
       offset = 0L,
-      unassignId = unassignedEvent.unassignId, // We don't know this value
+      reassignmentId = unassignedEvent.reassignmentId, // We don't know this value
       contractId = cid.coid,
       templateId = expectedTemplateId,
-      source = daId.toProtoPrimitive,
-      target = acmeId.toProtoPrimitive,
+      source = daId.logical.toProtoPrimitive,
+      target = acmeId.logical.toProtoPrimitive,
       submitter = submittingParty.toLf,
       reassignmentCounter = 1,
       assignmentExclusivity =
@@ -555,7 +730,7 @@ abstract class ReassignmentServiceIntegrationTest
     )
 
     val (assignedEvent, assignmentCompletion) = assign(
-      unassignId = unassignedEvent.unassignId,
+      reassignmentId = unassignedEvent.reassignmentId,
       source = daId,
       target = acmeId,
       submittingParty = submittingParty.toLf,
@@ -573,9 +748,9 @@ abstract class ReassignmentServiceIntegrationTest
         .replace(0)
 
     val expectedAssignedEvent = proto.reassignment.AssignedEvent(
-      source = daId.toProtoPrimitive,
-      target = acmeId.toProtoPrimitive,
-      unassignId = expectedUnassignedEvent.unassignId,
+      source = daId.logical.toProtoPrimitive,
+      target = acmeId.logical.toProtoPrimitive,
+      reassignmentId = expectedUnassignedEvent.reassignmentId,
       submitter = submittingParty.toLf,
       reassignmentCounter = 1,
       createdEvent = Some(expectedCreatedEvent),
@@ -623,8 +798,9 @@ class ReferenceReassignmentServiceIntegrationTest extends ReassignmentServiceInt
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(
-          Set(InstanceName.tryCreate("sequencer1"), InstanceName.tryCreate("sequencer2")),
-          Set(InstanceName.tryCreate("sequencer3"), InstanceName.tryCreate("sequencer4")),
+          Set(InstanceName.tryCreate("sequencer1")),
+          Set(InstanceName.tryCreate("sequencer2")),
+          Set(InstanceName.tryCreate("sequencer3")),
         )
       ),
     )

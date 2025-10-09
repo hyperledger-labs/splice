@@ -3,13 +3,14 @@
 
 package com.digitalasset.canton.sequencing
 
-import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.sequencing.InternalSequencerConnectionX.{
   SequencerConnectionXError,
   SequencerConnectionXState,
 }
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, HasExecutionContext}
 import org.scalatest.wordspec.AnyWordSpec
+import org.slf4j.event.Level.INFO
 
 class GrpcInternalSequencerConnectionXTest
     extends AnyWordSpec
@@ -17,6 +18,8 @@ class GrpcInternalSequencerConnectionXTest
     with HasExecutionContext
     with FailOnShutdown
     with ConnectionPoolTestHelpers {
+
+  import ConnectionPoolTestHelpers.*
 
   "GrpcInternalSequencerConnectionX" should {
     "be validated in the happy path" in {
@@ -119,6 +122,57 @@ class GrpcInternalSequencerConnectionXTest
       }
     }
 
+    "fail validation if an expected sequencer ID is specified and it is incorrect" in {
+      val responses = TestResponses(
+        apiResponses = Seq(correctApiResponse),
+        handshakeResponses = Seq(successfulHandshake),
+        synchronizerAndSeqIdResponses = Seq(correctSynchronizerIdResponse1),
+      )
+      val expectedSequencerIdO = Some(testSequencerId(666))
+      withConnection(responses, expectedSequencerIdO = expectedSequencerIdO) {
+        (connection, listener) =>
+          loggerFactory.assertLoggedWarningsAndErrorsSeq(
+            {
+              connection.start().valueOrFail("start connection")
+              listener.shouldStabilizeOn(SequencerConnectionXState.Fatal)
+              connection.attributes shouldBe None
+            },
+            LogEntry.assertLogSeq(
+              Seq(
+                (
+                  _.warningMessage should include(
+                    s"Validation failure: Connection is not on expected sequencer:" +
+                      s" expected $expectedSequencerIdO, got ${testSequencerId(1)}"
+                  ),
+                  "Protocol handshake fails",
+                )
+              )
+            ),
+          )
+
+          responses.assertAllResponsesSent()
+      }
+    }
+
+    "pass validation if an expected sequencer ID is specified and it is correct" in {
+      val responses = TestResponses(
+        apiResponses = Seq(correctApiResponse),
+        handshakeResponses = Seq(successfulHandshake),
+        synchronizerAndSeqIdResponses = Seq(correctSynchronizerIdResponse1),
+        staticParametersResponses = Seq(correctStaticParametersResponse),
+      )
+      val expectedSequencerIdO = Some(testSequencerId(1))
+      withConnection(responses, expectedSequencerIdO = expectedSequencerIdO) {
+        (connection, listener) =>
+          connection.start().valueOrFail("start connection")
+
+          listener.shouldStabilizeOn(SequencerConnectionXState.Validated)
+          connection.attributes shouldBe Some(correctConnectionAttributes)
+
+          responses.assertAllResponsesSent()
+      }
+    }
+
     "retry if the server is unavailable during any request" in {
       val responses = TestResponses(
         apiResponses = Seq(failureUnavailable, correctApiResponse),
@@ -127,22 +181,15 @@ class GrpcInternalSequencerConnectionXTest
         staticParametersResponses = Seq(failureUnavailable, correctStaticParametersResponse),
       )
       withConnection(responses) { (connection, listener) =>
-        loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(INFO))(
           {
             connection.start().valueOrFail("start connection")
             listener.shouldStabilizeOn(SequencerConnectionXState.Validated)
             connection.attributes shouldBe Some(correctConnectionAttributes)
           },
-          LogEntry.assertLogSeq(
-            Seq(
-              (
-                _.warningMessage should include(
-                  "Request failed for server-test-0. Is the server running?"
-                ),
-                "Request failure",
-              )
-            )
-          ),
+          forExactly(4, _) {
+            _.infoMessage should include("Waiting for 1ms before retrying...")
+          },
         )
 
         responses.assertAllResponsesSent()

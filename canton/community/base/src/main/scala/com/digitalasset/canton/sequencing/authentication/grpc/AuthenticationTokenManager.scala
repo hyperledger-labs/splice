@@ -132,7 +132,7 @@ class AuthenticationTokenManager(
         }
         completeRefresh(NoToken)
       case Success(UnlessShutdown.AbortedDueToShutdown) =>
-        logger.warn(s"Token refresh aborted due to shutdown.")
+        logger.info(s"Token refresh aborted due to shutdown.")
         completeRefresh(NoToken)
       case Success(UnlessShutdown.Outcome(Left(error))) =>
         if (error.getCode == Status.Code.CANCELLED)
@@ -165,7 +165,7 @@ class AuthenticationTokenManager(
   private def backgroundRefreshToken(): Unit =
     if (!isClosed) {
       // Create a fresh trace context for each refresh to avoid long-lasting trace IDs from other contexts
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("background_refresh_token") { implicit traceContext =>
         refreshToken(refreshWhenHaveToken = true).discard
       }
     }

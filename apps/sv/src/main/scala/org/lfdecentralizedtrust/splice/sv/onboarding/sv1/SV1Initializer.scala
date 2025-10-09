@@ -38,7 +38,6 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
   SynchronizerNodeReconciler,
 }
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
-import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer.bootstrapTransactionOrdering
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{
@@ -69,11 +68,11 @@ import com.digitalasset.canton.time.{
   PositiveSeconds,
 }
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
-  TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
@@ -122,6 +121,8 @@ class SV1Initializer(
     mat: Materializer,
     tracer: Tracer,
 ) extends NodeInitializerUtil {
+
+  import SV1Initializer.bootstrapTransactionOrdering
 
   def bootstrapDso()(implicit
       tc: TraceContext
@@ -179,9 +180,12 @@ class SV1Initializer(
                 transportSecurity = internalSequencerApi.tlsConfig.isDefined,
                 customTrustCertificates = None,
                 SequencerAlias.Default,
+                sequencerId = None,
               )
             ),
             PositiveInt.one,
+            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
           ),
           manualConnect = false,
@@ -406,7 +410,7 @@ class SV1Initializer(
   ): Future[PartyId] =
     for {
       dso <- connection.ensurePartyAllocated(
-        TopologyStoreId.SynchronizerStore(domain),
+        TopologyStoreId.Synchronizer(domain),
         sv1Config.dsoPartyHint,
         Some(namespace),
         participantAdminConnection,
@@ -449,7 +453,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
+        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v34)
         val values = initialValues.tryUpdate(
           topologyChangeDelay = config.topologyChangeDelayDuration.toInternal,
           trafficControlParameters = Some(initialTrafficControlParameters),
@@ -462,7 +466,7 @@ class SV1Initializer(
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
         )
         for {
-          _ <- retryProvider.ensureThatO(
+          physicalSynchronizerId <- retryProvider.ensureThatO(
             RetryFor.WaitingOnInitDependency,
             "init_sequencer",
             "sequencer is initialized",
@@ -492,7 +496,7 @@ class SV1Initializer(
                   ) { con =>
                     con
                       .getId()
-                      .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
+                      .flatMap(con.getIdentityTransactions(_, TopologyStoreId.Authorized))
                   }
                   .map(_.flatten),
                 participantAdminConnection.proposeInitialDomainParameters(
@@ -541,7 +545,7 @@ class SV1Initializer(
             "mediator is initialized",
             synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             synchronizerNode.mediatorAdminConnection.initialize(
-              synchronizerId,
+              physicalSynchronizerId,
               synchronizerNode.sequencerConnection,
               synchronizerNode.mediatorSequencerAmplification,
             ),

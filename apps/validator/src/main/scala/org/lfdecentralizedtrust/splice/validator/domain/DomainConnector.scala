@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfi
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -157,6 +158,8 @@ class DomainConnector(
                       Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                       config.sequencerRequestAmplificationPatience,
                     ),
+                    // TODO(#2110) Rethink this when we enable sequencer connection pools.
+                    sequencerLivenessMargin = NonNegativeInt.zero,
                   )
               }
             }.toMap

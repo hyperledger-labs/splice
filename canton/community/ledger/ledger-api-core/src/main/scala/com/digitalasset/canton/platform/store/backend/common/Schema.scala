@@ -97,7 +97,6 @@ private[backend] object AppendOnlySchema {
         "ledger_effective_time" -> fieldStrategy.bigint(_ => _.ledger_effective_time),
         "command_id" -> fieldStrategy.stringOptional(_ => _.command_id),
         "workflow_id" -> fieldStrategy.stringOptional(_ => _.workflow_id),
-        "user_id" -> fieldStrategy.stringOptional(_ => _.user_id),
         "submitters" -> fieldStrategy.intArrayOptional(stringInterning =>
           _.submitters.map(_.map(stringInterning.party.unsafe.internalize))
         ),
@@ -106,8 +105,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "flat_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.flat_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -134,12 +133,13 @@ private[backend] object AppendOnlySchema {
         "create_key_value_compression" -> fieldStrategy.smallintOptional(_ =>
           _.create_key_value_compression
         ),
-        "driver_metadata" -> fieldStrategy.bytea(_ => _.driver_metadata),
+        "authentication_data" -> fieldStrategy.bytea(_ => _.authentication_data),
         "synchronizer_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.synchronizerId.unsafe.internalize(dbDto.synchronizer_id)
         ),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
         "record_time" -> fieldStrategy.bigint(_ => _.record_time),
+        "external_transaction_hash" -> fieldStrategy.byteaOptional(_ => _.external_transaction_hash),
       )
 
     val exerciseFields: Vector[(String, Field[DbDto.EventExercise, _, _])] =
@@ -151,11 +151,9 @@ private[backend] object AppendOnlySchema {
         "node_id" -> fieldStrategy.int(_ => _.node_id),
         "command_id" -> fieldStrategy.stringOptional(_ => _.command_id),
         "workflow_id" -> fieldStrategy.stringOptional(_ => _.workflow_id),
-        "user_id" -> fieldStrategy.stringOptional(_ => _.user_id),
         "submitters" -> fieldStrategy.intArrayOptional(stringInterning =>
           _.submitters.map(_.map(stringInterning.party.unsafe.internalize))
         ),
-        "create_key_value" -> fieldStrategy.byteaOptional(_ => _.create_key_value),
         "exercise_choice" -> fieldStrategy.string(_ => _.exercise_choice),
         "exercise_argument" -> fieldStrategy.bytea(_ => _.exercise_argument),
         "exercise_result" -> fieldStrategy.byteaOptional(_ => _.exercise_result),
@@ -168,16 +166,13 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "tree_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.tree_event_witnesses.map(stringInterning.party.unsafe.internalize)
         ),
         "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "create_key_value_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.create_key_value_compression
-        ),
         "exercise_argument_compression" -> fieldStrategy.smallintOptional(_ =>
           _.exercise_argument_compression
         ),
@@ -189,6 +184,7 @@ private[backend] object AppendOnlySchema {
         ),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
         "record_time" -> fieldStrategy.bigint(_ => _.record_time),
+        "external_transaction_hash" -> fieldStrategy.byteaOptional(_ => _.external_transaction_hash),
       )
 
     val consumingExerciseFields: Vector[(String, Field[DbDto.EventExercise, _, _])] =
@@ -219,8 +215,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "flat_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.flat_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -231,7 +227,7 @@ private[backend] object AppendOnlySchema {
         "target_synchronizer_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.synchronizerId.unsafe.internalize(dbDto.target_synchronizer_id)
         ),
-        "unassign_id" -> fieldStrategy.string(_ => _.unassign_id),
+        "reassignment_id" -> fieldStrategy.string(_ => _.reassignment_id),
         "reassignment_counter" -> fieldStrategy.bigint(_ => _.reassignment_counter),
         "assignment_exclusivity" -> fieldStrategy.bigintOptional(_ => _.assignment_exclusivity),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
@@ -253,8 +249,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "flat_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.flat_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -265,7 +261,7 @@ private[backend] object AppendOnlySchema {
         "target_synchronizer_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.synchronizerId.unsafe.internalize(dbDto.target_synchronizer_id)
         ),
-        "unassign_id" -> fieldStrategy.string(_ => _.unassign_id),
+        "reassignment_id" -> fieldStrategy.string(_ => _.reassignment_id),
         "reassignment_counter" -> fieldStrategy.bigint(_ => _.reassignment_counter),
         "create_argument" -> fieldStrategy.bytea(_ => _.create_argument),
         "create_signatories" -> fieldStrategy.intArray(stringInterning =>
@@ -286,7 +282,7 @@ private[backend] object AppendOnlySchema {
           _.create_key_value_compression
         ),
         "ledger_effective_time" -> fieldStrategy.bigint(_ => _.ledger_effective_time),
-        "driver_metadata" -> fieldStrategy.bytea(_ => _.driver_metadata),
+        "authentication_data" -> fieldStrategy.bytea(_ => _.authentication_data),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
         "record_time" -> fieldStrategy.bigint(_ => _.record_time),
       )
@@ -420,7 +416,7 @@ private[backend] object AppendOnlySchema {
       )
 
     val idFilterUnassignStakeholderTable: Table[DbDto.IdFilterUnassignStakeholder] =
-      fieldStrategy.insert("lapi_pe_unassign_id_filter_stakeholder")(
+      fieldStrategy.insert("lapi_pe_reassignment_id_filter_stakeholder")(
         "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
         "template_id" -> fieldStrategy.int(stringInterning =>
           dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
@@ -442,7 +438,7 @@ private[backend] object AppendOnlySchema {
       )
 
     val transactionMeta: Table[DbDto.TransactionMeta] =
-      fieldStrategy.insert("lapi_transaction_meta")(
+      fieldStrategy.insert("lapi_update_meta")(
         "update_id" -> fieldStrategy.string(_ => _.update_id),
         "event_offset" -> fieldStrategy.bigint(_ => _.event_offset),
         "publication_time" -> fieldStrategy.bigint(_ => _.publication_time),

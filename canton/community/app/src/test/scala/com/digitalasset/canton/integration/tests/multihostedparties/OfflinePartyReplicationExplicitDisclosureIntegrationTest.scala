@@ -7,9 +7,11 @@ import com.daml.ledger.javaapi.data.codegen.HasCommands
 import com.daml.ledger.javaapi.data.{
   Command,
   CumulativeFilter,
+  EventFormat,
   Filter,
   Identifier,
-  TransactionFilter,
+  TransactionFormat,
+  TransactionShape,
 }
 import com.digitalasset.canton.HasTempDirectory
 import com.digitalasset.canton.config.DbConfig
@@ -28,7 +30,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission as PP
 
 import java.util.Collections
-import scala.annotation.nowarn
 
 sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
     extends UseSilentSynchronizerInTest
@@ -37,6 +38,7 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
   private val acsSnapshot = tempDirectory.toTempFile(s"${getClass.getSimpleName}.gz")
   private val acsSnapshotPath: String = acsSnapshot.toString
 
+  // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
   // Party replication to the target participant may trigger ACS commitment mismatch warnings.
   // This is expected behavior. To reduce the frequency of these warnings and avoid associated
   // test flakes, `reconciliationInterval` is set to one year.
@@ -92,8 +94,8 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
         commands = quote.create,
       )
       val tx = participant1.ledger_api.javaapi.updates
-        .flat_with_tx_filter(
-          filter = filter(alice -> PriceQuotation.TEMPLATE_ID),
+        .transactions_with_tx_format(
+          transactionFormat = transactionFormat(alice -> PriceQuotation.TEMPLATE_ID),
           completeAfter = 1,
         )
         .loneElement
@@ -165,20 +167,23 @@ sealed trait OfflinePartyReplicationExplicitDisclosureIntegrationTest
     )
   }
 
-  @nowarn("cat=deprecation")
-  private def filter(f: (PartyId, Identifier)): TransactionFilter = {
+  private def transactionFormat(f: (PartyId, Identifier)): TransactionFormat = {
     import scala.jdk.CollectionConverters.MapHasAsJava
     import scala.jdk.OptionConverters.RichOption
     val (party, templateId) = f
-    new TransactionFilter(
-      Map(
-        party.toProtoPrimitive -> (new CumulativeFilter(
-          Collections.emptyMap[Identifier, Filter.Interface](),
-          Map(templateId -> Filter.Template.INCLUDE_CREATED_EVENT_BLOB).asJava,
-          None.toJava,
-        ): Filter)
-      ).asJava,
-      None.toJava,
+    new TransactionFormat(
+      new EventFormat(
+        Map(
+          party.toProtoPrimitive -> (new CumulativeFilter(
+            Collections.emptyMap[Identifier, Filter.Interface](),
+            Map(templateId -> Filter.Template.INCLUDE_CREATED_EVENT_BLOB).asJava,
+            None.toJava,
+          ): Filter)
+        ).asJava,
+        None.toJava,
+        false,
+      ),
+      TransactionShape.ACS_DELTA,
     )
   }
 

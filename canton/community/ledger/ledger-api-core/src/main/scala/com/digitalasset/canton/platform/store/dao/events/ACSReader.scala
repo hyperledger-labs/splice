@@ -14,14 +14,15 @@ import com.daml.nameof.NameOf.qualifiedNameOfCurrentFunc
 import com.daml.tracing
 import com.daml.tracing.{SpanAttribute, Spans}
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.error.CommonErrors.ServerIsShuttingDown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
 import com.digitalasset.canton.platform.TemplatePartiesFilter
 import com.digitalasset.canton.platform.config.ActiveContractsServiceStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
   RawActiveContract,
@@ -46,7 +47,7 @@ import com.digitalasset.canton.platform.store.utils.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.Identifier
+import com.digitalasset.daml.lf.data.Ref.FullIdentifier
 import com.digitalasset.daml.lf.value.Value.ContractId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -306,7 +307,7 @@ class ACSReader(
             ) { implicit connection =>
               val result = withValidatedActiveAt(
                 eventStorageBackend.assignEventBatch(
-                  eventSequentialIds = ids,
+                  eventSequentialIds = Ids(ids),
                   allFilterParties = allFilterParties,
                 )(connection)
               )
@@ -330,7 +331,7 @@ class ACSReader(
           ) { implicit connection =>
             val result = withValidatedActiveAt(
               eventStorageBackend.unassignEventBatch(
-                eventSequentialIds = ids,
+                eventSequentialIds = Ids(ids),
                 allFilterParties = allFilterParties,
               )(connection)
             )
@@ -393,7 +394,7 @@ class ACSReader(
                   eventStorageBackend.fetchEventPayloadsAcsDelta(
                     EventPayloadSourceForUpdatesAcsDelta.Create
                   )(
-                    eventSequentialIds = ids,
+                    eventSequentialIds = Ids(ids),
                     requestingParties = allFilterParties,
                   )(connection)
                 )
@@ -489,12 +490,12 @@ class ACSReader(
     }
 
     val stringWildcardParties = filter.templateWildcardParties.map(_.map(_.toString))
-    val stringTemplateFilters = filter.relation.map { case (key, value) =>
+    val templateFilters = filter.relation.map { case (key, value) =>
       key -> value
     }
-    def eventMeetsConstraints(templateId: Identifier, witnesses: Set[String]): Boolean =
+    def eventMeetsConstraints(templateId: FullIdentifier, witnesses: Set[String]): Boolean =
       stringWildcardParties.fold(true)(_.exists(witnesses)) || (
-        stringTemplateFilters.get(templateId) match {
+        templateFilters.get(templateId.toNameTypeConRef) match {
           case Some(Some(filterParties)) => filterParties.exists(witnesses)
           case Some(None) => true // party wildcard
           case None =>
@@ -600,7 +601,7 @@ class ACSReader(
               .map(_._2)
           }.onShutdown {
             Source.failed(
-              ServerIsShuttingDown.Reject().asGrpcError
+              AbortedDueToShutdown.Error().asGrpcError
             )
           }
         )

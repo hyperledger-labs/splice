@@ -4,7 +4,7 @@
 package com.digitalasset.canton.console
 
 import com.digitalasset.canton.admin.api.client.commands.*
-import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.LocatePruningTimestampCommand
+import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.FindPruningTimestampCommand
 import com.digitalasset.canton.admin.api.client.data.topology.ListParticipantSynchronizerPermissionResult
 import com.digitalasset.canton.admin.api.client.data.{
   MediatorStatus,
@@ -44,8 +44,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.Se
   OrderingTopology,
   PeerNetworkStatus,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.{
   RemoteSequencerConfig,
   SequencerNodeConfig,
@@ -106,8 +106,10 @@ trait InstanceReference
   @Help.Description(
     "Some commands cache values on the client side. Use this command to explicitly clear the caches of these values."
   )
-  def clear_cache(): Unit =
-    topology.clearCache()
+  def clear_cache(): Unit = check(FeatureFlag.Testing)(topology.clearCache())
+
+  // Allow use from stop command
+  protected[canton] def clear_cache_internal(): Unit = topology.clearCache()
 
   type Status <: NodeStatus.Status
 
@@ -335,7 +337,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     try {
       stopInstance().toResult(_.message)
     } finally {
-      ErrorUtil.withThrowableLogging(clear_cache())
+      ErrorUtil.withThrowableLogging(clear_cache_internal())
     }
 
   protected def migrateInstanceDb(): Either[StartupError, ?] = nodes.migrateDatabase(name)
@@ -347,6 +349,11 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
   protected def startInstance(): Either[StartupError, Unit] =
     nodes.startAndWait(name)
   protected def stopInstance(): Either[ShutdownError, Unit] = nodes.stopAndWait(name)
+
+  /** We use [[com.digitalasset.canton.crypto.Crypto]] because it supports key administration
+    * console commands that do not require the node to be connected to a synchronizer. It is
+    * intended to be used exclusively by the admin API with a trusted operator.
+    */
   protected[canton] def crypto: Crypto
 
   protected def runCommandIfRunning[Result](
@@ -533,7 +540,7 @@ abstract class ParticipantReference(
   @Help.Group("Testing")
   def testing: ParticipantTestingGroup
 
-  @Help.Summary("Commands to pruning the archive of the ledger", FeatureFlag.Preview)
+  @Help.Summary("Commands to pruning the archive of the ledger")
   @Help.Group("Ledger Pruning")
   def pruning: ParticipantPruningAdministrationGroup = pruning_
 
@@ -566,14 +573,14 @@ abstract class ParticipantReference(
     * synchronizer store.
     */
   override protected def waitPackagesVetted(timeout: NonNegativeDuration): Unit = {
-    val connected = synchronizers.list_connected().map(_.synchronizerId).toSet
+    val connected = synchronizers.list_connected().map(_.physicalSynchronizerId).toSet
     // for every participant
     consoleEnvironment.participants.all
       .filter(p => p.health.is_running() && p.health.initialized())
       .foreach { participant =>
         // for every synchronizer this participant is connected to as well
         participant.synchronizers.list_connected().foreach {
-          case item if connected.contains(item.synchronizerId) =>
+          case item if connected.contains(item.physicalSynchronizerId) =>
             ConsoleMacros.utils.retry_until_true(timeout)(
               {
                 // ensure that vetted packages on the synchronizer match the ones in the authorized store
@@ -598,12 +605,12 @@ abstract class ParticipantReference(
                 val ret = onParticipantAuthorizedStore == onSynchronizer
                 if (!ret) {
                   logger.debug(
-                    show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.synchronizerId}: vetted -- onSynchronizer is ${onParticipantAuthorizedStore -- onSynchronizer} while onSynchronizer -- vetted is ${onSynchronizer -- onParticipantAuthorizedStore}"
+                    show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.physicalSynchronizerId}: vetted -- onSynchronizer is ${onParticipantAuthorizedStore -- onSynchronizer} while onSynchronizer -- vetted is ${onSynchronizer -- onParticipantAuthorizedStore}"
                   )
                 }
                 ret
               },
-              show"Participant ${participant.name} has not observed all vetting txs of $id on synchronizer ${item.synchronizerId} within the given timeout.",
+              show"Participant ${participant.name} has not observed all vetting txs of $id on synchronizer ${item.physicalSynchronizerId} within the given timeout.",
             )
           case _ =>
         }
@@ -802,8 +809,8 @@ abstract class SequencerReference(
       : AtomicReference[Option[ConsoleStaticSynchronizerParameters]] =
     new AtomicReference[Option[ConsoleStaticSynchronizerParameters]](None)
 
-  private val synchronizerId: AtomicReference[Option[SynchronizerId]] =
-    new AtomicReference[Option[SynchronizerId]](None)
+  private val synchronizerId: AtomicReference[Option[PhysicalSynchronizerId]] =
+    new AtomicReference[Option[PhysicalSynchronizerId]](None)
 
   @Help.Summary(
     "Yields the globally unique id of this sequencer. " +
@@ -842,8 +849,12 @@ abstract class SequencerReference(
   override def traffic_control: TrafficControlSequencerAdministrationGroup =
     sequencerTrafficControl
 
-  @Help.Summary("Return synchronizer id of the synchronizer")
+  @Help.Summary("Returns the logical synchronizer id of the synchronizer")
   def synchronizer_id: SynchronizerId =
+    physical_synchronizer_id.logical
+
+  @Help.Summary("Returns the physical synchronizer id of the synchronizer")
+  def physical_synchronizer_id: PhysicalSynchronizerId =
     synchronizerId.get() match {
       case Some(id) => id
       case None =>
@@ -871,7 +882,7 @@ abstract class SequencerReference(
           observers: Seq[MediatorReference] = Nil,
       ): Unit = {
 
-        val synchronizerId = synchronizer_id
+        val synchronizerId = physical_synchronizer_id
 
         val mediators = active ++ observers
 
@@ -880,14 +891,14 @@ abstract class SequencerReference(
 
           topology.transactions.load(
             identityState,
-            TopologyStoreId.Synchronizer(synchronizerId),
+            synchronizerId,
             ForceFlag.AlienMember,
           )
         }
 
         topology.mediators
           .propose(
-            synchronizerId = synchronizerId,
+            synchronizerId = synchronizerId.logical,
             threshold = threshold,
             active = active.map(_.id),
             observers = observers.map(_.id),
@@ -916,10 +927,10 @@ abstract class SequencerReference(
           additionalActive: Seq[MediatorReference],
           additionalObservers: Seq[MediatorReference] = Nil,
       ): Unit = {
-        val synchronizerId = synchronizer_id
+        val synchronizerId = physical_synchronizer_id
 
         val currentMediators = topology.mediators
-          .list(synchronizerId, group = Some(group))
+          .list(synchronizerId.logical, group = Some(group))
           .maxByOption(_.context.serial)
           .getOrElse(throw new IllegalArgumentException(s"Unknown mediator group $group"))
 
@@ -936,14 +947,14 @@ abstract class SequencerReference(
 
           topology.transactions.load(
             identityState,
-            TopologyStoreId.Synchronizer(synchronizerId),
+            synchronizerId,
             ForceFlag.AlienMember,
           )
         }
 
         topology.mediators
           .propose(
-            synchronizerId = synchronizerId,
+            synchronizerId = synchronizerId.logical,
             threshold = threshold,
             active = (currentActive ++ additionalActive.map(_.id)).distinct,
             observers = (currentObservers ++ additionalObservers.map(_.id)).distinct,
@@ -1159,15 +1170,12 @@ abstract class SequencerReference(
         |When pruning the sequencer manually via `prune_at` and with the intent to prune in batches, specify
         |a value such as 1000 to obtain a pruning timestamp that corresponds to the "end" of the batch."""
     )
-    def locate_pruning_timestamp(
+    def find_pruning_timestamp(
         index: PositiveInt = PositiveInt.tryCreate(1)
     ): Option[CantonTimestamp] =
-      check(FeatureFlag.Preview) {
-        this.consoleEnvironment.run {
-          runner.adminCommand(LocatePruningTimestampCommand(index))
-        }
+      this.consoleEnvironment.run {
+        runner.adminCommand(FindPruningTimestampCommand(index))
       }
-
   }
 
   @Help.Summary("Methods used for repairing the node")
@@ -1231,6 +1239,29 @@ abstract class SequencerReference(
       consoleEnvironment.run {
         runner.adminCommand(SequencerBftAdminCommands.GetOrderingTopology())
       }
+
+    @Help.Summary("Enable BFT ordering performance metrics")
+    def enable_performance_metrics(): Unit =
+      consoleEnvironment.run {
+        runner.adminCommand(SequencerBftAdminCommands.SetPerformanceMetricsEnabled(true))
+      }
+
+    @Help.Summary("Disable BFT ordering performance metrics")
+    def disable_performance_metrics(): Unit =
+      consoleEnvironment.run {
+        runner.adminCommand(SequencerBftAdminCommands.SetPerformanceMetricsEnabled(false))
+      }
+
+    @Help.Summary("Commands to prune the sequencer's BFT Orderer")
+    @Help.Group("BFT Orderer Pruning")
+    def pruning: SequencerBftPruningAdministrationGroup = pruning_
+
+    private lazy val pruning_ =
+      new SequencerBftPruningAdministrationGroup(
+        runner,
+        consoleEnvironment,
+        loggerFactory,
+      )
 
     private def toInternal(endpoint: BftBlockOrdererConfig.EndpointId): P2PEndpoint.Id =
       P2PEndpoint.Id(endpoint.address, endpoint.port, endpoint.tls)

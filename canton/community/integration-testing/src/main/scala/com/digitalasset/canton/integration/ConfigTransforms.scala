@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration
 
 import cats.syntax.option.*
+import com.digitalasset.canton.BaseTest.testedProtocolVersion
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel
@@ -126,6 +127,8 @@ object ConfigTransforms {
       _.focus(_.monitoring.logging.api.warnBeyondLoad).replace(Some(10000)),
       // disable exit on fatal error in tests
       ConfigTransforms.setExitOnFatalFailures(false),
+      // TODO(i26481): adjust when the new connection pool is stable
+      ConfigTransforms.setConnectionPool(testedProtocolVersion >= ProtocolVersion.dev),
     )
 
   lazy val dontWarnOnDeprecatedPV: Seq[ConfigTransform] = Seq(
@@ -780,6 +783,11 @@ object ConfigTransforms {
       )
   }
 
+  val disableUpgradeValidation: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.disableUpgradeValidation).replace(true)
+    )
+
   /** Enables remote mediators
     *
     * Alternatively use [[EnvironmentDefinition.buildBaseEnvironmentDefinition]] with `withRemote =
@@ -798,11 +806,11 @@ object ConfigTransforms {
   }
 
   def defaultsForNodes: Seq[ConfigTransform] =
-    setProtocolVersion(ProtocolVersion.v33) :+
-      ConfigTransforms.updateAllInitialProtocolVersion(ProtocolVersion.v33)
+    setProtocolVersion(ProtocolVersion.v34) :+
+      ConfigTransforms.updateAllInitialProtocolVersion(ProtocolVersion.v34)
 
   def setTopologyTransactionRegistrationTimeout(
-      timeout: config.NonNegativeDuration
+      timeout: config.NonNegativeFiniteDuration
   ): Seq[ConfigTransform] = Seq(
     updateAllParticipantConfigs_(
       _.focus(_.topology.topologyTransactionRegistrationTimeout).replace(timeout)
@@ -815,13 +823,41 @@ object ConfigTransforms {
     ),
   )
 
-  def unsafeEnableOnlinePartyReplication: Seq[ConfigTransform] = Seq(
-    updateAllParticipantConfigs_(
-      _.focus(_.parameters.unsafeOnlinePartyReplication)
-        .replace(Some(UnsafeOnlinePartyReplicationConfig()))
-    ),
+  def unsafeEnableOnlinePartyReplication(
+      participantsWithOnPRInterceptor: Map[
+        String,
+        UnsafeOnlinePartyReplicationConfig.TestInterceptor,
+      ] = Map.empty
+  ): Seq[ConfigTransform] = Seq(
+    updateAllParticipantConfigs { case (name, config) =>
+      config
+        .focus(_.parameters.unsafeOnlinePartyReplication)
+        .replace(
+          Some(
+            UnsafeOnlinePartyReplicationConfig(
+              testInterceptor = participantsWithOnPRInterceptor.get(name)
+            )
+          )
+        )
+    },
     updateAllSequencerConfigs_(
       _.focus(_.parameters.unsafeEnableOnlinePartyReplication).replace(true)
     ),
   )
+
+  def setDelayLoggingThreshold(duration: config.NonNegativeFiniteDuration): ConfigTransform =
+    _.focus(_.monitoring.logging.delayLoggingThreshold).replace(duration)
+
+  def disableConnectionPool: ConfigTransform = setConnectionPool(false)
+
+  /** Use the new sequencer connection pool if 'value' is true. Otherwise use the former transports.
+    */
+  private def setConnectionPool(value: Boolean): ConfigTransform =
+    updateAllSequencerConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    }.compose(updateAllMediatorConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    }).compose(updateAllParticipantConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    })
 }

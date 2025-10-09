@@ -71,8 +71,10 @@ abstract class RepairServiceIntegrationTest
 
         participant1.dars.upload(CantonExamplesPath)
 
-        payer = participant1.parties.enable(payerName)
-        owner = participant1.parties.enable(ownerName)
+        payer = participant1.parties.enable(payerName, synchronizer = daName)
+        participant1.parties.enable(payerName, synchronizer = acmeName)
+        owner = participant1.parties.enable(ownerName, synchronizer = daName)
+        participant1.parties.enable(ownerName, synchronizer = acmeName)
       }
 
   "repair.change_assignation" when {
@@ -97,8 +99,9 @@ abstract class RepairServiceIntegrationTest
 
         eventually() {
           val afterRepair = participant1.ledger_api.state.end()
-          val updates = participant1.ledger_api.updates.flat(
+          val updates = participant1.ledger_api.updates.reassignments(
             partyIds = Set(payer),
+            filterTemplates = Seq.empty,
             completeAfter = Int.MaxValue,
             beginOffsetExclusive = beforeRepair,
             endOffsetInclusive = Some(afterRepair),
@@ -119,19 +122,19 @@ abstract class RepairServiceIntegrationTest
                 s"Unable to find an unassigned event for contract ID ${iou.coid}"
               )
 
-          unassigned.source shouldBe daId.toProtoPrimitive
-          unassigned.target shouldBe acmeId.toProtoPrimitive
+          unassigned.source shouldBe daId.logical.toProtoPrimitive
+          unassigned.target shouldBe acmeId.logical.toProtoPrimitive
           unassigned.submitter shouldBe empty
 
           val assigned =
             assignedEvents
-              .find(_.unassignId == unassigned.unassignId)
+              .find(_.reassignmentId == unassigned.reassignmentId)
               .valueOrFail(
-                s"Unable to find an assigned event for unassign ID ${unassigned.unassignId}"
+                s"Unable to find an assigned event for unassign ID ${unassigned.reassignmentId}"
               )
 
-          assigned.source shouldBe daId.toProtoPrimitive
-          assigned.target shouldBe acmeId.toProtoPrimitive
+          assigned.source shouldBe daId.logical.toProtoPrimitive
+          assigned.target shouldBe acmeId.logical.toProtoPrimitive
           assigned.submitter shouldBe empty
 
         }
@@ -153,7 +156,7 @@ abstract class RepairServiceIntegrationTest
           .filter(_.createdEvent.value.contractId == cid.coid)
           .loneElement
 
-        beforeAssignation.synchronizerId shouldBe daId.toProtoPrimitive
+        beforeAssignation.synchronizerId shouldBe daId.logical.toProtoPrimitive
         beforeAssignation.reassignmentCounter shouldBe 4
 
         participant1.synchronizers.disconnect_all()
@@ -188,7 +191,7 @@ abstract class RepairServiceIntegrationTest
               .filter(_.createdEvent.value.contractId == cid.coid)
               .loneElement
 
-            afterAssignation.synchronizerId shouldBe acmeId.toProtoPrimitive
+            afterAssignation.synchronizerId shouldBe acmeId.logical.toProtoPrimitive
             afterAssignation.reassignmentCounter shouldBe 2
 
             val archiveCmd = participant1.ledger_api.javaapi.state.acs

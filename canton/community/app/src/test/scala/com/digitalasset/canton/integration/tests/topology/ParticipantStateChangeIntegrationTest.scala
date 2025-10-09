@@ -28,6 +28,7 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.sync.SyncServiceError.{
   SyncServiceInconsistentConnectivity,
   SyncServiceSynchronizerDisabledUs,
+  SyncServiceSynchronizerDisconnect,
 }
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.MemberAccessDisabled
@@ -168,7 +169,8 @@ trait ParticipantStateChangeIntegrationTest
         _.message should (include(MemberAccessDisabled(participant1.id).reason) or
           include(SyncServiceSynchronizerDisabledUs.id) or
           include("Aborted fetching token due to my node shutdown") or
-          include("Token refresh aborted due to shutdown"))
+          include("Token refresh aborted due to shutdown") or
+          include(SyncServiceSynchronizerDisconnect.id))
       },
     )
   }
@@ -214,8 +216,9 @@ trait ParticipantStateChangeIntegrationTest
       sequencerAlias = sequencer1.name,
       s"http://localhost:${sequencer1.config.publicApi.port}",
       manualConnect = true,
-      synchronizerId =
-        Some(SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("notcorrect::fingerprint"))),
+      psid = Some(
+        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("notcorrect::fingerprint")).toPhysical
+      ),
     )
 
     // fail because synchronizer id is wrong
@@ -226,7 +229,7 @@ trait ParticipantStateChangeIntegrationTest
       ),
     )
 
-    val synchronizerId = sequencer1.synchronizer_id
+    val synchronizerId = sequencer1.physical_synchronizer_id
     participant3.synchronizers.connect_by_config(
       conConfig.copy(synchronizerId = Some(synchronizerId))
     )
@@ -268,7 +271,7 @@ trait ParticipantStateChangeIntegrationTest
     // everything works before we test
     assertPingSucceeds(participant1, participant2)
     def submit() =
-      participant1.ledger_api.javaapi.commands.submit_flat(
+      participant1.ledger_api.javaapi.commands.submit(
         Seq(alice),
         Seq(
           IouSyntax
@@ -292,7 +295,7 @@ trait ParticipantStateChangeIntegrationTest
     )
 
     // p2 can not exercise a choice as p1 can not confirm
-    def call() = participant2.ledger_api.javaapi.commands.submit_flat(
+    def call() = participant2.ledger_api.javaapi.commands.submit(
       Seq(bob),
       Seq(cid.id.exerciseCall().commands().loneElement),
     )

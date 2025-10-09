@@ -5,10 +5,12 @@ package com.digitalasset.canton
 
 import cats.Functor
 import cats.data.{EitherT, OptionT}
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor, Threading}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
@@ -17,6 +19,7 @@ import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.WallClock
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
@@ -47,6 +50,7 @@ import org.typelevel.discipline.Laws
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.language.implicitConversions
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -248,6 +252,11 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
 
     def futureValueUS(implicit pos: Position): Either[E, A] =
       eitherT.value.futureValueUS
+
+    def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit
+        pos: Position
+    ): Either[E, A] =
+      eitherT.value.futureValueUS(timeout)(pos)
   }
 
   implicit class CheckedTFutureUnlessShutdownSyntax[A, N, R](
@@ -273,7 +282,9 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
     def failOnShutdown(implicit ec: ExecutionContext, pos: Position): Future[A] =
       fut.onShutdown(fail(s"Unexpected shutdown"))
     def futureValueUS(implicit pos: Position): A =
-      fut.unwrap.futureValue.onShutdown(fail("Unexpected shutdown"))
+      futureValueUS(PatienceConfiguration.Timeout(defaultPatience.timeout))(pos)
+    def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit pos: Position): A =
+      fut.unwrap.futureValue(timeout).onShutdown(fail("Unexpected shutdown"))
   }
 
   implicit class UnlessShutdownSyntax[A](us: UnlessShutdown[A]) {
@@ -454,11 +465,29 @@ trait BaseTest
   lazy val PerformanceTestPath: String = BaseTest.PerformanceTestPath
   lazy val DamlTestFilesPath: String = BaseTest.DamlTestFilesPath
   lazy val DamlTestLfDevFilesPath: String = BaseTest.DamlTestLfDevFilesPath
+  lazy val UpgradeTestsPath: String = BaseTest.UpgradeTestsPath
+  lazy val UpgradeTestsCompatPath: String = BaseTest.UpgradeTestsCompatPath
+  lazy val UpgradeTestsIncompatPath: String = BaseTest.UpgradeTestsIncompatPath
+  lazy val VettingDepPath: String = BaseTest.VettingDepPath
+  lazy val VettingMainPath: String = BaseTest.VettingMainPath
+
+  implicit class RichSynchronizerId(val id: SynchronizerId) {
+    def toPhysical: PhysicalSynchronizerId =
+      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
+  }
+
+  implicit def toSynchronizerId(id: PhysicalSynchronizerId): SynchronizerId = id.logical
+  implicit def toSynchronizerIdF[F[X]: Functor](id: F[PhysicalSynchronizerId]): F[SynchronizerId] =
+    id.map(_.logical)
 }
 
 object BaseTest {
-
   val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
+
+  implicit class RichSynchronizerIdO(val id: SynchronizerId) {
+    def toPhysical: PhysicalSynchronizerId =
+      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
+  }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
     * @return
@@ -551,7 +580,9 @@ object BaseTest {
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
     requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
     requiredSignatureFormats = SymbolicCryptoProvider.supportedSignatureFormats,
+    enableTransparencyChecks = false,
     protocolVersion = protocolVersion,
+    serial = NonNegativeInt.zero,
   )
 
   lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
@@ -567,14 +598,19 @@ object BaseTest {
   )
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
-  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.3.0.dar")
-  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.3.0.dar")
-  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.3.0.dar")
-  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.3.0.dar")
+  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.4.0.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.4.0.dar")
+  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.4.0.dar")
+  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.4.0.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
-  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.3.0.dar")
-  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.3.0.dar")
-  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.3.0.dar")
+  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.4.0.dar")
+  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.4.0.dar")
+  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.4.0.dar")
+  lazy val UpgradeTestsPath: String = getResourcePath("UpgradeTests-3.4.0.dar")
+  lazy val UpgradeTestsCompatPath: String = getResourcePath("UpgradeTests-4.0.0.dar")
+  lazy val UpgradeTestsIncompatPath: String = getResourcePath("UpgradeTests-5.0.0.dar")
+  lazy val VettingDepPath: String = getResourcePath("VettingDep-1.0.0.dar")
+  lazy val VettingMainPath: String = getResourcePath("VettingMain-1.0.0.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))

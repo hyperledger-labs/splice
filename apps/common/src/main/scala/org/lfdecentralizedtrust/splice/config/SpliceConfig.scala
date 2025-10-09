@@ -110,7 +110,4 @@ case class SharedSpliceAppParameters(
   override def watchdog: Option[WatchdogConfig] = None
 
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
-
-  // not applicable
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

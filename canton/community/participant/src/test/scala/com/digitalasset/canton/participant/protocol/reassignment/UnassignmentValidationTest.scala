@@ -14,7 +14,6 @@ import com.digitalasset.canton.data.{
   UnassignmentViewTree,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.participant.protocol.ContractAuthenticator
 import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetectionHelpers.mkActivenessResult
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
   ParsedReassignmentRequest,
@@ -32,16 +31,19 @@ import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, Reci
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.util.ContractAuthenticator
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
 
 class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecutionContext {
-  private val sourceSynchronizer = Source(SynchronizerId.tryFromString("synchronizer::source"))
+  private val sourceSynchronizer = Source(
+    SynchronizerId.tryFromString("synchronizer::source").toPhysical
+  )
   private val sourceMediator = MediatorGroupRecipient(MediatorGroupIndex.tryCreate(100))
   private val targetSynchronizer = Target(
-    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::target"))
+    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::target")).toPhysical
   )
 
   private val signatory: LfPartyId = LfPartyId.assertFromString("signatory::party")
@@ -82,8 +84,9 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
 
   private val stakeholders: Stakeholders = Stakeholders(baseMetadata)
 
-  private val contract = ExampleTransactionFactory.authenticatedSerializableContract(
-    metadata = baseMetadata
+  private val contract = ExampleContractFactory.build(
+    signatories = baseMetadata.signatories,
+    stakeholders = baseMetadata.stakeholders,
   )
 
   private val reassigningParticipants: Set[ParticipantId] =
@@ -118,7 +121,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
     "succeed without errors" in {
       val validation = performValidation().futureValueUS.value
 
-      validation.isSuccessfulF.futureValueUS shouldBe true
+      validation.isSuccessful.futureValueUS shouldBe true
     }
 
     "fail when wrong metadata is given" in {
@@ -135,8 +138,10 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       def test(
           metadata: ContractMetadata
       ): Either[ReassignmentValidationError, Unit] = {
-        val updatedContract = contract.copy(metadata = metadata)
-        performValidation(updatedContract).futureValueUS.value.metadataResultET.futureValueUS
+        val updatedContract = ExampleContractFactory.modify(contract, metadata = Some(metadata))
+        performValidation(
+          updatedContract
+        ).futureValueUS.value.commonValidationResult.contractAuthenticationResultF.futureValueUS
       }
 
       val incorrectStakeholders = testMetadata(
@@ -173,7 +178,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
 
       def createUnassignmentTree(metadata: ContractMetadata): FullUnassignmentTree =
         ReassignmentDataHelpers(
-          contract.copy(metadata = metadata),
+          ExampleContractFactory.modify(contract, metadata = Some(metadata)),
           sourceSynchronizer,
           targetSynchronizer,
           identityFactory,
@@ -200,7 +205,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
           FullUnassignmentTree(
             UnassignmentViewTree(commonData, view, Source(testedProtocolVersion), pureCrypto)
           )
-        ).futureValueUS.value.metadataResultET.futureValueUS
+        ).futureValueUS.value.commonValidationResult.contractAuthenticationResultF.futureValueUS
       }
 
       val incorrectMetadata = ContractMetadata.tryCreate(
@@ -222,16 +227,15 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
     "detect non-stakeholder submitter" in {
       def unassignmentValidation(submitter: LfPartyId) = {
         val validation = performValidation(submitter = submitter)
-
-        validation.futureValueUS.value.validationErrors
+        validation.futureValueUS.value.commonValidationResult.submitterCheckResult
       }
 
       assert(!stakeholders.all.contains(nonStakeholder))
 
-      unassignmentValidation(signatory) shouldBe Nil
+      unassignmentValidation(signatory) shouldBe None
       unassignmentValidation(
         nonStakeholder
-      ) shouldBe Seq(
+      ) shouldBe Some(
         SubmitterMustBeStakeholder(
           ReassignmentRef(contract.contractId),
           submittingParty = nonStakeholder,
@@ -244,7 +248,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       def unassignmentValidation(reassigningParticipants: Set[ParticipantId]) =
         performValidation(
           reassigningParticipantsOverride = reassigningParticipants
-        ).futureValueUS.value.validationErrors
+        ).futureValueUS.value.reassigningParticipantValidationResult.errors
 
       // Happy path / control
       unassignmentValidation(reassigningParticipants = reassigningParticipants) shouldBe Seq()
@@ -304,6 +308,8 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
     .forOwnerAndSynchronizer(confirmingParticipant, sourceSynchronizer.unwrap)
     .currentSnapshotApproximation
 
+  private val reassignmentId = ReassignmentId.tryCreate("00")
+
   private def mkParsedRequest(
       view: FullUnassignmentTree,
       recipients: Recipients,
@@ -317,10 +323,12 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
     signatureO,
     None,
     isFreshOwnTimelyRequest = true,
+    areContractsUnknown = false,
     Seq.empty,
     sourceMediator,
     cryptoSnapshot,
     cryptoSnapshot.ipsSnapshot.findDynamicSynchronizerParameters().futureValueUS.value,
+    reassignmentId,
   )
 
   private def validateUnassignmentTree(
@@ -343,7 +351,6 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       new UnassignmentValidation(confirmingParticipant, contractAuthenticator)
 
     unassignmentValidation.perform(
-      sourceTopology = Source(identityFactory.topologySnapshot()),
       targetTopology = Some(Target(identityFactory.topologySnapshot())),
       activenessF = FutureUnlessShutdown.pure(mkActivenessResult()),
     )(parsedRequest = parsed)
@@ -351,7 +358,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
   }
 
   private def performValidation(
-      contract: SerializableContract = contract,
+      contract: ContractInstance = contract,
       reassigningParticipantsOverride: Set[ParticipantId] = reassigningParticipants,
       submitter: LfPartyId = signatory,
       identityFactory: TestingIdentityFactory = identityFactory,

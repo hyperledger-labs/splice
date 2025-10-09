@@ -36,14 +36,6 @@ sealed trait GeneralSynchronizerRouterIntegrationTest
       import env.*
       participants.all.dars.upload(darPath)
 
-      party1Id = participant1.parties.enable("party1")
-      party1aId = participant1.parties.enable("party1a")
-      party1bId = participant1.parties.enable("party1b")
-      party1cId = participant1.parties.enable("party1c")
-      party2Id = participant2.parties.enable("party2")
-      party3Id = participant3.parties.enable("party3")
-      party4Id = participant4.parties.enable("party4")
-
       connectToDefaultSynchronizers()
     }
 
@@ -373,10 +365,10 @@ sealed trait GeneralSynchronizerRouterIntegrationTest
           events.size shouldBe contractTopology.size + 1
           events
             .take(contractTopology.size)
-            .foreach(ex => assert(ex.toProtoTreeEvent.hasExercised, "expect exercise"))
+            .foreach(ex => assert(ex.toProtoEvent.hasExercised, "expect exercise"))
 
           assert(
-            events.lastOption.value.toProtoTreeEvent.hasCreated,
+            events.lastOption.value.toProtoEvent.hasCreated,
             "expect last event to be creation of Single",
           )
 
@@ -389,7 +381,7 @@ sealed trait GeneralSynchronizerRouterIntegrationTest
             Seq(participant1),
             expectedRoutingSynchronizer,
             LfContractId.assertFromString(
-              events.lastOption.value.toProtoTreeEvent.getCreated.getContractId
+              events.lastOption.value.toProtoEvent.getCreated.getContractId
             ),
           )
         }

@@ -4,11 +4,11 @@
 package com.digitalasset.canton.integration.tests.multisynchronizer
 
 import com.daml.ledger.api.v2.completion.Completion
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalSequencerReference
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.iou.GetCash
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
@@ -17,12 +17,7 @@ import com.digitalasset.canton.integration.plugins.{
   UseProgrammableSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.util.{
-  AcsInspection,
-  HasCommandRunnersHelpers,
-  HasReassignmentCommandsHelpers,
-  PartyToParticipantDeclarative,
-}
+import com.digitalasset.canton.integration.util.{AcsInspection, PartyToParticipantDeclarative}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -30,30 +25,25 @@ import com.digitalasset.canton.integration.{
   SharedEnvironment,
   TestConsoleEnvironment,
 }
-import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.participant.store.ReassignmentStore.{
   ReassignmentEntry,
   UnknownReassignmentId,
 }
 import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.sequencing.protocol.SubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.{
   HasProgrammableSequencer,
   ProgrammableSequencer,
   ProgrammableSequencerPolicies,
   SendDecision,
-  SendPolicy,
+  SendPolicyWithoutTraceContext,
 }
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{BaseTest, config}
-import org.scalatest.Assertion
 
-import java.time.Duration
-import java.util.concurrent.atomic.AtomicLong
+import java.util.UUID
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters.*
 
 /** This test ensures that signatory assigning participant don't send confirmation responses if the
@@ -66,9 +56,9 @@ sealed trait ReassignmentNoReassignmentDataIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with AcsInspection
-    with HasReassignmentCommandsHelpers
-    with HasCommandRunnersHelpers
     with HasProgrammableSequencer {
+
+  private val acmeConfirmationResponses = new TrieMap[ParticipantId, SubmissionRequest]()
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1_S1M1
@@ -93,32 +83,16 @@ sealed trait ReassignmentNoReassignmentDataIntegrationTest
         participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
         participants.all.dars.upload(BaseTest.CantonExamplesPath)
 
-        alice = participant1.parties.enable("alice")
-        bob = participant2.parties.enable("bob")
+        alice = participant1.parties.enable("alice", synchronizer = daName)
+        participant1.parties.enable("alice", synchronizer = acmeName)
 
-        participantReactionTimeout = sequencer2.topology.synchronizer_parameters
-          .get_dynamic_synchronizer_parameters(acmeId)
-          .confirmationResponseTimeout
-          .toInternal
-          .duration
+        bob = participant2.parties.enable("bob", synchronizer = daName)
+        participant2.parties.enable("bob", synchronizer = acmeName)
 
-        programmableSequencer = getProgrammableSequencer(sequencer2.name)
       }
 
   private var alice: PartyId = _
   private var bob: PartyId = _
-  private var participantReactionTimeout: Duration = _
-  private val totalConfirmationsResponsesAcme: TrieMap[ParticipantId, Int] = new TrieMap()
-  private var programmableSequencer: ProgrammableSequencer = _
-
-  private lazy val reassignmentFailureLogAssertions
-      : Seq[(LogEntryOptionality, LogEntry => Assertion)] =
-    Seq(
-      (
-        LogEntryOptionality.OptionalMany,
-        _.warningMessage should include regex "Response message for request .* timed out",
-      )
-    )
 
   // Create a GetCash contract, which has alice and bob as signatories
   private def createGetCash(
@@ -175,38 +149,36 @@ sealed trait ReassignmentNoReassignmentDataIntegrationTest
     *   - unassign contract `cid`
     *   - if `deletedReassignmentEntry` is true, delete the reassignment entry in P1 store
     *   - submits the assignment
-    *   - returns once the expected number of confirmations have been sequenced
+    *   - returns the completion of the assignment
     */
-  // TODO(#24532) Test that p1 sends an abstain
   private def runScenario(cid: LfContractId, deleteReassignmentEntry: Boolean)(implicit
       env: TestConsoleEnvironment
-  ): Future[Completion] = {
+  ): Completion = {
     import env.*
 
-    val expectedConfirmationResponses =
-      if (deleteReassignmentEntry)
-        2 // p2, p3
-      else
-        3 // p1, p2, p3
+    // clear acmeConfirmationResponses for each run
+    acmeConfirmationResponses.clear()
 
-    val unassignId =
+    getProgrammableSequencer(sequencer2.name).setPolicy_("confirmations count")(
+      interceptConfirmationResponsesPolicy(acmeConfirmationResponses)
+    )
+
+    val reassignmentId =
       participant2.ledger_api.commands
         .submit_unassign(
           bob,
           Seq(cid),
           daId,
           acmeId,
-          waitForParticipants = Map(participant1 -> alice),
         )
-        .unassignId
+        .reassignmentId
 
     val reassignmentStore = participant1.underlying.value.sync.syncPersistentStateManager
       .get(acmeId)
       .value
       .reassignmentStore
 
-    val reassignmendId =
-      ReassignmentId(Source(daId), CantonTimestamp.assertFromLong(unassignId.toLong))
+    val reassignmendId = ReassignmentId.tryCreate(reassignmentId)
 
     reassignmentStore
       .findReassignmentEntry(reassignmendId)
@@ -223,98 +195,118 @@ sealed trait ReassignmentNoReassignmentDataIntegrationTest
         .value shouldBe a[UnknownReassignmentId]
     }
 
-    val confirmationResponsesCount = new AtomicLong(0)
+    val ledgerEndBefore = participant2.ledger_api.state.end()
+    val commandId = UUID.randomUUID().toString
 
-    val allExpectedConfirmationResponsesReceived = Promise[Unit]()
+    participant2.ledger_api.commands.submit_assign_async(
+      bob,
+      reassignmentId,
+      daId,
+      acmeId,
+      commandId = commandId,
+    )
+    val completion = participant2.ledger_api.completions
+      .list(
+        partyId = bob,
+        atLeastNumCompletions = 1,
+        beginOffsetExclusive = ledgerEndBefore,
+        filter = _.commandId == commandId,
+      )
+      .loneElement
 
-    programmableSequencer.setPolicy("count confirmation responses") {
-      SendPolicy.processTimeProofs { _ => submissionRequest =>
-        val isConfirmationResponse = ProgrammableSequencerPolicies
-          .isConfirmationResponse(submissionRequest)
+    completion
+  }
 
-        if (isConfirmationResponse) {
-          val participantId =
-            ParticipantId.tryFromProtoPrimitive(submissionRequest.sender.toProtoPrimitive)
-          val newTotalConfirmationsResponses =
-            totalConfirmationsResponsesAcme.getOrElse(participantId, 0) + 1
-          totalConfirmationsResponsesAcme.put(participantId, newTotalConfirmationsResponses)
+  "signatory assigning participants" should {
+    "send an abstain verdict for assignments if data is missing from the reassignment store" in {
+      implicit env =>
+        import env.*
 
-          if (confirmationResponsesCount.incrementAndGet() >= expectedConfirmationResponses)
-            allExpectedConfirmationResponsesReceived.success(())
+        clue("success: threshold is one (p3 confirmation is sufficient for Alice)") {
+          changeAliceHosting(confirmationThresholdAcme = PositiveInt.one)
+          val result = runScenario(createGetCash(1.0), deleteReassignmentEntry = true)
+
+          // all participants should send a confirmation response
+          ProgrammableSequencer.confirmationResponsesKind(
+            acmeConfirmationResponses.view.mapValues(Seq(_)).toMap
+          ) shouldBe Map(
+            participant1.id -> Seq("LocalAbstain"),
+            participant2.id -> Seq("LocalApprove"),
+            participant3.id -> Seq("LocalApprove"),
+          )
+
+          result.status.value.code shouldBe 0
         }
 
-        SendDecision.Process
-      }
+        clue("failure: threshold is two and p1 does not confirm (entry deleted)") {
+          changeAliceHosting(confirmationThresholdAcme = PositiveInt.two)
+          val result = runScenario(createGetCash(2.0), deleteReassignmentEntry = true)
+
+          val status = result.status.value
+
+          val decodedError = DecodedCantonError.fromGrpcStatus(status).value
+
+          decodedError.context.get("reported_by_participant_id") shouldBe Some(
+            participant1.id.toProtoPrimitive
+          )
+          decodedError.context.get("confirming_parties") shouldBe Some(alice.toProtoPrimitive)
+
+          status.code should not be 0
+
+          ProgrammableSequencer.confirmationResponsesKind(
+            acmeConfirmationResponses.view.mapValues(Seq(_)).toMap
+          ) shouldBe Map(
+            participant1.id -> Seq("LocalAbstain"),
+            participant2.id -> Seq("LocalApprove"),
+            participant3.id -> Seq("LocalApprove"),
+          )
+
+          status.message should include(
+            s"Cannot perform all validations: Unassignment data not found when processing assignment"
+          )
+        }
     }
 
-    val assignmentCompletion1F = Future {
-      failingAssignment(
-        unassignId = unassignId,
-        source = daId,
-        target = acmeId,
-        submittingParty = bob.toLf,
-        participantOverrideO = Some(participant2),
-      )
-    }
-
-    allExpectedConfirmationResponsesReceived.future.futureValue
-    assignmentCompletion1F
-  }
-
-  "signatory assigning participants without data in the reassignment store" should {
-    "not confirm assignments" in { implicit env =>
+    "send an approve verdict for assignments if data in the reassignment store" in { implicit env =>
       import env.*
 
-      loggerFactory.assertLogsUnorderedOptional(
-        {
+      def assertResultIsOK(result: Completion) = {
+        result.status.value.code shouldBe 0
+        ProgrammableSequencer.confirmationResponsesKind(
+          acmeConfirmationResponses.view.mapValues(Seq(_)).toMap
+        ) shouldBe Map(
+          participant1.id -> Seq("LocalApprove"),
+          participant2.id -> Seq("LocalApprove"),
+          participant3.id -> Seq("LocalApprove"),
+        )
+      }
 
-          // success: threshold is one (p3 confirmation is sufficient for Alice)
-          {
-            changeAliceHosting(confirmationThresholdAcme = PositiveInt.one)
-            val result = runScenario(createGetCash(1.0), deleteReassignmentEntry = true)
-            result.futureValue.status.value.code shouldBe 0
-          }
+      clue("success: entry is not deleted") {
+        changeAliceHosting(confirmationThresholdAcme = PositiveInt.one)
+        val result = runScenario(createGetCash(4.0), deleteReassignmentEntry = false)
+        assertResultIsOK(result)
+      }
 
-          // failure: threshold is two and p1 does not confirm (entry deleted)
-          {
-            changeAliceHosting(confirmationThresholdAcme = PositiveInt.two)
-            val result = runScenario(createGetCash(2.0), deleteReassignmentEntry = true)
-            environment.simClock.value.advance(participantReactionTimeout.plusMillis(1))
-            mediator2.testing.fetch_synchronizer_time()
-
-            val status = result.futureValue.status.value
-
-            status.code should not be 0
-            status.message should include(
-              "Rejected transaction as the mediator did not receive sufficient confirmations within the expected timeframe."
-            )
-          }
-
-          // success: entry is not deleted
-          {
-            changeAliceHosting(confirmationThresholdAcme = PositiveInt.one)
-            val result = runScenario(createGetCash(3.0), deleteReassignmentEntry = false)
-            result.futureValue.status.value.code shouldBe 0
-          }
-
-          // success: entry is not deleted
-          {
-            changeAliceHosting(confirmationThresholdAcme = PositiveInt.two)
-            val result = runScenario(createGetCash(4.0), deleteReassignmentEntry = false)
-            result.futureValue.status.value.code shouldBe 0
-          }
-
-          // p1 only confirms two assignments (when entry is not deleted)
-          totalConfirmationsResponsesAcme(participant1.id) shouldBe 2
-
-          // p2, p4 confirms the four assignments
-          totalConfirmationsResponsesAcme(participant2.id) shouldBe 4
-          totalConfirmationsResponsesAcme(participant3.id) shouldBe 4
-        },
-        reassignmentFailureLogAssertions*
-      )
+      clue("success: entry is not deleted") {
+        changeAliceHosting(confirmationThresholdAcme = PositiveInt.two)
+        val result = runScenario(createGetCash(5.0), deleteReassignmentEntry = false)
+        assertResultIsOK(result)
+      }
     }
   }
+
+  private def interceptConfirmationResponsesPolicy(
+      confirmations: TrieMap[ParticipantId, SubmissionRequest]
+  ): SendPolicyWithoutTraceContext = submissionRequest =>
+    submissionRequest.sender match {
+      case pid: ParticipantId
+          if ProgrammableSequencerPolicies.isConfirmationResponse(submissionRequest) =>
+        confirmations.put(pid, submissionRequest)
+
+        SendDecision.Process
+
+      case _ => SendDecision.Process
+    }
 }
 
 class ReassignmentNoReassignmentDataIntegrationTestPostgres

@@ -39,6 +39,7 @@ import com.digitalasset.canton.platform.store.backend.{DbDto, ParameterStorageBa
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
@@ -118,7 +119,7 @@ class ParallelIndexerSubscriptionSpec
     node_id = 3,
     contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
-    package_name = "",
+    package_id = "",
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
     create_argument = Array.empty,
@@ -130,10 +131,11 @@ class ParallelIndexerSubscriptionSpec
     create_argument_compression = None,
     create_key_value_compression = None,
     event_sequential_id = 0,
-    driver_metadata = Array.empty,
+    authentication_data = Array.empty,
     synchronizer_id = "x::sourcesynchronizer",
     trace_context = serializableTraceContext,
     record_time = 0,
+    external_transaction_hash = None,
   )
 
   private val someEventExercise = DbDto.EventExercise(
@@ -148,22 +150,21 @@ class ParallelIndexerSubscriptionSpec
     node_id = 3,
     contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
-    package_name = "",
+    package_id = "",
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
-    create_key_value = None,
     exercise_choice = "",
     exercise_argument = Array.empty,
     exercise_result = None,
     exercise_actors = Set.empty,
     exercise_last_descendant_node_id = 3,
-    create_key_value_compression = None,
     exercise_argument_compression = None,
     exercise_result_compression = None,
     event_sequential_id = 0,
     synchronizer_id = "",
     trace_context = serializableTraceContext,
     record_time = 0,
+    external_transaction_hash = None,
   )
 
   private val someEventAssign = DbDto.EventAssign(
@@ -175,7 +176,7 @@ class ParallelIndexerSubscriptionSpec
     node_id = 0,
     contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
-    package_name = "",
+    package_id = "",
     flat_event_witnesses = Set.empty,
     create_argument = Array.empty,
     create_signatories = Set.empty,
@@ -187,10 +188,10 @@ class ParallelIndexerSubscriptionSpec
     create_key_value_compression = None,
     event_sequential_id = 0,
     ledger_effective_time = 0,
-    driver_metadata = Array.empty,
+    authentication_data = Array.empty,
     source_synchronizer_id = "",
     target_synchronizer_id = "",
-    unassign_id = "",
+    reassignment_id = "",
     reassignment_counter = 0,
     trace_context = serializableTraceContext,
     record_time = 0,
@@ -205,12 +206,12 @@ class ParallelIndexerSubscriptionSpec
     node_id = 1,
     contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
-    package_name = "",
+    package_id = "",
     flat_event_witnesses = Set.empty,
     event_sequential_id = 0,
     source_synchronizer_id = "",
     target_synchronizer_id = "",
-    unassign_id = "",
+    reassignment_id = "",
     reassignment_counter = 0,
     assignment_exclusivity = None,
     trace_context = serializableTraceContext,
@@ -977,301 +978,311 @@ class ParallelIndexerSubscriptionSpec
 
   behavior of "monotonicOffsetValidator"
 
-  it should "throw if offsets are not in a strictly increasing order" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.Epoch,
-      ),
-      offset(3L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(1),
-      ),
-      offset(2L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(2),
-      ),
-    )
-
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ => Future.successful(None),
-          logger = logger,
+  it should "throw if offsets are not in a strictly increasing order" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.Epoch,
+          ),
+          offset(3L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(1),
+          ),
+          offset(2L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(2),
+          ),
         )
-      )
-      .runWith(TestSink.probe)
 
-    testSink.request(3)
-    testSink.expectNextN(offsetsUpdates.take(2))
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ => Future.successful(None),
+            )(logger)
+          )
+          .runWith(TestSink.probe)
 
-    val error = testSink.expectError()
-    error shouldBe an[AssertionError]
-    error.getMessage shouldBe "assertion failed: Monotonic Offset violation detected from Offset(3) to Offset(2)"
-  }
+        testSink.request(3)
+        testSink.expectNextN(offsetsUpdates.take(2))
 
-  it should "throw if offsets are not in a strictly increasing compared to the initial offset" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.Epoch,
-      )
+        throw testSink.expectError()
+      },
+      _.getMessage shouldBe "Monotonic Offset violation detected from Offset(3) to Offset(2)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = Some(Offset.tryFromLong(2)),
-          loadPreviousState = _ => Future.successful(None),
-          logger = logger,
+  it should "throw if offsets are not in a strictly increasing compared to the initial offset" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.Epoch,
+          )
         )
-      )
-      .runWith(TestSink.probe)
 
-    testSink.request(1)
-    val error = testSink.expectError()
-    error shouldBe an[AssertionError]
-    error.getMessage shouldBe "assertion failed: Monotonic Offset violation detected from Offset(2) to Offset(1)"
-  }
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = Some(Offset.tryFromLong(2)),
+              loadPreviousState = _ => Future.successful(None),
+            )(logger)
+          )
+          .runWith(TestSink.probe)
 
-  it should "throw if sequenced timestamps decrease" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(1),
-      ),
-      offset(2L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.Epoch,
-      ),
+        testSink.request(1)
+        throw testSink.expectError()
+      },
+      _.getMessage shouldBe "Monotonic Offset violation detected from Offset(2) to Offset(1)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ => Future.successful(None),
-          logger = logger,
+  it should "throw if sequenced timestamps decrease" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(1),
+          ),
+          offset(2L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.Epoch,
+          ),
         )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(2)
-    testSink.expectNextN(offsetsUpdates.take(1))
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ => Future.successful(None),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(2\)"
-  }
+        testSink.request(2)
+        testSink.expectNextN(offsetsUpdates.take(1))
 
-  it should "throw if sequenced timestamps decrease compared to clean synchronizer index" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(1),
-      )
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex raw"Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(2\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ =>
-            Future.successful(
-              Some(
-                SynchronizerIndex.of(
-                  SequencerIndex(
-                    sequencerTimestamp = CantonTimestamp.ofEpochSecond(10)
+  it should "throw if sequenced timestamps decrease compared to clean synchronizer index" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(1),
+          )
+        )
+
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ =>
+                Future.successful(
+                  Some(
+                    SynchronizerIndex.of(
+                      SequencerIndex(
+                        sequencerTimestamp = CantonTimestamp.ofEpochSecond(10)
+                      )
+                    )
                   )
-                )
-              )
-            ),
-          logger = logger,
-        )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
+                ),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(1)
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(1\)"
-  }
-
-  it should "throw if sequenced timestamps not increasing" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(1),
-      ),
-      offset(2L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(1),
-      ),
+        testSink.request(1)
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex raw"Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(1\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ => Future.successful(None),
-          logger = logger,
+  it should "throw if sequenced timestamps not increasing" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(1),
+          ),
+          offset(2L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(1),
+          ),
         )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(2)
-    testSink.expectNextN(offsetsUpdates.take(1))
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ => Future.successful(None),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: sequencer timestamp did not increase from .* to .* at offset Offset\(2\)"
-  }
+        testSink.request(2)
+        testSink.expectNextN(offsetsUpdates.take(1))
 
-  it should "throw if sequenced timestamps not increasing compared to clean synchronizer index" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> Update.SequencerIndexMoved(
-        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
-        recordTime = CantonTimestamp.ofEpochSecond(1),
-      )
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex raw"Monotonicity violation detected: sequencer timestamp did not increase from .* to .* at offset Offset\(2\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ =>
-            Future.successful(
-              Some(
-                SynchronizerIndex.of(
-                  SequencerIndex(
-                    sequencerTimestamp = CantonTimestamp.ofEpochSecond(1)
+  it should "throw if sequenced timestamps not increasing compared to clean synchronizer index" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> Update.SequencerIndexMoved(
+            synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+            recordTime = CantonTimestamp.ofEpochSecond(1),
+          )
+        )
+
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ =>
+                Future.successful(
+                  Some(
+                    SynchronizerIndex.of(
+                      SequencerIndex(
+                        sequencerTimestamp = CantonTimestamp.ofEpochSecond(1)
+                      )
+                    )
                   )
-                )
-              )
-            ),
-          logger = logger,
-        )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
+                ),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(1)
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: sequencer timestamp did not increase from .* to .* at offset Offset\(1\)"
-  }
-
-  it should "throw if repair counters decrease" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(15L)),
-      offset(2L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(13L)),
+        testSink.request(1)
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex raw"Monotonicity violation detected: sequencer timestamp did not increase from .* to .* at offset Offset\(1\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ => Future.successful(None),
-          logger = logger,
+  it should "throw if repair counters decrease" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(15L)),
+          offset(2L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(13L)),
         )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(2)
-    testSink.expectNextN(offsetsUpdates.take(1))
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ => Future.successful(None),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex
-      raw"assertion failed: Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(2\)"
-  }
+        testSink.request(2)
+        testSink.expectNextN(offsetsUpdates.take(1))
 
-  it should "throw if repair counters decrease compared to clean synchronizer index" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> repairUpdate(CantonTimestamp.ofEpochSecond(10), RepairCounter(15L))
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex
+        raw"Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(2\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ =>
-            Future.successful(
-              Some(
-                SynchronizerIndex.of(
-                  RepairIndex(
-                    counter = RepairCounter(20L),
-                    timestamp = CantonTimestamp.ofEpochSecond(10),
+  it should "throw if repair counters decrease compared to clean synchronizer index" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> repairUpdate(CantonTimestamp.ofEpochSecond(10), RepairCounter(15L))
+        )
+
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ =>
+                Future.successful(
+                  Some(
+                    SynchronizerIndex.of(
+                      RepairIndex(
+                        counter = RepairCounter(20L),
+                        timestamp = CantonTimestamp.ofEpochSecond(10),
+                      )
+                    )
                   )
-                )
-              )
-            ),
-          logger = logger,
-        )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
+                ),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(1)
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex
-      raw"assertion failed: Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(1\)"
-  }
-
-  it should "throw if record time decreases for floating events" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10)),
-      offset(2L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10)),
-      offset(3L) -> floatingUpdate(CantonTimestamp.Epoch),
+        testSink.request(1)
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex
+        raw"Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(1\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ => Future.successful(None),
-          logger = logger,
+  it should "throw if record time decreases for floating events" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10)),
+          offset(2L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10)),
+          offset(3L) -> floatingUpdate(CantonTimestamp.Epoch),
         )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(3)
-    testSink.expectNextN(offsetsUpdates.take(2))
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ => Future.successful(None),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
 
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex
-      raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(3\)"
-  }
+        testSink.request(3)
+        testSink.expectNextN(offsetsUpdates.take(2))
 
-  it should "throw if record time decreases for floating events compared to clean synchronizer index" in {
-    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-      offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10))
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex
+        raw"Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(3\)",
     )
 
-    val testSink = Source(offsetsUpdates)
-      .via(
-        ParallelIndexerSubscription.monotonicityValidator(
-          initialOffset = None,
-          loadPreviousState = _ =>
-            Future.successful(
-              Some(
-                SynchronizerIndex.of(
-                  CantonTimestamp.ofEpochSecond(11)
-                )
-              )
-            ),
-          logger = logger,
+  it should "throw if record time decreases for floating events compared to clean synchronizer index" in
+    loggerFactory.assertInternalError[IllegalStateException](
+      {
+        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+          offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10))
         )
-      )
-      .runWith(TestSink.probe[(Offset, Update)])
 
-    testSink.request(1)
-    val error = testSink.expectError().getCause
-    error shouldBe an[AssertionError]
-    error.getMessage should include regex
-      raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(1\)"
-  }
+        val testSink = Source(offsetsUpdates)
+          .via(
+            ParallelIndexerSubscription.monotonicityValidator(
+              initialOffset = None,
+              loadPreviousState = _ =>
+                Future.successful(
+                  Some(
+                    SynchronizerIndex.of(
+                      CantonTimestamp.ofEpochSecond(11)
+                    )
+                  )
+                ),
+            )(logger)
+          )
+          .runWith(TestSink.probe[(Offset, Update)])
+
+        testSink.request(1)
+        throw testSink.expectError()
+      },
+      _.getMessage should include regex
+        raw"Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(1\)",
+    )
 
   def update: Update =
     Update.SequencerIndexMoved(
@@ -1295,7 +1306,7 @@ class ParallelIndexerSubscriptionSpec
       ),
       transaction = CommittedTransaction(TransactionBuilder.Empty),
       updateId = Ref.TransactionId.fromLong(15000),
-      contractMetadata = Map.empty,
+      contractAuthenticationData = Map.empty,
       synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
       repairCounter = repairCounter,
       recordTime = recordTime,

@@ -63,35 +63,11 @@ class DbReferenceBlockOrderingStore(
           traceparent,
           v.value.tag,
           v.value.body,
+          v.value.orderingSequencerId,
           v.value.microsecondsSinceEpoch,
         )
       pp.setBytes(protoRequest.toByteArray)
     }
-
-  def insertRequestWithHeight(blockHeight: Long, request: BlockFormat.OrderedRequest)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = {
-    val uuid = LengthLimitedString.getUuid // uuid is only used so that inserts are idempotent
-    val tracedRequest = Traced(request)
-
-    // Logging the UUID to be able to correlate the block on the read side.
-    logger.debug(s"Storing an ordered request with UUID: $uuid")
-
-    storage.update_(
-      profile match {
-        case _: Postgres =>
-          sqlu"""insert into blocks (id, request, uuid)
-                 values ($blockHeight , $tracedRequest, $uuid)
-                 on conflict (id) do nothing
-                 """
-        case _: H2 =>
-          sqlu"""merge into blocks (id, request, uuid)
-                    values ($blockHeight, $tracedRequest, $uuid)
-                      """
-      },
-      s"insert block with height $blockHeight",
-    )
-  }
 
   override def insertRequest(request: BlockFormat.OrderedRequest)(implicit
       traceContext: TraceContext
@@ -232,6 +208,7 @@ object DbReferenceBlockOrderingStore {
         protoRequest.microsecondsSinceEpoch,
         protoRequest.tag,
         protoRequest.body,
+        protoRequest.orderingSequencerId,
       )
     val traceContext = W3CTraceContext(protoRequest.traceparent).toTraceContext
     Traced(request)(traceContext)

@@ -40,6 +40,7 @@ class ContractFilterSpec extends AnyFlatSpec with Matchers {
     Optional.empty(),
   )
 
+  // TODO(#23504) remove suppression of deprecation warnings
   @nowarn("cat=deprecation")
   private def assertFilters(
       contractFilter: ContractFilter[_],
@@ -77,11 +78,13 @@ class ContractFilterSpec extends AnyFlatSpec with Matchers {
       expectedShape,
     )
 
+    // TODO(#23504) remove
     contractFilter.transactionFilter(Optional.of(partiesSet)) shouldBe new TransactionFilter(
       expectedPartyToFilters,
       Optional.empty(),
     )
 
+    // TODO(#23504) remove
     contractFilter.transactionFilter(Optional.empty()) shouldBe new TransactionFilter(
       Collections.emptyMap(),
       Optional.of(expectedCumulativeFilter),

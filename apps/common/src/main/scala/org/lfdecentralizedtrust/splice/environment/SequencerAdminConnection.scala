@@ -59,7 +59,7 @@ class SequencerAdminConnection(
 
   override val serviceName = "Canton Sequencer Admin API"
 
-  override protected type Status = SequencerStatus
+  override type Status = SequencerStatus
 
   override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[SequencerStatus]] =
     SequencerAdminCommands.Health.SequencerStatusCommand()
@@ -185,7 +185,7 @@ class SequencerAdminConnection(
   ): Future[TopologyResult[SequencerSynchronizerState]] = {
     for {
       synchronizerId <- getStatus.map(_.trySuccess.synchronizerId)
-      sequencerState <- getSequencerSynchronizerState(synchronizerId, AuthorizedState)
+      sequencerState <- getSequencerSynchronizerState(synchronizerId.logical, AuthorizedState)
     } yield sequencerState
   }
 

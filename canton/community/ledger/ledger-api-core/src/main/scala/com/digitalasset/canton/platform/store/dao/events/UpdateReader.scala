@@ -114,6 +114,7 @@ private[dao] final class UpdateReader(
       .mapMaterializedValue((_: Future[NotUsed]) => NotUsed)
   }
 
+  // TODO(#23504) remove when getTransactionById is removed
   @nowarn("cat=deprecation")
   override def lookupTransactionById(
       updateId: data.UpdateId,
@@ -131,6 +132,7 @@ private[dao] final class UpdateReader(
       .map(_.flatMap(_.update.transaction))
       .map(_.map(tx => GetTransactionResponse(transaction = Some(tx))))
 
+  // TODO(#23504) remove when getTransactionByOffset is removed
   @nowarn("cat=deprecation")
   override def lookupTransactionByOffset(
       offset: data.Offset,
@@ -157,6 +159,7 @@ private[dao] final class UpdateReader(
       internalUpdateFormat = internalUpdateFormat,
     )
 
+  // TODO(#23504) remove when getTransactionByOffset is removed
   @nowarn("cat=deprecation")
   override def lookupTransactionTreeById(
       updateId: data.UpdateId,
@@ -171,6 +174,7 @@ private[dao] final class UpdateReader(
       eventProjectionProperties = eventProjectionProperties,
     )
 
+  // TODO(#23504) remove when getTransactionByOffset is removed
   @nowarn("cat=deprecation")
   override def lookupTransactionTreeByOffset(
       offset: data.Offset,
@@ -185,6 +189,7 @@ private[dao] final class UpdateReader(
       eventProjectionProperties = eventProjectionProperties,
     )
 
+  // TODO(#23504) remove when getTransactionByOffset is removed
   @nowarn("cat=deprecation")
   override def getTransactionTrees(
       startInclusive: Offset,
@@ -328,10 +333,10 @@ private[dao] object UpdateReader {
   def toUnassignedEvent(offset: Long, rawUnassignEvent: RawUnassignEvent): UnassignedEvent =
     UnassignedEvent(
       offset = offset,
-      unassignId = rawUnassignEvent.unassignId,
+      reassignmentId = rawUnassignEvent.reassignmentId,
       contractId = rawUnassignEvent.contractId.coid,
-      templateId = Some(LfEngineToApi.toApiIdentifier(rawUnassignEvent.templateId)),
-      packageName = rawUnassignEvent.packageName,
+      templateId = Some(LfEngineToApi.toApiIdentifier(rawUnassignEvent.templateId.toIdentifier)),
+      packageName = rawUnassignEvent.templateId.pkgName,
       source = rawUnassignEvent.sourceSynchronizerId,
       target = rawUnassignEvent.targetSynchronizerId,
       submitter = rawUnassignEvent.submitter.getOrElse(""),
@@ -360,6 +365,7 @@ private[dao] object UpdateReader {
         ),
         recordTime = Some(TimestampConversion.fromLf(first.recordTime)),
         traceContext = first.traceContext.map(DamlTraceContext.parseFrom),
+        synchronizerId = first.synchronizerId,
       )
     }
 
@@ -370,7 +376,7 @@ private[dao] object UpdateReader {
     AssignedEvent(
       source = rawAssignEvent.sourceSynchronizerId,
       target = rawAssignEvent.targetSynchronizerId,
-      unassignId = rawAssignEvent.unassignId,
+      reassignmentId = rawAssignEvent.reassignmentId,
       submitter = rawAssignEvent.submitter.getOrElse(""),
       reassignmentCounter = rawAssignEvent.reassignmentCounter,
       createdEvent = Some(createdEvent),
@@ -406,6 +412,7 @@ private[dao] object UpdateReader {
             },
             recordTime = Some(TimestampConversion.fromLf(first.recordTime)),
             traceContext = first.traceContext.map(DamlTraceContext.parseFrom),
+            synchronizerId = first.synchronizerId,
           )
         )
       )
@@ -510,7 +517,7 @@ private[dao] object UpdateReader {
         rawEvents.filter(entry =>
           // at least one of the witnesses exist in the template wildcard filter
           entry.event.witnessParties.exists(templateWildcardPartiesStrings) ||
-            (templateSpecifiedPartiesMap.get(entry.event.templateId) match {
+            (templateSpecifiedPartiesMap.get(entry.event.templateId.toNameTypeConRef) match {
               // the event's template id was not found in the filters
               case None => false
               case Some(partiesO) => partiesO.fold(true)(entry.event.witnessParties.exists)

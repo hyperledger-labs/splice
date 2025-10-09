@@ -18,6 +18,7 @@ import com.google.common.annotations.VisibleForTesting
 
 final case class ParticipantNodeParameters(
     general: CantonNodeParameters.General,
+    activationFrequencyForWarnAboutConsistencyChecks: Long,
     adminWorkflow: AdminWorkflowConfig,
     maxUnzippedDarSize: Int,
     stores: ParticipantStoreConfig,
@@ -27,12 +28,12 @@ final case class ParticipantNodeParameters(
     engine: CantonEngineConfig,
     journalGarbageCollectionDelay: NonNegativeFiniteDuration,
     disableUpgradeValidation: Boolean,
+    enableStrictDarValidation: Boolean,
     commandProgressTracking: CommandProgressTrackerConfig,
     unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig],
+    automaticallyPerformLogicalSynchronizerUpgrade: Boolean,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
-  override def sessionSigningKeys: SessionSigningKeysConfig =
-    protocolConfig.sessionSigningKeys
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
   override def alphaVersionSupport: Boolean = protocolConfig.alphaVersionSupport
   override def betaVersionSupport: Boolean = protocolConfig.betaVersionSupport
@@ -48,7 +49,8 @@ object ParticipantNodeParameters {
       loggingConfig = LoggingConfig(api = ApiLoggingConfig(messagePayloads = true)),
       processingTimeouts = DefaultProcessingTimeouts.testing,
       enablePreviewFeatures = false,
-      nonStandardConfig = false,
+      // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+      nonStandardConfig = true,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(
         maxPruningBatchSize = PositiveNumeric.tryCreate(10),
@@ -60,6 +62,7 @@ object ParticipantNodeParameters {
       watchdog = None,
       startupMemoryCheckConfig = StartupMemoryCheckConfig(ReportingLevel.Warn),
     ),
+    activationFrequencyForWarnAboutConsistencyChecks = 1000L,
     adminWorkflow = AdminWorkflowConfig(
       bongTestMaxLevel = NonNegativeInt.tryCreate(10)
     ),
@@ -68,8 +71,8 @@ object ParticipantNodeParameters {
     reassignmentTimeProofFreshnessProportion = NonNegativeInt.tryCreate(3),
     protocolConfig = ParticipantProtocolConfig(
       Some(testedProtocolVersion),
-      sessionSigningKeys = SessionSigningKeysConfig.disabled,
-      alphaVersionSupport = false,
+      // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+      alphaVersionSupport = true,
       betaVersionSupport = true,
       dontWarnOnDeprecatedPV = false,
     ),
@@ -77,7 +80,9 @@ object ParticipantNodeParameters {
     engine = CantonEngineConfig(),
     journalGarbageCollectionDelay = NonNegativeFiniteDuration.Zero,
     disableUpgradeValidation = false,
+    enableStrictDarValidation = false,
     commandProgressTracking = CommandProgressTrackerConfig(),
     unsafeOnlinePartyReplication = None,
+    automaticallyPerformLogicalSynchronizerUpgrade = true,
   )
 }

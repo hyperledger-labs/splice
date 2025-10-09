@@ -114,7 +114,7 @@ class InitialTopologySnapshotValidator(
         // This causes a mismatch between the transactions-to-be-validated and the transactions-actually-persisted.
         // For more details, see canton#27390
         .groupBy1 { case (tx, _idx) =>
-          (tx.sequenced, tx.hash, tx.transaction.signatures.map(_.signedBy))
+          (tx.sequenced, tx.hash, tx.transaction.signatures.map(_.authorizingLongTermKey))
         }
         .toSeq
         .flatMap { case ((sequenced, _, _), transactions) =>

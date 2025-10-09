@@ -30,6 +30,7 @@ trait CommandService {
       request: SubmitAndWaitForReassignmentRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForReassignmentResponse]
 
+  // TODO(#23504) remove when submitAndWaitForTransactionTree is removed from the API
   @nowarn("cat=deprecation")
   def submitAndWaitForTransactionTree(
       request: SubmitAndWaitRequest

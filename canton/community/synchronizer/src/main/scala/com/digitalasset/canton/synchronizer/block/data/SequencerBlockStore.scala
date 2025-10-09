@@ -46,8 +46,13 @@ trait SequencerBlockStore extends AutoCloseable {
     * deterministically derive the following counters and timestamps.
     *
     * The state excludes updates of unfinalized blocks added with [[partialBlockUpdate]].
+    *
+    * @return
+    *   `None` if no block has been written yet, `Some` otherwise.
     */
-  def readHead(implicit traceContext: TraceContext): FutureUnlessShutdown[BlockEphemeralState]
+  def readHead(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[BlockEphemeralState]]
 
   /** The block information for the block that contains the requested timestamp. */
   def findBlockContainingTimestamp(
@@ -63,7 +68,7 @@ trait SequencerBlockStore extends AutoCloseable {
     * @param maxSequencingTimeBound
     *   optional bound for requesting the state for the sequencer snapshot, that may be far in the
     *   past, thus needing to bound the db io. Can be computed with
-    *   `SequencerUtils.maxSequencingTimeBoundAt`. For requesting the latest state during the
+    *   `SequencerUtils.maxSequencingTimeUpperBoundAt`. For requesting the latest state during the
     *   sequencer startup, this can be set to `CantonTimestamp.MaxValue`.
     */
   def readStateForBlockContainingTimestamp(
@@ -123,6 +128,7 @@ object SequencerBlockStore {
           timeouts,
           loggerFactory,
           batchingConfig,
+          sequencerStore,
         )
       case otherwise =>
         sys.error(s"Invalid combination of stores: $otherwise")

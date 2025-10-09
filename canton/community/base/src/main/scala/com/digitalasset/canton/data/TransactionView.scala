@@ -21,7 +21,8 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.util.{ErrorUtil, MapsUtil, NamedLoggingLazyVal}
+import com.digitalasset.canton.util.collection.MapsUtil
+import com.digitalasset.canton.util.{ErrorUtil, NamedLoggingLazyVal}
 import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfVersioned, ProtoDeserializationError}
 import com.google.common.annotations.VisibleForTesting
@@ -153,8 +154,9 @@ final case class TransactionView private (
     copy(viewCommonData, viewParticipantData, subviews).tryValidated()
 
   /** If the view with the given hash appears either as this view or one of its unblinded
-    * descendants, replace it by the given view. TODO(i12900): not stack safe unless we have limits
-    * on the depths of views.
+    * descendants, replace it by the given view.
+    *
+    * TODO(i26565): not stack safe unless we have limits on the depths of views.
     */
   def replace(h: ViewHash, v: TransactionView): TransactionView =
     if (viewHash == h) v
@@ -323,7 +325,6 @@ final case class TransactionView private (
       }
     } yield this
   }
-
 }
 
 object TransactionView
@@ -333,7 +334,7 @@ object TransactionView
     ] {
   override def name: String = "TransactionView"
   override def versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewNode)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewNode)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
     )

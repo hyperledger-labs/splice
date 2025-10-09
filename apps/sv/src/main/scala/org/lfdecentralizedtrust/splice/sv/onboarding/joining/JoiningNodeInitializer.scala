@@ -5,13 +5,10 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{
-  catsSyntaxOptionId,
-  catsSyntaxTuple2Semigroupal,
-  catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
-}
+import cats.syntax.apply.*
 import cats.syntax.foldable.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
@@ -59,16 +56,21 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  PackageVetting,
+  SynchronizerMigrationUtil,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -142,6 +144,8 @@ class JoiningNodeInitializer(
         SequencerConnections.tryMany(
           Seq(GrpcSequencerConnection.tryCreate(url)),
           PositiveInt.one,
+          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification,
         ),
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
@@ -346,6 +350,7 @@ class JoiningNodeInitializer(
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
       skipTrafficReconciliationTriggers: Boolean = false,
+      unpauseSynchronizer: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
@@ -358,6 +363,12 @@ class JoiningNodeInitializer(
       logger,
     )
     for {
+      // Do this at the very start as scan depends on it to start up.
+      _ <- SetupUtil.ensureDsoPartyMetadataAnnotation(
+        svSvAutomationService.connection(SpliceLedgerConnectionPriority.Low),
+        config,
+        dsoPartyId,
+      )
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "dso_rules_visible",
@@ -367,6 +378,15 @@ class JoiningNodeInitializer(
       )
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
+      _ <-
+        // Unpause the synchronizer after the post onboarding triggers are started
+        // that start the BFT peer reconciliation
+        if (unpauseSynchronizer)
+          SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+            participantAdminConnection,
+            decentralizedSynchronizer,
+          )
+        else Future.unit
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
       // submission rights.
@@ -374,11 +394,6 @@ class JoiningNodeInitializer(
         waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
         waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator,
-        SetupUtil.ensureDsoPartyMetadataAnnotation(
-          svSvAutomationService.connection(SpliceLedgerConnectionPriority.Low),
-          config,
-          dsoPartyId,
-        ),
       ).tupled
       _ <-
         if (!config.skipSynchronizerInitialization) {
@@ -405,7 +420,7 @@ class JoiningNodeInitializer(
                 config.scan,
               )
               // Finally, fully onboard the sequencer and mediator
-              _ <-
+              physicalSynchronizerId <-
                 localSynchronizerNode.onboardLocalSequencerIfRequired(
                   svConnection.map(_._2)
                 )
@@ -413,7 +428,7 @@ class JoiningNodeInitializer(
               _ = if (!skipTrafficReconciliationTriggers)
                 dsoAutomationService.registerTrafficReconciliationTriggers()
               _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
-                decentralizedSynchronizer
+                physicalSynchronizerId
               )
               _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
               _ <- waitForSvToObtainUnlimitedTraffic(
@@ -480,7 +495,7 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission)) =>
+          case Some(HostingParticipant(_, permission, _)) =>
             if (permission == ParticipantPermission.Submission)
               dsoPartyHosting
             else
@@ -965,7 +980,7 @@ class JoiningNodeInitializer(
         // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+          TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
           topologyTransactionType = TopologyTransactionType.ProposalSignedByOwnKey,

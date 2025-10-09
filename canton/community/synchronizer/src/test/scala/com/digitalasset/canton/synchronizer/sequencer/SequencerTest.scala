@@ -15,22 +15,22 @@ import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.protocol.messages.{
-  EnvelopeContent,
-  ProtocolMessage,
-  UnsignedProtocolMessage,
-}
+import com.digitalasset.canton.protocol.messages.{EnvelopeContent, UnsignedProtocolMessage}
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.client.RequestSigner
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.{InMemorySequencerStore, SequencerStore}
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.{ParticipantAttributes, ParticipantPermission}
-import com.digitalasset.canton.version.RepresentativeProtocolVersion
+import com.digitalasset.canton.version.{
+  IgnoreInSerializationTestExhaustivenessCheck,
+  RepresentativeProtocolVersion,
+}
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, HasExecutionContext, config}
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.actor.ActorSystem
@@ -47,7 +47,7 @@ class SequencerTest
     with HasExecutionContext
     with FailOnShutdown {
 
-  private val synchronizerId = DefaultTestIdentities.synchronizerId
+  private val synchronizerId = DefaultTestIdentities.physicalSynchronizerId
   private val alice = ParticipantId("alice")
   private val bob = ParticipantId("bob")
   private val carole = ParticipantId("carole")
@@ -80,6 +80,7 @@ class SequencerTest
       sequencerMember = topologyClientMember,
       blockSequencerMode = true,
       loggerFactory = loggerFactory,
+      sequencerMetrics = SequencerMetrics.noop("sequencer-test"),
     )
     val clock = new WallClock(timeouts, loggerFactory = loggerFactory)
     private val testingTopology = TestingTopology(
@@ -124,6 +125,7 @@ class SequencerTest
       blockSequencerMode = false,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(),
+      sequencerMetrics = SequencerMetrics.noop("sequencer-test"),
     )
 
     val sequencer: DatabaseSequencer =
@@ -133,10 +135,10 @@ class SequencerTest
         DefaultProcessingTimeouts.testing,
         storage,
         sequencerStore,
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         clock,
-        synchronizerId,
         topologyClientMember,
-        testedProtocolVersion,
         crypto,
         metrics,
         loggerFactory,
@@ -148,7 +150,7 @@ class SequencerTest
         startingTimestamp: Option[CantonTimestamp] = None,
     ): FutureUnlessShutdown[Seq[SequencedSerializedEvent]] =
       FutureUnlessShutdown.outcomeF(
-        valueOrFail(sequencer.readInternalV2(member, startingTimestamp).failOnShutdown)(
+        valueOrFail(sequencer.readInternal(member, startingTimestamp).failOnShutdown)(
           s"read for $member"
         ) flatMap {
           _.take(limit.toLong)
@@ -189,8 +191,10 @@ class SequencerTest
     }
   }
 
-  class TestProtocolMessage() extends ProtocolMessage with UnsignedProtocolMessage {
-    override def synchronizerId: SynchronizerId = fail("shouldn't be used")
+  class TestProtocolMessage()
+      extends UnsignedProtocolMessage
+      with IgnoreInSerializationTestExhaustivenessCheck {
+    override def synchronizerId: PhysicalSynchronizerId = fail("shouldn't be used")
 
     override def representativeProtocolVersion: RepresentativeProtocolVersion[companionObj.type] =
       fail("shouldn't be used")
@@ -260,11 +264,11 @@ class SequencerTest
 
         bobDeliverEvent.messageIdO shouldBe None
         bobDeliverEvent.batch.envelopes.map(_.bytes) should contain only
-          EnvelopeContent.tryCreate(message1, testedProtocolVersion).toByteString
+          EnvelopeContent(message1, testedProtocolVersion).toByteString
 
         caroleDeliverEvent.messageIdO shouldBe None
         caroleDeliverEvent.batch.envelopes.map(_.bytes) should contain only
-          EnvelopeContent.tryCreate(message2, testedProtocolVersion).toByteString
+          EnvelopeContent(message2, testedProtocolVersion).toByteString
       }
     }
   }

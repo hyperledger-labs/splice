@@ -4,8 +4,6 @@
 package com.digitalasset.canton.platform.store.dao.events
 
 import com.daml.ledger.api.v2.event.Event
-import com.daml.ledger.api.v2.transaction.TreeEvent
-import com.daml.ledger.api.v2.transaction.TreeEvent.Kind
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
 import com.daml.metrics.{DatabaseMetrics, Timed}
 import com.daml.nameof.NameOf.qualifiedNameOfCurrentFunc
@@ -20,6 +18,7 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.config.UpdatesStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
   RawFlatEvent,
@@ -58,7 +57,6 @@ import org.apache.pekko.stream.Attributes
 import org.apache.pekko.stream.scaladsl.Source
 
 import java.sql.Connection
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining.*
 
@@ -331,7 +329,7 @@ class UpdatesStreamReader(
           eventStorageBackend.fetchEventPayloadsAcsDelta(target =
             EventPayloadSourceForUpdatesAcsDelta.Create
           )(
-            eventSequentialIds = ids,
+            eventSequentialIds = Ids(ids),
             requestingParties = txFilteringConstraints.allFilterParties,
           )(connection),
         maxParallelPayloadQueries = maxParallelPayloadCreateQueries,
@@ -345,7 +343,7 @@ class UpdatesStreamReader(
         fetchEvents = (ids, connection) =>
           eventStorageBackend
             .fetchEventPayloadsAcsDelta(target = EventPayloadSourceForUpdatesAcsDelta.Consuming)(
-              eventSequentialIds = ids,
+              eventSequentialIds = Ids(ids),
               requestingParties = txFilteringConstraints.allFilterParties,
             )(connection),
         maxParallelPayloadQueries = maxParallelPayloadConsumingQueries,
@@ -370,7 +368,6 @@ class UpdatesStreamReader(
       }
   }
 
-  @nowarn("cat=deprecation")
   private def doStreamTxsLedgerEffects(
       queryRange: EventsRange,
       internalEventFormat: InternalEventFormat,
@@ -463,7 +460,7 @@ class UpdatesStreamReader(
       eventStorageBackend.fetchEventPayloadsLedgerEffects(
         target = target
       )(
-        eventSequentialIds = ids,
+        eventSequentialIds = Ids(ids),
         requestingParties = txFilteringConstraints.allFilterParties,
       )(connection)
 
@@ -503,17 +500,6 @@ class UpdatesStreamReader(
         deserializationQueriesLimiter.execute(
           deserializeLfValuesTree(rawEvents, internalEventFormat.eventProjectionProperties)
         )
-      )
-      .map(treeEvents =>
-        treeEvents.map { entryTreeEvent =>
-          val event =
-            entryTreeEvent.event.kind match {
-              case Kind.Empty => Event.Event.Empty
-              case Kind.Created(created) => Event.Event.Created(created)
-              case Kind.Exercised(exercised) => Event.Event.Exercised(exercised)
-            }
-          entryTreeEvent.copy(event = Event(event = event))
-        }
       )
       .mapConcat { events =>
         val responses =
@@ -606,17 +592,16 @@ class UpdatesStreamReader(
       .mapConcat(identity)
   }
 
-  @nowarn("cat=deprecation")
   private def deserializeLfValuesTree(
       rawEvents: Vector[Entry[RawTreeEvent]],
       eventProjectionProperties: EventProjectionProperties,
-  )(implicit lc: LoggingContextWithTrace): Future[Seq[Entry[TreeEvent]]] =
+  )(implicit lc: LoggingContextWithTrace): Future[Seq[Entry[Event]]] =
     Timed.future(
       future = Future.delegate {
         implicit val executionContext: ExecutionContext =
           directEC // Scala 2 implicit scope override: shadow the outer scope's implicit by name
         MonadUtil.sequentialTraverse(rawEvents)(
-          UpdateReader.deserializeTreeEvent(eventProjectionProperties, lfValueTranslation)
+          UpdateReader.deserializeRawTreeEvent(eventProjectionProperties, lfValueTranslation)
         )
       },
       timer = dbMetrics.updatesLedgerEffectsStream.translationTimer,

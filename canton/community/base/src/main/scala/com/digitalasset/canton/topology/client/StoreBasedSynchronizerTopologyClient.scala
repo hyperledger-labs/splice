@@ -17,7 +17,6 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, TimeAwaiter}
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   PackageDependencyResolverUS,
@@ -25,6 +24,7 @@ import com.digitalasset.canton.topology.store.{
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -117,8 +117,7 @@ trait TopologyAwaiter extends FlagCloseable {
   */
 class StoreBasedSynchronizerTopologyClient(
     val clock: Clock,
-    val synchronizerId: SynchronizerId,
-    store: TopologyStore[TopologyStoreId],
+    store: TopologyStore[TopologyStoreId.SynchronizerStore],
     packageDependenciesResolver: PackageDependencyResolverUS,
     override val timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,
@@ -127,6 +126,9 @@ class StoreBasedSynchronizerTopologyClient(
     extends SynchronizerTopologyClientWithInit
     with TopologyAwaiter
     with NamedLogging {
+
+  def psid: PhysicalSynchronizerId = store.storeId.psid
+  val synchronizerId: SynchronizerId = psid.logical
 
   private val effectiveTimeAwaiter =
     new TimeAwaiter(
@@ -283,6 +285,17 @@ class StoreBasedSynchronizerTopologyClient(
       loggerFactory,
     )
   }
+
+  override def tryHypotheticalSnapshot(
+      timestamp: CantonTimestamp,
+      desiredTimestamp: CantonTimestamp,
+  )(implicit traceContext: TraceContext): StoreBasedTopologySnapshot =
+    ErrorUtil.internalError(
+      new UnsupportedOperationException(
+        "tryHypotheticalSnapshot is not " +
+          "supported on store-based synchronizer topology clients"
+      )
+    )
 
   /** @return
     *   the timestamp as of which the latest known effective time will be valid, i.e.

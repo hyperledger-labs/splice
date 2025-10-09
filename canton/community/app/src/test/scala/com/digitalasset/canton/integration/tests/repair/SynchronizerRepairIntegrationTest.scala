@@ -54,10 +54,12 @@ sealed abstract class SynchronizerRepairIntegrationTest
         participant1.parties.enable(
           aliceS,
           synchronizeParticipants = Seq(participant2),
+          synchronizer = lostSynchronizerAlias,
         )
         participant2.parties.enable(
           bobS,
           synchronizeParticipants = Seq(participant1),
+          synchronizer = lostSynchronizerAlias,
         )
       }
 
@@ -134,6 +136,17 @@ sealed abstract class SynchronizerRepairIntegrationTest
           ) shouldBe (true, true)
         )
       }
+
+      participant1.parties.enable(
+        aliceS,
+        synchronizeParticipants = Seq(participant2),
+        synchronizer = newSynchronizerAlias,
+      )
+      participant2.parties.enable(
+        bobS,
+        synchronizeParticipants = Seq(participant1),
+        synchronizer = newSynchronizerAlias,
+      )
 
       // Note that merely registering the synchronizer is not good enough as we need the topology state to be built.
       // For that we connect to replacement synchronizer and disconnect once the participants have the new synchronizer topology state.
@@ -240,7 +253,7 @@ sealed abstract class SynchronizerRepairIntegrationTest
     // Ensure that we can create new contracts.
     Seq(participant1 -> ((Alice, Bob)), participant2 -> ((Bob, Alice))).foreach {
       case (participant, (payer, owner)) =>
-        participant.ledger_api.javaapi.commands.submit_flat(
+        participant.ledger_api.javaapi.commands.submit(
           Seq(payer),
           new iou.Iou(
             payer.toProtoPrimitive,
@@ -255,7 +268,7 @@ sealed abstract class SynchronizerRepairIntegrationTest
     Seq(participant2 -> ((Bob, iouBob)), participant1 -> ((Alice, iouAlice))).foreach {
       case (participant, (owner, iou)) =>
         participant.ledger_api.javaapi.commands
-          .submit_flat(Seq(owner), iou.id.exerciseCall().commands.asScala.toSeq)
+          .submit(Seq(owner), iou.id.exerciseCall().commands.asScala.toSeq)
     }
     // user-manual-entry-end: VerifyNewSynchronizerWorks
 
@@ -303,7 +316,7 @@ sealed abstract class SynchronizerRepairIntegrationTest
 
   private def newSynchronizerAlias(implicit env: TestConsoleEnvironment) = env.acmeName
 
-  private def newSynchronizerId(implicit env: TestConsoleEnvironment) = env.acmeId
+  private def newSynchronizerId(implicit env: TestConsoleEnvironment) = env.acmeId.logical
 }
 
 final class SynchronizerRepairReferenceIntegrationTestPostgres

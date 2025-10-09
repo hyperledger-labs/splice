@@ -42,6 +42,7 @@ object UpdateServiceRequestValidator {
       end,
     )
 
+  // TODO(#23504) remove filter and verbose matching when they are removed from GetUpdatesRequest
   @nowarn("cat=deprecation")
   def validate(
       req: GetUpdatesRequest,

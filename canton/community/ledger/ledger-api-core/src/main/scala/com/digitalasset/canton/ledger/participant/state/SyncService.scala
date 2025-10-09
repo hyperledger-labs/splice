@@ -15,9 +15,8 @@ import com.digitalasset.canton.ledger.participant.state.SyncService.{
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.{LfContractId, LfSubmittedTransaction}
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{LfPackageId, LfPartyId, SynchronizerAlias}
 
 /** An interface to change a ledger via a participant. '''Please note that this interface is
@@ -45,19 +44,13 @@ trait SyncService
     with PartySyncService
     with ParticipantPruningSyncService
     with ReportsHealth
-    with InternalStateServiceProvider {
+    with InternalIndexServiceProvider {
 
   // temporary implementation, will be removed as topology events on Ledger API proceed
   def getConnectedSynchronizers(request: ConnectedSynchronizerRequest)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[ConnectedSynchronizerResponse] =
     throw new UnsupportedOperationException()
-
-  // TODO(i20688): Temporary until prepared transactions run through the synchronizer router
-  def getProtocolVersionForSynchronizer(
-      synchronizerId: Traced[SynchronizerId]
-  ): Option[ProtocolVersion] =
-    None
 
   // temporary implementation, will be removed as topology events on Ledger API proceed
   /** Get the offsets of the incomplete assigned/unassigned events for a set of stakeholders.
@@ -99,7 +92,7 @@ trait SyncService
       routingSynchronizerState: RoutingSynchronizerState,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[SynchronizerId, Map[LfPartyId, Set[LfPackageId]]]]
+  ): FutureUnlessShutdown[Map[PhysicalSynchronizerId, Map[LfPartyId, Set[LfPackageId]]]]
 
   // temporary implementation, will be removed with the refactoring of the SyncService interface
   /** Computes the highest ranked synchronizer from the given admissible synchronizers without
@@ -130,12 +123,12 @@ trait SyncService
       submitterInfo: SubmitterInfo,
       transaction: LfSubmittedTransaction,
       transactionMeta: TransactionMeta,
-      admissibleSynchronizers: NonEmpty[Set[SynchronizerId]],
+      admissibleSynchronizers: NonEmpty[Set[PhysicalSynchronizerId]],
       disclosedContractIds: List[LfContractId],
       routingSynchronizerState: RoutingSynchronizerState,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerId]
+  ): EitherT[FutureUnlessShutdown, TransactionRoutingError, PhysicalSynchronizerId]
 
   // temporary implementation, will be removed with the refactoring of the SyncService interface
   /** Computes the best synchronizer for a submitted transaction by checking the submitted
@@ -191,7 +184,7 @@ object SyncService {
   object ConnectedSynchronizerResponse {
     final case class ConnectedSynchronizer(
         synchronizerAlias: SynchronizerAlias,
-        synchronizerId: SynchronizerId,
+        synchronizerId: PhysicalSynchronizerId,
         permission: ParticipantPermission,
     )
   }

@@ -47,6 +47,15 @@ object AuthorizationError {
       s"Claims do not authorize to read data as any party (super-reader wildcard)"
   }
 
+  final case class MissingExecuteClaim(party: String) extends AuthorizationError {
+    override val reason = s"Claims do not authorize to execute for party '$party'"
+  }
+
+  final object MissingExecuteAsAnyPartyClaim extends AuthorizationError {
+    override val reason =
+      s"Claims do not authorize to execute as any party (super-executor wildcard)"
+  }
+
   final case class MissingActClaim(party: String) extends AuthorizationError {
     override val reason = s"Claims do not authorize to act as party '$party'"
   }
@@ -55,6 +64,11 @@ object AuthorizationError {
       extends AuthorizationError {
     override val reason =
       s"identity_provider_id from the request `$identityProviderId` does not match the one provided in the authorization claims"
+  }
+
+  final case class MissingAdminOrIdpAdminOrReadClaim(party: String) extends AuthorizationError {
+    override val reason =
+      s"Claims do not authorize the use of administrative services nor authorize to read data for party '$party'"
   }
 
   final case class InvalidField(fieldName: String, reason: String) extends AuthorizationError

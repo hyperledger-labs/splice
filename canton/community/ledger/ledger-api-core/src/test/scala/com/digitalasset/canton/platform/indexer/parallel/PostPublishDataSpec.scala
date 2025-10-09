@@ -12,7 +12,11 @@ import com.digitalasset.canton.ledger.participant.state.Update.{
   SequencedTransactionAccepted,
   UnSequencedCommandRejected,
 }
-import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, TransactionMeta}
+import com.digitalasset.canton.ledger.participant.state.{
+  CompletionInfo,
+  TestAcsChangeFactory,
+  TransactionMeta,
+}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -71,9 +75,10 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractMetadata = Map.empty,
+        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         recordTime = cantonTime2,
+        acsChangeFactory = TestAcsChangeFactory(),
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
@@ -102,9 +107,10 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractMetadata = Map.empty,
+        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         recordTime = cantonTime2,
+        acsChangeFactory = TestAcsChangeFactory(),
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
@@ -117,7 +123,7 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractMetadata = Map.empty,
+        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         repairCounter = RepairCounter(65),
         recordTime = cantonTime2,

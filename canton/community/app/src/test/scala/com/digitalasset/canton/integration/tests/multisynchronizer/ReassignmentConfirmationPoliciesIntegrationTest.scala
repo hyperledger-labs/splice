@@ -142,17 +142,30 @@ sealed trait ReassignmentConfirmationPoliciesPartyIntegrationTest
     val alice = participant1.parties.enable(
       "alice",
       synchronizeParticipants = Seq(participant2),
+      synchronizer = daName,
     )
+    participant1.parties.enable(
+      "alice",
+      synchronizeParticipants = Seq(participant2),
+      synchronizer = acmeName,
+    )
+
     val bob = participant2.parties.enable(
       "bob",
       synchronizeParticipants = Seq(participant1),
+      synchronizer = daName,
+    )
+    participant2.parties.enable(
+      "bob",
+      synchronizeParticipants = Seq(participant1),
+      synchronizer = acmeName,
     )
 
     val iou = IouSyntax.createIou(participant1, Some(daId))(alice, bob)
 
-    val unassignId = participant1.ledger_api.commands
+    val reassignmentId = participant1.ledger_api.commands
       .submit_unassign(alice, Seq(LfContractId.assertFromString(iou.id.contractId)), daId, acmeId)
-      .unassignId
+      .reassignmentId
 
     PartyToParticipantDeclarative(Set(participant1, participant2), Set(daId, acmeId))(
       owningParticipants = Map(alice -> participant1),
@@ -166,7 +179,7 @@ sealed trait ReassignmentConfirmationPoliciesPartyIntegrationTest
     )
 
     // Alice can submit the assignment
-    participant2.ledger_api.commands.submit_assign(alice, unassignId, daId, acmeId)
+    participant2.ledger_api.commands.submit_assign(alice, reassignmentId, daId, acmeId)
   }
 }
 

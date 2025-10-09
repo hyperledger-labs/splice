@@ -3,10 +3,11 @@
 
 package com.digitalasset.canton.platform.store.dao
 
+import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
+import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.{SynchronizerIndex, Update}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.platform.PackageName
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.backend.{
   DbDto,
@@ -22,9 +23,11 @@ import com.digitalasset.canton.platform.store.interning.{
   StringInterningDomain,
 }
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.Party
+import com.digitalasset.daml.lf.data.Ref.{NameTypeConRef, PackageId, Party}
+import com.google.protobuf.ByteString
 import org.mockito.MockitoSugar.mock
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -203,17 +206,7 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
     ): Unit =
       throw new UnsupportedOperationException
 
-    override def updatePrunedAllDivulgedContractsUpToInclusive(prunedUpToInclusive: Offset)(
-        connection: Connection
-    ): Unit =
-      throw new UnsupportedOperationException
-
     override def prunedUpToInclusive(connection: Connection): Option[Offset] =
-      throw new UnsupportedOperationException
-
-    override def participantAllDivulgedContractsPrunedUpToInclusive(
-        connection: Connection
-    ): Option[Offset] =
       throw new UnsupportedOperationException
 
     override def prunedUpToInclusiveAndLedgerEnd(
@@ -240,6 +233,12 @@ object SequentialWriteDaoSpec {
 
   private val serializableTraceContext =
     SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
+
+  private val externalTransactionHash =
+    Hash
+      .digest(HashPurpose.PreparedSubmission, ByteString.copyFromUtf8("mock_hash"), Sha256)
+      .unwrap
+      .toByteArray
 
   private def offset(l: Long): Offset = Offset.tryFromLong(l)
 
@@ -273,7 +272,7 @@ object SequentialWriteDaoSpec {
     node_id = 3,
     contract_id = Array(24),
     template_id = "",
-    package_name = "2",
+    package_id = "2",
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
     create_argument = Array.empty,
@@ -285,10 +284,11 @@ object SequentialWriteDaoSpec {
     create_argument_compression = None,
     create_key_value_compression = None,
     event_sequential_id = 0,
-    driver_metadata = Array.empty,
+    authentication_data = Array.empty,
     synchronizer_id = "x::synchronizer",
     trace_context = serializableTraceContext,
     record_time = 0,
+    external_transaction_hash = Some(externalTransactionHash),
   )
 
   private val someEventExercise = DbDto.EventExercise(
@@ -303,22 +303,21 @@ object SequentialWriteDaoSpec {
     node_id = 3,
     contract_id = Array(24),
     template_id = "",
-    package_name = "2",
+    package_id = "2",
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
-    create_key_value = None,
     exercise_choice = "",
     exercise_argument = Array.empty,
     exercise_result = None,
     exercise_actors = Set.empty,
     exercise_last_descendant_node_id = 3,
-    create_key_value_compression = None,
     exercise_argument_compression = None,
     exercise_result_compression = None,
     event_sequential_id = 0,
     synchronizer_id = "x::synchronizer",
     trace_context = serializableTraceContext,
     record_time = 0,
+    external_transaction_hash = Some(externalTransactionHash),
   )
 
   val singlePartyFixture: Option[Update.PartyAddedToParticipant] =
@@ -353,23 +352,23 @@ object SequentialWriteDaoSpec {
         parties = Iterator.empty,
         templateIds = List("1").iterator,
         synchronizerIds = Iterator.empty,
-        packageNames = Iterator("2"),
+        packageIds = Iterator("2"),
       )
     case _ =>
       new DomainStringIterators(
         parties = Iterator.empty,
         templateIds = Iterator.empty,
         synchronizerIds = Iterator.empty,
-        packageNames = Iterator.empty,
+        packageIds = Iterator.empty,
       )
   }
 
   private val stringInterningViewFixture: StringInterning with InternizingStringInterningView =
     new StringInterning with InternizingStringInterningView {
-      override def templateId: StringInterningDomain[Ref.Identifier] =
+      override def templateId: StringInterningDomain[NameTypeConRef] =
         throw new NotImplementedException
 
-      override def packageName: StringInterningDomain[PackageName] =
+      override def packageId: StringInterningDomain[PackageId] =
         throw new NotImplementedException
 
       override def party: StringInterningDomain[Party] = throw new NotImplementedException

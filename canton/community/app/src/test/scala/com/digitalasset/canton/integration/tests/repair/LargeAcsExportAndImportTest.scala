@@ -138,6 +138,7 @@ protected abstract class LargeAcsExportAndImportTestBase
     }
   }
 
+  // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
   // A party replication is involved, and we want to minimize the risk of warnings related to acs commitment mismatches
   protected val reconciliationInterval = PositiveSeconds.tryOfDays(365 * 10)
 
@@ -176,31 +177,24 @@ protected abstract class LargeAcsExportAndImportTestBase
             .focus(_.adminApi.internalPort)
             .replace(Some(RequireTypes.Port.tryCreate(9032)))
         ),
-      )
-      // Use distinct timeout values so that it is clear which timeout expired
-      .addConfigTransform(
+        // Use distinct timeout values so that it is clear which timeout expired
         _.focus(_.parameters.timeouts.processing.unbounded)
-          .replace(config.NonNegativeDuration.tryFromDuration(31.minute))
-      )
-      .addConfigTransform(
+          .replace(config.NonNegativeDuration.tryFromDuration(31.minute)),
         _.focus(_.parameters.timeouts.processing.network)
-          .replace(
-            config.NonNegativeDuration.tryFromDuration(32.minute)
-          ) // Addresses c.d.c.r.DbLockedConnection...=participant2/connId=pool-2 - Task connection check read-only did not complete within 2 minutes.
-      )
-      .addConfigTransform(
+          // Addresses c.d.c.r.DbLockedConnection...=participant2/connId=pool-2 - Task connection check read-only did not complete within 2 minutes.
+          .replace(config.NonNegativeDuration.tryFromDuration(32.minute)),
         _.focus(_.parameters.timeouts.console.bounded)
-          .replace(
-            config.NonNegativeDuration.tryFromDuration(33.minute)
-          ) // Addresses import_acs GrpcClientGaveUp: DEADLINE_EXCEEDED/CallOptions in was 3 min for 100_000
-      )
-      .addConfigTransform(
-        _.focus(
-          _.parameters.timeouts.console.unbounded
-        ) // Defaults to 3 minutes for tests (not enough for 250_000)
-          .replace(
-            config.NonNegativeDuration.tryFromDuration(34.minute)
-          ) // Addresses import_acs GrpcClientGaveUp: DEADLINE_EXCEEDED/CallOptions for ParticipantAdministration$synchronizers$.reconnect in was 3 min for 100_000
+          // Addresses import_acs GrpcClientGaveUp: DEADLINE_EXCEEDED/CallOptions in was 3 min for 100_000
+          .replace(config.NonNegativeDuration.tryFromDuration(33.minute)),
+        _.focus(_.parameters.timeouts.console.unbounded)
+          // Defaults to 3 minutes for tests (not enough for 250_000)
+          // Addresses import_acs GrpcClientGaveUp: DEADLINE_EXCEEDED/CallOptions for ParticipantAdministration$synchronizers$.reconnect in was 3 min for 100_000
+          .replace(config.NonNegativeDuration.tryFromDuration(34.minute)),
+        // Disable the warnings for enabled consistency checks as we're importing a large ACS
+        ConfigTransforms.updateAllParticipantConfigs_(
+          _.focus(_.parameters.activationFrequencyForWarnAboutConsistencyChecks)
+            .replace(Long.MaxValue)
+        ),
       )
 
   override protected def environmentDefinition: EnvironmentDefinition = baseEnvironmentDefinition
@@ -474,7 +468,7 @@ protected abstract class EstablishTestSet extends LargeAcsExportAndImportTestBas
 
     acsExportFile.get.foreach { acsExport =>
       clue("Get Alice ACS on P1 with export_acs")(
-        participant1.parties.export_acs(
+        participant1.repair.export_acs(
           parties = Set(alice),
           exportFilePath = acsExport.canonicalPath,
           ledgerOffset = aliceAddedOnP3Offset,

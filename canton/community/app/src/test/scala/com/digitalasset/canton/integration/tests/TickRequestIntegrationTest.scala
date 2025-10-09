@@ -58,7 +58,7 @@ sealed trait TickRequestIntegrationTest
     patienceDuration = patienceDuration,
     minObservationDuration = minObservationDuration,
   )
-  private val topologyTransactionRegistrationTimeout = config.NonNegativeDuration.ofMinutes(1)
+  private val topologyTransactionRegistrationTimeout = config.NonNegativeFiniteDuration.ofMinutes(1)
 
   private val setBalanceRequestSubmissionWindowSize = config.PositiveFiniteDuration.ofMinutes(5L)
   private lazy val trafficControlParameters = TrafficControlParameters(
@@ -111,7 +111,7 @@ sealed trait TickRequestIntegrationTest
                 // Disable automatic assignments
                 assignmentExclusivityTimeout = config.NonNegativeFiniteDuration.Zero,
                 trafficControl =
-                  Option.when(synchronizer.synchronizerId == daId)(trafficControlParameters),
+                  Option.when(synchronizer.synchronizerId == daId.logical)(trafficControlParameters),
               ),
             )
         )
@@ -139,8 +139,10 @@ sealed trait TickRequestIntegrationTest
         )
 
         participants.all.dars.upload(CantonExamplesPath)
-        participant1.parties.enable("Alice")
-        participant2.parties.enable("Bob")
+        participant1.parties.enable("Alice", synchronizer = daName)
+        participant2.parties.enable("Bob", synchronizer = daName)
+        participant1.parties.enable("Alice", synchronizer = acmeName)
+        participant2.parties.enable("Bob", synchronizer = acmeName)
       }
 
   "no time proof request after a successful traffic top-up" in { implicit env =>
@@ -196,7 +198,7 @@ sealed trait TickRequestIntegrationTest
     logger.info("Running a successful transaction")
     collector1.startCollecting()
 
-    val iou = IouSyntax.createIou(participant1, Some(daId))(alice, bob)
+    val iou = IouSyntax.createIou(participant1, Some(daId.logical))(alice, bob)
 
     advanceTimeBeyondTimeouts(simClock)
 
@@ -212,7 +214,12 @@ sealed trait TickRequestIntegrationTest
     val iouId = LfContractId.assertFromString(iou.id.contractId)
 
     val unassignment = participant2.ledger_api.javaapi.commands
-      .submit_unassign(bob, Seq(iouId), daId, acmeId)
+      .submit_unassign(
+        bob,
+        Seq(iouId),
+        daId.logical,
+        acmeId.logical,
+      )
       .getEvents
       .loneElement
 
@@ -236,10 +243,15 @@ sealed trait TickRequestIntegrationTest
     logger.info("Running a successful assignment")
 
     val reassignmentId = unassignment match {
-      case unassign: com.daml.ledger.javaapi.data.UnassignedEvent => unassign.getUnassignId
+      case unassign: com.daml.ledger.javaapi.data.UnassignedEvent => unassign.getReassignmentId
       case _ => fail(s"Expected an unassignment event, but got $unassignment")
     }
-    participant1.ledger_api.javaapi.commands.submit_assign(alice, reassignmentId, daId, acmeId)
+    participant1.ledger_api.javaapi.commands.submit_assign(
+      alice,
+      reassignmentId,
+      daId.logical,
+      acmeId.logical,
+    )
 
     advanceTimeBeyondTimeouts(simClock)
     always() {
@@ -257,7 +269,7 @@ sealed trait TickRequestIntegrationTest
     val collector1 = new TickRequestCollector(sequencer1)
     collector1.startCollecting()
 
-    participant1.parties.enable("Charlie")
+    participant1.parties.enable("Charlie", synchronizer = daName)
 
     advanceTimeBeyondTimeouts(env.environment.simClock.value)
     always() {

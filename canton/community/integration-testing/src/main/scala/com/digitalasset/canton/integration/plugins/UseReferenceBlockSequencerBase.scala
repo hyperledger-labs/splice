@@ -19,6 +19,7 @@ import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBas
 }
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
+import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.CircuitBreakerConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.{
   BlockSequencerConfig,
@@ -91,10 +92,14 @@ abstract class UseReferenceBlockSequencerBase[
       sequencerName -> SequencerConfig.External(
         driverFactory.name,
         BlockSequencerConfig(
+          circuitBreaker = config.sequencers(sequencerName).sequencer match {
+            case external: SequencerConfig.External => external.block.circuitBreaker
+            case _ => CircuitBreakerConfig()
+          },
           streamInstrumentation = config.sequencers(sequencerName).sequencer match {
             case external: SequencerConfig.External => external.block.streamInstrumentation
             case _ => BlockSequencerStreamInstrumentationConfig()
-          }
+          },
         ),
         ConfigCursor(
           driverFactory
