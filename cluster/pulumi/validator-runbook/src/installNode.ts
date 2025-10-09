@@ -155,9 +155,9 @@ async function installValidator(
     // can be removed once base version > 0.2.1
     `postgres`,
     'postgres-secrets',
-    supportsValidatorRunbookReset,
     postgresValues,
-    true
+    true,
+    supportsValidatorRunbookReset
   );
   const participantAddress = installParticipant(
     validatorConfig,

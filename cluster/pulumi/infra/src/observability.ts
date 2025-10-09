@@ -864,7 +864,6 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
     'grafana-pg',
     'grafana-pg',
     'grafana-pg-secret',
-    true,
     { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
     true // overrideDbSizeFromValues
   );
