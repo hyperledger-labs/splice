@@ -17,12 +17,12 @@ import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateResponse
+import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateV2Response
 import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.admin.v30.GenesisStateResponse
+import com.digitalasset.canton.topology.admin.v30.GenesisStateV2Response
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
@@ -70,10 +70,10 @@ class SequencerAdminConnection(
   def getGenesisState(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
-    val responseObserver = new ByteStringStreamObserver[GenesisStateResponse](_.chunk)
+    val responseObserver = new ByteStringStreamObserver[GenesisStateV2Response](_.chunk)
     runCmd(
       TopologyAdminCommands.Read
-        .GenesisState(
+        .GenesisStateV2(
           timestamp = Some(timestamp),
           synchronizerStore = None,
           observer = responseObserver,
@@ -85,9 +85,9 @@ class SequencerAdminConnection(
       traceContext: TraceContext
   ): Future[ByteString] = {
     val responseObserver =
-      new ByteStringStreamObserver[OnboardingStateResponse](_.onboardingStateForSequencer)
+      new ByteStringStreamObserver[OnboardingStateV2Response](_.onboardingStateForSequencer)
     runCmd(
-      SequencerAdminCommands.OnboardingState(responseObserver, Left(sequencerId))
+      SequencerAdminCommands.OnboardingStateV2(responseObserver, Left(sequencerId))
     ).flatMap(_ => responseObserver.resultBytes)
   }
 
@@ -98,7 +98,7 @@ class SequencerAdminConnection(
       domainParameters: StaticSynchronizerParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      SequencerAdminCommands.InitializeFromGenesisState(
+      SequencerAdminCommands.InitializeFromGenesisStateV2(
         // TODO(DACH-NY/canton-network-node#10953) Stop doing that.
         topologySnapshot.toByteString(domainParameters.protocolVersion),
         domainParameters,
@@ -112,7 +112,7 @@ class SequencerAdminConnection(
       domainParameters: StaticSynchronizerParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      SequencerAdminCommands.InitializeFromGenesisState(
+      SequencerAdminCommands.InitializeFromGenesisStateV2(
         genesisState,
         domainParameters,
       )
@@ -122,7 +122,7 @@ class SequencerAdminConnection(
       onboardingState: ByteString
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      SequencerAdminCommands.InitializeFromOnboardingState(
+      SequencerAdminCommands.InitializeFromOnboardingStateV2(
         onboardingState
       )
     )
