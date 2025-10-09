@@ -216,13 +216,13 @@ object SpliceUtil {
     damlDecimal(0.2),
 
     // featuredAppRewardCap
-    damlDecimal(100),
+    damlDecimal(20000),
 
     // unfeaturedAppRewardCap
     damlDecimal(0.6),
 
     // validatorFaucetCap
-    Some(damlDecimal(2.85)).toJava,
+    Some(damlDecimal(570.0)).toJava,
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
@@ -363,7 +363,7 @@ object SpliceUtil {
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       zeroTransferFees: Boolean = false,
       transferPreapprovalFee: Option[BigDecimal] = None,
-      featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
+      featuredAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       nextSynchronizerId: Option[SynchronizerId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
