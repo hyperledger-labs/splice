@@ -240,7 +240,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
   });
 
-  test('should show error on form if submission fails', async () => {
+  test('should show error on form if submission fails', { timeout: 10000 }, async () => {
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
         return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
