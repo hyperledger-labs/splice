@@ -1,4 +1,4 @@
-name: No-approval static checks for PRs from forks
+name: Static checks for PRs from forks (No Approval Required)
 on:
   # unapproved runs must be on: pull_request, to prevent cache pollution on main
   pull_request:
@@ -11,7 +11,7 @@ concurrency:
 jobs:
   # Note: unapproved runs must not be granted access to secrets, and must not run on self-hosted runners
   no_approval_static_tests:
-    name: Static Tests (No Approval Required)
+    name: Static Tests
     uses: ./.github/workflows/build.static_tests.yml
     if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     secrets: {} # Explcitly do not grant access to secrets
