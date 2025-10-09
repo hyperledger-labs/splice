@@ -96,14 +96,16 @@ class SequencerAdminConnection(
   def initializeFromBeginning(
       topologySnapshot: GenericStoredTopologyTransactions,
       domainParameters: StaticSynchronizerParameters,
-  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
+  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] = {
+    val builder = ByteString.newOutput()
+    topologySnapshot.result.foreach(_.writeDelimitedTo(domainParameters.protocolVersion, builder))
     runCmd(
       SequencerAdminCommands.InitializeFromGenesisStateV2(
-        // TODO(DACH-NY/canton-network-node#10953) Stop doing that.
-        topologySnapshot.toByteString(domainParameters.protocolVersion),
+        builder.toByteString,
         domainParameters,
       )
     )
+  }
 
   /** This is used for initializing the sequencer after hard domain migrations.
     */
