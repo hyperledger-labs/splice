@@ -44,12 +44,6 @@ spec:
           value: {{ .Values.persistence.port | quote }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
           value: {{ .Values.persistence.schema }}
-        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
-          valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
-        - name: AUTH_JWKS_URL
-          value: {{ .Values.auth.jwksUrl }}
-        - name: AUTH_TARGET_AUDIENCE
-          value: {{ .Values.auth.targetAudience }}
         - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -79,6 +73,13 @@ spec:
         - name: ADDITIONAL_CONFIG_DISABLE_AUTH
           value: |
             canton.participants.participant.ledger-api.auth-services=[]
+        {{- else }}
+        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
+          valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
+        - name: AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl }}
+        - name: AUTH_TARGET_AUDIENCE
+          value: {{ .Values.auth.targetAudience }}
         {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
