@@ -86,6 +86,12 @@ class BaseLedgerConnection(
 
   import BaseLedgerConnection.*
 
+  def deleteUser(
+      userId: String,
+      identityProviderId: Option[String] = None,
+  )(implicit tc: TraceContext): Future[Unit] =
+    client.deleteUser(userId, identityProviderId)
+
   def ledgerEnd()(implicit
       traceContext: TraceContext
   ): Future[Long] =

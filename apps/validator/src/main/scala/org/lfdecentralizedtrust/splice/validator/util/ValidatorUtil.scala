@@ -237,6 +237,7 @@ private[validator] object ValidatorUtil {
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     val store = storeWithIngestion.store
+    val connection = storeWithIngestion.connection(SpliceLedgerConnectionPriority.Low)
     store.lookupInstallByName(endUserName).flatMap {
       case None =>
         // Note: it's OK to skip off-boarding in this case, as on-boarding always creates an install contract first,
@@ -312,6 +313,7 @@ private[validator] object ValidatorUtil {
             // these commands could fail with PERMISSION_DENIED errors (#4425).
             Seq(Status.Code.PERMISSION_DENIED),
           )
+          _ <- connection.deleteUser(endUserName)
         } yield {
           logger.debug(s"User $endUserParty offboarded")
           ()
