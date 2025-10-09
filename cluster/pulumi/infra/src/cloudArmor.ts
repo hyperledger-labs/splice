@@ -118,58 +118,55 @@ function addThrottleAndBanRules(
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
-  apiThrottles.reduce((priority, apiConfig) => {
-    if (priority >= THROTTLE_BAN_RULE_MAX) {
-      throw new Error(
-        `Throttle rule priority ${priority} exceeds maximum ${THROTTLE_BAN_RULE_MAX}`
-      );
-    }
+  _.sortBy(Object.entries(throttles), e => e[0]).reduce(
+    (priority, [confEntryHead, singleServiceThrottle]) => {
+      if (priority >= THROTTLE_BAN_RULE_MAX) {
+        throw new Error(
+          `Throttle rule priority ${priority} exceeds maximum ${THROTTLE_BAN_RULE_MAX}`
+        );
+      }
 
-    const { endpoint, throttle, action } = apiConfig;
-    const ruleName = `${action}${throttle.perIp ? '-per-ip' : ''}-${endpoint.name}`;
+      const { hostname, pathPrefix, throttleAcrossAllEndpointsAllIps } = singleServiceThrottle;
+      // leave out the rule but consume the priority number if max is 0
+      // this makes the pulumi update cleaner if toggling just one service
+      if (throttleAcrossAllEndpointsAllIps.maxRequestsBeforeHttp429 > 0) {
+        const ruleName = `throttle-all-endpoints-all-ips-${confEntryHead}`;
 
     // Build the expression for path and hostname matching
     const pathExpr = `request.path.matches('${endpoint.path}')`;
     const hostExpr = `request.headers['host'].matches('${endpoint.hostname}')`;
     const matchExpr = `${pathExpr} && ${hostExpr}`;
 
-    new gcp.compute.SecurityPolicyRule(
-      ruleName,
-      {
-        securityPolicy: securityPolicy.name,
-        description: `${action === 'throttle' ? 'Throttle' : 'Ban'} rule${throttle.perIp ? ' per-IP' : ''} for ${endpoint.name} API endpoint`,
-        priority,
-        preview,
-        action: action === 'ban' ? 'rate_based_ban' : 'throttle',
-        match: {
-          expr: {
-            expression: matchExpr,
+        new gcp.compute.SecurityPolicyRule(
+          ruleName,
+          {
+            securityPolicy: securityPolicy.name,
+            description: `Throttle rule for all ${confEntryHead} API endpoints`,
+            priority,
+            preview: preview || singleServiceThrottle.rulePreviewOnly,
+            action: 'throttle',
+            match: {
+              expr: {
+                expression: matchExpr,
+              },
+            },
+            rateLimitOptions: {
+              enforceOnKey: 'ALL',
+              rateLimitThreshold: {
+                count: throttleAcrossAllEndpointsAllIps.maxRequestsBeforeHttp429,
+                intervalSec: throttleAcrossAllEndpointsAllIps.withinIntervalSeconds,
+              },
+              conformAction: 'allow',
+              exceedAction: 'deny(429)', // 429 Too Many Requests
+            },
           },
-        },
-        rateLimitOptions: {
-          // ban point is banThreshold + ratelimit count; consider splitting up rather than doubling
-          ...(action === 'ban'
-            ? {
-                banDurationSec: 600,
-                banThreshold: {
-                  count: throttle.rate,
-                  intervalSec: throttle.interval,
-                },
-              }
-            : {}),
-          enforceOnKey: throttle.perIp ? 'IP' : 'ALL',
-          rateLimitThreshold: {
-            count: throttle.rate,
-            intervalSec: throttle.interval,
-          },
-          conformAction: 'allow',
-          exceedAction: 'deny(429)', // 429 Too Many Requests
-        },
-      },
-      opts
-    );
-    return priority + RULE_SPACING;
-  }, THROTTLE_BAN_RULE_MIN);
+          opts
+        );
+      }
+      return priority + RULE_SPACING;
+    },
+    THROTTLE_BAN_RULE_MIN
+  );
 }
 
 /**
