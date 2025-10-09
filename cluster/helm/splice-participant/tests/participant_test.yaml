@@ -166,3 +166,26 @@ tests:
               persistentVolumeClaim:
                 claimName: claim_name
             - name: empty-dir-volume
+  - it: "defaults to auth"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='CANTON_PARTICIPANT_ADMIN_USER_NAME')].value
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+  - it: "supports disabling auth"
+    set:
+      disableAuth: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='CANTON_PARTICIPANT_ADMIN_USER_NAME')].value
+          value: ledger-api-user
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+          value: |
+            canton.participants.participant.ledger-api.auth-services=[]
