@@ -39,7 +39,7 @@ export function installPostgres(
     );
     const volumeSizeOverride = determineVolumeSizeOverride(valuesFromFile.db?.volumeSize);
     const values = _.merge(valuesFromFile || {}, { db: { volumeSize: volumeSizeOverride } });
-    return new SplicePostgres(xns, name, name, secretName, values);
+    return new SplicePostgres(xns, name, name, secretName, true, values);
   }
 }
 
