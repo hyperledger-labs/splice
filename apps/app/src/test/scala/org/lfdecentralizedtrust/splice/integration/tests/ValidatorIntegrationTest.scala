@@ -501,12 +501,14 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   }
 
-  "support existing party with invalid hit" in { implicit env =>
+  "support existing party with invalid hint" in { implicit env =>
     initDsoWithSv1Only()
     val validator = v(invalidValidator)
     val participantClientWithAdminToken = validator.participantClientWithAdminToken
+    val partyId =
+      PartyId.tryCreate(validatorPartyHint, participantClientWithAdminToken.id.namespace)
     participantClientWithAdminToken.topology.party_to_participant_mappings.propose(
-      PartyId.tryCreate(validatorPartyHint, participantClientWithAdminToken.id.namespace),
+      partyId,
       Seq(
         (
           participantClientWithAdminToken.id,
@@ -514,6 +516,15 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         )
       ),
     )
+
+    clue("party is seen on the ledger api") {
+      eventually() {
+        participantClientWithAdminToken.ledger_api.parties
+          .list()
+          .exists(_.party == partyId) shouldBe true
+      }
+    }
+
     val configuredUser = validator.config.ledgerApiUser
 
     def getUser = {
