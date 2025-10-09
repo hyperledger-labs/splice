@@ -1,33 +1,27 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { AmountDisplay, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+
+import {
+  AmountDisplay,
+  Loading,
+  medianPriceVotes,
+  useVotesHooks,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import BigNumber from 'bignumber.js';
 import React, { useMemo } from 'react';
 
 import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { useAmuletPriceVotes } from '../../hooks/useAmuletPriceVotes';
-import { useSvConfig } from '../../utils';
+interface MedianAmuletPriceProps {
+  amuletName: string;
+}
 
-const MedianAmuletPrice: React.FC = () => {
-  const config = useSvConfig();
-  const amuletPriceVotesQuery = useAmuletPriceVotes();
-  const amuletName = config.spliceInstanceNames.amuletName;
+export const MedianAmuletPrice: React.FC<MedianAmuletPriceProps> = props => {
+  const { amuletName } = props;
 
-  const median = (votedPrices: BigNumber[]) => {
-    if (votedPrices && votedPrices.length > 0) {
-      const sorted = [...votedPrices].sort((a, b) => {
-        return a.isEqualTo(b) ? 0 : a.isLessThan(b) ? -1 : 1;
-      });
-      const length = sorted.length;
-      const half = Math.floor(length / 2);
-      return length % 2 !== 0
-        ? sorted[half]
-        : sorted[half - 1].plus(sorted[half]).multipliedBy(0.5);
-    }
-    return undefined;
-  };
+  const voteHooks = useVotesHooks();
+  const amuletPriceVotesQuery = voteHooks.useAmuletPriceVotes();
 
   const amuletPrices = useMemo(
     () =>
@@ -38,7 +32,7 @@ const MedianAmuletPrice: React.FC = () => {
   );
 
   const medianAmuletPrice = useMemo(
-    () => (amuletPrices ? median(amuletPrices) : undefined),
+    () => (amuletPrices ? medianPriceVotes(amuletPrices) : undefined),
     [amuletPrices]
   );
 
@@ -64,5 +58,3 @@ const MedianAmuletPrice: React.FC = () => {
     </Stack>
   );
 };
-
-export default MedianAmuletPrice;
