@@ -22,17 +22,9 @@ export function installPostgres(
   isActive: boolean = true
 ): SplicePostgres | CloudPostgres {
   if (spliceConfig.pulumiProjectConfig.cloudSql.enabled) {
-    return new CloudPostgres(
-      xns,
-      name,
-      name,
-      secretName,
-      spliceConfig.pulumiProjectConfig.cloudSql,
-      isActive,
-      {
-        disableProtection: supportsSvRunbookReset,
-      }
-    );
+    return new CloudPostgres(xns, name, name, secretName, isActive, {
+      disableProtection: supportsSvRunbookReset,
+    });
   } else {
     const valuesFromFile = loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`

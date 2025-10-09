@@ -7,11 +7,16 @@ import * as _ from 'lodash';
 import { Resource } from '@pulumi/pulumi';
 
 import { CnChartVersion } from './artifacts';
-import { clusterSmallDisk, CloudSqlConfig, config } from './config';
+import { clusterSmallDisk, config } from './config';
 import { spliceConfig } from './config/config';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
+
+const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
+export const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
+const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
+const cloudSqlEnterprisePlus = spliceConfig.pulumiProjectConfig.cloudSql.enterprisePlus;
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -59,13 +64,12 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
-    cloudSqlConfig: CloudSqlConfig,
     active: boolean = true,
     opts: { disableProtection?: boolean; migrationId?: string; logicalDecoding?: boolean } = {}
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
-    const deletionProtection = opts.disableProtection ? false : cloudSqlConfig.protected;
+    const deletionProtection = opts.disableProtection ? false : protectCloudSql;
     const baseOpts = {
       protect: deletionProtection,
       aliases: [{ name: instanceLogicalNameAlias }],
@@ -102,9 +106,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           insightsConfig: {
             queryInsightsEnabled: true,
           },
-          tier: cloudSqlConfig.tier,
-          edition: cloudSqlConfig.enterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
-          ...(cloudSqlConfig.enterprisePlus
+          tier: cloudSqlDbInstance,
+          edition: cloudSqlEnterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
+          ...(cloudSqlEnterprisePlus
             ? {
                 dataCacheConfig: {
                   dataCacheEnabled: true,
@@ -201,7 +205,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
     super('canton:network:postgres', logicalName, [], {
-      protect: !disableProtection,
+      protect: disableProtection ? false : protectCloudSql,
       aliases: [{ name: logicalNameAlias, type: 'canton:network:postgres' }],
     });
 
@@ -255,7 +259,6 @@ export function installPostgres(
   instanceName: string,
   alias: string,
   version: CnChartVersion,
-  cloudSqlConfig: CloudSqlConfig,
   uniqueSecretName = false,
   opts: {
     isActive?: boolean;
@@ -267,8 +270,8 @@ export function installPostgres(
   const o = { isActive: true, ...opts };
   let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
-  if (cloudSqlConfig.enabled) {
-    ret = new CloudPostgres(xns, instanceName, alias, secretName, cloudSqlConfig, o.isActive, {
+  if (enableCloudSql) {
+    ret = new CloudPostgres(xns, instanceName, alias, secretName, o.isActive, {
       disableProtection: o.disableProtection,
       migrationId: o.migrationId?.toString(),
       logicalDecoding: o.logicalDecoding,

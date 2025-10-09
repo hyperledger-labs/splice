@@ -849,9 +849,7 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "googleCredentials": "base64-decoded-mock"
-        }
+        "value": {}
       },
       "type": "Opaque"
     },
@@ -871,9 +869,7 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "googleCredentials": "base64-decoded-mock"
-        }
+        "value": {}
       },
       "type": "Opaque"
     },
@@ -2663,7 +2659,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -2730,7 +2726,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -2797,7 +2793,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -2864,7 +2860,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -4827,7 +4823,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -4894,7 +4890,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -4961,7 +4957,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -5028,7 +5024,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -6395,7 +6391,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -6462,7 +6458,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -6529,7 +6525,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -6596,7 +6592,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "sequencer-override-tier",
+        "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"

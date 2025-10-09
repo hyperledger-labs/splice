@@ -22,8 +22,6 @@ import {
   InStackCometBftDecentralizedSynchronizerNode,
 } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
 
-import { spliceConfig } from '../../common/src/config/config';
-
 export function installCantonComponents(
   xns: ExactNamespace,
   migrationId: DomainMigrationIndex,
@@ -82,25 +80,16 @@ export function installCantonComponents(
       `participant-${migrationId}-pg`,
       `participant-pg`,
       migrationInfo.version,
-      svConfig.participant?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     );
   const mediatorPostgres =
     dbs?.mediator ||
-    installPostgres(
-      xns,
-      `mediator-${migrationId}-pg`,
-      `mediator-pg`,
-      migrationInfo.version,
-      svConfig.mediator?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
-      true,
-      {
-        isActive: migrationStillRunning,
-        migrationId,
-        disableProtection,
-      }
-    );
+    installPostgres(xns, `mediator-${migrationId}-pg`, `mediator-pg`, migrationInfo.version, true, {
+      isActive: migrationStillRunning,
+      migrationId,
+      disableProtection,
+    });
   const sequencerPostgres =
     dbs?.sequencer ||
     installPostgres(
@@ -108,7 +97,6 @@ export function installCantonComponents(
       `sequencer-${migrationId}-pg`,
       `sequencer-pg`,
       migrationInfo.version,
-      svConfig.sequencer?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     );

@@ -16,7 +16,6 @@ import {
   sanitizedForPostgres,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-  spliceConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
@@ -38,14 +37,7 @@ export function installParticipant(
 
   const participantPostgres =
     defaultPostgres ||
-    postgres.installPostgres(
-      xns,
-      `participant-pg`,
-      `participant-pg`,
-      activeVersion,
-      spliceConfig.pulumiProjectConfig.cloudSql,
-      true
-    );
+    postgres.installPostgres(xns, `participant-pg`, `participant-pg`, activeVersion, true);
   const participantValues: ChartValues = {
     ...loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,

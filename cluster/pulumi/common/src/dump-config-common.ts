@@ -15,7 +15,6 @@ export enum PulumiFunction {
   GCP_GET_SUB_NETWORK = 'gcp:compute/getSubnetwork:getSubnetwork',
   GCP_GET_SECRET_VERSION = 'gcp:secretmanager/getSecretVersion:getSecretVersion',
   GCP_GET_CLUSTER = 'gcp:container/getCluster:getCluster',
-  STD_BASE64_DECODE = 'std:index:base64decode',
 }
 
 export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
@@ -174,10 +173,6 @@ export async function initDumpConfig(): Promise<void> {
       },
       call: function (args: pulumi.runtime.MockCallArgs) {
         switch (args.token) {
-          case PulumiFunction.STD_BASE64_DECODE:
-            return {
-              result: `base64-decoded-mock`,
-            };
           case PulumiFunction.GCP_GET_PROJECT:
             return { ...args.inputs, name: projectName };
           case PulumiFunction.GCP_GET_SUB_NETWORK:

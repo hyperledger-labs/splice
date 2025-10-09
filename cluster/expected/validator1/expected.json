@@ -77,9 +77,7 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "googleCredentials": "base64-decoded-mock"
-        }
+        "value": {}
       },
       "type": "Opaque"
     },

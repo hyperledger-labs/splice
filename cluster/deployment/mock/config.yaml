@@ -130,13 +130,11 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomSequencerJvmFlag"
-      cloudSql:
-        tier: "sequencer-override-tier"
     mediator:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
-      additionalJvmOptions: "-DcustomMediatorJvmFlag"
+      additionalJvmOptions: "-DcustomSequencerJvmFlag"
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO

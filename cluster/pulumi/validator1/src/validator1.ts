@@ -30,7 +30,6 @@ import {
   installValidatorSecrets,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
-import { spliceConfig } from '../../common/src/config/config';
 import { validator1Config } from './config';
 
 export async function installValidator1(
@@ -55,26 +54,12 @@ export async function installValidator1(
   const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
-    ? postgres.installPostgres(
-        xns,
-        'postgres',
-        'postgres',
-        activeVersion,
-        spliceConfig.pulumiProjectConfig.cloudSql,
-        false
-      )
+    ? postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false)
     : undefined;
 
   const validatorPostgres =
     defaultPostgres ||
-    postgres.installPostgres(
-      xns,
-      `validator-pg`,
-      `validator-pg`,
-      activeVersion,
-      spliceConfig.pulumiProjectConfig.cloudSql,
-      true
-    );
+    postgres.installPostgres(xns, `validator-pg`, `validator-pg`, activeVersion, true);
   const validatorDbName = `validator1`;
 
   const validatorSecrets = await installValidatorSecrets({
