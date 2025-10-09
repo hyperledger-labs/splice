@@ -614,14 +614,12 @@ final class DbMultiDomainAcsStore[TXE](
       )(implicit
           tc: TraceContext
       ): Future[DestinationHistory.InsertResult] = {
-        val trees = items.collect {
-          case UpdateHistoryResponse(TransactionTreeUpdate(tree), _)
-              if !tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX) =>
-            assert(
-              tree.getRecordTime.isAfter(CantonTimestamp.MinValue.toInstant),
-              "insert() must not be called with import updates",
-            )
-            tree
+        val trees = items.collect { case UpdateHistoryResponse(TransactionTreeUpdate(tree), _) =>
+          assert(
+            tree.getRecordTime.isAfter(CantonTimestamp.MinValue.toInstant),
+            "insert() must not be called with import updates",
+          )
+          tree
         }
 
         NonEmptyList.fromFoldable(trees) match {
