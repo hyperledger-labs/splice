@@ -320,7 +320,7 @@ function configureGatewayService(
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
-      name: `istio-ingress${suffix}`,
+      name: `istio-ingress${suffix}-test`,
       chart: 'gateway',
       version: istioVersion.istio,
       namespace: ingressNs.metadata.name,
@@ -359,10 +359,14 @@ function configureGatewayService(
           ].concat(ingressPorts),
         },
         ...infraAffinityAndTolerations,
+        annotations: {
+          'cloud.google.com/l4-rbs': 'enabled',
+        },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
+      deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
             const base: pulumi.Resource[] = [ingressNs, istiod];

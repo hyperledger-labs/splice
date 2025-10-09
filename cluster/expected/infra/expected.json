@@ -1557,7 +1557,7 @@
       "chart": "gateway",
       "compat": "true",
       "maxHistory": 10,
-      "name": "istio-ingress-cometbft",
+      "name": "istio-ingress-cometbft-test",
       "namespace": "cluster-ingress",
       "repositoryOpts": {
         "repo": "https://istio-release.storage.googleapis.com/charts"
@@ -1578,6 +1578,9 @@
               ]
             }
           }
+        },
+        "annotations": {
+          "cloud.google.com/l4-rbs": "enabled"
         },
         "autoscaling": {
           "maxReplicas": 15
@@ -1735,7 +1738,7 @@
       "chart": "gateway",
       "compat": "true",
       "maxHistory": 10,
-      "name": "istio-ingress",
+      "name": "istio-ingress-test",
       "namespace": "cluster-ingress",
       "repositoryOpts": {
         "repo": "https://istio-release.storage.googleapis.com/charts"
@@ -1756,6 +1759,9 @@
               ]
             }
           }
+        },
+        "annotations": {
+          "cloud.google.com/l4-rbs": "enabled"
         },
         "autoscaling": {
           "maxReplicas": 15
