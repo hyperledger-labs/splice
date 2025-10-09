@@ -138,11 +138,11 @@ export async function installValidatorApp(
     throw new Error('secrets or secretsConfig must be provided if auth is not disabled');
   }
   // will be undefined if auth is disabled
-  const validatorSecrets: ValidatorSecrets | undefined =
-    baseConfig.disableAuth ? undefined :
-      'validatorSecret' in config.secrets!
+  const validatorSecrets: ValidatorSecrets | undefined = baseConfig.disableAuth
+    ? undefined
+    : 'validatorSecret' in config.secrets!
       ? config.secrets
-        : await installValidatorSecrets(config.secrets!);
+      : await installValidatorSecrets(config.secrets!);
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     !config.svValidator && config.participantBootstrapDump
@@ -164,7 +164,11 @@ export async function installValidatorApp(
     .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat(validatorSecrets ? [validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns] : [])
+    .concat(
+      validatorSecrets
+        ? [validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns]
+        : []
+    )
     .concat(config.extraDependsOn || []);
 
   const walletSweep = config.sweep && {
@@ -231,8 +235,10 @@ export async function installValidatorApp(
       enablePostgresMetrics: true,
       auth: {
         audience:
-          config.secrets.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-        jwksUrl: `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
+          config.secrets?.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+        jwksUrl: config.secrets
+          ? `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`
+          : undefined,
       },
       walletSweep,
       autoAcceptTransfers,
