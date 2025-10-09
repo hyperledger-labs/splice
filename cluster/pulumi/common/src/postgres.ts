@@ -193,9 +193,9 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     instanceName: string,
     alias: string,
     secretName: string,
-    disableProtection: boolean,
     values?: ChartValues,
     overrideDbSizeFromValues?: boolean,
+    disableProtection?: boolean,
     version?: CnChartVersion
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
@@ -279,7 +279,7 @@ export function installPostgres(
       instanceName,
       alias,
       secretName,
-      o.disableProtection || true,
+      undefined,
       undefined,
       undefined,
       version
