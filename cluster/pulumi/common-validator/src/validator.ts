@@ -233,13 +233,16 @@ export async function installValidatorApp(
       additionalJvmOptions: getAdditionalJvmOptions(config.additionalJvmOptions),
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       enablePostgresMetrics: true,
-      auth: {
-        audience:
-          config.secrets?.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-        jwksUrl: config.secrets
-          ? `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`
-          : undefined,
-      },
+      auth: config.secrets
+        ? {
+            audience:
+              config.secrets?.auth0Client.getCfg().appToApiAudience['validator'] ||
+              DEFAULT_AUDIENCE,
+            jwksUrl: config.secrets
+              ? `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`
+              : undefined,
+          }
+        : undefined,
       walletSweep,
       autoAcceptTransfers,
       contactPoint: daContactPoint,

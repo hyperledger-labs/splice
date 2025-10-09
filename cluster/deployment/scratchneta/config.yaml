@@ -13,6 +13,7 @@ validator1:
     maxDuration: "5m"
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
+  disableAuth: true
 svs:
   sv-da-1:
     publicName: Digital-Asset-1
