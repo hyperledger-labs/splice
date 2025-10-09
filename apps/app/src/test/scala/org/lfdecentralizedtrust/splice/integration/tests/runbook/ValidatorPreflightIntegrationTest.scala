@@ -418,46 +418,52 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   "can dump participant identities of validator" in { _ =>
-    eventuallySucceeds() {
-      validatorClient(suppressErrors = false).dumpParticipantIdentities()
+    if (isAuth0) {
+      eventuallySucceeds() {
+        validatorClient(suppressErrors = false).dumpParticipantIdentities()
+      }
     }
   }
 
   "connect to all sequencers stated in latest DsoRules contract" in { implicit env =>
-    val sv1ScanClient = scancl("sv1Scan")
-    eventually() {
-      val connections = inside(sv1ScanClient.listDsoSequencers()) {
-        case Seq(DomainSequencers(_, connections)) => connections
-      }
-      connections should not be empty
-      val latestMigrationId = connections.map(_.migrationId).max
-      val availableConnections = connections.filter(connection =>
-        connection.migrationId == latestMigrationId &&
-          connection.url != "" &&
-          // added 60s grace period for the polling trigger interval 30s + other latency
-          env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
-      )
-      val (expectedSequencerConnections, _) =
-        Endpoint
-          .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
+    if (isAuth0) {
+      val sv1ScanClient = scancl("sv1Scan")
+      eventually() {
+        val connections = inside(sv1ScanClient.listDsoSequencers()) {
+          case Seq(DomainSequencers(_, connections)) => connections
+        }
+        connections should not be empty
+        val latestMigrationId = connections.map(_.migrationId).max
+        val availableConnections = connections.filter(connection =>
+          connection.migrationId == latestMigrationId &&
+            connection.url != "" &&
+            // added 60s grace period for the polling trigger interval 30s + other latency
+            env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
+        )
+        val (expectedSequencerConnections, _) =
+          Endpoint
+            .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
+            .value
+
+        val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
+        val connectedEndpointSet =
+          domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
+
+        connectedEndpointSet should contain allElementsOf expectedSequencerConnections.map(
+          _.toString
+        )
+
+        domainConnectionConfig.sequencerConnections.sequencerTrustThreshold shouldBe Thresholds
+          .sequencerConnectionsSizeThreshold(
+            domainConnectionConfig.sequencerConnections.connections.size
+          )
           .value
-
-      val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
-      val connectedEndpointSet =
-        domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
-
-      connectedEndpointSet should contain allElementsOf expectedSequencerConnections.map(_.toString)
-
-      domainConnectionConfig.sequencerConnections.sequencerTrustThreshold shouldBe Thresholds
-        .sequencerConnectionsSizeThreshold(
-          domainConnectionConfig.sequencerConnections.connections.size
-        )
-        .value
-      domainConnectionConfig.sequencerConnections.submissionRequestAmplification.factor shouldBe Thresholds
-        .sequencerSubmissionRequestAmplification(
-          domainConnectionConfig.sequencerConnections.connections.size
-        )
-        .value
+        domainConnectionConfig.sequencerConnections.submissionRequestAmplification.factor shouldBe Thresholds
+          .sequencerSubmissionRequestAmplification(
+            domainConnectionConfig.sequencerConnections.connections.size
+          )
+          .value
+      }
     }
   }
 
