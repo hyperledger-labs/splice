@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
+import * as _ from 'lodash';
 import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import * as config from './config';
@@ -19,16 +20,11 @@ export interface ApiEndpoint {
   hostname: string;
 }
 
-export interface ThrottleConfig {
-  perIp: boolean;
-  rate: number; // Requests per minute
-  interval: number; // Interval in seconds
-}
-
-export type CloudArmorConfig = Pick<config.CloudArmorConfig, 'enabled' | 'allRulesPreviewOnly'> & {
+export type CloudArmorConfig = config.CloudArmorConfig & {
   predefinedWafRules?: PredefinedWafRule[];
-  apiThrottles?: ApiThrottleConfig[];
 };
+
+type ThrottleConfig = CloudArmorConfig['publicEndpoints'];
 
 export interface PredefinedWafRule {
   name: string;
@@ -36,14 +32,6 @@ export interface PredefinedWafRule {
   priority?: number;
   preview?: boolean;
   sensitivityLevel?: 'off' | 'low' | 'medium' | 'high';
-}
-
-// TODO (DACH-NY/canton-network-internal#2115) replace this placeholder config
-// with the real yaml structure we want to use
-export interface ApiThrottleConfig {
-  endpoint: ApiEndpoint;
-  throttle: ThrottleConfig;
-  action: 'throttle' | 'ban';
 }
 
 /**
@@ -86,8 +74,8 @@ export function configureCloudArmorPolicy(
   addIpWhitelistRules(/*securityPolicy, cac.allRulesPreviewOnly, ruleOpts*/);
 
   // Step 4: Add throttling/banning rules for specific API endpoints
-  if (cac.apiThrottles && cac.apiThrottles.length > 0) {
-    addThrottleAndBanRules(securityPolicy, cac.apiThrottles, cac.allRulesPreviewOnly, ruleOpts);
+  if (cac.publicEndpoints && !_.isEmpty(cac.publicEndpoints)) {
+    addThrottleAndBanRules(securityPolicy, cac.publicEndpoints, cac.allRulesPreviewOnly, ruleOpts);
   }
 
   // Step 5: Add default deny rule
@@ -126,7 +114,7 @@ function addIpWhitelistRules(): void {
  */
 function addThrottleAndBanRules(
   securityPolicy: gcp.compute.SecurityPolicy,
-  apiThrottles: ApiThrottleConfig[],
+  throttles: ThrottleConfig,
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
