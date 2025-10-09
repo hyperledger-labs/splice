@@ -85,6 +85,9 @@ monitoring:
         minRate: 0.95
       mediators:
         acknowledgementLagSeconds: 900
+cloudArmor:
+  enabled: false
+  allRulesPreviewOnly: true
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:

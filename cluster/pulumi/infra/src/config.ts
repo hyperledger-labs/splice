@@ -57,6 +57,20 @@ const MonitoringConfigSchema = z.object({
     logAlerts: z.object({}).catchall(z.string()).default({}),
   }),
 });
+const CloudArmorConfigSchema = z.object({
+  enabled: z.boolean(),
+  // "preview" is not pulumi preview, but https://cloud.google.com/armor/docs/security-policy-overview#preview_mode
+  allRulesPreviewOnly: z.boolean(),
+  publicEndpoints: z
+    .object({})
+    .catchall(
+      z.object({
+        domain: z.string(),
+        // TODO (DACH-NY/canton-network-internal#2115) more config
+      })
+    )
+    .default({}),
+});
 export const InfraConfigSchema = z.object({
   infra: z.object({
     ipWhitelisting: z
@@ -75,7 +89,10 @@ export const InfraConfigSchema = z.object({
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
   monitoring: MonitoringConfigSchema,
+  cloudArmor: CloudArmorConfigSchema,
 });
+
+export type CloudArmorConfig = z.infer<typeof CloudArmorConfigSchema>;
 
 export type Config = z.infer<typeof InfraConfigSchema>;
 
@@ -92,6 +109,7 @@ console.error(
 
 export const infraConfig = fullConfig.infra;
 export const monitoringConfig = fullConfig.monitoring;
+export const cloudArmorConfig: CloudArmorConfig = fullConfig.cloudArmor;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 
