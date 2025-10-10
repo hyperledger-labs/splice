@@ -180,7 +180,7 @@ function addDefaultDenyRule(
   // when you create a SecurityPolicy it has a default allow rule; we assume
   // that if you want all rules in preview, you *also* still want to allow
   // all traffic
-  if (preview) return;
+  if (preview) {return;}
   new gcp.compute.SecurityPolicyRule(
     'default-deny',
     {
