@@ -61,7 +61,7 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
     val scheduleAt = minSchedulingTime.plus(delayFromMinSchedulingTime)
 
     logger.info(
-      s"Schedling next poll at $scheduleAt for round $selectedRound interval $minSchedulingTime -> $maxSchedulingTime"
+      s"Scheduling next poll at $scheduleAt for round $selectedRound interval $minSchedulingTime -> $maxSchedulingTime"
     )
 
     retryProvider.scheduleAtUnlessShutdown(
@@ -104,7 +104,7 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
         .filter(_.number > previousRoundWeRanFor.get)
         .minByOption(_.number) match {
         case Some(round) =>
-          logger.warn(
+          logger.info(
             s"For last round $previousRoundWeRanFor we have detected missed round $round"
           )
           scheduleBetween(
