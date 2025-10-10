@@ -85,6 +85,9 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
 
   }
 
+  @SuppressWarnings(
+    Array("org.wartremover.warts.OptionPartial", "org.wartremover.warts.IterableOps")
+  )
   protected def scheduleWithPossibleMissingRound(
       action: => Unit,
       selectedRound: Round,
