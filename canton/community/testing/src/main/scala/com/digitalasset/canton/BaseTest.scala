@@ -45,6 +45,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
+import org.slf4j.event.Level
 import org.typelevel.discipline.Laws
 
 import scala.concurrent.duration.*

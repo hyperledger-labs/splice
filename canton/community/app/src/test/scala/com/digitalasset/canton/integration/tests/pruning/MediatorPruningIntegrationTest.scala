@@ -3,7 +3,8 @@
 
 package com.digitalasset.canton.integration.tests.pruning
 
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{CantonConfig, DbConfig}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
   UsePostgres,

@@ -30,6 +30,7 @@ import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, M
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
+import com.digitalasset.canton.resource.DbMigrationsMetaFactory
 import com.digitalasset.canton.synchronizer.mediator.{
   MediatorNodeBootstrap,
   MediatorNodeBootstrapFactory,
@@ -61,17 +62,34 @@ import scala.util.control.NonFatal
 
 /** Holds all significant resources held by this process.
   */
-class Environment(
-    initialConfig: CantonConfig,
+abstract class Environment[Config <: SharedCantonConfig[Config]](
+    initialConfig: Config,
     edition: CantonEdition,
     val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
     mediatorNodeFactory: MediatorNodeBootstrapFactory,
+    protected val migrationsFactoryFactory: DbMigrationsMetaFactory,
     override val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging
     with AutoCloseable
     with NoTracing {
+
+  type Console <: ConsoleEnvironment
+
+  def createConsole(
+      consoleOutput: ConsoleOutput = StandardConsoleOutput
+  ): Console = {
+    val console = _createConsole(consoleOutput)
+    healthDumpGenerator
+      .putIfAbsent(createHealthDumpGenerator(console.grpcAdminCommandRunner))
+      .discard
+    console
+  }
+
+  protected def _createConsole(
+      consoleOutput: ConsoleOutput = StandardConsoleOutput
+  ): Console
 
   implicit val scheduler: ScheduledExecutorService =
     Threading.singleThreadScheduledExecutor(
@@ -79,39 +97,14 @@ class Environment(
       noTracingLogger,
     )
 
-  def config: CantonConfig = currentConfig.get()
-  def pokeOrUpdateConfig(
-      newConfig: Option[Either[String, CantonConfig]]
-  )(implicit traceContext: TraceContext): Unit = {
-    def pokeDeclarativeApis(configState: Either[Unit, Boolean]): Unit =
-      Seq(sequencers, mediators, participants).foreach { group =>
-        group.pokeDeclarativeApis(configState)
-      }
-    newConfig match {
-      case Some(Left(error)) =>
-        logger.error(s"Failed to load new dynamic configuration: $error")
-        pokeDeclarativeApis(Left(()))
-      case Some(Right(newConfig)) if currentConfig.get().parameters.alphaVersionSupport =>
-        logger.info(
-          s"Loaded new configuration. Static node changes will only be applied after a node restart."
-        )
-        currentConfig.set(newConfig)
-        pokeDeclarativeApis(Right(true))
-      case Some(Right(newConfig)) =>
-        val changedConfig = config.mergeDynamicChanges(newConfig)
-        logger.info(
-          s"Loaded new configuration. As we are running without alpha-features enabled, only the dynamic changes will be reused"
-        )
-        currentConfig.set(changedConfig)
-        pokeDeclarativeApis(Right(true))
-      case None =>
-        pokeDeclarativeApis(Right(false))
-    }
-  }
+  def config: Config = currentConfig.get()
 
-  private val currentConfig = new AtomicReference[CantonConfig](initialConfig)
+  private val currentConfig = new AtomicReference[Config](initialConfig)
   private val histogramInventory = new HistogramInventory()
   private val histograms = new CantonHistograms()(histogramInventory)
+  val dbStorageHistograms = new DbStorageHistograms(
+    MetricName("cn")
+  )(histogramInventory)
   private val baseFilter = new MetricsInfoFilter(
     config.monitoring.metrics.globalFilters,
     config.monitoring.metrics.qualifiers.toSet,
@@ -294,6 +287,7 @@ class Environment(
   lazy val participants =
     new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode](
       createParticipant,
+      migrationsFactoryFactory.create(clock),
       timeouts,
       config.participantsByString,
       config.participantNodeParametersByString,
@@ -304,6 +298,7 @@ class Environment(
 
   val sequencers = new SequencerNodes(
     createSequencer,
+    migrationsFactoryFactory.create(clock),
     timeouts,
     config.sequencersByString,
     config.sequencerNodeParametersByString,
@@ -313,6 +308,7 @@ class Environment(
   val mediators =
     new MediatorNodes(
       createMediator,
+      migrationsFactoryFactory.create(clock),
       timeouts,
       config.mediatorsByString,
       config.mediatorNodeParametersByString,

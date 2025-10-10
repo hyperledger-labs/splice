@@ -3,64 +3,82 @@
 
 package com.digitalasset.canton.integration
 
+import com.daml.metrics.Timed
 import com.digitalasset.canton.CloseableTest
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
+  CommandService,
+  CommandSubmissionService,
+}
+import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
-  CantonConfig,
   CantonEdition,
   DefaultPorts,
+  SharedCantonConfig,
   TestingConfigInternal,
 }
-import com.digitalasset.canton.environment.EnvironmentFactory
-import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
+import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
+import com.digitalasset.canton.integration.plugins.{
+  UseH2,
+  UsePostgres,
+  UseReferenceBlockSequencerBase,
+}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
-import scala.util.control.NonFatal
+import java.util.concurrent.TimeUnit
+import scala.util.control.{NoStackTrace, NonFatal}
+import scala.util.Try
 
 /** Provides an ability to create a canton environment when needed for test. Include
   * [[IsolatedEnvironments]] or [[SharedEnvironment]] to determine when this happens. Uses
   * [[ConcurrentEnvironmentLimiter]] to ensure we limit the number of concurrent environments in a
   * test run.
   */
-sealed trait EnvironmentSetup extends BeforeAndAfterAll {
-  this: Suite with NamedLogging =>
+sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
+    extends BeforeAndAfterAll {
+  this: Suite with IntegrationTestMetrics with NamedLogging =>
 
-  protected def environmentDefinition: EnvironmentDefinition
+  protected def environmentDefinition: BaseEnvironmentDefinition[C, E]
 
-  private lazy val envDef: EnvironmentDefinition = environmentDefinition
+  private lazy val envDef: BaseEnvironmentDefinition[C, E] = environmentDefinition
 
-  protected def environmentFactory: EnvironmentFactory
+  protected def environmentFactory: EnvironmentFactory[C, E]
 
   val edition: CantonEdition
 
   // plugins are registered during construction from a single thread
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var plugins: Seq[EnvironmentSetupPlugin] = Seq()
+  private var plugins: Seq[EnvironmentSetupPlugin[C, E]] = Seq()
 
-  protected[integration] def registerPlugin(plugin: EnvironmentSetupPlugin): Unit =
+  protected[integration] def registerPlugin(plugin: EnvironmentSetupPlugin[C, E]): Unit =
     plugins = plugins :+ plugin
 
   override protected def beforeAll(): Unit = {
-    plugins.foreach(_.beforeTests())
+    Timed.value(testInfrastructureSuiteMetrics.pluginsBeforeTests, plugins.foreach(_.beforeTests()))
     super.beforeAll()
   }
 
   override protected def afterAll(): Unit =
     try super.afterAll()
-    finally plugins.foreach(_.afterTests())
+    finally
+      Timed.value(testInfrastructureSuiteMetrics.pluginsAfterTests, plugins.foreach(_.afterTests()))
 
   /** Provide an environment for an individual test either by reusing an existing one or creating a
     * new one depending on the approach being used.
     */
-  def provideEnvironment: TestConsoleEnvironment
+  def provideEnvironment(testName: String): TestConsoleEnvironment[C, E]
 
   /** Optional hook for implementors to know when a test has finished and be provided the
     * environment instance. This is required over a afterEach hook as we need the environment
     * instance passed.
     */
-  def testFinished(environment: TestConsoleEnvironment): Unit = {}
+  def testFinished(testName: String, environment: TestConsoleEnvironment[C, E]): Unit = {}
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 

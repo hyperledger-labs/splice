@@ -950,6 +950,7 @@ class DeclarativeParticipantApi(
                 expectedMainPackageId = "",
                 requestHeaders = Map.empty,
                 logger,
+                None,
               )
             ).map(_ => ())
           },

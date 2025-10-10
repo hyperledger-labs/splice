@@ -5,8 +5,9 @@ package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.StorageConfig
+import com.digitalasset.canton.config.{CantonConfig, StorageConfig}
 import com.digitalasset.canton.console.InstanceReference
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,

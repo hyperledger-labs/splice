@@ -16,6 +16,7 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.DefaultProcessingTimeouts.shutdownProcessing
 import com.digitalasset.canton.crypto.kms.{Kms, KmsError, KmsFactory, KmsKeyId}
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStore, EncryptedCryptoPrivateStore}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{
   ConfigTransforms,
   EnvironmentSetupPlugin,

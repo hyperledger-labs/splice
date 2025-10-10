@@ -7,9 +7,10 @@ import com.daml.ledger.api.v2.commands.Command
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedCreatedEvent
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.ConsoleCommandTimeout
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, CantonConfig}
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.cycle as M
 import com.digitalasset.canton.examples.java.cycle.Cycle
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
