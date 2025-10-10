@@ -20,6 +20,7 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MaybeCachedContract
 import org.lfdecentralizedtrust.splice.util.JavaDecodeUtil
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ledger.api.validation.ValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
