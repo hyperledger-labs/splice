@@ -394,6 +394,32 @@ class SuppressingLogger private[logging] (
     logEntries.foreach(_ => recordedLogEntries.remove())
   }
 
+  /** Variant of assertLogsSeq where assertions can depend on the result of the
+    * computation.
+    */
+  def assertLogsSeqWithResult[A](
+      rule: SuppressionRule
+  )(within: => A, assertion: (A, Seq[LogEntry]) => Assertion): A =
+    suppress(rule) {
+      runWithCleanup(
+        {
+          within
+        },
+        { (result: A) =>
+          // check the log
+
+          val logEntries = recordedLogEntries.asScala.toSeq
+
+          assertion(result, logEntries)
+
+          // Remove checked log entries only if check succeeds.
+          // This is to allow for retries, if the check fails.
+          logEntries.foreach(_ => recordedLogEntries.remove())
+        },
+        () => (),
+      )
+    }
+
   /** Asserts that the sequence of logged warnings/errors meets a set of expected log messages. */
   def assertLogsSeqString[A](rule: SuppressionRule, expectedLogs: Seq[String])(within: => A): A =
     assertLogsSeq(rule)(
@@ -609,6 +635,9 @@ class SuppressingLogger private[logging] (
         doFinally()
     }
   }
+
+  private def runWithCleanup[T](body: => T, onSuccess: () => Unit, doFinally: () => Unit): T =
+    runWithCleanup(body, (_: T) => onSuccess(), doFinally)
 
   private def beginSuppress(rule: SuppressionRule): () => Unit = {
     // Nested usages are not supported, because we clear the message queue when the suppression begins.

@@ -20,7 +20,7 @@ import com.digitalasset.canton.protocol.TestSynchronizerParameters
 
 import scala.concurrent.Future
 
-trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
+trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment[CantonConfig, CantonEnvironment] {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
@@ -77,7 +77,7 @@ trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with Share
   }
 
   private def countFinalizedResponses()(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Future[Long] = {
     val daMediatorStateInspection =
       env.mediator1.underlying

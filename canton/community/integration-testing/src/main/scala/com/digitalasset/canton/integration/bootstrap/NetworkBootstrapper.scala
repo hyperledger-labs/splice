@@ -12,6 +12,7 @@ import com.digitalasset.canton.console.{
   MediatorReference,
   SequencerReference,
 }
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
@@ -24,7 +25,7 @@ import monocle.syntax.all.*
   * Starts all sequencers and mediators, and all participants that auto-initialize.
   */
 class NetworkBootstrapper(networks: NetworkTopologyDescription*)(implicit
-    env: TestConsoleEnvironment
+    env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
 ) {
   def bootstrap(): Unit = {
     // Start all local nodes needed for bootstrap
@@ -69,7 +70,7 @@ class NetworkBootstrapper(networks: NetworkTopologyDescription*)(implicit
 
 object NetworkBootstrapper {
   def apply(networks: Seq[NetworkTopologyDescription])(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): NetworkBootstrapper = new NetworkBootstrapper(networks*)
 }
 

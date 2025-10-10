@@ -52,8 +52,8 @@ final case class AssignmentValidationResult private[reassignment] (
     val isReassignmentActive: Boolean =
       !reassigningParticipantValidationResult.isUnassignmentDataNotFound &&
         !reassigningParticipantValidationResult.isAssignmentCompleted &&
-        commonValidationResult.activenessResult.inactiveReassignments.contains(reassignmentId)
-        && commonValidationResult.activenessResult.contracts.isSuccessful
+        commonValidationResult.activenessResult.inactiveReassignments.contains(reassignmentId) &&
+        commonValidationResult.activenessResult.contracts.isSuccessful
 
     commonValidationResult.activenessResult.isSuccessful || isReassignmentActive
   }

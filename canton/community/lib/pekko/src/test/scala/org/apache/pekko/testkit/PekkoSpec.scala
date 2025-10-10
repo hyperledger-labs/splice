@@ -7,7 +7,7 @@
 package org.apache.pekko.testkit
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import org.scalactic.CanEqual
@@ -23,7 +23,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.dispatch.Dispatchers
 import org.apache.pekko.event.Logging
 import org.apache.pekko.event.LoggingAdapter
-import org.apache.pekko.testkit.TestEvent._
+import org.apache.pekko.testkit.TestEvent.*
 
 object PekkoSpec {
   val testConf: Config = ConfigFactory.parseString("""
@@ -45,7 +45,7 @@ object PekkoSpec {
       """)
 
   def mapToConfig(map: Map[String, Any]): Config = {
-    import org.apache.pekko.util.ccompat.JavaConverters._
+    import org.apache.pekko.util.ccompat.JavaConverters.*
     ConfigFactory.parseMap(map.asJava)
   }
 

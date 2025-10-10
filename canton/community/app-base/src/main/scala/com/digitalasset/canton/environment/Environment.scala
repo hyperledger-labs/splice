@@ -7,10 +7,12 @@ import better.files.File
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.metrics.api.{HistogramInventory, MetricsInfoFilter}
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
+import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.concurrent.*
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.{
+  CantonConsoleEnvironment,
   ConsoleEnvironment,
   ConsoleOutput,
   GrpcAdminCommandRunner,
@@ -24,7 +26,7 @@ import com.digitalasset.canton.environment.Environment.*
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
-import com.digitalasset.canton.metrics.{CantonHistograms, MetricsRegistry}
+import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, MetricsRegistry}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
@@ -145,17 +147,6 @@ class Environment(
 
   def isEnterprise: Boolean = edition == EnterpriseCantonEdition
 
-  def createConsole(
-      consoleOutput: ConsoleOutput = StandardConsoleOutput
-  ): ConsoleEnvironment = {
-    val console =
-      new ConsoleEnvironment(this, consoleOutput)
-    healthDumpGenerator
-      .putIfAbsent(createHealthDumpGenerator(console.grpcAdminCommandRunner))
-      .discard
-    console
-  }
-
   @VisibleForTesting
   protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
@@ -203,6 +194,11 @@ class Environment(
     Threading.newExecutionContext(
       loggerFactory.threadName + "-env-ec",
       noTracingLogger,
+      Some(
+        new ExecutorServiceMetrics(
+          metricsRegistry.generateMetricsFactory(MetricsContext.Empty)
+        )
+      ),
       numThreads,
     )
 
@@ -605,10 +601,35 @@ object Environment {
 
 }
 
-trait EnvironmentFactory {
+trait EnvironmentFactory[C <: SharedCantonConfig[C], E <: Environment[C]] {
   def create(
-      config: CantonConfig,
+      config: C,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal = TestingConfigInternal(),
-  ): Environment
+  ): E
+}
+
+final class CantonEnvironment(
+    override val config: CantonConfig,
+    edition: CantonEdition,
+    override val testingConfig: TestingConfigInternal,
+    participantNodeFactory: ParticipantNodeBootstrapFactory,
+    sequencerNodeFactory: SequencerNodeBootstrapFactory,
+    mediatorNodeFactory: MediatorNodeBootstrapFactory,
+    migrationsFactoryFactory: DbMigrationsMetaFactory,
+    override val loggerFactory: NamedLoggerFactory,
+) extends Environment[CantonConfig](
+      config,
+      edition,
+      testingConfig,
+      participantNodeFactory,
+      sequencerNodeFactory,
+      mediatorNodeFactory,
+      migrationsFactoryFactory,
+      loggerFactory,
+    ) {
+
+  override type Console = CantonConsoleEnvironment
+  override def _createConsole(output: ConsoleOutput) =
+    new CantonConsoleEnvironment(this, output)
 }

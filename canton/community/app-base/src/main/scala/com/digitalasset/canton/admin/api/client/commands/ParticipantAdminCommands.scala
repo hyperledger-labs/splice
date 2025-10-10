@@ -196,12 +196,17 @@ object ParticipantAdminCommands {
           .traverse(dar =>
             for {
               _ <- Either.cond(dar.darPath.nonEmpty, (), "Provided DAR path is empty")
-              filenameAndDarData <- loadDarData(dar.darPath)
+              filenameAndDarData <- dar.darDataO.fold(loadDarData(dar.darPath))(darData =>
+                Right(Paths.get(dar.darPath).getFileName.toString -> darData)
+              )
               (filename, darData) = filenameAndDarData
               descriptionOrFilename =
                 if (dar.description.isEmpty)
                   PathUtils.getFilenameWithoutExtension(Path.of(filename))
                 else dar.description
+              _ = logger.info(s"Sending upload dar for ${descriptionOrFilename}")(
+                TraceContext.empty
+              )
             } yield v30.UploadDarRequest.UploadDarData(
               darData,
               Some(descriptionOrFilename),

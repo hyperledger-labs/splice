@@ -57,6 +57,7 @@ import com.daml.ledger.javaapi.data.{
   Transaction,
   TransactionFormat,
 }
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.*
@@ -123,7 +124,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
   implicit protected[canton] lazy val executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
 
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
 
   protected val name: String
 
@@ -154,13 +155,13 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
     )
 
-  private[canton] def optionallyAwait[Tx](
+  def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       txSynchronizerId: String,
       optTimeout: Option[config.NonNegativeDuration],
   ): Tx
-  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
+  def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
   protected def defaultLimit: PositiveInt =
     consoleEnvironment.environment.config.parameters.console.defaultLimit
 
@@ -1421,6 +1422,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
+            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -3011,7 +3013,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 trait LedgerApiAdministration extends BaseLedgerApiAdministration {
   this: LedgerApiCommandRunner & AdminCommandRunner & NamedLogging & FeatureFlagFilter =>
 
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
   protected val name: String
 
   import com.digitalasset.canton.util.ShowUtil.*
@@ -3145,7 +3147,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  override private[canton] def optionallyAwait[T](
+  override def optionallyAwait[T](
       update: T,
       updateId: String,
       txSynchronizerId: String,

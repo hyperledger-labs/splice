@@ -18,7 +18,7 @@ import com.digitalasset.canton.topology.{Party, PartyId}
 /** Adds the ability to run cycles to integration tests
   */
 trait HasCycleUtils {
-  this: BaseIntegrationTest =>
+  this: BaseIntegrationTest[CantonConfig, CantonEnvironment] =>
 
   /** @param partyId
     *   assumes that the party is hosted on participant1 AND participant2 (in the simplest case this

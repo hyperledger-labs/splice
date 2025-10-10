@@ -17,7 +17,7 @@ import com.digitalasset.canton.integration.{
 
 sealed trait SimplestPingCommunityIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment {
+    with SharedEnvironment[CantonConfig, CantonEnvironment] {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.simpleTopology

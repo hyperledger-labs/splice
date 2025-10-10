@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
+import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
@@ -144,6 +144,11 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
       optionTAssertion: OptionT[Future, Assertion]
   )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
     optionTAssertion.getOrElse(fail(s"Unexpected None value"))
+
+  implicit def futureUnlessShutdownAssertionOfOptionTAssertion(
+      optionTAssertion: OptionT[FutureUnlessShutdown, Assertion]
+  )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
+    optionTAssertion.getOrElse(fail(s"Unexpected None value")).failOnShutdown("shutdown")
 
   /** Converts an EitherT into a Future, failing in case of a [[scala.Left$]]. */
   def valueOrFail[F[_], A, B](e: EitherT[F, A, B])(
@@ -368,6 +373,15 @@ trait BaseTest
         throw ex
     }
   }
+
+  /** Suppressed failed clue messages to make our log-checker happy when using clues within an eventually. */
+  def suppressFailedClues[T](loggerFactory: SuppressingLogger)(expr: => T): T =
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
+      expr,
+      logEntries =>
+        forAll(logEntries)(logEntry => logEntry.message should startWith("Failed: clue")),
+    )
+
   def clueFUS[T](
       message: String
   )(expr: => FutureUnlessShutdown[T])(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
@@ -408,6 +422,23 @@ trait BaseTest
       maxPollInterval,
       retryOnTestFailuresOnly = retryOnTestFailuresOnly,
     )(testCode)
+
+  /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
+    */
+  def eventuallySucceeds[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+      suppressErrors: Boolean = true,
+  )(testCode: => T): T = {
+    eventually(timeUntilSuccess, maxPollInterval) {
+      try {
+        if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
+      } catch {
+        case e: TestFailedException => throw e
+        case NonFatal(e) => fail(e)
+      }
+    }
+  }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
     * @return
@@ -472,6 +503,8 @@ trait BaseTest
 }
 
 object BaseTest {
+  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
+
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
       PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
@@ -527,8 +560,8 @@ object BaseTest {
     )
   )
   def eventually[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
+      timeUntilSuccess: FiniteDuration = DefaultEventuallyTimeUntilSuccess,
+      maxPollInterval: FiniteDuration = 100.millis,
       retryOnTestFailuresOnly: Boolean = true,
   )(testCode: => T): T = {
     require(
@@ -536,7 +569,7 @@ object BaseTest {
       s"The timeout must not be negative, but is $timeUntilSuccess",
     )
     val deadline = timeUntilSuccess.fromNow
-    var sleepMs = 1L
+    var sleepMs = 10L min (maxPollInterval.toMillis / 10L)
     def sleep(): Unit = {
       val timeLeft = deadline.timeLeft.toMillis max 0
       Threading.sleep(sleepMs min timeLeft)

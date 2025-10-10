@@ -31,7 +31,7 @@ import scala.concurrent.duration.DurationInt
   */
 trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   override lazy val environmentDefinition: EnvironmentDefinition =

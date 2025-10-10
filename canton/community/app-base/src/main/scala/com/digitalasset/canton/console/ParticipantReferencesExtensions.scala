@@ -37,6 +37,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
         requestHeaders: Map[String, String] = Map(),
+        darDataO: Option[ByteString] = None,
     ): Map[ParticipantReference, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
@@ -50,6 +51,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
             expectedMainPackageId = expectedMainPackageId,
             requestHeaders = requestHeaders,
             logger,
+            darDataO,
           )
       )
       if (synchronizeVetting && vetAllPackages) {
