@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.util.RoundBasedDelayedFutureScheduler.{
   IssuingRoundReader,
   OpenRoundReader,
+  Round,
 }
 
 import java.time.Instant
@@ -27,10 +28,17 @@ import scala.util.Random
 
 trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with NamedLogging {
 
+  private val lastRoundWeRanFor =
+    new java.util.concurrent.atomic.AtomicReference[Option[Long]](None)
+
   def retryProvider: RetryProvider
+
   def clock: Clock
 
-  protected def scheduleBetween(
+  def config: AutomationConfig
+
+  private def scheduleBetween(
+      selectedRound: Round,
       action: => Unit,
       minSchedulingTime: Instant,
       maxSchedulingTime: Instant,
@@ -44,6 +52,7 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
         .abs
         .toNanos
     }
+
     val delayFromMinSchedulingTime = java.time.Duration.ofNanos(
       Random.nextLong(
         nanosBetweenSchedulingInterval
@@ -52,7 +61,7 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
     val scheduleAt = minSchedulingTime.plus(delayFromMinSchedulingTime)
 
     logger.info(
-      s"Schedling next poll at $scheduleAt for interval $minSchedulingTime -> $maxSchedulingTime"
+      s"Schedling next poll at $scheduleAt for round $selectedRound interval $minSchedulingTime -> $maxSchedulingTime"
     )
 
     retryProvider.scheduleAtUnlessShutdown(
@@ -64,11 +73,66 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
     )
   }
 
+  protected def scheduleBasedOnRegularInterval(
+      action: => Unit
+  )(implicit ec: ExecutionContext): FutureUnlessShutdown[Unit] = {
+    retryProvider.scheduleAfterUnlessShutdown(
+      Future.successful(action),
+      clock,
+      config.rewardOperationPollingInterval,
+      config.rewardOperationPollingJitter,
+    )
+
+  }
+
+  protected def scheduleWithPossibleMissingRound(
+      action: => Unit,
+      selectedRound: Round,
+      rounds: Seq[Round],
+      maxSchedulingTime: Instant,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): FutureUnlessShutdown[Unit] = {
+    val previousRoundWeRanFor = lastRoundWeRanFor.get()
+    val isThereAMissedRound = previousRoundWeRanFor.exists(_ < selectedRound.number - 1)
+    if (isThereAMissedRound) {
+      rounds
+        .filter(_.number > previousRoundWeRanFor.get)
+        .minByOption(_.number) match {
+        case Some(round) =>
+          logger.warn(
+            s"For last round $previousRoundWeRanFor we have detected missed round $round"
+          )
+          scheduleBetween(
+            selectedRound,
+            action,
+            Seq(round.opensAt, clock.now.toInstant).max,
+            Seq(round.targetClosesAt.minusSeconds(30), clock.now.toInstant).max,
+          )
+        case None =>
+          logger.warn(
+            s"For last round $previousRoundWeRanFor we have detected missed rounds for $rounds but no newer round is found. Scheduling with regular interval"
+          )
+          scheduleBasedOnRegularInterval(action)
+      }
+    } else {
+      lastRoundWeRanFor.set(Some(selectedRound.number))
+      val minSchedulingTimeForOpenRound = selectedRound.opensAt
+      scheduleBetween(
+        selectedRound,
+        action,
+        minSchedulingTimeForOpenRound,
+        maxSchedulingTime,
+      )
+    }
+
+  }
 }
 
 class OpenRoundBasedUniformFutureScheduler(
     openRoundReader: OpenRoundReader,
-    config: AutomationConfig,
+    val config: AutomationConfig,
     val clock: Clock,
     val retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
@@ -86,22 +150,25 @@ class OpenRoundBasedUniformFutureScheduler(
           openRounds.filter(_.opensAt.isAfter(clock.now.toInstant)).minByOption(_.opensAt)
         firstRoundThatWillOpenInTheFuture match {
           case Some(round) =>
-            val minSchedulingTimeForOpenRound = round.opensAt
-            // the triggers always do a run during startup so we can ignore that scenario as it would cover any rounds missed previosly
-            // therefore we always schedule just for the next open round
-            scheduleBetween(
+            scheduleWithPossibleMissingRound(
               action,
-              minSchedulingTimeForOpenRound,
-              minSchedulingTimeForOpenRound.plus(maxSchedulingInterval(round)),
+              Round(
+                opensAt = round.opensAt,
+                targetClosesAt = round.targetClosesAt,
+                number = round.round.number,
+              ),
+              openRounds.map(r =>
+                Round(
+                  opensAt = r.opensAt,
+                  targetClosesAt = r.targetClosesAt,
+                  number = r.round.number,
+                )
+              ),
+              round.opensAt.plus(maxSchedulingInterval(round)),
             )
           case None =>
-            logger.warn("No future open round, scheduling next poll with fixed interval")
-            retryProvider.scheduleAfterUnlessShutdown(
-              Future.successful(action),
-              clock,
-              config.rewardOperationPollingInterval,
-              config.rewardOperationPollingJitter,
-            )
+            logger.info("No future open round, scheduling next poll with fixed interval")
+            scheduleBasedOnRegularInterval(action)
         }
       }
   }
@@ -119,7 +186,7 @@ class OpenRoundBasedUniformFutureScheduler(
 
 class IssuingRoundBasedUniformFutureScheduler(
     roundReader: IssuingRoundReader,
-    config: AutomationConfig,
+    val config: AutomationConfig,
     val clock: Clock,
     val retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
@@ -136,22 +203,25 @@ class IssuingRoundBasedUniformFutureScheduler(
         val futureRounds = issuingRounds.filter(_.opensAt.isAfter(clock.now.toInstant))
         futureRounds.minByOption(_.opensAt) match {
           case Some(round) =>
-            val minSchedulingTimeForOpenRound = round.opensAt
-            // the triggers always do a run during startup so we can ignore that scenario as it would cover any rounds missed previosly
-            // therefore we always schedule just for the next open round
-            scheduleBetween(
+            scheduleWithPossibleMissingRound(
               action,
-              minSchedulingTimeForOpenRound,
-              maxSchedulingTimeForRound(round, futureRounds),
+              Round(
+                opensAt = round.opensAt,
+                targetClosesAt = round.targetClosesAt,
+                number = round.round.number,
+              ),
+              futureRounds.map(r =>
+                Round(
+                  opensAt = r.opensAt,
+                  targetClosesAt = r.targetClosesAt,
+                  number = r.round.number,
+                )
+              ),
+              maxSchedulingTimeForRound(round, issuingRounds),
             )
           case None =>
-            logger.warn("No future issuing round, scheduling next poll with fixed interval")
-            retryProvider.scheduleAfterUnlessShutdown(
-              Future.successful(action),
-              clock,
-              config.rewardOperationPollingInterval,
-              config.rewardOperationPollingJitter,
-            )
+            logger.info("No future issuing round, scheduling next poll with fixed interval")
+            scheduleBasedOnRegularInterval(action)
         }
       }
   }
@@ -166,9 +236,16 @@ class IssuingRoundBasedUniformFutureScheduler(
         round.targetClosesAt
     }
   }
+
 }
 
 object RoundBasedDelayedFutureScheduler {
+
+  case class Round(
+      opensAt: Instant,
+      targetClosesAt: Instant,
+      number: Long,
+  )
   trait OpenRoundReader {
     def getOpenRounds(implicit
         ec: ExecutionContext,
