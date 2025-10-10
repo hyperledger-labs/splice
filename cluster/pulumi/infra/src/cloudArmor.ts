@@ -177,6 +177,10 @@ function addDefaultDenyRule(
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
+  // when you create a SecurityPolicy it has a default allow rule; we assume
+  // that if you want all rules in preview, you *also* still want to allow
+  // all traffic
+  // TODO (DACH-NY/canton-network-internal#2152) if (preview) return;
   new gcp.compute.SecurityPolicyRule(
     'default-deny',
     {
