@@ -15,7 +15,6 @@ import com.digitalasset.canton.config.{
   CantonConfig,
   TlsServerConfig,
 }
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
 import com.digitalasset.canton.lifecycle.LifeCycle.{CloseableServer, toCloseableServer}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -64,7 +63,7 @@ class OtlpGrpcServer(protected val loggerFactory: NamedLoggerFactory)
       synchronized(
         traceSpans.addAll(
           request.getResourceSpansList.asScala
-            .flatMap(_.getInstrumentationLibrarySpansList.asScala)
+            .flatMap(_.getScopeSpansList.asScala)
             .flatMap(_.getSpansList.asScala)
         )
       )
@@ -111,7 +110,7 @@ class UseOtlp(
     protected val trustCollectionPath: Option[String] = None,
     protected val tls: Option[TlsServerConfig] = None,
     protected val otlpHeaders: Map[String, String] = Map.empty,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with AutoCloseable {
 
   private var otlpServer: OtlpGrpcServer = _
@@ -131,7 +130,7 @@ class UseOtlp(
       .replace(BatchSpanProcessor(batchSize = Some(64), scheduleDelay = Some(50.millis)))
 
   private def startServer(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): CloseableServer = {
     import env.*
 
@@ -165,13 +164,12 @@ class UseOtlp(
 
   override def afterEnvironmentCreated(
       config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment,
   ): Unit =
     grpcServer = startServer(environment)
 
   override def beforeEnvironmentDestroyed(
-      config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment
   ): Unit = {}
 
   override def afterEnvironmentDestroyed(config: CantonConfig): Unit =

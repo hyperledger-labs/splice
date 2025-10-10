@@ -47,7 +47,7 @@ final case class ActiveContractOld(
 
 }
 
-object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
+private[canton] object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
 
   override def name: String = "ActiveContractOld"
 
@@ -85,7 +85,7 @@ object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
       protocolVersionRepresentativeFor(protocolVersion)
     )
 
-  def loadFromByteString(
+  private[admin] def loadFromByteString(
       bytes: ByteString
   ): Either[String, List[ActiveContractOld]] =
     for {

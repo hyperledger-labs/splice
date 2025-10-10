@@ -9,7 +9,6 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.ConfigTransforms.generateUniqueH2DatabaseName
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.{
@@ -57,7 +56,7 @@ abstract class UseReferenceBlockSequencerBase[
     sequencerGroups: SequencerSynchronizerGroups = SingleSynchronizer,
     postgres: Option[UsePostgres] = None,
 )(implicit c: ClassTag[StorageConfigT])
-    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
+    extends EnvironmentSetupPlugin {
 
   private implicit val pluginExecutionContext: ExecutionContext =
     Threading.newExecutionContext(
@@ -78,7 +77,7 @@ abstract class UseReferenceBlockSequencerBase[
       NonEmpty(
         List,
         dbNameForGroup(0), // db 0 is the default one
-        (1 to sequencerGroups.numberOfSynchronizers).map(i => dbNameForGroup(i)).toList*
+        (1 to sequencerGroups.numberOfSynchronizers).map(i => dbNameForGroup(i)).toList *,
       )
   }
 

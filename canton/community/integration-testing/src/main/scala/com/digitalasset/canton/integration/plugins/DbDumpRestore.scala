@@ -4,9 +4,7 @@
 package com.digitalasset.canton.integration.plugins
 
 import better.files.File
-import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.console.InstanceReference
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.{TempDirectory, TempFile}
 
@@ -21,7 +19,7 @@ trait DbDumpRestore {
   def copyToLocal(source: TempDirectory, target: File): Unit
 
   def saveDump(node: InstanceReference, tempFile: TempFile)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Future[Unit]
 
   def saveDump(nodeName: String, tempFile: TempFile): Future[Unit]
@@ -29,7 +27,7 @@ trait DbDumpRestore {
   def createParent(tempFile: TempFile): Future[Unit]
 
   def restoreDump(node: InstanceReference, dumpFileName: Path)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Future[Unit]
 
   def restoreDump(nodeName: String, dumpFileName: Path): Future[Unit]

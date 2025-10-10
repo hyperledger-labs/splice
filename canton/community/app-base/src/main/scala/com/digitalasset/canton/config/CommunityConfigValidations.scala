@@ -170,14 +170,12 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val CantonConfig(
-      _,
       participants,
       sequencers,
       mediators,
       remoteParticipants,
       remoteSequencers,
       remoteMediators,
-      _,
       _,
       _,
       _,

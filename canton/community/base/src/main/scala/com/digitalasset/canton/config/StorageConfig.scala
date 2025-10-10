@@ -426,7 +426,7 @@ object DbConfig {
 
   private val stableDir = "stable"
   private val devDir = "dev"
-  private val basePostgresMigrationsPath: String = "classpath:db/migration/canton-network/postgres/"
+  private val basePostgresMigrationsPath: String = "classpath:db/migration/canton/postgres/"
   private val baseH2MigrationsPath: String = "classpath:db/migration/canton/h2/"
   val postgresMigrationsPathStable: String = basePostgresMigrationsPath + stableDir
   val h2MigrationsPathStable: String = baseH2MigrationsPath + stableDir
