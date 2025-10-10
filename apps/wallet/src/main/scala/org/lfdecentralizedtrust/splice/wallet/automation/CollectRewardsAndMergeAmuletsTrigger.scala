@@ -47,6 +47,7 @@ class CollectRewardsAndMergeAmuletsTrigger(
           scanConnection
             .getOpenAndIssuingMiningRounds()(ec, mat, tc)
             .map(_._2.map(_.contract.payload))(ec),
+        context.config,
         clock,
         context.retryProvider,
         loggerFactory,

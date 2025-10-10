@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -14,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.util.RoundBasedDelayedFutureScheduler.{
   IssuingRoundReader,
@@ -68,6 +68,7 @@ trait RoundBasedDelayedFutureScheduler extends DelayedFutureScheduler with Named
 
 class OpenRoundBasedUniformFutureScheduler(
     openRoundReader: OpenRoundReader,
+    config: AutomationConfig,
     val clock: Clock,
     val retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
@@ -94,10 +95,12 @@ class OpenRoundBasedUniformFutureScheduler(
               minSchedulingTimeForOpenRound.plus(maxSchedulingInterval(round)),
             )
           case None =>
+            logger.warn("No future open round, scheduling next poll with fixed interval")
             retryProvider.scheduleAfterUnlessShutdown(
               Future.successful(action),
               clock,
-              NonNegativeFiniteDuration.ofMinutes(1),
+              config.rewardOperationPollingInterval,
+              config.rewardOperationPollingJitter,
             )
         }
       }
@@ -116,6 +119,7 @@ class OpenRoundBasedUniformFutureScheduler(
 
 class IssuingRoundBasedUniformFutureScheduler(
     roundReader: IssuingRoundReader,
+    config: AutomationConfig,
     val clock: Clock,
     val retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
@@ -141,10 +145,12 @@ class IssuingRoundBasedUniformFutureScheduler(
               maxSchedulingTimeForRound(round, futureRounds),
             )
           case None =>
+            logger.warn("No future issuing round, scheduling next poll with fixed interval")
             retryProvider.scheduleAfterUnlessShutdown(
               Future.successful(action),
               clock,
-              NonNegativeFiniteDuration.ofMinutes(1),
+              config.rewardOperationPollingInterval,
+              config.rewardOperationPollingJitter,
             )
         }
       }

@@ -54,6 +54,7 @@ class ReceiveSvRewardCouponTrigger(
       new OpenRoundBasedUniformFutureScheduler(
         (ec: ExecutionContext, tc: TraceContext) =>
           store.getOpenMiningRoundTriple()(ec, tc).map(_.toSeq.map(_.payload))(ec),
+        context.config,
         context.clock,
         context.retryProvider,
         loggerFactory,

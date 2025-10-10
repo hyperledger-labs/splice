@@ -56,6 +56,7 @@ class ReceiveFaucetCouponTrigger(
           scanConnection
             .getOpenAndIssuingMiningRounds()(ec, materializer, tc)
             .map(_._1.map(_.contract.payload))(ec),
+        context.config,
         clock,
         context.retryProvider,
         loggerFactory,
