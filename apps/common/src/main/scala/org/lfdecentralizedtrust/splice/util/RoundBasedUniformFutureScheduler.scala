@@ -29,8 +29,8 @@ class RoundBasedUniformFutureScheduler(
   override def scheduleNextPoll(
       action: => Unit
   )(implicit ec: ExecutionContext, tc: TraceContext): FutureUnlessShutdown[Unit] = {
-    FutureUnlessShutdown
-      .outcomeF(
+    retryProvider
+      .waitUnlessShutdown(
         openRoundReader.getOpenRounds
       )
       .flatMap { openRounds =>
