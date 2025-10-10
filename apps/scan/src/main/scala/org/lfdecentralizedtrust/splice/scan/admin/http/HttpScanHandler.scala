@@ -523,14 +523,20 @@ class HttpScanHandler(
       store
         .getTopProvidersByAppRewards(asOfEndOfRound, limit)
         .map(res =>
-          v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
-            definitions
-              .GetTopProvidersByAppRewardsResponse(
-                res
-                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
-                  .toVector
-              )
-          )
+          if (res.isEmpty) {
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse.NotFound(
+              ErrorResponse(s"No top providers by app rewards found for round $asOfEndOfRound")
+            )
+          } else {
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
+              definitions
+                .GetTopProvidersByAppRewardsResponse(
+                  res
+                    .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                    .toVector
+                )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -549,14 +555,22 @@ class HttpScanHandler(
       store
         .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
         .map(res =>
-          v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
-            definitions
-              .GetTopValidatorsByValidatorRewardsResponse(
-                res
-                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
-                  .toVector
+          if (res.isEmpty) {
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.NotFound(
+              ErrorResponse(
+                s"No top validators by validator rewards found for round $asOfEndOfRound"
               )
-          )
+            )
+          } else {
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
+              definitions
+                .GetTopValidatorsByValidatorRewardsResponse(
+                  res
+                    .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                    .toVector
+                )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -596,21 +610,29 @@ class HttpScanHandler(
       store
         .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
         .map(validatorTraffic =>
-          v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
-            definitions.GetTopValidatorsByPurchasedTrafficResponse(
-              validatorTraffic
-                .map(t =>
-                  definitions.ValidatorPurchasedTraffic(
-                    Codec.encode(t.validator),
-                    t.numPurchases,
-                    t.totalTrafficPurchased,
-                    Codec.encode(t.totalCcSpent),
-                    t.lastPurchasedInRound,
-                  )
-                )
-                .toVector
+          if (validatorTraffic.isEmpty) {
+            v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.NotFound(
+              ErrorResponse(
+                s"No top validators by purchased traffic found for round $asOfEndOfRound"
+              )
             )
-          )
+          } else {
+            v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
+              definitions.GetTopValidatorsByPurchasedTrafficResponse(
+                validatorTraffic
+                  .map(t =>
+                    definitions.ValidatorPurchasedTraffic(
+                      Codec.encode(t.validator),
+                      t.numPurchases,
+                      t.totalTrafficPurchased,
+                      Codec.encode(t.totalCcSpent),
+                      t.lastPurchasedInRound,
+                    )
+                  )
+                  .toVector
+              )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")

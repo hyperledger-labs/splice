@@ -63,6 +63,10 @@ object JdbcIndexer {
       val ingestionStorageBackend = factory.createIngestionStorageBackend
       val parameterStorageBackend =
         factory.createParameterStorageBackend(inMemoryState.stringInterningView)
+      val contractStorageBackend = factory.createContractStorageBackend(
+        inMemoryState.stringInterningView,
+        inMemoryState.ledgerEndCache,
+      )
       val DBLockStorageBackend = factory.createDBLockStorageBackend
       val stringInterningStorageBackend = factory.createStringInterningStorageBackend
       val completionStorageBackend =
@@ -96,6 +100,7 @@ object JdbcIndexer {
         parallelIndexerSubscription = ParallelIndexerSubscription(
           parameterStorageBackend = parameterStorageBackend,
           ingestionStorageBackend = ingestionStorageBackend,
+          contractStorageBackend = contractStorageBackend,
           participantId = participantId,
           translation = new LfValueTranslation(
             metrics = metrics,
@@ -105,9 +110,14 @@ object JdbcIndexer {
           ),
           compressionStrategy =
             if (config.enableCompression) CompressionStrategy.allGZIP(metrics)
-            else CompressionStrategy.none(metrics),
+            else
+              CompressionStrategy.buildFromConfig(metrics)(
+                config.enableCompressionConsumingExercise,
+                config.enableCompressionNonConsumingExercise,
+              ),
           maxInputBufferSize = config.maxInputBufferSize.unwrap,
           inputMappingParallelism = config.inputMappingParallelism.unwrap,
+          dbPrepareParallelism = config.dbPrepareParallelism.unwrap,
           batchingParallelism = config.batchingParallelism.unwrap,
           ingestionParallelism = ingestionParallelism,
           submissionBatchSize = config.submissionBatchSize,

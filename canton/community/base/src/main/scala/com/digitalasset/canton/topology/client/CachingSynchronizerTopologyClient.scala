@@ -19,15 +19,17 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.protocol.{
   DynamicSequencingParametersWithValidity,
   DynamicSynchronizerParametersWithValidity,
+  StaticSynchronizerParameters,
 }
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.processing.*
 import com.digitalasset.canton.topology.store.{
-  PackageDependencyResolverUS,
+  PackageDependencyResolver,
   TopologyStore,
   TopologyStoreId,
+  UnknownOrUnvettedPackages,
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -49,6 +51,9 @@ final class CachingSynchronizerTopologyClient(
 )(implicit val executionContext: ExecutionContext)
     extends SynchronizerTopologyClientWithInit
     with NamedLogging {
+
+  override def staticSynchronizerParameters: StaticSynchronizerParameters =
+    delegate.staticSynchronizerParameters
 
   override def updateHead(
       sequencedTimestamp: SequencedTime,
@@ -272,9 +277,10 @@ object CachingSynchronizerTopologyClient {
 
   def create(
       clock: Clock,
+      staticSynchronizerParameters: StaticSynchronizerParameters,
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
       synchronizerPredecessor: Option[SynchronizerPredecessor],
-      packageDependenciesResolver: PackageDependencyResolverUS,
+      packageDependenciesResolver: PackageDependencyResolver,
       cachingConfigs: CachingConfigs,
       batchingConfig: BatchingConfig,
       timeouts: ProcessingTimeout,
@@ -290,6 +296,7 @@ object CachingSynchronizerTopologyClient {
     val dbClient =
       new StoreBasedSynchronizerTopologyClient(
         clock,
+        staticSynchronizerParameters,
         store,
         packageDependenciesResolver,
         timeouts,
@@ -305,7 +312,7 @@ object CachingSynchronizerTopologyClient {
         futureSupervisor,
         loggerFactory,
       )
-    headStateInitializer.initialize(caching, synchronizerPredecessor)
+    headStateInitializer.initialize(caching, synchronizerPredecessor, staticSynchronizerParameters)
   }
 }
 
@@ -367,7 +374,7 @@ private class ForwardingTopologySnapshotClient(
       packageId: PackageId,
       ledgerTime: CantonTimestamp,
       vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages] =
     parent.loadUnvettedPackagesOrDependenciesUsingLoader(
       participant,
       packageId,
@@ -434,10 +441,10 @@ private class ForwardingTopologySnapshotClient(
   ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo]] =
     parent.partyAuthorization(party)
 
-  override def isSynchronizerUpgradeOngoing()(implicit
+  override def synchronizerUpgradeOngoing()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
-    parent.isSynchronizerUpgradeOngoing()
+    parent.synchronizerUpgradeOngoing()
 
   override def sequencerConnectionSuccessors()(implicit
       traceContext: TraceContext
@@ -616,7 +623,7 @@ class CachingTopologySnapshot(
       packageId: PackageId,
       ledgerTime: CantonTimestamp,
       vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages] =
     parent.loadUnvettedPackagesOrDependenciesUsingLoader(
       participant,
       packageId,
@@ -721,10 +728,10 @@ class CachingTopologySnapshot(
       )
       .map(_.toMap)
 
-  override def isSynchronizerUpgradeOngoing()(implicit
+  override def synchronizerUpgradeOngoing()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
-    getAndCache(synchronizerUpgradeCache, parent.isSynchronizerUpgradeOngoing())
+    getAndCache(synchronizerUpgradeCache, parent.synchronizerUpgradeOngoing())
 
   override def sequencerConnectionSuccessors()(implicit
       traceContext: TraceContext

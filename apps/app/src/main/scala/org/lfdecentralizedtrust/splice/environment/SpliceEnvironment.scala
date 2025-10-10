@@ -9,7 +9,6 @@ import com.digitalasset.canton.console.ConsoleOutput
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.CommunityParticipantNodeBootstrapFactory
-import com.digitalasset.canton.resource.CommunityDbMigrationsMetaFactory
 import com.digitalasset.canton.synchronizer.mediator.CommunityMediatorNodeBootstrapFactory
 import com.digitalasset.canton.synchronizer.sequencer.CommunitySequencerNodeBootstrapFactory
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
@@ -34,7 +33,6 @@ class SpliceEnvironment(
       CommunityParticipantNodeBootstrapFactory,
       CommunitySequencerNodeBootstrapFactory,
       CommunityMediatorNodeBootstrapFactory,
-      new CommunityDbMigrationsMetaFactory(loggerFactory),
       loggerFactory,
     ) {
 
@@ -73,7 +71,6 @@ class SpliceEnvironment(
 
   lazy val validators = new ValidatorApps(
     createValidator,
-    migrationsFactoryFactory.create(clock),
     timeouts,
     config.validatorsByString,
     config.tryValidatorAppParametersByString,
@@ -105,7 +102,6 @@ class SpliceEnvironment(
 
   lazy val svs = new SvApps(
     createSv,
-    migrationsFactoryFactory.create(clock),
     timeouts,
     config.svsByString,
     config.trySvAppParametersByString,
@@ -137,7 +133,6 @@ class SpliceEnvironment(
 
   lazy val scans = new ScanApps(
     createScan,
-    migrationsFactoryFactory.create(clock),
     timeouts,
     config.scansByString,
     config.tryScanAppParametersByString,
@@ -169,7 +164,6 @@ class SpliceEnvironment(
 
   lazy val splitwells = new SplitwellApps(
     createSplitwell,
-    migrationsFactoryFactory.create(clock),
     timeouts,
     config.splitwellsByString,
     config.trySplitwellAppParametersByString,

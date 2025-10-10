@@ -180,7 +180,7 @@ class RecoverExternalPartyIntegrationTest
 
     // Tap so we have money for creating the preapproval
     bobValidatorWalletClient.tap(5000.0)
-    createTransferPreapprovalIfNotExists(bobValidatorWalletClient)
+    createTransferPreapprovalEnsuringItExists(bobValidatorWalletClient, bobValidatorBackend)
 
     // Grant rights to bob's validator backend the rights to prepare transactions
     // and submit signed on behalf of the party.

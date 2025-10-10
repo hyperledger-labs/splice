@@ -16,20 +16,24 @@ import com.digitalasset.canton.ledger.api.{TraceIdentifiers, TransactionShape}
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.config.UpdatesStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
-  RawFlatEvent,
-  RawTreeEvent,
+  RawAcsDeltaEventLegacy,
+  RawArchivedEventLegacy,
+  RawCreatedEventLegacy,
+  RawExercisedEventLegacy,
+  RawLedgerEffectsEventLegacy,
 }
 import com.digitalasset.canton.platform.store.backend.common.{
-  EventIdSource,
-  EventPayloadSourceForUpdatesAcsDelta,
-  EventPayloadSourceForUpdatesLedgerEffects,
+  EventIdSourceLegacy,
+  EventPayloadSourceForUpdatesAcsDeltaLegacy,
+  EventPayloadSourceForUpdatesLedgerEffectsLegacy,
 }
-import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPaginationState
 import com.digitalasset.canton.platform.store.dao.events.EventsTable.TransactionConversions
 import com.digitalasset.canton.platform.store.dao.events.ReassignmentStreamReader.ReassignmentStreamQueryParams
 import com.digitalasset.canton.platform.store.dao.events.TopologyTransactionsStreamReader.TopologyTransactionsStreamQueryParams
@@ -44,6 +48,7 @@ import com.digitalasset.canton.platform.store.utils.{
   Telemetry,
 }
 import com.digitalasset.canton.platform.{
+  FatContract,
   InternalEventFormat,
   InternalTransactionFormat,
   InternalUpdateFormat,
@@ -68,6 +73,7 @@ class UpdatesStreamReader(
     queryValidRange: QueryValidRange,
     eventStorageBackend: EventStorageBackend,
     lfValueTranslation: LfValueTranslation,
+    contractStore: ContractStore,
     metrics: LedgerApiServerMetrics,
     tracer: Tracer,
     topologyTransactionsStreamReader: TopologyTransactionsStreamReader,
@@ -81,10 +87,12 @@ class UpdatesStreamReader(
   private val dbMetrics = metrics.index.db
 
   private val orderBySequentialEventIdFlat =
-    Ordering.by[Entry[RawFlatEvent], Long](_.eventSequentialId)
+    Ordering.by[(Entry[RawAcsDeltaEventLegacy], Option[FatContract]), Long](_._1.eventSequentialId)
 
   private val orderBySequentialEventIdTree =
-    Ordering.by[Entry[RawTreeEvent], Long](_.eventSequentialId)
+    Ordering.by[(Entry[RawLedgerEffectsEventLegacy], Option[FatContract]), Long](
+      _._1.eventSequentialId
+    )
 
   private val paginatingAsyncStream = new PaginatingAsyncStream(loggerFactory)
 
@@ -289,7 +297,7 @@ class UpdatesStreamReader(
 
     def fetchIdsSorted(
         txDecomposedFilters: Vector[DecomposedFilter],
-        target: EventIdSource,
+        target: EventIdSourceLegacy,
         maxParallelIdQueriesLimiter: QueueBasedConcurrencyLimiter,
         maxOutputBatchCount: Int,
         metric: DatabaseMetrics,
@@ -308,7 +316,7 @@ class UpdatesStreamReader(
     val idsCreate =
       fetchIdsSorted(
         txDecomposedFilters = txDecomposedFilters,
-        target = EventIdSource.CreateStakeholder,
+        target = EventIdSourceLegacy.CreateStakeholder,
         maxParallelIdQueriesLimiter = createEventIdQueriesLimiter,
         maxOutputBatchCount = maxParallelPayloadCreateQueries + 1,
         metric = dbMetrics.updatesAcsDeltaStream.fetchEventCreateIdsStakeholder,
@@ -316,25 +324,36 @@ class UpdatesStreamReader(
     val idsConsuming =
       fetchIdsSorted(
         txDecomposedFilters = txDecomposedFilters,
-        target = EventIdSource.ConsumingStakeholder,
+        target = EventIdSourceLegacy.ConsumingStakeholder,
         maxParallelIdQueriesLimiter = consumingEventIdQueriesLimiter,
         maxOutputBatchCount = maxParallelPayloadConsumingQueries + 1,
         metric = dbMetrics.updatesAcsDeltaStream.fetchEventConsumingIdsStakeholder,
       )
+
+    def getInternalContractIdFromCreated(event: RawAcsDeltaEventLegacy): Long = event match {
+      case created: RawCreatedEventLegacy => created.internalContractId
+      case _: RawArchivedEventLegacy =>
+        throw new IllegalStateException(
+          s"archived event should not be used to lookup a contract"
+        )
+    }
+
     val payloadsCreate =
       fetchPayloads(
         queryRange = queryRange,
         ids = idsCreate,
         fetchEvents = (ids, connection) =>
-          eventStorageBackend.fetchEventPayloadsAcsDelta(target =
-            EventPayloadSourceForUpdatesAcsDelta.Create
+          eventStorageBackend.fetchEventPayloadsAcsDeltaLegacy(target =
+            EventPayloadSourceForUpdatesAcsDeltaLegacy.Create
           )(
             eventSequentialIds = Ids(ids),
             requestingParties = txFilteringConstraints.allFilterParties,
           )(connection),
         maxParallelPayloadQueries = maxParallelPayloadCreateQueries,
-        dbMetric = dbMetrics.updatesAcsDeltaStream.fetchEventCreatePayloads,
+        dbMetric = dbMetrics.updatesAcsDeltaStream.fetchEventCreatePayloadsLegacy,
         payloadQueriesLimiter = payloadQueriesLimiter,
+        contractStore = contractStore,
+        getInternalContractIdO = Some(getInternalContractIdFromCreated),
       )
     val payloadsConsuming =
       fetchPayloads(
@@ -342,18 +361,22 @@ class UpdatesStreamReader(
         ids = idsConsuming,
         fetchEvents = (ids, connection) =>
           eventStorageBackend
-            .fetchEventPayloadsAcsDelta(target = EventPayloadSourceForUpdatesAcsDelta.Consuming)(
+            .fetchEventPayloadsAcsDeltaLegacy(target =
+              EventPayloadSourceForUpdatesAcsDeltaLegacy.Consuming
+            )(
               eventSequentialIds = Ids(ids),
               requestingParties = txFilteringConstraints.allFilterParties,
             )(connection),
         maxParallelPayloadQueries = maxParallelPayloadConsumingQueries,
-        dbMetric = dbMetrics.updatesAcsDeltaStream.fetchEventConsumingPayloads,
+        dbMetric = dbMetrics.updatesAcsDeltaStream.fetchEventConsumingPayloadsLegacy,
         payloadQueriesLimiter = payloadQueriesLimiter,
+        contractStore = contractStore,
+        getInternalContractIdO = None,
       )
     val allSortedPayloads =
       payloadsConsuming.mergeSorted(payloadsCreate)(orderBySequentialEventIdFlat)
     UpdateReader
-      .groupContiguous(allSortedPayloads)(by = _.updateId)
+      .groupContiguous(allSortedPayloads)(by = _._1.updateId)
       .mapAsync(transactionsProcessingParallelism)(rawEvents =>
         deserializationQueriesLimiter.execute(
           deserializeLfValues(rawEvents, internalEventFormat.eventProjectionProperties)
@@ -392,18 +415,18 @@ class UpdatesStreamReader(
           queryRange = queryRange,
           filter = filter,
           idPageSizing = idPageSizing,
-          target = EventIdSource.CreateStakeholder,
+          target = EventIdSourceLegacy.CreateStakeholder,
           maxParallelIdQueriesLimiter = createEventIdQueriesLimiter,
-          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventCreateIdsStakeholder,
+          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventCreateIdsStakeholderLegacy,
         )
       ) ++ txDecomposedFilters.map(filter =>
         fetchIds(
           queryRange = queryRange,
           filter = filter,
           idPageSizing = idPageSizing,
-          target = EventIdSource.CreateNonStakeholder,
+          target = EventIdSourceLegacy.CreateNonStakeholder,
           maxParallelIdQueriesLimiter = createEventIdQueriesLimiter,
-          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventCreateIdsNonStakeholder,
+          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventCreateIdsNonStakeholderLegacy,
         )
       )).pipe(
         mergeSortAndBatch(
@@ -416,19 +439,19 @@ class UpdatesStreamReader(
         fetchIds(
           queryRange = queryRange,
           filter = filter,
-          target = EventIdSource.ConsumingStakeholder,
+          target = EventIdSourceLegacy.ConsumingStakeholder,
           idPageSizing = idPageSizing,
           maxParallelIdQueriesLimiter = consumingEventIdQueriesLimiter,
-          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventConsumingIdsStakeholder,
+          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventConsumingIdsStakeholderLegacy,
         )
       ) ++ txDecomposedFilters.map(filter =>
         fetchIds(
           queryRange = queryRange,
           filter = filter,
-          target = EventIdSource.ConsumingNonStakeholder,
+          target = EventIdSourceLegacy.ConsumingNonStakeholder,
           idPageSizing = idPageSizing,
           maxParallelIdQueriesLimiter = consumingEventIdQueriesLimiter,
-          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventConsumingIdsNonStakeholder,
+          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventConsumingIdsNonStakeholderLegacy,
         )
       )).pipe(
         mergeSortAndBatch(
@@ -441,10 +464,10 @@ class UpdatesStreamReader(
         fetchIds(
           queryRange = queryRange,
           filter = filter,
-          target = EventIdSource.NonConsumingInformee,
+          target = EventIdSourceLegacy.NonConsumingInformee,
           idPageSizing = idPageSizing,
           maxParallelIdQueriesLimiter = nonConsumingEventIdQueriesLimiter,
-          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventNonConsumingIds,
+          metric = dbMetrics.updatesLedgerEffectsStream.fetchEventNonConsumingIdsLegacy,
         )
       )
       .pipe(
@@ -455,47 +478,62 @@ class UpdatesStreamReader(
       )
 
     def fetchEventPayloadsLedgerEffects(
-        target: EventPayloadSourceForUpdatesLedgerEffects
-    )(ids: Iterable[Long], connection: Connection): Vector[Entry[RawTreeEvent]] =
-      eventStorageBackend.fetchEventPayloadsLedgerEffects(
+        target: EventPayloadSourceForUpdatesLedgerEffectsLegacy
+    )(ids: Iterable[Long], connection: Connection): Vector[Entry[RawLedgerEffectsEventLegacy]] =
+      eventStorageBackend.fetchEventPayloadsLedgerEffectsLegacy(
         target = target
       )(
         eventSequentialIds = Ids(ids),
         requestingParties = txFilteringConstraints.allFilterParties,
       )(connection)
 
+    def getInternalContractIdFromCreated(event: RawLedgerEffectsEventLegacy): Long = event match {
+      case created: RawCreatedEventLegacy => created.internalContractId
+      case _: RawExercisedEventLegacy =>
+        throw new IllegalStateException(
+          s"exercised event should not be used to lookup a contract"
+        )
+    }
+
     val payloadsCreate = fetchPayloads(
       queryRange = queryRange,
       ids = idsCreate,
       fetchEvents =
-        fetchEventPayloadsLedgerEffects(EventPayloadSourceForUpdatesLedgerEffects.Create),
+        fetchEventPayloadsLedgerEffects(EventPayloadSourceForUpdatesLedgerEffectsLegacy.Create),
       maxParallelPayloadQueries = maxParallelPayloadCreateQueries,
       dbMetric = dbMetrics.updatesLedgerEffectsStream.fetchEventCreatePayloads,
       payloadQueriesLimiter = payloadQueriesLimiter,
+      contractStore = contractStore,
+      getInternalContractIdO = Some(getInternalContractIdFromCreated),
     )
     val payloadsConsuming = fetchPayloads(
       queryRange = queryRange,
       ids = idsConsuming,
       fetchEvents =
-        fetchEventPayloadsLedgerEffects(EventPayloadSourceForUpdatesLedgerEffects.Consuming),
+        fetchEventPayloadsLedgerEffects(EventPayloadSourceForUpdatesLedgerEffectsLegacy.Consuming),
       maxParallelPayloadQueries = maxParallelPayloadConsumingQueries,
       dbMetric = dbMetrics.updatesLedgerEffectsStream.fetchEventConsumingPayloads,
       payloadQueriesLimiter = payloadQueriesLimiter,
+      contractStore = contractStore,
+      getInternalContractIdO = None,
     )
     val payloadsNonConsuming = fetchPayloads(
       queryRange = queryRange,
       ids = idsNonConsuming,
-      fetchEvents =
-        fetchEventPayloadsLedgerEffects(EventPayloadSourceForUpdatesLedgerEffects.NonConsuming),
+      fetchEvents = fetchEventPayloadsLedgerEffects(
+        EventPayloadSourceForUpdatesLedgerEffectsLegacy.NonConsuming
+      ),
       maxParallelPayloadQueries = maxParallelPayloadNonConsumingQueries,
       dbMetric = dbMetrics.updatesLedgerEffectsStream.fetchEventNonConsumingPayloads,
       payloadQueriesLimiter = payloadQueriesLimiter,
+      contractStore = contractStore,
+      getInternalContractIdO = None,
     )
     val allSortedPayloads = payloadsConsuming
       .mergeSorted(payloadsCreate)(orderBySequentialEventIdTree)
       .mergeSorted(payloadsNonConsuming)(orderBySequentialEventIdTree)
     UpdateReader
-      .groupContiguous(allSortedPayloads)(by = _.updateId)
+      .groupContiguous(allSortedPayloads)(by = _._1.updateId)
       .mapAsync(transactionsProcessingParallelism)(rawEvents =>
         deserializationQueriesLimiter.execute(
           deserializeLfValuesTree(rawEvents, internalEventFormat.eventProjectionProperties)
@@ -514,35 +552,33 @@ class UpdatesStreamReader(
   private def fetchIds(
       queryRange: EventsRange,
       filter: DecomposedFilter,
-      target: EventIdSource,
+      target: EventIdSourceLegacy,
       idPageSizing: IdPageSizing,
       maxParallelIdQueriesLimiter: QueueBasedConcurrencyLimiter,
       metric: DatabaseMetrics,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[Long, NotUsed] =
-    paginatingAsyncStream.streamIdsFromSeekPagination(
+    paginatingAsyncStream.streamIdsFromSeekPaginationWithoutIdFilter(
+      idStreamName = s"Update IDs for $target $filter",
       idPageSizing = idPageSizing,
       idPageBufferSize = maxPagesPerIdPagesBuffer,
       initialFromIdExclusive = queryRange.startInclusiveEventSeqId,
+      initialEndInclusive = queryRange.endInclusiveEventSeqId,
     )(
-      fetchPage = (state: IdPaginationState) => {
+      eventStorageBackend.updateStreamingQueries.fetchEventIdsLegacy(
+        target = target
+      )(
+        stakeholderO = filter.party,
+        templateIdO = filter.templateId,
+      )
+    )(
+      executeIdQuery = f =>
         maxParallelIdQueriesLimiter.execute {
           globalIdQueriesLimiter.execute {
-            dbDispatcher.executeSql(metric) { connection =>
-              eventStorageBackend.updateStreamingQueries.fetchEventIds(
-                target = target
-              )(
-                stakeholderO = filter.party,
-                templateIdO = filter.templateId,
-                startExclusive = state.fromIdExclusive,
-                endInclusive = queryRange.endInclusiveEventSeqId,
-                limit = state.pageSize,
-              )(connection)
-            }
+            dbDispatcher.executeSql(metric)(f)
           }
         }
-      }
     )
 
   private def mergeSortAndBatch(
@@ -563,28 +599,49 @@ class UpdatesStreamReader(
       maxParallelPayloadQueries: Int,
       dbMetric: DatabaseMetrics,
       payloadQueriesLimiter: ConcurrencyLimiter,
+      contractStore: ContractStore,
+      getInternalContractIdO: Option[T => Long],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Source[Entry[T], NotUsed] = {
+  ): Source[(Entry[T], Option[FatContract]), NotUsed] = {
     // Pekko requires for this buffer's size to be a power of two.
     val inputBufferSize = Utils.largestSmallerOrEqualPowerOfTwo(maxParallelPayloadQueries)
-    ids.async
+    ids
       .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
       .mapAsync(maxParallelPayloadQueries)(ids =>
         payloadQueriesLimiter.execute {
           globalPayloadQueriesLimiter.execute {
-            dbDispatcher.executeSql(dbMetric) { implicit connection =>
-              queryValidRange.withRangeNotPruned(
-                minOffsetInclusive = queryRange.startInclusiveOffset,
-                maxOffsetInclusive = queryRange.endInclusiveOffset,
-                errorPruning = (prunedOffset: Offset) =>
-                  s"Updates request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} precedes pruned offset ${prunedOffset.unwrap}",
-                errorLedgerEnd = (ledgerEndOffset: Option[Offset]) =>
-                  s"Updates request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} is beyond ledger end offset ${ledgerEndOffset
-                      .fold(0L)(_.unwrap)}",
-              ) {
-                fetchEvents(ids, connection)
-              }
+            queryValidRange.withRangeNotPruned(
+              minOffsetInclusive = queryRange.startInclusiveOffset,
+              maxOffsetInclusive = queryRange.endInclusiveOffset,
+              errorPruning = (prunedOffset: Offset) =>
+                s"Updates request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} precedes pruned offset ${prunedOffset.unwrap}",
+              errorLedgerEnd = (ledgerEndOffset: Option[Offset]) =>
+                s"Updates request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} is beyond ledger end offset ${ledgerEndOffset
+                    .fold(0L)(_.unwrap)}",
+            ) {
+              dbDispatcher
+                .executeSql(dbMetric) { connection =>
+                  fetchEvents(ids, connection)
+                }
+                .flatMap(events =>
+                  getInternalContractIdO match {
+                    case Some(getInternalContractId) =>
+                      val internalContractIds =
+                        events.map(entry => getInternalContractId(entry.event))
+                      for {
+                        contractsM <- contractStore
+                          .lookupBatchedNonCached(internalContractIds)
+                          .failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
+                      } yield events.map { entry =>
+                        entry -> contractsM
+                          .get(getInternalContractId(entry.event))
+                          .map(_.inst)
+                      }
+                    case None =>
+                      Future.successful(events.map(_ -> None))
+                  }
+                )
             }
           }
         }
@@ -593,7 +650,7 @@ class UpdatesStreamReader(
   }
 
   private def deserializeLfValuesTree(
-      rawEvents: Vector[Entry[RawTreeEvent]],
+      rawEvents: Vector[(Entry[RawLedgerEffectsEventLegacy], Option[FatContract])],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit lc: LoggingContextWithTrace): Future[Seq[Entry[Event]]] =
     Timed.future(
@@ -601,14 +658,15 @@ class UpdatesStreamReader(
         implicit val executionContext: ExecutionContext =
           directEC // Scala 2 implicit scope override: shadow the outer scope's implicit by name
         MonadUtil.sequentialTraverse(rawEvents)(
-          UpdateReader.deserializeRawTreeEvent(eventProjectionProperties, lfValueTranslation)
+          UpdateReader
+            .deserializeRawLedgerEffectsEvent(eventProjectionProperties, lfValueTranslation)
         )
       },
       timer = dbMetrics.updatesLedgerEffectsStream.translationTimer,
     )
 
   private def deserializeLfValues(
-      rawEvents: Vector[Entry[RawFlatEvent]],
+      rawEvents: Vector[(Entry[RawAcsDeltaEventLegacy], Option[FatContract])],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit lc: LoggingContextWithTrace): Future[Seq[Entry[Event]]] =
     Timed.future(
@@ -616,7 +674,7 @@ class UpdatesStreamReader(
         implicit val executionContext: ExecutionContext =
           directEC // Scala 2 implicit scope override: shadow the outer scope's implicit by name
         MonadUtil.sequentialTraverse(rawEvents)(
-          UpdateReader.deserializeRawFlatEvent(eventProjectionProperties, lfValueTranslation)
+          UpdateReader.deserializeRawAcsDeltaEvent(eventProjectionProperties, lfValueTranslation)
         )
       },
       timer = dbMetrics.updatesAcsDeltaStream.translationTimer,

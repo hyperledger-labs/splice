@@ -26,6 +26,7 @@ runs:
           # is _before_ the approval already e.g. when an external contributor
           # created the PR and not when the maintainer approved it after adding the static label.
           pr_labels=$(curl -sSL --fail-with-body -H "Authorization: Bearer ${{ inputs.gh_token }}" \
+                             --retry 10 --retry-delay 10 --retry-all-errors \
                              -H "Accept: application/vnd.github.v3+json" \
                              "${{ github.event.pull_request.url }}" | jq '.labels')
           echo "Pull request labels: $pr_labels"

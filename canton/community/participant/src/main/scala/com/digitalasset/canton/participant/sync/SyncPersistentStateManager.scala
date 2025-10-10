@@ -18,7 +18,6 @@ import com.digitalasset.canton.environment.{
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.PackageDependencyResolver
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.memory.PackageMetadataView
@@ -123,10 +122,9 @@ class SyncPersistentStateManager(
     synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
     synchronizerCryptoFactory: StaticSynchronizerParameters => SynchronizerCrypto,
     clock: Clock,
-    packageDependencyResolver: PackageDependencyResolver,
+    packageMetadataView: PackageMetadataView,
     ledgerApiStore: Eval[LedgerApiStore],
     val contractStore: Eval[ContractStore],
-    packageMetadataView: Eval[PackageMetadataView],
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -202,12 +200,12 @@ class SyncPersistentStateManager(
 
   def getSynchronizerIdx(
       synchronizerId: SynchronizerId
-  ): FutureUnlessShutdown[IndexedSynchronizer] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[IndexedSynchronizer] =
     IndexedSynchronizer.indexed(this.indexedStringStore)(synchronizerId)
 
   def getPhysicalSynchronizerIdx(
       synchronizerId: PhysicalSynchronizerId
-  ): FutureUnlessShutdown[IndexedPhysicalSynchronizer] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[IndexedPhysicalSynchronizer] =
     IndexedPhysicalSynchronizer.indexed(this.indexedStringStore)(synchronizerId)
 
   /** Retrieves the [[com.digitalasset.canton.participant.store.SyncPersistentState]] from the
@@ -420,10 +418,9 @@ class SyncPersistentStateManager(
         clock,
         synchronizerCryptoFactory(staticSynchronizerParameters),
         parameters,
-        packageDependencyResolver,
+        packageMetadataView,
         ledgerApiStore,
         logicalSyncPersistentState,
-        packageMetadataView,
         psidLoggerFactory(physicalSynchronizerIdx.synchronizerId),
         futureSupervisor,
       )

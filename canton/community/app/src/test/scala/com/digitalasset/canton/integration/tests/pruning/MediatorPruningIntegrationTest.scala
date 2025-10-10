@@ -7,8 +7,8 @@ import com.digitalasset.canton.config.{CantonConfig, DbConfig}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -99,7 +99,7 @@ trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with Share
 class MediatorPruningReferenceIntegrationTestPostgres extends MediatorPruningIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
   )
 }
 

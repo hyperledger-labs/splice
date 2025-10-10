@@ -8,32 +8,56 @@
 Docker-Compose Based Deployment of a Local Network
 ==================================================
 
-Localnet provides a straightforward topology comprising three participants, three validators, a PostgreSQL database, and several web applications (wallet, sv, scan) behind an NGINX gateway. Each validator plays a distinct role within the Splice ecosystem:
+LocalNet provides a straightforward topology comprising three participants, three validators, a PostgreSQL database, and several web applications (wallet, sv, scan) behind an NGINX gateway. Each validator plays a distinct role within the Splice ecosystem:
 
 - **app-provider**: for the user operating their application
 - **app-user**: for a user wanting to use the app from the App Provider
 - **sv**: for providing the Global Synchronizer and handling AMT
 
-Designed primarily for development and testing, Localnet is not intended for production use.
+Designed primarily for development and testing, LocalNet is not intended for production use.
 
 Setup
 -----
 
-Before starting, ensure you have configured the following environment variables:
+1. Download the release artifacts from the
+   |bundle_download_link| link, and extract the bundle:
 
-- **IMAGE_TAG**: Specifies the version of Splice to be used in Localnet.
-- **LOCALNET_DIR**: Specifies the path to the Localnet directory.
+      .. parsed-literal::
 
-You can enable or disable any of the three validators using Docker Compose profiles (e.g., ``--profile app-provider``) alongside the corresponding environment variables (e.g., ``APP_PROVIDER_PROFILE=on/off``). By default, all three validators are active.
+        tar xzvf |version|\_splice-node.tar.gz
 
-Additional environment variables include:
+   The extracted docker compose files defining LocalNet are located in
+   ``splice-node/docker-compose/localnet``.
 
-- **LOCALNET_ENV_DIR**: Overrides the default environment file directory. The default is ``$LOCALNET_DIR/env``.
+2. Export these two environment variables used in the later commands:
+
+   - **LOCALNET_DIR**: Specifies the path to the LocalNet directory.
+   - **IMAGE_TAG**: Specifies the version of Splice to be used in LocalNet.
+
+   For the bundle that you downloaded use:
+
+      .. parsed-literal::
+
+         export LOCALNET_DIR=$PWD/splice-node/docker-compose/localnet
+         |image_tag_set_plain|
+
+3. See :ref:`use-localnet` for the commands to start, stop, inspect, and administrate the LocalNet nodes.
+
+Optional:
+use the Docker Compose profiles (e.g., ``--profile app-provider``) alongside the corresponding environment variables (e.g., ``APP_PROVIDER_PROFILE=on/off``)
+to disable specific validator nodes;
+for example, to reduce the resource needs of LocalNet.
+By default, all three validators are active.
+
+Optional: use the following additional environment variables to configure:
+
 - **LOCALNET_DIR/compose.env**: Contains Docker Compose configuration variables.
+- **LOCALNET_ENV_DIR**: Overrides the default environment file directory. The default is ``$LOCALNET_DIR/env``.
 - **LOCALNET_ENV_DIR/common.env**: Shared environment variables across Docker Compose and container configurations. It sets default ports, DB credentials, and Splice UI configurations.
 
 Resource constraints for containers can be configured via:
 - **LOCALNET_DIR/resource-constraints.yaml**
+
 
 Exposed Ports
 -------------
@@ -65,7 +89,7 @@ UI Ports are defined as follows:
 Database
 --------
 
-Localnet uses a single PostgreSQL database for all components. Database configurations are sourced from ``LOCALNET_ENV_DIR/postgres.env``.
+LocalNet uses a single PostgreSQL database for all components. Database configurations are sourced from ``LOCALNET_ENV_DIR/postgres.env``.
 
 Application UIs
 ---------------
@@ -90,10 +114,18 @@ Application UIs
     - **URL**: `http://scan.localhost:4000 <http://scan.localhost:4000>`_
     - **Description**: Interface to monitor transactions.
 
-    .. note::
-         `LocalNet` rounds may take up to 6 rounds (equivalent to one hour) to display in the scan UI.
+.. note::
+   `LocalNet` rounds may take up to 6 rounds (equivalent to one hour) to display in the scan UI.
 
-The ``*.localhost`` domains will resolve to your local host IP ``127.0.0.1``.
+In most scenarios, the ``*.localhost`` domains (e.g., ``http://scan.localhost``) will resolve to your local host IP ``127.0.0.1``.
+There are some situations where the resolution does not occur and the solution is to add entries to your ``/etc/hosts`` file.  For example,
+to resolve ``http://scan.localhost`` and ``http://wallet.localhost`` add these entry to the file:
+
+.. code-block::
+
+   127.0.0.1   scan.localhost
+   127.0.0.1   wallet.localhost
+
 
 Default Wallet Users
 --------------------
@@ -101,6 +133,8 @@ Default Wallet Users
 - **App User**: app-user
 - **App Provider**: app-provider
 - **SV**: sv
+
+.. _swagger-ui:
 
 Swagger UI
 ----------
@@ -114,11 +148,14 @@ Note: Some endpoints require a JWT token when using the **Try it out** feature. 
 
 For proper functionality, Swagger UI relies on a localhost nginx proxy for ``canton.localhost`` configured for each participant. For example, the ``JSON Ledger API HTTP Endpoints`` for the app-provider can be accessed at the nginx proxy URL ``http://canton.localhost:${APP_PROVIDER_UI_PORT}`` via Swagger UI, which corresponds to accessing ``localhost:3${PARTICIPANT_JSON_API_PORT}`` directly. The nginx proxy only adds additional headers to resolve CORS issues within Swagger UI.
 
-Run in localnet
-----------------
+.. _use-localnet:
 
-start
-^^^^^
+Use LocalNet
+------------
+
+
+Start LocalNet nodes
+^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -130,8 +167,8 @@ start
                   --profile app-provider \
                   --profile app-user up -d
 
-stop
-^^^^
+Stop LocalNet nodes
+^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -143,8 +180,10 @@ stop
                   --profile app-provider \
                   --profile app-user down -v
 
-start with swagger-ui
-^^^^^^^^^^^^^^^^^^^^^^
+Start nodes including a swagger-ui
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See :ref:`swagger-ui` for more information.
 
 .. code-block:: bash
 
@@ -157,8 +196,10 @@ start with swagger-ui
                   --profile app-user \
                   --profile swagger-ui up -d
 
-stop with swagger-ui
-^^^^^^^^^^^^^^^^^^^^^
+Stop nodes including a swagger-ui
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See :ref:`swagger-ui` for more information.
 
 .. code-block:: bash
 
@@ -171,8 +212,16 @@ stop with swagger-ui
                   --profile app-user \
                   --profile swagger-ui down -v
 
-console
-^^^^^^^
+Access the Canton Admin Console
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+Use the Canton Admin Console to inspect and modify the run configuration
+of the Canton sequencer, mediator, and participant nodes in your LocalNet deployment.
+
+* `Canton Console How-To <https://docs.digitalasset.com/operate/3.3/howtos/operate/console/console.html?>`__
+* `Canton Console commands <https://docs.digitalasset.com/operate/3.3/reference/console.html>`__
+
 
 .. code-block:: bash
 

@@ -11,8 +11,149 @@ import {
   config,
   isMainNet,
   NamespaceToClientIdMapMap,
+  clusterProdLike,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { standardSvConfigs, extraSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  standardSvConfigs,
+  extraSvConfigs,
+  dsoSize,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+
+function ledgerApiAudience(
+  svNamespaces: string,
+  clusterBasename: string,
+  auth0DomainProvider: auth0.Provider
+): pulumi.Output<string> {
+  if (clusterProdLike) {
+    // On prod clusters, we create a ledger API per SV namespace
+    const auth0Api = new auth0.ResourceServer(
+      `LedgerApi${svNamespaces.replace(/-/g, '')}`,
+      {
+        name: `Ledger API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://ledger_api.${svNamespaces}.${clusterBasename}.canton.network`,
+        allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
+      },
+      { provider: auth0DomainProvider }
+    );
+
+    new auth0.ResourceServerScopes(
+      `LedgerApiScopes${svNamespaces.replace(/-/g, '')}`,
+      {
+        resourceServerIdentifier: auth0Api.identifier,
+        scopes: [
+          {
+            name: 'daml_ledger_api',
+            description: 'Access to the Ledger API',
+          },
+        ],
+      },
+      { provider: auth0DomainProvider }
+    );
+
+    return auth0Api.identifier;
+  } else {
+    // On non-prod clusters, we currently use the hard-coded identifier that matches our docs, and the manually created auth0 API
+    return pulumi.output('https://canton.network.global');
+  }
+}
+
+function svAppAudience(
+  svNamespaces: string,
+  clusterBasename: string,
+  auth0DomainProvider: auth0.Provider
+): pulumi.Output<string> {
+  if (clusterProdLike) {
+    // On prod clusters, we create a SV App API per SV namespace
+    const auth0Api = new auth0.ResourceServer(
+      `SvAppApi${svNamespaces.replace(/-/g, '')}`,
+      {
+        name: `SV App API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://sv.${svNamespaces}.${clusterBasename}.canton.network/api`,
+        allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
+      },
+      { provider: auth0DomainProvider }
+    );
+
+    return auth0Api.identifier;
+  } else {
+    // On non-prod clusters, we currently use the hard-coded identifier that matches our docs, and the manually created auth0 API (same one as ledger API)
+    return pulumi.output('https://canton.network.global');
+  }
+}
+
+function validatorAppAudience(
+  svNamespaces: string,
+  clusterBasename: string,
+  auth0DomainProvider: auth0.Provider
+): pulumi.Output<string> {
+  if (clusterProdLike) {
+    // On prod clusters, we create a Validator App API per SV namespace
+    const auth0Api = new auth0.ResourceServer(
+      `ValidatorAppApi${svNamespaces.replace(/-/g, '')}`,
+      {
+        name: `Validator App API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://validator.${svNamespaces}.${clusterBasename}.canton.network/api`,
+        allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
+      },
+      { provider: auth0DomainProvider }
+    );
+
+    return auth0Api.identifier;
+  } else {
+    // On non-prod clusters, we currently use the hard-coded identifier that matches our docs, and the manually created auth0 API (same one as ledger API)
+    return pulumi.output('https://canton.network.global');
+  }
+}
+
+function newM2MApp(
+  resourceName: string,
+  name: string,
+  description: string,
+  clusterBasename: string,
+  ledgerApiAud: pulumi.Output<string>,
+  appAud: pulumi.Output<string>,
+  auth0DomainProvider: auth0.Provider
+): auth0.Client {
+  const ret = new auth0.Client(
+    resourceName,
+    {
+      name: `${name} (Pulumi managed, ${clusterBasename})`,
+      appType: 'non_interactive',
+      description: ` ** Managed by Pulumi, do not edit manually **\n${description}`,
+    },
+    { provider: auth0DomainProvider }
+  );
+
+  pulumi.all([ledgerApiAud, appAud]).apply(([ledgerApiAudValue, appAudValue]) => {
+    new auth0.ClientGrant(
+      `${resourceName}LedgerGrant`,
+      {
+        clientId: ret.id,
+        audience: ledgerApiAudValue,
+        scopes: ['daml_ledger_api'],
+      },
+      {
+        provider: auth0DomainProvider,
+      }
+    );
+
+    if (ledgerApiAudValue !== appAudValue) {
+      new auth0.ClientGrant(
+        `${resourceName}AppGrant`,
+        {
+          clientId: ret.id,
+          audience: appAudValue,
+          scopes: [],
+        },
+        {
+          provider: auth0DomainProvider,
+        }
+      );
+    }
+  });
+
+  return ret;
+}
 
 function newUiApp(
   resourceName: string,
@@ -119,14 +260,46 @@ function svsOnlyAuth0(
       )
     );
 
-  const appToClientId: ClientIdMap = svs.reduce(
-    (acc, sv) => ({
+  const appToClientId: ClientIdMap = svs.reduce((acc, sv) => {
+    // Create auth0 APIs if needed, and obtain the audiences
+    const ledgerApiAud = ledgerApiAudience(sv.namespace, clusterBasename, provider);
+    const svAppAud = svAppAudience(sv.namespace, clusterBasename, provider);
+    const validatorAppAud = validatorAppAudience(sv.namespace, clusterBasename, provider);
+    // Create M2M apps
+    const svApp = newM2MApp(
+      `${sv.namespace.replace(/-/g, '')}SvBackendApp`,
+      `${sv.namespace.replace(/-/g, '').toUpperCase()} SV Backend`,
+      `Used for the SV backend for ${sv.description} on ${clusterBasename}`,
+      clusterBasename,
+      ledgerApiAud,
+      svAppAud,
+      provider
+    );
+    const validatorApp = newM2MApp(
+      `${sv.namespace.replace(/-/g, '')}ValidatorBackendApp`,
+      `${sv.namespace.replace(/-/g, '').toUpperCase()} Validator Backend`,
+      `Used for the Validator backend for ${sv.description} on ${clusterBasename}`,
+      clusterBasename,
+      ledgerApiAud,
+      validatorAppAud,
+      provider
+    );
+    // Currently, for no good reason, we have sv-1 vs sv1_validator naming inconsistency.
+    // To make things worse, the sv-da-1 namespace is even more special and has sv-da-1 vs sv-da-1_validator.
+    // Then mainnet DA-2 is even worse, as we use "sv" and "validator"
+    // TODO(DACH-NY/canton-internal#2110): clean this up
+    const svAppName = isMainNet && sv.namespace == 'sv-1' ? 'sv' : sv.namespace;
+    const validatorAppName =
+      sv.namespace == 'sv-da-1'
+        ? 'sv-da-1_validator'
+        : isMainNet
+          ? 'validator'
+          : sv.namespace.replace('-', '') + '_validator';
+    return {
       ...acc,
-      ...(sv.svBackend ? { [sv.svBackend.name]: sv.svBackend.clientId } : {}),
-      ...(sv.validatorBackend ? { [sv.validatorBackend.name]: sv.validatorBackend.clientId } : {}),
-    }),
-    {}
-  );
+      ...{ [svAppName]: svApp.clientId, [validatorAppName]: validatorApp.clientId },
+    };
+  }, {});
 
   return nsToUiToCLientIdOutput.apply(nsToUiToClientId => {
     return {
@@ -171,32 +344,16 @@ function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Outpu
   });
 
   // hardcoded sv1 will be removed once we switch DA-2 to KMS (and, likely, the sv-da-1 namespace)
-  const sv1 = {
+  const sv1: svAuth0Params = {
     namespace: 'sv-1',
     description: 'sv-1 (Digital-Asset 2)',
     ingressName: 'sv-2', // Ingress name of sv-1 is sv-2!
-    svBackend: {
-      name: 'sv',
-      clientId: 'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
-    },
-    validatorBackend: {
-      name: 'validator',
-      clientId: 'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
-    },
   };
 
   const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
     ingressName: sv.ingressName,
-    svBackend: {
-      name: sv.auth0SvAppName,
-      clientId: sv.auth0SvAppClientId!,
-    },
-    validatorBackend: {
-      name: sv.auth0ValidatorAppName,
-      clientId: sv.auth0ValidatorAppClientId!,
-    },
   }));
 
   return svsOnlyAuth0(
@@ -226,35 +383,17 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     clientSecret: auth0MgtClientSecret,
   });
 
-  const standardSvs: svAuth0Params[] = standardSvConfigs.map(sv => ({
-    namespace: sv.nodeName,
-    description: sv.nodeName.replace(/-/g, '').toUpperCase(),
-    ingressName: sv.ingressName,
-    svBackend: sv.auth0SvAppClientId
-      ? {
-          name: sv.auth0SvAppName,
-          clientId: sv.auth0SvAppClientId,
-        }
-      : undefined,
-    validatorBackend: sv.auth0ValidatorAppClientId
-      ? {
-          name: sv.auth0ValidatorAppName,
-          clientId: sv.auth0ValidatorAppClientId,
-        }
-      : undefined,
-  }));
+  const standardSvs: svAuth0Params[] = standardSvConfigs
+    .map(sv => ({
+      namespace: sv.nodeName,
+      description: sv.nodeName.replace(/-/g, '').toUpperCase(),
+      ingressName: sv.ingressName,
+    }))
+    .slice(0, dsoSize);
   const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
     ingressName: sv.ingressName,
-    svBackend: {
-      name: sv.auth0SvAppName,
-      clientId: sv.auth0SvAppClientId!,
-    },
-    validatorBackend: {
-      name: sv.auth0ValidatorAppName,
-      clientId: sv.auth0ValidatorAppClientId!,
-    },
   }));
 
   const baseAuth0 = svsOnlyAuth0(
@@ -273,38 +412,6 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     validator1: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
     splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
     splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
-    'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',
-    'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
-    'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
-    'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
-    'sv-5': 'RSgbsze3cGHipLxhPGtGy7fqtYgyefTb',
-    'sv-6': '3MO1BRMNqEiIntIM1YWwBRT1EPpKyGO6',
-    'sv-7': '4imYa3E6Q5JPdLjZxHatRDtV1Wurq7pK',
-    'sv-8': 'lQogWncLX7AIc2laUj8VVW6zwNJ169vR',
-    'sv-9': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
-    'sv-10': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
-    'sv-11': 'ndIxuns8kZoObE7qN6M3IbtKSZ7RRO9B',
-    'sv-12': 'qnYhBjBJ5LQu0pM5M6V8e3erQsadfew1',
-    'sv-13': 'IA7BOrFhKvQ5AP9g8DxSTmO6pVT0oed3',
-    'sv-14': 'cY4I4HCHgDj2mkxSSEwguFQGRFEjhnTq',
-    'sv-15': 'hwKLKN5TWpaPjzuY52ubNVIRF8Onnzgk',
-    'sv-16': '9pvoTvQIt2l1rzlNnaEZVsnNDFTOvt7W',
-    sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
-    sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
-    sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
-    sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
-    sv5_validator: 'TdcDPsIwSXVw4rZmGqxl6Ifkn4neeOzW',
-    sv6_validator: '4pUXGkvvybNyTeWXEBlesr9qcYCQh2sh',
-    sv7_validator: '2cfFl6z5huY4rVYvxOEja8MvDdplYCDW',
-    sv8_validator: 'JYvSRekV1E5EUZ2sJ494YyHXbxR3OHIR',
-    sv9_validator: 'BABNqQ3m5ROTGJTlTHVlIckS3cwJ0M0w',
-    sv10_validator: 'EKBJkDcOHosrnhLALfrQYG6Uc4Csqwbe',
-    sv11_validator: '8jpCSqSkLxdY8zdmJwm0XXRfxFnPNAhG',
-    sv12_validator: 'PEMwunsstamR1c5k3LdjVInTKlVTkeb6',
-    sv13_validator: 'eqssDmClrmtQFTgJ7XIP7RDdhcD6iGfx',
-    sv14_validator: 'luGkjf4AvM5PYhmi3X5rFmKLzxHTBlgz',
-    sv15_validator: 'gL9Iv3iUiPTtDvyEZ9b4wCcTvz3G6qys',
-    sv16_validator: '6ANtCorumVE8Ur7n1gJ8Gfvgv5pa96mZ',
   };
 
   const validator1UiApp = newUiApp(

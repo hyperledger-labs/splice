@@ -20,6 +20,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultBoundedTimeout,
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
+  TimeoutType,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
@@ -115,6 +116,7 @@ abstract class AppConnection(
   protected def runCmd[Req, Res, Result](
       cmd: GrpcAdminCommand[Req, Res, Result],
       credentials: Option[CallCredentials] = None,
+      timeoutOverride: Option[TimeoutType] = None,
   )(implicit traceContext: TraceContext): Future[Result] = {
     val dso =
       cmd
@@ -132,7 +134,7 @@ abstract class AppConnection(
       case None => dso
     }
 
-    val timeout = cmd.timeoutType match {
+    val timeout = timeoutOverride.getOrElse(cmd.timeoutType) match {
       case ServerEnforcedTimeout =>
         None
       case CustomClientTimeout(timeout) =>

@@ -12,7 +12,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   InterfaceCompanion,
   ValueDecoder,
 }
-import org.lfdecentralizedtrust.splice.environment.DarResource
+import com.digitalasset.canton.caching.CaffeineCache
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -22,7 +22,9 @@ import com.digitalasset.daml.lf.archive.{ArchivePayload, Dar, DarReader}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
 import com.digitalasset.daml.lf.typesig
+import com.github.benmanes.caffeine.cache.Caffeine
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.environment.DarResource
 
 import java.util.zip.ZipInputStream
 
@@ -129,16 +131,29 @@ class ResourceTemplateDecoder(
 
 object ResourceTemplateDecoder {
 
-  def loadPackageSignaturesFromResource(
+  // caching loaded package signatures to avoid re-reading the same DAR multiple times
+  private val loadedPackageCache = CaffeineCache[String, Map[PackageId, typesig.PackageSignature]](
+    Caffeine
+      .newBuilder()
+      .maximumSize(10000),
+    None,
+  )
+
+  private def loadPackageSignaturesFromResource(
       resource: DarResource
   ): Map[PackageId, typesig.PackageSignature] = {
-    val inputStream = getClass.getClassLoader.getResourceAsStream(resource.path)
-    val dar: Dar[ArchivePayload] = DarReader
-      .readArchive(resource.path, new ZipInputStream(inputStream))
-      .valueOr(e =>
-        throw new IllegalArgumentException(s"Failed to read DAR at path ${resource.path}: $e")
-      )
-    dar.all.map(a => a.pkgId -> typesig.reader.SignatureReader.readPackageSignature(a)._2).toMap
+    loadedPackageCache.getOrAcquire(
+      resource.path,
+      { path =>
+        val inputStream = getClass.getClassLoader.getResourceAsStream(path)
+        val dar: Dar[ArchivePayload] = DarReader
+          .readArchive(resource.path, new ZipInputStream(inputStream))
+          .valueOr(e =>
+            throw new IllegalArgumentException(s"Failed to read DAR at path ${resource.path}: $e")
+          )
+        dar.all.map(a => a.pkgId -> typesig.reader.SignatureReader.readPackageSignature(a)._2).toMap
+      },
+    )
   }
 
   def loadPackageSignaturesFromResources(

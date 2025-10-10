@@ -83,7 +83,13 @@ class DbSvSvStore(
             acsStoreId,
             domainMigrationId,
             ValidatorOnboarding.COMPANION,
-            where = sql"""onboarding_secret = ${lengthLimited(secret)}""",
+            where = sql"""
+              onboarding_secret = ${lengthLimited(secret)}
+                or (
+                  onboarding_secret like '{%'
+                  and (onboarding_secret::jsonb ->> 'secret') = ${lengthLimited(secret)}
+                )
+              """,
           ).headOption,
           "lookupValidatorOnboardingBySecretWithOffset",
         )
@@ -105,7 +111,13 @@ class DbSvSvStore(
               acsStoreId,
               domainMigrationId,
               UsedSecret.COMPANION,
-              where = sql"""onboarding_secret = ${lengthLimited(secret)}""",
+              where = sql"""
+                  onboarding_secret = ${lengthLimited(secret)}
+                  or (
+                    onboarding_secret like '{%'
+                    and (onboarding_secret::jsonb ->> 'secret') = ${lengthLimited(secret)}
+                  )
+                """,
             ).headOption,
             "lookupUsedSecretWithOffset",
           )

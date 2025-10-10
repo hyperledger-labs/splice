@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 import time
@@ -37,7 +37,7 @@ from com.digitalasset.canton.admin.participant.v30 import (
     participant_status_service_pb2,
     participant_status_service_pb2_grpc,
 )
-from external_party_onboarding import (
+from external_party_onboarding_admin_api import (
     onboard_external_party,
     wait_to_observe_party_to_participant,
 )

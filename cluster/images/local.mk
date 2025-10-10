@@ -127,13 +127,10 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 		--iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+	cd $(@D)/.. && prefix-output docker-push $$(cat $(abspath $<))
 
 %/$(docker-scan):  %/$(docker-image-tag)
-	cd $(@D) && docker-scan $$(cat $(abspath $<))
-
-%/$(docker-copy-release-to-ghcr):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))
+	cd $(@D) && prefix-output docker-scan $$(cat $(abspath $<))
 
 #########
 # Global targets
@@ -145,4 +142,4 @@ write-images:
 
 .PHONY: cluster/docker/copy_release_to_ghcr
 cluster/docker/copy_release_to_ghcr: write-images
-	./build-tools/copy_release_images_to_ghcr.sh -v '$(shell get-snapshot-version)' -f $(images_file)
+	prefix-output ./build-tools/copy_release_images_to_ghcr.sh -v '$(shell get-snapshot-version)' -f $(images_file)

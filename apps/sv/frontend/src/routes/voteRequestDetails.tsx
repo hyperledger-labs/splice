@@ -89,7 +89,7 @@ export const VoteRequestDetails: React.FC = () => {
   const votingInformation: ProposalVotingInformation = {
     requester: request.requester,
     requesterIsYou: request.requester === svPartyId,
-    votingCloses: dayjs(request.voteBefore).format(dateTimeFormatISO),
+    votingThresholdDeadline: dayjs(request.voteBefore).format(dateTimeFormatISO),
     voteTakesEffect: request.targetEffectiveAt
       ? dayjs(request.targetEffectiveAt).format(dateTimeFormatISO)
       : 'Threshold',

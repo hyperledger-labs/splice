@@ -177,9 +177,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => (
-                <field.TextArea title="Proposal Summary" id="update-sv-reward-weight-summary" />
-              )}
+              {field => <field.ProposalSummaryField id="update-sv-reward-weight-summary" />}
             </form.AppField>
 
             <form.AppField

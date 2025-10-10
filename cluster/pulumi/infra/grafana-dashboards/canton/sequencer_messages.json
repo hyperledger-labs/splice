@@ -17,8 +17,8 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 5075,
+  "graphTooltip": 1,
+  "id": 80,
   "links": [],
   "panels": [
     {
@@ -347,9 +347,9 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.0.2",
@@ -539,9 +539,9 @@
           "sortDesc": true
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.0.2",
@@ -642,9 +642,9 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.0.2",
@@ -746,8 +746,8 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.0.2",
@@ -803,8 +803,8 @@
       },
       {
         "current": {
-          "text": "global-domain-6-sequencer",
-          "value": "global-domain-6-sequencer"
+          "text": "global-domain-0-sequencer",
+          "value": "global-domain-0-sequencer"
         },
         "datasource": {
           "type": "prometheus",
@@ -833,5 +833,5 @@
   "timezone": "",
   "title": "Sequencer Messages",
   "uid": "fdjrxql2alblsd",
-  "version": 5
+  "version": 2
 }

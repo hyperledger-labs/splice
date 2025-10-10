@@ -245,6 +245,8 @@ async function installValidator(
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
+    additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
+    additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

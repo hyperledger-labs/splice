@@ -25,13 +25,7 @@ import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingCon
 import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandInterpreter.PackageResolver
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
-import com.digitalasset.canton.protocol.{
-  CantonContractIdV1Version,
-  CantonContractIdV2Version,
-  CantonContractIdVersion,
-  LfFatContractInst,
-  LfHash,
-}
+import com.digitalasset.canton.protocol.{CantonContractIdVersion, LfFatContractInst}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -42,7 +36,12 @@ import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.engine.*
 import com.digitalasset.daml.lf.engine.ResultNeedContract.Response
 import com.digitalasset.daml.lf.language.Ast.Package
-import com.digitalasset.daml.lf.transaction.{Node, SubmittedTransaction, Transaction}
+import com.digitalasset.daml.lf.transaction.{
+  GlobalKeyWithMaintainers,
+  Node,
+  SubmittedTransaction,
+  Transaction,
+}
 import scalaz.syntax.tag.*
 
 import java.util.concurrent.TimeUnit
@@ -138,20 +137,19 @@ final class StoreBackedCommandInterpreter(
   )(implicit
       tc: TraceContext
   ): Either[ErrorCause.DisclosedContractsSynchronizerIdMismatch, CommandInterpretationResult] = {
-    val disclosedContractsMap =
-      commands.disclosedContracts.iterator.map(d => d.fatContractInstance.contractId -> d).toMap
 
-    val processedDisclosedContractsSynchronizers = meta.disclosedEvents
-      .map { event =>
-        val disclosedContract = disclosedContractsMap(event.coid)
-        disclosedContract.fatContractInstance -> disclosedContract.synchronizerIdO
-      }
+    val usedDisclosedContracts = {
+      val inputContractIds = updateTx.inputContracts
+      commands.disclosedContracts.filter(c =>
+        inputContractIds.contains(c.fatContractInstance.contractId)
+      )
+    }
 
     StoreBackedCommandInterpreter
       .considerDisclosedContractsSynchronizerId(
         commands.synchronizerId,
-        processedDisclosedContractsSynchronizers.map { case (disclosed, synchronizerIdO) =>
-          disclosed.contractId -> synchronizerIdO
+        usedDisclosedContracts.map { disclosed =>
+          disclosed.fatContractInstance.contractId -> disclosed.synchronizerIdO
         },
         logger,
       )
@@ -185,7 +183,7 @@ final class StoreBackedCommandInterpreter(
           dependsOnLedgerTime = meta.dependsOnTime,
           interpretationTimeNanos = interpretationTimeNanos,
           globalKeyMapping = meta.globalKeyMapping,
-          processedDisclosedContracts = processedDisclosedContractsSynchronizers.map(_._1),
+          processedDisclosedContracts = usedDisclosedContracts.map(_.fatContractInstance),
         )
       }
   }
@@ -213,11 +211,10 @@ final class StoreBackedCommandInterpreter(
           submitters = commitAuthorizers,
           readAs = commands.readAs,
           cmds = commands.commands,
-          disclosures = commands.disclosedContracts.map(_.fatContractInstance),
           participantId = participant,
           submissionSeed = submissionSeed,
           prefetchKeys = commands.prefetchKeys,
-          config.toEngineLogger(loggerFactory.append("phase", "submission")),
+          engineLogger = config.toEngineLogger(loggerFactory.append("phase", "submission")),
         )
       })),
     )
@@ -266,6 +263,18 @@ final class StoreBackedCommandInterpreter(
     val lookupContractKeyTime = new AtomicLong(0L)
     val lookupContractKeyCount = new AtomicLong(0L)
 
+    val disclosedContractsByKey = (for {
+      idC <- disclosedContracts.view
+      (id, c) = idC
+      k <- c.contractKeyWithMaintainers.toList
+    } yield k -> id).toMap
+
+    def disclosedOrStoreLookup(acoid: ContractId): FutureUnlessShutdown[Option[LfFatContractInst]] =
+      disclosedContracts.get(acoid) match {
+        case Some(fatContract) => FutureUnlessShutdown.pure(Some(fatContract))
+        case None => timedLookup(acoid)
+      }
+
     def timedLookup(acoid: ContractId): FutureUnlessShutdown[Option[LfFatContractInst]] = {
       val start = System.nanoTime
       Timed
@@ -273,9 +282,34 @@ final class StoreBackedCommandInterpreter(
           metrics.execution.lookupActiveContract,
           FutureUnlessShutdown.outcomeF(contractStore.lookupActiveContract(readers, acoid)),
         )
-        .tap { _ =>
-          lookupActiveContractTime.addAndGet(System.nanoTime() - start)
-          lookupActiveContractCount.incrementAndGet()
+        .map {
+          _.tap { _ =>
+            lookupActiveContractTime.addAndGet(System.nanoTime() - start)
+            lookupActiveContractCount.incrementAndGet()
+          }
+        }
+    }
+
+    def disclosedOrStoreKeyLookup(
+        key: GlobalKeyWithMaintainers
+    ): FutureUnlessShutdown[Option[ContractId]] =
+      disclosedContractsByKey.get(key) match {
+        case Some(fatContract) => FutureUnlessShutdown.pure(Some(fatContract))
+        case None => timedKeyLookup(key)
+      }
+
+    def timedKeyLookup(key: GlobalKeyWithMaintainers): FutureUnlessShutdown[Option[ContractId]] = {
+      val start = System.nanoTime
+      Timed
+        .future(
+          metrics.execution.lookupContractKey,
+          FutureUnlessShutdown.outcomeF(contractStore.lookupContractKey(readers, key.globalKey)),
+        )
+        .map {
+          _.tap { _ =>
+            lookupContractKeyTime.addAndGet(System.nanoTime() - start)
+            lookupContractKeyCount.incrementAndGet()
+          }
         }
     }
 
@@ -288,17 +322,11 @@ final class StoreBackedCommandInterpreter(
         case ResultNeedContract(acoid, resume) =>
           (CantonContractIdVersion.extractCantonContractIdVersion(acoid) match {
             case Right(version) =>
-              val hashingMethod = version match {
-                case v1: CantonContractIdV1Version => v1.contractHashingMethod
-                case _: CantonContractIdV2Version =>
-                  // TODO(#23971) - Add support for transforming the contract argument prior to hashing and switch to TypedNormalForm
-                  LfHash.HashingMethod.UpgradeFriendly
-              }
-              timedLookup(acoid).map[Response] {
+              disclosedOrStoreLookup(acoid).map[Response] {
                 case Some(contract) =>
                   Response.ContractFound(
                     contract,
-                    hashingMethod,
+                    version.contractHashingMethod,
                     hash => contractAuthenticator(contract, hash).isRight,
                   )
                 case None => Response.ContractNotFound
@@ -317,22 +345,15 @@ final class StoreBackedCommandInterpreter(
           )
 
         case ResultNeedKey(key, resume) =>
-          val start = System.nanoTime
-          Timed
-            .future(
-              metrics.execution.lookupContractKey,
-              FutureUnlessShutdown.outcomeF(contractStore.lookupContractKey(readers, key.globalKey)),
-            )
-            .flatMap { contractId =>
-              lookupContractKeyTime.addAndGet(System.nanoTime() - start)
-              lookupContractKeyCount.incrementAndGet()
+          disclosedOrStoreKeyLookup(key)
+            .flatMap(response =>
               resolveStep(
                 Tracked.value(
                   metrics.execution.engineRunning,
-                  trackSyncExecution(interpretationTimeNanos)(resume(contractId)),
+                  trackSyncExecution(interpretationTimeNanos)(resume(response)),
                 )
               )
-            }
+            )
 
         case ResultNeedPackage(packageId, resume) =>
           packageResolver(packageId)(loggingContext.traceContext)

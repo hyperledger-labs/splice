@@ -34,6 +34,7 @@ import type {
 } from '../utils/types';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
+import { AmuletRules_SetConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 
 export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag, string> => ({
   CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
@@ -110,11 +111,11 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
         } as OffBoardMemberProposal;
       case 'SRARC_UpdateSvRewardWeight': {
         const allSvInfos = dsoInfo?.dsoRules.payload.svs.entriesArray() || [];
-        const svPartyId = dsoInfo?.svPartyId || '';
-        const currentWeight = getSvRewardWeight(allSvInfos, svPartyId);
+        const svToUpdate = dsoAction.value.svParty;
+        const currentWeight = getSvRewardWeight(allSvInfos, svToUpdate);
 
         return {
-          svToUpdate: dsoAction.value.svParty,
+          svToUpdate: svToUpdate,
           currentWeight: currentWeight,
           weightChange: dsoAction.value.newRewardWeight,
         } as UpdateSvRewardWeightProposal;
@@ -217,6 +218,35 @@ export function buildPendingConfigFields(
       const dsoAction = (proposal.payload.action.value as ActionRequiringConfirmation.ARC_DsoRules)
         .dsoAction.value as DsoRules_SetConfig;
       const changes = buildDsoConfigChanges(dsoAction.baseConfig, dsoAction.newConfig);
+
+      return changes.map(change => ({
+        fieldName: change.fieldName,
+        pendingValue: change.newValue as string,
+        proposalCid: proposal.contractId,
+        effectiveDate: proposal.payload.targetEffectiveAt
+          ? dayjs(proposal.payload.targetEffectiveAt).format(dateTimeFormatISO)
+          : 'Threshold',
+      }));
+    });
+}
+
+export function buildAmuletRulesPendingConfigFields(
+  proposals: Contract<VoteRequest>[] | undefined
+): PendingConfigFieldInfo[] {
+  if (!proposals?.length) {
+    return [];
+  }
+
+  return proposals
+    .filter(proposal => {
+      const a = proposal.payload.action;
+      return a.tag === 'ARC_AmuletRules' && a.value.amuletRulesAction.tag === 'CRARC_SetConfig';
+    })
+    .flatMap(proposal => {
+      const amuletAction = (
+        proposal.payload.action.value as ActionRequiringConfirmation.ARC_AmuletRules
+      ).amuletRulesAction.value as AmuletRules_SetConfig;
+      const changes = buildAmuletConfigChanges(amuletAction.baseConfig, amuletAction.newConfig);
 
       return changes.map(change => ({
         fieldName: change.fieldName,

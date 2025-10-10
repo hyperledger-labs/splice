@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.{MetricDoc, MetricsDocGenerator}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.admin.api.client.DamlGrpcClientMetrics
 import org.lfdecentralizedtrust.splice.automation.TriggerMetrics
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningMe
 import org.lfdecentralizedtrust.splice.sv.automation.ReportSvStatusMetricsExportTrigger
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStoreMetrics
 import org.lfdecentralizedtrust.splice.store.{DomainParamsStore, HistoryMetrics, StoreMetrics}
+import org.lfdecentralizedtrust.splice.validator.metrics.TopologyMetrics
 import org.lfdecentralizedtrust.splice.wallet.metrics.AmuletMetrics
 
 final case class GeneratedMetrics(
@@ -47,6 +48,8 @@ final case class GeneratedMetrics(
   def renderSection(prefix: String, metrics: List[MetricDoc.Item]): String = {
     val header = s"$prefix Metrics"
     (Seq(
+      s".. _${prefix.toLowerCase}-metrics-reference:",
+      "",
       header,
       "+" * header.length,
     ) ++
@@ -81,6 +84,11 @@ object MetricsDocs {
     generator.reset()
     // validator
     new AmuletMetrics(walletUserParty, generator)
+    val topologyMetrics = new TopologyMetrics(generator)
+    // force creation of a gauge for a dummy participant
+    val _ = topologyMetrics.getNumPartiesPerParticipantGauge(
+      ParticipantId.tryFromProtoPrimitive("PAR::participantId::namespace")
+    )
     val validatorMetrics = generator.getAll()
     generator.reset()
     // sv

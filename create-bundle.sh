@@ -133,9 +133,7 @@ adjust_shellscript_binary
 # pack releases
 cd "$RELEASES_DIR"
 rm -f "${RELEASE}.tar.gz"
-rm -f "${RELEASE}.zip"
 tar -zcf "${RELEASE}.tar.gz" "$RELEASE" &
-zip -rq "${RELEASE}.zip" "$RELEASE"/* &
 wait
 
 echo "Successfully created release bundle for release $RELEASE"

@@ -100,6 +100,31 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <form.Field
+            name="reason"
+            validators={{
+              onChange: ({ value }) => {
+                const result = z.string().safeParse(value);
+                return result.success ? undefined : result.error.issues[0].message;
+              },
+            }}
+            children={field => {
+              return (
+                <TextField
+                  label="Reason"
+                  multiline
+                  rows={4}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={e => field.handleChange(e.target.value)}
+                  error={!field.state.meta.isValid}
+                  helperText={field.state.meta.errors?.[0]}
+                  inputProps={{ 'data-testid': 'your-vote-reason-input' }}
+                />
+              );
+            }}
+          />
+          <form.Field
             name="url"
             validators={{
               onChange: ({ value }) => {
@@ -129,31 +154,6 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                     </span>
                   }
                   inputProps={{ 'data-testid': 'your-vote-url-input' }}
-                />
-              );
-            }}
-          />
-          <form.Field
-            name="reason"
-            validators={{
-              onChange: ({ value }) => {
-                const result = z.string().safeParse(value);
-                return result.success ? undefined : result.error.issues[0].message;
-              },
-            }}
-            children={field => {
-              return (
-                <TextField
-                  label="Reason"
-                  multiline
-                  rows={4}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={e => field.handleChange(e.target.value)}
-                  error={!field.state.meta.isValid}
-                  helperText={field.state.meta.errors?.[0]}
-                  inputProps={{ 'data-testid': 'your-vote-reason-input' }}
                 />
               );
             }}

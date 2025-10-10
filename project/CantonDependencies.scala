@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.4.0-snapshot.20250914.14200.0.v4c1522f4"
+  val version: String = "3.4.0-snapshot.20251007.14274.0.ve2024cd6"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -184,9 +184,9 @@ object CantonDependencies {
   lazy val janino = "org.codehaus.janino" % "janino" % "3.1.4"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "6.6"
 
-  lazy val cats = "org.typelevel" %% "cats-core" % "2.6.1"
-  lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.6.1"
-  lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
+  lazy val cats = "org.typelevel" %% "cats-core" % "2.9.0"
+  lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.9.0"
+  lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.3.2"
 
   lazy val chimney = "io.scalaland" %% "chimney" % "1.4.0"
 
@@ -290,4 +290,13 @@ object CantonDependencies {
   lazy val protobuf_version = google_protobuf_java.revision
   lazy val google_protobuf_java_util =
     "com.google.protobuf" % "protobuf-java-util" % protobuf_version
+
+  // AWS SDK for Java API to encrypt/decrypt keys using AWS KMS
+  lazy val aws_version = "2.29.5"
+  lazy val aws_kms = "software.amazon.awssdk" % "kms" % aws_version
+  lazy val aws_sts = "software.amazon.awssdk" % "sts" % aws_version
+
+  // GCP SDK for Java API to encrypt/decrypt keys using GCP KMS
+  lazy val gcp_kms_version = "2.55.0"
+  lazy val gcp_kms = "com.google.cloud" % "google-cloud-kms" % gcp_kms_version
 }

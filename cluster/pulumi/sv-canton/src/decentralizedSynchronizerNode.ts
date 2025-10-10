@@ -119,6 +119,7 @@ abstract class InStackDecentralizedSynchronizerNode
               postgresName: dbs.mediatorPostgres.instanceName,
               ...(dbs.setCoreDbNames ? { databaseName: mediatorDbName } : {}),
             },
+            additionalEnvVars: svConfig.mediator?.additionalEnvVars,
           },
           enablePostgresMetrics: true,
           metrics: {

@@ -116,7 +116,7 @@ function backup_cloudsql() {
         _error_msg "$output"
       fi
       retry_count=$((retry_count+1))
-      sleep 10
+      sleep 30
     else
       echo "Backup succeeded"
       return 0

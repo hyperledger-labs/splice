@@ -129,6 +129,7 @@ class QueueBasedSynchronizerOutboxTest
       defaultStaticSynchronizerParameters,
       target,
       queue,
+      disableOptionalTopologyChecks = false,
       // we don't need the validation logic to run, because we control the outcome of transactions manually
       exitOnFatalFailures = true,
       timeouts,
@@ -137,6 +138,7 @@ class QueueBasedSynchronizerOutboxTest
     )
     val client = new StoreBasedSynchronizerTopologyClient(
       clock,
+      defaultStaticSynchronizerParameters,
       store = target,
       packageDependenciesResolver = StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       timeouts = timeouts,
@@ -444,7 +446,8 @@ class QueueBasedSynchronizerOutboxTest
         (target, manager, handle, client) <-
           mk(
             transactions.size,
-            rejections = Iterator.continually(Some(TopologyTransactionRejection.NotAuthorized)),
+            rejections =
+              Iterator.continually(Some(TopologyTransactionRejection.Authorization.NotAuthorized)),
           )
         _ <- outboxConnected(manager, handle, client, target)
         res <- push(manager, transactions)

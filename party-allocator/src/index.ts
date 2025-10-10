@@ -6,7 +6,7 @@ import {
   Command,
   DisclosedContract,
 } from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
-import { readdir, writeFile } from "node:fs/promises";
+import { opendir, writeFile } from "node:fs/promises";
 import { config } from "./config.js";
 import fs from "fs";
 import { logger } from "./logger.js";
@@ -187,7 +187,12 @@ async function setupPreapproval(
     [],
     command2,
   );
-  await client.retry("getPreapproval", () => getPreapproval(client, partyId));
+  await client.retry(
+    "getPreapproval",
+    () => getPreapproval(client, partyId),
+    config.preapprovalRetries,
+    config.preapprovalRetryDelayMs,
+  );
 }
 
 function pubKeyPath(index: number) {
@@ -310,12 +315,13 @@ async function main() {
   if (!fs.existsSync(config.keyDirectory)) {
     fs.mkdirSync(config.keyDirectory);
   }
-  const contents = await readdir(config.keyDirectory);
-  const keyIndices = contents.map((f) => {
-    const match = f.match(/(?<index>.*)_priv.key/);
-    return parseInt(match?.groups?.index || "0");
-  });
-  const maxIndex = keyIndices.length > 0 ? Math.max(...keyIndices) + 1 : 0;
+  const dir = await opendir(config.keyDirectory);
+  let maxIndex = 0;
+  for await (const f of dir) {
+    const match = f.name.match(/(?<index>.*)_priv.key/);
+    const index = parseInt(match?.groups?.index || "0");
+    maxIndex = Math.max(maxIndex, index + 1);
+  }
   metrics.totalPartiesAllocated.record(maxIndex);
   // We just reinitialize the party at maxIndex + 1 from scratch instead of trying to clever
   // and incrementally handle all kinds of failures.

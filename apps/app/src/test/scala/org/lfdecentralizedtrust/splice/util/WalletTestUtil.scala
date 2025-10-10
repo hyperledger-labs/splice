@@ -1309,17 +1309,29 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       .supported
   }
 
-  def createTransferPreapprovalIfNotExists(
-      partyWalletClient: WalletAppClientReference
+  /** @param partyWalletClient the wallet in which to create the transfer preapproval
+    * @param checkValidator a validator to use to check that the preapproval was created and ingested by enough Scans
+    */
+  def createTransferPreapprovalEnsuringItExists(
+      partyWalletClient: WalletAppClientReference,
+      checkValidator: ValidatorAppBackendReference,
   ): TransferPreapproval.ContractId = {
     // creating the transfer preapproval can fail because there are no funds (which this won't recover),
     // but also by the validator being slow to approve the preapproval, which we can recover here
-    eventuallySucceeds() {
+    val cid = eventuallySucceeds() {
       partyWalletClient.createTransferPreapproval() match {
         case CreateTransferPreapprovalResponse.Created(contractId) => contractId
         case CreateTransferPreapprovalResponse.AlreadyExists(contractId) => contractId
       }
     }
+    // Ensure enough Scans have ingested it for it to be usable
+    eventually() {
+      checkValidator.lookupTransferPreapprovalByParty(
+        PartyId.tryFromProtoPrimitive(partyWalletClient.userStatus().party)
+      ) shouldBe defined
+    }
+
+    cid
   }
 
 }

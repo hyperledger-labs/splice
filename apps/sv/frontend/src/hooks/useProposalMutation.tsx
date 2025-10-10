@@ -51,7 +51,6 @@ export const useProposalMutation: () => UseMutationResult<
 
     onError: error => {
       console.error(`Failed to send proposal to dso`, error);
-      toast.error(`Failed to send proposal to dso: ${error.message}`);
     },
   });
 };

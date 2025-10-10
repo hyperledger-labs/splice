@@ -43,7 +43,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.{ContractAuthenticator, EitherTUtil}
+import com.digitalasset.canton.util.{ContractValidator, EitherTUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 
@@ -56,7 +56,7 @@ private[reassignment] class AssignmentProcessingSteps(
     reassignmentCoordination: ReassignmentCoordination,
     targetCrypto: SynchronizerCryptoClient,
     seedGenerator: SeedGenerator,
-    override protected val contractAuthenticator: ContractAuthenticator,
+    override protected val contractValidator: ContractValidator,
     staticSynchronizerParameters: Target[StaticSynchronizerParameters],
     val protocolVersion: Target[ProtocolVersion],
     protected val loggerFactory: NamedLoggerFactory,
@@ -94,7 +94,7 @@ private[reassignment] class AssignmentProcessingSteps(
     staticSynchronizerParameters,
     participantId,
     reassignmentCoordination,
-    contractAuthenticator,
+    contractValidator,
     loggerFactory,
   )
 
@@ -378,29 +378,14 @@ private[reassignment] class AssignmentProcessingSteps(
           logger.info(
             s"Sending an abstain verdict for ${assignmentValidationResult.hostedConfirmingReassigningParties} because unassignment data is not found in the reassignment store"
           )
-          val confirmationResponses = checked(
-            ConfirmationResponses.tryCreate(
-              parsedRequest.requestId,
-              assignmentValidationResult.rootHash,
-              synchronizerId.unwrap,
-              participantId,
-              NonEmpty.mk(
-                Seq,
-                ConfirmationResponse
-                  .tryCreate(
-                    Some(ViewPosition.root),
-                    LocalAbstainError.CannotPerformAllValidations
-                      .Abstain(
-                        s"Unassignment data not found when processing assignment $reassignmentId."
-                      )
-                      .toLocalAbstain(protocolVersion.unwrap),
-                    assignmentValidationResult.hostedConfirmingReassigningParties,
-                  ),
-              ),
-              protocolVersion.unwrap,
-            )
+          val confirmationResponses = createAbstainResponse(
+            parsedRequest.requestId,
+            assignmentValidationResult.rootHash,
+            s"Unassignment data not found when processing assignment $reassignmentId.",
+            assignmentValidationResult.hostedConfirmingReassigningParties,
           )
-          FutureUnlessShutdown.pure(Some(confirmationResponses))
+
+          FutureUnlessShutdown.pure(confirmationResponses)
         } else {
           createConfirmationResponses(
             parsedRequest.requestId,
@@ -489,7 +474,7 @@ private[reassignment] class AssignmentProcessingSteps(
       } yield CommitAndStoreContractsAndPublishEvent(
         None,
         Seq.empty,
-        eventO.map(event => _ => event),
+        eventO.map(event => _ => _ => event),
       )
       EitherT.fromEither[FutureUnlessShutdown](commit)
     }
@@ -552,13 +537,11 @@ private[reassignment] class AssignmentProcessingSteps(
                   source = assignmentValidationResult.sourcePSId.map(_.logical),
                   target = synchronizerId.map(_.logical),
                 )
-              } else EitherTUtil.unitUS
-            update <- EitherT.fromEither[FutureUnlessShutdown](
-              assignmentValidationResult.createReassignmentAccepted(
-                synchronizerId.map(_.logical),
-                participantId,
-                requestId.unwrap,
-              )
+              } else EitherTUtil.unitUS[ReassignmentProcessorError]
+            update = assignmentValidationResult.createReassignmentAccepted(
+              synchronizerId.map(_.logical),
+              participantId,
+              requestId.unwrap,
             )
           } yield CommitAndStoreContractsAndPublishEvent(
             commitSetO,

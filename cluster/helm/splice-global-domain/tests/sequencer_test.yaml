@@ -1,6 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
 suite: "sequencer values"
 templates:
   - sequencer.yaml
@@ -11,13 +12,13 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+set:
+  # Things we need just to pass the schema
+  sequencer:
+    driver:
+      type: cometbft
 tests:
   - it: "sets labels as expected"
-    set:
-      # Things we need just to pass the schema
-      sequencer:
-        driver:
-          type: cometbft
     documentSelector:
       path: kind
       value: Deployment
@@ -59,10 +60,7 @@ tests:
             helm.sh/chart: splice-global-domain-0.1.1
   - it: "can enable postgres metrics"
     set:
-      # Things we need just to pass the schema
       sequencer:
-        driver:
-          type: cometbft
       # Things we need for the postgres exporter
         persistence:
           postgresName: sequencer-6
@@ -78,10 +76,6 @@ tests:
           value: pge-sequencer-6-cantonnet-sequencer
   - it: "can enable pvc"
     set:
-      # Things we need just to pass the schema
-      sequencer:
-        driver:
-          type: cometbft
       # Things we need for the pvc mount
       pvc:
         size: 10Gi
@@ -95,10 +89,6 @@ tests:
           value: global-domain-6-sequencer-pvc
   - it: "sets log-level environment variables correctly when only logLevel is provided"
     set:
-      # Things we need just to pass the schema
-      sequencer:
-        driver:
-          type: cometbft
       # Set log level for testing
       logLevel: INFO
     documentSelector:
@@ -117,10 +107,6 @@ tests:
             value: INFO
   - it: "sets log-level environment variables correctly when both logLevel and logLevelStdout are provided"
     set:
-      # Things we need just to pass the schema
-      sequencer:
-        driver:
-          type: cometbft
       # Set log levels for testing
       logLevel: DEBUG
       logLevelStdout: ERROR
@@ -138,3 +124,47 @@ tests:
           content:
             name: LOG_LEVEL_STDOUT
             value: ERROR
+  - it: "sets anti affinity by default"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].labelSelector.matchExpressions[0].values[0]
+          value: "sequencer"
+  - it: "sets affinity alongside default anti affinity"
+    set:
+      affinity:
+        nodeAffinity:
+          test: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - exists:
+          path: spec.template.spec.affinity.nodeAffinity
+      - exists:
+          path: spec.template.spec.affinity.podAntiAffinity
+  - it: "sets only the specified affinity"
+    set:
+      enableAntiAffinity: false
+      affinity:
+        nodeAffinity:
+          test: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - exists:
+          path: spec.template.spec.affinity.nodeAffinity.test
+      - notExists:
+          path: spec.template.spec.affinity.podAntiAffinity
+  - it: "doesn't set any affinity"
+    set:
+      enableAntiAffinity: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.affinity

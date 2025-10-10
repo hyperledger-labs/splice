@@ -80,6 +80,7 @@ if docker-image-reference-exists "${imageReference}"; then
   fi
 fi
 
+_info "Tagging image ID ${imageId} with reference ${imageReference}"
 if ! _set_x docker tag "${imageId}" "${imageReference}"; then
     _error "Could not tag image '${imageId}."
     exit 1
@@ -88,6 +89,7 @@ fi
 pushed=""
 max_attempts=5
 
+_info "Pushing Docker image ${imageReference} (with ID ${imageId})"
 for ((i=1; i<=max_attempts; i++)); do
   if _set_x docker push "${imageReference}"; then
     pushed=1
@@ -101,5 +103,7 @@ if [ -z "$pushed" ]; then
   _error "Failed to push Docker image '${imageReference}' with ID '${imageId}' after ${max_attempts} attempts."
   exit 1
 fi
+
+_info "Successfully pushed Docker image ${imageReference} (with ID ${imageId})"
 
 echo "${targetPushState}" > target/docker.push

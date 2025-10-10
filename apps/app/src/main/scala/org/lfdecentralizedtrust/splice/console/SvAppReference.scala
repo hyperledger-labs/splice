@@ -343,10 +343,10 @@ class SvAppBackendReference(
     }
 
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via admin API)")
-  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String =
+  def prepareValidatorOnboarding(expiresIn: FiniteDuration, partyHint: Option[String]): String =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.PrepareValidatorOnboarding(expiresIn)
+        HttpSvAdminAppClient.PrepareValidatorOnboarding(expiresIn, partyHint)
       )
     }
 

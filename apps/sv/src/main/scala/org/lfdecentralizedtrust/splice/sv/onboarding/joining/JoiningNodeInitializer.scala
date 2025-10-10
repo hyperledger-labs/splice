@@ -4,11 +4,32 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
-import org.apache.pekko.stream.Materializer
+import cats.implicits.{
+  catsSyntaxOptionId,
+  catsSyntaxTuple2Semigroupal,
+  catsSyntaxTuple4Semigroupal,
+  toTraverseOps,
+}
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
@@ -19,18 +40,19 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
-import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
   ReconcileSequencerLimitWithMemberTrafficTrigger,
   SvPackageVettingTrigger,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -46,41 +68,14 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
   OnboardedAfterDelay,
   Onboarding,
 }
-import org.lfdecentralizedtrust.splice.sv.onboarding.{
-  DsoPartyHosting,
-  NodeInitializerUtil,
-  SetupUtil,
-  SynchronizerNodeInitializer,
-  SynchronizerNodeReconciler,
-}
+import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  PackageVetting,
-  SynchronizerMigrationUtil,
-  TemplateJsonDecoder,
-}
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
 
 import java.security.interfaces.ECPrivateKey
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
@@ -172,7 +167,10 @@ class JoiningNodeInitializer(
           )
         ),
       ).tupled
-      decentralizedSynchronizerId <- connectToDomainUnlessMigratingDsoParty(dsoPartyId)
+      // It is possible that the participant left disconnected to domains due to a failure in the last SV startup.
+      // Reconnect all domains at the beginning of SV initialization in case, but
+      // only if we already host the dso party or if we don't see a proposal to host it.
+      decentralizedSynchronizerId <- proceedWithReconnectAllDomains(dsoPartyId)
       svParty <- SetupUtil.setupSvParty(
         initConnection,
         config,
@@ -472,6 +470,59 @@ class JoiningNodeInitializer(
     } yield {
       ()
     }
+  }
+
+  // We can only reconnect the domains if the participant:
+  // - already hosts the dsoParty or
+  // - is not in the process to host it
+  // if not we risk reconnecting while the party was authorized but the acs was not imported yet thus breaking the participant
+  private def proceedWithReconnectAllDomains(
+      dsoParty: PartyId
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[SynchronizerId] = {
+    retryProvider.retry(
+      RetryFor.ClientCalls,
+      "reconnect_all_domains",
+      "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
+      for {
+        decentralizedSynchronizerId <- participantAdminConnection
+          .getSynchronizerIdWithoutConnecting(
+            config.domains.global.alias
+          )
+        participantId <- participantAdminConnection.getParticipantId()
+        // Check if the participant hosts the DSO party. If so,
+        // the dsoParty is hosted on the participant we can proceed to all domains reconnect
+        dsoPartyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
+          store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+          filterParty = dsoParty.filterString,
+          filterParticipant = participantId.filterString,
+          topologyTransactionType = TopologyTransactionType.AuthorizedState,
+        )
+        // Check if he participant has a proposal for hosting the DSO party. If so,
+        // we are in the middle of an DSO party migration so don't reconnect to the domain.
+        activeDsoPartyToParticipantProposals <- participantAdminConnection
+          .listPartyToParticipant(
+            store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+            filterParty = dsoParty.filterString,
+            filterParticipant = participantId.filterString,
+            topologyTransactionType = TopologyTransactionType.AllProposals,
+          )
+        _ <-
+          if (
+            dsoPartyToParticipantMapping.nonEmpty || activeDsoPartyToParticipantProposals.isEmpty
+          ) {
+            logger.info("Reconnecting all domains.")
+            participantAdminConnection.reconnectAllDomains()
+          } else {
+            Future.unit
+          }
+      } yield {
+        logger.info(
+          s"Participant hosts dsoParty: ${dsoPartyToParticipantMapping.nonEmpty} and has proposals to host dsoParty ${activeDsoPartyToParticipantProposals.nonEmpty}"
+        )
+        decentralizedSynchronizerId
+      },
+      logger,
+    )
   }
 
   private def waitForSvParticipantToHaveSubmissionRights(

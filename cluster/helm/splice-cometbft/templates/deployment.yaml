@@ -33,19 +33,6 @@ spec:
         {{- end }}
     spec:
       {{- include "splice-util-lib.service-account" $.Values | nindent 6 }}
-      {{- if $.Values.enableAntiAffinity }}
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: splice-component
-                    operator: In
-                    values:
-                      - cometbft
-              topologyKey: kubernetes.io/hostname
-              namespaceSelector: { } # search in all namespaces
-      {{- end }}
       containers:
         - name: "cometbft"
           image: {{ $.Values.imageRepo }}/cometbft:{{ $.Chart.AppVersion }}{{ (($.Values.imageDigests).cometbft) }}
@@ -143,10 +130,7 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with $.Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "splice-util-lib.affinity" (set $.Values "app" "cometbft") | nindent 6 }}
       {{- with $.Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

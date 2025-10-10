@@ -91,7 +91,7 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class PrepareValidatorOnboarding(expiresIn: FiniteDuration)
+  case class PrepareValidatorOnboarding(expiresIn: FiniteDuration, partyHint: Option[String])
       extends BaseCommand[http.PrepareValidatorOnboardingResponse, String] {
 
     override def submitRequest(
@@ -99,7 +99,7 @@ object HttpSvAdminAppClient {
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.PrepareValidatorOnboardingResponse] =
       client.prepareValidatorOnboarding(
-        body = definitions.PrepareValidatorOnboardingRequest(expiresIn.toSeconds),
+        body = definitions.PrepareValidatorOnboardingRequest(expiresIn.toSeconds, partyHint),
         headers = headers,
       )
 

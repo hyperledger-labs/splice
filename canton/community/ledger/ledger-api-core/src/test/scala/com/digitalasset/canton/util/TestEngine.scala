@@ -11,7 +11,6 @@ import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt, TestSalt}
 import com.digitalasset.canton.ledger.api.validation.ValidateUpgradingPackageResolutions.ValidatedCommandPackageResolutionsSnapshot
 import com.digitalasset.canton.ledger.api.validation.{
   CommandsValidator,
-  ValidateDisclosedContracts,
   ValidateUpgradingPackageResolutions,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -47,6 +46,7 @@ class TestEngine(
     userId: String = "TestUserId",
     commandId: String = "TestCmdId",
     iterationsBetweenInterruptions: Long = 1000,
+    cantonContractIdVersion: CantonContractIdV1Version = CantonContractIdVersion.maxV1,
 ) extends EitherValues
     with OptionValues {
 
@@ -63,8 +63,7 @@ class TestEngine(
   }
 
   private val commandsValidator = new CommandsValidator(
-    validateUpgradingPackageResolutions = validateUpgradingPackageResolutions,
-    validateDisclosedContracts = ValidateDisclosedContracts.WithContractIdVerificationDisabled,
+    validateUpgradingPackageResolutions = validateUpgradingPackageResolutions
   )
 
   val packageResolver: PackageId => TraceContext => FutureUnlessShutdown[Option[Package]] =
@@ -92,7 +91,6 @@ class TestEngine(
   private val testInstant = Instant.now
   private val testTimestamp = Time.Timestamp.assertFromInstant(testInstant)
   private val maxDeduplicationDuration = Duration.ZERO
-  private val cantonContractIdVersion = AuthenticatedContractIdVersionV11
 
   val engine = new Engine(
     EngineConfig(
@@ -100,6 +98,12 @@ class TestEngine(
       iterationsBetweenInterruptions = iterationsBetweenInterruptions,
     )
   )
+
+  def hashAndConsume(
+      c: LfNodeCreate,
+      method: Hash.HashingMethod = cantonContractIdVersion.contractHashingMethod,
+  ): LfHash =
+    consume(engine.hashCreateNode(c, identity, method))
 
   private val valueEnricher = new Enricher(engine)
 
@@ -187,7 +191,6 @@ class TestEngine(
       packagePreference = engineCommands.packagePreferenceSet,
       submitters = Set(Ref.Party.assertFromString(actAs)),
       cmds = engineCommands.commands,
-      disclosures = engineCommands.disclosedContracts.map(_.fatContractInstance),
       participantId = participantId,
       submissionSeed = randomHash(),
       readAs = Set.empty,
@@ -213,8 +216,7 @@ class TestEngine(
           create.stakeholders,
           create.keyOpt.map(Versioned(create.version, _)),
         ),
-        contractHash = LegacyContractHash
-          .tryThinContractHash(create.coinst, cantonContractIdVersion.useUpgradeFriendlyHashing),
+        contractHash = hashAndConsume(create),
       )
       .value
 
@@ -225,7 +227,7 @@ class TestEngine(
     val suffixed = create.mapCid(_ => contractId)
 
     val authenticationData =
-      ContractAuthenticationDataV1(salt)(AuthenticatedContractIdVersionV11).toLfBytes
+      ContractAuthenticationDataV1(salt)(cantonContractIdVersion).toLfBytes
 
     FatContractInstance.fromCreateNode(
       suffixed,
@@ -238,10 +240,7 @@ class TestEngine(
       fat: FatContractInstance,
       recomputeIdVersion: CantonContractIdV1Version,
   ): Unicum = {
-
-    val contractHash =
-      LegacyContractHash.tryFatContractHash(fat, recomputeIdVersion.useUpgradeFriendlyHashing)
-
+    val contractHash = hashAndConsume(fat.toCreateNode, recomputeIdVersion.contractHashingMethod)
     unicumGenerator.recomputeUnicum(fat, recomputeIdVersion, contractHash).value
   }
 

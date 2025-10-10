@@ -306,7 +306,6 @@ object ApiServices {
           getPackageMetadataSnapshot = syncService.getPackageMetadataSnapshot(_)
         )
       val commandsValidator = new CommandsValidator(
-        validateDisclosedContracts = new ValidateDisclosedContracts(contractAuthenticator),
         validateUpgradingPackageResolutions = validateUpgradingPackageResolutions,
         topologyAwarePackageSelectionEnabled = ledgerFeatures.topologyAwarePackageSelection,
       )
@@ -321,12 +320,12 @@ object ApiServices {
           metrics,
           loggerFactory,
         )
-
       val apiPartyManagementService = ApiPartyManagementService.createApiService(
         partyManagementService,
         userManagementStore,
         new IdentityProviderExists(identityProviderConfigStore),
         partyManagementServiceConfig.maxPartiesPageSize,
+        partyManagementServiceConfig.maxSelfAllocatedParties,
         partyRecordStore,
         syncService,
         managementServiceTimeout,
@@ -366,8 +365,7 @@ object ApiServices {
         loggerFactory = loggerFactory,
       )
       val updateServices = new CommandServiceImpl.UpdateServices(
-        getTransactionTreeById = ledgerApiUpdateService.getTransactionTreeById,
-        getUpdateById = ledgerApiUpdateService.getUpdateById,
+        getUpdateById = ledgerApiUpdateService.getUpdateById
       )
       val apiCommandService = CommandServiceImpl.createApiService(
         commandsValidator = commandsValidator,

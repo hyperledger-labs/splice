@@ -81,7 +81,9 @@ class AcceptTransferPreapprovalProposalTrigger(
           validatorWallet.treasury
             .enqueueAmuletOperation(
               operation,
-              dedup = Some(AmuletOperationDedupConfig(commandId, DedupOffset(offset))),
+              dedup = Some(AmuletOperationDedupConfig(commandId, DedupOffset(offset))).filter(_ =>
+                transferPreapprovalConfig.proposalAcceptanceDeduplication
+              ),
             )
             .flatMap {
               case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>

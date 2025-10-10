@@ -94,6 +94,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
@@ -118,6 +119,8 @@ class OutputModule[E <: Env[E]](
     override val timeouts: ProcessingTimeout,
     requestInspector: RequestInspector = DefaultRequestInspector, // For testing
     epochChecker: EpochChecker = EpochChecker.DefaultEpochChecker, // For testing
+    // Passed from BftBlockOrderer to allow a near-0 latency `GetTime` implementation
+    private[bftordering] val previousStoredBlock: PreviousStoredBlock = new PreviousStoredBlock,
 )(implicit
     override val config: BftBlockOrdererConfig,
     synchronizerProtocolVersion: ProtocolVersion,
@@ -158,8 +161,6 @@ class OutputModule[E <: Env[E]](
       )
     )
 
-  @VisibleForTesting
-  private[output] val previousStoredBlock = new PreviousStoredBlock
   startupState.previousBftTimeForOnboarding.foreach { time =>
     previousStoredBlock.update(
       BlockNumber(startupState.initialHeightToProvide - 1),
@@ -889,28 +890,30 @@ object OutputModule {
       initialLowerBound: Option[(EpochNumber, BlockNumber)],
       initialLeaderSelectionPolicy: LeaderSelectionPolicy[E],
   )
-  @VisibleForTesting
-  private[output] final class PreviousStoredBlock {
 
-    @SuppressWarnings(Array("org.wartremover.warts.Var"))
-    private var blockNumberAndBftTime: Option[(BlockNumber, CantonTimestamp)] = None
+  private[bftordering] final class PreviousStoredBlock {
 
-    @VisibleForTesting
-    private[output] def getBlockNumberAndBftTime =
-      blockNumberAndBftTime
+    private val blockNumberAndBftTimeRef =
+      new AtomicReference[Option[(BlockNumber, CantonTimestamp)]](None)
+
+    private[bftordering] def getBlockNumberAndBftTime: Option[(BlockNumber, CantonTimestamp)] =
+      blockNumberAndBftTimeRef.get()
 
     override def toString: String =
-      blockNumberAndBftTime
+      blockNumberAndBftTimeRef
+        .get()
         .map(b => s"(block number = ${b._1}, BFT time = ${b._2})")
         .getOrElse("undefined")
 
-    def update(blockNumber: BlockNumber, blockBftTime: CantonTimestamp): Unit =
-      blockNumberAndBftTime = Some(blockNumber -> blockBftTime)
+    @VisibleForTesting
+    private[output] def update(blockNumber: BlockNumber, blockBftTime: CantonTimestamp): Unit =
+      blockNumberAndBftTimeRef.set(Some(blockNumber -> blockBftTime))
 
-    def computeBlockBftTime(orderedBlock: OrderedBlock): CantonTimestamp =
+    private[OutputModule] def computeBlockBftTime(orderedBlock: OrderedBlock): CantonTimestamp =
       BftTime.blockBftTime(
         orderedBlock.canonicalCommitSet,
-        previousBlockBftTime = blockNumberAndBftTime.map(_._2).getOrElse(CantonTimestamp.Epoch),
+        previousBlockBftTime =
+          blockNumberAndBftTimeRef.get().map(_._2).getOrElse(CantonTimestamp.Epoch),
       )
   }
 

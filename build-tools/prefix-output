@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+    echo "Error: No command provided." >&2
+    echo "Usage: $0 <command> [args...]" >&2
+    exit 1
+fi
+
+FULL_CMD="$*"
+
+( "$@" ) 2>&1 | awk -v prefix="[$FULL_CMD] " '{ print prefix $0 }'

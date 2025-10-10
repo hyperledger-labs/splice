@@ -45,9 +45,11 @@ trait SvTestUtil extends TestCommon {
   protected def svs(implicit env: SpliceTestConsoleEnvironment) =
     Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
 
-  def allocateRandomSvParty(name: String)(implicit env: SpliceTestConsoleEnvironment) = {
-    val id = (new scala.util.Random).nextInt().toHexString
-    val partyIdHint = s"$name-$id"
+  def allocateRandomSvParty(name: String, id: Option[Int] = None)(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val enumerator = id.getOrElse((new scala.util.Random).nextInt()).toHexString
+    val partyIdHint = s"$name-$enumerator"
     eventuallySucceeds() {
       try { sv1Backend.participantClient.ledger_api.parties.allocate(partyIdHint).party }
       catch {

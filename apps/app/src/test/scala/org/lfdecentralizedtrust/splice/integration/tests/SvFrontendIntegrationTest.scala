@@ -104,14 +104,29 @@ class SvFrontendIntegrationTest
           _ => {
             find(className("onboarding-secret-table")) should not be empty
             val rows = findAll(className("onboarding-secret-table-row")).toSeq
+            find(id("create-party-hint")) should not be empty
             find(id("create-validator-onboarding-secret")) should not be empty
             rows.size
           },
         )
 
         val (_, newSecret) = actAndCheck(
-          "click on the button to create an onboarding secret", {
-            click on "create-validator-onboarding-secret"
+          "fill the party hint field and click on the button to create an onboarding secret", {
+            clue("fill party hint") {
+              inside(find(id("create-party-hint"))) { case Some(element) =>
+                element.underlying.sendKeys("splice-client-2")
+              }
+            }
+
+            clue("wait for the create button to become enabled") {
+              eventually() {
+                find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
+              }
+            }
+
+            clue("click the create validator onboarding secret button") {
+              click on "create-validator-onboarding-secret"
+            }
           },
         )(
           "a new secret row is added",
@@ -125,7 +140,7 @@ class SvFrontendIntegrationTest
         )
 
         val licenseRows = getLicensesTableRows
-        val newValidatorParty = allocateRandomSvParty("validatorX")
+        val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
 
         actAndCheck(
           "onboard new validator using the secret",

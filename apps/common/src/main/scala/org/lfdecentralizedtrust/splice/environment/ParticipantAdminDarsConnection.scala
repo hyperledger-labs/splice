@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse_
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -265,7 +264,9 @@ trait ParticipantAdminDarsConnection {
     for {
       existingDars <- listDars().map(_.map(_.mainPackageId))
       darsToUploads = dars.filterNot(dar => existingDars.contains(dar.packageId))
-      _ <- darsToUploads.parTraverse_(uploadDar(_, vetTheDar, retryFor))
+      _ <- MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(5))(darsToUploads)(
+        uploadDar(_, vetTheDar, retryFor)
+      )
     } yield {}
   }
 

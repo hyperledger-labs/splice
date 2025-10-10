@@ -80,7 +80,7 @@ final case class ParticipantNodeConfig(
     override val init: ParticipantInitConfig = ParticipantInitConfig(),
     override val crypto: CryptoConfig = CryptoConfig(),
     ledgerApi: LedgerApiServerConfig = LedgerApiServerConfig(),
-    httpLedgerApi: Option[JsonApiConfig] = None,
+    httpLedgerApi: JsonApiConfig = JsonApiConfig(),
     override val adminApi: AdminServerConfig = AdminServerConfig(),
     override val storage: StorageConfig = StorageConfig.Memory(),
     testingTime: Option[TestingTimeServiceConfig] = None,
@@ -112,6 +112,8 @@ final case class ParticipantNodeConfig(
       .modify(ports.participantAdminApiPort.setDefaultPort)
       .focus(_.replication)
       .modify(ReplicationConfig.withDefaultO(storage, _, edition))
+      .focus(_.httpLedgerApi.server.internalPort)
+      .modify(ports.jsonLedgerApiPort.setDefaultPort)
 }
 
 object ParticipantNodeConfig {
@@ -247,6 +249,9 @@ final case class LedgerApiServerConfig(
 ) extends ServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 
+  // LAPI server does not use the canonical server builder, so doesn't support the stream limits using stream limit config
+  override val stream: Option[StreamLimitConfig] = None
+
   lazy val clientConfig: FullClientConfig =
     FullClientConfig(address, port, tls.map(_.clientConfig))
 
@@ -314,12 +319,6 @@ object TestingTimeServiceConfig {
   *
   * The following specialized participant node performance tuning parameters may be grouped once a
   * more final set of configs emerges.
-  * @param reassignmentTimeProofFreshnessProportion
-  *   Proportion of the target synchronizer exclusivity timeout that is used as a freshness bound
-  *   when requesting a time proof. Setting to 3 means we'll take a 1/3 of the target synchronizer
-  *   exclusivity timeout and potentially we reuse a recent timeout if one exists within that bound,
-  *   otherwise a new time proof will be requested. Setting to zero will disable reusing recent time
-  *   proofs and will instead always fetch a new proof.
   * @param minimumProtocolVersion
   *   The minimum protocol version that this participant will speak when connecting to a
   *   synchronizer
@@ -350,6 +349,9 @@ object TestingTimeServiceConfig {
   *   [[com.digitalasset.canton.config.CantonParameters.enableAdditionalConsistencyChecks]] being
   *   enabled are logged, measured in the number of contract activations during a single connection
   *   to a synchronizer. Used only for database storage.
+  * @param doNotAwaitOnCheckingIncomingCommitments
+  *   Enable fully asynchronous checking of incoming commitments. This may result in some incoming
+  *   commitments not being checked in case of crashes or HA failovers.
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -357,7 +359,6 @@ final case class ParticipantNodeParameterConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
-    reassignmentTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
       ParticipantProtocolVersion(ProtocolVersion.v34)
     ),
@@ -384,15 +385,15 @@ final case class ParticipantNodeParameterConfig(
     // TODO(#25344): check whether this should be removed
     automaticallyPerformLogicalSynchronizerUpgrade: Boolean = true,
     activationFrequencyForWarnAboutConsistencyChecks: Long = 1000,
+    reassignmentsConfig: ReassignmentsConfig = ReassignmentsConfig(),
+    doNotAwaitOnCheckingIncomingCommitments: Boolean = false,
 ) extends LocalNodeParametersConfig
     with UniformCantonConfigValidation
 
 object ParticipantNodeParameterConfig {
   implicit val participantNodeParameterConfigCantonConfigValidator
-      : CantonConfigValidator[ParticipantNodeParameterConfig] = {
-    import CantonConfigValidatorInstances.*
+      : CantonConfigValidator[ParticipantNodeParameterConfig] =
     CantonConfigValidatorDerivation[ParticipantNodeParameterConfig]
-  }
 }
 
 /** Parameters for the participant node's stores

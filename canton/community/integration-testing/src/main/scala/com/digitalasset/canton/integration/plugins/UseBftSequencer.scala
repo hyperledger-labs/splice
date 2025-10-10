@@ -3,13 +3,14 @@
 
 package com.digitalasset.canton.integration.plugins
 
+import com.digitalasset.canton
 import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.StorageConfig.Memory
-import com.digitalasset.canton.config.{CantonConfig, TlsClientConfig}
+import com.digitalasset.canton.config.{CantonConfig, QueryCostMonitoringConfig, TlsClientConfig}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.{
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.{
   MultiSynchronizer,
   SequencerSynchronizerGroups,
   SingleSynchronizer,
@@ -49,7 +50,7 @@ final class UseBftSequencer(
     shouldGenerateEndpointsOnly: Boolean = false,
     shouldOverwriteStoredEndpoints: Boolean = false,
     shouldUseMemoryStorageForBftOrderer: Boolean = false,
-    shouldDisableCircuitBreaker: Boolean = false,
+    shouldBenchmarkBftSequencer: Boolean = false,
 ) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
 
   val sequencerEndpoints
@@ -155,7 +156,7 @@ final class UseBftSequencer(
             overwriteStoredEndpoints = shouldOverwriteStoredEndpoints,
           )
           val blockSequencerConfig =
-            if (shouldDisableCircuitBreaker)
+            if (shouldBenchmarkBftSequencer)
               BlockSequencerConfig(
                 circuitBreaker = BlockSequencerConfig.CircuitBreakerConfig(enabled = false),
                 streamInstrumentation = BlockSequencerStreamInstrumentationConfig(isEnabled = true),
@@ -183,6 +184,15 @@ final class UseBftSequencer(
 
     sequencerEndpoints.putIfAbsent(sequencersToEndpoints.toMap)
     config
+      .focus(_.monitoring.logging.queryCost)
+      .modify { _ =>
+        if (shouldBenchmarkBftSequencer)
+          Some(
+            QueryCostMonitoringConfig(every = canton.config.NonNegativeFiniteDuration.ofSeconds(30))
+          )
+        else
+          None
+      }
       .focus(_.sequencers)
       .modify(_.map(mapSequencerConfigs))
   }

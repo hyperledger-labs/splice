@@ -5,13 +5,16 @@ import * as React from 'react';
 import { Box } from '@mui/material';
 
 import DesiredAmuletPrice from '../components/amuletprice/DesiredAmuletPrice';
-import MedianAmuletPrice from '../components/amuletprice/MedianAmuletPrice';
 import OpenMiningRounds from '../components/amuletprice/OpenMiningRounds';
+import { MedianAmuletPrice } from '../components/amuletprice/MedianAmuletPrice';
+import { useSvConfig } from '../utils';
 
 const AmuletPrice: React.FC = () => {
+  const config = useSvConfig();
+
   return (
     <Box>
-      <MedianAmuletPrice />
+      <MedianAmuletPrice amuletName={config.spliceInstanceNames.amuletName} />
       <DesiredAmuletPrice canEditVote />
       <OpenMiningRounds />
     </Box>

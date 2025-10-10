@@ -45,6 +45,16 @@ describe('Action Required', () => {
     expect(true).toBe(true);
   });
 
+  test('should render no items message when no items available', () => {
+    render(
+      <MemoryRouter>
+        <ActionRequiredSection actionRequiredRequests={[]} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('No Action Required items available')).toBeDefined();
+  });
+
   test('should render all action required requests', () => {
     render(
       <MemoryRouter>

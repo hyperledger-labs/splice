@@ -70,6 +70,9 @@ class ParticipantInitializer(
   private val nodeInitializer =
     new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
 
+  def waitForNodeInitialized(): Future[Unit] =
+    nodeInitializer.waitForNodeInitialized()
+
   def ensureInitializedWithExpectedId(): Future[Unit] =
     dumpConfig match {
       case Some(c: ParticipantBootstrapDumpConfig.File) =>
