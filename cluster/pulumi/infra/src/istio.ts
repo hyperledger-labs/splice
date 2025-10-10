@@ -320,7 +320,7 @@ function configureGatewayService(
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
-      name: `istio-ingress${suffix}-test`,
+      name: `istio-ingress${suffix}`,
       chart: 'gateway',
       version: istioVersion.istio,
       namespace: ingressNs.metadata.name,
@@ -359,6 +359,7 @@ function configureGatewayService(
           ].concat(ingressPorts),
         },
         ...infraAffinityAndTolerations,
+        // The httpLoadBalancing addon needs to be enabled to use backend service-based network load balancers.
         annotations: {
           'cloud.google.com/l4-rbs': 'enabled',
         },
@@ -366,6 +367,7 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
+      replaceOnChanges: ['values.annotations'],
       deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
