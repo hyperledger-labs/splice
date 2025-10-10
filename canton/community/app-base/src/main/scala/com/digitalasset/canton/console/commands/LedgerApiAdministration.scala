@@ -57,7 +57,6 @@ import com.daml.ledger.javaapi.data.{
   Transaction,
   TransactionFormat,
 }
-import com.daml.ledger.api.v2.value.Identifier
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.*

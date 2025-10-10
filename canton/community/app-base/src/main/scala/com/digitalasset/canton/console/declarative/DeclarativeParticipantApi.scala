@@ -861,25 +861,28 @@ class DeclarativeParticipantApi(
   )(implicit
       traceContext: TraceContext
   ): Either[String, UpdateResult] =
-    queryAdminApi(TopologyAdminCommands.Init.GetId()).flatMap { participantId =>
+    queryAdminApi(TopologyAdminCommands.Init.GetId()).flatMap { participantIdResult =>
       queryAdminApi(ListConnectedSynchronizers()).flatMap { connectedSynchronizers =>
         val want =
           computeWanted(mirrorDarsIfNecessary(fetchDarDirectory, dars), connectedSynchronizers)
 
         def fetchVettedPackages(store: Option[TopologyStoreId]) =
-          queryAdminApi(
-            TopologyAdminCommands.Read.ListVettedPackages(
-              BaseQuery(
-                store = store,
-                proposals = false,
-                timeQuery = TimeQuery.HeadState,
-                ops = Some(TopologyChangeOp.Replace),
-                filterSigningKey = "",
-                protocolVersion = None,
-              ),
-              filterParticipant = ParticipantId(participantId).filterString,
-            )
-          )
+          participantIdResult.uniqueIdentifier.toRight("Node is not initialized").flatMap {
+            participantId =>
+              queryAdminApi(
+                TopologyAdminCommands.Read.ListVettedPackages(
+                  BaseQuery(
+                    store = store,
+                    proposals = false,
+                    timeQuery = TimeQuery.HeadState,
+                    ops = Some(TopologyChangeOp.Replace),
+                    filterSigningKey = "",
+                    protocolVersion = None,
+                  ),
+                  filterParticipant = ParticipantId(participantId).filterString,
+                )
+              )
+          }
 
         def fetchDars(limit: PositiveInt): Either[String, Seq[((String, SynchronizerId), String)]] =
           for {

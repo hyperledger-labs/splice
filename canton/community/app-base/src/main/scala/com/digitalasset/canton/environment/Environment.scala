@@ -30,7 +30,6 @@ import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, M
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
-import com.digitalasset.canton.resource.DbMigrationsMetaFactory
 import com.digitalasset.canton.synchronizer.mediator.{
   MediatorNodeBootstrap,
   MediatorNodeBootstrapFactory,
@@ -69,7 +68,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
     mediatorNodeFactory: MediatorNodeBootstrapFactory,
-    protected val migrationsFactoryFactory: DbMigrationsMetaFactory,
     override val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging
     with AutoCloseable
@@ -287,7 +285,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   lazy val participants =
     new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode](
       createParticipant,
-      migrationsFactoryFactory.create(clock),
       timeouts,
       config.participantsByString,
       config.participantNodeParametersByString,
@@ -298,7 +295,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   val sequencers = new SequencerNodes(
     createSequencer,
-    migrationsFactoryFactory.create(clock),
     timeouts,
     config.sequencersByString,
     config.sequencerNodeParametersByString,
@@ -308,7 +304,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   val mediators =
     new MediatorNodes(
       createMediator,
-      migrationsFactoryFactory.create(clock),
       timeouts,
       config.mediatorsByString,
       config.mediatorNodeParametersByString,
@@ -612,7 +607,6 @@ final class CantonEnvironment(
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
     mediatorNodeFactory: MediatorNodeBootstrapFactory,
-    migrationsFactoryFactory: DbMigrationsMetaFactory,
     override val loggerFactory: NamedLoggerFactory,
 ) extends Environment[CantonConfig](
       config,
@@ -621,7 +615,6 @@ final class CantonEnvironment(
       participantNodeFactory,
       sequencerNodeFactory,
       mediatorNodeFactory,
-      migrationsFactoryFactory,
       loggerFactory,
     ) {
 
