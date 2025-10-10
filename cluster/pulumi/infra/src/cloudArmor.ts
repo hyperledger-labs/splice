@@ -183,7 +183,8 @@ function addDefaultDenyRule(
       securityPolicy: securityPolicy.name,
       description: 'Default rule to deny all other traffic',
       priority: DEFAULT_DENY_RULE_NUMBER,
-      preview,
+      // default rule cannot be in preview mode; google API gives 400 if you try
+      preview: false,
       action: 'deny',
       match: {
         config: {
