@@ -77,12 +77,13 @@ export async function installValidator1(
     );
   const validatorDbName = `validator1`;
 
-  const validatorSecrets = validator1Config?.disableAuth ? undefined :
-    await installValidatorSecrets({
-      xns,
-      auth0Client,
-      auth0AppName: 'validator1',
-    });
+  const validatorSecrets = validator1Config?.disableAuth
+    ? undefined
+    : await installValidatorSecrets({
+        xns,
+        auth0Client,
+        auth0AppName: 'validator1',
+      });
 
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
