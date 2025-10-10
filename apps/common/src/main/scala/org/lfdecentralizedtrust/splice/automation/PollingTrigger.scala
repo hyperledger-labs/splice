@@ -4,22 +4,23 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import com.daml.metrics.api.MetricsContext
-import org.lfdecentralizedtrust.splice.automation.PollingTrigger.PollingTriggerState
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.ErrorKind.*
 import org.apache.pekko.Done
+import org.lfdecentralizedtrust.splice.automation.PollingTrigger.PollingTriggerState
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.{Failure, Success}
 
 /** A trigger that regularly executes work.
@@ -33,12 +34,13 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     "trigger_type" -> "polling",
   ).withExtraLabels(extraMetricLabels*)
 
-  protected def isRewardOperationTrigger: Boolean = false
-
-  private val (pollingInterval, pollingJitter) =
-    if (isRewardOperationTrigger)
-      (context.config.rewardOperationPollingInterval, context.config.rewardOperationPollingJitter)
-    else (context.config.pollingInterval, context.config.pollingJitter)
+  protected def pollingScheduler: PollingTrigger.DelayedFutureScheduler =
+    new PollingTrigger.JitteredDelayedFutureScheduler(
+      context.pollingClock,
+      context.config.pollingInterval,
+      context.config.pollingJitter,
+      context.retryProvider,
+    )
 
   /** The main body of the polling trigger
     *
@@ -105,7 +107,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     Map.empty,
     "transient",
     "non-transient",
-    s"restarting after $pollingInterval",
+    s"restarting after ${context.config.pollingInterval}",
     context.metricsFactory,
     mc.labels,
     context.retryProvider,
@@ -139,13 +141,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             // Like below,
             // we use updateAndGet even if it can be reapplied during contention because we know there's no contention
             pollingLoopRef.updateAndGet(_.map(_.flatMap { state =>
-              context.retryProvider
-                .scheduleAfterUnlessShutdown(
-                  Future.successful(pollingLoop(newState)),
-                  context.pollingClock,
-                  pollingInterval,
-                  pollingJitter,
-                )
+              pollingScheduler
+                .scheduleNextPoll(pollingLoop(newState))
                 .onShutdown(())
                 .map(_ => state)
             }))
@@ -176,7 +173,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                       numConsecutiveTransientFailures > context.config.maxNumSilentPollingRetries
                     ) {
                       logger.warn(
-                        s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval $pollingInterval).\nThe last one was:",
+                        s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval ${context.config.pollingInterval}).\nThe last one was:",
                         ex,
                       )
                       PollingTrigger.initialPollingTriggerState
@@ -280,6 +277,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 object PollingTrigger {
 
   private val initialPollingTriggerState = PollingTriggerState(0)
+
   private case class PollingTriggerState(numConsecutiveTransientFailures: Int)
 
   private case class ConfigSummary(config: AutomationConfig) extends PrettyPrinting {
@@ -290,5 +288,33 @@ object PollingTrigger {
         param("maxNumSilentPollingRetries", _.config.maxNumSilentPollingRetries),
       )
     }
+  }
+
+  trait DelayedFutureScheduler {
+
+    def scheduleNextPoll(action: => Unit)(implicit
+        ec: ExecutionContext,
+        tc: TraceContext,
+    ): FutureUnlessShutdown[Unit]
+
+  }
+
+  class JitteredDelayedFutureScheduler(
+      clock: Clock,
+      pollingInterval: NonNegativeFiniteDuration,
+      pollingJitter: Double,
+      retryProvider: RetryProvider,
+  ) extends DelayedFutureScheduler {
+    override def scheduleNextPoll(action: => Unit)(implicit
+        ec: ExecutionContext,
+        tc: TraceContext,
+    ): FutureUnlessShutdown[Unit] =
+      retryProvider.scheduleAfterUnlessShutdown(
+        Future.successful(action),
+        clock,
+        pollingInterval,
+        pollingJitter,
+      )
+
   }
 }

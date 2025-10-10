@@ -3,6 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.wallet.automation
 
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.PollingTrigger.JitteredDelayedFutureScheduler
 import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_MergeTransferInputs
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
@@ -11,14 +17,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
 }
 import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryFor}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.util.RoundBasedUniformFutureScheduler
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -38,7 +40,24 @@ class CollectRewardsAndMergeAmuletsTrigger(
 
   override protected def extraMetricLabels = Seq("party" -> store.key.endUserParty.toString)
 
-  override def isRewardOperationTrigger: Boolean = true
+  override protected val pollingScheduler: PollingTrigger.DelayedFutureScheduler =
+    if (context.config.rewardOperationEnableRoundBasedInterval)
+      new RoundBasedUniformFutureScheduler(
+        (ec: ExecutionContext, tc: TraceContext) =>
+          scanConnection
+            .getOpenAndIssuingMiningRounds()(ec, mat, tc)
+            .map(_._1.map(_.contract.payload))(ec),
+        clock,
+        context.retryProvider,
+        loggerFactory,
+      )
+    else
+      new JitteredDelayedFutureScheduler(
+        context.clock,
+        context.config.rewardOperationPollingInterval,
+        context.config.rewardOperationPollingJitter,
+        context.retryProvider,
+      )
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     // Retry because we want to avoid missing rewards.

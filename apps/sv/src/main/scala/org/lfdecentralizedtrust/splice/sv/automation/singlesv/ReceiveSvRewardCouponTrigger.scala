@@ -4,25 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.data.OptionT
-import org.lfdecentralizedtrust.splice.automation.{
-  PollingParallelTaskExecutionTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
-import org.lfdecentralizedtrust.splice.environment.{
-  DarResources,
-  ParticipantAdminConnection,
-  SpliceLedgerConnection,
-}
-import org.lfdecentralizedtrust.splice.sv.config.BeneficiaryConfig
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.store.MiningRoundsStore.OpenMiningRoundContract
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -30,8 +11,27 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.*
+import org.lfdecentralizedtrust.splice.automation.PollingTrigger.JitteredDelayedFutureScheduler
+import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.{
+  DarResources,
+  ParticipantAdminConnection,
+  SpliceLedgerConnection,
+}
+import org.lfdecentralizedtrust.splice.store.MiningRoundsStore.OpenMiningRoundContract
+import org.lfdecentralizedtrust.splice.sv.config.BeneficiaryConfig
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.util.{
+  AmuletConfigSchedule,
+  AssignedContract,
+  RoundBasedUniformFutureScheduler,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -49,7 +49,24 @@ class ReceiveSvRewardCouponTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ReceiveSvRewardCouponTrigger.Task] {
 
-  override def isRewardOperationTrigger: Boolean = true
+  override protected val pollingScheduler: PollingTrigger.DelayedFutureScheduler = {
+    if (context.config.rewardOperationEnableRoundBasedInterval)
+      new RoundBasedUniformFutureScheduler(
+        (ec: ExecutionContext, tc: TraceContext) =>
+          store.getOpenMiningRoundTriple()(ec, tc).map(_.toSeq.map(_.payload))(ec),
+        context.clock,
+        context.retryProvider,
+        loggerFactory,
+      )
+    else {
+      new JitteredDelayedFutureScheduler(
+        context.clock,
+        context.config.rewardOperationPollingInterval,
+        context.config.rewardOperationPollingJitter,
+        context.retryProvider,
+      )
+    }
+  }
 
   private val svParty = store.key.svParty
   private val dsoParty = store.key.dsoParty
@@ -58,6 +75,7 @@ class ReceiveSvRewardCouponTrigger(
       tc: TraceContext
   ): Future[Seq[ReceiveSvRewardCouponTrigger.Task]] = {
     for {
+      _ <- store.getOpenMiningRoundTriple()
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       packages = AmuletConfigSchedule(amuletRules)
@@ -233,8 +251,8 @@ object ReceiveSvRewardCouponTrigger {
       round: OpenMiningRoundContract,
       beneficiaries: Seq[BeneficiaryConfig],
   ) extends PrettyPrinting {
-    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] =
       prettyOfClass(

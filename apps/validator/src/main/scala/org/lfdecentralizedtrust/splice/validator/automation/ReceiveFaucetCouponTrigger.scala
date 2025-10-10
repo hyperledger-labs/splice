@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.validator.automation
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
+  PollingTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -14,7 +15,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.{CommandPriority, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, ContractWithState}
+import org.lfdecentralizedtrust.splice.util.{
+  AssignedContract,
+  ContractWithState,
+  RoundBasedUniformFutureScheduler,
+}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
@@ -24,6 +29,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.PollingTrigger.JitteredDelayedFutureScheduler
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -43,7 +49,24 @@ class ReceiveFaucetCouponTrigger(
     materializer: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[ReceiveFaucetCouponTrigger.Task] {
 
-  override def isRewardOperationTrigger = true
+  override protected val pollingScheduler: PollingTrigger.DelayedFutureScheduler =
+    if (context.config.rewardOperationEnableRoundBasedInterval)
+      new RoundBasedUniformFutureScheduler(
+        (ec: ExecutionContext, tc: TraceContext) =>
+          scanConnection
+            .getOpenAndIssuingMiningRounds()(ec, materializer, tc)
+            .map(_._1.map(_.contract.payload))(ec),
+        clock,
+        context.retryProvider,
+        loggerFactory,
+      )
+    else
+      new JitteredDelayedFutureScheduler(
+        context.clock,
+        context.config.rewardOperationPollingInterval,
+        context.config.rewardOperationPollingJitter,
+        context.retryProvider,
+      )
 
   private val validatorParty = validatorStore.key.validatorParty
 
