@@ -1911,12 +1911,45 @@ final class DbMultiDomainAcsStore[TXE](
       val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
       domainMigrationInfo.acsRecordTime match {
         case Some(acsRecordTime) =>
-          deleteRolledBackTxLogEntries(txLogStoreId, previousMigrationId, acsRecordTime)
+          if (domainMigrationInfo.synchronizerWasPaused) {
+            verifyNoRolledBackData(txLogStoreId, previousMigrationId, acsRecordTime)
+          } else {
+            deleteRolledBackTxLogEntries(txLogStoreId, previousMigrationId, acsRecordTime)
+          }
         case _ =>
           logger.debug("No previous domain migration, not checking or deleting txlog entries")
           Future.unit
       }
     }
+  }
+
+  private[this] def verifyNoRolledBackData(
+      txLogStoreId: TxLogStoreId, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext) = {
+    val action =
+      sql"""
+            select count(*) from #$txLogTableName
+            where store_id = $txLogStoreId and migration_id = $migrationId and record_time > $recordTime
+          """
+        .as[Long]
+        .head
+        .map(rows =>
+          if (rows > 0) {
+            logger.error(
+              s"Found $rows rows for $txLogStoreDescriptor where migration_id = $migrationId and record_time > $recordTime, " +
+                "but the configuration says the domain was paused during the migration. " +
+                "Check the domain migration configuration and the content of the txlog database."
+            )
+            throw new RuntimeException("FIXME")
+          } else {
+            logger.debug(
+              s"No txlog entries found for $txLogStoreDescriptor where migration_id = $migrationId and record_time > $recordTime"
+            )
+          }
+        )
+    storage.query(action, "deleteRolledBackTxLogEntries")
   }
 
   private[this] def deleteRolledBackTxLogEntries(

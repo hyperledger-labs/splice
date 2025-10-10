@@ -119,6 +119,8 @@ class SplitwellApp(
     migrationInfo = DomainMigrationInfo(
       config.domainMigrationId,
       None,
+      // Hardcoded as splitwell is only for testing and does not keep tx history.
+      synchronizerWasPaused = true,
     )
     store = SplitwellStore(
       storeKey,

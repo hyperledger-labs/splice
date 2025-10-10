@@ -1018,7 +1018,8 @@ class AcsSnapshotStoreTest
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
       storage.underlying, // not under test
-      new DomainMigrationInfo(migrationId, None),
+      // FIXME
+      new DomainMigrationInfo(migrationId, None, synchronizerWasPaused = true),
       "update_history_acs_snapshot_test",
       mkParticipantId(participantId),
       dsoParty,

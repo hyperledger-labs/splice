@@ -253,6 +253,8 @@ class SV1Initializer(
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId, // Note: not guaranteed to be 0 for sv1
           acsRecordTime = None, // No previous migration, we're starting the network
+          // FIXME
+          synchronizerWasPaused = true,
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)

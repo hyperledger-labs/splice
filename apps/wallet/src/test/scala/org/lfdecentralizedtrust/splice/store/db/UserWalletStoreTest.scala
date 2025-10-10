@@ -1556,6 +1556,8 @@ class DbUserWalletStoreTest
       DomainMigrationInfo(
         migrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId = mkParticipantId("UserWalletStoreTest"),
     )

@@ -551,6 +551,8 @@ class TxLogBackfillingStoreTest
       DomainMigrationInfo(
         migrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       "TxLogBackfillingStoreTest",
       participantId,
@@ -589,6 +591,8 @@ class TxLogBackfillingStoreTest
       DomainMigrationInfo(
         migrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

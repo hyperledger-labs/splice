@@ -18,6 +18,8 @@ final case class DomainDataSnapshot(
     acsSnapshot: ByteString,
     acsTimestamp: Instant,
     dars: Seq[Dar],
+    // true if we exported for a proper migration, false for DR.
+    synchronizerWasPaused: Boolean,
 ) extends PrettyPrinting {
   def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
     genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
@@ -27,6 +29,7 @@ final case class DomainDataSnapshot(
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
       http.Dar(dar.mainPackageId, content)
     }.toVector,
+    synchronizerWasPaused = Some(synchronizerWasPaused),
   )
 
   override def pretty: Pretty[DomainDataSnapshot.this.type] =
@@ -36,6 +39,7 @@ final case class DomainDataSnapshot(
       param("acsSnapshotSize", _.acsSnapshot.size),
       param("acsTimestamp", _.acsTimestamp),
       param("darsSize", _.dars.size),
+      param("synchronizerWasPaused", _.synchronizerWasPaused),
     )
 }
 
@@ -74,6 +78,7 @@ object DomainDataSnapshot {
         acsSnapshot,
         acsTimestamp,
         dars,
+        src.synchronizerWasPaused.getOrElse(false),
       )
     )
   }

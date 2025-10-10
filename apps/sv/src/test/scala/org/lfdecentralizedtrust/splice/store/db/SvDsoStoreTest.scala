@@ -1579,6 +1579,8 @@ class DbSvDsoStoreTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId = mkParticipantId("SvDsoStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)

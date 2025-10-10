@@ -245,6 +245,8 @@ abstract class UpdateHistoryTestBase
       DomainMigrationInfo(
         domainMigrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       storeName,
       participantId,

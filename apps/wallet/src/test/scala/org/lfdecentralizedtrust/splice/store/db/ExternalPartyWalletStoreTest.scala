@@ -153,6 +153,8 @@ class DbExternalPartyWalletStoreTest
       DomainMigrationInfo(
         migrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId = mkParticipantId("ExternalPartyWalletStoreTest"),
     )

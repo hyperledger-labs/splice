@@ -2351,6 +2351,8 @@ class DbScanStoreTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
       enableImportUpdateBackfill = true,
