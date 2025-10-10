@@ -32,17 +32,3 @@ jobs:
     needs: env_hold
     with:
       commit_sha: ${{ github.event.pull_request.head.sha }}
-
-  # Note: unapproved runs must not be granted access to secrets, and must not run on self-hosted runners
-  no_approval_static_tests:
-    name: Static Tests (No Approval Required)
-    uses: ./.github/workflows/build.static_tests.yml
-    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
-    secrets: {} # Explcitly do not grant access to secrets
-    permissions:
-      contents: read
-      pull-requests: read # Required for the static tests
-      issues: read # Required for the static tests
-    with:
-      self_hosted: false
-      commit_sha: ${{ github.event.pull_request.head.sha }}
