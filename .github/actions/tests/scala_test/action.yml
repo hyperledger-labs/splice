@@ -141,7 +141,7 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 666632-4
+        cache_version: 666632-3
 
     - name: Set Daml package versions
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -285,7 +285,7 @@ runs:
       if: ${{ !cancelled() }}
       uses: ./.github/actions/sbt/post_sbt
       with:
-        cache_version: 666632-4
+        cache_version: 666632-3
         setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
         # Save caches only from one runner, to reduce conflicts on the save
         save_caches: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
