@@ -31,7 +31,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.Limit
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
@@ -112,7 +112,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   "return dso info same as the sv app" in { implicit env =>
     val scan = sv1ScanBackend.getDsoInfo()
     inside(sv1Backend.getDsoInfo()) {
-      case HttpSvAppClient.DsoInfo(
+      case HttpSvPublicAppClient.DsoInfo(
             svUser,
             svParty,
             dsoParty,

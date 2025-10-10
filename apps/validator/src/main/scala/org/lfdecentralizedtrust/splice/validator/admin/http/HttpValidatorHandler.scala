@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
-import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
@@ -14,6 +13,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.auth.AuthenticationOnlyAuthExtractor.AuthenticatedRequest
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,15 +27,17 @@ class HttpValidatorHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.ValidatorHandler[TracedUser]
+) extends v0.ValidatorHandler[AuthenticatedRequest]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
 
   def register(
       respond: v0.ValidatorResource.RegisterResponse.type
-  )(body: Option[Json])(tracedUser: TracedUser): Future[v0.ValidatorResource.RegisterResponse] = {
-    implicit val TracedUser(ledgerApiUser, traceContext) = tracedUser
+  )(
+      body: Option[Json]
+  )(tracedUser: AuthenticatedRequest): Future[v0.ValidatorResource.RegisterResponse] = {
+    implicit val AuthenticatedRequest(ledgerApiUser, traceContext) = tracedUser
 
     withSpan(s"$workflowId.register") { _ => span =>
       span.setAttribute("name", ledgerApiUser)
