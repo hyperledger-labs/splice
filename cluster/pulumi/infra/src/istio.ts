@@ -359,10 +359,16 @@ function configureGatewayService(
           ].concat(ingressPorts),
         },
         ...infraAffinityAndTolerations,
+        // The httpLoadBalancing addon needs to be enabled to use backend service-based network load balancers.
+        annotations: {
+          'cloud.google.com/l4-rbs': 'enabled',
+        },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
+      replaceOnChanges: ['values.annotations'],
+      deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
             const base: pulumi.Resource[] = [ingressNs, istiod];

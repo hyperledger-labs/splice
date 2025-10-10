@@ -696,6 +696,9 @@ function subcmd_create() {
         #### Enable Firewall Access
         subcmd_cluster_update_access
 
+        ### Enable Http Load Balancing
+        subcmd_cluster_enable_http_load_balancing
+
         #### Delete default firewall rules, if they exist.
         if (gcloud compute firewall-rules delete\
                          default-allow-rdp \
@@ -911,6 +914,19 @@ function subcmd_cluster_enable_workload_identity() {
         --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
         --workload-metadata=GKE_METADATA
 }
+
+subcommand_whitelist[cluster_enable_http_load_balancing]='Enable http load balancing for the cluster.'
+
+function subcmd_cluster_enable_http_load_balancing() {
+    if ! gcloud container clusters describe "${GCP_CLUSTER_NAME}" --format="value(addonsConfig.httpLoadBalancing)" | grep -q "disabled=True"; then
+        _info "Http Load Balancing is already enabled for the cluster."
+        return
+    fi
+
+    _info "Enabling http load balancing for the cluster ${GCP_CLUSTER_NAME}."
+    gcloud container clusters update "${GCP_CLUSTER_NAME}" --update-addons=HttpLoadBalancing=ENABLED
+}
+
 ###
 
 subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'

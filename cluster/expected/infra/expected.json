@@ -1683,6 +1683,9 @@
             }
           }
         },
+        "annotations": {
+          "cloud.google.com/l4-rbs": "enabled"
+        },
         "autoscaling": {
           "maxReplicas": 15
         },
@@ -1860,6 +1863,9 @@
               ]
             }
           }
+        },
+        "annotations": {
+          "cloud.google.com/l4-rbs": "enabled"
         },
         "autoscaling": {
           "maxReplicas": 15
