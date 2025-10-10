@@ -1025,11 +1025,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   pageSize = 1000,
                   templates = Some(
                     Vector(
-                      DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID,
-                      AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
-                      AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+                      DsoRules.COMPANION,
+                      AmuletRules.COMPANION,
+                      AnsRules.COMPANION,
                     ).map(
-                      PackageQualifiedName.getFromResources(_)
+                      PackageQualifiedName.fromJavaCodegenCompanion
                     )
                   ),
                 )

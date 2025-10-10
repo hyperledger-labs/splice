@@ -70,9 +70,7 @@ class DbUserWalletStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
-        // to version 2 descriptors.
-        version = 2,
+        version = 3,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
@@ -202,7 +200,7 @@ class DbUserWalletStore(
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[(Contract[TCid, T], BigDecimal)]] = {
-    val templateId = companionClass.typeId(companion)
+    val packageQualifiedName = companionClass.packageQualifiedName(companion)
     issuingRoundsMap
       .flatMap { case (round, contract) =>
         roundToIssuance(contract).map(round.number.longValue() -> _)
@@ -224,13 +222,14 @@ class DbUserWalletStore(
                  from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
                  where acs.store_id = $acsStoreId
                    and migration_id = $domainMigrationId
-                   and acs.template_id_qualified_name = ${QualifiedName(templateId)}
+                   and acs.package_name = ${packageQualifiedName.packageName}
+                   and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
                  order by (acs.reward_coupon_round, -""" ++ ccValue ++ sql""")
                  limit ${sqlLimit(limit)}""").toActionBuilder
               .as[(SelectFromAcsTableResult, BigDecimal)],
-            s"listSorted${templateId.getEntityName}",
+            s"listSorted:$packageQualifiedName",
           )
-        } yield applyLimit(s"listSorted${templateId.getEntityName}", limit, result).map {
+        } yield applyLimit(s"listSorted:$packageQualifiedName", limit, result).map {
           case (row, issuance) =>
             val contract = contractFromRow(companion)(row)
             contract -> issuance
@@ -295,8 +294,10 @@ class DbUserWalletStore(
              where """ ++
         filterAcsStoreMigrationIds("ansEntry.", "ansEntryContext.", "sub.", "st.") ++
         sql" and " ++ subscriptionFilter(now) ++ sql"""
+               and ansEntry.package_name = ${ansCodegen.AnsEntry.PACKAGE_NAME}
                and ansEntry.template_id_qualified_name =
                      ${QualifiedName(ansCodegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID)}
+               and ansEntryContext.package_name = ${ansCodegen.AnsEntryContext.PACKAGE_NAME}
                and ansEntryContext.template_id_qualified_name =
                      ${QualifiedName(ansCodegen.AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID)}
                and ansEntry.create_arguments ->> 'name' = ansEntryContext.create_arguments ->> 'name'
@@ -388,8 +389,8 @@ class DbUserWalletStore(
         // provide a grace period for subscription payments.
         (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("st.")},
                       #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("sub.")},
-                      (case when st.template_id_qualified_name =
-                                   ${QualifiedName(
+                      (case when st.package_name = ${subsCodegen.SubscriptionIdleState.PACKAGE_NAME}
+                             and st.template_id_qualified_name = ${QualifiedName(
             subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
           )}
                             then $idleStateFlag
@@ -420,12 +421,12 @@ class DbUserWalletStore(
   }
 
   private[this] def subscriptionFilter(now: CantonTimestamp) =
-    sql"""((st.template_id_qualified_name =
+    sql"""((st.package_name = ${subsCodegen.SubscriptionIdleState.PACKAGE_NAME} and st.template_id_qualified_name =
                ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID)}
             and st.contract_expires_at >= $now)
-           or st.template_id_qualified_name =
+           or st.package_name = ${subsCodegen.SubscriptionPayment.PACKAGE_NAME} and st.template_id_qualified_name =
                 ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID_WITH_PACKAGE_ID)})
-      and sub.template_id_qualified_name =
+      and sub.package_name = ${subsCodegen.Subscription.PACKAGE_NAME} and sub.template_id_qualified_name =
             ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID_WITH_PACKAGE_ID)}
       and (st.create_arguments ->> 'subscription') = sub.contract_id"""
 
@@ -446,12 +447,8 @@ class DbUserWalletStore(
               WalletTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              sql"""
-            template_id_qualified_name = ${QualifiedName(
-                  TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-              and transfer_preapproval_receiver = ${receiver}
-            """,
+              TransferPreapproval.COMPANION,
+              sql""" transfer_preapproval_receiver = $receiver """,
               sql"limit 1",
             ).headOption,
             "lookupTransferPreapproval",
@@ -478,12 +475,8 @@ class DbUserWalletStore(
               WalletTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              sql"""
-            template_id_qualified_name = ${QualifiedName(
-                  TransferPreapprovalProposal.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-              and transfer_preapproval_receiver = ${receiver}
-            """,
+              TransferPreapprovalProposal.COMPANION,
+              sql"""transfer_preapproval_receiver = $receiver""",
               sql"limit 1",
             ).headOption,
             "lookupTransferPreapprovalProposal",

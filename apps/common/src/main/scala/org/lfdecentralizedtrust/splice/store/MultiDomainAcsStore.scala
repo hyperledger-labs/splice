@@ -6,7 +6,10 @@ package org.lfdecentralizedtrust.splice.store
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
-import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
+import org.lfdecentralizedtrust.splice.util.Contract.Companion.{
+  Interface,
+  Template as TemplateCompanion,
+}
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.metrics.api.MetricsContext
@@ -26,6 +29,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   PackageQualifiedName,
+  QualifiedName,
   TemplateJsonDecoder,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -170,22 +174,6 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]]
-
-  /** At most 1000 (`notOnDomainsTotalLimit`) contracts sorted by a hash of
-    * contract ID and participant ID.
-    *
-    * The idea is that different apps making the same migration on different
-    * participants will split the work better, while preserving determinism of a
-    * specific running app for fault-tolerance.  For the former to happen, the
-    * position of a contract on one list must have no correlation with that on
-    * another list; that is why the contract ID by itself cannot be used by
-    * itself as the source of the sort key.
-    */
-  def listAssignedContractsNotOnDomainN(
-      excludedDomain: SynchronizerId,
-      companions: Seq[ConstrainedTemplate],
-      limit: notOnDomainsTotalLimit.type = notOnDomainsTotalLimit,
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
 
   private[splice] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
       companion: C
@@ -470,7 +458,7 @@ object MultiDomainAcsStore extends StoreErrors {
       TemplateFilter[TCid, T, R],
   ) =
     (
-      PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId),
+      PackageQualifiedName.fromJavaCodegenCompanion(templateCompanion),
       TemplateFilter(
         ev => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev)
@@ -597,6 +585,8 @@ object MultiDomainAcsStore extends StoreErrors {
 
     def typeId(companion: C): Identifier
 
+    def packageQualifiedName(companion: C): PackageQualifiedName
+
     def toContractId(companion: C, contractId: String): TCid
 
     protected def fromJson(
@@ -618,6 +608,13 @@ object MultiDomainAcsStore extends StoreErrors {
 
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
         companion.getTemplateIdWithPackageId
+
+      override def packageQualifiedName(
+          companion: TemplateCompanion[TCid, T]
+      ): PackageQualifiedName = PackageQualifiedName(
+        companion.PACKAGE_NAME,
+        QualifiedName(companion.getTemplateIdWithPackageId),
+      )
 
       override def toContractId(companion: Companion.Template[TCid, T], contractId: String): TCid =
         companion.toContractId(new ContractId[T](contractId))
@@ -651,6 +648,13 @@ object MultiDomainAcsStore extends StoreErrors {
 
       override def typeId(companion: Contract.Companion.Interface[ICid, Marker, View]): Identifier =
         companion.getTemplateIdWithPackageId
+
+      override def packageQualifiedName(
+          companion: Interface[ICid, Marker, View]
+      ): PackageQualifiedName = PackageQualifiedName(
+        companion.PACKAGE_NAME,
+        QualifiedName(companion.getTemplateIdWithPackageId),
+      )
 
       override def toContractId(
           companion: Companion.Interface[ICid, Marker, View],

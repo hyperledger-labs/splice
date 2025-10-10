@@ -404,7 +404,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
           val filterIdentifier =
-            PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId)
+            PackageQualifiedName.fromJavaCodegenCompanion(templateCompanion)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,
@@ -443,8 +443,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
         ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
             partyId: PartyId
         ): Seq[CreatedEvent] = {
-          val filterIdentifier =
-            PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId)
+          val filterIdentifier = PackageQualifiedName.fromJavaCodegenCompanion(templateCompanion)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,
