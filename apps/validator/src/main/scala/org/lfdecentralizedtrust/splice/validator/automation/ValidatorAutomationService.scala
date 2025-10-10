@@ -68,8 +68,6 @@ class ValidatorAutomationService(
     domainMigrationDumpPath: Option[Path],
     domainMigrationId: Long,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
@@ -90,8 +88,6 @@ class ValidatorAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
     ) {
   override def companion

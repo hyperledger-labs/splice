@@ -786,8 +786,6 @@ class ValidatorApp(
             loggerFactory,
             domainMigrationInfo,
             participantId,
-            config.ingestFromParticipantBegin,
-            config.ingestUpdateHistoryFromParticipantBegin,
             config.parameters,
           )
           val walletManager = new UserWalletManager(
@@ -807,8 +805,6 @@ class ValidatorApp(
             loggerFactory,
             domainMigrationInfo,
             participantId,
-            config.ingestFromParticipantBegin,
-            config.ingestUpdateHistoryFromParticipantBegin,
             validatorTopupConfig,
             config.walletSweep,
             config.autoAcceptTransfers,
@@ -851,8 +847,6 @@ class ValidatorApp(
         config.domainMigrationDumpPath,
         config.domainMigrationId,
         retryProvider,
-        config.ingestFromParticipantBegin,
-        config.ingestUpdateHistoryFromParticipantBegin,
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
         config.contactPoint,
