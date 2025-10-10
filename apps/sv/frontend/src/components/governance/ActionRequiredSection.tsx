@@ -3,7 +3,7 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ArrowForward, ContentCopy } from '@mui/icons-material';
-import { Badge, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
+import { Alert, Badge, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 export interface ActionRequiredData {
@@ -40,17 +40,23 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-        {actionRequiredRequests.map((ar, index) => (
-          <ActionCard
-            key={index}
-            action={ar.actionName}
-            createdAt={ar.createdAt}
-            contractId={ar.contractId}
-            votingEnds={ar.votingCloses}
-            requester={ar.requester}
-            isYou={ar.isYou}
-          />
-        ))}
+        {actionRequiredRequests.length === 0 ? (
+          <Alert severity="info" data-testid={'action-required-section-no-items'}>
+            No Action Required items available
+          </Alert>
+        ) : (
+          actionRequiredRequests.map((ar, index) => (
+            <ActionCard
+              key={index}
+              action={ar.actionName}
+              createdAt={ar.createdAt}
+              contractId={ar.contractId}
+              votingEnds={ar.votingCloses}
+              requester={ar.requester}
+              isYou={ar.isYou}
+            />
+          ))
+        )}
       </Box>
     </Box>
   );

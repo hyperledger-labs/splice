@@ -421,7 +421,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         browseToSv1Wallet(sv1ValidatorWalletUser)
         actAndCheck(
           "SV1 creates a transfer preapproval and automation renews it immediately",
-          createTransferPreapprovalIfNotExists(sv1WalletClient),
+          createTransferPreapprovalEnsuringItExists(sv1WalletClient, sv1ValidatorBackend),
         )(
           "SV1 sees the creation and renewal transactions",
           _ => {

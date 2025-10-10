@@ -572,7 +572,7 @@ class WalletIntegrationTest
         sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
         val (_, cid) = actAndCheck(
           "Create TransferPreapproval",
-          createTransferPreapprovalIfNotExists(aliceWalletClient),
+          createTransferPreapprovalEnsuringItExists(aliceWalletClient, aliceValidatorBackend),
         )(
           "Scan lookup returns TransferPreapproval",
           c => {
@@ -719,7 +719,7 @@ class WalletIntegrationTest
         aliceValidatorWalletClient.tap(10.0)
         actAndCheck(
           "Create TransferPreapproval for end user",
-          createTransferPreapprovalIfNotExists(aliceWalletClient),
+          createTransferPreapprovalEnsuringItExists(aliceWalletClient, aliceValidatorBackend),
         )(
           "Scan lookup returns TransferPreapproval for end user",
           c => {
@@ -730,7 +730,10 @@ class WalletIntegrationTest
         )
         actAndCheck(
           "Create TransferPreapproval for validator operator",
-          createTransferPreapprovalIfNotExists(aliceValidatorWalletClient),
+          createTransferPreapprovalEnsuringItExists(
+            aliceValidatorWalletClient,
+            aliceValidatorBackend,
+          ),
         )(
           "Scan lookup returns TransferPreapproval",
           c => {

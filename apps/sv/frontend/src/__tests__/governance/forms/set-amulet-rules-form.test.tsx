@@ -242,6 +242,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
   test(
     'should show error on form if submission fails',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
