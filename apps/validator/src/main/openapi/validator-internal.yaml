@@ -775,6 +775,8 @@ components:
           type: string
         created_at:
           type: string
+        synchronizer_was_paused:
+          type: boolean
 
     GetValidatorDomainDataSnapshotResponse:
       type: object
