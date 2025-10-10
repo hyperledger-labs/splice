@@ -88,6 +88,13 @@ monitoring:
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true
+  publicEndpoints:
+    publicScan:
+      hostname: scan.sv-2.scratcha.global.canton.network.digitalasset.com
+      pathPrefix: /api/scan
+      throttleAcrossAllEndpointsAllIps:
+        withinIntervalSeconds: 60
+        maxRequestsBeforeHttp429: 0
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
