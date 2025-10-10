@@ -1647,7 +1647,7 @@ object TopologyAdminConnection {
       param("validFrom", _.validFrom),
       param("validUntil", _.validUntil),
       param("operation", _.operation),
-      param("transactionHash", _.transactionHash),
+      param("transactionHash", _.transactionHash.hash),
       param("serial", _.serial),
       param("signedBy", _.signedBy),
     )

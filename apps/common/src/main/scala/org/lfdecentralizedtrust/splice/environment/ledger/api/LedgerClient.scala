@@ -36,7 +36,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTr
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
 import org.lfdecentralizedtrust.splice.util.DisclosedContracts
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.admin.api.client.data.PartyDetails
+import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
@@ -472,6 +472,8 @@ private[environment] class LedgerClient(
       v1User.Right.defaultInstance.withCanActAs(v1User.Right.CanActAs(as.party))
     case as: Right.CanReadAs =>
       v1User.Right.defaultInstance.withCanReadAs(v1User.Right.CanReadAs(as.party))
+    case as: Right.CanExecuteAs =>
+      v1User.Right.defaultInstance.withCanExecuteAs(v1User.Right.CanExecuteAs(as.party))
     case _: Right.IdentityProviderAdmin =>
       v1User.Right.defaultInstance.withIdentityProviderAdmin(
         v1User.Right.IdentityProviderAdmin()
@@ -480,6 +482,8 @@ private[environment] class LedgerClient(
       v1User.Right.defaultInstance.withParticipantAdmin(v1User.Right.ParticipantAdmin())
     case _: Right.CanReadAsAnyParty =>
       v1User.Right.defaultInstance.withCanReadAsAnyParty(v1User.Right.CanReadAsAnyParty())
+    case _: Right.CanExecuteAsAnyParty =>
+      v1User.Right.defaultInstance.withCanExecuteAsAnyParty(v1User.Right.CanExecuteAsAnyParty())
     case unsupported => throw new IllegalArgumentException(s"unsupported right: $unsupported")
 
   }

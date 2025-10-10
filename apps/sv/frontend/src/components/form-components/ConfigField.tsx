@@ -6,11 +6,13 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useFieldContext } from '../../hooks/formContext';
 import type { ConfigChange, PendingConfigFieldInfo } from '../../utils/types';
+import { nextScheduledSynchronizerUpgradeFormat } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 dayjs.extend(relativeTime);
 
 export interface ConfigFieldProps {
   configChange: ConfigChange;
+  effectiveDate?: string | undefined;
   pendingFieldInfo?: PendingConfigFieldInfo;
 }
 
@@ -20,8 +22,30 @@ export type ConfigFieldState = {
 };
 
 export const ConfigField: React.FC<ConfigFieldProps> = props => {
-  const { configChange, pendingFieldInfo } = props;
+  const { configChange, effectiveDate, pendingFieldInfo } = props;
   const field = useFieldContext<ConfigFieldState>();
+
+  const isSynchronizerUpgradeTime =
+    field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeTime';
+  const isSynchronizerUpgradeMigrationId =
+    field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeMigrationId';
+
+  // We disable the field if it is pending and the value is the default value.
+  // The default value check is to handle the case where the user made a change
+  // to the field before it became a field with pending changes.
+  // This gives them the chance to revert that change.
+  const isPendingAndDefaultValue =
+    pendingFieldInfo !== undefined && field.state.meta.isDefaultValue;
+
+  const isEffectiveAtThreshold = !effectiveDate;
+
+  // When effective at Threshold, we disable the upgrade time and migrationId config fields
+  const isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId =
+    isEffectiveAtThreshold && (isSynchronizerUpgradeTime || isSynchronizerUpgradeMigrationId);
+
+  const isDisabled =
+    isPendingAndDefaultValue || isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId;
+
   const textFieldProps = {
     variant: 'outlined' as const,
     size: 'small' as const,
@@ -32,11 +56,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
       sx: { textAlign: 'right' },
       'data-testid': `config-field-${configChange.fieldName}`,
     },
-    // We disable the field if it is pending and the value is the default value.
-    // The default value check is to handle the case where the user made a change
-    // to the field before it became a field with pending changes.
-    // This gives them the chance to revert that change.
-    disabled: pendingFieldInfo !== undefined && field.state.meta.isDefaultValue,
+    disabled: isDisabled,
   };
 
   return (
@@ -77,6 +97,13 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
             </Typography>
           )}
 
+          {isSynchronizerUpgradeTime && (
+            <SynchronizerUpgradeTimeDisplay
+              effectiveDate={effectiveDate}
+              configChange={configChange}
+            />
+          )}
+
           {pendingFieldInfo && <PendingConfigDisplay pendingFieldInfo={pendingFieldInfo} />}
         </Box>
       </Box>
@@ -99,10 +126,36 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
       data-testid={`config-pending-value-${pendingFieldInfo.fieldName}`}
     >
       Pending Configuration: <strong>{pendingFieldInfo.pendingValue}</strong> <br />
-      This proposal will go into effect{' '}
+      This pending configuration will go into effect{' '}
       <strong>
         {atThreshold ? 'at Threshold' : dayjs(pendingFieldInfo.effectiveDate).fromNow()}
       </strong>
+    </Typography>
+  );
+};
+
+interface SynchronizerUpgradeTimeDisplayProps {
+  effectiveDate: string | undefined;
+  configChange: ConfigChange;
+}
+
+export const SynchronizerUpgradeTimeDisplay: React.FC<
+  SynchronizerUpgradeTimeDisplayProps
+> = props => {
+  const { effectiveDate } = props;
+  const defaultMigrationTime = dayjs(effectiveDate)
+    .utc()
+    .add(1, 'hour')
+    .format(nextScheduledSynchronizerUpgradeFormat);
+
+  return (
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
+      data-testid={`next-scheduled-upgrade-time-default`}
+    >
+      {`Default: ${defaultMigrationTime}`}
     </Typography>
   );
 };

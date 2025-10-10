@@ -235,7 +235,10 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listExpiredAmulets(Set.empty)(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
             traceContext
           )
         } yield {
@@ -253,12 +256,74 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
-          result <- store.listExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listExpiredAmulets(Set.empty)(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
             traceContext
           )
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound3)
+        }
+      }
+
+      "respects ignored parties" in {
+        val party1 = userParty(1)
+        val party2 = userParty(2)
+        val party3 = userParty(3)
+        val expiresAtRound2 = amulet(party1, 1.0, 1, 1.0)
+        val expiresAtRound3 = amulet(party2, 1.0, 2, 1.0)
+        val expiresAtRound4 = amulet(party3, 3.0, 1, 1.0)
+        val wontExpireAnyTimeSoon = amulet(party1, 10.0, 2, 0.0001)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- createMiningRoundsTriple(store, startRound = 4L) // oldest is round 4, newest is 6
+          _ <- MonadUtil.sequentialTraverse(
+            Seq(expiresAtRound2, expiresAtRound3, expiresAtRound4, wontExpireAnyTimeSoon)
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listExpiredAmulets(Set.empty)(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty1 <- store.listExpiredAmulets(Set(party1))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty2 <- store.listExpiredAmulets(Set(party2))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty1And2 <- store.listExpiredAmulets(Set(party1, party2))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+        } yield {
+          result.map(_.contract) should contain theSameElementsAs Seq(
+            expiresAtRound2,
+            expiresAtRound3,
+            expiresAtRound4,
+          )
+          resultNoParty1.map(_.contract) should contain theSameElementsAs Seq(
+            expiresAtRound3,
+            expiresAtRound4,
+          )
+          resultNoParty2.map(_.contract) should contain theSameElementsAs Seq(
+            expiresAtRound2,
+            expiresAtRound4,
+          )
+          resultNoParty1And2.map(_.contract) should contain theSameElementsAs Seq(expiresAtRound4)
         }
       }
 
@@ -280,7 +345,10 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listLockedExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listLockedExpiredAmulets(Set.empty)(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
             traceContext
           )
         } yield {
@@ -298,7 +366,10 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
-          result <- store.listLockedExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listLockedExpiredAmulets(Set.empty)(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
             traceContext
           )
         } yield {
@@ -307,6 +378,71 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      "respects ignored parties" in {
+        val party1 = userParty(1)
+        val party2 = userParty(2)
+        val party3 = userParty(3)
+        val expiresAtRound2 = lockedAmulet(party1, 1.0, 1, 1.0, holders = Seq(party1))
+        val expiresAtRound3 = lockedAmulet(party2, 1.0, 2, 1.0, holders = Seq(party2, party3))
+        val expiresAtRound4 = lockedAmulet(party3, 3.0, 1, 1.0, holders = Seq.empty)
+        val wontExpireAnyTimeSoon = lockedAmulet(party1, 10.0, 2, 0.0001, holders = Seq(party1))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- createMiningRoundsTriple(store, startRound = 4L) // oldest is round 4, newest is 6
+          _ <- MonadUtil.sequentialTraverse(
+            Seq(expiresAtRound2, expiresAtRound3, expiresAtRound4, wontExpireAnyTimeSoon)
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listLockedExpiredAmulets(Set.empty)(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty1 <- store.listLockedExpiredAmulets(Set(party1))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty2 <- store.listLockedExpiredAmulets(Set(party2))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty1And2 <- store.listLockedExpiredAmulets(Set(party1, party2))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+          resultNoParty3 <- store.listLockedExpiredAmulets(Set(party3))(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+        } yield {
+          result.map(_.contract) should contain theSameElementsAs Seq(
+            expiresAtRound2,
+            expiresAtRound3,
+            expiresAtRound4,
+          )
+          resultNoParty1.map(_.contract) should contain theSameElementsAs Seq(
+            expiresAtRound3,
+            expiresAtRound4,
+          )
+          resultNoParty2.map(_.contract) should contain theSameElementsAs Seq(
+            expiresAtRound2,
+            expiresAtRound4,
+          )
+          resultNoParty3.map(_.contract) should contain theSameElementsAs Seq(expiresAtRound2)
+          resultNoParty1And2.map(_.contract) should contain theSameElementsAs Seq(expiresAtRound4)
+        }
+      }
     }
 
     "listConfirmations" should {

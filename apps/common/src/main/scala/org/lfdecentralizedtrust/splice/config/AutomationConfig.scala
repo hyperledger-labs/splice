@@ -46,6 +46,11 @@ case class AutomationConfig(
       */
     domainIngestionPollingInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration ofSeconds 30,
+    /** Polling interval to recompute and export topology metrics.
+      *
+      * Set to None to disable the topology metrics trigger.
+      */
+    topologyMetricsPollingInterval: Option[NonNegativeFiniteDuration] = None,
     /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
       */
     maxNumSilentPollingRetries: Int = 3,
@@ -87,6 +92,7 @@ case class AutomationConfig(
       */
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
+    ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries, AdvisoryLockIds}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
@@ -25,7 +25,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import slick.dbio.DBIOAction
+import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
@@ -158,11 +158,40 @@ class AcsSnapshotStore(
         join creates_to_insert on inserted_rows.create_id = creates_to_insert.row_id
         having min(inserted_rows.row_id) is not null;
              """).toActionBuilder.asUpdate
-      storage.update(statement, "insertNewSnapshot")
+      storage.queryAndUpdate(withExclusiveSnapshotDataLock(statement), "insertNewSnapshot")
     }.andThen { _ =>
       AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
     }
   }
+
+  /** Wraps the given action in a transaction that holds an exclusive lock on the acs_snapshot_data table.
+    *
+    *  Note: The acs_snapshot_data table must not have interleaved rows from two different acs snapshots.
+    *  In rare cases, it can happen that the application crashes while writing a snapshot, then
+    *  restarts and starts writing a different snapshot while the previous statement is still running.
+    *
+    *  The exclusive lock prevents this.
+    *  We use a transaction-scoped advisory lock, which is released when the transaction ends.
+    *  Regular locks (e.g. obtained via `LOCK TABLE ... IN EXCLUSIVE MODE`) would conflict with harmless
+    *  background operations like autovacuum or create index concurrently.
+    *
+    *  In case the application crashes while holding the lock, the server _should_ close the connection
+    *  and abort the transaction as soon as it detects a disconnect.
+    *  TODO(#2488): Verify that the server indeed closes connections in a reasonable time.
+    */
+  private def withExclusiveSnapshotDataLock[T, E <: Effect](
+      action: DBIOAction[T, NoStream, E]
+  ): DBIOAction[T, NoStream, Effect.Read & Effect.Transactional & E] =
+    (for {
+      lockResult <- sql"SELECT pg_try_advisory_xact_lock(${AdvisoryLockIds.acsSnapshotDataInsert})"
+        .as[Boolean]
+        .head
+      result <- lockResult match {
+        case true => action
+        // Lock conflicts should almost never happen. If they do, we fail immediately and rely on the trigger infrastructure to retry and log errors.
+        case false => DBIOAction.failed(new Exception("Failed to acquire exclusive lock"))
+      }
+    } yield result).transactionally
 
   def deleteSnapshot(
       snapshot: AcsSnapshot

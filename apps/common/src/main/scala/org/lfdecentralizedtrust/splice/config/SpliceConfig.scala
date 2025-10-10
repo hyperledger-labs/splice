@@ -41,6 +41,8 @@ final case class CircuitBreakerConfig(
     maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
     exponentialBackoffFactor: Double = 2.0,
     randomFactor: Double = 0.2,
+    // If the last failure was more than resetFailuresAfter ago, reset the failures to 0.
+    resetFailuresAfter: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(15),
 )
 
 final case class CircuitBreakersConfig(
@@ -52,6 +54,14 @@ final case class CircuitBreakersConfig(
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
     ),
     lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 5,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
+    // Amulet expiry is different from essentially any other trigger run in the SV app in that for it to complete successfully
+    // we need a confirmation from the node hosting the amulet owner. So in other words, if a node is down
+    // this will start failing. Therefore, we use a dedicated circuit breaker just for amulet expiry
+    // to avoid this causing issues for other triggers.
+    amuletExpiry: CircuitBreakerConfig = CircuitBreakerConfig(
       maxFailures = 5,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),

@@ -21,6 +21,7 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencing.protocol.{Batch, ClosedEnvelope}
 import com.digitalasset.canton.synchronizer.block.UninitializedBlockHeight
+import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
@@ -48,6 +49,7 @@ class InMemorySequencerStore(
     override val sequencerMember: Member,
     override val blockSequencerMode: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
+    override protected val sequencerMetrics: SequencerMetrics,
 )(implicit
     protected val executionContext: ExecutionContext
 ) extends SequencerStore {
@@ -182,15 +184,6 @@ class InMemorySequencerStore(
       now
     }
 
-  override def readEvents(
-      memberId: SequencerMemberId,
-      member: Member,
-      fromExclusiveO: Option[CantonTimestamp] = None,
-      limit: Int = 100,
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[ReadEvents] = readEventsInternal(memberId, fromExclusiveO, limit)
-
   override protected def readEventsInternal(
       memberId: SequencerMemberId,
       fromExclusiveO: Option[CantonTimestamp] = None,
@@ -213,7 +206,26 @@ class InMemorySequencerStore(
           .takeWhile(e => e.getKey <= watermark)
           .filter(e => isMemberRecipient(memberId)(e.getValue))
           .take(limit)
-          .map(entry => Sequenced(entry.getKey, entry.getValue))
+          .map { entry =>
+            val event = entry.getValue match {
+              case deliver: DeliverStoreEvent[PayloadId] =>
+                val sequencerMemberId = members
+                  .getOrElse(
+                    sequencerMember,
+                    ErrorUtil.invalidState(
+                      s"Sequencer member $sequencerMember is not registered in the sequencer store"
+                    ),
+                  )
+                  .memberId
+                if (deliver.members.contains(sequencerMemberId)) {
+                  deliver.copy(members = NonEmpty(SortedSet, memberId, sequencerMemberId))
+                } else {
+                  deliver.copy(members = NonEmpty(SortedSet, memberId))
+                }
+              case other => other
+            }
+            Sequenced(entry.getKey, event)
+          }
           .toList
 
       if (payloads.nonEmpty)
@@ -237,7 +249,6 @@ class InMemorySequencerStore(
             .toList
         case payload: BytesPayload =>
           List(payload.id -> payload.decodeBatchAndTrim(protocolVersion, member))
-        case batch: FilteredBatch => List(batch.id -> Batch.trimForMember(batch.batch, member))
       }.toMap
     )
 

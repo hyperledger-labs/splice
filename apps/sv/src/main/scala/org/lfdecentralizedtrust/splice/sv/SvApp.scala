@@ -26,6 +26,7 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import io.circe.Json
+import io.circe.syntax.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -85,6 +86,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{
+  JsonOnboardingSecret,
   SvOnboardingToken,
   SvUtil,
   ValidatorOnboardingSecret,
@@ -351,17 +353,6 @@ class SvApp(
           } yield res
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           for {
-            // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
-            // reconnect all domains at the beginning of SV initialization just in case.
-            _ <- appInitStep("Reconnect all domains") {
-              retryProvider.retry(
-                RetryFor.WaitingOnInitDependency,
-                "reconect_domains",
-                "Reconnect all domains",
-                participantAdminConnection.reconnectAllDomains(),
-                logger,
-              )
-            }
             cometBftNode <- SvUtil.mapToCometBftNode(
               cometBftClient,
               cometBftConfig,
@@ -752,7 +743,7 @@ class SvApp(
     Future.traverse(config.expectedValidatorOnboardings)(c =>
       SvApp
         .prepareValidatorOnboarding(
-          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, c.secret),
+          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, c.secret, None),
           c.expiresIn,
           svStoreWithIngestion,
           decentralizedSynchronizer,
@@ -845,21 +836,34 @@ object SvApp {
       retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svStore = svStoreWithIngestion.store
-    val svParty = svStore.key.svParty
+
+    // If the secret contains partyHint, use it as a single source of truth
+    val (svParty, rawSecret, secretValue) = secret.partyHint match {
+      case Some(hint) =>
+        val sv = secret.sponsoringSv
+        (
+          sv,
+          secret.secret,
+          JsonOnboardingSecret(sv.toProtoPrimitive, secret.secret, hint).asJson.noSpaces,
+        )
+      case None => (svStore.key.svParty, secret.secret, secret.secret)
+    }
+
     val validatorOnboarding = new splice.validatoronboarding.ValidatorOnboarding(
       svParty.toProtoPrimitive,
-      secret.secret,
+      secretValue,
       (clock.now + expiresIn.toInternal).toInstant,
     ).create()
+
     for {
-      res <- svStore.lookupUsedSecretWithOffset(secret.secret).flatMap {
+      res <- svStore.lookupUsedSecretWithOffset(rawSecret).flatMap {
         case QueryResult(_, Some(usedSecret)) =>
           val validator = usedSecret.payload.validator
           Future.successful(
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
         case QueryResult(offset, None) =>
-          svStore.lookupValidatorOnboardingBySecretWithOffset(secret.secret).flatMap {
+          svStore.lookupValidatorOnboardingBySecretWithOffset(rawSecret).flatMap {
             case QueryResult(_, Some(_)) =>
               Future.successful(
                 Left("A validator onboarding contract with this secret already exists.")
@@ -877,7 +881,7 @@ object SvApp {
                         .CommandId(
                           "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
                           Seq(svParty),
-                          secret.secret, // not a leak as this gets hashed before it's used
+                          secretValue, // not a leak as this gets hashed before it's used
                         ),
                       deduplicationOffset = offset,
                     )

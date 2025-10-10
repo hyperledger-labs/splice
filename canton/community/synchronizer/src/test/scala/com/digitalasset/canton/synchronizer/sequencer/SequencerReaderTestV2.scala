@@ -13,10 +13,11 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.SuppressionRule.FullSuppression
-import com.digitalasset.canton.logging.{LogEntry, SuppressionRule, TracedLogger}
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
+import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.SynchronizerSequencingTestUtils.*
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.synchronizer.sequencer.store.*
@@ -29,7 +30,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   TestingTopology,
 }
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{
   BaseTest,
@@ -42,9 +43,8 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Sink, SinkQueueWithCancel, Source}
 import org.apache.pekko.stream.{Materializer, OverflowStrategy, QueueOfferResult}
+import org.scalatest.FutureOutcome
 import org.scalatest.wordspec.FixtureAsyncWordSpec
-import org.scalatest.{Assertion, FutureOutcome}
-import org.slf4j.event.Level
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -88,18 +88,18 @@ class SequencerReaderTestV2
       extends EventSignaller
       with FlagCloseableAsync {
     private val (queue, source) = Source
-      .queue[ReadSignal](1)
+      .queue[Traced[ReadSignal]](1)
       .buffer(1, OverflowStrategy.dropHead)
       .preMaterialize()
 
     override protected def timeouts: ProcessingTimeout = SequencerReaderTestV2.this.timeouts
 
-    def signalRead(): Unit = queue.offer(ReadSignal).discard[QueueOfferResult]
+    def signalRead(): Unit = queue.offer(Traced(ReadSignal)).discard[QueueOfferResult]
 
     override def readSignalsForMember(
         member: Member,
         memberId: SequencerMemberId,
-    )(implicit traceContext: TraceContext): Source[ReadSignal, NotUsed] =
+    )(implicit traceContext: TraceContext): Source[Traced[ReadSignal], NotUsed] =
       source
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
@@ -125,6 +125,7 @@ class SequencerReaderTestV2
       sequencerMember = topologyClientMember,
       blockSequencerMode = true,
       loggerFactory = loggerFactory,
+      sequencerMetrics = SequencerMetrics.noop("sequencer-reader-test"),
     )
     val instanceIndex: Int = 0
     // create a spy so we can add verifications on how many times methods were called
@@ -145,6 +146,8 @@ class SequencerReaderTestV2
       testedProtocolVersion,
       timeouts,
       loggerFactory,
+      streamInstrumentationConfig = BlockSequencerStreamInstrumentationConfig(),
+      SequencerMetrics.noop("sequencer-reader-test"),
     )
     val defaultTimeout: FiniteDuration = 20.seconds
     implicit val closeContext: CloseContext = CloseContext(reader)
@@ -160,25 +163,22 @@ class SequencerReaderTestV2
         timestampInclusive: Option[CantonTimestamp],
         take: Int,
     ): FutureUnlessShutdown[Seq[SequencedSerializedEvent]] =
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
-        FutureUnlessShutdown.outcomeF(
-          valueOrFail(reader.readV2(member, timestampInclusive).failOnShutdown)(
-            s"Events source for $member"
-          ) flatMap { eventSource =>
-            eventSource
-              .take(take.toLong)
-              .idleTimeout(defaultTimeout)
-              .map {
-                case Right(event) => event
-                case Left(err) =>
-                  fail(
-                    s"The DatabaseSequencer's SequencerReader does not produce tombstone-errors: $err"
-                  )
-              }
-              .runWith(Sink.seq)
-          }
-        ),
-        ignoreWarningsFromLackOfTopologyUpdates,
+      FutureUnlessShutdown.outcomeF(
+        valueOrFail(reader.readV2(member, timestampInclusive).failOnShutdown)(
+          s"Events source for $member"
+        ) flatMap { eventSource =>
+          eventSource
+            .take(take.toLong)
+            .idleTimeout(defaultTimeout)
+            .map {
+              case Right(event) => event
+              case Left(err) =>
+                fail(
+                  s"The DatabaseSequencer's SequencerReader does not produce tombstone-errors: $err"
+                )
+            }
+            .runWith(Sink.seq)
+        }
       )
 
     def readWithQueueFUS(
@@ -225,19 +225,10 @@ class SequencerReaderTestV2
         .idleTimeout(defaultTimeout)
         .runWith(Sink.queue())
 
-    // We don't update the topology client, so we expect to get a couple of warnings about unknown topology snapshots
-    private def ignoreWarningsFromLackOfTopologyUpdates(entries: Seq[LogEntry]): Assertion =
-      forEvery(entries) {
-        _.warningMessage should fullyMatch regex ".*Using approximate topology snapshot .* for desired timestamp.*"
-      }
-
     def pullFromQueue(
         queue: SinkQueueWithCancel[SequencedSerializedEvent]
     ): FutureUnlessShutdown[Option[SequencedSerializedEvent]] =
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
-        FutureUnlessShutdown.outcomeF(queue.pull()),
-        ignoreWarningsFromLackOfTopologyUpdates,
-      )
+      FutureUnlessShutdown.outcomeF(queue.pull())
 
     def waitFor(duration: FiniteDuration): FutureUnlessShutdown[Unit] =
       FutureUnlessShutdown.outcomeF {
@@ -595,10 +586,7 @@ class SequencerReaderTestV2
             _ <- store
               .saveLowerBound(ts(10), ts(9).some)
               .valueOrFail("saveLowerBound")
-            error <- loggerFactory.assertLogs(
-              leftOrFail(reader.readV2(alice, requestedTimestampInclusive = None))("read"),
-              _.errorMessage shouldBe expectedMessage,
-            )
+            error <- leftOrFail(reader.readV2(alice, requestedTimestampInclusive = None))("read")
           } yield inside(error) {
             case CreateSubscriptionError.EventsUnavailableForTimestamp(None, message) =>
               message should include(expectedMessage)
@@ -624,14 +612,9 @@ class SequencerReaderTestV2
           _ <- store
             .saveLowerBound(ts(10), ts(9).some)
             .valueOrFail("saveLowerBound")
-          error <- loggerFactory.assertLogs(
-            leftOrFail(
-              reader.readV2(alice, requestedTimestampInclusive = Some(ts0.plusSeconds(10)))
-            )(
-              "read succeeded"
-            ),
-            _.errorMessage shouldBe expectedMessage,
-          )
+          error <- leftOrFail(
+            reader.readV2(alice, requestedTimestampInclusive = Some(ts0.plusSeconds(10)))
+          )("read succeeded")
         } yield inside(error) {
           case CreateSubscriptionError.EventsUnavailableForTimestamp(Some(timestamp), message) =>
             timestamp shouldBe ts0.plusSeconds(10)

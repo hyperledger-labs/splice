@@ -31,6 +31,7 @@ function prettyPrintInterval(
 }
 
 export const dateTimeFormatISO = 'YYYY-MM-DD HH:mm';
+export const nextScheduledSynchronizerUpgradeFormat = 'YYYY-MM-DDTHH:mm:ss[Z]';
 
 export function durationToInterval(duration: string): string {
   const { years, months, days, hours, minutes, seconds } = Temporal.Duration.from(duration);

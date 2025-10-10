@@ -1,7 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { deployedValidators } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import {
+  deployedValidators,
+  validatorRunbookStackName,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { GitFluxRef } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/flux-source';
 import {
   createStackCR,
@@ -19,7 +22,7 @@ export function installAllValidatorStacks(
   const validatorStacksToCreate = deployedValidators.map(validator => {
     return {
       validator: validator,
-      stackName: validator === 'validator-runbook' ? validator : `validators.${validator}`,
+      stackName: validatorRunbookStackName(validator),
     };
   });
   validatorStacksToCreate.forEach(validator => {

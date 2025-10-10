@@ -53,7 +53,7 @@ import scala.jdk.OptionConverters.*
 object SpliceUtil {
 
   private def readDarVersion(resource: DarResource): PackageVersion =
-    DarUtil.readDarMetadata(resource.path).version
+    resource.metadata.version
 
   def readPackageConfig(): splice.amuletconfig.PackageConfig = {
     new splice.amuletconfig.PackageConfig(

@@ -34,6 +34,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.store.db.RequiredTypesCodec.*
 import com.digitalasset.canton.synchronizer.block.UninitializedBlockHeight
+import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.{
   CommitMode,
   SequencerMemberStatus,
@@ -50,6 +51,7 @@ import com.google.protobuf.ByteString
 import org.h2.api.ErrorCode as H2ErrorCode
 import org.postgresql.util.PSQLState
 import slick.jdbc.*
+import slick.sql.SqlStreamingAction
 
 import java.sql.SQLException
 import java.util.UUID
@@ -70,8 +72,11 @@ class DbSequencerStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override val sequencerMember: Member,
     override val blockSequencerMode: Boolean,
+    useRecipientsTableForReads: Boolean,
+    bufferEventsWithPayloads: Boolean,
     cachingConfigs: CachingConfigs,
     override val batchingConfig: BatchingConfig,
+    override protected val sequencerMetrics: SequencerMetrics,
     overrideCloseContext: Option[CloseContext] = None,
 )(protected implicit val executionContext: ExecutionContext)
     extends SequencerStore
@@ -394,6 +399,7 @@ class DbSequencerStore(
         payloadId => readPayloadsFromStore(Seq(payloadId)).map(_(payloadId)),
       allLoader =
         Some(implicit traceContext => payloadIds => readPayloadsFromStore(payloadIds.toSeq)),
+      metrics = Some(sequencerMetrics.payloadCache),
     )(logger, "payloadCache")
 
   override def registerMember(member: Member, timestamp: CantonTimestamp)(implicit
@@ -458,6 +464,9 @@ class DbSequencerStore(
         .map(_ => ())
     )
   }
+
+  override def bufferPayload(payload: BytesPayload)(implicit tc: TraceContext): Unit =
+    payloadCache.put(payload.id, payload)
 
   /** Save the provided payloads to the store.
     *
@@ -884,10 +893,8 @@ class DbSequencerStore(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] = {
 
-    val preloadedPayloads = payloadIds.collect {
-      case payload: BytesPayload =>
-        payload.id -> payload.decodeBatchAndTrim(protocolVersion, member)
-      case batch: FilteredBatch => batch.id -> Batch.trimForMember(batch.batch, member)
+    val preloadedPayloads = payloadIds.collect { case payload: BytesPayload =>
+      payload.id -> payload.decodeBatchAndTrim(protocolVersion, member)
     }.toMap
 
     val idsToLoad = payloadIds.collect { case id: PayloadId => id }
@@ -929,13 +936,138 @@ class DbSequencerStore(
     val fromTimestampInclusive =
       fromTimestampExclusiveO.map(_.immediateSuccessor).getOrElse(CantonTimestamp.MinValue)
 
+    def getResultFixedRecipients(
+        topologyClientMemberId: SequencerMemberId
+    ): GetResult[Sequenced[PayloadId]] = {
+      val timestampGetter = implicitly[GetResult[CantonTimestamp]]
+      val timestampOGetter = implicitly[GetResult[Option[CantonTimestamp]]]
+      val discriminatorGetter = implicitly[GetResult[EventTypeDiscriminator]]
+      val messageIdGetter = implicitly[GetResult[Option[MessageId]]]
+      val memberIdGetter = implicitly[GetResult[Option[SequencerMemberId]]]
+      val payloadIdGetter = implicitly[GetResult[Option[PayloadId]]]
+      val traceContextGetter = implicitly[GetResult[SerializableTraceContext]]
+      val errorOGetter = implicitly[GetResult[Option[ByteString]]]
+      val trafficReceipt = implicitly[GetResult[Option[TrafficReceipt]]]
+
+      GetResult { r =>
+        val row = DeliverStoreEventRow[PayloadId](
+          timestampGetter(r),
+          r.nextInt(),
+          discriminatorGetter(r),
+          messageIdGetter(r),
+          memberIdGetter(r),
+          // instead of reading a large row, we construct a minimal recipients set here
+          if (r.nextBoolean()) {
+            Some(NonEmpty(SortedSet, memberId, topologyClientMemberId))
+          } else {
+            Some(NonEmpty(SortedSet, memberId))
+          },
+          payloadIdGetter(r),
+          timestampOGetter(r),
+          traceContextGetter(r).unwrap,
+          errorOGetter(r),
+          trafficReceipt(r),
+        )
+
+        row.asStoreEvent
+          .fold(
+            msg => throw new DbDeserializationException(s"Failed to deserialize event row: $msg"),
+            identity,
+          )
+      }
+    }
+
+    def queryEventsViaRecipientsTable(
+        safeWatermarkO: Option[CantonTimestamp],
+        topologyClientMemberId: SequencerMemberId,
+    ) = {
+      val safeWatermark = safeWatermarkO.getOrElse(CantonTimestamp.MaxValue)
+
+      profile match {
+        case _: Postgres =>
+          sql"""
+            with
+              watermarks as (select * from sequencer_watermarks)
+            select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
+              case
+                when #$memberContainsBefore $topologyClientMemberId #$memberContainsAfter then true
+                else false
+              end as addressed_to_sequencer,
+              events.payload_id, events.topology_timestamp,
+              events.trace_context, events.error,
+              events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
+            from
+              watermarks inner join lateral (
+              -- Watermarks contain 1 record for block sequencer, up to hardcoded max of 32 records
+              -- for DB sequencer - both are fine as long as the query is better than the alternative
+              -- (scanning a wrong index or the table itself).
+                select * from sequencer_events
+                where ts in (
+                  select ts
+                  from sequencer_event_recipients recipients
+                  where
+                    recipients.node_index = watermarks.node_index
+                    -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+                    and (watermarks.sequencer_online = true or recipients.ts <= watermarks.watermark_ts)
+                    and recipients.recipient_id = $memberId
+                    -- inclusive timestamp bound that defaults to MinValue if unset
+                    and recipients.ts >= $fromTimestampInclusive
+                    -- only consider events within the safe watermark
+                    and recipients.ts <= $safeWatermark
+                  order by recipients.ts asc
+                  -- We only have limit on the inner query. We can add an extra limit outside (for DB sequencer case),
+                  -- but it doesn't make sense to drop already read events and it seems reasonable to just return them.
+                  limit $limit
+                )
+              ) events
+              on (true)
+            order by events.ts asc""".as[Sequenced[PayloadId]](
+            getResultFixedRecipients(topologyClientMemberId)
+          )
+        case _: H2 =>
+          // This is the previous version of the query as H2 doesn't support lateral joins
+          sql"""
+            select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
+              case
+                when #$memberContainsBefore $topologyClientMemberId #$memberContainsAfter then true
+                else false
+              end,
+              events.payload_id, events.topology_timestamp,
+              events.trace_context, events.error,
+              events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
+            from sequencer_event_recipients recipients
+            inner join sequencer_events events
+              on events.node_index = recipients.node_index and events.ts = recipients.ts
+            inner join sequencer_watermarks watermarks
+              on recipients.node_index = watermarks.node_index
+            where recipients.recipient_id = $memberId
+              and (
+                -- inclusive timestamp bound that defaults to MinValue if unset
+                recipients.ts >= $fromTimestampInclusive
+                  -- only consider events within the safe watermark
+                  and recipients.ts <= $safeWatermark
+                  -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+                  and (watermarks.sequencer_online = true or recipients.ts <= watermarks.watermark_ts)
+              )
+            order by recipients.ts asc
+            limit $limit""".as[Sequenced[PayloadId]](
+            getResultFixedRecipients(topologyClientMemberId)
+          )
+      }
+    }
+
     def h2PostgresQueryEvents(
         memberContainsBefore: String,
         memberContainsAfter: String,
         safeWatermark: CantonTimestamp,
+        topologyClientMemberId: SequencerMemberId,
     ) = sql"""
         select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
-          events.recipients, events.payload_id, events.topology_timestamp,
+              case
+                when #$memberContainsBefore $topologyClientMemberId #$memberContainsAfter then true
+                else false
+              end as addressed_to_sequencer,
+          events.payload_id, events.topology_timestamp,
           events.trace_context, events.error,
           events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
         from sequencer_events events
@@ -953,32 +1085,60 @@ class DbSequencerStore(
         order by events.ts asc
         limit $limit"""
 
-    def queryEvents(safeWatermarkO: Option[CantonTimestamp]) = {
+    def queryEvents(
+        safeWatermarkO: Option[CantonTimestamp],
+        topologyClientMemberId: SequencerMemberId,
+    ) = {
       // If we don't have a safe watermark of all online sequencers (if all are offline) we'll fallback on allowing all
       // and letting the offline condition in the query include the event if suitable
       val safeWatermark = safeWatermarkO.getOrElse(CantonTimestamp.MaxValue)
       val query = profile match {
         case _: Postgres =>
-          h2PostgresQueryEvents("", " = any(events.recipients)", safeWatermark)
+          h2PostgresQueryEvents(
+            "",
+            " = any(events.recipients)",
+            safeWatermark,
+            topologyClientMemberId,
+          )
 
         case _: H2 =>
-          h2PostgresQueryEvents("array_contains(events.recipients, ", ")", safeWatermark)
+          h2PostgresQueryEvents(
+            "array_contains(events.recipients, ",
+            ")",
+            safeWatermark,
+            topologyClientMemberId,
+          )
       }
 
-      query.as[Sequenced[PayloadId]]
+      query.as[Sequenced[PayloadId]](getResultFixedRecipients(topologyClientMemberId))
     }
 
-    val query = for {
-      safeWatermark <- safeWaterMarkDBIO
-      events <- queryEvents(safeWatermark)
-    } yield {
-      (events, safeWatermark)
-    }
-
-    storage.query(query.transactionally, functionFullName).map {
-      case (events, _) if events.nonEmpty => ReadEventPayloads(events)
-      case (_, watermark) => SafeWatermark(watermark)
-    }
+    for {
+      topologyClientMemberId <- lookupMember(sequencerMember).map(
+        _.map(_.memberId).getOrElse(
+          ErrorUtil.invalidState(
+            s"Sequencer member $sequencerMember not found in sequencer members table"
+          )
+        )
+      )
+      query = for {
+        safeWatermark <- safeWaterMarkDBIO
+        events <-
+          if (useRecipientsTableForReads) {
+            queryEventsViaRecipientsTable(safeWatermark, topologyClientMemberId)
+          } else {
+            queryEvents(safeWatermark, topologyClientMemberId)
+          }
+      } yield {
+        (events, safeWatermark)
+      }
+      result <- {
+        storage.query(query.transactionally, functionFullName).map {
+          case (events, _) if events.nonEmpty => ReadEventPayloads(events)
+          case (_, watermark) => SafeWatermark(watermark)
+        }: FutureUnlessShutdown[ReadEvents]
+      }
+    } yield result
   }
 
   private def readEventsLatest(
@@ -986,9 +1146,11 @@ class DbSequencerStore(
       upperBoundExclusive: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Vector[Sequenced[BytesPayload]]] = {
-    def queryEvents(safeWatermark: CantonTimestamp) = {
-      val query =
+  ): FutureUnlessShutdown[Vector[Sequenced[IdOrPayload]]] = {
+    def queryEvents(
+        safeWatermark: CantonTimestamp
+    ): SqlStreamingAction[Vector[Sequenced[IdOrPayload]], Sequenced[IdOrPayload], Effect.Read] =
+      if (bufferEventsWithPayloads) {
         sql"""
         select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
           events.recipients, payloads.id, payloads.content, events.topology_timestamp,
@@ -1008,10 +1170,27 @@ class DbSequencerStore(
               and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts)
           )
         order by events.ts desc
-        limit $limit"""
-
-      query.as[Sequenced[BytesPayload]]
-    }
+        limit $limit""".as[Sequenced[BytesPayload]]
+      } else {
+        sql"""
+        select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
+          events.recipients, events.payload_id, events.topology_timestamp,
+          events.trace_context, events.error,
+          events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
+        from sequencer_events events
+        inner join sequencer_watermarks watermarks
+          on events.node_index = watermarks.node_index
+        where
+          (
+              -- only consider events within the safe watermark
+              events.ts <= $safeWatermark
+              and events.ts < $upperBoundExclusive
+              -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+              and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts)
+          )
+        order by events.ts desc
+        limit $limit""".as[Sequenced[PayloadId]]
+      }
 
     val query = for {
       safeWatermarkO <- safeWaterMarkDBIO

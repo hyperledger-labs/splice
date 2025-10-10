@@ -1,7 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  dateTimeFormatISO,
+  nextScheduledSynchronizerUpgradeFormat,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
@@ -383,5 +386,147 @@ describe('Set DSO Config Rules Form', () => {
     expect(jsonDiffs).toBeDefined();
     await user.click(jsonDiffs);
     expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+  });
+});
+
+describe('Next Scheduled Synchronizer Upgrade', () => {
+  test('render default time for next scheduled upgrade', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
+    expect(effectiveDateInput).toBeDefined();
+
+    const tenDaysFromNow = dayjs().add(10, 'day').format(dateTimeFormatISO);
+    await user.type(effectiveDateInput, tenDaysFromNow);
+
+    const defaultTimeDisplay = screen.getByTestId('next-scheduled-upgrade-time-default');
+    expect(defaultTimeDisplay).toBeDefined();
+
+    // The default should be effective date + 1 hour in UTC format
+    await waitFor(() => {
+      const expectedDefaultTime = dayjs(tenDaysFromNow)
+        .utc()
+        .add(1, 'hour')
+        .format(nextScheduledSynchronizerUpgradeFormat);
+
+      expect(defaultTimeDisplay.textContent).toContain(`Default: ${expectedDefaultTime}`);
+    });
+  });
+
+  test('no validation for time or migration id if neither is provided', async () => {
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    expect(
+      screen.queryByText(
+        'Upgrade Time and Migration ID are required for a Scheduled Synchronizer Upgrade'
+      )
+    ).toBeNull();
+  });
+
+  test('show error if only one of time or migrationId is provided', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+    const errorMessage =
+      'Upgrade Time and Migration ID are required for a Scheduled Synchronizer Upgrade';
+
+    expect(screen.queryByText(errorMessage)).toBeNull();
+
+    // migrationId field only - should show error
+    const migrationIdInput = screen.getByTestId(
+      'config-field-nextScheduledSynchronizerUpgradeMigrationId'
+    );
+    expect(migrationIdInput).toBeDefined();
+
+    await user.type(migrationIdInput, '12345');
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeDefined();
+    });
+
+    // Error should be gone when migration ID is cleared
+    await user.clear(migrationIdInput);
+    await user.click(screen.getByTestId('set-dso-config-rules-action'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+
+    const timeInput = screen.getByTestId('config-field-nextScheduledSynchronizerUpgradeTime');
+    expect(timeInput).toBeDefined();
+
+    const futureTime = dayjs().add(2, 'hour').format(dateTimeFormatISO);
+    await user.type(timeInput, futureTime);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeDefined();
+    });
+
+    // Error should be gone when upgrade time is cleared
+    await user.clear(timeInput);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+  });
+
+  test('show error on form if supplied time is not after effective date', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const errorMessage = 'Upgrade Time must be at least 1 hour after the Effective Date';
+
+    const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
+    const effectiveDate = dayjs().add(10, 'day').format(dateTimeFormatISO);
+    await user.type(effectiveDateInput, effectiveDate);
+
+    expect(screen.queryByText(errorMessage)).toBeNull();
+
+    const timeInput = screen.getByTestId('config-field-nextScheduledSynchronizerUpgradeTime');
+    const migrationIdInput = screen.getByTestId(
+      'config-field-nextScheduledSynchronizerUpgradeMigrationId'
+    );
+
+    // Set time to be only 30 minutes after effective date (should fail validation)
+    const invalidTime = dayjs(effectiveDate)
+      .utc()
+      .add(30, 'minute')
+      .format(nextScheduledSynchronizerUpgradeFormat);
+    await user.type(timeInput, invalidTime);
+    await user.type(migrationIdInput, '12345');
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeDefined();
+    });
+
+    // Set upgrade time to be more than 1 hour after effective date - error should disappear
+    const validTime = dayjs(effectiveDate)
+      .utc()
+      .add(2, 'hours')
+      .format(nextScheduledSynchronizerUpgradeFormat);
+    await user.clear(timeInput);
+    await user.type(timeInput, validTime);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
   });
 });

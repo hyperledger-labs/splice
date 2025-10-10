@@ -80,6 +80,7 @@ class SequencerTest
       sequencerMember = topologyClientMember,
       blockSequencerMode = true,
       loggerFactory = loggerFactory,
+      sequencerMetrics = SequencerMetrics.noop("sequencer-test"),
     )
     val clock = new WallClock(timeouts, loggerFactory = loggerFactory)
     private val testingTopology = TestingTopology(
@@ -122,8 +123,11 @@ class SequencerTest
       loggerFactory = loggerFactory,
       sequencerMember = topologyClientMember,
       blockSequencerMode = false,
+      useRecipientsTableForReads = false,
+      bufferEventsWithPayloads = false,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(),
+      sequencerMetrics = SequencerMetrics.noop("sequencer-test"),
     )
 
     val sequencer: DatabaseSequencer =
