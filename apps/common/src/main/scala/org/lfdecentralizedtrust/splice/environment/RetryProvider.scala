@@ -26,6 +26,7 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.{Backoff, ErrorKind, ExceptionRetryPolicy, Success}
 import ErrorKind.*
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.time.Clock
 import io.grpc.Status
@@ -161,17 +162,46 @@ final class RetryProvider(
       (pollingIntervalNanos * jitter * (math.random() - 0.5)).toLong
     val delayNanos =
       (pollingIntervalNanos + jitterNanos).max(0L).min(2L * pollingIntervalNanos)
-    this
-      .waitUnlessShutdown(
-        clock
-          .scheduleAfter(
-            _ => {
-              // No work done here, as we are only interested in the scheduling notification
-              ()
-            },
-            java.time.Duration.ofNanos(delayNanos),
-          )
-      )
+    scheduleAfterUnlessShutdown(
+      action,
+      clock,
+      NonNegativeFiniteDuration.tryFromJavaDuration(java.time.Duration.ofNanos(delayNanos)),
+    )
+  }
+
+  def scheduleAfterUnlessShutdown[A](
+      action: => Future[A],
+      clock: Clock,
+      delay: NonNegativeFiniteDuration,
+  )(implicit ec: ExecutionContext): FutureUnlessShutdown[A] = {
+    waitUnlessShutdown(
+      clock
+        .scheduleAfter(
+          _ => {
+            // No work done here, as we are only interested in the scheduling notification
+            ()
+          },
+          delay.asJava,
+        )
+    )
+      .flatMap(_ => FutureUnlessShutdown.outcomeF(action))
+  }
+
+  def scheduleAtUnlessShutdown[A](
+      action: => Future[A],
+      clock: Clock,
+      target: CantonTimestamp,
+  )(implicit ec: ExecutionContext): FutureUnlessShutdown[A] = {
+    waitUnlessShutdown(
+      clock
+        .scheduleAt(
+          _ => {
+            // No work done here, as we are only interested in the scheduling notification
+            ()
+          },
+          target,
+        )
+    )
       .flatMap(_ => FutureUnlessShutdown.outcomeF(action))
   }
 

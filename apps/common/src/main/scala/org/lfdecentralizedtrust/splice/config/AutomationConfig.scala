@@ -25,11 +25,12 @@ case class AutomationConfig(
       * `[pollingInterval * (1 - 0.5*pollingJitter), pollingInterval * (1 + 0.5 * pollingJitter)]`
       */
     pollingJitter: Double = 0.2,
+    rewardOperationEnableRoundBasedInterval: Boolean = true,
     /** Reward operations can result in spikes overloading sequencers on each round switch so we
       * use a lower polling interval of 1/3 tick with tick = 600s
       */
     rewardOperationPollingInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(200),
+      NonNegativeFiniteDuration.ofSeconds(300),
     /** Reward operations can result in spikes overloading sequencers on each round switch so we
       * use higher jitter.
       */
