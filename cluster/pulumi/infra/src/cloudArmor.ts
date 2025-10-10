@@ -191,6 +191,7 @@ function addDefaultDenyRule(
       preview: false,
       action: 'deny',
       match: {
+        versionedExpr: 'SRC_IPS_V1',
         config: {
           srcIpRanges: ['*'],
         },
