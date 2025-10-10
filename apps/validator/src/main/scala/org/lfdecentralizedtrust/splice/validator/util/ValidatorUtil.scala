@@ -315,7 +315,7 @@ private[validator] object ValidatorUtil {
           )
           _ <- connection.deleteUser(endUserName)
         } yield {
-          logger.debug(s"User $endUserParty offboarded")
+          logger.info(s"User $endUserName offboarded")
           ()
         }
     }
