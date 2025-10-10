@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   AssignedContract,
-  RoundBasedUniformFutureScheduler,
+  OpenRoundBasedUniformFutureScheduler,
 }
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -51,7 +51,7 @@ class ReceiveSvRewardCouponTrigger(
 
   override protected val pollingScheduler: PollingTrigger.DelayedFutureScheduler = {
     if (context.config.rewardOperationEnableRoundBasedInterval)
-      new RoundBasedUniformFutureScheduler(
+      new OpenRoundBasedUniformFutureScheduler(
         (ec: ExecutionContext, tc: TraceContext) =>
           store.getOpenMiningRoundTriple()(ec, tc).map(_.toSeq.map(_.payload))(ec),
         context.clock,

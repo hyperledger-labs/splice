@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
 }
 import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryFor}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.util.RoundBasedUniformFutureScheduler
+import org.lfdecentralizedtrust.splice.util.IssuingRoundBasedUniformFutureScheduler
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
@@ -42,11 +42,11 @@ class CollectRewardsAndMergeAmuletsTrigger(
 
   override protected val pollingScheduler: PollingTrigger.DelayedFutureScheduler =
     if (context.config.rewardOperationEnableRoundBasedInterval)
-      new RoundBasedUniformFutureScheduler(
+      new IssuingRoundBasedUniformFutureScheduler(
         (ec: ExecutionContext, tc: TraceContext) =>
           scanConnection
             .getOpenAndIssuingMiningRounds()(ec, mat, tc)
-            .map(_._1.map(_.contract.payload))(ec),
+            .map(_._2.map(_.contract.payload))(ec),
         clock,
         context.retryProvider,
         loggerFactory,

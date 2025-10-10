@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   ContractWithState,
-  RoundBasedUniformFutureScheduler,
+  OpenRoundBasedUniformFutureScheduler,
 }
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
@@ -51,7 +51,7 @@ class ReceiveFaucetCouponTrigger(
 
   override protected val pollingScheduler: PollingTrigger.DelayedFutureScheduler =
     if (context.config.rewardOperationEnableRoundBasedInterval)
-      new RoundBasedUniformFutureScheduler(
+      new OpenRoundBasedUniformFutureScheduler(
         (ec: ExecutionContext, tc: TraceContext) =>
           scanConnection
             .getOpenAndIssuingMiningRounds()(ec, materializer, tc)
