@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.DelegationRestriction
@@ -45,18 +44,7 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
           ConfigTransforms.bumpSomeWalletClientPortsBy(22_000, Seq("aliceWallet"))(config),
       )
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
-      .addConfigTransform((_, conf) =>
-        conf.copy(validatorApps =
-          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
-            _.map { aliceValidatorConfig =>
-              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
-              aliceValidatorConfig.copy(
-                domains = withoutExtraDomains
-              )
-            }
-          }
-        )
-      )
+      .withoutAliceValidatorConnectingToSplitwell
       .withTrafficTopupsDisabled
       .withManualStart
 
