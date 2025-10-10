@@ -48,7 +48,7 @@ jobs:
       - name: Post-SBT job
         uses: ./.github/actions/sbt/post_sbt
         with:
-          cache_version: 666632-3
+          cache_version: 666632-2
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Report Failures on Slack & Github
