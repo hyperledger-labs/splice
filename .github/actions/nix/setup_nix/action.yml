@@ -91,6 +91,7 @@ runs:
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
+          # TODO (#2663): fix & uncomment these two lines
           # rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
           # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
         else
@@ -193,6 +194,7 @@ runs:
 
           #requires to preserve read only during clone
           sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
+          # TODO (#2663): fix & uncomment this line
           # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
