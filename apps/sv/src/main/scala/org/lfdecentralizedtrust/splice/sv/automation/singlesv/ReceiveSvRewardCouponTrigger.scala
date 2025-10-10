@@ -207,6 +207,9 @@ class ReceiveSvRewardCouponTrigger(
     }
     val weightDistribution =
       SvUtil.weightDistributionForSv(svRewardWeight, beneficiaries, svParty)(logger, tc)
+    logger.info(
+      s"Claiming SV rewards at round ${unclaimedRound.payload.round.number}."
+    )
     spliceLedgerConnection
       .submit(
         actAs = Seq(svParty),

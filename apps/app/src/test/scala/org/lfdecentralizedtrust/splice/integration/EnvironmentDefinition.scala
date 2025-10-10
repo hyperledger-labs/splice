@@ -425,6 +425,11 @@ case class EnvironmentDefinition(
               .replace(NonNegativeFiniteDuration.Zero)
           )(conf)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllAutomationConfigs(
+          _.focus(_.rewardOperationEnableRoundBasedInterval).replace(true)
+        )(conf)
+      )
       .withSequencerConnectionsFromScanDisabled(10_000)
 
   override lazy val environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =

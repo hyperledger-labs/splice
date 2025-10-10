@@ -119,6 +119,7 @@ class ReceiveFaucetCouponTrigger(
               s"This is expected in case of validator inactivity."
           )
     }
+    logger.info(s"Claiming faucet coupons for round ${unclaimedRound.payload.round.number}")
     for {
       validatorWallet <- ValidatorUtil.getValidatorWallet(validatorStore, userWalletManager)
       commandPriority <- TopupUtil

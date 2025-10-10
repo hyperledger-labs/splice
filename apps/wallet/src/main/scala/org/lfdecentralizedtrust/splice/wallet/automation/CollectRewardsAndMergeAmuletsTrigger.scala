@@ -88,6 +88,9 @@ class CollectRewardsAndMergeAmuletsTrigger(
             .hasSufficientFundsForTopup(scanConnection, store, validatorTopupConfig, clock)
             .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
       }
+      _ = logger.info(
+        s"Enqueueing collection of rewards and merging amulets with priority $commandPriority"
+      )
       result <- treasury
         .enqueueAmuletOperation(
           new CO_MergeTransferInputs(com.daml.ledger.javaapi.data.Unit.getInstance()),
