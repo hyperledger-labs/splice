@@ -89,7 +89,7 @@ class BlockSequencer(
     loggerFactory: NamedLoggerFactory,
     exitOnFatalFailures: Boolean,
     runtimeReady: FutureUnlessShutdown[Unit],
-)(implicit executionContext: ExecutionContext, materializer: Materializer, tracer: Tracer)
+)(implicit executionContext: ExecutionContext, materializer: Materializer, val tracer: Tracer)
     extends DatabaseSequencer(
       SequencerWriterStoreFactory.singleInstance,
       dbSequencerStore,
@@ -172,7 +172,7 @@ class BlockSequencer(
       metrics,
       loggerFactory,
       memberValidator = memberValidator,
-    )(CloseContext(cryptoApi))
+    )(CloseContext(cryptoApi), tracer)
 
     implicit val traceContext: TraceContext = TraceContext.empty
 
@@ -358,11 +358,8 @@ class BlockSequencer(
     )
 
     for {
-
       _ <- rejectSubmissionsBeforeOrAtSequencingTimeLowerBound()
-      _ <-
-        if (submission.isConfirmationRequest) rejectSubmissionsIfOverloaded(submission)
-        else EitherT.rightT[FutureUnlessShutdown, SequencerDeliverError](())
+      _ <- rejectSubmissionsIfOverloaded(submission)
       // TODO(i17584): revisit the consequences of no longer enforcing that
       //  aggregated submissions with signed envelopes define a topology snapshot
       _ <- validateMaxSequencingTime(submission)
@@ -619,14 +616,11 @@ class BlockSequencer(
       _ = logger.trace(s"Storage active: ${storage.isActive}")
     } yield {
       if (!ledgerStatus.isActive) SequencerHealthStatus(isActive = false, ledgerStatus.description)
-      else if (!isStorageActive)
-        SequencerHealthStatus(isActive = false, Some("Can't connect to database"))
-      else if (circuitBreaker.shouldRejectRequests(SubmissionRequestType.ConfirmationRequest))
+      else
         SequencerHealthStatus(
-          isActive = false,
-          Some("Overloaded. Can't receive requests at the moment"),
+          isStorageActive,
+          if (isStorageActive) None else Some("Can't connect to database"),
         )
-      else SequencerHealthStatus(isActive = true, None)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
@@ -758,4 +752,9 @@ class BlockSequencer(
       timestamp,
       stateManager.getHeadState.block.latestSequencerEventTimestamp,
     )
+
+  override def sequencingTime(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
+    blockOrderer.sequencingTime
 }

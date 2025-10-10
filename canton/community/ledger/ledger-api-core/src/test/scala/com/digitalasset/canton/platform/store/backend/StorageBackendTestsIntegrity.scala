@@ -9,6 +9,7 @@ import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransacti
   Revoked,
 }
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -32,8 +33,8 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "find duplicate event ids" in {
     val updates = Vector(
-      dtoCreate(offset(7), 7L, hashCid("#7")),
-      dtoCreate(offset(7), 7L, hashCid("#7")), // duplicate id
+      dtoCreateLegacy(offset(7), 7L, hashCid("#7")),
+      dtoCreateLegacy(offset(7), 7L, hashCid("#7")), // duplicate id
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -48,8 +49,8 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "find duplicate event ids with different offsets" in {
     val updates = Vector(
-      dtoCreate(offset(6), 7L, hashCid("#7")),
-      dtoCreate(offset(7), 7L, hashCid("#7")), // duplicate id
+      dtoCreateLegacy(offset(6), 7L, hashCid("#7")),
+      dtoCreateLegacy(offset(7), 7L, hashCid("#7")), // duplicate id
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -64,8 +65,8 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "find non-consecutive event ids" in {
     val updates = Vector(
-      dtoCreate(offset(1), 1L, hashCid("#1")),
-      dtoCreate(offset(3), 3L, hashCid("#3")), // non-consecutive id
+      dtoCreateLegacy(offset(1), 1L, hashCid("#1")),
+      dtoCreateLegacy(offset(3), 3L, hashCid("#3")), // non-consecutive id
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -80,13 +81,13 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "not find non-consecutive event ids if those gaps are before the pruning offset" in {
     val updates = Vector(
-      dtoCreate(offset(1), 1L, hashCid("#1")),
-      dtoCreate(
+      dtoCreateLegacy(offset(1), 1L, hashCid("#1")),
+      dtoCreateLegacy(
         offset(3),
         3L,
         hashCid("#3"),
       ), // non-consecutive id but after pruning offset
-      dtoCreate(offset(4), 4L, hashCid("#4")),
+      dtoCreateLegacy(offset(4), 4L, hashCid("#4")),
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -98,39 +99,39 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in created table" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(3),
         3L,
         hashCid("#3"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         4L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         5L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -147,40 +148,40 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in consuming exercise table" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
-      dtoExercise(
+      dtoExerciseLegacy(
         offset(3),
         3L,
         consuming = true,
         hashCid("#3"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         4L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         5L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -197,40 +198,40 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in non-consuming exercise table" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
-      dtoExercise(
+      dtoExerciseLegacy(
         offset(3),
         3L,
         consuming = false,
         hashCid("#3"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         4L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         5L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -247,39 +248,39 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in assign table" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
-      dtoAssign(
+      dtoAssignLegacy(
         offset(3),
         3L,
         hashCid("#3"),
-        targetSynchronizerId = someSynchronizerId.toProtoPrimitive,
+        targetSynchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         4L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         5L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -296,39 +297,39 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in unassign table" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
-      dtoUnassign(
+      dtoUnassignLegacy(
         offset(3),
         3L,
         hashCid("#3"),
-        sourceSynchronizerId = someSynchronizerId.toProtoPrimitive,
+        sourceSynchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         4L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         5L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -345,37 +346,37 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in completions table" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
       dtoCompletion(
         offset(3),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         3L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         4L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -392,38 +393,38 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "detect monotonicity violation of record times for one synchronizer in completions table, if it is a timely-reject going backwards" in {
     val updates = Vector(
-      dtoCreate(
+      dtoCreateLegacy(
         offset(1),
         1L,
         hashCid("#1"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(2),
         2L,
         hashCid("#2"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
       dtoCompletion(
         offset(3),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time7,
         messageUuid = Some("message uuid"),
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(4),
         3L,
         hashCid("#4"),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
-      dtoCreate(
+      dtoCreateLegacy(
         offset(5),
         4L,
         hashCid("#5"),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -446,7 +447,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         someParty,
         someParticipantId.toString,
         Added(AuthorizationLevel.Submission),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time5,
       ),
       dtoPartyToParticipant(
@@ -455,7 +456,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         someParty,
         someParticipantId.toString,
         ChangedTo(AuthorizationLevel.Confirmation),
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time1,
       ),
       dtoPartyToParticipant(
@@ -464,7 +465,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         someParty,
         someParticipantId.toString,
         ChangedTo(AuthorizationLevel.Observation),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time7,
       ),
       dtoPartyToParticipant(
@@ -473,7 +474,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         someParty,
         someParticipantId.toString,
         Revoked,
-        synchronizerId = someSynchronizerId2.toProtoPrimitive,
+        synchronizerId = someSynchronizerId2,
         recordTime = time3,
       ),
       dtoPartyToParticipant(
@@ -482,7 +483,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         someParty,
         someParticipantId.toString,
         Added(AuthorizationLevel.Submission),
-        synchronizerId = someSynchronizerId.toProtoPrimitive,
+        synchronizerId = someSynchronizerId,
         recordTime = time6,
       ),
     )
@@ -503,25 +504,25 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(1),
         1L,
         4L,
-        udpateId = Some(updateIdFromOffset(offset(1))),
+        udpateId = Some(updateIdArrayFromOffset(offset(1))),
       ),
       dtoTransactionMeta(
         offset(2),
         1L,
         4L,
-        udpateId = Some(updateIdFromOffset(offset(2))),
+        udpateId = Some(updateIdArrayFromOffset(offset(2))),
       ),
       dtoTransactionMeta(
         offset(3),
         1L,
         4L,
-        udpateId = Some(updateIdFromOffset(offset(2))),
+        udpateId = Some(updateIdArrayFromOffset(offset(2))),
       ),
       dtoTransactionMeta(
         offset(4),
         1L,
         4L,
-        udpateId = Some(updateIdFromOffset(offset(4))),
+        udpateId = Some(updateIdArrayFromOffset(offset(4))),
       ),
     )
 
@@ -530,8 +531,9 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
     executeSql(updateLedgerEnd(offset(5), 4L))
     val failure =
       intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
+    val hashForOffset2 = updateIdFromOffset(offset(2)).toHexString
     failure.getMessage should include(
-      "occurrence of duplicate update ID [2] found for offsets Offset(2), Offset(3)"
+      s"occurrence of duplicate update ID [$hashForOffset2] found for offsets Offset(2), Offset(3)"
     )
   }
 
@@ -567,13 +569,13 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(2),
         commandId = "commandid",
         submissionId = Some("submissionid"),
-        updateId = Some(updateIdFromOffset(offset(2))),
+        updateId = Some(updateIdArrayFromOffset(offset(2))),
       ),
       dtoCompletion(
         offset(3),
         commandId = "commandid",
         submissionId = Some("submissionid"),
-        updateId = Some(updateIdFromOffset(offset(2))),
+        updateId = Some(updateIdArrayFromOffset(offset(2))),
       ),
     )
 
@@ -597,14 +599,14 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(2),
         commandId = "commandid1",
         submissionId = Some("submissionid1"),
-        updateId = Some(updateIdFromOffset(offset(2))),
+        updateId = Some(updateIdArrayFromOffset(offset(2))),
         messageUuid = messageUuid,
       ),
       dtoCompletion(
         offset(3),
         commandId = "commandid",
         submissionId = Some("submissionid"),
-        updateId = Some(updateIdFromOffset(offset(3))),
+        updateId = Some(updateIdArrayFromOffset(offset(3))),
         messageUuid = messageUuid,
       ),
     )
@@ -628,14 +630,14 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(2),
         commandId = "commandid",
         submissionId = Some("submissionid"),
-        updateId = Some(updateIdFromOffset(offset(2))),
+        updateId = Some(updateIdArrayFromOffset(offset(2))),
       ),
       dtoCompletion(
         offset(3),
         commandId = "commandid",
         submissionId = Some("submissionid"),
-        updateId = Some(updateIdFromOffset(offset(2))),
-        synchronizerId = "x::othersynchronizerid",
+        updateId = Some(updateIdArrayFromOffset(offset(2))),
+        synchronizerId = SynchronizerId.tryFromString("x::othersynchronizerid"),
       ),
     )
 
@@ -647,11 +649,11 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   it should "not find errors beyond the ledger end" in {
     val updates = Vector(
-      dtoCreate(offset(1), 1L, hashCid("#1")),
-      dtoCreate(offset(2), 2L, hashCid("#2")),
-      dtoCreate(offset(7), 7L, hashCid("#7")), // beyond the ledger end
-      dtoCreate(offset(7), 7L, hashCid("#7")), // duplicate id (beyond ledger end)
-      dtoCreate(offset(9), 9L, hashCid("#9")), // non-consecutive id (beyond ledger end)
+      dtoCreateLegacy(offset(1), 1L, hashCid("#1")),
+      dtoCreateLegacy(offset(2), 2L, hashCid("#2")),
+      dtoCreateLegacy(offset(7), 7L, hashCid("#7")), // beyond the ledger end
+      dtoCreateLegacy(offset(7), 7L, hashCid("#7")), // duplicate id (beyond ledger end)
+      dtoCreateLegacy(offset(9), 9L, hashCid("#9")), // non-consecutive id (beyond ledger end)
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))

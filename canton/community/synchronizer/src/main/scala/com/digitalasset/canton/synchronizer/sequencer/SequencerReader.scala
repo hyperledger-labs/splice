@@ -48,12 +48,13 @@ import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.{Member, SequencerId}
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.*
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
 import org.apache.pekko.{Done, NotUsed}
@@ -128,9 +129,10 @@ class SequencerReader(
     topologyClientMember: Member,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with FlagCloseable
+    with Spanning
     with HasCloseContext {
 
   private val psid = syncCryptoApi.psid
@@ -185,6 +187,9 @@ class SequencerReader(
       safeWatermarkTimestampO <- EitherT.right(store.fetchWatermark(0)).map(_.map(_.timestamp))
       _ = logger.debug(
         s"Current safe watermark is $safeWatermarkTimestampO"
+      )
+      _ = logger.debug(
+        s"Member $member was registered at ${registeredMember.registeredFrom}"
       )
 
       // It can happen that a member switching between sequencers runs into a sequencer that is catching up.
@@ -266,7 +271,11 @@ class SequencerReader(
                 show"but this sequencer cannot serve timestamps at or before ${lowerBoundText.unquoted} " +
                 show"or below the member's registration timestamp ${registeredMember.registeredFrom}."
 
-            logger.error(errorMessage)
+            // Logging at INFO level because this can happen during normal operations for a decentralized synchronizer
+            // where a participant updates its sequencer connection config before it has caught up to the point
+            // where the sequencer was actually onboarded.
+            // TODO(#28184) Make sure that this cannot happen due to misconfiguration of sequencer connections
+            logger.info(errorMessage)
             CreateSubscriptionError
               .EventsUnavailableForTimestamp(readFromTimestampInclusive, errorMessage)
           },
@@ -286,10 +295,10 @@ class SequencerReader(
         // This is a "reading watermark" meaning that "we have read up to and including this timestamp",
         // so if we want to grab the event exactly at timestampInclusive, we do -1 here
         nextReadTimestamp = readFromTimestampInclusive
+          .map(_.immediatePredecessor)
           .getOrElse(
             registeredMember.registeredFrom
-          )
-          .immediatePredecessor,
+          ),
         nextPreviousEventTimestamp = previousEventTimestamp,
         latestTopologyClientRecipientTimestamp = latestTopologyClientRecipientTimestampO,
       )
@@ -339,32 +348,33 @@ class SequencerReader(
         eventTraceContext,
       ) = unsignedEventData
       implicit val traceContext: TraceContext = eventTraceContext
-      logger.trace(
-        s"Latest topology client timestamp for $member at sequencing timestamp ${event.timestamp} is $previousTopologyClientTimestamp / $latestTopologyClientTimestamp"
-      )
-
-      val res = for {
-        signingSnapshot <- OptionT
-          .fromOption[FutureUnlessShutdown](topologySnapshotO)
-          .getOrElseF {
-            val warnIfApproximate =
-              event.previousTimestamp.nonEmpty // warn if we are not at genesis
-            SyncCryptoClient.getSnapshotForTimestamp(
-              syncCryptoApi,
-              event.timestamp,
-              previousTopologyClientTimestamp,
-              protocolVersion,
-              warnIfApproximate = warnIfApproximate,
-            )
-          }
-        _ = logger.debug(
-          s"Signing event with sequencing timestamp ${event.timestamp} for $member"
+      withSpan("SequencerReader.signValidatedEvent") { implicit traceContext => span =>
+        logger.trace(
+          s"Latest topology client timestamp for $member at sequencing timestamp ${event.timestamp} is $previousTopologyClientTimestamp / $latestTopologyClientTimestamp"
         )
-        signed <- synchronizeWithClosing("sign-event")(
-          signEvent(event, signingSnapshot).value
-        )
-      } yield signed
-      EitherT(res)
+        span.setAttribute("member", member.toString)
+        val res = for {
+          signingSnapshot <- OptionT
+            .fromOption[FutureUnlessShutdown](topologySnapshotO)
+            .getOrElseF {
+              val warnIfApproximate =
+                event.previousTimestamp.nonEmpty // warn if we are not at genesis
+              SyncCryptoClient.getSnapshotForTimestamp(
+                syncCryptoApi,
+                event.timestamp,
+                previousTopologyClientTimestamp,
+                warnIfApproximate = warnIfApproximate,
+              )
+            }
+          _ = logger.debug(
+            s"Signing event with sequencing timestamp ${event.timestamp} for $member"
+          )
+          signed <- synchronizeWithClosing("sign-event")(
+            signEvent(event, signingSnapshot).value
+          )
+        } yield signed
+        EitherT(res)
+      }
     }
 
     def latestTopologyClientTimestampAfter(
@@ -420,7 +430,6 @@ class SequencerReader(
             topologyTimestamp,
             sequencingTimestamp,
             topologyClientTimestampBefore,
-            protocolVersion,
             // This warning should never be triggered.
             warnIfApproximate = true,
             _.sequencerTopologyTimestampTolerance,
@@ -606,7 +615,6 @@ class SequencerReader(
                       ),
                     )
                   case payload: BytesPayload => payload.decodeBatchAndTrim(protocolVersion, member)
-                  case batch: FilteredBatch => Batch.trimForMember(batch.batch, member)
                 })
               )
             }
@@ -766,7 +774,6 @@ class SequencerReader(
                   syncCryptoApi,
                   timestamp,
                   topologyClientTimestampBeforeO,
-                  protocolVersion,
                 )
                 .map(_.ipsSnapshot)
             )(FutureUnlessShutdown.pure)
@@ -912,10 +919,10 @@ object SequencerReader {
           case None => nextPreviousEventTimestamp
         },
         // set the timestamp to next timestamp from the read events or keep the current timestamp if we got no results
-        nextReadTimestamp = readEvents.nextTimestamp
-          .getOrElse(nextReadTimestamp),
+        nextReadTimestamp = readEvents.nextTimestamp.getOrElse(nextReadTimestamp),
         // did we receive a full batch of events on this update
-        lastBatchWasFull = readEvents.events.sizeCompare(batchSize) == 0,
+        // the case > is there as events query can return more events than requested in multi-instance setups
+        lastBatchWasFull = readEvents.events.sizeCompare(batchSize) >= 0,
       )
 
     override protected def pretty: Pretty[ReadState] = prettyOfClass(

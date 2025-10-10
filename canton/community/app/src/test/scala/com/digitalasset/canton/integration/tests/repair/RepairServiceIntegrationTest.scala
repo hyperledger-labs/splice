@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.tests.repair
 
 import cats.syntax.either.*
+import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.test.evidence.scalatest.ScalaTestSupport.TagContainer
 import com.daml.test.evidence.tag.EvidenceTag
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
@@ -15,11 +16,11 @@ import com.digitalasset.canton.crypto.TestSalt
 import com.digitalasset.canton.data.{CantonTimestamp, ViewPosition}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.util.{EntitySyntax, PartiesAllocator}
 import com.digitalasset.canton.participant.admin.data.RepairContract
@@ -30,6 +31,7 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
+import com.digitalasset.canton.util.TestContractHasher
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{
   LfVersioned,
@@ -38,13 +40,13 @@ import com.digitalasset.canton.{
   SynchronizerAlias,
   config,
 }
-import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
 import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.{ValueParty, ValueRecord}
 import org.scalatest.{Assertion, Tag}
 
+import java.time.Duration
 import java.util.UUID
 import scala.annotation.nowarn
 import scala.concurrent.{Future, Promise}
@@ -96,7 +98,8 @@ sealed trait RepairServiceIntegrationTest
 
       participant1.synchronizers.connect_local(sequencer1, alias = daName)
       participant1.synchronizers.connect_local(sequencer2, alias = acmeName)
-      participant1.dars.upload(cantonTestsPath)
+      participant1.dars.upload(cantonTestsPath, synchronizerId = daId)
+      participant1.dars.upload(cantonTestsPath, synchronizerId = acmeId)
       eventually()(assert(participant1.synchronizers.is_connected(daId)))
 
       participant2.synchronizers.connect_local(sequencer2, alias = acmeName)
@@ -246,31 +249,38 @@ sealed trait RepairServiceIntegrationTestStableLf
 
       "contract doesn't exist yet (remote version)" in { implicit env =>
         import env.*
-        def queryCids(): Seq[String] =
+        def queryContracts(): Seq[CreatedEvent] =
           participant1.ledger_api.state.acs.of_all().collect {
-            case entry if entry.synchronizerId.contains(daId.logical) => entry.contractId
-          }
-
-        def queryCreateLETs(): Seq[Timestamp] =
-          participant1.ledger_api.state.acs.of_all().collect {
-            case entry if entry.synchronizerId.contains(daId.logical) =>
-              CantonTimestamp.fromProtoTimestamp(entry.event.createdAt.value).value.underlying
+            case entry if entry.synchronizerId.contains(daId.logical) => entry.event
           }
 
         withParticipantsInitialized { (alice, bob) =>
           val c1 = createContractInstance(participant2, acmeName, acmeId, alice, bob)
+            .copy(representativePackageId = "should-not-be-used")
           val c2 = createContractInstance(participant2, acmeName, acmeId, alice, bob)
-          val cids = Set(c1, c2).map(_.contract.contractId.coid)
-          val createLETs = Set(c1, c2).map(_.contract.createdAt.time)
 
-          queryCids() should contain noElementsOf cids
-
+          val acsBeforeRepair = queryContracts().toSet
           participant1_.repair.add(daId, testedProtocolVersion, Seq(c1, c2))
 
           withSynchronizerConnected(daName) {
             eventually() {
-              queryCids() should contain allElementsOf cids
-              queryCreateLETs() should contain allElementsOf createLETs
+              val acsAfterRepair = queryContracts()
+              val newContracts = acsAfterRepair.filterNot(acsBeforeRepair)
+
+              newContracts should have size 2
+
+              newContracts.zip(Seq(c1, c2)).foreach {
+                case (queriedCreatedEvent, expectedRepairContract) =>
+                  queriedCreatedEvent.contractId shouldBe expectedRepairContract.contractId.coid
+                  CantonTimestamp
+                    .fromProtoTimestamp(queriedCreatedEvent.createdAt.value)
+                    .value
+                    .underlying shouldBe expectedRepairContract.contract.createdAt.time
+
+                  // Limitation: ImportAcsOld assigns the representative package ID as the original contract package ID
+                  // TODO(#24610): Adapt to assert that the representative package ID of the repair contract is used
+                  queriedCreatedEvent.representativePackageId shouldBe expectedRepairContract.contract.templateId.packageId
+              }
             }
           }
         }
@@ -396,6 +406,37 @@ sealed trait RepairServiceIntegrationTestStableLf
             _.commandFailureMessage should include(
               "Failed to authenticate contract with id"
             ),
+          )
+        }
+      }
+
+      // TODO(#24610): Add test cases for ContractImportMode.ACCEPT to showcase that authentication is bypassed
+      "contract authentication fails" in { implicit env =>
+        withParticipantsInitialized { (alice, bob) =>
+          import env.*
+
+          val contract = withSynchronizerConnected(daName) {
+            createContractInstance(participant1, daName, daId, alice, bob, "YEN")
+          }
+
+          val modifiedContract = {
+            val fci = contract.contract
+            contract.copy(contract =
+              LfFatContractInst.fromCreateNode(
+                fci.toCreateNode,
+                fci.createdAt.copy(fci.createdAt.time.add(Duration.ofSeconds(1337L))),
+                fci.authenticationData,
+              )
+            )
+          }
+
+          loggerFactory.assertThrowsAndLogs[CommandFailure](
+            participant1.repair.add(
+              acmeId,
+              testedProtocolVersion,
+              Seq(modifiedContract),
+            ),
+            _.commandFailureMessage should include(s"Failed to authenticate contract with id"),
           )
         }
       }
@@ -798,7 +839,7 @@ sealed trait RepairServiceIntegrationTestDevLf extends RepairServiceIntegrationT
               template = lfNoMaintainerTemplateId,
               packageName = lfPackageName,
               arg = LfVersioned(
-                ExampleTransactionFactory.transactionVersion,
+                ExampleTransactionFactory.serializationVersion,
                 ValueRecord(None, ImmArray(None -> ValueParty(alice.toLf))),
               ),
             )
@@ -819,13 +860,22 @@ sealed trait RepairServiceIntegrationTestDevLf extends RepairServiceIntegrationT
               stakeholders = Set(alice.toLf),
               key = Some(keyWithMaintainers.unversioned),
             )
+            val contractHash = TestContractHasher.Sync.hash(
+              unsuffixedCreateNode,
+              contractIdSuffixer.contractHashingMethod,
+            )
             val ContractIdSuffixer.RelativeSuffixResult(
               suffixedCreateNode,
               _,
               _,
               authenticationData,
             ) = contractIdSuffixer
-              .relativeSuffixForLocalContract(contractSalt, creationTime, unsuffixedCreateNode)
+              .relativeSuffixForLocalContract(
+                contractSalt,
+                creationTime,
+                unsuffixedCreateNode,
+                contractHash,
+              )
               .valueOr(err => fail(s"Failed to generate contract suffix: $err"))
 
             val suffixedContractInstance = LfFatContractInst.fromCreateNode(
@@ -840,7 +890,12 @@ sealed trait RepairServiceIntegrationTestDevLf extends RepairServiceIntegrationT
                 daId,
                 testedProtocolVersion,
                 Seq(
-                  RepairContract(daId, absolutizedContractInstance, ReassignmentCounter.Genesis)
+                  RepairContract(
+                    daId,
+                    absolutizedContractInstance,
+                    ReassignmentCounter.Genesis,
+                    absolutizedContractInstance.templateId.packageId,
+                  )
                 ),
               ),
               _.commandFailureMessage should (
@@ -859,7 +914,7 @@ sealed trait RepairServiceReferenceSequencerPostgresTest {
   self: SharedEnvironment =>
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(

@@ -4,7 +4,8 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.{reassignment, state_service, transaction_filter}
+import com.daml.ledger.api.v2.transaction_filter.EventFormat
+import com.daml.ledger.api.v2.{reassignment, state_service}
 import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
@@ -18,6 +19,7 @@ import com.digitalasset.canton.http.json.v2.JsContractEntry.{
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
@@ -30,11 +32,8 @@ import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.*
 import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, query, webSocketBody}
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
-// TODO(#23504) remove deprecation suppression
-@nowarn("cat=deprecation")
 class JsStateService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
@@ -77,16 +76,16 @@ class JsStateService(
 
   private def getConnectedSynchronizers(
       callerContext: CallerContext
-  ): TracedInput[(String, Option[String], Option[String])] => Future[
+  ): TracedInput[(Option[String], Option[String], Option[String])] => Future[
     Either[JsCantonError, state_service.GetConnectedSynchronizersResponse]
   ] = req =>
     stateServiceClient(callerContext.token())(req.traceContext)
       .getConnectedSynchronizers(
         state_service
           .GetConnectedSynchronizersRequest(
-            party = req.in._1,
+            party = req.in._1.getOrElse(""),
             participantId = req.in._2.getOrElse(""),
-            identityProviderId = req.in._2.getOrElse(""),
+            identityProviderId = req.in._3.getOrElse(""),
           )
       )
       .resultToRight
@@ -118,23 +117,53 @@ class JsStateService(
   ] =
     req => {
       implicit val tc = req.traceContext
-      Flow[LegacyDTOs.GetActiveContractsRequest].map { request =>
-        state_service.GetActiveContractsRequest(
-          filter = request.filter.map(f =>
-            transaction_filter.TransactionFilter(
-              filtersByParty = f.filtersByParty,
-              filtersForAnyParty = f.filtersForAnyParty,
-            )
-          ),
-          verbose = request.verbose,
-          activeAtOffset = request.activeAtOffset,
-          eventFormat = request.eventFormat,
-        )
+      Flow[LegacyDTOs.GetActiveContractsRequest].map {
+        toGetActiveContractsRequest
       } via
         prepareSingleWsStream(
           stateServiceClient(caller.token())(TraceContext.empty).getActiveContracts,
           (r: state_service.GetActiveContractsResponse) =>
             protocolConverters.GetActiveContractsResponse.toJson(r),
+        )
+    }
+
+  private def toGetActiveContractsRequest(
+      req: LegacyDTOs.GetActiveContractsRequest
+  )(implicit traceContext: TraceContext): state_service.GetActiveContractsRequest =
+    (req.eventFormat, req.filter, req.verbose) match {
+      case (Some(_), Some(_), _) =>
+        throw RequestValidationErrors.InvalidArgument
+          .Reject(
+            "Both event_format and filter are set. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
+          )
+          .asGrpcError
+      case (Some(_), _, true) =>
+        throw RequestValidationErrors.InvalidArgument
+          .Reject(
+            "Both event_format and verbose are set. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
+          )
+          .asGrpcError
+      case (Some(_), None, false) =>
+        state_service.GetActiveContractsRequest(
+          activeAtOffset = req.activeAtOffset,
+          eventFormat = req.eventFormat,
+        )
+      case (None, None, _) =>
+        throw RequestValidationErrors.InvalidArgument
+          .Reject(
+            "Either filter/verbose or event_format is required. Please use either backwards compatible arguments (filter and verbose) or event_format."
+          )
+          .asGrpcError
+      case (None, Some(filter), verbose) =>
+        state_service.GetActiveContractsRequest(
+          activeAtOffset = req.activeAtOffset,
+          eventFormat = Some(
+            EventFormat(
+              filtersByParty = filter.filtersByParty,
+              filtersForAnyParty = filter.filtersForAnyParty,
+              verbose = verbose,
+            )
+          ),
         )
     }
 
@@ -174,7 +203,7 @@ object JsStateService extends DocumentationEndpoints {
 
   val getConnectedSynchronizersEndpoint = state.get
     .in(sttp.tapir.stringToPath("connected-synchronizers"))
-    .in(query[String]("party"))
+    .in(query[Option[String]]("party"))
     .in(query[Option[String]]("participantId"))
     .in(query[Option[String]]("identityProviderId"))
     .out(jsonBody[state_service.GetConnectedSynchronizersResponse])
@@ -230,8 +259,6 @@ final case class JsGetActiveContractsResponse(
     contractEntry: JsContractEntry,
 )
 
-// TODO(#23504) remove deprecation suppression
-@nowarn("cat=deprecation")
 object JsStateServiceCodecs {
 
   import JsSchema.*
@@ -259,6 +286,7 @@ object JsStateServiceCodecs {
   implicit val getConnectedSynchronizersResponseRW
       : Codec[state_service.GetConnectedSynchronizersResponse] =
     deriveRelaxedCodec
+
   implicit val connectedSynchronizerRW
       : Codec[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
     deriveRelaxedCodec
