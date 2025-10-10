@@ -91,8 +91,8 @@ runs:
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
-          rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
-          sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+          # rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
+          # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
         else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
@@ -193,8 +193,7 @@ runs:
 
           #requires to preserve read only during clone
           sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
-          # see https://github.com/NixOS/nix/commit/a5919f4754be6f4a9fe091e0ee5538ad85af0050 for why those two are excluded
-          sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var" --exclude "/profiles/**" --exclude "/gcroots/**"
+          # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
         fi
