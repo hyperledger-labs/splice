@@ -423,7 +423,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val onboarding @ OnboardingResult(externalParty, _, _) =
         onboardExternalParty(validatorBackend)
       walletClient.tap(50.0)
-      createTransferPreapprovalIfNotExists(walletClient)
+      createTransferPreapprovalEnsuringItExists(walletClient, validatorBackend)
       createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
       eventually() {
         validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty
@@ -1364,6 +1364,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           Map("fake-key-1" -> "fake-value-1"),
           s"fake-idp-enabled-${suffix}",
           false,
+          executeAs = Set(someParties(0)),
+          executeAsAnyParty = true,
         )
         if (createNewParties) {
           participant.ledger_api.users.create(

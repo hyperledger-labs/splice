@@ -97,7 +97,7 @@ export type ProposalDetails = {
 export interface ProposalVotingInformation {
   requester: string;
   requesterIsYou?: boolean;
-  votingCloses: string;
+  votingThresholdDeadline: string;
   voteTakesEffect: string;
   status: ProposalListingStatus;
 }

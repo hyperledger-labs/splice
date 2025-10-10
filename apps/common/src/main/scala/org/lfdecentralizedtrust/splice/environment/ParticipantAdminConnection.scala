@@ -329,7 +329,8 @@ class ParticipantAdminConnection(
             acsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             allowContractIdSuffixRecomputation = false,
-          )
+          ),
+        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
       logger,
     )

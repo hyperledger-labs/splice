@@ -160,7 +160,7 @@ export const OffboardSvForm: React.FC = _ => {
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => <field.TextArea title="Proposal Summary" id="offboard-sv-summary" />}
+              {field => <field.ProposalSummaryField id="offboard-sv-summary" />}
             </form.AppField>
 
             <form.AppField

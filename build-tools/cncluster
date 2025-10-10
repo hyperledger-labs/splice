@@ -128,9 +128,9 @@ function _retry_until_success() {
         exit 1
     fi
 
-    # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # with 5 second sleep + 1 second kubectl timeout, this is roughly 15 minutes
     # See also max_wait which caps the overall wait time
-    local -i -r max_retries=$((100))
+    local -i -r max_retries=$((150))
     local -i num_retries=0
     local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
     local -i -r start_time=$(date +%s)
@@ -1346,15 +1346,14 @@ function _unlock() {
 }
 
 function _check_stateful_sets() {
-    # Checks if any StatefulSets EXCEPT those with a prometheus image (which are part of the infra stack)
+    # Checks if any StatefulSets EXCEPT those in the observability namespace (which are part of the infra stack)
     # are currently deployed
     # grep exits with return code 1 if it finds no matches so we account for that
-    query_result=$(kubectl get StatefulSets -A -o json 2> /dev/null | jq '.items[].spec.template.spec.containers[].image' |  { grep -v prometheus || test $? = 1; })
-    echo "$query_result"
+    kubectl get statefulset -A -o json | jq '.items[] | select(.metadata.namespace != "observability" and .metadata.namespace != "gmp-system")'
 }
 
 function _check_reset_and_unlock() {
-    s=$(_check_stateful_sets)
+    s="$(_check_stateful_sets)"
 
     if [ -n "$s" ]; then
         echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"

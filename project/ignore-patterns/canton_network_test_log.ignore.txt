@@ -124,7 +124,7 @@ GENERIC_CONFIG_ERROR.*SpliceConfigTest
 # ExecutorServiceMetrics closes the gauges twice through shutdown and shutownNow in cases where shutdown times out
 .*InstrumentDescriptor.*name=daml.executor.* has called close\(\) multiple times
 
-Circuit breaker .* tripped after .* failures.*SpliceCircuitBreakerTest
+Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 
 
 # Make sure to have a trailing newline

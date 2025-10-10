@@ -7,13 +7,13 @@ import type {
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
   getDsoConfigToCompareWith,
+  PrettyJsonDiff,
   useVotesHooks,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Alert, Box, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { PrettyJsonDiff } from '../../../../../common/frontend/lib/components/PrettyJsonDiff';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { useListDsoRulesVoteRequests } from '../../hooks';
 import { useAppForm } from '../../hooks/form';
@@ -256,7 +256,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               onChange: ({ value }) => validateSummary(value),
             }}
           >
-            {field => <field.TextArea title="Proposal Summary" id="set-dso-config-rules-summary" />}
+            {field => <field.ProposalSummaryField id="set-dso-config-rules-summary" />}
           </form.AppField>
 
           <form.AppField

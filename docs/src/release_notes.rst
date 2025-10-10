@@ -8,18 +8,55 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.20
+------
+
+  - Deployment
+
+    - Fix a bug where the setting the affinity for the ``splice-cometbft`` and ``splice-global-domain`` helm charts would remove the anti affinity for the ``cometbft`` and the ``sequencer`` deployment. This ensures that if multiple SVs are run on the same nodes, not more than one ``cometbft`` pod can be deployed on the same node and that no more than one ``sequencer`` pod can be deployed to the same node (a ``cometbft`` pod can still share a node with a ``sequencer`` pod). This can be disabled by setting the ``enableAntiAffinity`` helm value to ``false`` (default ``true``).
+
+    - Replace ``-Dscala.concurrent.context.minThreads=8`` with ``-Dscala.concurrent.context.numThreads=8`` and set ``-XX:ActiveProcessorCount=8``  in the ``defaultJvmOptions`` for all the helm charts that deploy scala apps. This should ensure that the internal execution contexts spawn 8 threads to handle processing and that the JVM is configured for 8 CPUs as well. The previous behavior would spawn up to number of available processors, which can be up to the number of CPUs on the actual node if no CPU limit is set. This should avoid overloading the nodes during heavy processing.
+
+  - SV
+
+    - UI
+
+      - Add the ability to specify a validator party hint when generating onboarding secrets.
+
+      - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
+
+
+0.4.19
+------
+
+  - Sequencer
+
+    - Fix a regression introduced in 0.4.18 that made topology transactions significantly more expensive to process.
 
   - Docker images
 
     - All app & UI images now use a non-root user.
 
+  - Validator
+
+     - Add a trigger to export these party metrics:
+
+        - ``validator_synchronizer_topology_num_parties``:
+          Counts the number of parties allocated on the Global Synchronizer
+        - ``validator_synchronizer_topology_num_parties_per_participant``:
+          Uses the label ``participant_id`` and
+          counts the number of parties hosted on the Global Synchronizer per participant.
+          Note that multi-hosted parties are counted for each participant they are hosted on.
+
+       The trigger does not run by default. See :ref:`enable_extra_metric_triggers`
+       for instructions on how to enable it.
+
   - SV
 
     - Deployment
 
-      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps. This should avoid issues with cpu scheduling that might lead to performance degradations.
+      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps.
+        This should avoid issues with cpu scheduling that might lead to performance degradations.
 
     - UI
 

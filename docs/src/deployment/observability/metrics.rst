@@ -64,6 +64,23 @@ Configuring a docker compose deployment to enable metrics
 
 When using docker compose for the deployment, the metrics are enabled by default. These can be accessed at `http://validator.localhost/metrics` for the validator app and at `http://participant.localhost/metrics` for the participant.
 
+.. _enable_extra_metric_triggers:
+
+Enabling extra metric triggers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The validator app can be configured to run a trigger
+that polls the topology state and exports metrics summarizing that state.
+These metrics have the prefix ``splice.synchronizer-topology``.
+See the :ref:`validator-metrics-reference` for the concrete set of metrics.
+
+This trigger is disabled by default.
+As per the information in :ref:`Adding ad-hoc configuration <configuration_ad_hoc>`,
+add an environment variable
+``ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT=canton.validator-apps.validator.automation.topology-metrics-polling-interval = 5m``
+to enable the trigger with a polling interval of 5 minutes.
+
+
 .. _metrics_grafana_dashboards:
 
 Grafana Dashboards
