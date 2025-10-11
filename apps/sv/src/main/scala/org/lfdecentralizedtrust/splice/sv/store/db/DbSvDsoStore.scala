@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchron
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   SummarizingMiningRound,
+  OpenMiningRound,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,

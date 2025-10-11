@@ -366,6 +366,12 @@ class SvDsoAutomationService(
         connection(SpliceLedgerConnectionPriority.Low),
       )
     )
+    registerTrigger(
+      new AmuletPriceMetricsTrigger(
+        triggerContext,
+        dsoStore,
+      )
+    )
 
     config.scan.foreach { scan =>
       registerTrigger(
