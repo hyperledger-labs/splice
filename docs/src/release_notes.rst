@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - Deployment
+
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments,
+      and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
+      can act on your behalf.
+
 0.4.20
 ------
 

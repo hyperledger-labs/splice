@@ -77,11 +77,13 @@ export async function installValidator1(
     );
   const validatorDbName = `validator1`;
 
-  const validatorSecrets = await installValidatorSecrets({
-    xns,
-    auth0Client,
-    auth0AppName: 'validator1',
-  });
+  const validatorSecrets = validator1Config?.disableAuth
+    ? undefined
+    : await installValidatorSecrets({
+        xns,
+        auth0Client,
+        auth0AppName: 'validator1',
+      });
 
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
@@ -90,6 +92,7 @@ export async function installValidator1(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
+    validator1Config?.disableAuth,
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
     {
@@ -132,6 +135,7 @@ export async function installValidator1(
     nodeIdentifier: 'validator1',
     participantPruningConfig,
     deduplicationDuration: validator1Config?.deduplicationDuration,
+    disableAuth: validator1Config?.disableAuth,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

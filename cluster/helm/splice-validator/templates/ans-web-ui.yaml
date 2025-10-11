@@ -34,20 +34,6 @@ spec:
         imagePullPolicy: {{ . }}
         {{- end }}
         env:
-        - name: SPLICE_APP_UI_AUTH_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              key: client-id
-              name: splice-app-cns-ui-auth
-              optional: false
-        - name: SPLICE_APP_UI_AUTH_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: splice-app-cns-ui-auth
-              optional: false
-        - name: SPLICE_APP_UI_AUTH_AUDIENCE
-          value: {{ .Values.auth.audience | quote }}
         - name: SPLICE_APP_UI_NETWORK_NAME
           value: {{ .Values.spliceInstanceNames.networkName | quote }}
         - name: SPLICE_APP_UI_NETWORK_FAVICON_URL
@@ -62,6 +48,29 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         - name: SPLICE_APP_UI_POLL_INTERVAL
           value: {{ .Values.uiPollInterval | quote }}
+        {{- if .Values.disableAuth }}
+        - name: SPLICE_APP_UI_UNSAFE
+          value: "true"
+        - name: SPLICE_APP_UI_UNSAFE_SECRET
+          value: "unsafe"
+        - name: SPLICE_APP_UI_AUTH_AUDIENCE
+          value: "https://validator.example.com"
+        {{- else }}
+        - name: SPLICE_APP_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: splice-app-cns-ui-auth
+              optional: false
+        - name: SPLICE_APP_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: splice-app-cns-ui-auth
+              optional: false
+        - name: SPLICE_APP_UI_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        {{- end }}
         ports:
         - containerPort: 8080
           name: http

@@ -11,27 +11,29 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+
+set:
+  # Things we need just to pass the schema
+  nodeIdentifier: "helm-mock-1-validator"
+  validatorPartyHint: "helm-mock-1"
+  validatorWalletUser: "mock-wallet-user-id"
+  scanAddress: "trusted.scan.mock.com"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  topup:
+    enabled: false
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
 tests:
   - it: "sets labels and annotations as expected"
     set:
-      # Things we need just to pass the schema
-      nodeIdentifier: "helm-mock-1-validator"
-      validatorPartyHint: "helm-mock-1"
-      validatorWalletUser: "mock-wallet-user-id"
-      scanAddress: "trusted.scan.mock.com"
-      topup:
-        enabled: false
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
-      # Extra labels and annotations for testing
       pod:
         labels:
           mock: yes-please
@@ -83,24 +85,6 @@ tests:
 
   - it: "always populates enable-wallet"
     set:
-      # Things we need just to pass the schema
-      nodeIdentifier: "helm-mock-1-validator"
-      validatorPartyHint: "helm-mock-1"
-      validatorWalletUser: "mock-wallet-user-id"
-      scanAddress: "trusted.scan.mock.com"
-      topup:
-        enabled: false
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
-      # Extra values for testing
       enableWallet: false
       migration:
         migrating: true
@@ -115,24 +99,7 @@ tests:
 
   - it: "sets JWKS timeouts"
     set:
-      # Things we need just to pass the schema
-      nodeIdentifier: "helm-mock-1-validator"
-      validatorPartyHint: "helm-mock-1"
-      validatorWalletUser: "mock-wallet-user-id"
-      scanAddress: "trusted.scan.mock.com"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
-      topup:
-        enabled: false
       auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-        # actual test
         jwks:
           connectionTimeout: "33s"
           readTimeout: "44s"
@@ -146,3 +113,16 @@ tests:
       - equal:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT')].value
           value: "44s"
+
+  - it: "supports disabling auth"
+    set:
+      disableAuth: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME')].value
+          value: ledger-api-user
+      - exists:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value

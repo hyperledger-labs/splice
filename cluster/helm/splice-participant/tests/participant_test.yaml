@@ -104,7 +104,22 @@ tests:
           content:
             # We don't really care about the name of the env var but helm unittest wants it
             name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
-            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    map-canton-key = {\n      first-map-entry = first_map_value\n      recursive-map-entry = {\n        recursive-map = recursive_value\n      }\n      second-map-entry = second_map_value\n    }\n    region = mock_region\n    type = awwws\n  }\n}        \n"
+            value: |
+              canton.participants.participant.crypto {
+                provider = kms
+                kms = {
+                  extra-canton-key = mock_value
+                  map-canton-key = {
+                    first-map-entry = first_map_value
+                    recursive-map-entry = {
+                      recursive-map = recursive_value
+                    }
+                    second-map-entry = second_map_value
+                  }
+                  region = mock_region
+                  type = awwws
+                }
+              }
       # Secret configured via Helm with valueFrom
       - contains:
           path: spec.template.spec.containers[0].env
@@ -166,3 +181,30 @@ tests:
               persistentVolumeClaim:
                 claimName: claim_name
             - name: empty-dir-volume
+  - it: "defaults to auth"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='CANTON_PARTICIPANT_ADMIN_USER_NAME')].value
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+  - it: "supports disabling auth"
+    set:
+      disableAuth: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='CANTON_PARTICIPANT_ADMIN_USER_NAME')].value
+          value: ledger-api-user
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+          value: |
+            canton.participants.participant.ledger-api.auth-services=[]
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_JWKS_URL')].value
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_TARGET_AUDIENCE')].value
