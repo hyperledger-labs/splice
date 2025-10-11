@@ -325,6 +325,9 @@ In order to run the validator without authentication, add ``disableAuth: true`` 
 ``splice-node/examples/sv-helm/validator-values.yaml`` and ``splice-node/examples/sv-helm/participant-values.yaml``.
 Note that you must disable auth in both places, otherwise the validator will not be able to connect to the participant.
 
+When running without authentication, the username of the validator administrator
+is `administrator`.
+
 
 .. _helm-validator-install:
 
