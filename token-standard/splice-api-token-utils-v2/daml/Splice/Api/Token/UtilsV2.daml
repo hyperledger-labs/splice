@@ -5,7 +5,6 @@
 -- implement the V1 interfaces from the V2 interfaces.
 module Splice.Api.Token.UtilsV2 where
 
-import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -99,9 +98,13 @@ allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
     allocation = allocation_specification_v1_to_v2 allocation
     holdingCids = map coerceInterfaceContractId holdingCids
     meta
-    transferExtraAuth
+    senders
+    requiredReceiverAuth
   where
-    transferExtraAuth = case TextMap.lookup "canton.network/transferExtraAuth" meta.values of
+    senders = case TextMap.lookup "canton.network/senders" meta.values of
+      None -> [allocation.transferLeg.sender]
+      Some ol -> [allocation.transferLeg.sender] -- TODO: Parse extra auth list.
+    requiredReceiverAuth = case TextMap.lookup "canton.network/requiredReceiverAuth" meta.values of
       None -> []
       Some ol -> [] -- TODO: Parse extra auth list.
 
@@ -159,7 +162,8 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
     meta' = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
-        TextMap.insert "canton.network/transferExtraAuth" (show transferExtraAuth) $
+        TextMap.insert "canton.network/senders" (show senders) $
+        TextMap.insert "canton.network/requiredReceiverAuth" (show requiredReceiverAuth) $
         meta.values
 
 -- Choices
@@ -167,7 +171,7 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
 allocation_execute_transfer_v1_to_v2 : AllocationV1.Allocation_ExecuteTransfer -> AllocationV2.Allocation_ExecuteTransfer
 allocation_execute_transfer_v1_to_v2 AllocationV1.Allocation_ExecuteTransfer{..} =
   AllocationV2.Allocation_ExecuteTransfer with
-    extraAuth = None
+    extraAuth = []
     ..
 
 allocation_transfer_result_v2_to_v1 : AllocationV2.Allocation_ExecuteTransferResult -> AllocationV1.Allocation_ExecuteTransferResult
@@ -228,7 +232,12 @@ allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructi
     pendingActions
     requestedAt
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    senders
     meta
+  where
+    senders = case TextMap.lookup "canton.network/senders" meta.values of
+      None -> [allocation.transferLeg.sender]
+      Some ol -> [allocation.transferLeg.sender] -- TODO: Parse extra auth list.
 
 -- Downcast
 allocation_instruction_view_v2_to_v1 : AllocationInstructionV2.AllocationInstructionView -> AllocationInstructionV1.AllocationInstructionView
@@ -305,6 +314,7 @@ allocation_factory_allocate_v1_to_v2 AllocationInstructionV1.AllocationFactory_A
      requestedAt
      inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
      extraArgs
+     creator = allocation.transferLeg.sender
 
 allocationFactory_v1_allocateImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_Allocate -> Update AllocationInstructionV1.AllocationInstructionResult
 allocationFactory_v1_allocateImpl this self alloc = do
@@ -473,3 +483,5 @@ transferFactory_v1_publicFetchImpl this self TransferInstructionV1.TransferFacto
     (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
     TransferInstructionV2.TransferFactory_PublicFetch with ..
   return (transfer_factory_view_v2_to_v1 resv2)
+
+
