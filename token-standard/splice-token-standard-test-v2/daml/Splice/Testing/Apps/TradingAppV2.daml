@@ -6,94 +6,84 @@
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
 module Splice.Testing.Apps.TradingAppV2 where
 
-import DA.Assert ((===))
-import DA.Either (fromLeft)
 import DA.Foldable qualified as F
-import DA.Optional (fromOptional, fromSomeNote)
-import DA.Set as Set
+import DA.Optional (fromSomeNote)
+import DA.Set qualified as Set
 import DA.TextMap as TextMap
-import DA.Traversable qualified as Traversable
+import DA.Map as Map
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV2
+import DA.List (groupOn)
+import DA.Foldable (mapA_)
+import DA.List.Total (dedup)
+import DA.Assert ((===))
+import qualified DA.Traversable as Traversable
 
-
-template OTCTradeProposal with
-    venue : Party
-    tradeCid : Optional (ContractId OTCTradeProposal) -- Tracking-id for the trade being proposed. Set to None for new trades.
-    transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
-    approvers : [Party] -- ^ Parties that have approved the proposal
+template OTCTradeAllocationRequest with
+    otcTrade : OTCTrade
+    otcTradeCid : ContractId OTCTrade
   where
-    signatory approvers
-    observer venue, tradingParties transferLegs
+    signatory otcTrade.venue
+    observer otcTrade.venue, tradingParties (otcTrade.transferLegs)
 
-    -- This is test code, so we don't care about the contention here.
-    -- Moreover, likely the number of trading parties is going to be low anyways.
-    choice OTCTradeProposal_Accept : ContractId OTCTradeProposal
-      with
-        approver : Party
-      controller approver
-      do
-        let newApprovers = approver :: approvers
-        let traders = tradingParties transferLegs
-        require "Approver is a trading party" (approver `Set.member` traders)
-        require "Approver is new" (approver `notElem` approvers)
-        create this with
-          approvers = newApprovers
-          tradeCid = Some (fromOptional self tradeCid)
+    interface instance AllocationRequest for OTCTradeAllocationRequest where
+      view = AllocationRequestView with
+        settlement = SettlementInfo with
+          executor = otcTrade.venue
+          requestedAt = otcTrade.createdAt
+          settlementRef = makeTradeRef otcTradeCid
+          allocateBefore = otcTrade.prepareUntil
+          settleBefore = otcTrade.settleBefore
+          meta = emptyMetadata
+          controllerOverride = Some [] -- We will settle using only executor authority.
+        transferLegs = otcTrade.transferLegs
+        meta = emptyMetadata
 
-    choice OTCTradeProposal_Reject : ()
-      with
-        trader : Party
-      controller trader
-      do require "Trader is a trading party" (trader `Set.member` tradingParties transferLegs)
+      allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
+        -- Note: this corresponds to signalling early that assets won't be allocated / that the trade is being rejected.
+        require "Actor is a trader" (F.any (\leg -> actor == leg.sender || actor == leg.receiver) otcTrade.transferLegs)
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
 
-    choice OTCTradeProposal_InitiateSettlement : ContractId OTCTrade
-      with
-        prepareUntil : Time
-        settleBefore : Time
-      controller venue
-      do
-        require "All trading parties have approved" (Set.fromList approvers == tradingParties transferLegs)
-        now <- getTime
-        require "Preparation time has not passed" (now < prepareUntil)
-        require "Preparation time before settlement time" (prepareUntil < settleBefore)
-        create OTCTrade with
-          venue
-          transferLegs
-          tradeCid = fromOptional self tradeCid
-          createdAt = now
-          prepareUntil
-          settleBefore
+      allocationRequest_WithdrawImpl _self _extraArgs =
+        -- just archiving the trade is enough
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
 
-tradeAllocations
-  : SettlementInfo -> TextMap Api.Token.AllocationV2.TransferLeg
-  -> TextMap AllocationSpecification
-tradeAllocations settlementInfo transferLegs =
-  TextMap.fromList $ do
-    (transferLegId, transferLeg) <- TextMap.toList transferLegs
-    let spec = AllocationSpecification with
-          settlement = settlementInfo
-          transferLegs = TextMap.fromList [(transferLegId, transferLeg)]
-    pure (transferLegId, spec)
-
-template OTCTrade
-  with
+template OTCTrade with
     venue : Party
     transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
-    tradeCid : ContractId OTCTradeProposal
     createdAt : Time
     prepareUntil : Time
     settleBefore : Time
   where
-    signatory venue, tradingParties transferLegs
+    signatory venue
+    observer venue, tradingParties transferLegs
 
-    choice OTCTrade_Settle : TextMap Allocation_ExecuteTransferResult
+    nonconsuming choice OTCTrade_RequestAllocations : [ContractId OTCTradeAllocationRequest]
       with
-        allocationsWithContext : TextMap (ContractId Allocation, ExtraArgs)
       controller venue
       do
+        now <- getTime
+        require "Preparation time has not passed" (now < prepareUntil)
+        require "Preparation time before settlement time" (prepareUntil < settleBefore)
+        let 
+          legsByAdmin =
+            map TextMap.fromList $
+            groupOn (\(_, tl) -> tl.instrumentId.admin) $
+            TextMap.toList transferLegs
+        mapA (\transferLegs -> create (OTCTradeAllocationRequest (this with transferLegs) self)) legsByAdmin
+
+    choice OTCTrade_Settle : Map Party (Map Party Allocation_ExecuteTransferResult)
+      with
+        allocationsWithContext : Map Party (Map Party (ContractId Allocation, ExtraArgs))
+        -- ^ Allocations sorted by admin and sender.
+        allocationRequests : [ContractId OTCTradeAllocationRequest]
+      controller venue
+      do
+        -- Could be safer by validating the requests match the trade, but venue is the only authorizer
+        -- so we can assume the checks happened off-ledger. 
+        mapA_ archive allocationRequests
         -- check timing constraints
         now <- getTime
         require "Settlement deadline has not passed" (now < settleBefore)
@@ -101,84 +91,96 @@ template OTCTrade
         let settlementInfo = SettlementInfo with
               executor = venue
               requestedAt = createdAt
-              settlementRef = makeTradeRef tradeCid
+              settlementRef = makeTradeRef self
               allocateBefore = prepareUntil
               settleBefore
               meta = emptyMetadata
-              controllerOverride = None
-        let expectedAllocations = tradeAllocations settlementInfo transferLegs
-        let mergedMaps = zipTextMaps allocationsWithContext expectedAllocations
-        forTextMapWithKey mergedMaps \legId (optAllocWithContext,  optExpectedAlloc) -> do
-          let (allocCid, extraArgs) = fromSomeNote ("Allocation cid and extra arg is missing for leg " <> legId) optAllocWithContext
-          let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected leg " <> legId) optExpectedAlloc
-          -- fetch and validate the allocation instruction
-          instr <- fetch @Allocation allocCid
-          let instrView = view @Allocation instr
-          case matchAllocationWithMeta expectedAlloc instrView.allocation of
-            Right () -> return ()
-            Left mismatch -> abort
-              ("Submitted allocation does not match expected allocation." <> "\nMismatch: " <> mismatch)
-          exercise allocCid (Allocation_ExecuteTransfer with extraArgs; extraAuth = None)
-
-
-    -- NOTE: this choice is an approximation to what a real app would do.
-    -- As it stands, the venue can't cancel allocations that come right after
-    -- the first cancellation.  A better approach would be to leave a marker
-    -- contract in place until the `settleBefore` time, so that the venue
-    -- retains the ability to cancel the allocations that are created.
-    choice OTCTrade_Cancel : TextMap (Optional Allocation_CancelResult)
-      with
-        allocationsWithContext : TextMap (ContractId Allocation, ExtraArgs)
-      controller venue
-      do
-        -- validate and cancel transferLegs
-        let settlementInfo = SettlementInfo with
-              executor = venue
-              requestedAt = createdAt
-              settlementRef = makeTradeRef tradeCid
-              allocateBefore = prepareUntil
-              settleBefore
-              meta = emptyMetadata
-              controllerOverride = None
-        let expectedAllocations = tradeAllocations settlementInfo transferLegs
-        let mergedMaps = zipTextMaps allocationsWithContext expectedAllocations
-          -- fetch and validate the allocation instruction
-        forTextMapWithKey mergedMaps \legId (optAllocWithContext,  optExpectedAlloc) ->
-          -- skip the leg if there is no matching allocation to cancel
-          Traversable.forA optAllocWithContext $ \(allocCid, extraArgs) -> do
+              controllerOverride = Some []
+        let expectedAllocations = expectedTradeAllocations settlementInfo transferLegs
+        let outerMergedMaps = zipMaps allocationsWithContext expectedAllocations
+        exercises <- forMapWithKey outerMergedMaps \admin (optAdminAllocsWithContext,  optExpectedAdminAllocs) -> do
+          let adminAllocsWithContext = fromSomeNote ("Allocations are missing for admin " <> show admin) optAdminAllocsWithContext
+          let expectedAdminAllocs = fromSomeNote ("Allocation with context provided for unexpected admin " <> show admin) optExpectedAdminAllocs
+          let innerMergedMaps = zipMaps adminAllocsWithContext expectedAdminAllocs
+          forMapWithKey innerMergedMaps \trader (optAllocWithContext,  optExpectedAlloc) -> do
+            let (allocCid, extraArgs) = fromSomeNote ("Allocation is missing for admin " <> show admin <> " and trader " <> show trader) optAllocWithContext
+            let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected admin " <> show admin) optExpectedAlloc
             -- fetch and validate the allocation instruction
-            let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected leg " <> legId) optExpectedAlloc
             instr <- fetch @Allocation allocCid
             let instrView = view @Allocation instr
             case matchAllocationWithMeta expectedAlloc instrView.allocation of
               Right () -> return ()
               Left mismatch -> abort
                 ("Submitted allocation does not match expected allocation." <> "\nMismatch: " <> mismatch)
+
+            -- Fetch extra auths
+            let requiredReceiverAuth = (view instr).requiredReceiverAuth
+            extraAuth <- forA requiredReceiverAuth
+              (\receiver -> do
+                debug ("authorizing incoming for " <> show admin <> ", " <> show trader <> ", " <> show receiver)
+                (recAllocCid, recExtraArgs) <- case Map.lookup receiver innerMergedMaps of
+                  Some (optReceiverAllocWithContext, _) -> 
+                    return $ fromSomeNote ("Allocation is missing for admin " <> show admin <> " and trader " <> show receiver) optReceiverAllocWithContext
+                  None -> abort ("Extra auth needed for receiver that is not present in any transfer legs: " <> show receiver)
+                exercise recAllocCid Allocation_AuthorizeIncoming with extraArgs = recExtraArgs
+              )
+            -- on first pass don't settle yet as we may still need the extra auth.
+            return $ (allocCid, Allocation_ExecuteTransfer with extraArgs; extraAuth)
+        -- Exercise on second pass
+        Traversable.mapA (Traversable.mapA (uncurry exercise)) exercises
+
+    -- NOTE: this choice is an approximation to what a real app would do.
+    -- As it stands, the venue can't cancel allocations that come right after
+    -- the first cancellation.  A better approach would be to leave a marker
+    -- contract in place until the `settleBefore` time, so that the venue
+    -- retains the ability to cancel the allocations that are created.
+    choice OTCTrade_Cancel : [Allocation_CancelResult]
+      with
+        allocationsWithContext : [(ContractId Allocation, ExtraArgs)]
+        allocationRequests : [ContractId OTCTradeAllocationRequest]
+      controller venue
+      do
+        mapA_ (\arCid -> do
+            ar <- fetch arCid
+            -- validate the allocation request matches this trade
+            ar.otcTradeCid ===  self
+            signatory ar === [venue]
+            archive arCid
+          )
+          allocationRequests
+        mapA (\(allocCid, extraArgs) -> do
+            alloc <- fetch allocCid
+            -- validate the allocation request matches this trade
+            (view alloc).allocation.settlement.settlementRef === makeTradeRef self
+            (view alloc).allocation.settlement.executor === venue
             exercise allocCid (Allocation_Cancel extraArgs)
+          )
+          allocationsWithContext            
 
-
-    interface instance AllocationRequest for OTCTrade where
-      view = AllocationRequestView with
-        settlement = SettlementInfo with
-          executor = venue
-          requestedAt = createdAt
-          settlementRef = makeTradeRef tradeCid
-          allocateBefore = prepareUntil
-          settleBefore
-          meta = emptyMetadata
-          controllerOverride = None
-        transferLegs
-        meta = emptyMetadata
-
-      allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
-        -- Note: this corresponds to signalling early that one is going to fail to deliver one's assets.
-        -- A real trading app will likely demand punitive charges for this.
-        require "Actor is a sender" (F.any (\leg -> actor == leg.sender) transferLegs)
-        pure ChoiceExecutionMetadata with meta = emptyMetadata
-
-      allocationRequest_WithdrawImpl _self _extraArgs =
-        -- just archiving the trade is enough
-        pure ChoiceExecutionMetadata with meta = emptyMetadata
+expectedTradeAllocations
+  : SettlementInfo -> TextMap Api.Token.AllocationV2.TransferLeg
+  -> Map Party (Map Party AllocationSpecification)
+expectedTradeAllocations settlementInfo transferLegs = Map.fromList allocsByAdminAndTrader
+  where 
+    legsByAdmin =
+      map (\tls@((_, tl)::_) -> (tl.instrumentId.admin, TextMap.fromList tls)) $
+      groupOn (\(_, tl) -> tl.instrumentId.admin) $
+      TextMap.toList transferLegs
+    tradersForLegs tls = dedup $ concatMap (\(_, tl) -> [tl.sender, tl.receiver]) (TextMap.toList tls)
+    legsForTrader tls trader = 
+      TextMap.fromList $ 
+      Prelude.filter (\(_, tl) -> tl.sender == trader || tl.receiver == trader) $
+      TextMap.toList tls
+    allocForTraderAndLegs trader tls = AllocationSpecification with
+      settlement = settlementInfo
+      transferLegs = legsForTrader tls trader
+    allocsByTrader tls = map 
+      (\trader -> (trader, allocForTraderAndLegs trader $ legsForTrader tls trader))
+      (tradersForLegs tls)
+    allocsByAdminAndTrader = map 
+      (\(admin, tls) -> (admin, Map.fromList (allocsByTrader tls)))
+      legsByAdmin
+     
 
 
 tradingParties : TextMap Api.Token.AllocationV2.TransferLeg -> Set.Set Party
@@ -190,7 +192,7 @@ require : CanAssert m => Text -> Bool -> m ()
 require msg invariant =
   assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
 
-makeTradeRef : ContractId OTCTradeProposal -> Api.Token.AllocationV2.Reference
+makeTradeRef : ContractId OTCTrade -> Api.Token.AllocationV2.Reference
 makeTradeRef tradeCid = Api.Token.AllocationV2.Reference with
   id = "OTCTradeProposal" -- set to the name of the template to simplify debugging
   cid = Some (coerceContractId tradeCid)
@@ -199,68 +201,19 @@ makeTradeRef tradeCid = Api.Token.AllocationV2.Reference with
 -- Additional text map utilities
 --------------------------------
 
-zipTextMaps : TextMap a -> TextMap b -> TextMap (Optional a, Optional b)
-zipTextMaps m1 m2 =
-  TextMap.merge
+zipMaps : (Ord k) => Map k a -> Map k b -> Map k (Optional a, Optional b)
+zipMaps m1 m2 =
+  Map.merge
     (\_ v1 -> Some (Some v1, None))
     (\_ v2 -> Some (None, Some v2))
     (\_ v1 v2 -> Some (Some v1, Some v2))
     m1
     m2
 
-forTextMapWithKey : Applicative f => TextMap a -> (Text -> a -> f b) -> f (TextMap b)
-forTextMapWithKey m f =
-    TextMap.fromList <$> mapA f' (TextMap.toList m)
+forMapWithKey : (Ord k) => Applicative f => Map k a -> (k -> a -> f b) -> f (Map k b)
+forMapWithKey m f =
+    Map.fromList <$> mapA f' (Map.toList m)
   where
     f' (k, v) = (k,) <$> f k v
 
-
--- Utility for matching with metadata
--------------------------------------
-
--- If an app has an expected allocation and receives a allocation, it needs
--- to check whether they match. The received may have extra metadata so a simple
--- equality check is insufficient. This function checks that the received
--- has only _additional_ metadata.
-
-matchMeta : Metadata -> Metadata -> Either Text ()
-matchMeta expected received = do
-  F.forA_ (TextMap.toList expected.values) (\(k, v) -> do
-      case TextMap.lookup k received.values of
-        None -> abort ("Entry missing in received metadata: " <> k)
-        Some w
-          | w == v -> return ()
-          | otherwise -> abort ("Matadata entry " <> k <> "doesn't match.\nExpected: " <> v <> "\nReceived: " <> w)
-    )
-
-matchLegs : TextMap TransferLeg -> TextMap TransferLeg -> Either Text ()
-matchLegs expected received = do
-  assertMsg 
-    ("Expected " <> show (TextMap.size expected) <> " transfer legs. Received " <> show (TextMap.size received))
-    (TextMap.size expected == TextMap.size received)
-  F.forA_ (TextMap.toList expected) (\(tlId, tl_e) -> do
-      tl_r <- case TextMap.lookup tlId received of
-        None -> abort ("Did not receive expected transfer leg with Id " <> tlId)
-        Some tl -> Right tl
-      let
-        baseExpected = tl_e with meta = emptyMetadata 
-        baseReceived = tl_r with meta = emptyMetadata
-      baseExpected === baseReceived
-      matchMeta tl_e.meta tl_r.meta
-    )
-
-matchAllocationWithMeta : AllocationSpecification -> AllocationSpecification -> Either Text ()
-matchAllocationWithMeta expected received = do
-  let
-    baseExpected = expected with
-      transferLegs = TextMap.empty
-      settlement = expected.settlement with
-        meta = emptyMetadata
-    baseReceived = received with
-      transferLegs = TextMap.empty
-      settlement = received.settlement with
-        meta = emptyMetadata
-  baseExpected === baseReceived
-  matchMeta expected.settlement.meta received.settlement.meta
-  matchLegs expected.transferLegs received.transferLegs
 

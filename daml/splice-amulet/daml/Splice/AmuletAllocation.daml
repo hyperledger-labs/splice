@@ -4,12 +4,13 @@
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
   allocationToTwoStepTransfer,
-  allocationSender,
 ) where
 
+import DA.Assert((===), (=/=))
 import DA.Text as Text
 import DA.TextMap qualified as TextMap
-import DA.List (dedupSort)
+import DA.List ((\\), dedupSort)
+import DA.Optional(fromSome)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -26,21 +27,32 @@ template AmuletAllocation
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
     allocation : AllocationSpecification
+    sender : Party
+    admin : Party
   where
-    signatory allocationInstrumentAdmin allocation, allocationSender allocation
+    signatory admin, sender
     observer allocation.settlement.executor
 
-    -- Only allow a single sender.
-    ensure all (\(_,tl) -> tl.sender == allocationSender allocation) (TextMap.toList allocation.transferLegs)
+    ensure 
+      all 
+        (\(_,tl) -> (
+            -- Sender needs to appear as sender or receiver of each leg.
+            sender `elem` [tl.sender, tl.receiver]) 
+            -- Only one admin Id allowed.
+            && tl.instrumentId.admin == admin) 
+        (TextMap.toList allocation.transferLegs)
 
     interface instance Allocation for AmuletAllocation where
       view = AllocationView with
         allocation
         holdingCids = [toInterfaceContractId lockedAmulet]
         meta = emptyMetadata
-        transferExtraAuth = [allocationSender allocation]
+        senders = [sender]
+        requiredReceiverAuth = (defaultAllocationControllers allocation) \\ (sender::allocationControllers allocation)
 
-      allocation_executeTransferImpl _self Allocation_ExecuteTransfer{..} = transferAmuletAllocation this extraArgs
+      allocation_executeTransferImpl self Allocation_ExecuteTransfer{..} = case extraAuth of
+        [] ->  transferAmuletAllocation this extraArgs
+        ea -> collectAuthAndSettle (fromInterfaceContractId self) extraArgs ea []
 
       allocation_withdrawImpl _self Allocation_Withdraw{..} = do
         senderHoldingCids <- unlockAmuletAllocation this extraArgs
@@ -56,7 +68,12 @@ template AmuletAllocation
             senderHoldingCids
             meta = emptyMetadata
 
-      allocation_executeAuthorizeIncomingImpl = error "unimplemented"
+      allocation_executeAuthorizeIncomingImpl _self Allocation_AuthorizeIncoming{..} = do
+        cid <- create AmuletAllocationTransferAuthorization with 
+          allocation
+          receiver = sender
+          admin
+        return $ toInterfaceContractId cid
 
     interface instance AllocationV1.Allocation for AmuletAllocation where
       view = allocation_view_v2_to_v1 (view (toInterface @Allocation this))
@@ -65,46 +82,53 @@ template AmuletAllocation
       AllocationV1.allocation_withdrawImpl = allocation_v1_withdrawImpl (toInterface @Allocation this)
       AllocationV1.allocation_cancelImpl = allocation_v1_cancelImpl (toInterface @Allocation this)
 
-allocationInstrumentAdmin : AllocationSpecification -> Party
-allocationInstrumentAdmin AllocationSpecification{..} =
-  let tl::_ = (TextMap.toList transferLegs)
-  in tl._2.instrumentId.admin
+    choice AmuletAllocation_InternalSettleWithExtraAuth : Allocation_ExecuteTransferResult
+      with
+        extraArgs : ExtraArgs
+        extraControllers : [Party]
+      controller extraControllers ++ allocationControllers allocation
+      do transferAmuletAllocation this extraArgs 
 
--- Amulet only supports a single sender!
-allocationSender : AllocationSpecification -> Party
-allocationSender AllocationSpecification{..} =
-  let tl::_ = (TextMap.toList transferLegs)
-  in tl._2.sender
 
-allocationInstrumentReceivers : AllocationSpecification -> [Party]
-allocationInstrumentReceivers AllocationSpecification{..} =
+
+allocationReceivers : AllocationSpecification -> [Party]
+allocationReceivers AllocationSpecification{..} =
   dedupSort $ map ((.receiver) . snd) (TextMap.toList transferLegs)
 
 -- Allocation usage
 -------------------
 
-allocationToTwoStepTransfer : AllocationSpecification -> TwoStepTransfer
-allocationToTwoStepTransfer allocation =
+allocationToTwoStepTransfer : Party -> Party -> AllocationSpecification -> TwoStepTransfer
+allocationToTwoStepTransfer sender admin allocation =
   TwoStepTransfer with
-    dso = transferLeg.instrumentId.admin
-    sender = transferLeg.sender
-    receiver = transferLeg.receiver
-    amount = transferLeg.amount
+    dso = admin
+    sender = sender
+    outputs
     provider = allocation.settlement.executor
     transferBefore = allocation.settlement.settleBefore
     transferBeforeDeadline = "allocation.settlement.settleBefore"
     allowFeaturing = True
     lockContext = Text.implode
       -- We don't show more context to avoid bloating the response here.
-      ["allocation for transfer leg ", show transferLegId, " to ", show transferLeg.receiver]
+      ["allocation for settlement ", allocation.settlement.settlementRef.id]
   where
-    (transferLegId, transferLeg) = case TextMap.toList allocation.transferLegs of
-      [tl] -> tl
-      _ -> error "Only one leg supported" -- TODO.
+    senderLegs = filter (\tl -> tl.sender == sender) $ map snd (TextMap.toList allocation.transferLegs)
+    outputs = map (\tl -> (tl.receiver, tl.amount)) senderLegs
+
+collectAuthAndSettle : ContractId AmuletAllocation -> ExtraArgs -> [ContractId AllocationTransferAuthorization] -> [Party] -> Update Allocation_ExecuteTransferResult
+collectAuthAndSettle allocationCid extraArgs extraAuth extraControllers = do
+  case extraAuth of
+    eaCid::eas -> exercise (fromInterfaceContractId @AmuletAllocationTransferAuthorization eaCid) AmuletAllocationTransferAuthorization_AuthorizeTransfer with
+      extraAuth = eas
+      extraControllers
+      ..
+    [] -> exercise allocationCid AmuletAllocation_InternalSettleWithExtraAuth with
+      extraArgs
+      extraControllers
 
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.admin amuletAllocation.allocation
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
   pure Allocation_ExecuteTransferResult
@@ -115,5 +139,40 @@ transferAmuletAllocation amuletAllocation extraArgs = do
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId Holding]
 unlockAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.admin amuletAllocation.allocation
   abortTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+
+template AmuletAllocationTransferAuthorization
+  with
+    allocation : AllocationSpecification
+    receiver : Party
+    admin : Party
+  where
+    signatory admin, receiver, allocation.settlement.executor     
+
+    interface instance AllocationTransferAuthorization for AmuletAllocationTransferAuthorization where
+      view = AllocationTransferAuthorizationView with 
+        allocation
+        receiver
+        admin
+
+    choice AmuletAllocationTransferAuthorization_AuthorizeTransfer : Allocation_ExecuteTransferResult
+      with
+        allocationCid : ContractId AmuletAllocation 
+        extraArgs : ExtraArgs
+        extraAuth : [ContractId AllocationTransferAuthorization]
+        extraControllers : [Party]
+      controller extraControllers ++ allocation.settlement.executor :: fromSome (allocation.settlement.controllerOverride) -- should never be None if this is called.
+      do
+        -- Validate that the receiver is only a receiver on a matching settlement
+        amuletAllocation <- fetch allocationCid
+        let allocation' = amuletAllocation.allocation
+        allocation === allocation'
+        admin === amuletAllocation.admin
+        receiver =/= amuletAllocation.sender
+        let receivers = allocationReceivers allocation
+        assertMsg ("Receiver " <> show receiver <> " not found in receivers " <> show receivers)
+          (receiver `elem` receivers)
+        -- Transfer with added authority.
+        collectAuthAndSettle allocationCid extraArgs extraAuth (receiver::extraControllers)
+

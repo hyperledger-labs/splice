@@ -8,11 +8,13 @@
 -- by an app.
 module Splice.Api.Token.AllocationV2 where
 
-import DA.List (dedupSort)
-import DA.TextMap
+import DA.List (dedup, dedupSort)
+import DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 (Holding, InstrumentId)
+import qualified DA.Foldable as F
+import DA.Assert ((===))
 
 -- | A generic type to refer to data defined within an app.
 
@@ -96,16 +98,22 @@ data AllocationView = AllocationView with
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
-    transferExtraAuth : [Party]
-      -- ^ Any additional parties whose authorization that needs to be provided to
-      -- Allocation_ExecuteTransfer via AllocationTransferAuthorizations
+    senders : [Party]
+      -- ^ The senders of this allocation, who could also authorize incoming transfers
+      -- through Allocation_AuthorizeIncoming
+    requiredReceiverAuth : [Party]
+      -- ^ The extra authority this allocation needs for settlement on top of
+      -- the controllers specified via allocation.settlement.controllerOverride
   deriving (Show, Eq)
 
 -- | View of a delegated authority from the signer to the execurot to settle given transfer legs.
 -- authorizers are always the signatories so not made available in the viewtype.
 data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView with
   allocation : AllocationSpecification
-  -- ^ the allocation to which this authorization applies. 
+  receiver : Party
+  admin : Party
+  -- ^ the settlement to which this authorization applies. 
+
 
 
 -- Allocation
@@ -114,16 +122,17 @@ data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView w
 -- | Convenience function to refer to the union of sender, receiver, and
 -- executor of the settlement, which jointly control the execution of the
 -- allocation.
-allocationControllers : AllocationView -> [Party]
-allocationControllers AllocationView{..} =
-  optional
-    (allocation.settlement.executor :: concat (map (\leg -> [leg._2.sender, leg._2.receiver]) (toList allocation.transferLegs)))
-    (\override -> allocation.settlement.executor :: override)
-    allocation.settlement.controllerOverride
+defaultAllocationControllers : AllocationSpecification -> [Party]
+defaultAllocationControllers AllocationSpecification{..} =
+  dedup $ settlement.executor :: concatMap (\leg -> [leg._2.sender, leg._2.receiver]) (toList transferLegs)
 
--- | Convenience function to get all senders
-allocationSenders : AllocationSpecification -> [Party]
-allocationSenders AllocationSpecification{..} = map (._2.sender) (toList transferLegs)
+-- | Convenience function read out the overridden allocation controllers.
+allocationControllers : AllocationSpecification -> [Party]
+allocationControllers alloc@AllocationSpecification{..} =
+  optional
+    (defaultAllocationControllers alloc)
+    (\override -> dedup $ settlement.executor :: override)
+    settlement.controllerOverride
 
 -- | Convenience to get the allocation admin
 allocationAdmin : AllocationSpecification -> Party
@@ -144,25 +153,26 @@ interface Allocation where
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
   allocation_executeAuthorizeIncomingImpl : ContractId Allocation -> Allocation_AuthorizeIncoming -> Update (ContractId AllocationTransferAuthorization)
 
-  choice Allocation_AuthorizeIncoming : ContractId AllocationTransferAuthorization
+  nonconsuming choice Allocation_AuthorizeIncoming : ContractId AllocationTransferAuthorization
   -- ^ Transfer the authority from this Allocation to a AllocationTransferAuthorization which
   -- can then be used in another allocation's Allocation_ExecuteTransfer to authorize incoming
   -- transfers.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationControllers (view this)
+    controller allocationControllers (view this).allocation
     do allocation_executeAuthorizeIncomingImpl this self arg
 
-  choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
+  -- NOTE: This used to be consuming. Implementations now must archive self.
+  nonconsuming choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
     -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
     -- This choice SHOULD succeed provided the `settlement.settleBefore` deadline has not yet passed.
     with
-      extraAuth : Optional [ContractId AllocationTransferAuthorization]
-        -- ^ Contract encapsulating extra authority needed to exercise the choice 
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationControllers (view this)
+      extraAuth : [ContractId AllocationTransferAuthorization]
+        -- ^ Contract encapsulating extra authority needed to exercise the choice 
+    controller allocationControllers (view this).allocation
     do allocation_executeTransferImpl this self arg
 
   choice Allocation_Cancel : Allocation_CancelResult
@@ -176,7 +186,7 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationControllers (view this)
+    controller allocationControllers (view this).allocation
     do allocation_cancelImpl this self arg
 
   choice Allocation_Withdraw : Allocation_WithdrawResult
@@ -186,7 +196,7 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSenders (view this).allocation
+    controller (view this).senders
     do allocation_withdrawImpl this self arg
 
 -- AllocationTransferAuthorization
@@ -230,4 +240,53 @@ data Allocation_WithdrawResult = Allocation_WithdrawResult
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
 
+
+-- Utility for matching with metadata
+-------------------------------------
+
+-- If an app has an expected allocation and receives a allocation, it needs
+-- to check whether they match. The received may have extra metadata so a simple
+-- equality check is insufficient. This function checks that the received
+-- has only _additional_ metadata.
+
+matchMeta : Metadata -> Metadata -> Either Text ()
+matchMeta expected received = do
+  F.forA_ (TextMap.toList expected.values) (\(k, v) -> do
+      case TextMap.lookup k received.values of
+        None -> abort ("Entry missing in received metadata: " <> k)
+        Some w
+          | w == v -> return ()
+          | otherwise -> abort ("Matadata entry " <> k <> "doesn't match.\nExpected: " <> v <> "\nReceived: " <> w)
+    )
+
+matchLegs : TextMap TransferLeg -> TextMap TransferLeg -> Either Text ()
+matchLegs expected received = do
+  assertMsg 
+    ("Expected " <> show (TextMap.size expected) <> " transfer legs. Received " <> show (TextMap.size received))
+    (TextMap.size expected == TextMap.size received)
+  F.forA_ (TextMap.toList expected) (\(tlId, tl_e) -> do
+      tl_r <- case TextMap.lookup tlId received of
+        None -> abort ("Did not receive expected transfer leg with Id " <> tlId)
+        Some tl -> Right tl
+      let
+        baseExpected = tl_e with meta = emptyMetadata 
+        baseReceived = tl_r with meta = emptyMetadata
+      baseExpected === baseReceived
+      matchMeta tl_e.meta tl_r.meta
+    )
+
+matchAllocationWithMeta : AllocationSpecification -> AllocationSpecification -> Either Text ()
+matchAllocationWithMeta expected received = do
+  let
+    baseExpected = expected with
+      transferLegs = TextMap.empty
+      settlement = expected.settlement with
+        meta = emptyMetadata
+    baseReceived = received with
+      transferLegs = TextMap.empty
+      settlement = received.settlement with
+        meta = emptyMetadata
+  baseExpected === baseReceived
+  matchMeta expected.settlement.meta received.settlement.meta
+  matchLegs expected.transferLegs received.transferLegs
 

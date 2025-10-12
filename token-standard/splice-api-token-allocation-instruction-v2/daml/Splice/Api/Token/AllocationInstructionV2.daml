@@ -34,6 +34,9 @@ data AllocationInstructionView = AllocationInstructionView with
       -- ^ The holdings to be used to fund the allocation.
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
+    senders : [Party]
+      -- ^ The senders of the allocation - who typically instructed the allocation instruction
+      -- and later appear on the Allocation as senders.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for
       -- extensibility; e.g., more detailed status information.
@@ -57,7 +60,7 @@ interface AllocationInstruction where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSenders (view this).allocation
+    controller (view this).senders
     do allocationInstruction_withdrawImpl this self arg
 
   choice AllocationInstruction_Update : AllocationInstructionResult
@@ -124,7 +127,8 @@ interface AllocationFactory where
         -- deliberate contention on holdings to prevent duplicate allocations.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
-    controller allocationSenders allocation
+      creator : Party
+    controller creator
     do allocationFactory_allocateImpl this self arg
 
   nonconsuming choice AllocationFactory_PublicFetch : AllocationFactoryView

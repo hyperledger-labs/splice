@@ -1107,22 +1107,22 @@ testTokenStandardAllocate = script do
         meta = emptyMetadata
   let aliceLeg = mkTransfer alice alice 100.0
 
-  -- alice proposes trade with herself
-  proposalCid <- submit alice $ createCmd OTCTradeProposal with
-    venue = provider
-    tradeCid = None
-    transferLegs = TextMap.fromList [("leg0", aliceLeg)]
-    approvers = [alice]
-
-  -- provider initiates settlement
+  -- provider proposes a trade for alice with herself
   now <- getTime
   let settleBefore = now `addRelTime` hours 2
-  _ <- submit provider $
-    exerciseCmd proposalCid OTCTradeProposal_InitiateSettlement with
-      prepareUntil = now `addRelTime` hours 1
-      settleBefore
+  proposalCid <- submit provider $ createCmd OTCTrade with
+    venue = provider
+    transferLegs = TextMap.fromList [("leg0", aliceLeg)]
+    prepareUntil = now `addRelTime` hours 1
+    settleBefore
+    createdAt = now
 
-  [aliceAlloc] <- WalletClient.listRequestedAllocations alice amuletId
+
+  -- provider initiates settlement
+  _ <- submit provider $
+    exerciseCmd proposalCid OTCTrade_RequestAllocations with
+
+  [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
 
   holdingCid <- AmuletRegistry.tapFaucet registry alice 200.0
 
@@ -1132,6 +1132,7 @@ testTokenStandardAllocate = script do
     inputHoldingCids = [coerceInterfaceContractId holdingCid]
     requestedAt = now
     extraArgs = emptyExtraArgs
+    creator = alice
 
   result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_AllocationFactory_Allocate with
     allocationFactory = enrichedChoice.factoryCid

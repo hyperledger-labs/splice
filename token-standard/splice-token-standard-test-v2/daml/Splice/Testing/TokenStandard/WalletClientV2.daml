@@ -24,7 +24,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
     listTransferOffers,
 
     -- * Reading allocations
-    listRequestedAllocations,
+    listRequestedAllocationsForAdmin,
 
   ) where
 
@@ -119,17 +119,18 @@ listTransferOffers p instrumentId = do
 
 -- | List all allocations requested from the owner for a specific instrument.
 -- Currently targeting V1.
--- TODO: Make this sensible.
-listRequestedAllocations : Party -> HoldingV2.InstrumentId -> Script [AllocationV2.AllocationSpecification]
-listRequestedAllocations p instrumentId = do
+listRequestedAllocationsForAdmin : Party -> Party -> Script [AllocationV2.AllocationSpecification]
+listRequestedAllocationsForAdmin p admin = do
   reqs <- queryInterface @AllocationRequestV2.AllocationRequest p
   trace reqs $ pure ()
   let amuletAllocs = do
         (_reqCid, Some req) <- reqs
-        (tfId, tf) <- TextMap.toList req.transferLegs
-        guard (tf.instrumentId ==  instrumentId)
-        guard (p == tf.sender)
+        let transferLegs = do
+              (tfId, tf) <- TextMap.toList req.transferLegs
+              guard (tf.instrumentId.admin ==  admin)
+              guard (p == tf.sender || p == tf.receiver)
+              return (tfId, tf)
         pure AllocationV2.AllocationSpecification with
           settlement = req.settlement
-          transferLegs = TextMap.fromList [(tfId, tf)]
+          transferLegs = TextMap.fromList transferLegs
   pure amuletAllocs

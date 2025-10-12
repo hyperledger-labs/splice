@@ -368,7 +368,7 @@ amulet_allocationFactory_allocateImpl
   -> Update AllocationInstructionResult
 amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   let dso = externalAmuletRules.dso
-  let AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids, extraArgs} = arg
+  let AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids, extraArgs, creator} = arg
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch arg.expectedAdmin dso
 
@@ -412,13 +412,16 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   require "At least one input holding must be provided" (not $ null inputHoldingCids)
 
   -- lock the funds
-  let twoStepTransfer = allocationToTwoStepTransfer arg.allocation
+  let sender = creator
+  let twoStepTransfer = allocationToTwoStepTransfer sender dso arg.allocation
   (lockedAmulet, senderChangeCids, meta) <-
     prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
   -- create the amulet allocation
   allocationCid <- toInterfaceContractId <$> create AmuletAllocation with
     allocation = arg.allocation
     lockedAmulet
+    admin = dso
+    sender
 
   -- finaly done: return the result
   pure AllocationInstructionResult with

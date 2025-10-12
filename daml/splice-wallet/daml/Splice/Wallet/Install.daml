@@ -15,7 +15,6 @@ import qualified Splice.Api.Token.AllocationV2
 import qualified Splice.Api.Token.AllocationInstructionV2
 import qualified Splice.Api.Token.TransferInstructionV2
 import Splice.Amulet
-import Splice.AmuletAllocation (allocationSender)
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
 import Splice.AmuletRules
@@ -648,7 +647,8 @@ template WalletAppInstall
         withdrawArg : Splice.Api.Token.AllocationV2.Allocation_Withdraw
       controller validatorParty
       do allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
-         let sender = allocationSender (view allocation).allocation
+          -- Amulet only supports a single sender per allocation
+         let [sender] = (view allocation).senders
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise allocationCid withdrawArg
 
