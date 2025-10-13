@@ -51,7 +51,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
                   tasks
                 } else {
                   logger.info(
-                    s"Running for $tasks at min time $minRunAt (computed for interval between $minRunTime and $maxRunTime)."
+                    s"Will run for $tasks at min time $minRunAt (computed for interval between $minRunTime and $maxRunTime)."
                   )
                   Seq.empty
                 }

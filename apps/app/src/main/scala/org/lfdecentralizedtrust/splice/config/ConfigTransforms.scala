@@ -333,6 +333,18 @@ object ConfigTransforms {
         }
     )
 
+  def updateInitialTickDuration(tick: NonNegativeFiniteDuration): ConfigTransform = {
+    ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+      _.copy(initialTickDuration = tick)
+    ) compose (ConfigTransforms.updateAllAutomationConfigs(config =>
+      if (config.pollingInterval.toInternal > tick.toInternal)
+        config.copy(
+          pollingInterval = tick
+        )
+      else config
+    ))
+  }
+
   def noDevNet: ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(_.focus(_.isDevNet).replace(false))
 

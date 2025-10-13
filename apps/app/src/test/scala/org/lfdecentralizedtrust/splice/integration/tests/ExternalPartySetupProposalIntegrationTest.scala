@@ -90,8 +90,8 @@ class ExternalPartySetupProposalIntegrationTest
               .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
           )(config),
         (_, config) =>
-          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-            _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
+          ConfigTransforms.updateInitialTickDuration(
+            NonNegativeFiniteDuration.ofMillis(500)
           )(config),
       )
 
