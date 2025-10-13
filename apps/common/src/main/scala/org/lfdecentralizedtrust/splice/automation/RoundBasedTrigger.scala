@@ -21,8 +21,13 @@ abstract class RoundBasedTrigger[T <: RoundBasedTask: Pretty]()(implicit
 ) extends PollingParallelTaskExecutionTrigger[T] {
   private val nextRunTime = new AtomicReference[Option[(Long, Instant)]](None)
 
+  private val isNewSchedulingLogicEnabled: Boolean = context.config.enableNewRewardTriggerScheduling
+
+  // if the new logic is disable then use the old behaviour that uses increased polling intervals
+  override protected def isRewardOperationTrigger: Boolean = !isNewSchedulingLogicEnabled
+
   override protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]] = {
-    if (context.config.enableNewRewardTriggerScheduling) {
+    if (isNewSchedulingLogicEnabled) {
       if (shouldRun) {
         retrieveAvailableTasksForRound().map(tasks => {
           tasks.minByOption(_.roundDetails._1) match {
