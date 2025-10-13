@@ -2175,6 +2175,8 @@ EOF
     _update_cluster_config "$deployment_config" "operatorDeployment"
 }
 
+###
+
 subcommand_whitelist[psql]=""
 function subcmd_psql() {
   _cluster_must_exist
@@ -2268,7 +2270,7 @@ function subcmd_psql() {
   local PASSWORD_REF
   PASSWORD_REF=$(
     kubectl get deployment \
-      --namespace sv-1 \
+      --namespace "${NAMESPACE}" \
       --output 'jsonpath={.spec.template.spec.initContainers[].env[?(@.name == "PGPASSWORD")].valueFrom.secretKeyRef}' \
       "${APPLICATION}"
   )
