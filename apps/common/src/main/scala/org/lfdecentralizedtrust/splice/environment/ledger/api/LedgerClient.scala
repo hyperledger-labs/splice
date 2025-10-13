@@ -36,6 +36,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTr
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
 import org.lfdecentralizedtrust.splice.util.DisclosedContracts
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
@@ -336,11 +337,11 @@ private[environment] class LedgerClient(
                 lapi.interactive.interactive_submission_service.SinglePartySignatures(
                   party.toProtoPrimitive,
                   Seq(
-                    lapi.interactive.interactive_submission_service.Signature(
-                      lapi.interactive.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
+                    lapi.crypto.Signature(
+                      lapi.crypto.SignatureFormat.SIGNATURE_FORMAT_RAW,
                       signature.signature,
                       signature.signedBy.toProtoPrimitive,
-                      lapi.interactive.interactive_submission_service.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519,
+                      lapi.crypto.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519,
                     )
                   ),
                 )

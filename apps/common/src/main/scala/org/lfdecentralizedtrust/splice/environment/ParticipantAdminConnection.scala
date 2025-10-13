@@ -21,6 +21,7 @@ import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningS
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -309,7 +310,6 @@ class ParticipantAdminConnection(
         filterSynchronizerId,
         timestamp,
         observer,
-        Map.empty,
         force,
       )
     ).discard
