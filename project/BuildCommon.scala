@@ -1553,7 +1553,10 @@ object BuildCommon {
   lazy val `canton-community-reference-driver` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-community-reference-driver", file("canton/community/reference-sequencer-driver/"))
+      .apply(
+        "canton-community-reference-driver",
+        file("canton/community/reference-sequencer-driver/"),
+      )
       .dependsOn(
         `canton-util-external`,
         `canton-community-common` % "compile->compile;test->test",

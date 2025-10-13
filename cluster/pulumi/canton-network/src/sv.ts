@@ -432,8 +432,9 @@ function installSvApp(
             value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
           },
         ];
-  const additionalEnvVars = (config.svApp?.additionalEnvVars || [])
-    .concat(bftSequencerConnectionEnvVars);
+  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
+    bftSequencerConnectionEnvVars
+  );
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,

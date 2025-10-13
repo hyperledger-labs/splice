@@ -70,7 +70,12 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.util.{Contract, SynchronizerMigrationUtil, PackageVetting, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  SynchronizerMigrationUtil,
+  PackageVetting,
+  TemplateJsonDecoder,
+}
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}

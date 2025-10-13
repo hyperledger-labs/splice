@@ -260,8 +260,9 @@ async function installSvAndValidator(
           value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
         },
       ];
-  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || [])
-    .concat(disableBftSequencerConnectionEnvVars);
+  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || []).concat(
+    disableBftSequencerConnectionEnvVars
+  );
 
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,

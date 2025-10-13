@@ -39,7 +39,13 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
-import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId, PartyId, PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  NodeIdentity,
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString

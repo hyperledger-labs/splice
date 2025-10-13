@@ -98,7 +98,8 @@ object SvOnboardingConfig {
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
       // We want to be able to override this for simtime tests
-      topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(250),
+      topologyChangeDelayDuration: NonNegativeFiniteDuration =
+        NonNegativeFiniteDuration.ofMillis(250),
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

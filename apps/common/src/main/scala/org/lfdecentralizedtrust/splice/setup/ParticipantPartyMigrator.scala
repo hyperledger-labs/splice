@@ -13,7 +13,8 @@ import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   TopologyChangeOp,
   ParticipantPermission,
-  PartyToParticipant}
+  PartyToParticipant,
+}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil

@@ -731,7 +731,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
                   /*acsDelta*/ false,
-                  /*representativePackageId*/ id1.getPackageId
+                  /*representativePackageId*/ id1.getPackageId,
                 ),
                 new CreatedEvent(
                   /*witnessParties*/ Seq(party1).asJava,
@@ -751,7 +751,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
                   /*acsDelta*/ false,
-                  /*representativePackageId*/ id1.getPackageId
+                  /*representativePackageId*/ id1.getPackageId,
                 ),
               ),
               synchronizerId = domain1,
@@ -785,7 +785,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
                   /*acsDelta*/ false,
-                  /*representativePackageId*/ id1.getPackageId
+                  /*representativePackageId*/ id1.getPackageId,
                 )
               ),
               synchronizerId = domain1,
@@ -817,7 +817,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*observers*/ Seq(party1, party2).asJava,
                   /*createdAt*/ effectiveAt,
                   /*acsDelta*/ false,
-                  /*representativePackageId*/ id1.getPackageId
+                  /*representativePackageId*/ id1.getPackageId,
                 )
               ),
               synchronizerId = domain1,

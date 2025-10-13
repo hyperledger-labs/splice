@@ -329,8 +329,7 @@ class SvTimeBasedRewardCouponIntegrationTest
       aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
         aliceParticipantId,
         removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
-        force =
-          ForceFlags(ForceFlag.AllowUnvetPackageWithActiveContracts),
+        force = ForceFlags(ForceFlag.AllowUnvetPackageWithActiveContracts),
       ),
     )(
       "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",
