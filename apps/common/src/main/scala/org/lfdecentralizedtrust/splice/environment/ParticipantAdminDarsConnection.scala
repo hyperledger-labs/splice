@@ -42,13 +42,8 @@ trait ParticipantAdminDarsConnection {
   def uploadDarFiles(
       pkg: Seq[UploadablePackage],
       retryFor: RetryFor,
-      vetTheDar: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    uploadDarsLocally(
-      pkg,
-      retryFor,
-      vetTheDar,
-    )
+    uploadDarsLocally(pkg, retryFor)
   }
 
   def uploadDarFileWithVettingOnAllConnectedSynchronizers(
@@ -65,7 +60,6 @@ trait ParticipantAdminDarsConnection {
       _ <- uploadDarsLocally(
         Seq(UploadablePackage.fromByteString(path.getFileName.toString, darFile)),
         retryFor,
-        vetTheDar = false,
       )
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
@@ -257,7 +251,6 @@ trait ParticipantAdminDarsConnection {
   private def uploadDarsLocally(
       dars: Seq[UploadablePackage],
       retryFor: RetryFor,
-      vetTheDar: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
@@ -265,24 +258,25 @@ trait ParticipantAdminDarsConnection {
       existingDars <- listDars().map(_.map(_.mainPackageId))
       darsToUploads = dars.filterNot(dar => existingDars.contains(dar.packageId))
       _ <- MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(5))(darsToUploads)(
-        uploadDar(_, vetTheDar, retryFor)
+        uploadDar(_, retryFor)
       )
     } yield {}
   }
 
-  private def uploadDar(dar: UploadablePackage, vetTheDar: Boolean, retryFor: RetryFor)(implicit
+  private def uploadDar(dar: UploadablePackage, retryFor: RetryFor)(implicit
       tc: TraceContext
   ) = {
     retryProvider.retry(
       retryFor,
       "upload_dar",
-      s"Upload dar ${dar.packageId} with vetting $vetTheDar",
+      s"Upload dar ${dar.packageId} (without vetting)",
       runCmd(
         ParticipantAdminCommands.Package
           .UploadDar(
-            dar.resourcePath,
-            vetAllPackages = vetTheDar,
-            synchronizeVetting = vetTheDar,
+            darPath = dar.resourcePath,
+            synchronizerId = None,
+            vetAllPackages = false,
+            synchronizeVetting = false,
             description = "",
             expectedMainPackageId = dar.packageId,
             requestHeaders = Map.empty,
