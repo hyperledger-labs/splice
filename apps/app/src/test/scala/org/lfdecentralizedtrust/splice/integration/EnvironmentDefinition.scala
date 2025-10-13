@@ -172,10 +172,7 @@ case class EnvironmentDefinition(
           p.topology.vetted_packages.propose(
             p.id,
             Seq.empty,
-            force = ForceFlags(
-              ForceFlag.AllowUnvetPackage,
-              ForceFlag.AllowUnvetPackageWithActiveContracts,
-            ),
+            force = ForceFlags(ForceFlag.AllowUnvetPackageWithActiveContracts),
           )
         }
         participants(env).foreach { p =>

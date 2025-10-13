@@ -48,7 +48,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, SynchronizerTimeTrackerConfig}
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -64,7 +64,10 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.time.{
   Clock,
-  PositiveFiniteDuration}
+  NonNegativeFiniteDuration,
+  PositiveFiniteDuration,
+  PositiveSeconds,
+}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}

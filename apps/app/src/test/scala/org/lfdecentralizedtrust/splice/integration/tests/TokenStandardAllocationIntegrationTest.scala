@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi.data.CreatedEvent
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
@@ -90,7 +90,7 @@ class TokenStandardAllocationIntegrationTest
         participantClient.ledger_api.state.acs.of_party(
           party = sender,
           filterInterfaces = Seq(holdingv1.Holding.TEMPLATE_ID).map(templateId =>
-            Identifier(
+            TemplateId(
               templateId.getPackageId,
               templateId.getModuleName,
               templateId.getEntityName,
@@ -305,7 +305,7 @@ class TokenStandardAllocationIntegrationTest
         splitwellValidatorBackend.participantClient.ledger_api.state.acs.of_party(
           party = allocatedOtcTrade.venueParty,
           filterInterfaces = Seq(allocationv1.Allocation.TEMPLATE_ID).map(templateId =>
-            Identifier(
+            TemplateId(
               templateId.getPackageId,
               templateId.getModuleName,
               templateId.getEntityName,

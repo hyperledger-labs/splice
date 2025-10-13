@@ -330,7 +330,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         aliceParticipantId,
         removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
         force =
-          ForceFlags(ForceFlag.AllowUnvetPackage, ForceFlag.AllowUnvetPackageWithActiveContracts),
+          ForceFlags(ForceFlag.AllowUnvetPackageWithActiveContracts),
       ),
     )(
       "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",

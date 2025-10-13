@@ -1016,39 +1016,6 @@ class JoiningNodeInitializer(
       logger,
     )
   }
-
-  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[SynchronizerId] =
-    retryProvider.retry(
-      RetryFor.ClientCalls,
-      "connect_domain",
-      "Connect to global domain if not migrating party",
-      for {
-        decentralizedSynchronizerId <- participantAdminConnection
-          .getPhysicalSynchronizerIdWithoutConnecting(
-            config.domains.global.alias
-          )
-        participantId <- participantAdminConnection.getParticipantId()
-        // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
-        // we are in the middle of an DSO party migration so don't reconnect to the domain.
-        proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
-          filterParty = dsoPartyId.filterString,
-          filterParticipant = participantId.filterString,
-          topologyTransactionType = TopologyTransactionType.ProposalSignedByOwnKey,
-        )
-        _ <-
-          if (proposals.nonEmpty) {
-            logger.info(
-              "Participant is in process of hosting the DSO party, not reconnecting to domain to avoid inconsistent ACS"
-            )
-            Future.unit
-          } else {
-            logger.info("Reconnecting to global domain")
-            participantAdminConnection.connectDomain(config.domains.global.alias)
-          }
-      } yield decentralizedSynchronizerId.logical,
-      logger,
-    )
 }
 
 object JoiningNodeInitializer {}
