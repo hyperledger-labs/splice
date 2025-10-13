@@ -70,7 +70,7 @@ object HttpAdminService {
     )
     private val routes: AtomicReference[List[Route]] = new AtomicReference(List())
     private val dynamicRoute: Route = ctx => {
-      concat((commonAdminRoute +: routes.get())*)(ctx)
+      encodeResponse(concat((commonAdminRoute +: routes.get())*))(ctx)
     }
 
     val commonAdminRoute: Route =

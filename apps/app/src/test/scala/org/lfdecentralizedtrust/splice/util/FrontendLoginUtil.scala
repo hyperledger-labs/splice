@@ -34,6 +34,12 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
       currentUrl should startWith(url)
     }
+    loginOnceConfirmedToBeAtUrl(ledgerApiUser)
+  }
+
+  protected def loginOnceConfirmedToBeAtUrl(
+      ledgerApiUser: String
+  )(implicit webDriver: WebDriver) = {
     eventually(timeUntilSuccess = 5.seconds) {
       if (find(id("logout-button")).isDefined) {
         eventuallyClickOn(id("logout-button"))
