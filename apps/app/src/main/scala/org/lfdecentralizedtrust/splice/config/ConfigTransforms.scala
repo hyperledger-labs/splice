@@ -336,13 +336,6 @@ object ConfigTransforms {
   def updateInitialTickDuration(tick: NonNegativeFiniteDuration): ConfigTransform = {
     ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
       _.copy(initialTickDuration = tick)
-    ) compose ConfigTransforms.updateAllAutomationConfigs(config =>
-      // ensure polling duration allows automation to run at least once per tick
-      if (config.pollingInterval.toInternal > (tick.toInternal / NonNegativeInt.tryCreate(2)))
-        config.copy(
-          pollingInterval = (tick.toInternal / NonNegativeInt.tryCreate(2)).toConfig
-        )
-      else config
     )
   }
 

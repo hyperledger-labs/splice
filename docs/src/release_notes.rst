@@ -17,6 +17,10 @@ Upcoming
       and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
       can act on your behalf.
 
+  - Reward collection
+
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
+
 0.4.20
 ------
 

@@ -427,6 +427,7 @@ case class EnvironmentDefinition(
       )
       .addConfigTransform((_, conf) =>
         ConfigTransforms.updateAllAutomationConfigs(
+          // disable round based triggers because tests don't advance time for the triggers to run
           _.focus(_.enableNewRewardTriggerScheduling).replace(false)
         )(conf)
       )
