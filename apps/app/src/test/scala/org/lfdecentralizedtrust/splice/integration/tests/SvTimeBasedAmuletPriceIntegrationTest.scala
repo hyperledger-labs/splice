@@ -4,8 +4,8 @@ import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.util.AmuletConfigUtil
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
-
 import com.digitalasset.canton.metrics.MetricValue
+import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 
 import scala.jdk.OptionConverters.*
 
@@ -31,18 +31,45 @@ class SvTimeBasedAmuletPriceIntegrationTest
       }
     }
 
-    clue("svs 2-4 vote on new prices") {
-      sv2Backend.updateAmuletPriceVote(BigDecimal(0.3))
-      sv3Backend.updateAmuletPriceVote(BigDecimal(0.1))
-      sv4Backend.updateAmuletPriceVote(BigDecimal(0.2))
-      advanceRoundsByOneTick
-    }
+    val votedPrices = Seq(Some(0.005), Some(0.3), Some(0.1), Some(0.2))
+    actAndCheck(
+      "svs 2-4 vote on new prices", {
+        sv2Backend.updateAmuletPriceVote(BigDecimal(0.3))
+        sv3Backend.updateAmuletPriceVote(BigDecimal(0.1))
+        sv4Backend.updateAmuletPriceVote(BigDecimal(0.2))
+      },
+    )(
+      "All SV backends see the new prices",
+      _ =>
+        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach {
+          svSeesPrices(_, svParties, votedPrices)
+        },
+    )
+
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
 
     clue("Metrics are updated") {
       eventually() {
-        checkPrices(svParties, Seq(Some(0.005), Some(0.3), Some(0.1), Some(0.2)))
+        checkPrices(svParties, votedPrices)
       }
     }
+  }
+
+  private def svSeesPrices(
+      svBackend: SvAppBackendReference,
+      svParties: Seq[String],
+      prices: Seq[Option[Double]],
+  ) = {
+    svParties.zip(prices).foreach {
+      case (sv, Some(price)) =>
+        svBackend
+          .listAmuletPriceVotes()
+          .filter(_.payload.sv == sv)
+          .foreach(_.payload.amuletPrice.toScala.value.doubleValue() shouldBe price)
+      case _ =>
+    }
+
   }
 
   private def checkPrices(svParties: Seq[String], prices: Seq[Option[Double]])(implicit
@@ -50,18 +77,12 @@ class SvTimeBasedAmuletPriceIntegrationTest
   ): Unit = {
     clue("Check individual SV votes") {
       svParties.zip(prices).foreach {
-        case (sv, price) if price.isDefined =>
-//          println(s"metric for $sv should exist:")
-//          sv1Backend.metrics.list(
-//            s"$MetricsPrefix.amulet_price.voted_price"
-//          ).foreach{case (a, b) => println(s"Have a metric for $a: $b")}
-
+        case (sv, Some(price)) =>
           sv1Backend.metrics.list(
             s"$MetricsPrefix.amulet_price.voted_price",
             Map("sv" -> sv),
           ) should not be empty
 
-//          println(s"metric for $sv should be $price:")
           sv1Backend.metrics
             .get(
               s"$MetricsPrefix.amulet_price.voted_price",
@@ -69,9 +90,7 @@ class SvTimeBasedAmuletPriceIntegrationTest
             )
             .select[MetricValue.DoublePoint]
             .value
-            .value shouldBe price.value
-
-//          println("good")
+            .value shouldBe price
         case (sv, _) =>
           sv1Backend.metrics.list(
             s"$MetricsPrefix.amulet_price.voted_price",

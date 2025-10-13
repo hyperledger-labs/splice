@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
 0.4.20
 ------
 
