@@ -414,6 +414,7 @@ object UpdateHistoryTestBase {
       /*observers = */ created.getObservers,
       /*createdAt = */ created.getCreatedAt,
       /*acsDelta = */ false, // Not preserved
+      /*representativePackageId = */ created.getRepresentativePackageId,
     )
   }
 

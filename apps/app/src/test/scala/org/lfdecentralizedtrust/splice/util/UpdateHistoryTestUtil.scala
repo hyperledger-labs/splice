@@ -356,6 +356,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     e.getObservers,
     e.createdAt,
     e.isAcsDelta,
+    e.getRepresentativePackageId,
   )
   def dropTrailingNones(e: ExercisedEvent): ExercisedEvent = new ExercisedEvent(
     e.getWitnessParties,

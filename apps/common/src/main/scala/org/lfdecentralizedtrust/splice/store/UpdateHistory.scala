@@ -8,6 +8,7 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
+import com.google.protobuf.ByteString;
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -1398,6 +1399,7 @@ class UpdateHistory(
       /*observers = */ updateRow.observers.getOrElse(missingStringSeq).asJava,
       /*createdAt = */ updateRow.createdAt.toInstant,
       /*acsDelta = */ false,
+      /*representativePackageId = */ updateRow.templatePackageId,
     )
 
     UpdateHistoryResponse(
@@ -1516,6 +1518,7 @@ class UpdateHistory(
               /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
               /*createdAt = */ row.createdAt.toInstant,
               /*acsDelta = */ false,
+              /*representativePackageId = */ row.templatePackageId,
             ),
             counter = row.reassignmentCounter,
           ),
@@ -2328,6 +2331,7 @@ object UpdateHistory {
           /*observers = */ observers.getOrElse(missingStringSeq).asJava,
           /*createdAt = */ createdAt.toInstant,
           /*acsDelta = */ false,
+          /*representativePackageId = */ templatePackageId,
         ),
       )
     }
