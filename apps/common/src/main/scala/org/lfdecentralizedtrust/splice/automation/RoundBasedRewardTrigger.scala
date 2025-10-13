@@ -83,10 +83,10 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
   }
 
   private def randomInstantBetween(start: Instant, end: Instant): Instant = {
-    if (end.isBefore(start) || start == end)
+    val range = Duration.between(start, end)
+    if (range.isNegative || range.isZero)
       start
     else {
-      val range = Duration.between(start, end)
       val randomMillisInRange = Random.nextLong(range.toMillis)
       start.plusMillis(randomMillisInRange)
     }
