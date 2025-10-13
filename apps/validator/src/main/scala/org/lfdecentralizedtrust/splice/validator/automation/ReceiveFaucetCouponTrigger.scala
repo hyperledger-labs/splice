@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -148,11 +148,14 @@ object ReceiveFaucetCouponTrigger {
         param("round", _.round),
       )
 
-    override def roundDetails: (Long, Instant) =
-      Long.unbox(round.payload.round.number) -> round.payload.opensAt
+    override def scheduleAtMaxTime: Instant =
+      opensAt.plus(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
 
-    override def tickDuration: Duration =
-      Duration.of(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
+    def closesAt: Instant = round.payload.targetClosesAt
+
+    def roundNumber: Long = Long.unbox(round.payload.round.number)
+
+    def opensAt: Instant = round.payload.opensAt
   }
 
 }

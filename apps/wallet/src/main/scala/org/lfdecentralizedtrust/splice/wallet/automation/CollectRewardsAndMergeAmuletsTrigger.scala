@@ -3,23 +3,27 @@
 
 package org.lfdecentralizedtrust.splice.wallet.automation
 
-import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_MergeTransferInputs
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
-  COO_Error,
-  COO_MergeTransferInputs,
-}
-import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryFor}
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
-import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
-import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.*
+import org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTrigger.RoundBasedTask
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_MergeTransferInputs
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
+  COO_Error,
+  COO_MergeTransferInputs,
+}
+import org.lfdecentralizedtrust.splice.environment.CommandPriority
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger.CollectRewardsAndMergeAmuletsTask
+import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
+import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
+import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 
+import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -34,27 +38,58 @@ class CollectRewardsAndMergeAmuletsTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     val mat: Materializer,
-) extends PollingTrigger {
+) extends RoundBasedRewardTrigger[CollectRewardsAndMergeAmuletsTask] {
 
   override protected def extraMetricLabels = Seq("party" -> store.key.endUserParty.toString)
 
-  override def isRewardOperationTrigger: Boolean = true
+  override protected def retrieveAvailableTasksForRound()(implicit
+      tc: TraceContext
+  ): Future[Seq[CollectRewardsAndMergeAmuletsTask]] = {
+    for {
+      (_, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
+    } yield {
+      val openIssuingRounds = issuingRounds
+        .filter(_.payload.opensAt.isBefore(context.clock.now.toInstant))
+      val openIssuingRoundsThatAreNotYetClosing = openIssuingRounds
+        // add 30seconds as a buffer, if the round is about to close we might as well just skip it as we will not have enough time to collect
+        .filter(_.payload.targetClosesAt.isAfter(context.clock.now.toInstant.plusSeconds(30)))
+      openIssuingRoundsThatAreNotYetClosing
+        .maxByOption(_.payload.opensAt)
+        .map(issuingRound =>
+          CollectRewardsAndMergeAmuletsTask(
+            Long.unbox(issuingRound.payload.round.number),
+            issuingRound.payload.opensAt,
+            tickDuration =
+              Duration.between(issuingRound.payload.opensAt, issuingRound.payload.targetClosesAt),
+            openIssuingRoundsThatAreNotYetClosing
+              .map(_.payload.targetClosesAt)
+              .minOption
+              .getOrElse(issuingRound.payload.targetClosesAt),
+            issuingRound.payload.targetClosesAt,
+          )
+        )
+        .toList
+    }
+  }
 
-  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
-    // Retry because we want to avoid missing rewards.
-    // We add the retry here instead of using a PeriodicTaskTrigger because
-    // PeriodicTaskTrigger does not allow defining whether work was performed
-    // that skips the polling interval. So if we have more rewards than we can
-    // get in one polling interval,
-    // it would wait until the next polling interval before trying to collect
-    // them which risks missing some.
-    context.retryProvider.retry(
-      RetryFor.Automation,
-      "collect_rewards_and_merge_amulets",
-      "Collect rewards and merge amulets",
-      collectRewardsAndMergeAmulets(),
-      logger,
-    )
+  override protected def completeTask(task: CollectRewardsAndMergeAmuletsTask)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] = collectRewardsAndMergeAmulets().map(workWasDone =>
+    if (workWasDone) {
+      TaskSuccess(
+        s"Collected rewards and merged amulets for round ${task.roundNumber}, still more work to do"
+      )
+    } else {
+      logger.info(
+        s"Finished collecting rewards and merging amulets for round ${task.roundNumber}"
+      )
+      TaskNoop
+    }
+  )
+
+  override protected def isStaleTask(task: CollectRewardsAndMergeAmuletsTask)(implicit
+      tc: TraceContext
+  ): Future[Boolean] = Future.successful(false)
 
   private def collectRewardsAndMergeAmulets()(implicit
       traceContext: TraceContext
@@ -93,4 +128,39 @@ class CollectRewardsAndMergeAmuletsTrigger(
           case Failure(err) => Failure(err)
         }
     } yield result
+}
+
+object CollectRewardsAndMergeAmuletsTrigger {
+  case class CollectRewardsAndMergeAmuletsTask(
+      roundNumber: Long,
+      opensAt: Instant,
+      tickDuration: Duration,
+      closingTimeOfEarliestRound: Instant,
+      closesAt: Instant,
+  ) extends PrettyPrinting
+      with RoundBasedTask {
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("round", _.roundNumber),
+        param("opensAt", _.opensAt),
+        param("tickDuration", _.tickDuration),
+      )
+
+    /** We schedule the task to run between round opening time and the earliest time between a tick after
+      * the round opens and the closing time of the earliest round we know of. In reality these two time points should be pretty close to each other.
+      * We also check the closing time of the earliest round to ensure that we run for a second time for the round so that we cover edge cases where the first run failed (because of issues with the syncrhonizer for example).
+      * This also covers cases where the opening of the round was delayed because of downtime.
+      * This can be further optimized by checking the actual rewards we still need to collect but it would result in the same scheduling time so we play it safe and just schedule it to cover the earlier round as well.
+      */
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    override def scheduleAtMaxTime: Instant = Seq(
+      closingTimeOfEarliestRound
+        // run 2 minutes before the closing time to account for any latency and avoid missing rewards because the round closed
+        // this is relevant only during downtimes where we might have missed the first opportunity to collect rewards
+        // rate limiting should protect us against any spikes caused by this running at the same time on every node
+        .minusSeconds(120),
+      opensAt.plus(tickDuration),
+    ).min
+  }
 }
