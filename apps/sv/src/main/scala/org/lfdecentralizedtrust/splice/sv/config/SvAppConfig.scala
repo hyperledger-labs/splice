@@ -97,6 +97,8 @@ object SvOnboardingConfig {
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
+      // We want to be able to override this for simtime tests
+      topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(250),
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -321,8 +323,6 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
-    topologyChangeDelayDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
     bftSequencerConnection: Boolean = true,

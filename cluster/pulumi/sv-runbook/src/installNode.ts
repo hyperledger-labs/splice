@@ -252,14 +252,6 @@ async function installSvAndValidator(
 
   const bftSequencerConnection =
     !svConfig.participant || svConfig.participant.bftSequencerConnection;
-  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
-    ? [
-        {
-          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-        },
-      ]
-    : [];
   const disableBftSequencerConnectionEnvVars = bftSequencerConnection
     ? []
     : [
@@ -269,7 +261,6 @@ async function installSvAndValidator(
         },
       ];
   const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || [])
-    .concat(topologyChangeDelayEnvVars)
     .concat(disableBftSequencerConnectionEnvVars);
 
   const valuesFromYamlFile = loadYamlFromFile(
