@@ -7,14 +7,14 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.automation.RoundBasedTrigger.RoundBasedTask
+import org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTrigger.RoundBasedTask
 
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-abstract class RoundBasedTrigger[T <: RoundBasedTask: Pretty]()(implicit
+abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
@@ -94,7 +94,7 @@ abstract class RoundBasedTrigger[T <: RoundBasedTask: Pretty]()(implicit
 
 }
 
-object RoundBasedTrigger {
+object RoundBasedRewardTrigger {
 
   trait RoundBasedTask {
     def roundDetails: (Long, Instant)

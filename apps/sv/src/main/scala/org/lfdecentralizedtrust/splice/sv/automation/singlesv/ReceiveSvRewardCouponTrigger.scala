@@ -11,9 +11,9 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.automation.RoundBasedTrigger.RoundBasedTask
+import org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTrigger.RoundBasedTask
 import org.lfdecentralizedtrust.splice.automation.{
-  RoundBasedTrigger,
+  RoundBasedRewardTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -50,7 +50,7 @@ class ReceiveSvRewardCouponTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends RoundBasedTrigger[ReceiveSvRewardCouponTrigger.Task] {
+) extends RoundBasedRewardTrigger[ReceiveSvRewardCouponTrigger.Task] {
 
   private val svParty = store.key.svParty
   private val dsoParty = store.key.dsoParty
