@@ -226,7 +226,7 @@ of at least one of the parties hosted on your node. To address this, you can usu
    .. code::
 
       val syncId = participant.synchronizers.list_connected().head.synchronizerId
-      participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
+      participant.topology.party_to_participant_mappings.list(syncId, filterParticipant = <namespace>)
 
    If all parties are on the same node, proceed to the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node by opening a console to the new node and running the following command
    (adjust the parameters as required for your parties):
@@ -235,6 +235,20 @@ of at least one of the parties hosted on your node. To address this, you can usu
 
       val participantId = participant.id // ID of the new participant
       participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
+
+   For this command a list of all parties can be found by running <party-id> can be found by first running:
+
+   .. code::
+
+      val parties = participant.parties.list (<participantIdentifier>)
+  
+   Then you can map the party to a variable using a command asa such where <index> is the 0 based index of the party in the list:
+    
+    .. code::
+  
+        val partyId = parties(<index>).party
+    
+    The available options for <participant-permission> are ``Submission``, ``Confirmation``, and ``Observation``.
 
 2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
    If your parties have been migrated to the new node already, take a new identities dump from the new node.
