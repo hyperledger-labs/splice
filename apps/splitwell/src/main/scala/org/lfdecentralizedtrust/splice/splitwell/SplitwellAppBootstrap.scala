@@ -108,7 +108,7 @@ object SplitwellAppBootstrap {
           testingConfigInternal,
           clock,
           splitwellMetrics,
-          new CommunityStorageFactory(splitwellConfig.storage),
+          new StorageSingleFactory(splitwellConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

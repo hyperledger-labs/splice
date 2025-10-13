@@ -109,7 +109,7 @@ object ScanAppBootstrap {
           testingConfigInternal,
           clock,
           scanMetrics,
-          new CommunityStorageFactory(scanConfig.storage),
+          new StorageSingleFactory(scanConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

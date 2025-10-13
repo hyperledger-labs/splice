@@ -64,10 +64,7 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.time.{
   Clock,
-  NonNegativeFiniteDuration,
-  PositiveFiniteDuration,
-  PositiveSeconds,
-}
+  PositiveFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
@@ -456,7 +453,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v34)
+        val initialValues = DynamicSynchronizerParameters.initialValues(ProtocolVersion.v34)
         val values = initialValues.tryUpdate(
           topologyChangeDelay = config.topologyChangeDelayDuration.toInternal,
           trafficControlParameters = Some(initialTrafficControlParameters),

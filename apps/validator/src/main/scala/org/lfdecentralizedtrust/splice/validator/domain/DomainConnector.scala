@@ -22,8 +22,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
   SequencerConnections,
+  SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -159,6 +159,8 @@ class DomainConnector(
                       Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                       config.sequencerRequestAmplificationPatience,
                     ),
+                    // TODO(#2110) Rethink this when we enable sequencer connection pools.
+                    sequencerLivenessMargin = NonNegativeInt.zero,
                     // TODO(#2666) Make the delays configurable.
                     sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                   )

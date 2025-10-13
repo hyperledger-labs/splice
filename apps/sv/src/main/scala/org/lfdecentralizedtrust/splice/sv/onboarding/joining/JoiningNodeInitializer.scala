@@ -3,18 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
+import cats.implicits.catsSyntaxOptionId
 import cats.data.OptionT
-import cats.implicits.{
-  catsSyntaxOptionId,
-  catsSyntaxTuple2Semigroupal,
-  catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
-}
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
-import cats.syntax.option.*
 import cats.syntax.traverse.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -26,7 +20,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
 }
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -76,7 +70,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, SynchronizerMigrationUtil, PackageVetting, TemplateJsonDecoder}
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -491,14 +485,14 @@ class JoiningNodeInitializer(
       "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
       for {
         decentralizedSynchronizerId <- participantAdminConnection
-          .getSynchronizerIdWithoutConnecting(
+          .getPhysicalSynchronizerIdWithoutConnecting(
             config.domains.global.alias
           )
         participantId <- participantAdminConnection.getParticipantId()
         // Check if the participant hosts the DSO party. If so,
         // the dsoParty is hosted on the participant we can proceed to all domains reconnect
         dsoPartyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
-          store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+          store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
           filterParty = dsoParty.filterString,
           filterParticipant = participantId.filterString,
           topologyTransactionType = TopologyTransactionType.AuthorizedState,
@@ -507,7 +501,7 @@ class JoiningNodeInitializer(
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         activeDsoPartyToParticipantProposals <- participantAdminConnection
           .listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+            store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
             filterParty = dsoParty.filterString,
             filterParticipant = participantId.filterString,
             topologyTransactionType = TopologyTransactionType.AllProposals,
@@ -525,7 +519,7 @@ class JoiningNodeInitializer(
         logger.info(
           s"Participant hosts dsoParty: ${dsoPartyToParticipantMapping.nonEmpty} and has proposals to host dsoParty ${activeDsoPartyToParticipantProposals.nonEmpty}"
         )
-        decentralizedSynchronizerId
+        decentralizedSynchronizerId.logical
       },
       logger,
     )
@@ -1030,7 +1024,7 @@ class JoiningNodeInitializer(
       "Connect to global domain if not migrating party",
       for {
         decentralizedSynchronizerId <- participantAdminConnection
-          .getSynchronizerIdWithoutConnecting(
+          .getPhysicalSynchronizerIdWithoutConnecting(
             config.domains.global.alias
           )
         participantId <- participantAdminConnection.getParticipantId()
@@ -1052,7 +1046,7 @@ class JoiningNodeInitializer(
             logger.info("Reconnecting to global domain")
             participantAdminConnection.connectDomain(config.domains.global.alias)
           }
-      } yield decentralizedSynchronizerId,
+      } yield decentralizedSynchronizerId.logical,
       logger,
     )
 }

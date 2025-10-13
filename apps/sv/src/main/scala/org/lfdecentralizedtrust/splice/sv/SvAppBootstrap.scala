@@ -109,7 +109,7 @@ object SvAppBootstrap {
           testingConfigInternal,
           clock,
           svMetrics,
-          new CommunityStorageFactory(svConfig.storage),
+          new StorageSingleFactory(svConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,
