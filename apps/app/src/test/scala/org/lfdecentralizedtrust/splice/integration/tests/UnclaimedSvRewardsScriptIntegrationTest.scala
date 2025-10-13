@@ -83,9 +83,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
       }
 
       clue("SV reward coupons for round 0,1,2 have been created") {
-        eventually() {
-          sv1WalletClient.listSvRewardCoupons() should have size 3
-        }
+        sv1WalletClient.listSvRewardCoupons() should have size 3
       }
 
       val (_, svRewardCoupons) = actAndCheck(

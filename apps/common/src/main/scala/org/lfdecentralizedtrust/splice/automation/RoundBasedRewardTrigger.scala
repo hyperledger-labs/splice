@@ -78,13 +78,13 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
     nextRunTime
       .get()
       .fold(true) { case (_, runAt) =>
-        runAt.isAfter(context.clock.now.toInstant)
+        runAt.isBefore(context.clock.now.toInstant) || runAt.equals(context.clock.now.toInstant)
       }
   }
 
   private def randomInstantBetween(start: Instant, end: Instant): Instant = {
     val range = Duration.between(start, end)
-    if (range.isNegative || range.isZero)
+    if (start.isBefore(end) || range.toMillis <= 0)
       start
     else {
       val randomMillisInRange = Random.nextLong(range.toMillis)
