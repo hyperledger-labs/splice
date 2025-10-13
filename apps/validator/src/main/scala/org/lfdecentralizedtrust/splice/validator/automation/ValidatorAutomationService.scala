@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
+  UpdateIngestionService,
 }
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
@@ -19,6 +20,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
@@ -59,6 +61,7 @@ class ValidatorAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
+    val updateHistory: UpdateHistory,
     storage: Storage,
     scanConnection: BftScanConnection,
     ledgerClient: SpliceLedgerClient,
@@ -91,12 +94,24 @@ class ValidatorAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
+
+  registerService(
+    new UpdateIngestionService(
+      updateHistory.getClass.getSimpleName,
+      updateHistory.ingestionSink,
+      connection(SpliceLedgerConnectionPriority.High),
+      automationConfig,
+      backoffClock = triggerContext.pollingClock,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+      ingestUpdateHistoryFromParticipantBegin,
+    )
+  )
 
   automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
     registerTrigger(

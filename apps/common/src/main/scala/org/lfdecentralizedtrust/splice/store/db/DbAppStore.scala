@@ -11,7 +11,6 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.ExecutionContext
 
@@ -24,10 +23,6 @@ abstract class DbTxLogAppStore[TXE](
     txLogStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    enableissue12777Workaround: Boolean,
-    enableImportUpdateBackfill: Boolean,
-    backfillingRequired: BackfillingRequirement,
-    oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -39,10 +34,6 @@ abstract class DbTxLogAppStore[TXE](
       acsStoreDescriptor = acsStoreDescriptor,
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
-      enableissue12777Workaround = enableissue12777Workaround,
-      enableImportUpdateBackfill = enableImportUpdateBackfill,
-      backfillingRequired,
-      oHistoryMetrics = oHistoryMetrics,
     )
     with TxLogAppStore[TXE] {
 
@@ -71,10 +62,6 @@ abstract class DbAppStore(
     acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    enableissue12777Workaround: Boolean,
-    enableImportUpdateBackfill: Boolean,
-    backfillingRequired: BackfillingRequirement,
-    oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -103,25 +90,13 @@ abstract class DbAppStore(
       handleIngestionSummary,
     )
 
+  override val storeName: String = multiDomainAcsStore.storeName
+
   override lazy val domains: InMemorySynchronizerStore =
     new InMemorySynchronizerStore(
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
       retryProvider,
-    )
-
-  override lazy val updateHistory: UpdateHistory =
-    new UpdateHistory(
-      storage,
-      domainMigrationInfo,
-      acsStoreDescriptor.name,
-      participantId,
-      acsContractFilter.ingestionFilter.primaryParty,
-      backfillingRequired,
-      loggerFactory,
-      enableissue12777Workaround,
-      enableImportUpdateBackfill,
-      oHistoryMetrics,
     )
 
   override def close(): Unit = {

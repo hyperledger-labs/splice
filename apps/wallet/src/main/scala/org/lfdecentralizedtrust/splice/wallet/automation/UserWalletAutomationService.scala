@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TransferFollowTrigger,
   TxLogBackfillingTrigger,
   UnassignTrigger,
+  UpdateIngestionService,
 }
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
@@ -19,6 +20,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
@@ -35,6 +37,7 @@ import scala.concurrent.ExecutionContext
 
 class UserWalletAutomationService(
     store: UserWalletStore,
+    val updateHistory: UpdateHistory,
     treasury: TreasuryService,
     ledgerClient: SpliceLedgerClient,
     automationConfig: AutomationConfig,
@@ -67,12 +70,24 @@ class UserWalletAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       paramsConfig,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService.type =
     UserWalletAutomationService
+
+  registerService(
+    new UpdateIngestionService(
+      updateHistory.getClass.getSimpleName,
+      updateHistory.ingestionSink,
+      connection(SpliceLedgerConnectionPriority.High),
+      automationConfig,
+      backoffClock = triggerContext.pollingClock,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+      ingestUpdateHistoryFromParticipantBegin,
+    )
+  )
 
   registerTrigger(
     new ExpireTransferOfferTrigger(
@@ -182,6 +197,7 @@ class UserWalletAutomationService(
     registerTrigger(
       new TxLogBackfillingTrigger(
         store,
+        updateHistory,
         txLogBackfillingBatchSize,
         triggerContext,
       )

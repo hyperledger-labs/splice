@@ -37,7 +37,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     parametersConfig: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
@@ -110,19 +109,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
       ingestFromParticipantBegin,
-    )
-  )
-
-  registerService(
-    new UpdateIngestionService(
-      store.updateHistory.getClass.getSimpleName,
-      store.updateHistory.ingestionSink,
-      connection(SpliceLedgerConnectionPriority.High),
-      automationConfig,
-      backoffClock = triggerContext.pollingClock,
-      triggerContext.retryProvider,
-      triggerContext.loggerFactory,
-      ingestUpdateHistoryFromParticipantBegin,
     )
   )
 

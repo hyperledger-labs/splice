@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.splice.store.{
   PageLimit,
   SortOrder,
   TxLogAppStore,
+  UpdateHistory,
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
@@ -283,6 +284,7 @@ trait ScanStore
 
   def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
       companion: C,
+      updateHistory: UpdateHistory,
       recordTime: CantonTimestamp = CantonTimestamp.MinValue,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
@@ -311,7 +313,6 @@ object ScanStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       cacheConfigs: ScanCacheConfig,
-      enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
       initialRound: Long,
   )(implicit
@@ -333,7 +334,6 @@ object ScanStore {
             createScanAggregatesReader,
             domainMigrationInfo,
             participantId,
-            enableImportUpdateBackfill,
             metrics,
             initialRound,
           ),

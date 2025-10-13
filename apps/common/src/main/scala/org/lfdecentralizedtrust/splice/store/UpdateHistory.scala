@@ -96,14 +96,15 @@ class UpdateHistory(
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
-    val oMetrics: Option[HistoryMetrics] = None,
+    metrics: HistoryMetrics,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
 ) extends HasIngestionSink
     with AcsJdbcTypes
     with AcsQueries
-    with NamedLogging {
+    with NamedLogging
+    with AutoCloseable {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
@@ -132,6 +133,8 @@ class UpdateHistory(
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
 
   def isReady: Boolean = state.get().historyId.isDefined
+
+  override def close(): Unit = metrics.close()
 
   lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
     new MultiDomainAcsStore.IngestionSink {
@@ -442,7 +445,7 @@ class UpdateHistory(
     val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
-    oMetrics.foreach(_.UpdateHistory.unassignments.mark())
+    metrics.UpdateHistory.unassignments.mark()
     sqlu"""
       insert into update_history_unassignments(
         history_id,update_id,record_time,
@@ -488,7 +491,7 @@ class UpdateHistory(
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
     val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
-    oMetrics.foreach(_.UpdateHistory.assignments.mark())
+    metrics.UpdateHistory.assignments.mark()
     sqlu"""
       insert into update_history_assignments(
         history_id,update_id,record_time,
@@ -518,7 +521,7 @@ class UpdateHistory(
       tree: TransactionTree,
       migrationId: Long,
   ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-    oMetrics.foreach(_.UpdateHistory.transactionsTrees.mark())
+    metrics.UpdateHistory.transactionsTrees.mark()
     insertTransactionUpdateRow(tree, migrationId).flatMap(updateRowId => {
       // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
       // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.

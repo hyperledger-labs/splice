@@ -107,6 +107,7 @@ class HttpScanHandler(
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: SequencerAdminConnection,
     protected val store: ScanStore,
+    updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     dsoAnsResolver: DsoAnsResolver,
@@ -757,7 +758,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { after =>
       val afterRecordTime = parseTimestamp(after.afterRecordTime)
       (
@@ -864,7 +864,7 @@ class HttpScanHandler(
     for {
       eventO <- eventStore.getEventByUpdateId(
         updateId,
-        store.updateHistory.domainMigrationInfo.currentMigrationId,
+        updateHistory.domainMigrationInfo.currentMigrationId,
       )
     } yield {
       eventO match {
@@ -906,7 +906,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.EventHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { a =>
       val afterRecordTime = parseTimestamp(a.afterRecordTime)
       (a.afterMigrationId, afterRecordTime)
@@ -1258,7 +1257,7 @@ class HttpScanHandler(
           .sequentialTraverse(txLogEntryMap.view.toList) { case (cid, entry) =>
             // The update history ingests independently so this lookup can return None temporarily.
             // We just filter out those contracts.
-            store.updateHistory
+            updateHistory
               .lookupContractById(TransferCommand.COMPANION)(cid)
               .map(
                 _.map(c =>
@@ -1398,7 +1397,7 @@ class HttpScanHandler(
                   .asRuntimeException(),
               )
             )
-          snapshotTime <- snapshotStore.updateHistory
+          snapshotTime <- updateHistory
             .getUpdatesBefore(
               snapshotStore.currentMigrationId,
               synchronizerId,
@@ -1628,7 +1627,7 @@ class HttpScanHandler(
   ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
     for {
-      tx <- store.updateHistory.getUpdate(updateId)
+      tx <- updateHistory.getUpdate(updateId)
     } yield {
       tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
         Left(
@@ -1964,7 +1963,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetMigrationInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getMigrationInfo") { _ => _ =>
-      val sourceHistory = store.updateHistory.sourceHistory
+      val sourceHistory = updateHistory.sourceHistory
       for {
         infoO <- sourceHistory.migrationInfo(body.migrationId)
       } yield infoO match {
@@ -1997,7 +1996,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetUpdatesBeforeResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getUpdatesBefore") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getUpdatesBefore(
           migrationId = body.migrationId,
@@ -2028,7 +2026,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetImportUpdatesResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getImportUpdates") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getImportUpdates(
           migrationId = body.migrationId,
@@ -2158,7 +2155,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getBackfillingStatus") { _ => _ =>
       for {
-        updateHistoryStatus <- store.updateHistory.getBackfillingState()
+        updateHistoryStatus <- updateHistory.getBackfillingState()
         txLogStatus <- store.multiDomainAcsStore.getTxLogBackfillingState()
         updateHistoryComplete = updateHistoryStatus == BackfillingState.Complete
         txLogComplete = txLogStatus == TxLogBackfillingState.Complete

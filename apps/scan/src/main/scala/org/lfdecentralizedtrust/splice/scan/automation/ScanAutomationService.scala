@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
   TxLogBackfillingTrigger,
+  UpdateIngestionService,
 }
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
@@ -17,6 +18,7 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
@@ -25,6 +27,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -36,6 +39,7 @@ class ScanAutomationService(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
+    val updateHistory: UpdateHistory,
     storage: Storage,
     snapshotStore: AcsSnapshotStore,
     ingestFromParticipantBegin: Boolean,
@@ -60,7 +64,6 @@ class ScanAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       config.parameters,
     ) {
   override def companion
@@ -71,10 +74,25 @@ class ScanAutomationService(
   registerTrigger(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
   )
+
+  registerService(
+    new UpdateIngestionService(
+      updateHistory.getClass.getSimpleName,
+      updateHistory.ingestionSink,
+      connection(SpliceLedgerConnectionPriority.High),
+      automationConfig,
+      backoffClock = triggerContext.pollingClock,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+      ingestUpdateHistoryFromParticipantBegin,
+    )
+  )
+
   if (config.updateHistoryBackfillEnabled) {
     registerTrigger(
       new ScanHistoryBackfillingTrigger(
         store,
+        updateHistory,
         svName,
         ledgerClient,
         config.updateHistoryBackfillBatchSize,
@@ -88,7 +106,7 @@ class ScanAutomationService(
   registerTrigger(
     new AcsSnapshotTrigger(
       snapshotStore,
-      store.updateHistory,
+      updateHistory,
       config.acsSnapshotPeriodHours,
       // The acs snapshot trigger should not attempt to backfill snapshots unless the backfilling
       // UpdateHistory is fully enabled and complete.
@@ -100,7 +118,7 @@ class ScanAutomationService(
     registerTrigger(
       new DeleteCorruptAcsSnapshotTrigger(
         snapshotStore,
-        store.updateHistory,
+        updateHistory,
         triggerContext,
       )
     )
@@ -109,6 +127,7 @@ class ScanAutomationService(
     registerTrigger(
       new TxLogBackfillingTrigger(
         store,
+        updateHistory,
         config.txLogBackfillBatchSize,
         triggerContext,
       )

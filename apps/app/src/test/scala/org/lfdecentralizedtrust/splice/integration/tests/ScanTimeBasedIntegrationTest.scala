@@ -434,7 +434,7 @@ class ScanTimeBasedIntegrationTest
       "Wait for backfilling to complete, as the ACS snapshot trigger is paused until then"
     ) {
       eventually() {
-        sv1ScanBackend.automation.store.updateHistory
+        sv1ScanBackend.automation.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
         advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)

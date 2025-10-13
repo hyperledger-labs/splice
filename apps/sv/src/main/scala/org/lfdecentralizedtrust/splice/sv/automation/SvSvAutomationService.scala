@@ -56,7 +56,6 @@ class SvSvAutomationService(
       ledgerClient,
       retryProvider,
       config.ingestFromParticipantBegin,
-      config.ingestUpdateHistoryFromParticipantBegin,
       config.parameters,
     ) {
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
@@ -68,6 +67,8 @@ class SvSvAutomationService(
       connection(SpliceLedgerConnectionPriority.Low),
     )
   )
+
+  // notice the absence of UpdateHistory: the history for the sv party is not needed as we don't foresee ever adding TxLog for it
 
   registerTrigger(
     SqlIndexInitializationTrigger(

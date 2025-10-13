@@ -129,6 +129,7 @@ class SplitwellApp(
       migrationInfo,
       participantId,
     )
+    // splitwell does not need to have UpdateHistory
     automation = new SplitwellAutomationService(
       config.automation,
       clock,

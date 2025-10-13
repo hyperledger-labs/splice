@@ -977,7 +977,6 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
-      enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
       initialRound = initialRound,
     )(parallelExecutionContext, implicitly, implicitly)

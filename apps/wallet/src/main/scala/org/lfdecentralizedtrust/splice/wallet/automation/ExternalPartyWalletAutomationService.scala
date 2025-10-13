@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.automation
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+  UpdateIngestionService,
 }
 import AutomationServiceCompanion.TriggerClass
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
@@ -13,17 +14,20 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContext
 
 class ExternalPartyWalletAutomationService(
     store: ExternalPartyWalletStore,
+    updateHistory: UpdateHistory,
     ledgerClient: SpliceLedgerClient,
     automationConfig: AutomationConfig,
     clock: Clock,
@@ -47,12 +51,24 @@ class ExternalPartyWalletAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =
     ExternalPartyWalletAutomationService
+
+  registerService(
+    new UpdateIngestionService(
+      updateHistory.getClass.getSimpleName,
+      updateHistory.ingestionSink,
+      connection(SpliceLedgerConnectionPriority.High),
+      automationConfig,
+      backoffClock = triggerContext.pollingClock,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+      ingestUpdateHistoryFromParticipantBegin,
+    )
+  )
 }
 
 object ExternalPartyWalletAutomationService extends AutomationServiceCompanion {
