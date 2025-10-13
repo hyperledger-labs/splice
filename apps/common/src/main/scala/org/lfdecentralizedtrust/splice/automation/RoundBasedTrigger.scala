@@ -22,45 +22,49 @@ abstract class RoundBasedTrigger[T <: RoundBasedTask: Pretty]()(implicit
   private val nextRunTime = new AtomicReference[Option[(Long, Instant)]](None)
 
   override protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]] = {
-    if (shouldRun) {
-      retrieveAvailableTasksForRound().map(tasks => {
-        tasks.minByOption(_.roundDetails._1) match {
-          case Some(firstRound) =>
-            val (roundNumber, roundOpening) = firstRound.roundDetails
-            val lastRunWasForAnOlderRound = nextRunTime.get().forall(_._1 < roundNumber)
-            if (lastRunWasForAnOlderRound) {
-              @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-              val minRunTime = Seq(roundOpening, context.clock.now.toInstant).max
-              val maxRunTime = roundOpening.plus(firstRound.tickDuration)
-              val minRunAt = randomInstantBetween(minRunTime, maxRunTime)
-              nextRunTime.set(
-                Some(
-                  roundNumber -> minRunAt
+    if (context.config.enableNewRewardTriggerScheduling) {
+      if (shouldRun) {
+        retrieveAvailableTasksForRound().map(tasks => {
+          tasks.minByOption(_.roundDetails._1) match {
+            case Some(firstRound) =>
+              val (roundNumber, roundOpening) = firstRound.roundDetails
+              val lastRunWasForAnOlderRound = nextRunTime.get().forall(_._1 < roundNumber)
+              if (lastRunWasForAnOlderRound) {
+                @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+                val minRunTime = Seq(roundOpening, context.clock.now.toInstant).max
+                val maxRunTime = roundOpening.plus(firstRound.tickDuration)
+                val minRunAt = randomInstantBetween(minRunTime, maxRunTime)
+                nextRunTime.set(
+                  Some(
+                    roundNumber -> minRunAt
+                  )
                 )
-              )
-              if (shouldRun) {
-                logger.info(
-                  s"Running for $tasks because the calculated run time $minRunAt is now (between $minRunTime and $maxRunTime)."
-                )
-                tasks
+                if (shouldRun) {
+                  logger.info(
+                    s"Running for $tasks because the calculated run time $minRunAt is now (between $minRunTime and $maxRunTime)."
+                  )
+                  tasks
+                } else {
+                  logger.info(
+                    s"Running for $tasks at min time $minRunAt (computed for interval between $minRunTime and $maxRunTime)."
+                  )
+                  Seq.empty
+                }
               } else {
                 logger.info(
-                  s"Running for $tasks at min time $minRunAt (computed for interval between $minRunTime and $maxRunTime)."
+                  s"Running for $tasks as the round still matches the next run ${nextRunTime.get()}."
                 )
-                Seq.empty
+                tasks
               }
-            } else {
-              logger.info(
-                s"Running for $tasks as the round still matches the next run ${nextRunTime.get()}."
-              )
+            case None =>
+              // no tasks available
               tasks
-            }
-          case None =>
-            // no tasks available
-            tasks
-        }
-      })
-    } else Future.successful(Seq.empty)
+          }
+        })
+      } else Future.successful(Seq.empty)
+    } else {
+      retrieveAvailableTasksForRound()
+    }
   }
 
   protected def retrieveAvailableTasksForRound()(implicit tc: TraceContext): Future[Seq[T]]
