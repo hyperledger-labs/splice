@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.Port
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
