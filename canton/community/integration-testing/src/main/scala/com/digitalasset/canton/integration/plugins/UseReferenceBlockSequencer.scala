@@ -72,7 +72,7 @@ class UseReferenceBlockSequencer[StorageConfigT <: StorageConfig](
       NonEmpty(
         List,
         dbNameForGroup(0), // db 0 is the default one
-        (1 to sequencerGroups.numberOfSynchronizers).map(i => dbNameForGroup(i)).toList *,
+        (1 to sequencerGroups.numberOfSynchronizers).map(i => dbNameForGroup(i)).toList*
       )
   }
 

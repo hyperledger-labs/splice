@@ -114,7 +114,9 @@ object NetworkTopologyDescription {
         Map[MediatorReference, (Seq[SequencerReference], PositiveInt, NonNegativeInt)]
       ] = None,
       mediatorThreshold: PositiveInt = PositiveInt.one,
-  )(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): NetworkTopologyDescription =
+  )(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription =
     NetworkTopologyDescription(
       synchronizerName = synchronizerAlias.unwrap,
       synchronizerOwners,

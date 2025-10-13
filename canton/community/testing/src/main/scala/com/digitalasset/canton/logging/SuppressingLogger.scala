@@ -138,7 +138,7 @@ class SuppressingLogger private[logging] (
         case Failure(c(_)) => Success(succeed)
         case Failure(t) => fail(s"Exception has wrong type. Expected type: $c. Got: $t.", t)
       }(directExecutionContext),
-      assertions *,
+      assertions*
     )
 
   def assertThrowsAndLogsAsync[T <: Throwable](
