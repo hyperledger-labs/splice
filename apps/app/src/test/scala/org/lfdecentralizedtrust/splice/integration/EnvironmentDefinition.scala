@@ -427,7 +427,7 @@ case class EnvironmentDefinition(
       )
       .addConfigTransform((_, conf) =>
         ConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.rewardOperationEnableRoundBasedInterval).replace(true)
+          _.focus(_.rewardOperationEnableRoundBasedInterval).replace(false)
         )(conf)
       )
       .withSequencerConnectionsFromScanDisabled(10_000)
