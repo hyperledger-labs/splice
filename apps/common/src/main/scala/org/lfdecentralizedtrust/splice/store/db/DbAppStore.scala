@@ -90,7 +90,7 @@ abstract class DbAppStore(
       handleIngestionSummary,
     )
 
-  override val storeName: String = multiDomainAcsStore.storeName
+  override lazy val storeName: String = multiDomainAcsStore.storeName
 
   override lazy val domains: InMemorySynchronizerStore =
     new InMemorySynchronizerStore(
