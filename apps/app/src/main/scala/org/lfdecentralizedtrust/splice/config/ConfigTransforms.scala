@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
@@ -336,13 +336,14 @@ object ConfigTransforms {
   def updateInitialTickDuration(tick: NonNegativeFiniteDuration): ConfigTransform = {
     ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
       _.copy(initialTickDuration = tick)
-    ) compose (ConfigTransforms.updateAllAutomationConfigs(config =>
-      if (config.pollingInterval.toInternal > tick.toInternal)
+    ) compose ConfigTransforms.updateAllAutomationConfigs(config =>
+      // ensure polling duration allows automation to run at least once per tick
+      if (config.pollingInterval.toInternal > (tick.toInternal / NonNegativeInt.tryCreate(2)))
         config.copy(
-          pollingInterval = tick
+          pollingInterval = (tick.toInternal / NonNegativeInt.tryCreate(2)).toConfig
         )
       else config
-    ))
+    )
   }
 
   def noDevNet: ConfigTransform =
