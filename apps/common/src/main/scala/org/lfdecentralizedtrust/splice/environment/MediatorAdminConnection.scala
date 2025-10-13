@@ -12,10 +12,11 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.admin.api.client.data.{MediatorStatus, NodeStatus}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencing.{
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnectionValidation,
   SequencerConnections,
   SubmissionRequestAmplification,
@@ -69,6 +70,8 @@ class MediatorAdminConnection(
           // TODO(#2110) Rethink this when we enable sequencer connection pools.
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
+          // TODO(#2666) Make the delays configurable.
+          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
         ),
         SequencerConnectionValidation.ThresholdActive,
       )
@@ -105,6 +108,8 @@ class MediatorAdminConnection(
           // TODO(#2110) Rethink this when we enable sequencer connection pools.
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
+          // TODO(#2666) Make the delays configurable.
+          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
         ),
         SequencerConnectionValidation.ThresholdActive,
       )
