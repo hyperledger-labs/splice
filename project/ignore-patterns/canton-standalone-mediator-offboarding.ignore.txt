@@ -12,3 +12,5 @@ INCORRECT_EVENT_COST.*: Missing or incorrect event cost provided by member
 TOPOLOGY_UNAUTHORIZED_TRANSACTION
 
 Failed to send result to sequencer for request.*Unregistered recipients.*unregistered senders.*MED::sv4SvOffboarding
+
+Could not send a time-advancing message
