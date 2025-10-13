@@ -23,7 +23,7 @@ import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupExce
 import com.digitalasset.canton.integration.plugins.{
   UseH2,
   UsePostgres,
-  UseReferenceBlockSequencerBase,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}

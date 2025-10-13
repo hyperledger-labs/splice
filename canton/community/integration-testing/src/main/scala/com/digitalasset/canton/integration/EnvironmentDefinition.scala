@@ -160,7 +160,7 @@ final case class EnvironmentDefinition(
 object EnvironmentDefinition extends LazyLogging {
 
   def defaultStaticSynchronizerParameters(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): StaticSynchronizerParameters =
     StaticSynchronizerParameters.initialValues(
       env.environment.clock,
