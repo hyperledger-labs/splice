@@ -40,7 +40,7 @@ class TimeBasedTreasuryIntegrationTest
 
     // create two amulets in alice's wallet
     aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq(exactly(50)))
+    checkWalletExactly(alice, aliceWalletClient, Seq(exactly(50)))
 
     // run a transfer such that alice's validator has some rewards
     p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
@@ -48,7 +48,7 @@ class TimeBasedTreasuryIntegrationTest
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
     // and give alice another amulet.
     aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
+    checkWalletExactly(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
 
     // advance by two ticks, so the issuing round of round 1 is created
     advanceRoundsByOneTick
@@ -63,7 +63,7 @@ class TimeBasedTreasuryIntegrationTest
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
       // and amulets are automatically merged.
-      checkWallet(alice, aliceWalletClient, Seq((59, 61)))
+      checkWalletExactly(alice, aliceWalletClient, Seq((59, 61)))
       // same for validator rewards
       aliceValidatorWalletClient
         .listValidatorRewardCoupons()
@@ -182,6 +182,7 @@ class TimeBasedTreasuryIntegrationTest
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
         // trigger automation.
+        advanceRoundsByOneTick
         advanceRoundsByOneTick
       },
       entries => {

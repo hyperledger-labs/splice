@@ -55,11 +55,11 @@ class TimeBasedTestNetPreviewIntegrationTest
     )(
       "Check balances",
       _ => {
-        checkWallet(bobParty, bobWalletClient, Seq((amountToTransfer, amountToTransfer)))
-        checkWallet(
+        checkWalletAmount(bobParty, bobWalletClient, (amountToTransfer, amountToTransfer))
+        checkWalletAmount(
           sv1Party,
           sv1WalletClient,
-          Seq((sv1Balance - amountToTransfer - feeCeiling, sv1Balance - amountToTransfer)),
+          (sv1Balance - amountToTransfer - feeCeiling, sv1Balance - amountToTransfer),
         )
       },
     )

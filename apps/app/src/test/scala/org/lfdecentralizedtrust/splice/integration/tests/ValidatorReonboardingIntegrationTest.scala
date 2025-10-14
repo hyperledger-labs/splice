@@ -354,12 +354,10 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
 
           clue(s"party $partyId amulet balance is preserved") {
             val expectedAmulets: Range = 99 to 100
-            checkWallet(
+            checkWalletAmount(
               partyId,
               walletAppClient,
-              Seq(
-                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
-              ),
+              (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
             )
           }
 
@@ -370,12 +368,10 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
             "balance updated",
             _ => {
               val expectedAmulets: Range = 149 to 150
-              checkWallet(
+              checkWalletAmount(
                 partyId,
                 walletAppClient,
-                Seq(
-                  (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
-                ),
+                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
               )
             },
           )
@@ -550,12 +546,10 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
 
           clue(s"party $partyId amulet balance is preserved") {
             val expectedAmulets: Range = 99 to 100
-            checkWallet(
+            checkWalletAmount(
               partyId,
               walletAppClient,
-              Seq(
-                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
-              ),
+              (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
             )
           }
         }

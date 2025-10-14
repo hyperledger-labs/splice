@@ -62,7 +62,35 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(SpliceUtil.defaultHoldingFee.rate)
 
   /** @param expectedAmountRanges : lower and upper bounds for amulets sorted by their initial amount in ascending order. */
-  def checkWallet(
+  def checkWalletAmount(
+      walletParty: PartyId,
+      wallet: WalletAppClientReference,
+      expectedAmountRanges: (BigDecimal, BigDecimal),
+  ): Unit = clue(s"checking wallet with $expectedAmountRanges") {
+    val expectedRatePerRound = new feesCodegen.RatePerRound(
+      defaultHoldingFeeAmulet.bigDecimal setScale 10
+    )
+    eventually(10.seconds, 500.millis) {
+      val amulets =
+        wallet.list().amulets
+
+      amulets
+        .foreach { case amulet =>
+          amulet.contract.payload.owner shouldBe walletParty.toProtoPrimitive
+          val amuletAmount =
+            amulet.contract.payload.amount
+
+          amuletAmount.ratePerRound shouldBe expectedRatePerRound
+        }
+
+      assertInRange(
+        amulets.foldLeft(BigDecimal(0))(_ + _.contract.payload.amount.initialAmount),
+        expectedAmountRanges,
+      )
+    }
+  }
+
+  def checkWalletExactly(
       walletParty: PartyId,
       wallet: WalletAppClientReference,
       expectedAmountRanges: Seq[(BigDecimal, BigDecimal)],

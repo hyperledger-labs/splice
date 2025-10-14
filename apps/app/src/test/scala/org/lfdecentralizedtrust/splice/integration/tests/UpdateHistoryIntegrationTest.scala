@@ -78,12 +78,23 @@ class UpdateHistoryIntegrationTest
       "Transfer some CC to alice, to commit transactions related to CC transfers",
       p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, transferAmount),
     )(
-      "Alice receives the transfer from bob and merges amulets",
+      "Alice receives the transfer from bob",
       _ => {
         val partitionAmount = walletUsdToAmulet(tapAmount) + transferAmount / 2
         aliceWalletClient.balance().unlockedQty should be > partitionAmount
         bobWalletClient.balance().unlockedQty should be < partitionAmount
+      },
+    )
 
+    actAndCheck(
+      "Advance rounds to open issuing rounds for amulet merging",
+      eventually() {
+        advanceRoundsTrigger.runOnce().futureValue should be(true)
+        sv1ScanBackend.getOpenAndIssuingMiningRounds()._2 should not be empty
+      },
+    )(
+      "Alice merges amulets",
+      _ => {
         aliceWalletClient.list().amulets should have length 1
         bobWalletClient.list().amulets should have length 1
       },

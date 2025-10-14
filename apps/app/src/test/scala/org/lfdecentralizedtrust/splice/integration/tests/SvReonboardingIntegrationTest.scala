@@ -523,12 +523,12 @@ class SvReonboardingIntegrationTest
 
         sv4WalletClient.userStatus().party shouldBe sv4PartyNew.toProtoPrimitive
 
+        val originalAmulets: Range = 99 to 100
         clue("amulet balance is preserved from off-boarded sv4") {
-          val expectedAmulets: Range = 99 to 100
-          checkWallet(
+          checkWalletAmount(
             sv4Party,
             validatorLocalWalletClient,
-            Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
+            (walletUsdToAmulet(originalAmulets.start), walletUsdToAmulet(originalAmulets.end)),
           )
         }
 
@@ -538,13 +538,11 @@ class SvReonboardingIntegrationTest
         )(
           "balance updated",
           _ => {
-            val expectedAmulets: Range = 149 to 150
-            checkWallet(
+            val expectedAmulets: Range = 49 to 50
+            checkWalletAmount(
               sv4Party,
               validatorLocalWalletClient,
-              Seq(
-                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
-              ),
+              (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
             )
           },
         )
@@ -572,12 +570,10 @@ class SvReonboardingIntegrationTest
           _ => {
             sv4WalletClient.listTransferOffers() should have length 0
             val expectedAmulets: Range = 147 to 148
-            checkWallet(
+            checkWalletAmount(
               sv4PartyNew,
               sv4WalletClient,
-              Seq(
-                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
-              ),
+              (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
             )
           },
         )

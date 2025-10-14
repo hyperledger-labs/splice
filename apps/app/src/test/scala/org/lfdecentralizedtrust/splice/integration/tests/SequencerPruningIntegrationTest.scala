@@ -100,7 +100,7 @@ class SequencerPruningIntegrationTest
       val walletUserParty = onboardWalletUser(bobWalletClient, bobValidatorLocalBackend)
       bobWalletClient.tap(walletAmuletToUsd(50.0))
       clue(s"${bobValidatorLocalBackend.name} has tapped a amulet") {
-        checkWallet(walletUserParty, bobWalletClient, Seq((50, 50)))
+        checkWalletAmount(walletUserParty, bobWalletClient, (50, 50))
       }
       bobValidatorLocalBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
         true

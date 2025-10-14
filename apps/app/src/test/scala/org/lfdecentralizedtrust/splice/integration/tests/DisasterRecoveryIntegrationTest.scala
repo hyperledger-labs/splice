@@ -327,10 +327,10 @@ class DisasterRecoveryIntegrationTest
         )(
           "alice wallet balance updated",
           _ => {
-            checkWallet(
+            checkWalletAmount(
               validatorParty,
               aliceWalletClient,
-              Seq((walletUsdToAmulet(1000), walletUsdToAmulet(2000))),
+              (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
             )
           },
         )
@@ -596,10 +596,10 @@ class DisasterRecoveryIntegrationTest
           val validatorLocalParty =
             onboardWalletUser(aliceValidatorWalletLocalClient, aliceValidatorLocalBackend)
           aliceValidatorWalletLocalClient.tap(1600)
-          checkWallet(
+          checkWalletAmount(
             validatorLocalParty,
             aliceValidatorWalletLocalClient,
-            Seq((walletUsdToAmulet(3000), walletUsdToAmulet(3500))),
+            (walletUsdToAmulet(3000), walletUsdToAmulet(3500)),
           )
         }
       }

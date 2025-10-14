@@ -152,14 +152,14 @@ class WalletPaymentIntegrationTest
 
       clue("Alice transfers 39") {
         p2pTransfer(aliceWalletClient, bobWalletClient, bob, 39)
-        checkWallet(alice, aliceWalletClient, Seq((baseWalletFloor - 39, baseWalletCeiling - 39)))
+        checkWalletAmount(alice, aliceWalletClient, (baseWalletFloor - 39, baseWalletCeiling - 39))
       }
       clue("Alice transfers 19") {
         p2pTransfer(aliceWalletClient, bobWalletClient, bob, 19)
-        checkWallet(
+        checkWalletAmount(
           alice,
           aliceWalletClient,
-          Seq((baseWalletFloor - 39 - 19, baseWalletCeiling - 39 - 19)),
+          (baseWalletFloor - 39 - 19, baseWalletCeiling - 39 - 19),
         )
       }
     }
@@ -208,12 +208,12 @@ class WalletPaymentIntegrationTest
           aliceWalletClient.listAcceptedTransferOffers() should have length 0
           bobWalletClient.listTransferOffers() should have length 2
           bobWalletClient.listAcceptedTransferOffers() should have length 0
-          checkWallet(
+          checkWalletAmount(
             aliceUserParty,
             aliceWalletClient,
-            Seq((walletUsdToAmulet(99.8) - 1, walletUsdToAmulet(100) - 1)),
+            (walletUsdToAmulet(99.8) - 1, walletUsdToAmulet(100) - 1),
           )
-          checkWallet(bobUserParty, bobWalletClient, Seq((1, 1)))
+          checkWalletAmount(bobUserParty, bobWalletClient, (1, 1))
         },
       )
 
@@ -260,7 +260,7 @@ class WalletPaymentIntegrationTest
             trackingId,
           ),
           _.errorMessage should include("Command submission already exists").or(
-            include(s"Transfer offer with trackingId ${trackingId} already exists.")
+            include(s"Transfer offer with trackingId $trackingId already exists.")
           ),
         )
       )

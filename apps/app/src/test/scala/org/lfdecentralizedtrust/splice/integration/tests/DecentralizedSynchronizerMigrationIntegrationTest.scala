@@ -511,10 +511,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
       walletClient.tap(tapAmount)
       withClueAndLog(s"${validatorBackend.name} has tapped a amulet") {
-        checkWallet(
+        checkWalletAmount(
           walletUserParty,
           walletClient,
-          Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
+          (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
         )
       }
       validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(

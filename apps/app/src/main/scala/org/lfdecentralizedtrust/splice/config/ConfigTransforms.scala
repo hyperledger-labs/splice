@@ -197,6 +197,9 @@ object ConfigTransforms {
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
       disableZeroFees(),
+      updateAllAutomationConfigs(
+        _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
+      ),
     )
   }
 

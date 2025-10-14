@@ -57,9 +57,15 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
                   nextRunTime.get().forall(_.roundNumber < schedulingRound.roundNumber)
                 if (lastRunWasForAnOlderRound) {
                   val minRunTime = Seq(schedulingRound.opensAt, context.clock.now.toInstant).max
-                  val maxRunTime = (previousSchedulingRoundStillOpen
-                    .map(_.closesAt.minusSeconds(120))
-                    .toList :+ schedulingRound.scheduleAtMaxTime).min
+                  val maxRunTime = (
+                    previousSchedulingRoundStillOpen
+                      .map(
+                        _.closesAt.minus(
+                          context.config.rewardOperationRoundsCloseBufferDuration.asJava
+                        )
+                      )
+                      .toList :+ schedulingRound.scheduleAtMaxTime
+                  ).min
                   val minScheduledTimeToRunAt = randomInstantBetween(
                     minRunTime,
                     maxRunTime,

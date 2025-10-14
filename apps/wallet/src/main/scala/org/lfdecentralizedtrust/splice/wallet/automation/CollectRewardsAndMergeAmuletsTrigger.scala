@@ -18,7 +18,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
 }
 import org.lfdecentralizedtrust.splice.environment.CommandPriority
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger.CollectRewardsAndMergeAmuletsTask
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger.{
+  CollectOrMergeRound,
+  CollectRewardsAndMergeAmuletsTask,
+}
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
@@ -46,26 +49,51 @@ class CollectRewardsAndMergeAmuletsTrigger(
       tc: TraceContext
   ): Future[Seq[CollectRewardsAndMergeAmuletsTask]] = {
     for {
-      (_, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
+      (openRounds, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds().map {
+        case (openRounds, issuingRounds) =>
+          (
+            openRounds.map(round =>
+              CollectOrMergeRound(
+                Long.unbox(round.payload.round.number),
+                round.payload.opensAt,
+                round.payload.targetClosesAt,
+              )
+            ),
+            issuingRounds.map(round =>
+              CollectOrMergeRound(
+                Long.unbox(round.payload.round.number),
+                round.payload.opensAt,
+                round.payload.targetClosesAt,
+              )
+            ),
+          )
+      }
     } yield {
-      val openIssuingRounds = issuingRounds
-        .filter(_.payload.opensAt.isBefore(context.clock.now.toInstant))
-      val openIssuingRoundsThatAreNotYetClosing = openIssuingRounds
-        // add 30seconds as a buffer, if the round is about to close we might as well just skip it as we will not have enough time to collect
-        .filter(_.payload.targetClosesAt.isAfter(context.clock.now.toInstant.plusSeconds(30)))
-      openIssuingRoundsThatAreNotYetClosing
-        .maxByOption(_.payload.opensAt)
-        .map(issuingRound =>
+      val roundsToUseForTask =
+        if (issuingRounds.nonEmpty) issuingRounds
+        else {
+          logger.info(
+            "No issuing rounds found, falling back to open rounds to ensure amulet merging runs"
+          )
+          openRounds
+        }
+      val openRoundsForTask = roundsToUseForTask
+        .filter(_.opensAt.isBefore(context.clock.now.toInstant))
+      openRoundsForTask
+        .maxByOption(_.opensAt)
+        .map(round =>
           CollectRewardsAndMergeAmuletsTask(
-            Long.unbox(issuingRound.payload.round.number),
-            issuingRound.payload.opensAt,
+            round.number,
+            round.opensAt,
             tickDuration =
-              Duration.between(issuingRound.payload.opensAt, issuingRound.payload.targetClosesAt),
-            openIssuingRoundsThatAreNotYetClosing
-              .map(_.payload.targetClosesAt)
+              Duration.ofMillis(Duration.between(round.opensAt, round.closesAt).toMillis / 2),
+            openRoundsForTask
+              .filter(_.closesAt.isAfter(context.clock.now.toInstant))
+              .map(_.closesAt)
               .minOption
-              .getOrElse(issuingRound.payload.targetClosesAt),
-            issuingRound.payload.targetClosesAt,
+              .getOrElse(round.closesAt),
+            round.closesAt,
+            context.config.rewardOperationRoundsCloseBufferDuration.asJava,
           )
         )
         .toList
@@ -131,12 +159,20 @@ class CollectRewardsAndMergeAmuletsTrigger(
 }
 
 object CollectRewardsAndMergeAmuletsTrigger {
+
+  case class CollectOrMergeRound(
+      number: Long,
+      opensAt: Instant,
+      closesAt: Instant,
+  )
+
   case class CollectRewardsAndMergeAmuletsTask(
       roundNumber: Long,
       opensAt: Instant,
       tickDuration: Duration,
       closingTimeOfEarliestRound: Instant,
       closesAt: Instant,
+      bufferDuration: Duration,
   ) extends PrettyPrinting
       with RoundBasedTask {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -145,6 +181,7 @@ object CollectRewardsAndMergeAmuletsTrigger {
         param("round", _.roundNumber),
         param("opensAt", _.opensAt),
         param("tickDuration", _.tickDuration),
+        param("closesAt", _.closesAt),
       )
 
     /** We schedule the task to run between round opening time and the earliest time between a tick after
@@ -159,7 +196,8 @@ object CollectRewardsAndMergeAmuletsTrigger {
         // run 2 minutes before the closing time to account for any latency and avoid missing rewards because the round closed
         // this is relevant only during downtimes where we might have missed the first opportunity to collect rewards
         // rate limiting should protect us against any spikes caused by this running at the same time on every node
-        .minusSeconds(120),
+        // we calculate this here instead of letting the trigger handle this because we always return the task only for the latest round that is open
+        .minus(bufferDuration),
       opensAt.plus(tickDuration),
     ).min
   }

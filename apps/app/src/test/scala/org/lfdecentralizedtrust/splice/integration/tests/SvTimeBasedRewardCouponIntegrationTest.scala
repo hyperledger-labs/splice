@@ -173,16 +173,16 @@ class SvTimeBasedRewardCouponIntegrationTest
       val expectedAliceAmount = eachSvGetInRound0.multiply(new java.math.BigDecimal("0.3333"))
 
       eventually() {
-        checkWallet(
+        checkWalletAmount(
           sv1Party,
           sv1WalletClient,
-          Seq(BigDecimal(eachSvGetInRound0) - feesUpperBoundCC -> eachSvGetInRound0),
+          BigDecimal(eachSvGetInRound0) - feesUpperBoundCC -> eachSvGetInRound0,
         )
 
-        checkWallet(
+        checkWalletAmount(
           aliceValidatorParty,
           aliceValidatorWalletClient,
-          Seq(BigDecimal(expectedAliceAmount) - feesUpperBoundCC -> expectedAliceAmount),
+          BigDecimal(expectedAliceAmount) - feesUpperBoundCC -> expectedAliceAmount,
         )
       }
 

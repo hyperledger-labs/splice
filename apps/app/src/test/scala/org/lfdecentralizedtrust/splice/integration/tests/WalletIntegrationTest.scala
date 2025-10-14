@@ -118,12 +118,12 @@ class WalletIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       aliceWalletClient.tap(walletAmuletToUsd(50.0))
-      checkWallet(aliceUserParty, aliceWalletClient, Seq((50, 50)))
+      checkWalletAmount(aliceUserParty, aliceWalletClient, (50, 50))
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       charlieWalletClient.tap(walletAmuletToUsd(50.0))
-      checkWallet(charlieUserParty, charlieWalletClient, Seq((50, 50)))
+      checkWalletAmount(charlieUserParty, charlieWalletClient, (50, 50))
     }
 
     "skip empty batches in the treasury service" in { implicit env =>
