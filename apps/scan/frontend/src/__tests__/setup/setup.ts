@@ -8,6 +8,7 @@ import {
   resetIntersectionMocking,
 } from 'react-intersection-observer/test-utils';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { DetachedWindowAPI } from 'happy-dom';
 
 import { buildServer } from '../mocks/server';
 import { config } from './config';
@@ -22,10 +23,14 @@ export type Services = Config['services'];
 window.splice_config = config;
 export const server: SetupServer = buildServer(window.splice_config.services);
 
+window.happyDOM.settings.enableJavaScriptEvaluation = true;
+
 // Start server before all tests
 beforeAll(() => {
   setupIntersectionMocking(vi.fn);
   server.listen({ onUnhandledRequest: 'error' });
+  console.log('===========');
+  console.log(window.happyDOM.settings.enableJavaScriptEvaluation);
 });
 
 //  Close server after all tests
@@ -43,5 +48,6 @@ afterEach(() => {
 declare global {
   interface Window {
     splice_config: typeof config; // (make typescript happy)
+    happyDOM: DetachedWindowAPI;
   }
 }
