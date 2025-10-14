@@ -117,7 +117,7 @@ describe('Offboard SV Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(screen.getByTestId('submit-button').getAttribute('disabled')).toBe('');
   });
 
   test('expiry date must be in the future', async () => {
