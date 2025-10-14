@@ -43,10 +43,8 @@ class WalletExpirationsIntegrationTest
         )(config)
       )
       // Very short round ticks
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       // Start rounds trigger in paused state
       .addConfigTransforms((_, config) =>
