@@ -1134,8 +1134,7 @@ This will automatically pick up the conversion rate from
 ``#splice-amulet-name-service:Splice.Ans.AmuletConversionRateFeed:AmuletConversionRateFeed``
 contracts published by the party ``publisher::namespace`` and set the
 SV's config to the latest rate from the publisher. If the published
-rate falls outside of the accepted range, a warning is logged and no
-change to the SV's published conversion rate is made.
+rate falls outside of the accepted range, a warning is logged and the published rate is clamped to the configured range.
 
 Note that SVs must wait ``voteCooldownTime`` (a governance parameter
 that defaults to 1min) between updates to their rate. Therefore updates made

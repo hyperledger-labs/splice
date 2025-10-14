@@ -21,6 +21,11 @@ Upcoming
 
     - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
 
+  - SV app
+
+    - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out of range values.
+
 0.4.20
 ------
 
