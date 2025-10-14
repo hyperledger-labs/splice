@@ -606,7 +606,7 @@ abstract class TopologyAdminConnection(
       )
     )
 
-  private def ensureInitialMapping[M <: TopologyMapping: ClassTag](
+  protected def ensureInitialMapping[M <: TopologyMapping: ClassTag](
       mappingE: Either[String, M]
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] = {
     val mapping =

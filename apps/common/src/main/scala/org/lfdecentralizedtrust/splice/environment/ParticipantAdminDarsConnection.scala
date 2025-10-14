@@ -76,34 +76,65 @@ trait ParticipantAdminDarsConnection {
       tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
-    ensureTopologyMapping[VettedPackages](
-      TopologyStoreId.Synchronizer(synchronizerId),
-      s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
-      topologyTransactionType =>
-        EitherT(
-          getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
-            if (
-              dars
-                .forall(dar => vettedPackages.mapping.packages.exists(_.packageId == dar.packageId))
-            ) {
-              // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
-              Right(vettedPackages)
-            } else {
-              Left(vettedPackages)
-            }
-          }
-        ),
-      currentVettingState =>
-        Right(
-          updateVettingStateForDars(
-            dars = dars,
-            packageValidFrom = cantonFromDate,
-            currentVetting = currentVettingState,
-          )
-        ),
+
+    retryProvider.retry(
       RetryFor.Automation,
-      maxSubmissionDelay = maxVettingDelay,
-    ).map(_ => ())
+      "dar_vetting",
+      s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
+      lookupVettingState(
+        Some(synchronizerId),
+        TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+      ).flatMap {
+        case None =>
+          for {
+            participantId <- getParticipantId()
+            _ <- ensureInitialMapping(
+              Right(
+                updateVettingStateForDars(
+                  dars,
+                  cantonFromDate,
+                  VettedPackages.tryCreate(
+                    participantId,
+                    Seq.empty,
+                  ),
+                )
+              )
+            )
+          } yield ()
+        case Some(_) =>
+          ensureTopologyMapping[VettedPackages](
+            TopologyStoreId.Synchronizer(synchronizerId),
+            s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
+            topologyTransactionType =>
+              EitherT(
+                getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
+                  if (
+                    dars
+                      .forall(dar =>
+                        vettedPackages.mapping.packages.exists(_.packageId == dar.packageId)
+                      )
+                  ) {
+                    // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
+                    Right(vettedPackages)
+                  } else {
+                    Left(vettedPackages)
+                  }
+                }
+              ),
+            currentVettingState =>
+              Right(
+                updateVettingStateForDars(
+                  dars = dars,
+                  packageValidFrom = cantonFromDate,
+                  currentVetting = currentVettingState,
+                )
+              ),
+            RetryFor.Automation,
+            maxSubmissionDelay = maxVettingDelay,
+          ).map(_ => ())
+      },
+      logger,
+    )
   }
 
   def lookupDar(mainPackageId: String)(implicit
@@ -199,23 +230,33 @@ trait ParticipantAdminDarsConnection {
   def getVettingState(
       domain: Option[SynchronizerId],
       topologyTransactionType: TopologyTransactionType,
-  )(implicit tc: TraceContext): Future[TopologyResult[VettedPackages]] = {
+  )(implicit tc: TraceContext): Future[TopologyResult[VettedPackages]] =
+    lookupVettingState(domain, topologyTransactionType).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(s"No package vetting state found for domain $domain")
+          .asRuntimeException
+      )
+    )
+
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def lookupVettingState(
+      domain: Option[SynchronizerId],
+      topologyTransactionType: TopologyTransactionType,
+  )(implicit tc: TraceContext): Future[Option[TopologyResult[VettedPackages]]] = {
     for {
       participantId <- getParticipantId()
       vettedState <- listVettedPackages(participantId, domain, topologyTransactionType)
     } yield {
       vettedState match {
-        case Seq() =>
-          throw Status.NOT_FOUND
-            .withDescription(s"No package vetting state found for domain $domain")
-            .asRuntimeException
-        case Seq(state) => state
+        case Seq() => None
+        case Seq(state) => Some(state)
         case other =>
           logger.warn(
             s"Vetted state contains multiple entries on domain $domain for $participantId: $other. Will use the last entry"
           )
           // TODO(DACH-NY/canton-network-node#18175) - remove once canton can handle this and fixed the issue
-          other.maxBy(_.base.serial)
+          Some(other.maxBy(_.base.serial))
       }
     }
   }
