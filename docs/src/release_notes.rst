@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - SV
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+
 0.4.20
 ------
 
