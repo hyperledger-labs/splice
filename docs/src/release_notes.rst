@@ -28,7 +28,7 @@ Release Notes
   - Validator
 
       - ``/v0/admin/users/offboard``:
-        Off boarding a user deletes the ledgerAPI user in the participant node.
+        Offboarding a user deletes the ledger API user in the participant node.
 
 
 0.4.19
