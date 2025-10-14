@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -57,7 +57,7 @@ class SplitwellApp(
     override val name: InstanceName,
     val config: SplitwellAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -251,7 +251,7 @@ class SplitwellApp(
 object SplitwellApp {
   case class State(
       automation: SplitwellAutomationService,
-      storage: Storage,
+      storage: DbStorage,
       store: SplitwellStore,
       scanConnection: ScanConnection,
       participantAdminConnection: ParticipantAdminConnection,

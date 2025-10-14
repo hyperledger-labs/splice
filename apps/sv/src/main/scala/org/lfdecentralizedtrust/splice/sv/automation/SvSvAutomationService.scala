@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -37,7 +37,7 @@ class SvSvAutomationService(
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
-    storage: Storage,
+    storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     localSynchronizerNode: Option[LocalSynchronizerNode],

@@ -27,7 +27,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -154,7 +154,7 @@ object ValidatorStore {
 
   def apply(
       key: Key,
-      storage: Storage,
+      storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
@@ -164,18 +164,14 @@ object ValidatorStore {
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
   ): ValidatorStore =
-    storage match {
-      case storage: DbStorage =>
-        new DbValidatorStore(
-          key,
-          storage,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbValidatorStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+    )
 
   case class Key(
       /** The validator party. */

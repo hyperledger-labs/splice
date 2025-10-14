@@ -8,7 +8,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -305,7 +305,7 @@ object ScanStore {
 
   def apply(
       key: ScanStore.Key,
-      storage: Storage,
+      storage: DbStorage,
       isFirstSv: Boolean,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
@@ -320,28 +320,24 @@ object ScanStore {
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): ScanStore = {
-    storage match {
-      case db: DbStorage =>
-        new CachingScanStore(
-          loggerFactory,
-          retryProvider,
-          new DbScanStore(
-            key = key,
-            db,
-            isFirstSv,
-            loggerFactory,
-            retryProvider,
-            createScanAggregatesReader,
-            domainMigrationInfo,
-            participantId,
-            metrics,
-            initialRound,
-          ),
-          cacheConfigs,
-          metrics,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new CachingScanStore(
+      loggerFactory,
+      retryProvider,
+      new DbScanStore(
+        key = key,
+        storage,
+        isFirstSv,
+        loggerFactory,
+        retryProvider,
+        createScanAggregatesReader,
+        domainMigrationInfo,
+        participantId,
+        metrics,
+        initialRound,
+      ),
+      cacheConfigs,
+      metrics,
+    )
   }
 
   def contractFilter(

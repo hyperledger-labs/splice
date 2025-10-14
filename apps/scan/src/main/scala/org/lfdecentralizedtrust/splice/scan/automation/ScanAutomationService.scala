@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
   TxLogBackfillingTrigger,
-  UpdateIngestionService,
 }
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
@@ -23,11 +22,10 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -40,7 +38,7 @@ class ScanAutomationService(
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
     val updateHistory: UpdateHistory,
-    storage: Storage,
+    storage: DbStorage,
     snapshotStore: AcsSnapshotStore,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,

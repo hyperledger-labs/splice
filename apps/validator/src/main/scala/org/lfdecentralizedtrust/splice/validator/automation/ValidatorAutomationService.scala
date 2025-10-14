@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
-  UpdateIngestionService,
 }
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
@@ -37,7 +36,7 @@ import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -62,7 +61,7 @@ class ValidatorAutomationService(
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
     val updateHistory: UpdateHistory,
-    storage: Storage,
+    storage: DbStorage,
     scanConnection: BftScanConnection,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,

@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   TransferFollowTrigger,
   TxLogBackfillingTrigger,
   UnassignTrigger,
-  UpdateIngestionService,
 }
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}

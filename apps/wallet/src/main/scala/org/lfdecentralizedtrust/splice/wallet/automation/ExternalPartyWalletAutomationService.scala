@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.wallet.automation
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-  UpdateIngestionService,
 }
 import AutomationServiceCompanion.TriggerClass
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
@@ -21,7 +20,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContext
 
