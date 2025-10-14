@@ -148,8 +148,10 @@ Sequencing result message timed out.*mediator=
 # TODO (DACH-NY/canton-network-internal#966) - remove if not necessary anymore
 ACS_COMMITMENT_DEGRADATION
 
+# TODO(#2689) remove once fix consumed
+the set of package dependencies is not self consistent, the extra dependencies are.*54f85eb
+
 # FIXME
 Admin workflow services not started as DARs have not been loaded
-the set of package dependencies is not self consistent, the extra dependencies are
 
 # Make sure to have a trailing newline
