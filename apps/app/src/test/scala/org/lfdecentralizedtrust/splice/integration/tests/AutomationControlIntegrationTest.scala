@@ -183,6 +183,16 @@ class AutomationControlIntegrationTest
       _ => aliceWalletClient.list().amulets should have length 2,
     )
 
+    clue("Advance rounds to open issuing rounds for amulet merging automation") {
+      eventually() {
+        sv1Backend.dsoDelegateBasedAutomation
+          .trigger[AdvanceOpenMiningRoundTrigger]
+          .runOnce()
+          .futureValue should be(true)
+        sv1ScanBackend.getOpenAndIssuingMiningRounds()._2 should not be empty
+      }
+    }
+
     // Note: this is just to illustrate that nothing is happening while Alice's automation is paused.
     clue("Verify that no amulets are merged over a long time interval") {
       Threading.sleep(waitTimeInMillis)

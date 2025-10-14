@@ -113,7 +113,7 @@ class AppUpgradeIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateInitialTickDuration(
           // required for reward triggers and amulet merging to run
-          NonNegativeFiniteDuration.ofSeconds(5)
+          NonNegativeFiniteDuration.ofSeconds(2)
         )(config)
       )
 
