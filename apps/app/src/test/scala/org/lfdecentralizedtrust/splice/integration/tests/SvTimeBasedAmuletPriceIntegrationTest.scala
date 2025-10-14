@@ -3,7 +3,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.util.AmuletConfigUtil
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 import com.digitalasset.canton.metrics.MetricValue
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 
