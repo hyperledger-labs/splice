@@ -226,7 +226,8 @@ class SvApp(
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
-            ),
+            )
+            .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal),
           svSynchronizerConfig.sequencer.internalApi,
           svSynchronizerConfig.sequencer.externalPublicApiUrl,
           svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,

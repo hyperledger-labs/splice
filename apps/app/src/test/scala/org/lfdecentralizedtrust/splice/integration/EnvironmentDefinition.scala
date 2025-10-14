@@ -418,7 +418,7 @@ case class EnvironmentDefinition(
       )
       .addConfigTransform((_, conf) =>
         ConfigTransforms
-          .updateAllSvAppFoundDsoConfigs_(
+          .updateAllSvAppConfigs_(
             _.focus(_.topologyChangeDelayDuration)
               // same as canton for sim time
               .replace(NonNegativeFiniteDuration.Zero)
