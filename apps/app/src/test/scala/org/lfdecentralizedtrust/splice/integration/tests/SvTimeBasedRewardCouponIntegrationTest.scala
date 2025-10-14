@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.validator.automation.{
   ReceiveFaucetCouponTrigger,
   ValidatorPackageVettingTrigger,
 }
-import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.TransferTxLogEntry
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransferTransactionSubtype
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -307,15 +306,6 @@ class SvTimeBasedRewardCouponIntegrationTest
 
     clue("Pause SV4's SvRewardCouponTrigger") {
       sv4RewardCouponTrigger.pause().futureValue
-      // TODO(#2380) Remove the pause once the scan txlog script is fixed.
-    }
-    clue("Pause alice reward collection trigger") {
-      aliceValidatorBackend
-        .userWalletAutomation(aliceValidatorWalletClient.config.ledgerApiUser)
-        .futureValue
-        .trigger[CollectRewardsAndMergeAmuletsTrigger]
-        .pause()
-        .futureValue
     }
 
     clue("Pause alice vetting trigger") {
