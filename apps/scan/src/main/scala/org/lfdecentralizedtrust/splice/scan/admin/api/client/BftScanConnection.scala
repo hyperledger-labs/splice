@@ -852,7 +852,7 @@ object BftScanConnection {
       val loggerFactory: NamedLoggerFactory,
   ) extends ScanList {
     override def scanConnections: ScanConnections =
-      ScanConnections(Seq(scanConnection), 0, false, 0)
+      ScanConnections(Seq(scanConnection), 0, false, Some(0))
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
       SyncCloseable("scan_connection", scanConnection.close())
@@ -882,7 +882,12 @@ object BftScanConnection {
       failedConnections: Map[Uri, (Throwable, SvName)],
   ) {
     def scanConnections: ScanConnections =
-      ScanConnections(openConnections.values.map(_._1).toSeq, failedConnections.size, false, 0)
+      ScanConnections(
+        openConnections.values.map(_._1).toSeq,
+        failedConnections.size,
+        false,
+        Some(0),
+      )
   }
 
   class Bft(
