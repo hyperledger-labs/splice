@@ -125,6 +125,8 @@ class BftScanConnection(
   private val refreshAction: Option[PeriodicAction] = scanList match {
     case _: BftScanConnection.TrustSingle =>
       None
+    case _: BftScanConnection.TrustSpecificScanList =>
+      None
     case bft: BftScanConnection.Bft =>
       Some(
         new PeriodicAction(
@@ -785,13 +787,25 @@ object BftScanConnection {
 
   object BftCallConfig {
     def default(connections: ScanConnections): BftCallConfig = {
-      val f = connections.f
-      BftCallConfig(
-        connections = connections.open,
-        requestsToDo = 2 * f + 1,
-        targetSuccess = f + 1,
-      )
+
+      if (connections.trustSpecific) {
+        val n = connections.open.size
+        val threshold = connections.threshold.getOrElse((n / 2) + 1)
+        BftCallConfig(
+          connections = connections.open,
+          requestsToDo = n,
+          targetSuccess = threshold,
+        )
+      } else {
+        val f = connections.f
+        BftCallConfig(
+          connections = connections.open,
+          requestsToDo = 2 * f + 1,
+          targetSuccess = f + 1,
+        )
+      }
     }
+
     def forAvailableData(
         connections: ScanConnections,
         dataAvailable: SingleScanConnection => Boolean,
@@ -816,7 +830,12 @@ object BftScanConnection {
     }
   }
 
-  case class ScanConnections(open: Seq[SingleScanConnection], failed: Int) {
+  case class ScanConnections(
+      open: Seq[SingleScanConnection],
+      failed: Int,
+      trustSpecific: Boolean = false,
+      threshold: Option[Int] = Some(0),
+  ) {
     val totalNumber: Int = open.size + failed
     val f: Int = (totalNumber - 1) / 3
   }
@@ -832,11 +851,29 @@ object BftScanConnection {
       val retryProvider: RetryProvider,
       val loggerFactory: NamedLoggerFactory,
   ) extends ScanList {
-    override def scanConnections: ScanConnections = ScanConnections(Seq(scanConnection), 0)
+    override def scanConnections: ScanConnections =
+      ScanConnections(Seq(scanConnection), 0, false, 0)
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
       SyncCloseable("scan_connection", scanConnection.close())
     )
+  }
+
+  class TrustSpecificScanList(
+      connections: Seq[SingleScanConnection],
+      threshold: Option[Int],
+      val retryProvider: RetryProvider,
+      val loggerFactory: NamedLoggerFactory,
+  ) extends ScanList {
+    override def scanConnections: ScanConnections =
+      ScanConnections(connections, 0, true, threshold)
+
+    // No refresh logic; connections are static for the lifetime
+
+    override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+      connections.zipWithIndex.map { case (connection, i) =>
+        SyncCloseable(s"scan_connection_$i", connection.close())
+      }
   }
 
   type SvName = String
@@ -845,7 +882,7 @@ object BftScanConnection {
       failedConnections: Map[Uri, (Throwable, SvName)],
   ) {
     def scanConnections: ScanConnections =
-      ScanConnections(openConnections.values.map(_._1).toSeq, failedConnections.size)
+      ScanConnections(openConnections.values.map(_._1).toSeq, failedConnections.size, false, 0)
   }
 
   class Bft(
@@ -1096,6 +1133,31 @@ object BftScanConnection {
               loggerFactory,
             )
           )
+      case BftScanClientConfig.TrustSpecific(seedUrls, threshold, amuletRulesCacheTimeToLive) =>
+        // Connects to all provided URLs
+        seedUrls
+          .traverse(uri =>
+            builder(uri, amuletRulesCacheTimeToLive).transformWith {
+              case Success(conn) => Future.successful(Right(conn))
+              case Failure(err) => Future.successful(Left(uri -> err))
+            }
+          )
+          .map { cs =>
+            val (failed, connections) = cs.toList.partitionEither(identity)
+            new BftScanConnection(
+              spliceLedgerClient,
+              amuletRulesCacheTimeToLive,
+              new TrustSpecificScanList(
+                connections,
+                threshold,
+                retryProvider,
+                loggerFactory,
+              ),
+              clock,
+              retryProvider,
+              loggerFactory,
+            )
+          }
       case BftScanClientConfig.Bft(seedUrls, scansRefreshInterval, amuletRulesCacheTimeToLive) =>
         for {
           bft <- seedUrls
@@ -1256,6 +1318,17 @@ object BftScanConnection {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSingle =
         copy(amuletRulesCacheTimeToLive = ttl)
     }
+
+    case class TrustSpecific(
+        seedUrls: NonEmptyList[Uri],
+        threshold: Option[Int] = None,
+        amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
+          ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
+    ) extends BftScanClientConfig {
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSpecific =
+        copy(amuletRulesCacheTimeToLive = ttl)
+    }
+
     case class Bft(
         seedUrls: NonEmptyList[Uri],
         scansRefreshInterval: NonNegativeFiniteDuration =

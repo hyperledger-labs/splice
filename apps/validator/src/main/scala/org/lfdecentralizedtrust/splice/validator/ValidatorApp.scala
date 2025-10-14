@@ -598,6 +598,18 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+        case BftScanClientConfig.TrustSpecific(seedUrls, _, _) =>
+          seedUrls
+            .traverse { url =>
+              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+              MinimalScanConnection(
+                config,
+                amuletAppParameters.upgradesConfig,
+                retryProvider,
+                loggerFactory,
+              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+            }
+            .map(_ => ())
         case BftScanClientConfig.Bft(seedUrls, _, _) =>
           seedUrls
             .traverse { url =>
