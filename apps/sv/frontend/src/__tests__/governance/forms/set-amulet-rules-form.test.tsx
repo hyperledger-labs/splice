@@ -64,18 +64,21 @@ describe('Set Amulet Config Rules Form', () => {
     expect(urlInput.getAttribute('value')).toBe('');
 
     // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
-    waitFor(() => {
-      const configLabels = screen.getAllByTestId('config-label', { exact: false });
-      expect(configLabels.length).toBeGreaterThan(65);
+    waitFor(
+      () => {
+        const configLabels = screen.getAllByTestId('config-label', { exact: false });
+        expect(configLabels.length).toBeGreaterThan(65);
 
-      const configFields = screen.getAllByTestId('config-field', { exact: false });
-      expect(configFields.length).toBeGreaterThan(65);
+        const configFields = screen.getAllByTestId('config-field', { exact: false });
+        expect(configFields.length).toBeGreaterThan(65);
 
-      // no changes have been made so we should not see any current values
-      expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
-        /Unable to find an element/
-      );
-    });
+        // no changes have been made so we should not see any current values
+        expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
+          /Unable to find an element/
+        );
+      },
+      { timeout: 1000 }
+    );
   });
 
   test('should render errors when submit button is clicked on new form', async () => {

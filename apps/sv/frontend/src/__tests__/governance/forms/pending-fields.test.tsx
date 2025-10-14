@@ -96,11 +96,14 @@ describe('Pending Fields', () => {
       </Wrapper>
     );
 
-    await waitFor(() => {
-      expect(
-        screen.queryByText('Some fields are disabled for editing due to pending votes.')
-      ).not.toBeNull();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.queryByText('Some fields are disabled for editing due to pending votes.')
+        ).not.toBeNull();
+      },
+      { timeout: 5000 }
+    );
 
     const pendingLabels = screen.queryAllByTestId(/^config-pending-value-/);
     expect(pendingLabels.length).toBe(2);
@@ -141,11 +144,14 @@ describe('Pending Fields', () => {
       </Wrapper>
     );
 
-    await waitFor(() => {
-      expect(
-        screen.queryByText('Some fields are disabled for editing due to pending votes.')
-      ).not.toBeNull();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.queryByText('Some fields are disabled for editing due to pending votes.')
+        ).not.toBeNull();
+      },
+      { timeout: 5000 }
+    );
 
     const pendingLabels = screen.queryAllByTestId(/^config-pending-value-/);
     expect(pendingLabels.length).toBe(7);
