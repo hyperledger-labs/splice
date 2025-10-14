@@ -291,6 +291,40 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
       }
     }
 
+    "correctly handles migration with no verdicts in prior migration" in {
+      val mig0 = domainMigrationId
+      val mig1 = mig0 + 1
+      for {
+        ctx0 <- newEventStore(mig0)
+        ctx1 <- newEventStore(mig1)
+
+        // mig0: has only one update (T1), no verdicts
+        recordTs1 = CantonTimestamp.now()
+        tx0 <- insertUpdate(ctx0.updateHistory, recordTs1, "update-mig0")
+        updateId0 = tx0.getUpdateId
+
+        // mig1 (current): has 1 update and 1 verdict (T2)
+        recordTs2 = recordTs1.plusSeconds(1)
+        tx1 <- insertUpdate(ctx1.updateHistory, recordTs2, "update-mig1")
+        updateId1 = tx1.getUpdateId
+        _ <- insertVerdict(ctx1.verdictStore, updateId1, recordTs2, migrationId = mig1)
+
+        // Query combined events at current migration = mig1, starting from beginning of time
+        events <- fetchEvents(ctx1.eventStore, None, mig1, pageLimit)
+      } yield {
+        // Both the update from mig0 and the combined event from mig1 should be present
+        events.size shouldBe 2
+        hasUpdate(events, updateId0) shouldBe true
+        hasUpdate(events, updateId1) shouldBe true
+        hasVerdict(events, updateId1) shouldBe true
+
+        // The event for mig0 should only have an update, no verdict
+        val event0 = events.find(_._2.exists(_.update.update.updateId == updateId0)).value
+        event0._1.isEmpty shouldBe true
+        event0._2.isDefined shouldBe true
+      }
+    }
+
     "Cap the assignments till the latest verdict" in {
       for {
         ctx <- newEventStore()
