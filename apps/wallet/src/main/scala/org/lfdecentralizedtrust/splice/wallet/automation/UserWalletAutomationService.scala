@@ -76,17 +76,9 @@ class UserWalletAutomationService(
       : org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService.type =
     UserWalletAutomationService
 
-  registerService(
-    new UpdateIngestionService(
-      updateHistory.getClass.getSimpleName,
-      updateHistory.ingestionSink,
-      connection(SpliceLedgerConnectionPriority.High),
-      automationConfig,
-      backoffClock = triggerContext.pollingClock,
-      triggerContext.retryProvider,
-      triggerContext.loggerFactory,
-      ingestUpdateHistoryFromParticipantBegin,
-    )
+  registerUpdateHistoryIngestion(
+    updateHistory,
+    ingestUpdateHistoryFromParticipantBegin,
   )
 
   registerTrigger(

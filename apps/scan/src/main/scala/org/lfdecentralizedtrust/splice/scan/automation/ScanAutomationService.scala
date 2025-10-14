@@ -75,17 +75,9 @@ class ScanAutomationService(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
   )
 
-  registerService(
-    new UpdateIngestionService(
-      updateHistory.getClass.getSimpleName,
-      updateHistory.ingestionSink,
-      connection(SpliceLedgerConnectionPriority.High),
-      automationConfig,
-      backoffClock = triggerContext.pollingClock,
-      triggerContext.retryProvider,
-      triggerContext.loggerFactory,
-      ingestUpdateHistoryFromParticipantBegin,
-    )
+  registerUpdateHistoryIngestion(
+    updateHistory,
+    ingestUpdateHistoryFromParticipantBegin,
   )
 
   if (config.updateHistoryBackfillEnabled) {

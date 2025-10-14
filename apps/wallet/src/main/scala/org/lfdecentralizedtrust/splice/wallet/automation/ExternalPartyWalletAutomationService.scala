@@ -57,17 +57,9 @@ class ExternalPartyWalletAutomationService(
       : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =
     ExternalPartyWalletAutomationService
 
-  registerService(
-    new UpdateIngestionService(
-      updateHistory.getClass.getSimpleName,
-      updateHistory.ingestionSink,
-      connection(SpliceLedgerConnectionPriority.High),
-      automationConfig,
-      backoffClock = triggerContext.pollingClock,
-      triggerContext.retryProvider,
-      triggerContext.loggerFactory,
-      ingestUpdateHistoryFromParticipantBegin,
-    )
+  registerUpdateHistoryIngestion(
+    updateHistory,
+    ingestUpdateHistoryFromParticipantBegin,
   )
 }
 

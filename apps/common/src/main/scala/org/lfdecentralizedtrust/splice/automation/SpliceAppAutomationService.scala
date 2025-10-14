@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
@@ -95,6 +96,24 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       case SpliceLedgerConnectionPriority.Low => lowPriorityConnection
       case SpliceLedgerConnectionPriority.AmuletExpiry => amuletExpiryConnection
     }
+
+  final protected def registerUpdateHistoryIngestion(
+      updateHistory: UpdateHistory,
+      ingestUpdateHistoryFromParticipantBegin: Boolean,
+  ): Unit = {
+    registerService(
+      new UpdateIngestionService(
+        updateHistory.getClass.getSimpleName,
+        updateHistory.ingestionSink,
+        connection(SpliceLedgerConnectionPriority.High),
+        automationConfig,
+        backoffClock = triggerContext.pollingClock,
+        triggerContext.retryProvider,
+        triggerContext.loggerFactory,
+        ingestUpdateHistoryFromParticipantBegin,
+      )
+    )
+  }
 
   private def completionOffsetCallback(offset: Long): Future[Unit] =
     store.multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)(TraceContext.empty)

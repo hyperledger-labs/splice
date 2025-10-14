@@ -100,17 +100,9 @@ class ValidatorAutomationService(
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
 
-  registerService(
-    new UpdateIngestionService(
-      updateHistory.getClass.getSimpleName,
-      updateHistory.ingestionSink,
-      connection(SpliceLedgerConnectionPriority.High),
-      automationConfig,
-      backoffClock = triggerContext.pollingClock,
-      triggerContext.retryProvider,
-      triggerContext.loggerFactory,
-      ingestUpdateHistoryFromParticipantBegin,
-    )
+  registerUpdateHistoryIngestion(
+    updateHistory,
+    ingestUpdateHistoryFromParticipantBegin,
   )
 
   automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
