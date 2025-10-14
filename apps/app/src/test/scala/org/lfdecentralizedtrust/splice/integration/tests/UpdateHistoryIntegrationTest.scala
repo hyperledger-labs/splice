@@ -88,7 +88,7 @@ class UpdateHistoryIntegrationTest
 
     actAndCheck(
       "Advance rounds to open issuing rounds for amulet merging",
-      eventually() {
+      eventually(maxPollInterval = 100.milli) {
         advanceRoundsTrigger.runOnce().futureValue should be(true)
         sv1ScanBackend.getOpenAndIssuingMiningRounds()._2 should not be empty
       },

@@ -54,7 +54,11 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
         },
       )(
         "Wait for SV rewards to be collected",
-        _ => sv1WalletClient.balance().unlockedQty should be > BigDecimal(0),
+        _ => {
+          // advance rounds for the reward triggers to run
+          advanceRoundsByOneTick
+          sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
+        },
       )
 
       val transferAmount = BigDecimal(100)

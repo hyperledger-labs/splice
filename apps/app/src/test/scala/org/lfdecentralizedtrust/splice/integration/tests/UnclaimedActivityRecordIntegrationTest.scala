@@ -40,7 +40,7 @@ class UnclaimedActivityRecordIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         // for reward triggers to run
-        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofSeconds(5))(config)
       )
 
   override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
@@ -131,18 +131,6 @@ class UnclaimedActivityRecordIntegrationTest
     val amountToMint = 15.0
     val unclaimedRewardsToMint = Seq(15.0)
 
-    clue("Mint some unclaimed rewards") {
-      unclaimedRewardsToMint.foreach { amount =>
-        createUnclaimedReward(
-          sv1ValidatorBackend.participantClientWithAdminToken,
-          sv1UserId,
-          amount,
-        )
-      }
-      sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
-    }
-
     setTriggersWithin(
       triggersToPauseAtStart = mergeAmuletsTrigger(
         aliceValidatorBackend,
@@ -150,6 +138,18 @@ class UnclaimedActivityRecordIntegrationTest
       ) +: (expiredUnallocatedTriggers ++ expiredUnclaimedTriggers),
       triggersToResumeAtStart = Seq.empty,
     ) {
+      clue("Mint some unclaimed rewards") {
+        unclaimedRewardsToMint.foreach { amount =>
+          createUnclaimedReward(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            amount,
+          )
+        }
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
+      }
+
       actAndCheck(
         "Creating vote request", {
           val action = new ARC_DsoRules(
@@ -205,22 +205,22 @@ class UnclaimedActivityRecordIntegrationTest
 
     aliceWalletClient.list().amulets should have length 0
 
-    clue("Mint some unclaimed rewards") {
-      unclaimedRewardsToMint.foreach { amount =>
-        createUnclaimedReward(
-          sv1ValidatorBackend.participantClientWithAdminToken,
-          sv1UserId,
-          amount,
-        )
-      }
-      sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
-    }
-
     setTriggersWithin(
       triggersToPauseAtStart = Seq(mergeAmuletsTrigger(aliceValidatorBackend, aliceUserName)),
       triggersToResumeAtStart = Seq.empty,
     ) {
+
+      clue("Mint some unclaimed rewards") {
+        unclaimedRewardsToMint.foreach { amount =>
+          createUnclaimedReward(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            amount,
+          )
+        }
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
+      }
       actAndCheck(
         "Creating vote request", {
           val action = new ARC_DsoRules(
@@ -257,6 +257,8 @@ class UnclaimedActivityRecordIntegrationTest
         },
       )
     }
+
+    advanceRoundsByOneTickViaAutomation()
 
     clue("Amulet gets minted") {
       eventually() {

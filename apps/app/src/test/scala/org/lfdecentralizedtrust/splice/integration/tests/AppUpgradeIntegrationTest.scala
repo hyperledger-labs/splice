@@ -113,7 +113,7 @@ class AppUpgradeIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateInitialTickDuration(
           // required for reward triggers and amulet merging to run
-          NonNegativeFiniteDuration.ofSeconds(2)
+          NonNegativeFiniteDuration.ofSeconds(5)
         )(config)
       )
 
@@ -368,6 +368,12 @@ class AppUpgradeIntegrationTest
           forExactly(1, sv1PackagesAfterUpgrade) { pkg =>
             withClue(s"Package ${pkg.packageId}") {
               pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
+            }
+          }
+
+          clue("Issuing rounds are open for rewards to be collected") {
+            eventuallySucceeds() {
+              sv1ScanBackend.getOpenAndIssuingMiningRounds()._2 should not be empty
             }
           }
 

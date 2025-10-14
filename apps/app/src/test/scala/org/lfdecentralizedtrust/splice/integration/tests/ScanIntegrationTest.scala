@@ -45,7 +45,7 @@ import scala.util.{Success, Try}
 
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
-class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
+class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
   private val defaultPageSize = Limit.MaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -287,6 +287,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       "Amulets should appear in Alice's wallet",
       _ => aliceWalletClient.list().amulets should have length 2,
     )
+
+    advanceRoundsByOneTickViaAutomation()
 
     actAndCheck(
       "Run merge amulets automation once",

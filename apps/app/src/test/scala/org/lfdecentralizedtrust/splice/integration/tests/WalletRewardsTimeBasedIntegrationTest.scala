@@ -46,6 +46,8 @@ class WalletRewardsTimeBasedIntegrationTest
         openRounds
       }
 
+      advanceRoundsByOneTick
+
       eventually() {
         bobValidatorWalletClient.listAppRewardCoupons() should have size 1
         bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
@@ -66,8 +68,7 @@ class WalletRewardsTimeBasedIntegrationTest
       val prevBalance = bobValidatorWalletClient.balance().unlockedQty
 
       // Bob's validator collects rewards
-      // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
-      advanceRoundsByOneTick
+      // it takes 2 more ticks for the IssuingMiningRound 1 to be created and open.
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 

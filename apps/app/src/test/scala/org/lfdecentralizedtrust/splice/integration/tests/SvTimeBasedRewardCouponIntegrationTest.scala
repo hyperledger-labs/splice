@@ -132,6 +132,8 @@ class SvTimeBasedRewardCouponIntegrationTest
         openRounds
       }
 
+      // advance rounds for the reward triggers to run
+      advanceRoundsByOneTick
       eventually() {
         val expectedSize = openRounds.size.toLong
         val sv1Coupons = sv1WalletClient.listSvRewardCoupons()
