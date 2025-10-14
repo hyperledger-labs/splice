@@ -36,7 +36,7 @@ describe('SV user can', () => {
   });
 });
 
-describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
+describe('Set Amulet Config Rules Form', () => {
   test('should render all Set Amulet Config Rules Form components', () => {
     render(
       <Wrapper>
@@ -64,62 +64,55 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     expect(urlInput.getAttribute('value')).toBe('');
 
     // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
-    waitFor(
-      () => {
-        const configLabels = screen.getAllByTestId('config-label', { exact: false });
-        expect(configLabels.length).toBeGreaterThan(65);
+    waitFor(() => {
+      const configLabels = screen.getAllByTestId('config-label', { exact: false });
+      expect(configLabels.length).toBeGreaterThan(65);
 
-        const configFields = screen.getAllByTestId('config-field', { exact: false });
-        expect(configFields.length).toBeGreaterThan(65);
+      const configFields = screen.getAllByTestId('config-field', { exact: false });
+      expect(configFields.length).toBeGreaterThan(65);
 
-        // no changes have been made so we should not see any current values
-        expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
-          /Unable to find an element/
-        );
-      },
-      { timeout: 1000 }
-    );
+      // no changes have been made so we should not see any current values
+      expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
+        /Unable to find an element/
+      );
+    });
   });
 
-  test(
-    'should render errors when submit button is clicked on new form',
-    async () => {
-      const user = userEvent.setup();
+  test('should render errors when submit button is clicked on new form', async () => {
+    const user = userEvent.setup();
 
-      render(
-        <Wrapper>
-          <SetAmuletConfigRulesForm />
-        </Wrapper>
-      );
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
 
-      const actionInput = screen.getByTestId('set-amulet-config-rules-action');
-      const submitButton = screen.getByTestId('submit-button');
-      expect(submitButton).toBeDefined();
+    const actionInput = screen.getByTestId('set-amulet-config-rules-action');
+    const submitButton = screen.getByTestId('submit-button');
+    expect(submitButton).toBeDefined();
 
-      await user.click(submitButton);
-      expect(submitButton.getAttribute('disabled')).toBeDefined();
-      await expect(async () => await user.click(submitButton)).rejects.toThrowError(
-        /Unable to perform pointer interaction/
-      );
+    await user.click(submitButton);
+    expect(submitButton.getAttribute('disabled')).toBeDefined();
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
+      /Unable to perform pointer interaction/
+    );
 
-      expect(screen.getByText('Summary is required')).toBeDefined();
-      expect(screen.getByText('Invalid URL')).toBeDefined();
+    expect(screen.getByText('Summary is required')).toBeDefined();
+    expect(screen.getByText('Invalid URL')).toBeDefined();
 
-      // completing the form should reenable the submit button
-      const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
-      expect(summaryInput).toBeDefined();
-      await user.type(summaryInput, 'Summary of the proposal');
+    // completing the form should reenable the submit button
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    expect(summaryInput).toBeDefined();
+    await user.type(summaryInput, 'Summary of the proposal');
 
-      const urlInput = screen.getByTestId('set-amulet-config-rules-url');
-      expect(urlInput).toBeDefined();
-      await user.type(urlInput, 'https://example.com');
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
 
-      await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-      expect(submitButton.getAttribute('disabled')).toBeNull();
-    },
-    { timeout: 10000 }
-  );
+    expect(submitButton.getAttribute('disabled')).toBeNull();
+  });
 
   test('expiry date must be in the future', async () => {
     const user = userEvent.setup();
@@ -240,7 +233,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
   });
 
-  test('should show error on form if submission fails', { timeout: 10000 }, async () => {
+  test('should show error on form if submission fails', async () => {
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
         return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
