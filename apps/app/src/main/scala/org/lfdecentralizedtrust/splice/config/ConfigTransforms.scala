@@ -333,6 +333,12 @@ object ConfigTransforms {
         }
     )
 
+  def updateInitialTickDuration(tick: NonNegativeFiniteDuration): ConfigTransform = {
+    ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+      _.copy(initialTickDuration = tick)
+    )
+  }
+
   def noDevNet: ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(_.focus(_.isDevNet).replace(false))
 
