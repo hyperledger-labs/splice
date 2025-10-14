@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.daml.scalautil.Statement.discard
+import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -40,6 +41,8 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.NodeIdentity
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.VettedPackage
 
 import java.io.File
 import scala.concurrent.ExecutionContext
@@ -250,10 +253,21 @@ class ParticipantClientReference(
   def upload_dar_unless_exists(
       path: String
   ): Unit = {
-    val hash = DarParser.assertReadArchiveFromFile(new File(path)).main.getHash
+    val dar = DarParser.assertReadArchiveFromFile(new File(path))
+    val hash = dar.main.getHash
     val pkgs = this.ledger_api.packages.list()
     if (!pkgs.map(_.packageId).contains(hash)) {
-      discard[String](this.dars.upload(path))
+      discard[String](this.dars.upload(path, vetAllPackages = false))
+      this.synchronizers.list_connected().foreach { sync =>
+        this.topology.vetted_packages.propose_delta(
+          this.id,
+          adds = dar.all
+            .map(p => LfPackageId.assertFromString(p.getHash))
+            .distinct
+            .map(VettedPackage(_, None, None)),
+          store = TopologyStoreId.Synchronizer(sync.synchronizerId),
+        )
+      }
     }
   }
 }
