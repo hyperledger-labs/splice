@@ -21,6 +21,8 @@ import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.daml.ledger.javaapi.data.Identifier
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -36,6 +38,10 @@ class UnclaimedActivityRecordIntegrationTest
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransform((_, config) =>
+        // for reward triggers to run
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
+      )
 
   override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
     UnclaimedReward.TEMPLATE_ID_WITH_PACKAGE_ID

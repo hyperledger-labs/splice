@@ -523,12 +523,12 @@ class SvReonboardingIntegrationTest
 
         sv4WalletClient.userStatus().party shouldBe sv4PartyNew.toProtoPrimitive
 
-        val originalAmulets: Range = 99 to 100
         clue("amulet balance is preserved from off-boarded sv4") {
+          val expectedAmulets: Range = 99 to 100
           checkWalletAmount(
             sv4Party,
             validatorLocalWalletClient,
-            (walletUsdToAmulet(originalAmulets.start), walletUsdToAmulet(originalAmulets.end)),
+            (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end)),
           )
         }
 
@@ -538,7 +538,7 @@ class SvReonboardingIntegrationTest
         )(
           "balance updated",
           _ => {
-            val expectedAmulets: Range = 49 to 50
+            val expectedAmulets: Range = 149 to 150
             checkWalletAmount(
               sv4Party,
               validatorLocalWalletClient,

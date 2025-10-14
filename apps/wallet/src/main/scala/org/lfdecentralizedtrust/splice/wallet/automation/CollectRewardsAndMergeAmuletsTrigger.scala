@@ -49,7 +49,7 @@ class CollectRewardsAndMergeAmuletsTrigger(
       tc: TraceContext
   ): Future[Seq[CollectRewardsAndMergeAmuletsTask]] = {
     for {
-      (openRounds, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds().map {
+      (_, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds().map {
         case (openRounds, issuingRounds) =>
           (
             openRounds.map(round =>
@@ -69,15 +69,7 @@ class CollectRewardsAndMergeAmuletsTrigger(
           )
       }
     } yield {
-      val roundsToUseForTask =
-        if (issuingRounds.nonEmpty) issuingRounds
-        else {
-          logger.info(
-            "No issuing rounds found, falling back to open rounds to ensure amulet merging runs"
-          )
-          openRounds
-        }
-      val openRoundsForTask = roundsToUseForTask
+      val openRoundsForTask = issuingRounds
         .filter(_.opensAt.isBefore(context.clock.now.toInstant))
       openRoundsForTask
         .maxByOption(_.opensAt)

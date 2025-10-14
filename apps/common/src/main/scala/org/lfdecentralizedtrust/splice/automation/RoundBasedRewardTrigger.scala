@@ -15,6 +15,12 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
+/** Returns to actual tasks to be executed based on the rounds of the task.
+  * It pessimistically tries to execute the tasks in the first tick of the first open round that it did not already ran for in the past.
+  * It chooses a random time between the round open time (or now if the rounds is already opened) and either one tick in the future or the close time of the previous round minus a buffer (to ensure we run at least twice for the same round).
+  * The trigger will respect the parallel polling trigger behavior and execute until no work is left to be done. From that point it will not run again for the same round (we can't tell if the execution failed, but the next round will cover it again just in case).``
+  * -
+  */
 abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -100,6 +106,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
                   tasks
                 }
               case None =>
+                logger.debug(s"No new rounds to schedule for, last ran for ${nextRunTime.get()}.")
                 Seq.empty
             }
           })

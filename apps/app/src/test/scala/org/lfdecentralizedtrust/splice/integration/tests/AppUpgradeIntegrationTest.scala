@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -110,6 +111,12 @@ class AppUpgradeIntegrationTest
                 })
           }))
       })
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(
+          // required for reward triggers and amulet merging to run
+          NonNegativeFiniteDuration.ofSeconds(5)
+        )(config)
+      )
 
   "A set of Splice apps" should {
     "be upgradeable" in { implicit env =>
