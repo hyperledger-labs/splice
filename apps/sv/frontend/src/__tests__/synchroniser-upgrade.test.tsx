@@ -64,7 +64,7 @@ describe('SV user can', () => {
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
 
-  test('set next scheduled synchronizer upgrade', { timeout: 10000 }, async () => {
+  test('set next scheduled synchronizer upgrade', async () => {
     server.use(
       rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
         return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
@@ -92,280 +92,248 @@ describe('SV user can', () => {
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
   });
 
-  test(
-    'submit vote request with new valid synchronizer upgrade time',
-    { timeout: 10000 },
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
-        })
-      );
-
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
-
-      expect(await screen.findByText('Log In')).toBeDefined();
-
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
-
-      await user.click(screen.getByText('Governance'));
-
-      changeAction();
-
-      const synchronizerUpgradeCheckBox = screen.getByTestId(
-        'enable-next-scheduled-domain-upgrade'
-      );
-      await user.click(synchronizerUpgradeCheckBox);
-
-      await fillOutForm(user);
-
-      const expirationDate = screen
-        .getByTestId('datetime-picker-vote-request-expiration')
-        .getAttribute('value');
-      expect(expirationDate).toBeDefined();
-
-      const expirationDateDayjs = dayjs(expirationDate);
-      const newSyncUpgradeTime = expirationDateDayjs
-        .utc()
-        .add(1, 'minute')
-        .format(syncPauseTimeDateFormat);
-
-      const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
-        'nextScheduledSynchronizerUpgrade.time-value'
-      );
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: newSyncUpgradeTime },
-      });
-
-      expect(
-        screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-      ).toBeDefined();
-    }
-  );
-
-  test(
-    'submit vote request with existing and unchanged synchronizer upgrade time',
-    { timeout: 10000 },
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithSynchronizerUpgrade));
-        })
-      );
-
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
-
-      expect(await screen.findByText('Log In')).toBeDefined();
-
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
-
-      await user.click(screen.getByText('Governance'));
-
-      changeAction();
-      await fillOutForm(user);
-
-      const disabled = screen
-        .queryByTestId('create-voterequest-submit-button')
-        ?.getAttribute('disabled');
-
-      expect(disabled).toBeOneOf([null, '']);
-    }
-  );
-
-  test(
-    'not submit vote request if new synchronizer upgrade time is before expiry',
-    { timeout: 10000 },
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
-        })
-      );
-
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
-
-      expect(await screen.findByText('Log In')).toBeDefined();
-
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
-
-      await user.click(screen.getByText('Governance'));
-
-      changeAction();
-      await fillOutForm(user);
-
-      const effectiveAtThresholdCheckBox = screen.getByTestId(
-        'checkbox-set-effective-at-threshold'
-      );
-      await user.click(effectiveAtThresholdCheckBox);
-
-      const synchronizerUpgradeCheckBox = screen.getByTestId(
-        'enable-next-scheduled-domain-upgrade'
-      );
-      await user.click(synchronizerUpgradeCheckBox);
-
-      const expirationDate = screen
-        .getByTestId('datetime-picker-vote-request-expiration')
-        .getAttribute('value');
-      expect(expirationDate).toBeDefined();
-
-      const expirationDateDayjs = dayjs(expirationDate);
-      const invalidUpgradeTime = expirationDateDayjs.subtract(1, 'minute').format(dateFormat);
-      const validUpgradeTime = expirationDateDayjs.utc().add(1, 'minute').format(dateFormat);
-
-      const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
-        'nextScheduledSynchronizerUpgrade.time-value'
-      );
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
-      });
-
-      expect(
-        screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-      ).toBeDefined();
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: validUpgradeTime },
-      });
-
-      expect(
-        screen.queryByTestId('create-voterequest-submit-button')?.getAttribute('disabled')
-      ).toBeNull();
-    }
-  );
-
-  test(
-    'not submit vote request if synchronizer upgrade time is changed and is before expiry and effective at threshold',
-    { timeout: 10000 },
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithSynchronizerUpgrade));
-        })
-      );
-
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
-
-      expect(await screen.findByText('Log In')).toBeDefined();
-
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
-
-      await user.click(screen.getByText('Governance'));
-
-      changeAction();
-      await fillOutForm(user);
-
-      const effectiveDateComponent = screen.getByTestId('datetime-picker-vote-request-expiration');
-      const effectiveDate = effectiveDateComponent.getAttribute('value');
-      const effectiveDateDayjs = dayjs(effectiveDate);
-      const effectiveDateMinus1Minute = effectiveDateDayjs.subtract(1, 'minute').format(dateFormat);
-
-      fireEvent.change(effectiveDateComponent, {
-        target: { value: effectiveDateMinus1Minute },
-      });
-
-      // effective date above is invalid but shouldn;t matter because we checked this box
-      const effectiveAtThresholdCheckBox = screen.getByTestId(
-        'checkbox-set-effective-at-threshold'
-      );
-      await user.click(effectiveAtThresholdCheckBox);
-
-      const synchronizerUpgradeCheckBox = screen.getByTestId(
-        'enable-next-scheduled-domain-upgrade'
-      );
-      await user.click(synchronizerUpgradeCheckBox);
-
-      const expirationDate = screen
-        .getByTestId('datetime-picker-vote-request-expiration')
-        .getAttribute('value');
-      expect(expirationDate).toBeDefined();
-
-      const expirationDateDayjs = dayjs(expirationDate);
-      const invalidUpgradeTime = expirationDateDayjs.utc().subtract(1, 'minute').format(dateFormat);
-
-      const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
-        'nextScheduledSynchronizerUpgrade.time-value'
-      );
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
-      });
-
-      expect(
-        screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-      ).toBeDefined();
-    }
-  );
-
-  test(
-    'not submit vote request if synchronizer upgrade time is changed and is before effective date',
-    { timeout: 10000 },
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithSynchronizerUpgrade));
-        })
-      );
-
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
-
-      expect(await screen.findByText('Log In')).toBeDefined();
-
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
-
-      await user.click(screen.getByText('Governance'));
-
-      changeAction();
-      await fillOutForm(user);
-
-      const synchronizerUpgradeCheckBox = screen.getByTestId(
-        'enable-next-scheduled-domain-upgrade'
-      );
-      await user.click(synchronizerUpgradeCheckBox);
-
-      const effectiveDate = screen
-        .getByTestId('datetime-picker-vote-request-effectivity')
-        .getAttribute('value');
-      expect(effectiveDate).toBeDefined();
-
-      const effectiveDateDayjs = dayjs(effectiveDate);
-      const invalidUpgradeTime = effectiveDateDayjs.utc().subtract(1, 'minute').format(dateFormat);
-      const validUpgradeTime = effectiveDateDayjs.add(1, 'minute').format(dateFormat);
-
-      const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
-        'nextScheduledSynchronizerUpgrade.time-value'
-      );
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
-      });
-
-      expect(
-        screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-      ).toBeDefined();
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: validUpgradeTime },
-      });
-
-      const disabled = screen
-        .queryByTestId('create-voterequest-submit-button')
-        ?.getAttribute('disabled');
-
-      expect(disabled).toBeOneOf([null, '']);
-    }
-  );
+  test('submit vote request with new valid synchronizer upgrade time', async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    await user.click(screen.getByText('Governance'));
+
+    changeAction();
+
+    const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(synchronizerUpgradeCheckBox);
+
+    await fillOutForm(user);
+
+    const expirationDate = screen
+      .getByTestId('datetime-picker-vote-request-expiration')
+      .getAttribute('value');
+    expect(expirationDate).toBeDefined();
+
+    const expirationDateDayjs = dayjs(expirationDate);
+    const newSyncUpgradeTime = expirationDateDayjs
+      .utc()
+      .add(1, 'minute')
+      .format(syncPauseTimeDateFormat);
+
+    const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
+      'nextScheduledSynchronizerUpgrade.time-value'
+    );
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: newSyncUpgradeTime },
+    });
+
+    expect(
+      screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
+    ).toBeDefined();
+  });
+
+  test('submit vote request with existing and unchanged synchronizer upgrade time', async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        return res(ctx.json(dsoInfoWithSynchronizerUpgrade));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    await user.click(screen.getByText('Governance'));
+
+    changeAction();
+    await fillOutForm(user);
+
+    const disabled = screen
+      .queryByTestId('create-voterequest-submit-button')
+      ?.getAttribute('disabled');
+
+    expect(disabled).toBeOneOf([null, '']);
+  });
+
+  test('not submit vote request if new synchronizer upgrade time is before expiry', async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    await user.click(screen.getByText('Governance'));
+
+    changeAction();
+    await fillOutForm(user);
+
+    const effectiveAtThresholdCheckBox = screen.getByTestId('checkbox-set-effective-at-threshold');
+    await user.click(effectiveAtThresholdCheckBox);
+
+    const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(synchronizerUpgradeCheckBox);
+
+    const expirationDate = screen
+      .getByTestId('datetime-picker-vote-request-expiration')
+      .getAttribute('value');
+    expect(expirationDate).toBeDefined();
+
+    const expirationDateDayjs = dayjs(expirationDate);
+    const invalidUpgradeTime = expirationDateDayjs.subtract(1, 'minute').format(dateFormat);
+    const validUpgradeTime = expirationDateDayjs.utc().add(1, 'minute').format(dateFormat);
+
+    const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
+      'nextScheduledSynchronizerUpgrade.time-value'
+    );
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: invalidUpgradeTime },
+    });
+
+    expect(
+      screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
+    ).toBeDefined();
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: validUpgradeTime },
+    });
+
+    expect(
+      screen.queryByTestId('create-voterequest-submit-button')?.getAttribute('disabled')
+    ).toBeNull();
+  });
+
+  test('not submit vote request if synchronizer upgrade time is changed and is before expiry and effective at threshold', async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        return res(ctx.json(dsoInfoWithSynchronizerUpgrade));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    await user.click(screen.getByText('Governance'));
+
+    changeAction();
+    await fillOutForm(user);
+
+    const effectiveDateComponent = screen.getByTestId('datetime-picker-vote-request-expiration');
+    const effectiveDate = effectiveDateComponent.getAttribute('value');
+    const effectiveDateDayjs = dayjs(effectiveDate);
+    const effectiveDateMinus1Minute = effectiveDateDayjs.subtract(1, 'minute').format(dateFormat);
+
+    fireEvent.change(effectiveDateComponent, {
+      target: { value: effectiveDateMinus1Minute },
+    });
+
+    // effective date above is invalid but shouldn;t matter because we checked this box
+    const effectiveAtThresholdCheckBox = screen.getByTestId('checkbox-set-effective-at-threshold');
+    await user.click(effectiveAtThresholdCheckBox);
+
+    const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(synchronizerUpgradeCheckBox);
+
+    const expirationDate = screen
+      .getByTestId('datetime-picker-vote-request-expiration')
+      .getAttribute('value');
+    expect(expirationDate).toBeDefined();
+
+    const expirationDateDayjs = dayjs(expirationDate);
+    const invalidUpgradeTime = expirationDateDayjs.utc().subtract(1, 'minute').format(dateFormat);
+
+    const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
+      'nextScheduledSynchronizerUpgrade.time-value'
+    );
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: invalidUpgradeTime },
+    });
+
+    expect(
+      screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
+    ).toBeDefined();
+  });
+
+  test('not submit vote request if synchronizer upgrade time is changed and is before effective date', async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        return res(ctx.json(dsoInfoWithSynchronizerUpgrade));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    await user.click(screen.getByText('Governance'));
+
+    changeAction();
+    await fillOutForm(user);
+
+    const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(synchronizerUpgradeCheckBox);
+
+    const effectiveDate = screen
+      .getByTestId('datetime-picker-vote-request-effectivity')
+      .getAttribute('value');
+    expect(effectiveDate).toBeDefined();
+
+    const effectiveDateDayjs = dayjs(effectiveDate);
+    const invalidUpgradeTime = effectiveDateDayjs.utc().subtract(1, 'minute').format(dateFormat);
+    const validUpgradeTime = effectiveDateDayjs.add(1, 'minute').format(dateFormat);
+
+    const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
+      'nextScheduledSynchronizerUpgrade.time-value'
+    );
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: invalidUpgradeTime },
+    });
+
+    expect(
+      screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
+    ).toBeDefined();
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: validUpgradeTime },
+    });
+
+    const disabled = screen
+      .queryByTestId('create-voterequest-submit-button')
+      ?.getAttribute('disabled');
+
+    expect(disabled).toBeOneOf([null, '']);
+  });
 
   test(
     'make changes with different timezones',

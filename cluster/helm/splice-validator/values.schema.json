@@ -81,7 +81,6 @@
     },
     {
       "required": [
-        "auth",
         "defaultJvmOptions",
         "enableWallet",
         "imageRepo",
@@ -241,6 +240,21 @@
               "description": "The URL for the JWKS endpoint for the validator app API"
             }
           }
+        },
+        "disableAuth": {
+          "type": "boolean"
+        },
+        "if": {
+          "properties": {
+            "disableAuth": {
+              "const": "true"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "auth"
+          ]
         },
         "scanAddress": {
           "type": "string"
