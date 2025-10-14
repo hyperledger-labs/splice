@@ -42,7 +42,6 @@ spec:
         - name: SPLICE_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}
         {{ end }}
-        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         {{- range $ii, $user := .Values.additionalUsers }}
         - name: {{ $user.name }}
           {{ if $user.value }}
@@ -88,18 +87,6 @@ spec:
         {{ if .Values.validatorPartyHint }}
         - name: SPLICE_APP_VALIDATOR_PARTY_HINT
           value: {{ .Values.validatorPartyHint }}
-        {{ end }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_AUDIENCE
-          value: {{ .Values.auth.audience | quote }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
-          value: {{ .Values.auth.jwksUrl | quote }}
-        {{ if (.Values.auth.jwks).connectionTimeout }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
-          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
-        {{ end }}
-        {{ if (.Values.auth.jwks).readTimeout }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
-          value: {{ .Values.auth.jwks.readTimeout | quote }}
         {{ end }}
         {{ if .Values.svValidator }}
         - name: SPLICE_APP_VALIDATOR_SV_VALIDATOR
@@ -281,6 +268,42 @@ spec:
         {{- with .Values.maxVettingDelay }}
         - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
           value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
+        {{- end }}
+        {{- if .Values.disableAuth }}
+        - name: ADDITIONAL_CONFIG_DISABLE_AUTH
+          value: |
+            canton.validator-apps.validator_backend {
+              auth=""
+            }
+            canton.validator-apps.validator_backend {
+              auth={
+                algorithm = "hs-256-unsafe"
+                audience = "https://validator.example.com"
+                secret = "unsafe"
+              }
+            }
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
+              type="none"
+            }
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          value: ledger-api-user
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE
+          value: "https://ledger_api.example.com"
+        {{- else }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl | quote }}
+        {{ if (.Values.auth.jwks).connectionTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
+          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
+        {{ end }}
+        {{ if (.Values.auth.jwks).readTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
+          value: {{ .Values.auth.jwks.readTimeout | quote }}
+        {{ end }}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         {{- end }}
         ports:
         - containerPort: 5003

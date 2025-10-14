@@ -113,13 +113,16 @@ You must:
 
 2. Configure your backends to use that OIDC provider.
 
+The validator supports non-authenticated deployments as well, but this is strongly discouraged for production deployments.
+If you wish to run without authentication, please refer to the notes in :ref:`helm-validator-no-auth`.
+
 .. _helm-validator-auth-requirements:
 
 OIDC Provider Requirements
 ++++++++++++++++++++++++++
 
 This section provides pointers for setting up an OIDC provider for use with your Validator node.
-Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.  
+Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.
 
 These docs focus on Auth0, and are being continuously tested and maintained. Other OIDC providers can be used, and are in active use by various community members, who have contributed some notes and examples in `Okta and Keycloak community authored examples </community/oidc-config-okta-keycloak.html>`.
 
@@ -305,6 +308,26 @@ To setup the wallet and CNS UI, create the following two secrets.
     kubectl create --namespace validator secret generic splice-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
+
+.. _helm-validator-no-auth:
+
+Running without Authentication
+++++++++++++++++++++++++++++++
+
+.. warning::
+
+  Running without authentication is highly insecure. Anyone with access to the wallet UI,
+  or to the validator in any other way, may log in to your wallet as a user of their choice,
+  or otherwise transact on-ledger on your behalf. For any production use, you should configure
+  proper authentication as described in the sections above.
+
+In order to run the validator without authentication, add ``disableAuth: true`` to both
+``splice-node/examples/sv-helm/validator-values.yaml`` and ``splice-node/examples/sv-helm/participant-values.yaml``.
+Note that you must disable auth in both places, otherwise the validator will not be able to connect to the participant.
+
+When running without authentication, the username of the validator administrator
+is `administrator`.
+
 
 .. _helm-validator-install:
 

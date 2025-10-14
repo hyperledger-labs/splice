@@ -425,6 +425,12 @@ case class EnvironmentDefinition(
               .replace(NonNegativeFiniteDuration.Zero)
           )(conf)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllAutomationConfigs(
+          // disable round based triggers because tests don't advance time for the triggers to run
+          _.focus(_.enableNewRewardTriggerScheduling).replace(false)
+        )(conf)
+      )
       .withSequencerConnectionsFromScanDisabled(10_000)
 
   override lazy val environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =

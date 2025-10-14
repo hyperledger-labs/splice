@@ -11,11 +11,23 @@ Release Notes
 Upcoming
 --------
 
-  - SV
+  - Deployment
 
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments,
+      and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
+      can act on your behalf.
+
+  - Reward collection
+
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
+
+  - SV app
+
+    - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out of range values.
+      
     - The SV app will no longer store the update history and such, will not be able to answer historical queries.
       All updates involving the DSO party will still be stored and returned by Scan.
-
 
 0.4.20
 ------
