@@ -24,7 +24,6 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.HasParticipantId
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
@@ -69,7 +68,7 @@ trait ParticipantAdminDarsConnection {
     } yield ()
 
   def vetDars(
-      domainId: SynchronizerId,
+      synchronizerId: SynchronizerId,
       dars: Seq[DarResource],
       fromDate: Option[Instant],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
@@ -78,12 +77,11 @@ trait ParticipantAdminDarsConnection {
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
     ensureTopologyMapping[VettedPackages](
-      // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
-      TopologyStoreId.Authorized,
-      s"dars ${dars.map(_.packageId)} are vetted in the authorized store with from $fromDate",
+      TopologyStoreId.Synchronizer(synchronizerId),
+      s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
       topologyTransactionType =>
         EitherT(
-          getVettingState(None, topologyTransactionType).map { vettedPackages =>
+          getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
             if (
               dars
                 .forall(dar => vettedPackages.mapping.packages.exists(_.packageId == dar.packageId))
@@ -105,26 +103,7 @@ trait ParticipantAdminDarsConnection {
         ),
       RetryFor.Automation,
       maxSubmissionDelay = maxVettingDelay,
-    ).flatMap(_ =>
-      retryProvider.waitUntil(
-        RetryFor.Automation,
-        s"vet_dars_on_sync",
-        s"Dars ${dars.map(_.packageId)} are vetted on synchronizer $domainId",
-        getVettingState(domainId, AuthorizedState).map { vettingState =>
-          val packagesNotVetted = dars.filterNot(dar =>
-            vettingState.mapping.packages.exists(_.packageId == dar.packageId)
-          )
-          if (packagesNotVetted.nonEmpty) {
-            throw Status.NOT_FOUND
-              .withDescription(
-                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on synchronizer $domainId"
-              )
-              .asRuntimeException
-          }
-        },
-        logger,
-      )
-    )
+    ).map(_ => ())
   }
 
   def lookupDar(mainPackageId: String)(implicit
