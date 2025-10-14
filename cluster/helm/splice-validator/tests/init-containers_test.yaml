@@ -33,7 +33,7 @@ tests:
     asserts:
       - lengthEqual:
           path: spec.template.spec.initContainers
-          count: 2
+          count: 1
       - isSubset:
           path: spec.template.spec.initContainers[0]
           content:
