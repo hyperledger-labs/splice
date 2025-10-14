@@ -166,18 +166,24 @@ class ValidatorApp(
                 )
                 .asRuntimeException()
             case _ =>
-              logger.info(
-                "Ensuring participant is initialized"
-              )
               val cantonIdentifierConfig =
                 ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
-              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+              val participantInitializer = new ParticipantInitializer(
                 cantonIdentifierConfig.participant,
-                participantAdminConnection,
                 config.participantBootstrappingDump,
                 loggerFactory,
                 retryProvider,
+                participantAdminConnection,
               )
+              if (config.svValidator) {
+                logger.info("Waiting for the participant to be initialized by the SV app")
+                participantInitializer.waitForNodeInitialized()
+              } else {
+                logger.info(
+                  "Ensuring participant is initialized"
+                )
+                participantInitializer.ensureInitializedWithExpectedId()
+              }
           }
       }
     }

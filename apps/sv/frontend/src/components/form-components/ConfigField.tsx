@@ -24,6 +24,28 @@ export type ConfigFieldState = {
 export const ConfigField: React.FC<ConfigFieldProps> = props => {
   const { configChange, effectiveDate, pendingFieldInfo } = props;
   const field = useFieldContext<ConfigFieldState>();
+
+  const isSynchronizerUpgradeTime =
+    field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeTime';
+  const isSynchronizerUpgradeMigrationId =
+    field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeMigrationId';
+
+  // We disable the field if it is pending and the value is the default value.
+  // The default value check is to handle the case where the user made a change
+  // to the field before it became a field with pending changes.
+  // This gives them the chance to revert that change.
+  const isPendingAndDefaultValue =
+    pendingFieldInfo !== undefined && field.state.meta.isDefaultValue;
+
+  const isEffectiveAtThreshold = !effectiveDate;
+
+  // When effective at Threshold, we disable the upgrade time and migrationId config fields
+  const isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId =
+    isEffectiveAtThreshold && (isSynchronizerUpgradeTime || isSynchronizerUpgradeMigrationId);
+
+  const isDisabled =
+    isPendingAndDefaultValue || isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId;
+
   const textFieldProps = {
     variant: 'outlined' as const,
     size: 'small' as const,
@@ -34,11 +56,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
       sx: { textAlign: 'right' },
       'data-testid': `config-field-${configChange.fieldName}`,
     },
-    // We disable the field if it is pending and the value is the default value.
-    // The default value check is to handle the case where the user made a change
-    // to the field before it became a field with pending changes.
-    // This gives them the chance to revert that change.
-    disabled: pendingFieldInfo !== undefined && field.state.meta.isDefaultValue,
+    disabled: isDisabled,
   };
 
   return (
@@ -79,8 +97,8 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
             </Typography>
           )}
 
-          {field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeTime' && (
-            <NextScheduledSynchronizerUpgradeDisplay
+          {isSynchronizerUpgradeTime && (
+            <SynchronizerUpgradeTimeDisplay
               effectiveDate={effectiveDate}
               configChange={configChange}
             />
@@ -116,13 +134,13 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
   );
 };
 
-interface NextScheduledSynchronizerUpgradeDisplayProps {
+interface SynchronizerUpgradeTimeDisplayProps {
   effectiveDate: string | undefined;
   configChange: ConfigChange;
 }
 
-export const NextScheduledSynchronizerUpgradeDisplay: React.FC<
-  NextScheduledSynchronizerUpgradeDisplayProps
+export const SynchronizerUpgradeTimeDisplay: React.FC<
+  SynchronizerUpgradeTimeDisplayProps
 > = props => {
   const { effectiveDate } = props;
   const defaultMigrationTime = dayjs(effectiveDate)

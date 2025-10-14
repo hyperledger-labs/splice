@@ -197,7 +197,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => <field.TextArea title="Proposal Summary" id={`${testIdPrefix}-summary`} />}
+              {field => <field.ProposalSummaryField id={`${testIdPrefix}-summary`} />}
             </form.AppField>
 
             <form.AppField

@@ -206,15 +206,31 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false, {
-        logicalDecoding: !!baseConfig.scanBigQuery,
-      });
+    : postgres.installPostgres(
+        xns,
+        'postgres',
+        'postgres',
+        activeVersion,
+        spliceConfig.pulumiProjectConfig.cloudSql,
+        false,
+        {
+          logicalDecoding: !!baseConfig.scanBigQuery,
+        }
+      );
 
   const appsPostgres =
     defaultPostgres ||
-    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true, {
-      logicalDecoding: !!baseConfig.scanBigQuery,
-    });
+    postgres.installPostgres(
+      xns,
+      `cn-apps-pg`,
+      `cn-apps-pg`,
+      activeVersion,
+      spliceConfig.pulumiProjectConfig.cloudSql,
+      true,
+      {
+        logicalDecoding: !!baseConfig.scanBigQuery,
+      }
+    );
 
   const canton = buildCrossStackCantonDependencies(
     decentralizedSynchronizerUpgradeConfig,

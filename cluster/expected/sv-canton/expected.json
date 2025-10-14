@@ -849,7 +849,9 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
       },
       "type": "Opaque"
     },
@@ -869,7 +871,9 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
       },
       "type": "Opaque"
     },
@@ -1874,6 +1878,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
@@ -1968,6 +1978,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
@@ -2791,7 +2807,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -2858,7 +2874,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -2925,7 +2941,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -2992,7 +3008,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -3976,6 +3992,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
@@ -4070,6 +4092,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
@@ -4943,7 +4971,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -5010,7 +5038,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -5077,7 +5105,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -5144,7 +5172,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -5582,6 +5610,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_3",
             "port": 5432,
@@ -5676,6 +5710,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_4",
             "port": 5432,
@@ -6499,7 +6539,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -6566,7 +6606,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -6633,7 +6673,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -6700,7 +6740,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
