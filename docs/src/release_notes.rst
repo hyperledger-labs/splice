@@ -26,6 +26,11 @@ Upcoming
     - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
       only logging a warning and not publishing an updated value for out of range values.
 
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
 0.4.20
 ------
 
