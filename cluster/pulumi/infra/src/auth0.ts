@@ -141,7 +141,7 @@ function newM2MApp(
       // TODO(DACH-NY/canton-network-internal#2206): For now, we also grant all apps access to the old default ledger API
       // audience, to un-break it until we clean up the audiences we use.
       new auth0.ClientGrant(
-        `${resourceName}LedgerGrant`,
+        `${resourceName}LegacyGrant`,
         {
           clientId: ret.id,
           audience: 'https://canton.network.global',

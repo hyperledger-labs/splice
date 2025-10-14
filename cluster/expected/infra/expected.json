@@ -3385,7 +3385,7 @@
         "daml_ledger_api"
       ]
     },
-    "name": "sv1SvBackendAppLedgerGrant",
+    "name": "sv1SvBackendAppLegacyGrant",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientGrant:ClientGrant"
   },
@@ -3493,7 +3493,7 @@
         "daml_ledger_api"
       ]
     },
-    "name": "sv1ValidatorBackendAppLedgerGrant",
+    "name": "sv1ValidatorBackendAppLegacyGrant",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientGrant:ClientGrant"
   },
@@ -3545,7 +3545,7 @@
         "daml_ledger_api"
       ]
     },
-    "name": "svda1SvBackendAppLedgerGrant",
+    "name": "svda1SvBackendAppLegacyGrant",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientGrant:ClientGrant"
   },
@@ -3653,7 +3653,7 @@
         "daml_ledger_api"
       ]
     },
-    "name": "svda1ValidatorBackendAppLedgerGrant",
+    "name": "svda1ValidatorBackendAppLegacyGrant",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientGrant:ClientGrant"
   },
