@@ -11,9 +11,17 @@ Release Notes
 Upcoming
 --------
 
+  - Deployment
+
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments,
+      and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
+      can act on your behalf.
+
   - Monitoring
 
     - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
 
 0.4.20
 ------
