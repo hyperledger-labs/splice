@@ -288,6 +288,10 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with Trigg
       _ => aliceWalletClient.list().amulets should have length 2,
     )
 
+    // get to the issuing round
+    advanceRoundsByOneTickViaAutomation()
+    advanceRoundsByOneTickViaAutomation()
+    advanceRoundsByOneTickViaAutomation()
     advanceRoundsByOneTickViaAutomation()
 
     actAndCheck(

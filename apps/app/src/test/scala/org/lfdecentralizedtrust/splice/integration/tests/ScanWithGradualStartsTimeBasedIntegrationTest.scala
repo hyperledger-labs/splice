@@ -80,6 +80,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     (firstOpenRound.payload.round.number.toInt to (firstOpenRound.payload.round.number.toInt + 6))
       .foreach { n =>
         clue("Ensure SvRewardCoupons are received") {
+          advanceTimeForRewardAutomationToRunForCurrentRound
           eventually() {
             ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
             // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.

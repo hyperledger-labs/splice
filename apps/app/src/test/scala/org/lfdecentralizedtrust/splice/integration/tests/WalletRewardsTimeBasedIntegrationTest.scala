@@ -36,14 +36,16 @@ class WalletRewardsTimeBasedIntegrationTest
       eventually()(bobWalletClient.list().amulets should have size 1)
       p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0)
 
-      val openRounds = eventually() {
+      def openRounds = {
         import math.Ordering.Implicits.*
-        val openRounds = sv1ScanBackend
+        sv1ScanBackend
           .getOpenAndIssuingMiningRounds()
           ._1
           .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
+      }
+
+      eventually() {
         openRounds should not be empty
-        openRounds
       }
 
       advanceRoundsByOneTick
