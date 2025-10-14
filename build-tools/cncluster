@@ -2205,8 +2205,7 @@ function subcmd_psql() {
     exit 1
   fi
   
-  # shellcheck disable=SC2086
-  set -- $DB_INIT_COMMAND
+  eval "set -- $DB_INIT_COMMAND"
   while [ $# -gt 0 ]; do
     case "$1" in
       -h|--host)
@@ -2233,12 +2232,12 @@ function subcmd_psql() {
         local DB_USERNAME="${1#*=}"
         shift
         ;;
-      -d|--dbname)
-        local DB_NAME="$2"
+      -c|--command)
+        local DB_CREATE_STATEMENT="$2"
         shift 2
         ;;
-      -d=*|--dbname=*)
-        local DB_NAME="${1#*=}"
+      -c=*|--command=*)
+        local DB_CREATE_STATEMENT="${1#*=}"
         shift
         ;;
       *)
@@ -2262,7 +2261,11 @@ function subcmd_psql() {
     exit 1
   fi
 
-  if [ -z "${DB_NAME:-}" ]; then
+  # shellcheck disable=SC2086
+  set -- $DB_CREATE_STATEMENT
+  if [ "${1,,}" == "create" ] && [ "${2,,}" == "database" ] && [ -n "$3" ]; then
+    DB_NAME="$3"
+  else
     _error "Failed to retrieve DB name from pod description."
     exit 1
   fi
