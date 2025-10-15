@@ -49,7 +49,7 @@ class CollectRewardsAndMergeAmuletsTrigger(
       tc: TraceContext
   ): Future[Seq[CollectRewardsAndMergeAmuletsTask]] = {
     for {
-      (_, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds().map {
+      (openRounds, issuingRounds) <- scanConnection.getOpenAndIssuingMiningRounds().map {
         case (openRounds, issuingRounds) =>
           (
             openRounds.map(round =>
@@ -69,26 +69,43 @@ class CollectRewardsAndMergeAmuletsTrigger(
           )
       }
     } yield {
-      val openRoundsForTask = issuingRounds
-        .filter(_.opensAt.isBefore(context.clock.now.toInstant))
-      openRoundsForTask
-        .maxByOption(_.opensAt)
-        .map(round =>
-          CollectRewardsAndMergeAmuletsTask(
-            round.number,
-            round.opensAt,
-            tickDuration =
-              Duration.ofMillis(Duration.between(round.opensAt, round.closesAt).toMillis / 2),
-            openRoundsForTask
-              .filter(_.closesAt.isAfter(context.clock.now.toInstant))
-              .map(_.closesAt)
-              .minOption
-              .getOrElse(round.closesAt),
-            round.closesAt,
-            context.config.rewardOperationRoundsCloseBufferDuration.asJava,
+      if (isNewSchedulingLogicEnabled) {
+        val openRoundsForTask = issuingRounds
+          .filter(_.opensAt.isBefore(context.clock.now.toInstant))
+        openRoundsForTask
+          .maxByOption(_.opensAt)
+          .map(round =>
+            CollectRewardsAndMergeAmuletsTask(
+              round.number,
+              round.opensAt,
+              tickDuration =
+                Duration.ofMillis(Duration.between(round.opensAt, round.closesAt).toMillis / 2),
+              openRoundsForTask
+                .filter(_.closesAt.isAfter(context.clock.now.toInstant))
+                .map(_.closesAt)
+                .minOption
+                .getOrElse(round.closesAt),
+              round.closesAt,
+              context.config.rewardOperationRoundsCloseBufferDuration.asJava,
+            )
           )
-        )
-        .toList
+          .toList
+      } else {
+        openRounds
+          .minByOption(_.opensAt)
+          .map(round =>
+            CollectRewardsAndMergeAmuletsTask(
+              round.number,
+              round.opensAt,
+              tickDuration =
+                Duration.ofMillis(Duration.between(round.opensAt, round.closesAt).toMillis / 2),
+              round.closesAt,
+              round.closesAt,
+              context.config.rewardOperationRoundsCloseBufferDuration.asJava,
+            )
+          )
+          .toList
+      }
     }
   }
 

@@ -29,7 +29,8 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
   private val nextRunTime =
     new AtomicReference[Option[RoundBasedRewardTrigger.RoundBasedTriggerState]](None)
 
-  private val isNewSchedulingLogicEnabled: Boolean = context.config.enableNewRewardTriggerScheduling
+  protected val isNewSchedulingLogicEnabled: Boolean =
+    context.config.enableNewRewardTriggerScheduling
 
   // if the new logic is disable then use the old behaviour that uses increased polling intervals
   override protected def isRewardOperationTrigger: Boolean = !isNewSchedulingLogicEnabled
