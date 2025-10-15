@@ -270,7 +270,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           </form.AppField>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6" gutterBottom data-test-id="set-dso-config-header">
+            <Typography variant="h6" gutterBottom>
               Configuration
             </Typography>
 

@@ -29,8 +29,6 @@ window.happyDOM.settings.enableJavaScriptEvaluation = true;
 beforeAll(() => {
   setupIntersectionMocking(vi.fn);
   server.listen({ onUnhandledRequest: 'error' });
-  console.log('===========');
-  console.log(window.happyDOM.settings.enableJavaScriptEvaluation);
 });
 
 //  Close server after all tests

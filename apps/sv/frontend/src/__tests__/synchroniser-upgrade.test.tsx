@@ -82,6 +82,7 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
 
     expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
@@ -110,6 +111,7 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
 
     const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
     await user.click(synchronizerUpgradeCheckBox);
@@ -158,6 +160,7 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
     await fillOutForm(user);
 
     const disabled = screen
@@ -185,6 +188,7 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
     await fillOutForm(user);
 
     const effectiveAtThresholdCheckBox = screen.getByTestId('checkbox-set-effective-at-threshold');
@@ -241,9 +245,7 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
-
-    await waitFor(() => expect(screen.getByTestId('set-dso-config-header')).toBeDefined());
-
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
     await fillOutForm(user);
 
     const effectiveDateComponent = screen.getByTestId('datetime-picker-vote-request-expiration');
@@ -301,6 +303,7 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
     await fillOutForm(user);
 
     const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
@@ -358,9 +361,7 @@ describe('SV user can', () => {
       await user.click(screen.getByText('Governance'));
 
       changeAction();
-
-      await waitFor(() => expect(screen.getByTestId('set-dso-config-header')).toBeDefined());
-
+      await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
       await fillOutForm(user);
 
       const effectiveAtThresholdCheckBox = screen.getByTestId(
