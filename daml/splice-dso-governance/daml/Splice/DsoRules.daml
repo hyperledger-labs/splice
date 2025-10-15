@@ -207,6 +207,9 @@ data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResu
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
     validatorLicense : ContractId ValidatorLicense
 
+data DsoRules_GrantValidatorLicenseResult = DsoRules_GrantValidatorLicenseResult with
+    validatorLicense : ContractId ValidatorLicense
+
 data DsoRules_MergeValidatorLicenseResult = DsoRules_MergeValidatorLicenseResult with
     validatorLicense : ContractId ValidatorLicense
 
@@ -980,8 +983,28 @@ template DsoRules with
           metadata = fmap (\version -> ValidatorLicenseMetadata with version; contactPoint = fromOptional "" contactPoint; lastUpdatedAt = now) version
           lastActiveAt = Some now
           weight = None -- An individual SV can only create a license with the default weight.
-          kind = None
+          kind = Some OperatorLicense
         return DsoRules_OnboardValidatorResult with ..
+
+    nonconsuming choice DsoRules_GrantValidatorLicense : DsoRules_GrantValidatorLicenseResult
+      with
+        sponsor : Party
+        validator : Party
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        -- create license for a validator that is not an operator
+        now <- getTime
+        validatorLicense <- create ValidatorLicense with
+          dso
+          sponsor
+          validator
+          faucetState = None
+          metadata = None
+          lastActiveAt = Some now
+          weight = None
+          kind = Some NonOperatorLicense
+        return DsoRules_GrantValidatorLicenseResult with ..
 
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
       -- ^ Note: removes the old duplicated licenses and creates a new one with the highest lastReceivedFor round
