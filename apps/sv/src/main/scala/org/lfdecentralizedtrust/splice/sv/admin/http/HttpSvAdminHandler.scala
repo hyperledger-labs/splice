@@ -184,6 +184,49 @@ class HttpSvAdminHandler(
       .map(SvAdminResource.ListValidatorLicensesResponse.OK)
   }
 
+  override def grantValidatorLicense(
+      respond: SvAdminResource.GrantValidatorLicenseResponse.type
+  )(
+      body: definitions.GrantValidatorLicenseRequest
+  )(tuser: TracedUser): Future[SvAdminResource.GrantValidatorLicenseResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.grantValidatorLicense") { implicit traceContext => _ =>
+      Codec.decode(Codec.Party)(body.partyId) match {
+        case Left(error) =>
+          Future.failed(
+            HttpErrorHandler.badRequest(s"Invalid party ID '${body.partyId}': $error")
+          )
+        case Right(validatorParty) =>
+          retryProvider.retryForClientCalls(
+            "grantValidatorLicense",
+            "Grant Validator License", {
+              val svParty = svStore.key.svParty
+              val dsoParty = dsoStore.key.dsoParty
+
+              for {
+                dsoRules <- dsoStore.getDsoRules()
+                cmd = dsoRules.exercise(
+                  _.exerciseDsoRules_GrantValidatorLicense(
+                    svParty.toProtoPrimitive,
+                    validatorParty.toProtoPrimitive,
+                  )
+                )
+                _ <- dsoStoreWithIngestion
+                  .connection(SpliceLedgerConnectionPriority.Low)
+                  .submit(Seq(svParty), Seq(dsoParty), cmd)
+                  .withSynchronizerId(dsoRules.domain)
+                  .noDedup
+                  .yieldUnit()
+              } yield {
+                v0.SvAdminResource.GrantValidatorLicenseResponseOK
+              }
+            },
+            logger,
+          )
+      }
+    }
+  }
+
   def prepareValidatorOnboarding(
       respond: v0.SvAdminResource.PrepareValidatorOnboardingResponse.type
   )(
