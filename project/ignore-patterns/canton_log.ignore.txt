@@ -151,7 +151,4 @@ ACS_COMMITMENT_DEGRADATION
 # TODO(#2689) remove once fix consumed
 the set of package dependencies is not self consistent, the extra dependencies are.*54f85eb
 
-# FIXME
-Admin workflow services not started as DARs have not been loaded
-
 # Make sure to have a trailing newline
