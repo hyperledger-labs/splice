@@ -29,6 +29,11 @@ Upcoming
     - The SV app will no longer store the update history and such, will not be able to answer historical queries.
       All updates involving the DSO party will still be stored and returned by Scan.
 
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
 0.4.20
 ------
 

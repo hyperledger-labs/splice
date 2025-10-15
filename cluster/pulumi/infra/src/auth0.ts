@@ -137,6 +137,22 @@ function newM2MApp(
       }
     );
 
+    if (ledgerApiAudValue !== 'https://canton.network.global') {
+      // TODO(DACH-NY/canton-network-internal#2206): For now, we also grant all apps access to the old default ledger API
+      // audience, to un-break it until we clean up the audiences we use.
+      new auth0.ClientGrant(
+        `${resourceName}LegacyGrant`,
+        {
+          clientId: ret.id,
+          audience: 'https://canton.network.global',
+          scopes: ['daml_ledger_api'],
+        },
+        {
+          provider: auth0DomainProvider,
+        }
+      );
+    }
+
     if (ledgerApiAudValue !== appAudValue) {
       new auth0.ClientGrant(
         `${resourceName}AppGrant`,
