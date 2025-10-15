@@ -134,6 +134,7 @@ class TimeBasedTreasuryIntegrationTest
       // advancing the rounds so the rewards would be collectable.
       advanceRoundsByOneTick
       advanceRoundsByOneTick
+      advanceRoundsByOneTick
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
