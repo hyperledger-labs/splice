@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransferTransacti
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -109,7 +110,7 @@ class SvTimeBasedRewardCouponIntegrationTest
       eventually() {
         val vettedByAlice =
           aliceValidatorBackend.participantClientWithAdminToken.topology.vetted_packages
-            .list()
+            .list(Some(TopologyStoreId.Synchronizer(decentralizedSynchronizerId)))
             .flatMap(
               _.item.packages.map(_.packageId)
             )
@@ -330,6 +331,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         aliceParticipantId,
         removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
         force = ForceFlags(ForceFlag.AllowUnvettedDependencies, ForceFlag.AllowUnvetPackageWithActiveContracts),
+        store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
       ),
     )(
       "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",
@@ -378,6 +380,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
           aliceParticipantId,
           adds = Seq(VettedPackage(PackageId.assertFromString(latestAmuletPackageId), None, None)),
+          store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
         )
       },
     )(
