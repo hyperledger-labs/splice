@@ -14,7 +14,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
@@ -604,11 +604,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             // reset to not crash other tests
             {
               clue(
-                s"reset confirmationRequestsMaxRate to ${domainDynamicParams.confirmationRequestsMaxRate} to not crash other tests"
+                s"reset domain parameters to old values confirmationRequestsMaxRate=${domainDynamicParams.confirmationRequestsMaxRate},mediatorReactionTimeout=${domainDynamicParams.mediatorReactionTimeout}"
               ) {
-                changeDomainRatePerParticipant(
+                changeDomainParameters(
                   allNodes.map(_.oldParticipantConnection),
                   domainDynamicParams.confirmationRequestsMaxRate,
+                  domainDynamicParams.mediatorReactionTimeout,
                 )
               }
               deleteDirectoryRecursively(migrationDumpDir.toFile)
@@ -1131,9 +1132,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     }
   }
 
-  private def changeDomainRatePerParticipant(
+  private def changeDomainParameters(
       nodes: Seq[ParticipantAdminConnection],
-      rate: NonNegativeInt,
+      confirmationRequestsMaxRate: NonNegativeInt,
+      mediatorReactionTimeout: com.digitalasset.canton.time.NonNegativeFiniteDuration,
   )(implicit
       env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
@@ -1143,7 +1145,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         node
           .ensureDomainParameters(
             decentralizedSynchronizerId,
-            _.tryUpdate(confirmationRequestsMaxRate = rate),
+            _.tryUpdate(
+              confirmationRequestsMaxRate = confirmationRequestsMaxRate,
+              mediatorReactionTimeout = mediatorReactionTimeout,
+            ),
+            forceChanges = ForceFlags(ForceFlag.AllowOutOfBoundsValue),
           )
       }
       .futureValue
