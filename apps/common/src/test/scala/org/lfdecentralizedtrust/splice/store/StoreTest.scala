@@ -409,6 +409,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         )
       ).toJava,
       Some(defaultEffectiveAt).toJava,
+      Optional.empty(),
+      Optional.empty(),
     )
     contract(
       identifier = templateId,
@@ -458,6 +460,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         dsoParty.toProtoPrimitive,
         validator.toProtoPrimitive,
         new Round(round),
+        Optional.empty(),
       ),
     )
   }
