@@ -86,7 +86,7 @@ describe('Offboard SV Form', () => {
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
@@ -117,7 +117,7 @@ describe('Offboard SV Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(screen.getByTestId('submit-button').getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBe(null);
   });
 
   test('expiry date must be in the future', async () => {

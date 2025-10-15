@@ -64,7 +64,7 @@ export const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
 export function changeAction(actionName: string = 'SRARC_SetConfig'): void {
   const dropdown = screen.getByTestId('display-actions');
   expect(dropdown).toBeDefined();
-  fireEvent.change(dropdown!, { target: { value: actionName } });
+  fireEvent.change(dropdown, { target: { value: actionName } });
 
   const actionChangeDialog = screen.getByTestId('action-change-dialog');
   expect(actionChangeDialog).toBeDefined();

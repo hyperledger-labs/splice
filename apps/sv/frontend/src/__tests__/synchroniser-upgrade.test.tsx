@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { dsoInfo } from '@lfdecentralizedtrust/splice-common-test-handlers';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
@@ -241,6 +241,9 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     changeAction();
+
+    await waitFor(() => expect(screen.getByTestId('set-dso-config-header')).toBeDefined());
+
     await fillOutForm(user);
 
     const effectiveDateComponent = screen.getByTestId('datetime-picker-vote-request-expiration');
@@ -355,6 +358,9 @@ describe('SV user can', () => {
       await user.click(screen.getByText('Governance'));
 
       changeAction();
+
+      await waitFor(() => expect(screen.getByTestId('set-dso-config-header')).toBeDefined());
+
       await fillOutForm(user);
 
       const effectiveAtThresholdCheckBox = screen.getByTestId(
