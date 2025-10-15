@@ -979,6 +979,8 @@ template DsoRules with
           faucetState = None
           metadata = fmap (\version -> ValidatorLicenseMetadata with version; contactPoint = fromOptional "" contactPoint; lastUpdatedAt = now) version
           lastActiveAt = Some now
+          weight = None -- An individual SV can only create a license with the default weight.
+          kind = None
         return DsoRules_OnboardValidatorResult with ..
 
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
@@ -1000,7 +1002,6 @@ template DsoRules with
                          None    -> Round 0
                          Some r  -> r.lastReceivedFor) validatorLicenses
          pure $ DsoRules_MergeValidatorLicenseResult cid
-
 
     -- SV onboarding
     ----------------
