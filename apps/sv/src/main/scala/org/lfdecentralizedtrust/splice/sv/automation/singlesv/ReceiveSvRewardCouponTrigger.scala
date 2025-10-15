@@ -35,7 +35,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
 
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -246,11 +246,14 @@ object ReceiveSvRewardCouponTrigger {
         param("round", _.round),
       )
 
-    override def roundDetails: (Long, Instant) =
-      Long.unbox(round.payload.round.number) -> round.payload.opensAt
+    def roundNumber: Long = Long.unbox(round.payload.round.number)
 
-    override def tickDuration: Duration =
-      Duration.of(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
+    def opensAt: Instant = round.payload.opensAt
+
+    override def scheduleAtMaxTime: Instant =
+      opensAt.plus(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
+
+    def closesAt: Instant = round.payload.targetClosesAt
   }
 
   def svLatestVettedPackages(packages: PackageConfig): Seq[String] = Seq(
