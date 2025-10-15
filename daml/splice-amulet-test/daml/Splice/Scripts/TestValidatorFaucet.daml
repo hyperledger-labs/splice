@@ -24,7 +24,8 @@ test_ValidatorFaucet = do
           map (._2) coupons === [ValidatorLivenessActivityRecord with
                 dso = app.dso
                 validator = aliceValidator.primaryParty
-                round]
+                round
+                weight = None]
 
     let checkActivityRecordsDoNotExist round = do
           [] <- queryFilter @ValidatorLivenessActivityRecord app.dso (\co -> co.round == round)
