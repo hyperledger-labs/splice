@@ -158,13 +158,13 @@ trait TimeTestUtil extends TestCommon {
   def advanceTimeForRewardAutomationToRunForCurrentRound(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
+    import math.Ordering.Implicits.*
     val now = sv1Backend.participantClient.ledger_api.time.get().toInstant
     val (openRounds, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
     val nearestClose = openRounds
       .filter(round =>
-        now.isBefore(round.contract.payload.targetClosesAt) && now.isAfter(
+        now <= round.contract.payload.targetClosesAt && now >=
           round.contract.payload.opensAt
-        )
       )
       .map(_.contract.payload.targetClosesAt)
       .min
