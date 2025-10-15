@@ -4,10 +4,8 @@
 -- | Instruct transfers of holdings between parties.
 module Splice.Api.Token.TransferPreapprovalV1 where
 
-import qualified DA.Map as Map
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
 
 {-
 
@@ -35,20 +33,21 @@ Ideas left out:
 
 -- | Specification of which incoming transfers are pre-approved by a receiver.
 data PreapprovalSpecification = PreapprovalSpecification with
-  admin : Party
-    -- ^ Admin party of the holidings whose transfers are preapproved.
-  receiver : Party
-    -- ^ Receiver that preapproves incoming transfers.
-  senderFilter : [Party]
-    -- ^ Optional filter for which parties are allowed to send funds.
-    -- Empty list means no filter is applied.
-  idFilter : [Text]
-    -- ^ Optional filter on the instrument identifiers that are preapproved.
-    -- Empty list means no filter is applied.
-  minAmount : Optional Decimal
-    -- ^ Optional lower bound on the amount whose transfer is preapproved.
-  maxAmount : Optional Decimal
-    -- ^ Optional upper bound on the amount whose transfer is preapproved.
+    admin : Party
+      -- ^ Admin party of the holidings whose transfers are preapproved.
+    receiver : Party
+      -- ^ Receiver that preapproves incoming transfers.
+    senderFilter : [Party]
+      -- ^ Optional filter for which parties are allowed to send funds.
+      -- Empty list means no filter is applied.
+    idFilter : [Text]
+      -- ^ Optional filter on the instrument identifiers that are preapproved.
+      -- Empty list means no filter is applied.
+    minAmount : Optional Decimal
+      -- ^ Optional lower bound on the amount whose transfer is preapproved.
+    maxAmount : Optional Decimal
+      -- ^ Optional upper bound on the amount whose transfer is preapproved.
+  deriving (Eq, Show)
 
 
 -- | View for `TransferPreapproval`.
@@ -61,7 +60,7 @@ data TransferPreapprovalView = TransferPreapprovalView with
       -- ^ When the preapproval expires.
     meta : Metadata
       -- ^ Additional metadata specific to the preapproval, used for extensibility.
-  deriving (Show, Eq)
+  deriving (Eq, Show)
 
 -- | An interface for tracking the status of a transfer instruction,
 -- i.e., a request to a registry app to execute a transfer.
@@ -73,63 +72,66 @@ data TransferPreapprovalView = TransferPreapprovalView with
 interface TransferPreapproval where
   viewtype TransferPreapprovalView
 
-  -- FIX
-  transferPreapproval_acceptImpl : ContractId TransferPreapproval -> TransferPreapproval_Accept -> Update TransferPreapprovalResult
-  transferPreapproval_rejectImpl : ContractId TransferPreapproval -> TransferPreapproval_Reject -> Update TransferPreapprovalResult
-  transferPreapproval_withdrawImpl : ContractId TransferPreapproval -> TransferPreapproval_Withdraw -> Update TransferPreapprovalResult
-  transferPreapproval_updateImpl : ContractId TransferPreapproval -> TransferPreapproval_Update -> Update TransferPreapprovalResult
-
-{-
-  nonconsuming choice TransferPreapproval_AcceptTransfer : TransferPreapprovalResult
-    -- ^ Allow the sender to accept a preapproved transfer in the name of the receiver.
-    with
-      sender : Party
-        -- ^ Sender of the transfer.
-      transferInstructionCid : ContractId TransferInstruction
-        -- ^ The transfer instruction contract to be accepted.
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller sender
-    do transferPreapproval_acceptTransferImpl this self arg
-
-  -- QUESTION: do we need this in addition to direct transfers?
-  -- transfer instruction? That would allow for smaller txs, but complicates tx
-  -- history parsing.
--}
-
-  nonconsuming choice TransferPreapproval_Transfer : TransferPreapprovalResult
-    -- ^ Perform a preapproved direct transfer to the receiver.
-    with
-      transfer : Transfer
-        -- ^ The transfer instruction contract to be accepted.
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller transfer.sender
-    do transferPreapproval_acceptTransferImpl this self arg
+  transferPreapproval_renewImpl : ContractId TransferPreapproval -> TransferPreapproval_Renew -> Update TransferPreapproval_RenewResult
+  transferPreapproval_withdrawImpl : ContractId TransferPreapproval -> TransferPreapproval_Withdraw -> Update ChoiceExecutionMetadata
+  transferPreapproval_rejectImpl : ContractId TransferPreapproval -> TransferPreapproval_Reject -> Update ChoiceExecutionMetadata
 
 
-  choice TransferPreapproval_Renew : TransferPreapprovalResult
-    -- ^ Renew the preapproval as the receiver.
+  choice TransferPreapproval_Renew : TransferPreapproval_RenewResult
+    -- ^ Renew the preapproval as the delegate or receiver.
     --
-    -- IMPL. IDEA:
-    --
+    -- Can also be used to update the specification and expiration time.
     with
       specification : PreapprovalSpecification
+        -- ^ New specification of which transfers are preapproved.
       requestedAt : Time
+        -- ^ When the preapproval was requested to be (re-)created.
       expiresAt : Optional Time
+        -- ^ New expiration time of the preapproval.
+        --
+        -- Will be capped by the maximal expiration time allowed by the instrument admin;
+        -- and if not provided, the maximal expiration time will be used.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.receiver
+        --
+        -- FIXME: decide whether we really want to the full extra context here?
+    controller (view this).specification.receiver
     do transferPreapproval_renewImpl this self arg
 
-  choice TransferPreapproval_Withdraw : TransferPreapprovalResult
-    -- ^ Withdraw the transfer preapproval.
+  choice TransferPreapproval_Withdraw : ChoiceExecutionMetadata
+    -- ^ Withdraw the transfer preapproval as the receiver.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).receiver
+        --
+        -- FIXME: decide whether we really want to the full extra context here?
+    controller (view this).specification.receiver
     do transferPreapproval_withdrawImpl this self arg
 
+  choice TransferPreapproval_Reject : ChoiceExecutionMetadata
+    -- ^ Reject the transfer preapproval as the instrument admin.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+        --
+        -- FIXME: decide whether we really want to the full extra context here?
+    controller (view this).specification.admin
+    do transferPreapproval_rejectImpl this self arg
+
+data TransferPreapproval_RenewResult = TransferPreapproval_RenewResult with
+    preapprovalCid : ContractId TransferPreapproval
+      -- ^ The renewed preapproval contract.
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of the choice, used for extensibility.
+  deriving (Show, Eq)
+
+
+data PreapprovalFactory_PreapproveResult = PreapprovalFactory_PreapproveResult with
+    preapprovalCid : ContractId TransferPreapproval
+      -- ^ The created preapproval contract.
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of the choice, used for extensibility.
+  deriving (Show, Eq)
 
 
 -- Preapproval Factory
@@ -139,10 +141,10 @@ interface TransferPreapproval where
 interface PreapprovalFactory where
   viewtype PreapprovalFactoryView
 
-  transferFactory_transferImpl : ContractId PreapprovalFactory -> PreapprovalFactory_Transfer -> Update TransferPreapprovalResult
-  transferFactory_publicFetchImpl : ContractId PreapprovalFactory -> PreapprovalFactory_PublicFetch -> Update PreapprovalFactoryView
+  preapprovalFactory_preapproveImpl : ContractId PreapprovalFactory -> PreapprovalFactory_Preapprove -> Update PreapprovalFactory_PreapproveResult
+  preapprovalFactory_publicFetchImpl : ContractId PreapprovalFactory -> PreapprovalFactory_PublicFetch -> Update PreapprovalFactoryView
 
-  nonconsuming choice PreapprovalFactory_CreatePreapproval : TransferPreapprovalResult
+  nonconsuming choice PreapprovalFactory_Preapprove : PreapprovalFactory_PreapproveResult
     -- ^ Create a new transfer preapproval.
     -- Implementations MUST ensure that this choice fails if `transfer.executeBefore` is in the past.
     --
@@ -156,12 +158,12 @@ interface PreapprovalFactory where
         -- on a factory contract acquired from an untrusted source *provided*
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
-      preapproval : Preapproval
+      specification : PreapprovalSpecification
         -- ^ The transfer to execute.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
-    controller transfer.sender
-    do transferFactory_transferImpl this self arg
+    controller specification.receiver
+    do preapprovalFactory_preapproveImpl this self arg
 
   nonconsuming choice PreapprovalFactory_PublicFetch : PreapprovalFactoryView
     -- ^ Fetch the view of the factory contract.
@@ -177,7 +179,7 @@ interface PreapprovalFactory where
       actor : Party
         -- ^ The party fetching the contract.
     controller actor
-    do transferFactory_publicFetchImpl this self arg
+    do preapprovalFactory_publicFetchImpl this self arg
 
 -- | View for `PreapprovalFactory`.
 data PreapprovalFactoryView = PreapprovalFactoryView

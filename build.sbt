@@ -112,6 +112,7 @@ lazy val root: Project = (project in file("."))
     `splice-api-token-metadata-v1-daml`,
     `splice-api-token-holding-v1-daml`,
     `splice-api-token-transfer-instruction-v1-daml`,
+    `splice-api-token-transfer-preapproval-v1-daml`,
     `splice-api-token-allocation-v1-daml`,
     `splice-api-token-allocation-request-v1-daml`,
     `splice-api-token-allocation-instruction-v1-daml`,
@@ -231,6 +232,7 @@ lazy val docs = project
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-transfer-preapproval-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -374,6 +376,34 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
           )
         },
       cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-api-token-transfer-preapproval-v1-daml` =
+  project
+    .in(file("token-standard/splice-api-token-transfer-preapproval-v1"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      // FIXME: enable when the OpenAPI spec is ready
+      // templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      // Compile / sourceGenerators +=
+      //   Def.taskDyn {
+      //     val transferPreapprovalOpenApiFile =
+      //       baseDirectory.value / "openapi/transfer-preapproval-v1.yaml"
+
+      //     BuildCommon.TS.generateOpenApiClient(
+      //       unscopedNpmName = "transfer-preapproval-openapi",
+      //       openApiSpec = "transfer-preapproval-v1.yaml",
+      //       cacheFileDependencies = Set(transferPreapprovalOpenApiFile),
+      //       directory = "openapi-ts-client",
+      //       subPath = "openapi",
+      //     )
+      //   },
+      // cleanFiles += { baseDirectory.value / "openapi-ts-client" },
     )
     .dependsOn(`canton-bindings-java`)
 
