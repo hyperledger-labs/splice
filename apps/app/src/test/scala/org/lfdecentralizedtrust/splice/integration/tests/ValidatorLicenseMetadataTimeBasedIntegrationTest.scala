@@ -137,8 +137,7 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       aliceValidatorBackend,
     )
 
-    // advance rounds for the reward triggers to run
-    advanceRoundsToNextRoundOpening
+    advanceTimeForRewardAutomationToRunForCurrentRound
 
     eventually() {
       val validatorLivenessActivityRecordRounds =

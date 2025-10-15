@@ -123,8 +123,7 @@ class SvTimeBasedRewardCouponIntegrationTest
           .resume()
       )
 
-      // advance rounds for the reward triggers to run
-      advanceRoundsToNextRoundOpening
+      advanceTimeForRewardAutomationToRunForCurrentRound
 
       val openRounds = eventually() {
         val openRounds = sv1ScanBackend
