@@ -330,7 +330,10 @@ class SvTimeBasedRewardCouponIntegrationTest
       aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
         aliceParticipantId,
         removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
-        force = ForceFlags(ForceFlag.AllowUnvettedDependencies, ForceFlag.AllowUnvetPackageWithActiveContracts),
+        force = ForceFlags(
+          ForceFlag.AllowUnvettedDependencies,
+          ForceFlag.AllowUnvetPackageWithActiveContracts,
+        ),
         store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
       ),
     )(

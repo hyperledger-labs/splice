@@ -170,10 +170,15 @@ case class EnvironmentDefinition(
         this.preSetup(env)
         participants(env).foreach { p =>
           p.synchronizers.list_connected().foreach { connected =>
-            val currentVettedPackages = p.topology.vetted_packages.list(store = Some(TopologyStoreId.Synchronizer(connected.synchronizerId)), filterParticipant = p.id.filterString)
+            val currentVettedPackages = p.topology.vetted_packages.list(
+              store = Some(TopologyStoreId.Synchronizer(connected.synchronizerId)),
+              filterParticipant = p.id.filterString,
+            )
             currentVettedPackages match {
               case Seq(mapping) if mapping.item.packages.length > 1 =>
-                logger.info(s"Removing all vetted packages for ${p.name} on ${connected.synchronizerId}")(TraceContext.empty)
+                logger.info(
+                  s"Removing all vetted packages for ${p.name} on ${connected.synchronizerId}"
+                )(TraceContext.empty)
                 p.topology.vetted_packages.propose(
                   p.id,
                   Seq.empty,
@@ -181,7 +186,9 @@ case class EnvironmentDefinition(
                   store = TopologyStoreId.Synchronizer(connected.synchronizerId),
                 )
               case _ =>
-                logger.info(s"No vetted packages for ${p.name} on ${connected.synchronizerId}")(TraceContext.empty)
+                logger.info(s"No vetted packages for ${p.name} on ${connected.synchronizerId}")(
+                  TraceContext.empty
+                )
             }
           }
         }
