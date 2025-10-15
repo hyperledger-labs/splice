@@ -36,7 +36,7 @@ describe('SV user can', () => {
   });
 });
 
-describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
+describe('Set Amulet Config Rules Form', () => {
   test('should render all Set Amulet Config Rules Form components', () => {
     render(
       <Wrapper>

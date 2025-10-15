@@ -173,12 +173,12 @@ class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
         loggerFactory.assertLogs(
           runTrigger,
           _.warningMessage should include(
-            "200.0000000000 which is outside of the configured accepted range"
+            "200.0000000000 which is outside of the configured accepted range RangeConfig(0.01,100.0), clamping to 100.0"
           ),
         )
         BigDecimal(
           sv1Backend.listAmuletPriceVotes().loneElement.payload.amuletPrice.toScala.value
-        ) shouldBe BigDecimal(23.0)
+        ) shouldBe BigDecimal(100.0)
       },
     )
     // Advance below the configured bound
@@ -206,12 +206,12 @@ class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
         loggerFactory.assertLogs(
           runTrigger,
           _.warningMessage should include(
-            "0.0010000000 which is outside of the configured accepted range"
+            "0.0010000000 which is outside of the configured accepted range RangeConfig(0.01,100.0), clamping to 0.01"
           ),
         )
         BigDecimal(
           sv1Backend.listAmuletPriceVotes().loneElement.payload.amuletPrice.toScala.value
-        ) shouldBe BigDecimal(23.0)
+        ) shouldBe BigDecimal(0.01)
       },
     )
   }

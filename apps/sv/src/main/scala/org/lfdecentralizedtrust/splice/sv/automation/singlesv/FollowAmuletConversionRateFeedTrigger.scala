@@ -51,44 +51,49 @@ class FollowAmuletConversionRateFeedTrigger(
           logger.warn(s"No AmuletConversionRateFeed for publisher ${config.publisher}")
           Future.successful(Seq.empty)
         case Some(feed) =>
-          val feedRate = BigDecimal(feed.payload.amuletConversionRate)
-          if (feedRate < config.acceptedRange.min || feedRate > config.acceptedRange.max) {
-            logger.warn(
-              s"Rate from publisher ${config.publisher} is ${feedRate} which is outside of the configured accepted range ${config.acceptedRange}"
-            )
-            Future.successful(Seq.empty)
-          } else {
-            for {
-              existingVote <- store
-                .lookupAmuletPriceVoteByThisSv()
-                .map(
-                  _.getOrElse(
-                    // This can happen after a hard migration or when reingesting from
-                    // ledger begin for other reasons so we don't make this INTERNAL.
-                    throw Status.NOT_FOUND
-                      .withDescription("No price vote for this SV found")
-                      .asRuntimeException
-                  )
+          val followedFeedRate = BigDecimal(feed.payload.amuletConversionRate)
+          val publishedFeedRate =
+            if (
+              followedFeedRate < config.acceptedRange.min || followedFeedRate > config.acceptedRange.max
+            ) {
+              val rate =
+                followedFeedRate.max(config.acceptedRange.min).min(config.acceptedRange.max)
+              logger.warn(
+                s"Rate from publisher ${config.publisher} is ${followedFeedRate} which is outside of the configured accepted range ${config.acceptedRange}, clamping to ${rate}"
+              )
+              rate
+            } else followedFeedRate
+          for {
+            existingVote <- store
+              .lookupAmuletPriceVoteByThisSv()
+              .map(
+                _.getOrElse(
+                  // This can happen after a hard migration or when reingesting from
+                  // ledger begin for other reasons so we don't make this INTERNAL.
+                  throw Status.NOT_FOUND
+                    .withDescription("No price vote for this SV found")
+                    .asRuntimeException
                 )
-              dsoRules <- store.getDsoRules()
-              voteCooldown = dsoRules.contract.payload.config.voteCooldownTime.toScala
-                .fold(Duration.ofMinutes(1))(t => Duration.ofNanos(t.microseconds * 1000))
-            } yield {
-              val earliestVoteTimestamp = CantonTimestamp
-                .tryFromInstant(existingVote.payload.lastUpdatedAt.plus(voteCooldown))
-              if (
-                earliestVoteTimestamp < now && existingVote.payload.amuletPrice.toScala
-                  .map(BigDecimal(_)) != Some(feedRate)
-              ) {
-                Seq(
-                  Task(
-                    existingVote,
-                    feed,
-                  )
+              )
+            dsoRules <- store.getDsoRules()
+            voteCooldown = dsoRules.contract.payload.config.voteCooldownTime.toScala
+              .fold(Duration.ofMinutes(1))(t => Duration.ofNanos(t.microseconds * 1000))
+          } yield {
+            val earliestVoteTimestamp = CantonTimestamp
+              .tryFromInstant(existingVote.payload.lastUpdatedAt.plus(voteCooldown))
+            if (
+              earliestVoteTimestamp < now && existingVote.payload.amuletPrice.toScala
+                .map(BigDecimal(_)) != Some(publishedFeedRate)
+            ) {
+              Seq(
+                Task(
+                  existingVote,
+                  feed,
+                  publishedFeedRate,
                 )
-              } else {
-                Seq.empty
-              }
+              )
+            } else {
+              Seq.empty
             }
           }
       }
@@ -103,7 +108,7 @@ class FollowAmuletConversionRateFeedTrigger(
         _.exerciseDsoRules_UpdateAmuletPriceVote(
           store.key.svParty.toProtoPrimitive,
           task.work.existingVote.contractId,
-          task.work.feed.payload.amuletConversionRate,
+          task.work.publishedFeedRate.bigDecimal,
         )
       )
       _ <- connection
@@ -111,7 +116,7 @@ class FollowAmuletConversionRateFeedTrigger(
         .noDedup
         .yieldResult()
     } yield TaskSuccess(
-      s"Updated amulet conversion rate to ${task.work.feed.payload.amuletConversionRate}"
+      s"Updated amulet conversion rate to ${task.work.publishedFeedRate}"
     )
 
   override protected def isStaleTask(
@@ -125,12 +130,15 @@ class FollowAmuletConversionRateFeedTrigger(
 object FollowAmuletConversionRateFeedTrigger {
   final case class Task(
       existingVote: Contract[AmuletPriceVote.ContractId, AmuletPriceVote],
+      // mainly included for logging, the actual value to publish is publishedFeedRate which can be clamped to the boundaries.
       feed: Contract[AmuletConversionRateFeed.ContractId, AmuletConversionRateFeed],
+      publishedFeedRate: BigDecimal,
   ) extends PrettyPrinting {
 
     override protected def pretty: Pretty[this.type] = prettyOfClass(
       param("existingVote", _.existingVote),
       param("feed", _.feed),
+      param("publishedFeedRate", _.publishedFeedRate),
     )
   }
 }

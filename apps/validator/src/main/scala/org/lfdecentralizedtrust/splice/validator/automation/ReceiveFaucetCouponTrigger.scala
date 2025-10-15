@@ -4,8 +4,14 @@
 package org.lfdecentralizedtrust.splice.validator.automation
 
 import cats.data.OptionT
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTrigger.RoundBasedTask
 import org.lfdecentralizedtrust.splice.automation.{
-  PollingParallelTaskExecutionTrigger,
+  RoundBasedRewardTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -19,15 +25,12 @@ import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
 
+import java.time.temporal.ChronoUnit
+import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
-import math.Ordering.Implicits.*
+import scala.math.Ordering.Implicits.*
 
 class ReceiveFaucetCouponTrigger(
     override protected val context: TriggerContext,
@@ -41,17 +44,14 @@ class ReceiveFaucetCouponTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     materializer: Materializer,
-) extends PollingParallelTaskExecutionTrigger[ReceiveFaucetCouponTrigger.Task] {
-
-  override def isRewardOperationTrigger = true
+) extends RoundBasedRewardTrigger[ReceiveFaucetCouponTrigger.Task] {
 
   private val validatorParty = validatorStore.key.validatorParty
 
-  override protected def retrieveTasks()(implicit
+  override protected def retrieveAvailableTasksForRound()(implicit
       tc: TraceContext
-  ): Future[Seq[ReceiveFaucetCouponTrigger.Task]] = {
+  ): Future[Seq[ReceiveFaucetCouponTrigger.Task]] =
     retrieveNextRoundToClaim().value.map(_.toList)
-  }
 
   private def retrieveNextRoundToClaim()(implicit
       tc: TraceContext
@@ -139,13 +139,20 @@ object ReceiveFaucetCouponTrigger {
   case class Task(
       license: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
       round: ContractWithState[OpenMiningRound.ContractId, OpenMiningRound],
-  ) extends PrettyPrinting {
+  ) extends PrettyPrinting
+      with RoundBasedTask {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] =
       prettyOfClass(
         param("license", _.license),
         param("round", _.round),
       )
+
+    override def roundDetails: (Long, Instant) =
+      Long.unbox(round.payload.round.number) -> round.payload.opensAt
+
+    override def tickDuration: Duration =
+      Duration.of(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
   }
 
 }

@@ -1708,6 +1708,9 @@
             }
           }
         },
+        "annotations": {
+          "cloud.google.com/l4-rbs": "enabled"
+        },
         "autoscaling": {
           "maxReplicas": 15
         },
@@ -1885,6 +1888,9 @@
               ]
             }
           }
+        },
+        "annotations": {
+          "cloud.google.com/l4-rbs": "enabled"
         },
         "autoscaling": {
           "maxReplicas": 15
@@ -3404,6 +3410,20 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "audience": "https://canton.network.global",
+      "clientId": "SV1 SV Backend (Pulumi managed, test-stack)_id",
+      "scopes": [
+        "daml_ledger_api"
+      ]
+    },
+    "name": "sv1SvBackendAppLegacyGrant",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientGrant:ClientGrant"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "appType": "non_interactive",
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV1 on test-stack",
       "name": "SV1 SV Backend (Pulumi managed, test-stack)"
@@ -3498,6 +3518,20 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "audience": "https://canton.network.global",
+      "clientId": "SV1 Validator Backend (Pulumi managed, test-stack)_id",
+      "scopes": [
+        "daml_ledger_api"
+      ]
+    },
+    "name": "sv1ValidatorBackendAppLegacyGrant",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientGrant:ClientGrant"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "appType": "non_interactive",
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV1 on test-stack",
       "name": "SV1 Validator Backend (Pulumi managed, test-stack)"
@@ -3529,6 +3563,20 @@
       ]
     },
     "name": "svda1SvBackendAppLedgerGrant",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientGrant:ClientGrant"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "audience": "https://canton.network.global",
+      "clientId": "SVDA1 SV Backend (Pulumi managed, test-stack)_id",
+      "scopes": [
+        "daml_ledger_api"
+      ]
+    },
+    "name": "svda1SvBackendAppLegacyGrant",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientGrant:ClientGrant"
   },
@@ -3623,6 +3671,20 @@
       ]
     },
     "name": "svda1ValidatorBackendAppLedgerGrant",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientGrant:ClientGrant"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "audience": "https://canton.network.global",
+      "clientId": "SVDA1 Validator Backend (Pulumi managed, test-stack)_id",
+      "scopes": [
+        "daml_ledger_api"
+      ]
+    },
+    "name": "svda1ValidatorBackendAppLegacyGrant",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
     "type": "auth0:index/clientGrant:ClientGrant"
   },

@@ -33,7 +33,8 @@ const createKmsServiceAccount = (
   };
   const serviceAccountName = migrationIdSuffixed(
     `${CLUSTER_BASENAME}-${xns.logicalName}-kms`,
-    migrationId
+    migrationId,
+    true
   );
   const kmsServiceAccount = new GcpServiceAccount(serviceAccountName, {
     accountId: serviceAccountName,
@@ -109,5 +110,16 @@ export const getParticipantKmsHelmResources = (
   };
 };
 
-const migrationIdSuffixed = (name: string, migrationId?: DomainMigrationIndex) =>
-  migrationId != undefined ? `${name}-migration-${migrationId}` : name;
+function migrationIdSuffixed(
+  name: string,
+  migrationId?: DomainMigrationIndex,
+  limit30?: boolean
+): string {
+  if (migrationId === undefined) {
+    return name;
+  }
+  const longName = `${name}-migration-${migrationId}`;
+  // error: gcp:serviceaccount/account:Account
+  // resource..."account_id"...must be between 6 and 30 characters long
+  return limit30 && longName.length > 30 ? `${name}-mg-${migrationId}` : longName;
+}
