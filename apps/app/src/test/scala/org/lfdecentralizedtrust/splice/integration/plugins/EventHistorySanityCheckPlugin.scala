@@ -75,7 +75,8 @@ class EventHistorySanityCheckPlugin(
 
       // custom error message to help debugging
       if (different.nonEmpty) {
-        val debug = otherRestDebug.zipAll(founderRestDebug, None, None)
+        val debug: Seq[(Option[EventHistoryItem], Option[EventHistoryItem])] =
+          otherRestDebug.map(Some(_)).zipAll(founderRestDebug.map(Some(_)), None, None)
         fail(s"Mismatched Events: $different. The ones that come after are: $debug")
       }
     }
