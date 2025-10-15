@@ -23,13 +23,13 @@ import Splice.Api.Token.MetadataV1
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
-import Splice.AmuletConfig (AmuletConfig(..))
+import Splice.AmuletConfig (AmuletConfig(..), USD, TransferConfig(..))
 import qualified Splice.AmuletConfig as Unit
 import Splice.Expiry
 import Splice.ExternalPartyAmuletRules
 import Splice.Issuance
 import Splice.Round
-import Splice.Fees
+import Splice.Fees (FixedFee(..), RatePerRound(..), SteppedRate(..), getValueAsOfRound0)
 import Splice.Types
 import Splice.RelRound
 import Splice.Schedule
@@ -58,7 +58,11 @@ setupApp = genericSetupApp ""
 
 -- | Setup the DSO party with a specific prefix and the contracts defining the Amulet app.
 genericSetupApp : Text -> Script AmuletApp
-genericSetupApp dsoPrefix = do
+genericSetupApp dsoPrefix = genericSetupAppWithConfigSchedule dsoPrefix defaultAmuletConfigSchedule
+
+-- | Setup the DSO party with a specific prefix and custom config schedule.
+genericSetupAppWithConfigSchedule : Text -> Schedule Time (AmuletConfig USD) -> Script AmuletApp
+genericSetupAppWithConfigSchedule dsoPrefix configSchedule = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
 
@@ -70,7 +74,7 @@ genericSetupApp dsoPrefix = do
   recordValidatorOf app app.dso app.dso
 
   _ <- submit dso $ createCmd AmuletRules with
-    configSchedule = defaultAmuletConfigSchedule
+    configSchedule
     isDevNet = True
     ..
 
@@ -83,6 +87,27 @@ genericSetupApp dsoPrefix = do
 
   -- return the off-ledger reference to the app for later script steps
   return app
+
+-- | Setup the DSO party and the contracts defining the Amulet app with no fees.
+setupAppNoFees : Script AmuletApp
+setupAppNoFees =
+  let noFeeTransferConfig = TransferConfig with
+        createFee = FixedFee 0.0
+        holdingFee = RatePerRound 0.0
+        lockHolderFee = FixedFee 0.0
+        transferFee = SteppedRate with
+          initialRate = 0.0
+          steps = []
+        extraFeaturedAppRewardAmount = 1.0
+        maxNumInputs = 100
+        maxNumOutputs = 100
+        maxNumLockHolders = 10
+      noFeeConfig = defaultAmuletConfig with
+        transferConfig = noFeeTransferConfig
+      noFeeSchedule = Schedule with
+        initialValue = noFeeConfig
+        futureValues = []
+  in genericSetupAppWithConfigSchedule "" noFeeSchedule
 
 
 -- AmuletApp users
@@ -108,6 +133,8 @@ setupValidator' app name = do
       contactPoint = name <> "@example.com"
       lastUpdatedAt = now
     lastActiveAt = Some now
+    weight = None
+    kind = None
 
   userId <- validateUserId name
   -- TODO(#2957): remove read-as DSO party.
@@ -159,15 +186,21 @@ data DefaultAppWithUsers = DefaultAppWithUsers with
     provider2Validator: AmuletUser
   deriving (Show, Eq, Ord)
 
-setupDefaultAppWithUsers: Script DefaultAppWithUsers
-setupDefaultAppWithUsers = do
-  app <- setupApp
+setupDefaultAppWithUsersInternal: Script AmuletApp -> Script DefaultAppWithUsers
+setupDefaultAppWithUsersInternal appSetup = do
+  app <- appSetup
   (alice, aliceValidator) <- setupSelfHostedUser app "alice"
   (bob, bobValidator) <- setupSelfHostedUser app "bob"
   charlie <- setupUser app "charlie" bobValidator.primaryParty
   (provider1, provider1Validator) <- setupSelfHostedUser app "provider1"
   (provider2, provider2Validator) <- setupSelfHostedUser app "provider2"
   return DefaultAppWithUsers with ..
+
+setupDefaultAppWithUsers: Script DefaultAppWithUsers
+setupDefaultAppWithUsers = setupDefaultAppWithUsersInternal setupApp
+
+setupDefaultAppWithUsersNoFees: Script DefaultAppWithUsers
+setupDefaultAppWithUsersNoFees = setupDefaultAppWithUsersInternal setupAppNoFees
 
 -- dummy argument to avoid running this script by default.
 getAllValidatorRights : AmuletApp -> Script [ValidatorRight]
@@ -263,7 +296,8 @@ runNextIssuanceInternal app amuletPrice = do
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
-          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
+          optTotalValidatorFaucetCoupons = None
+          optTotalValidatorLivenessActivityRecords = Some (intToDecimal (length validatorFaucetCoupons) + sum [ fromOptional defaultValidatorLicenseWeight c.weight | (_, c) <- validatorLivenessActivityRecords ])
 
     -- create issuing mining round
     submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with
