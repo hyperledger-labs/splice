@@ -15,7 +15,10 @@ import org.lfdecentralizedtrust.splice.automation.TriggerMetrics
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningMetrics
-import org.lfdecentralizedtrust.splice.sv.automation.ReportSvStatusMetricsExportTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.{
+  AmuletPriceMetricsTrigger,
+  ReportSvStatusMetricsExportTrigger,
+}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStoreMetrics
 import org.lfdecentralizedtrust.splice.store.{DomainParamsStore, HistoryMetrics, StoreMetrics}
 import org.lfdecentralizedtrust.splice.validator.metrics.TopologyMetrics
@@ -99,6 +102,7 @@ object MetricsDocs {
       ReportSvStatusMetricsExportTrigger.SvId(svParty.toProtoPrimitive, "svName"),
       generator,
     )
+    new AmuletPriceMetricsTrigger.AmuletPriceMetrics(generator)
     val svMetrics = generator.getAll()
     generator.reset()
     // scan

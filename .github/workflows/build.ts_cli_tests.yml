@@ -20,17 +20,17 @@ jobs:
           # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Check out repository code
-        uses: actions/checkout@v4
-        if: inputs.commit_sha != ''
-        with:
-          ref: ${{ inputs.commit_sha }}
-
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: skip
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        if: inputs.commit_sha != ''
+        with:
+          ref: ${{ inputs.commit_sha }}
 
       - name: Setup
         id: setup

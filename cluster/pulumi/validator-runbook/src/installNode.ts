@@ -164,6 +164,7 @@ async function installValidator(
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
+    false, // We don't currently support non-auth for validator-runbook
     activeVersion,
     postgres,
     {

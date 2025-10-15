@@ -33,6 +33,51 @@ Release Notes
 
     - Fix a regression introduced in 0.4.18 that made topology transactions significantly more expensive to process.
 
+  - Deployment
+
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments,
+      and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
+      can act on your behalf.
+
+  - Reward collection
+
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
+
+  - SV app
+
+    - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out of range values.
+
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
+0.4.20
+------
+
+  - Deployment
+
+    - Fix a bug where the setting the affinity for the ``splice-cometbft`` and ``splice-global-domain`` helm charts would remove the anti affinity for the ``cometbft`` and the ``sequencer`` deployment. This ensures that if multiple SVs are run on the same nodes, not more than one ``cometbft`` pod can be deployed on the same node and that no more than one ``sequencer`` pod can be deployed to the same node (a ``cometbft`` pod can still share a node with a ``sequencer`` pod). This can be disabled by setting the ``enableAntiAffinity`` helm value to ``false`` (default ``true``).
+
+    - Replace ``-Dscala.concurrent.context.minThreads=8`` with ``-Dscala.concurrent.context.numThreads=8`` and set ``-XX:ActiveProcessorCount=8``  in the ``defaultJvmOptions`` for all the helm charts that deploy scala apps. This should ensure that the internal execution contexts spawn 8 threads to handle processing and that the JVM is configured for 8 CPUs as well. The previous behavior would spawn up to number of available processors, which can be up to the number of CPUs on the actual node if no CPU limit is set. This should avoid overloading the nodes during heavy processing.
+
+  - SV
+
+    - UI
+
+      - Add the ability to specify a validator party hint when generating onboarding secrets.
+
+      - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
+
+
+0.4.19
+------
+
+  - Sequencer
+
+    - Fix a regression introduced in 0.4.18 that made topology transactions significantly more expensive to process.
+
   - Docker images
 
     - All app & UI images now use a non-root user.

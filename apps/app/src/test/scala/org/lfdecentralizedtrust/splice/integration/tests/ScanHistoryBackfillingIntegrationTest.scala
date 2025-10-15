@@ -65,10 +65,8 @@ class ScanHistoryBackfillingIntegrationTest
             .withPausedTrigger[DeleteCorruptAcsSnapshotTrigger]
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
