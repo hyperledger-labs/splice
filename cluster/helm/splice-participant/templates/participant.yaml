@@ -72,7 +72,11 @@ spec:
           value: ledger-api-user
         - name: ADDITIONAL_CONFIG_DISABLE_AUTH
           value: |
-            canton.participants.participant.ledger-api.auth-services=[]
+            canton.participants.participant.ledger-api.auth-services=[{
+              type = unsafe-jwt-hmac-256
+              target-audience = "https://ledger_api.example.com"
+              secret = "unsafe"
+            }]
         {{- else }}
         - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
           valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
