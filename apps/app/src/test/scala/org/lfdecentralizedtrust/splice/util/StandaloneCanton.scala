@@ -83,36 +83,32 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
     val dbNamesEnv = {
       val svDbsSuffix = overrideSvDbsSuffix.getOrElse(dbsSuffix)
       val sequencerDriverDbSuffix = overrideSequencerDriverDbSuffix.getOrElse(dbsSuffix)
-      (1 to 4)
-        .map(i =>
-          Seq(
-            s"SV${i}_PARTICIPANT_DB" -> s"participant_sv${i}_${svDbsSuffix}",
-            s"SV${i}_SEQUENCER_DB_BFT" -> s"sequencer_sv${i}_${svDbsSuffix}_bft",
-            s"SV${i}_SEQUENCER_DB" -> s"sequencer_sv${i}_${svDbsSuffix}",
-            s"SV${i}_MEDIATOR_DB" -> s"mediator_sv${i}_${svDbsSuffix}",
-          )
+      (1 to 4).flatMap(i =>
+        Seq(
+          s"SV${i}_PARTICIPANT_DB" -> s"participant_sv${i}_${svDbsSuffix}",
+          s"SV${i}_SEQUENCER_DB_BFT" -> s"sequencer_sv${i}_${svDbsSuffix}_bft",
+          s"SV${i}_SEQUENCER_DB" -> s"sequencer_sv${i}_${svDbsSuffix}",
+          s"SV${i}_MEDIATOR_DB" -> s"mediator_sv${i}_${svDbsSuffix}",
         )
-        .flatten :+
+      ) :+
         "SEQUENCER_DRIVER_DB" -> s"sequencer_driver_${sequencerDriverDbSuffix}"
     }
 
     val portsEnv = portsRange.fold(Seq(): Seq[(String, String)])(range =>
-      (1 to 4)
-        .map(i =>
-          Seq(
-            s"SV${i}_PARTICIPANT_LEDGER_API_PORT" -> (range * 1000 + i * 100 + 1).toString,
-            s"SV${i}_PARTICIPANT_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 2).toString,
-            s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 7).toString,
-            s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + i * 100 + 8).toString,
-            s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 9).toString,
-          )
+      (1 to 4).flatMap(i =>
+        Seq(
+          s"SV${i}_PARTICIPANT_LEDGER_API_PORT" -> (range * 1000 + i * 100 + 1).toString,
+          s"SV${i}_PARTICIPANT_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 2).toString,
+          s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 7).toString,
+          s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + i * 100 + 8).toString,
+          s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 9).toString,
         )
-        .flatten
+      )
     )
 
     val allExtraEnv =
       (extraEnv ++
-        (1 to 4).map(adminUserEnv(_)).flatten ++
+        (1 to 4).flatMap(adminUserEnv(_)) ++
         portsEnv ++
         dbNamesEnv) ++ extraParticipantsEnvMap.toList
 

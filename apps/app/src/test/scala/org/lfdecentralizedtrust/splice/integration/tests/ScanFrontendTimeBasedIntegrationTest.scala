@@ -459,9 +459,12 @@ class ScanFrontendTimeBasedIntegrationTest
           "See valid total amulet balance",
           _ => {
             val totalText = seleniumText(find(id("total-amulet-balance-amulet")))
-            val totalBalance = sv1ScanBackend
-              .getTotalAmuletBalance(firstRound + 1)
-              .valueOrFail("Amulet balance not yet computed")
+            val totalBalance = BigDecimal(
+              sv1ScanBackend
+                .lookupInstrument("Amulet")
+                .flatMap(_.totalSupply)
+                .valueOrFail("Amulet balance not yet computed")
+            )
             parseAmountText(totalText, amuletNameAcronym) shouldBe totalBalance
             val totalUsdText = seleniumText(find(id("total-amulet-balance-usd")))
             val totalUsdBalance = totalBalance * amuletPrice

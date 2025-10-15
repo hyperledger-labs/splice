@@ -366,6 +366,12 @@ class SvDsoAutomationService(
         connection(SpliceLedgerConnectionPriority.Low),
       )
     )
+    registerTrigger(
+      new AmuletPriceMetricsTrigger(
+        triggerContext,
+        dsoStore,
+      )
+    )
 
     config.scan.foreach { scan =>
       registerTrigger(
@@ -375,6 +381,17 @@ class SvDsoAutomationService(
           connection(SpliceLedgerConnectionPriority.Low),
           scan,
           upgradesConfig,
+        )
+      )
+    }
+
+    config.followAmuletConversionRateFeed.foreach { c =>
+      registerTrigger(
+        new FollowAmuletConversionRateFeedTrigger(
+          triggerContext,
+          dsoStore,
+          connection(SpliceLedgerConnectionPriority.Low),
+          c,
         )
       )
     }
@@ -503,5 +520,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
+      aTrigger[FollowAmuletConversionRateFeedTrigger],
+      aTrigger[AmuletPriceMetricsTrigger],
     )
 }

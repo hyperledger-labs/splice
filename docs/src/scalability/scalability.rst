@@ -82,3 +82,34 @@ required, you must build your own minting automation.
 You also cannot use any of the validator endpoints under
 ``/v0/admin/external-party/`` for this party, e.g., to initiate a
 transfer. Instead, interact with the external party through the :ref:`token standard <token_standard>` over the ledger API.
+
+.. _topology_batching:
+
+Topology Batching
+-----------------
+
+By default, topology batching is disabled meaning that every single
+topology transaction gets submitted as its own message to the
+synchronizer. This is in particular required for bootstrapping where a
+batch that is too large could exceed the free traffic limit preventing
+the node from ever being able to even get to the point where it can
+purchase traffic and the only option is to purchase traffic for the
+new node from an existing node.
+
+However, after bootstrapping is complete (the validator readiness
+probe reports as ready and you observe rewards collected), it can be
+useful to increase the batch size to increase the throughput of
+topology transactions that can be submitted by your node. This is in
+particular useful for nodes from wallets that host a lot of different
+end user parties.
+
+To do so, add the following :ref:`environment variables
+<configuration_ad_hoc>` to your participant configuration. You can
+experiment with the batch size but batch sizes above 20 are not
+recommended as batches that are too large can cause issues.
+
+.. code::
+
+    - name: ADDITIONAL_CONFIG_TOPOLOGY_BATCH_SIZE
+      value: |
+        canton.participants.participant.topology.broadcast-batch-size = 20

@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.store
 
 import cats.implicits.toTraverseOps
-import com.daml.ledger.javaapi.data as javab
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
@@ -40,7 +39,6 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{QueryResult, T
 import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
-import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -182,14 +180,14 @@ trait SvDsoStore
     )
 
   /** List amulets that are expired and can never be used as transfer input. */
-  final def listExpiredAmulets
-      : ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] =
-    listExpiredRoundBased(splice.amulet.Amulet.COMPANION)(identity)
+  def listExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet]
 
   /** List locked amulets that are expired and can never be used as transfer input. */
-  final def listLockedExpiredAmulets
-      : ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet] =
-    listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION)(_.amulet)
+  def listLockedExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet]
 
   def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)
@@ -697,10 +695,6 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
 
-  protected def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
-      companion: TemplateCompanion[Id, T]
-  )(amulet: T => splice.amulet.Amulet): ListExpiredContracts[Id, T]
-
   final def listUnclaimedRewards(
       limit: Limit
   )(implicit
@@ -962,6 +956,14 @@ trait SvDsoStore
     multiDomainAcsStore
       .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
       .map(_.map(_.contract))
+
+  def lookupAmuletConversionRateFeed(
+      publisher: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.ContractId,
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
+  ]]]
+
 }
 
 object SvDsoStore {
@@ -1315,6 +1317,15 @@ object SvDsoStore {
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
+      },
+      mkFilter(splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          conversionRateFeedPublisher =
+            Some(PartyId.tryFromProtoPrimitive(contract.payload.publisher)),
+        )
       },
     )
 

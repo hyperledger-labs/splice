@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
+  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
@@ -41,14 +42,20 @@ import org.lfdecentralizedtrust.splice.validator.automation.TopupMemberTrafficTr
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
 import scala.concurrent.{Future, blocking}
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.util.{Success, Try}
 
+// this test sets fees to zero, and that only works from 0.1.14 onwards
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
   private val defaultPageSize = Limit.MaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        updateAllSvAppFoundDsoConfigs_(
+          _.copy(zeroTransferFees = true)
+        )(config)
+      )
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
@@ -86,10 +93,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           )
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .withTrafficTopupsEnabled
 
@@ -387,15 +392,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           balance.unlockedQty shouldBe (walletUsdToAmulet(aliceTapAmount) + transferAmount)
         }
         eventually() {
-          val approxBobFees = walletUsdToAmulet(3) // this value depends on transferAmount
           val balance = bobWalletClient.balance()
-          assertInRange(
-            balance.unlockedQty,
-            (
-              walletUsdToAmulet(bobTapAmount) - transferAmount - approxBobFees,
-              walletUsdToAmulet(bobTapAmount) - transferAmount,
-            ),
-          )
+          balance.unlockedQty shouldBe walletUsdToAmulet(bobTapAmount) - transferAmount
         }
       }
       val bobBalanceAfterTransfer = bobWalletClient.balance()
@@ -418,17 +416,12 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputAmuletAmount =
             transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
-          val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
-          senderChangeFee shouldBe (amuletConfig.amuletCreateFee)
-          val senderFee = BigDecimal(transfer.sender.senderFee)
-          val holdingFees = BigDecimal(transfer.sender.holdingFees)
+          BigDecimal(transfer.sender.senderChangeFee) shouldBe BigDecimal(0)
+          BigDecimal(transfer.sender.senderFee) shouldBe BigDecimal(0)
+          BigDecimal(transfer.sender.holdingFees) shouldBe BigDecimal(0)
+
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-
-          senderFee shouldBe expectedSenderFee(transferAmount)
-
-          val totalSenderFee = senderFee + holdingFees + senderChangeFee
-
-          inputAmuletAmount - senderChangeAmount shouldBe (transferAmount + totalSenderFee)
+          inputAmuletAmount - senderChangeAmount shouldBe transferAmount
 
           // alice receives transfer
           transfer.receivers
@@ -477,9 +470,9 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       }
       clue("Bob receives self-transfer") {
         eventually() {
-          // a self-transfer should cost some fees.
+          // a self-transfer should not cost any fees.
           val balance = bobWalletClient.balance()
-          balance.unlockedQty should be < bobBalanceAfterTransfer.unlockedQty
+          balance.unlockedQty shouldBe bobBalanceAfterTransfer.unlockedQty
         }
       }
       clue("Bob's self-transfer is shown in scan activity") {
@@ -501,15 +494,14 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           val inputAmuletAmount =
             transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
           val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
-          senderChangeFee shouldBe (amuletConfig.amuletCreateFee)
+          senderChangeFee shouldBe BigDecimal(0)
 
           val senderFee = BigDecimal(transfer.sender.senderFee)
-          val holdingFees = BigDecimal(transfer.sender.holdingFees)
+          BigDecimal(transfer.sender.holdingFees) shouldBe BigDecimal(0)
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-          senderFee shouldBe walletUsdToAmulet(SpliceUtil.defaultCreateFee.fee)
+          senderFee shouldBe BigDecimal(0)
 
-          val totalSenderFee = senderFee + holdingFees + senderChangeFee
-          inputAmuletAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
+          inputAmuletAmount - senderChangeAmount shouldBe selfTransferAmount
 
           BigDecimal(receiver.amount) shouldBe selfTransferAmount
           BigDecimal(receiver.receiverFee) shouldBe BigDecimal(0)
@@ -556,9 +548,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           PartyId
             .tryFromProtoPrimitive(receiver.party) shouldBe (charlieUserParty)
           BigDecimal(receiver.amount) shouldBe transferAmount
-          BigDecimal(receiver.receiverFee) shouldBe expectedSenderFee(
-            transferAmount
-          ) * receiverFeeRatio
+          BigDecimal(receiver.receiverFee) shouldBe BigDecimal(0)
         }
       }
   }
@@ -817,22 +807,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       forAll(_) { _.message shouldNot include("Illegal 'user-agent' header") },
     )
     response.status shouldBe StatusCodes.OK
-  }
-
-  def expectedSenderFee(amount: BigDecimal) = {
-    val initialRate = SpliceUtil.defaultTransferFee.initialRate
-    val step1 = SpliceUtil.defaultTransferFee.steps.get(0)
-    val step2 = SpliceUtil.defaultTransferFee.steps.get(1)
-    val step3 = SpliceUtil.defaultTransferFee.steps.get(2)
-    val (step1Amount, step1Mult) = (walletUsdToAmulet(step1._1), step1._2)
-    val (step2Amount, step2Mult) = (walletUsdToAmulet(step2._1), step2._2)
-    // ensuring the right steps are hardcoded here.
-    walletUsdToAmulet(step3._1) should be > amount
-    val steppedRate =
-      initialRate * (amount min step1Amount) +
-        step1Mult * ((amount - step1Amount) max 0 min step2Amount) +
-        step2Mult * ((amount - step1Amount - step2Amount) max 0)
-    walletUsdToAmulet(SpliceUtil.defaultCreateFee.fee) + steppedRate
   }
 
   def triggerTopupAliceAndBob()(implicit env: SpliceTestConsoleEnvironment): (Boolean, Boolean) = {

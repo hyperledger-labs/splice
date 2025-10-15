@@ -3,20 +3,23 @@
 
 import { Box, TextField as MuiTextField, Typography } from '@mui/material';
 import { useFieldContext } from '../../hooks/formContext';
+import { PROPOSAL_SUMMARY_SUBTITLE, PROPOSAL_SUMMARY_TITLE } from '../../utils/constants';
 
-export interface TextAreaProps {
-  title: string;
-  optional?: boolean;
+export interface ProposalSummaryFieldProps {
   id: string;
+  title?: string;
+  optional?: boolean;
+  subtitle?: string;
 }
 
-export const TextArea: React.FC<TextAreaProps> = props => {
-  const { title, optional, id } = props;
+export const ProposalSummaryField: React.FC<ProposalSummaryFieldProps> = props => {
+  const { title, optional, id, subtitle } = props;
   const field = useFieldContext<string>();
+
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        {title}
+        {title || PROPOSAL_SUMMARY_TITLE}
         {optional && (
           <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
             optional
@@ -36,6 +39,9 @@ export const TextArea: React.FC<TextAreaProps> = props => {
         helperText={field.state.meta.errors?.[0]}
         inputProps={{ 'data-testid': id }}
       />
+      <Typography variant="body2" sx={{ mt: 1 }} data-testid={`${id}-subtitle`}>
+        {subtitle || PROPOSAL_SUMMARY_SUBTITLE}
+      </Typography>
     </Box>
   );
 };

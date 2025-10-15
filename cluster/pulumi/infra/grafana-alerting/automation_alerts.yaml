@@ -490,8 +490,9 @@ groups:
               maxDataPoints: 43200
               refId: threshold
               type: math
-        noDataState: NoData
-        execErrState: Error
+        # Alert also reports noData when there is no contention.
+        noDataState: OK
+        execErrState: Alerting
         for: 5m
         annotations:
           description: '{{ index $labels "namespace" }} had more than 5% contention in the last 30 minutes.'

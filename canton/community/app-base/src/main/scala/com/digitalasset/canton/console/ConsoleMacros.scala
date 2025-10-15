@@ -57,14 +57,12 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransaction,
-  StoredTopologyTransactions,
-}
+import com.digitalasset.canton.topology.store.StoredTopologyTransaction
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.BinaryFileUtil
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.google.protobuf.ByteString
@@ -817,23 +815,29 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       val merged =
         SignedTopologyTransactions.compact(initialTopologyState).map(_.updateIsProposal(false))
 
-      val storedTopologySnapshot = StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
-        merged.map(stored =>
-          StoredTopologyTransaction(
-            sequenced = SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-            validFrom = EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-            validUntil = None,
-            transaction = stored,
-            rejectionReason = None,
-          )
+      val out = ByteString.newOutput()
+      merged.foreach { stored =>
+        val tx = StoredTopologyTransaction(
+          sequenced = SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+          validFrom = EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+          validUntil = None,
+          transaction = stored,
+          rejectionReason = None,
         )
-      ).toByteString(staticSynchronizerParameters.protocolVersion)
+        tx.writeDelimitedTo(staticSynchronizerParameters.protocolVersion, out)
+          .left
+          .foreach(error =>
+            consoleEnvironment.raiseError(s"The synchronizer cannot be bootstrapped: $error")
+          )
+      }
+
+      val storedTopologySnapshot = out.toByteString
 
       sequencers
         .filterNot(_.health.initialized())
         .foreach(x =>
           x.setup
-            .assign_from_genesis_state(storedTopologySnapshot, staticSynchronizerParameters)
+            .assign_from_genesis_stateV2(storedTopologySnapshot, staticSynchronizerParameters)
             .discard
         )
 
@@ -860,6 +864,53 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       )
 
       synchronizerId
+    }
+
+    @Help.Summary("Bootstraps a local synchronizer using default arguments")
+    @Help.Description(
+      "This is a convenience method for bootstrapping a local synchronizer." +
+        "The synchronizer will include all sequencers and mediators that are currently running." +
+        "It will be owned by the sequencers, while the mediator threshold will be set to require" +
+        "all mediators to confirm."
+    )
+    def local(
+        synchronizerName: String = "local"
+    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
+      def checkEnoughAndNotInitialized[T <: InstanceReference](
+          name: String,
+          items: Seq[T],
+      ): Seq[T] = {
+        val distinct = items
+          .filter(x => x.health.is_running() && x.health.active && x.health.has_identity())
+          .groupBy(_.id)
+          .flatMap { case (_, v) =>
+            v.headOption.toList
+          }
+          .toList
+        if (distinct.isEmpty) {
+          consoleEnvironment.raiseError(s"No ${name}s available to bootstrap a local synchronizer.")
+        }
+        distinct.find(_.health.initialized()).foreach { ref =>
+          consoleEnvironment.raiseError(
+            s"$name ${ref.id} has already been initialized"
+          )
+        }
+        distinct
+      }
+      val distinctSequencers =
+        checkEnoughAndNotInitialized("sequencer", consoleEnvironment.sequencers.all)
+      val distinctMediators =
+        checkEnoughAndNotInitialized("mediator", consoleEnvironment.mediators.all)
+      synchronizer(
+        synchronizerName,
+        distinctSequencers,
+        distinctMediators,
+        synchronizerOwners = distinctSequencers,
+        synchronizerThreshold = PositiveInt.tryCreate(distinctSequencers.length),
+        staticSynchronizerParameters =
+          data.StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.forSynchronizer),
+        mediatorThreshold = PositiveInt.tryCreate(distinctMediators.size),
+      )
     }
 
     @Help.Summary(
@@ -1041,10 +1092,10 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
       // now we can establish the sequencer snapshot
       val onboardingState =
-        existingSequencer.setup.onboarding_state_for_sequencer(newSequencer.id)
+        existingSequencer.setup.onboarding_state_for_sequencerV2(newSequencer.id)
 
       // finally, initialize "newSequencer"
-      newSequencer.setup.assign_from_onboarding_state(onboardingState).discard
+      newSequencer.setup.assign_from_onboarding_stateV2(onboardingState).discard
     }
   }
 

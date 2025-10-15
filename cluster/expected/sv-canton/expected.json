@@ -839,11 +839,47 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials-migration-3",
+        "namespace": "sv-da-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials-migration-3",
     "provider": "",
-    "type": "gcp:compute/network:Network"
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials-migration-4",
+        "namespace": "sv-da-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials-migration-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
@@ -964,6 +1000,122 @@
     "name": "k8s-imgpull-sv-sv-canton-migration-4",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock\")",
+        "title": "\"sv-da-1_participant_mock\" keyring"
+      },
+      "role": "roles/cloudkms.admin"
+    },
+    "name": "mock-sv-da-1-kms-migration-3-roles/cloudkms.admin-\"sv-da-1_participant_mock\"-keyring-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock\")",
+        "title": "\"sv-da-1_participant_mock\" keyring"
+      },
+      "role": "roles/cloudkms.cryptoOperator"
+    },
+    "name": "mock-sv-da-1-kms-migration-3-roles/cloudkms.cryptoOperator-\"sv-da-1_participant_mock\"-keyring-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "mock-sv-da-1-kms-migration-3",
+      "description": "(managed by Pulumi)",
+      "displayName": "KMS Service Account (mock sv-da-1 M3)"
+    },
+    "name": "mock-sv-da-1-kms-migration-3-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "mock-sv-da-1-kms-migration-3",
+    "provider": "",
+    "type": "cn:gcp:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock\")",
+        "title": "\"sv-da-1_participant_mock\" keyring"
+      },
+      "role": "roles/cloudkms.admin"
+    },
+    "name": "mock-sv-da-1-kms-migration-4-roles/cloudkms.admin-\"sv-da-1_participant_mock\"-keyring-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock\")",
+        "title": "\"sv-da-1_participant_mock\" keyring"
+      },
+      "role": "roles/cloudkms.cryptoOperator"
+    },
+    "name": "mock-sv-da-1-kms-migration-4-roles/cloudkms.cryptoOperator-\"sv-da-1_participant_mock\"-keyring-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "mock-sv-da-1-kms-migration-4",
+      "description": "(managed by Pulumi)",
+      "displayName": "KMS Service Account (mock sv-da-1 M4)"
+    },
+    "name": "mock-sv-da-1-kms-migration-4-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "mock-sv-da-1-kms-migration-4",
+    "provider": "",
+    "type": "cn:gcp:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {},
+    "name": "participantKmsServiceAccountKey-migration-3",
+    "provider": "",
+    "type": "gcp:serviceaccount/key:Key"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {},
+    "name": "participantKmsServiceAccountKey-migration-4",
+    "provider": "",
+    "type": "gcp:serviceaccount/key:Key"
   },
   {
     "custom": true,
@@ -1582,6 +1734,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
@@ -1676,6 +1834,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
@@ -2499,7 +2663,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -2566,7 +2730,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -2633,7 +2797,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -2700,7 +2864,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -3384,12 +3548,12 @@
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26326,
           "keysSecret": "",
-          "privateKey": "svda1-cometbft-keys-node-private-key",
+          "privateKey": "svda1-mock-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
             "keyAddress": "2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7",
-            "privateKey": "svda1-cometbft-keys-validator-private-key",
-            "publicKey": "svda1-cometbft-keys-validator-public-key"
+            "privateKey": "svda1-mock-cometbft-keys-validator-private-key",
+            "publicKey": "svda1-mock-cometbft-keys-validator-public-key"
           }
         },
         "nodeName": "Digital-Asset-1",
@@ -3483,12 +3647,12 @@
           "identifier": "global-domain-4-cometbft",
           "istioPort": 26426,
           "keysSecret": "",
-          "privateKey": "svda1-cometbft-keys-node-private-key",
+          "privateKey": "svda1-mock-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
             "keyAddress": "2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7",
-            "privateKey": "svda1-cometbft-keys-validator-private-key",
-            "publicKey": "svda1-cometbft-keys-validator-public-key"
+            "privateKey": "svda1-mock-cometbft-keys-validator-private-key",
+            "publicKey": "svda1-mock-cometbft-keys-validator-public-key"
           }
         },
         "nodeName": "Digital-Asset-1",
@@ -3684,6 +3848,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
@@ -3778,6 +3948,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
@@ -4307,6 +4483,10 @@
       "values": {
         "additionalEnvVars": [
           {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": "/app/gcp-credentials.json"
+          },
+          {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           }
@@ -4340,7 +4520,28 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
+        "extraVolumeMounts": [
+          {
+            "mountPath": "/app/gcp-credentials.json",
+            "name": "gcp-credentials",
+            "subPath": "googleCredentials"
+          }
+        ],
+        "extraVolumes": [
+          {
+            "name": "gcp-credentials",
+            "secret": {
+              "secretName": "gke-credentials-migration-3"
+            }
+          }
+        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "kms": {
+          "keyRingId": "sv-da-1_participant_mock",
+          "locationId": "us-central1",
+          "projectId": "da-cn-devnet",
+          "type": "gcp"
+        },
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -4466,6 +4667,10 @@
       "values": {
         "additionalEnvVars": [
           {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": "/app/gcp-credentials.json"
+          },
+          {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           }
@@ -4499,7 +4704,28 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
+        "extraVolumeMounts": [
+          {
+            "mountPath": "/app/gcp-credentials.json",
+            "name": "gcp-credentials",
+            "subPath": "googleCredentials"
+          }
+        ],
+        "extraVolumes": [
+          {
+            "name": "gcp-credentials",
+            "secret": {
+              "secretName": "gke-credentials-migration-4"
+            }
+          }
+        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "kms": {
+          "keyRingId": "sv-da-1_participant_mock",
+          "locationId": "us-central1",
+          "projectId": "da-cn-devnet",
+          "type": "gcp"
+        },
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -4601,7 +4827,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -4668,7 +4894,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -4735,7 +4961,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -4802,7 +5028,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -4980,6 +5206,30 @@
     "name": "sv-da-1-sv-canton-migration-4",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-da-1-sv-canton-migration-4::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock",
+    "inputs": {
+      "location": "us-central1",
+      "name": "sv-da-1_participant_mock",
+      "project": "da-cn-devnet"
+    },
+    "name": "sv-da-1_participant_mock_keyring",
+    "provider": "",
+    "type": "gcp:kms/keyRing:KeyRing"
+  },
+  {
+    "custom": true,
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock",
+    "inputs": {
+      "location": "us-central1",
+      "name": "sv-da-1_participant_mock",
+      "project": "da-cn-devnet"
+    },
+    "name": "sv-da-1_participant_mock_keyring",
+    "provider": "",
+    "type": "gcp:kms/keyRing:KeyRing"
   },
   {
     "custom": true,
@@ -5216,6 +5466,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_3",
             "port": 5432,
@@ -5310,6 +5566,12 @@
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_4",
             "port": 5432,
@@ -6133,7 +6395,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -6200,7 +6462,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -6267,7 +6529,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -6334,7 +6596,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"

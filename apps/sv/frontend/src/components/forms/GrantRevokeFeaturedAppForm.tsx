@@ -169,7 +169,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
             >
               {field => (
                 <field.DateField
-                  title="Vote Proposal Expiration"
+                  title="Threshold Deadline"
                   description="This is the last day voters can vote on this proposal"
                   id={`${testIdPrefix}-expiry-date`}
                 />
@@ -197,7 +197,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => <field.TextArea title="Proposal Summary" id={`${testIdPrefix}-summary`} />}
+              {field => <field.ProposalSummaryField id={`${testIdPrefix}-summary`} />}
             </form.AppField>
 
             <form.AppField

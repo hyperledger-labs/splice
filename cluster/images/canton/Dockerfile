@@ -38,5 +38,10 @@ RUN ln -s bin/canton splice-image-bin
 # Add label for security scanners, compliance tools, and auditing purposes
 LABEL org.opencontainers.image.base.name="${BASE_IMAGE}"
 
+RUN addgroup --gid 1001 nonroot && adduser --uid 1001 --gid 1001 nonroot
+RUN chown -R nonroot:nonroot /app
+RUN chown nonroot:nonroot splice-image-bin
+USER nonroot
+
 # point entrypoint to the amulet executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

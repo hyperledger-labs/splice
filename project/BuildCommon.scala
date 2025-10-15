@@ -21,6 +21,8 @@ import xsbti.compile.CompileAnalysis
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
 import CantonDependencies.daml_ledger_api_value_proto
 
+import java.util.concurrent.atomic.AtomicInteger
+
 object BuildCommon {
 
   object defs {
@@ -198,7 +200,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
+          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; party-allocator/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all Splice DARs here, just in case
@@ -1588,6 +1590,8 @@ object BuildCommon {
     cache(dars.toSet).toSeq
   }
 
+  val id = new AtomicInteger(0)
+
   /** Runs npm-install.sh script, which in turn runs 'npm install' in a dev environment, or
     * 'npm ci' in ci. The source package.json file should be specified in pkg. Rerunning this
     * task will re-execute 'npm install' only if the package file has been modified.
@@ -1601,12 +1605,15 @@ object BuildCommon {
     val cacheDir = streams.value.cacheDirectory / "npmInstall"
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
+        val i = id.getAndIncrement()
+        println(s"Npm install called for ${npmRootDir.value}. Id: $i")
         BuildUtil.runCommandWithRetries(
           Seq(npmInstallScript.getAbsolutePath),
           log,
           None,
           Some(npmRootDir.value),
         )
+        println(s"Npm install completed for ${npmRootDir.value}. Id: $i")
         Set(npmRootDir.value / "node_modules")
       }
     val openApiPackageJsons = openApiPkgs.flatMap { case (_, baseDir, hasExternalSpec) =>

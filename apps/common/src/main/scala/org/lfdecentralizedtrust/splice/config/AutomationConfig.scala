@@ -25,11 +25,14 @@ case class AutomationConfig(
       * `[pollingInterval * (1 - 0.5*pollingJitter), pollingInterval * (1 + 0.5 * pollingJitter)]`
       */
     pollingJitter: Double = 0.2,
+    /** Enabled schedling reward operations unfiromly across the first tick of a round opening.
+      */
+    enableNewRewardTriggerScheduling: Boolean = false,
     /** Reward operations can result in spikes overloading sequencers on each round switch so we
       * use a lower polling interval of 1/3 tick with tick = 600s
       */
     rewardOperationPollingInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(200),
+      NonNegativeFiniteDuration.ofSeconds(300),
     /** Reward operations can result in spikes overloading sequencers on each round switch so we
       * use higher jitter.
       */
@@ -46,6 +49,11 @@ case class AutomationConfig(
       */
     domainIngestionPollingInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration ofSeconds 30,
+    /** Polling interval to recompute and export topology metrics.
+      *
+      * Set to None to disable the topology metrics trigger.
+      */
+    topologyMetricsPollingInterval: Option[NonNegativeFiniteDuration] = None,
     /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
       */
     maxNumSilentPollingRetries: Int = 3,
@@ -87,6 +95,7 @@ case class AutomationConfig(
       */
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
+    ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName

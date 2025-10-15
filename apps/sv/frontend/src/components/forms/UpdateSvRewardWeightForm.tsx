@@ -47,9 +47,6 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
     [dsoInfosQuery]
   );
 
-  const svPartyId = dsoInfosQuery.data?.svPartyId || '';
-  const currentWeight = getSvRewardWeight(svs, svPartyId);
-
   const svOptions: { key: string; value: string }[] = useMemo(
     () => svs.map(([partyId, svInfo]) => ({ key: svInfo.name, value: partyId })),
     [svs]
@@ -108,6 +105,12 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
     },
   });
 
+  const selectedSv = svOptions.find(o => o.value === form.state.values.sv);
+
+  const currentWeight = useMemo(() => {
+    return getSvRewardWeight(svs, selectedSv?.value || '');
+  }, [svs, selectedSv]);
+
   return (
     <>
       <FormLayout form={form} id="update-sv-reward-weight-form">
@@ -146,7 +149,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
             >
               {field => (
                 <field.DateField
-                  title="Vote Proposal Expiration"
+                  title="Threshold Deadline"
                   description="This is the last day voters can vote on this proposal"
                   id="update-sv-reward-weight-expiry-date"
                 />
@@ -174,9 +177,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => (
-                <field.TextArea title="Proposal Summary" id="update-sv-reward-weight-summary" />
-              )}
+              {field => <field.ProposalSummaryField id="update-sv-reward-weight-summary" />}
             </form.AppField>
 
             <form.AppField
@@ -212,7 +213,13 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                 onChange: ({ value }) => validateWeight(value),
               }}
             >
-              {field => <field.TextField title="Weight" id="update-sv-reward-weight-weight" />}
+              {field => (
+                <field.TextField
+                  title="Weight"
+                  id="update-sv-reward-weight-weight"
+                  subtitle={selectedSv ? `Current Weight: ${currentWeight}` : undefined}
+                />
+              )}
             </form.AppField>
           </>
         )}

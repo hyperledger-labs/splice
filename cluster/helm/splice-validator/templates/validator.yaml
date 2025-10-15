@@ -42,7 +42,6 @@ spec:
         - name: SPLICE_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}
         {{ end }}
-        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         {{- range $ii, $user := .Values.additionalUsers }}
         - name: {{ $user.name }}
           {{ if $user.value }}
@@ -88,18 +87,6 @@ spec:
         {{ if .Values.validatorPartyHint }}
         - name: SPLICE_APP_VALIDATOR_PARTY_HINT
           value: {{ .Values.validatorPartyHint }}
-        {{ end }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_AUDIENCE
-          value: {{ .Values.auth.audience | quote }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
-          value: {{ .Values.auth.jwksUrl | quote }}
-        {{ if (.Values.auth.jwks).connectionTimeout }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
-          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
-        {{ end }}
-        {{ if (.Values.auth.jwks).readTimeout }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
-          value: {{ .Values.auth.jwks.readTimeout | quote }}
         {{ end }}
         {{ if .Values.svValidator }}
         - name: SPLICE_APP_VALIDATOR_SV_VALIDATOR
@@ -282,6 +269,42 @@ spec:
         - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
           value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
         {{- end }}
+        {{- if .Values.disableAuth }}
+        - name: ADDITIONAL_CONFIG_DISABLE_AUTH
+          value: |
+            canton.validator-apps.validator_backend {
+              auth=""
+            }
+            canton.validator-apps.validator_backend {
+              auth={
+                algorithm = "hs-256-unsafe"
+                audience = "https://validator.example.com"
+                secret = "unsafe"
+              }
+            }
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
+              type="none"
+            }
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          value: ledger-api-user
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE
+          value: "https://ledger_api.example.com"
+        {{- else }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl | quote }}
+        {{ if (.Values.auth.jwks).connectionTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
+          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
+        {{ end }}
+        {{ if (.Values.auth.jwks).readTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
+          value: {{ .Values.auth.jwks.readTimeout | quote }}
+        {{ end }}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http
@@ -317,7 +340,22 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
+      {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
+      volumes:
+      {{- with .Values.participantIdentitiesDumpImport }}
+        - name: participant-bootstrapping-dump-secret
+          secret:
+            secretName: {{ .secretName }}
+        - name: participant-bootstrapping-dump-volume
+          emptyDir: {}
+      {{- end }}
+      {{- if $requiresMigrationPvc }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.volumeName }}
+      {{- end }}
+      {{- end }}
+      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) (.Values.participantIdentitiesDumpImport) ($requiresMigrationPvc) }}
       initContainers:
         {{- if .Values.persistence.enablePgInitContainer }}
         - name: {{ .Release.Name }}-init
@@ -345,19 +383,24 @@ spec:
         {{- if .Values.extraInitContainers }}
         {{ .Values.extraInitContainers | toYaml | nindent 8 }}
         {{- end }}
-      {{- end }}
-      {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
-      volumes:
-      {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-volume
-          secret:
-            secretName: {{ .secretName }}
-      {{- end }}
-      {{- if $requiresMigrationPvc }}
-        - name: domain-upgrade-dump-volume
-          persistentVolumeClaim:
-            claimName: {{ .Values.pvc.volumeName }}
-      {{- end }}
+        {{- if .Values.participantIdentitiesDumpImport }}
+        - name: chown-participant-bootstrapping-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "cp /participant-bootstrapping-dump-secret/content /participant-bootstrapping-dump/ && chown -R 1001:1001 /participant-bootstrapping-dump"]
+          volumeMounts:
+            - name: participant-bootstrapping-dump-secret
+              mountPath: /participant-bootstrapping-dump-secret
+            - name: participant-bootstrapping-dump-volume
+              mountPath: /participant-bootstrapping-dump
+        {{- end }}
+        {{- if $requiresMigrationPvc }}
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

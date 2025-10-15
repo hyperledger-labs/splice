@@ -30,22 +30,22 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('action-title').textContent).toBe('Action');
-    expect(screen.getByTestId('action-field').getAttribute('value')).toBe(actionName);
+    expect(screen.getByTestId('action-field').textContent).toBe(actionName);
 
     expect(screen.getByTestId('url-title').textContent).toBe('URL');
-    expect(screen.getByTestId('url-field').getAttribute('value')).toBe(url);
+    expect(screen.getByTestId('url-field').textContent).toBe(url);
 
     expect(screen.getByTestId('summary-title').textContent).toBe('Summary');
     expect(screen.getByTestId('summary-field').textContent).toBe(summary);
 
-    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Expiry Date');
-    expect(screen.getByTestId('expiryDate-field').getAttribute('value')).toBe(expiryDate);
+    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Threshold Deadline');
+    expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
     expect(screen.getByTestId('offboardMember-title').textContent).toBe('Offboard Member');
-    expect(screen.getByTestId('offboardMember-field').getAttribute('value')).toBe(offboardMember);
+    expect(screen.getByTestId('offboardMember-field').textContent).toBe(offboardMember);
   });
 
   test('should render review proposal component for offboard member at Threshold', () => {
@@ -67,7 +67,7 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe('Threshold');
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe('Threshold');
   });
 
   test('should render review proposal component for sv reward weight', () => {
@@ -94,19 +94,19 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('action-title').textContent).toBe('Action');
-    expect(screen.getByTestId('action-field').getAttribute('value')).toBe(actionName);
+    expect(screen.getByTestId('action-field').textContent).toBe(actionName);
 
     expect(screen.getByTestId('url-title').textContent).toBe('URL');
-    expect(screen.getByTestId('url-field').getAttribute('value')).toBe(url);
+    expect(screen.getByTestId('url-field').textContent).toBe(url);
 
     expect(screen.getByTestId('summary-title').textContent).toBe('Summary');
     expect(screen.getByTestId('summary-field').textContent).toBe(summary);
 
-    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Expiry Date');
-    expect(screen.getByTestId('expiryDate-field').getAttribute('value')).toBe(expiryDate);
+    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Threshold Deadline');
+    expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
     expect(screen.getByTestId('config-change-field-label').textContent).toBe(title);
     expect(screen.getByTestId('config-change-current-value').textContent).toBe(currentWeight);
@@ -132,22 +132,22 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('action-title').textContent).toBe('Action');
-    expect(screen.getByTestId('action-field').getAttribute('value')).toBe(actionName);
+    expect(screen.getByTestId('action-field').textContent).toBe(actionName);
 
     expect(screen.getByTestId('url-title').textContent).toBe('URL');
-    expect(screen.getByTestId('url-field').getAttribute('value')).toBe(url);
+    expect(screen.getByTestId('url-field').textContent).toBe(url);
 
     expect(screen.getByTestId('summary-title').textContent).toBe('Summary');
     expect(screen.getByTestId('summary-field').textContent).toBe(summary);
 
-    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Expiry Date');
-    expect(screen.getByTestId('expiryDate-field').getAttribute('value')).toBe(expiryDate);
+    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Threshold Deadline');
+    expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
     expect(screen.getByTestId('grantRight-title').textContent).toBe('Provider');
-    expect(screen.getByTestId('grantRight-field').getAttribute('value')).toBe(provider);
+    expect(screen.getByTestId('grantRight-field').textContent).toBe(provider);
   });
 
   test('should render review proposal component for unfeature application', () => {
@@ -169,24 +169,24 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('action-title').textContent).toBe('Action');
-    expect(screen.getByTestId('action-field').getAttribute('value')).toBe(actionName);
+    expect(screen.getByTestId('action-field').textContent).toBe(actionName);
 
     expect(screen.getByTestId('url-title').textContent).toBe('URL');
-    expect(screen.getByTestId('url-field').getAttribute('value')).toBe(url);
+    expect(screen.getByTestId('url-field').textContent).toBe(url);
 
     expect(screen.getByTestId('summary-title').textContent).toBe('Summary');
     expect(screen.getByTestId('summary-field').textContent).toBe(summary);
 
-    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Expiry Date');
-    expect(screen.getByTestId('expiryDate-field').getAttribute('value')).toBe(expiryDate);
+    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Threshold Deadline');
+    expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
     expect(screen.getByTestId('revokeRight-title').textContent).toBe(
       'Featured Application Right Contract Id'
     );
-    expect(screen.getByTestId('revokeRight-field').getAttribute('value')).toBe(contractId);
+    expect(screen.getByTestId('revokeRight-field').textContent).toBe(contractId);
   });
 
   test('should render review proposal component for dso rules config', () => {
@@ -224,19 +224,19 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('action-title').textContent).toBe('Action');
-    expect(screen.getByTestId('action-field').getAttribute('value')).toBe(actionName);
+    expect(screen.getByTestId('action-field').textContent).toBe(actionName);
 
     expect(screen.getByTestId('url-title').textContent).toBe('URL');
-    expect(screen.getByTestId('url-field').getAttribute('value')).toBe(url);
+    expect(screen.getByTestId('url-field').textContent).toBe(url);
 
     expect(screen.getByTestId('summary-title').textContent).toBe('Summary');
     expect(screen.getByTestId('summary-field').textContent).toBe(summary);
 
-    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Expiry Date');
-    expect(screen.getByTestId('expiryDate-field').getAttribute('value')).toBe(expiryDate);
+    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Threshold Deadline');
+    expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
     expect(screen.getByText('Proposed Changes')).toBeDefined();
     expect(screen.getByText(numThresholdTitle)).toBeDefined();
@@ -296,19 +296,19 @@ describe('Review Proposal Component', () => {
     );
 
     expect(screen.getByTestId('action-title').textContent).toBe('Action');
-    expect(screen.getByTestId('action-field').getAttribute('value')).toBe(actionName);
+    expect(screen.getByTestId('action-field').textContent).toBe(actionName);
 
     expect(screen.getByTestId('url-title').textContent).toBe('URL');
-    expect(screen.getByTestId('url-field').getAttribute('value')).toBe(url);
+    expect(screen.getByTestId('url-field').textContent).toBe(url);
 
     expect(screen.getByTestId('summary-title').textContent).toBe('Summary');
     expect(screen.getByTestId('summary-field').textContent).toBe(summary);
 
-    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Expiry Date');
-    expect(screen.getByTestId('expiryDate-field').getAttribute('value')).toBe(expiryDate);
+    expect(screen.getByTestId('expiryDate-title').textContent).toBe('Threshold Deadline');
+    expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
 
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
-    expect(screen.getByTestId('effectiveDate-field').getAttribute('value')).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
     expect(screen.getByText('Proposed Changes')).toBeDefined();
     expect(screen.getByText(feeTitle)).toBeDefined();

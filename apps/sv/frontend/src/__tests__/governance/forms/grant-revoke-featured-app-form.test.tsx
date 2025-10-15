@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import { GrantRevokeFeaturedAppForm } from '../../../components/forms/GrantRevokeFeaturedAppForm';
 import { server, svUrl } from '../../setup/setup';
 import { rest } from 'msw';
+import { PROPOSAL_SUMMARY_SUBTITLE, PROPOSAL_SUMMARY_TITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -53,6 +54,10 @@ describe('Grant Featured App Form', () => {
     const summaryInput = screen.getByTestId('grant-featured-app-summary');
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
+
+    const summarySubtitle = screen.getByTestId('grant-featured-app-summary-subtitle');
+    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
     const urlInput = screen.getByTestId('grant-featured-app-url');
     expect(urlInput).toBeDefined();
@@ -198,7 +203,7 @@ describe('Grant Featured App Form', () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText('Proposal Summary')).toBeDefined();
+    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
   });
 });
 
@@ -361,7 +366,7 @@ describe('Revoke Featured App Form', () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText('Proposal Summary')).toBeDefined();
+    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
   });
 
   test('should show error on form if submission fails', async () => {

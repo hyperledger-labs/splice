@@ -116,5 +116,4 @@ object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
         source,
         ActiveContractOld,
       )
-      .map(_.toList)
 }

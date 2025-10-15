@@ -14,8 +14,7 @@ import {
   Postgres,
   CloudPostgres,
   generatePassword,
-  privateNetwork,
-  protectCloudSql,
+  privateNetworkId,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   ExactNamespace,
@@ -23,6 +22,7 @@ import {
   commandScriptPath,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
+import { spliceConfig } from '../../common/src/config/config';
 import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
@@ -367,7 +367,7 @@ function installPrivateConnectivityConfiguration(
       privateConnectionId: privateConnectionName,
       displayName: privateConnectionName,
       location: cloudsdkComputeRegion(),
-      vpcPeeringConfig: { subnet: pickDatastreamPeeringCidr(), vpc: privateNetwork.id },
+      vpcPeeringConfig: { subnet: pickDatastreamPeeringCidr(), vpc: privateNetworkId },
       labels: {
         cluster: CLUSTER_BASENAME,
       },
@@ -406,7 +406,7 @@ function installReplicatorPassword(postgres: CloudPostgres): PostgresPassword {
   const secretName = `${postgres.namespace.logicalName}-${replicatorUserName}-passwd`;
   const password = generatePassword(`${postgres.instanceName}-${replicatorUserName}-passwd`, {
     parent: postgres,
-    protect: protectCloudSql,
+    protect: spliceConfig.pulumiProjectConfig.cloudSql.protected,
   }).result;
   return {
     contents: password,
@@ -430,7 +430,7 @@ function createPostgresReplicatorUser(
       parent: postgres,
       deletedWith: postgres.databaseInstance,
       retainOnDelete: true,
-      protect: protectCloudSql,
+      protect: spliceConfig.pulumiProjectConfig.cloudSql.protected,
       dependsOn: [postgres.databaseInstance, password.secret],
     }
   );
@@ -450,7 +450,7 @@ function createPublicationAndReplicationSlots(
   const schemaName = dbName;
   const path = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
   const scriptArgs = pulumi.interpolate`\\
-      --private-network-project="${privateNetwork.project}" \\
+      --private-network-project="${gcp.organizations.getProjectOutput({}).apply(proj => proj.name)}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
       --tables-to-replicate-length="${tablesToReplicate.length}" \\

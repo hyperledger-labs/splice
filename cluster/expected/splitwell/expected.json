@@ -89,14 +89,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "enableServerSideApply": "true"
@@ -528,6 +520,7 @@
       "namespace": "splitwell",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -555,6 +548,7 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "disableAuth": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -920,6 +914,7 @@
           "name": "cn-mocknet"
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",

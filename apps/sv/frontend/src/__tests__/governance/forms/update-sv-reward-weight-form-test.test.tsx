@@ -13,6 +13,7 @@ import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-
 import dayjs from 'dayjs';
 import { server, svUrl } from '../../setup/setup';
 import { rest } from 'msw';
+import { PROPOSAL_SUMMARY_SUBTITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -53,6 +54,10 @@ describe('Update SV Reward Weight Form', () => {
     const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
+
+    const summarySubtitle = screen.getByTestId('update-sv-reward-weight-summary-subtitle');
+    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
     const urlInput = screen.getByTestId('update-sv-reward-weight-url');
     expect(urlInput).toBeDefined();
@@ -199,6 +204,34 @@ describe('Update SV Reward Weight Form', () => {
     );
   });
 
+  test('Current weight of selected SV is shown', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+
+    const validateCurrentWeightFor = async (sv: string, weight: string) => {
+      await waitFor(async () => {
+        fireEvent.mouseDown(selectInput);
+        const memberToSelect = screen.getByText(sv);
+        expect(memberToSelect).not.toBeNull();
+        await user.click(memberToSelect);
+        expect(await screen.findByText(`Current Weight: ${weight}`)).toBeDefined();
+      });
+    };
+
+    await validateCurrentWeightFor('Digital-Asset-2', '10');
+    await validateCurrentWeightFor('Digital-Asset-Eng-2', '12345');
+  });
+
   test('Weight must be a valid number', async () => {
     const user = userEvent.setup();
     render(
@@ -278,6 +311,54 @@ describe('Update SV Reward Weight Form', () => {
     expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
     expect(screen.getByText(/Submission failed/)).toBeDefined();
     expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+  });
+
+  test('show the correct weights for selected sv in summary page', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput).toBeDefined();
+    await user.type(weightInput, '1000');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+    await user.click(submitButton); //review proposal
+
+    waitFor(() => {
+      expect(screen.getByTestId('config-change-current-value').textContent).toBe('12345');
+      expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
+    });
   });
 
   test('should redirect to governance page after successful submission', async () => {

@@ -44,8 +44,11 @@ abstract class DatabaseSequencerApiTest extends SequencerApiTest {
       loggerFactory = loggerFactory,
       sequencerMember = sequencerId,
       blockSequencerMode = false,
+      useRecipientsTableForReads = false,
+      bufferEventsWithPayloads = false,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(),
+      sequencerMetrics = metrics,
     )
     DatabaseSequencer.single(
       dbConfig,

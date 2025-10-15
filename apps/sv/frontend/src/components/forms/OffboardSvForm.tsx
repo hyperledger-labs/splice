@@ -130,7 +130,7 @@ export const OffboardSvForm: React.FC = _ => {
             >
               {field => (
                 <field.DateField
-                  title="Vote Proposal Expiration"
+                  title="Threshold Deadline"
                   description="This is the last day voters can vote on this proposal"
                   id="offboard-sv-expiry-date"
                 />
@@ -160,7 +160,7 @@ export const OffboardSvForm: React.FC = _ => {
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => <field.TextArea title="Proposal Summary" id="offboard-sv-summary" />}
+              {field => <field.ProposalSummaryField id="offboard-sv-summary" />}
             </form.AppField>
 
             <form.AppField

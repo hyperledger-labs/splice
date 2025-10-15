@@ -32,11 +32,13 @@ class FeaturedAppActivityMarkerIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(
-            initialTickDuration = NonNegativeFiniteDuration.ofMillis(500),
             initialFeaturedAppActivityMarkerAmount = Some(1.0),
             initialAmuletPrice = 1.0,
           )
         )(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(

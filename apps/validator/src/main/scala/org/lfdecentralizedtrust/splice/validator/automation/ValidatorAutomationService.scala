@@ -98,6 +98,18 @@ class ValidatorAutomationService(
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
 
+  automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
+    registerTrigger(
+      new TopologyMetricsTrigger(
+        triggerContext
+          .focus(_.config.pollingInterval)
+          .replace(topologyPollingInterval),
+        scanConnection,
+        participantAdminConnection,
+      )
+    )
+  )
+
   walletManagerOpt.foreach { walletManager =>
     registerTrigger(
       new WalletAppInstallTrigger(

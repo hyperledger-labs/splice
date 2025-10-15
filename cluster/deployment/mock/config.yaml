@@ -130,6 +130,13 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomSequencerJvmFlag"
+      cloudSql:
+        tier: "sequencer-override-tier"
+    mediator:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomMediatorJvmFlag"
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -147,28 +154,30 @@ svs:
         dataset: mock_da2_scan
         prefix: da2
   sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
-    # the values here are actually working on scratch and CI
     publicName: Digital-Asset-1
     subdomain: sv-1
+    participant:
+      kms:
+        keyRingId: sv-da-1_participant_mock
+        locationId: us-central1
     cometbft:
       nodeId: d825622358065aea3cb3b3479cf64d172675037e
       validatorKeyAddress: 2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7
+      keysGcpSecret: svda1-mock-cometbft-keys
     svApp:
       auth0:
         clientId: bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7
+      svIdKeyGcpSecret: svda1-mock-id
+      cometBftGovernanceKeyGcpSecret: svda1-mock-cometbft-governance-key
     validatorApp:
       walletUser: auth0|68c2c41e6470184569e4521e
+      sweep:
+        fromEnv: SVDA1
       auth0:
         clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY
-  # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
-  sv-2:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
-    participant:
-      kms:
-        keyRingId: sv-3_participant_mock
-        locationId: us-central1
 infra:
   extraCustomResources:
     deny-onboard-prepare-endpoint:
@@ -203,6 +212,23 @@ cluster:
 networkWide:
   maxVettingDelay: 1m
 validators:
+  validator-runbook:
+    partyAllocator:
+      enable: true
+      maxParties: 1234
+      parallelism: 321
+      preapprovalRetries: 9876
+      preapprovalRetryDelayMs: 42
+    participant:
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE
+      additionalJvmOptions: -Dparticipantoption
+    validatorApp:
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
+      additionalJvmOptions: -Dparticipantoption
   extra-validator:
     namespace: validator
     partyHint: 'extra-validator'

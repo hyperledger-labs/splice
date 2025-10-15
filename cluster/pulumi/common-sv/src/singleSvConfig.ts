@@ -1,6 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { KmsConfigSchema, LogLevelSchema } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  KmsConfigSchema,
+  LogLevelSchema,
+  CloudSqlConfigSchema,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/config';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { merge } from 'lodash';
 import util from 'node:util';
@@ -10,6 +16,7 @@ const SvCometbftConfigSchema = z
   .object({
     nodeId: z.string().optional(),
     validatorKeyAddress: z.string().optional(),
+    // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
     snapshotName: z.string().optional(),
   })
@@ -18,10 +25,21 @@ const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
 });
+const CloudSqlWithOverrideConfigSchema = CloudSqlConfigSchema.partial()
+  .default(spliceConfig.pulumiProjectConfig.cloudSql)
+  .transform(sqlConfig => merge({}, spliceConfig.pulumiProjectConfig.cloudSql, sqlConfig));
+const SvMediatorConfigSchema = z
+  .object({
+    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+    additionalJvmOptions: z.string().optional(),
+    cloudSql: CloudSqlWithOverrideConfigSchema,
+  })
+  .strict();
 const SvSequencerConfigSchema = z
   .object({
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
+    cloudSql: CloudSqlWithOverrideConfigSchema,
   })
   .strict();
 const SvParticipantConfigSchema = z
@@ -30,6 +48,7 @@ const SvParticipantConfigSchema = z
     bftSequencerConnection: z.boolean().optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
+    cloudSql: CloudSqlWithOverrideConfigSchema,
   })
   .strict();
 const Auth0ConfigSchema = z
@@ -40,15 +59,13 @@ const Auth0ConfigSchema = z
   .strict();
 const SvAppConfigSchema = z
   .object({
-    // TODO(tech-debt) inline env var into config.yaml
-    sweep: z
-      .object({
-        fromEnv: z.string(),
-      })
-      .optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     auth0: Auth0ConfigSchema.optional(),
+    // defaults to {svName}-id if not set
+    svIdKeyGcpSecret: z.string().optional(),
+    // defaults to {svName}-cometbft-governance-key if not set
+    cometBftGovernanceKeyGcpSecret: z.string().optional(),
   })
   .strict();
 const ScanAppConfigSchema = z
@@ -63,14 +80,18 @@ const ScanAppConfigSchema = z
     additionalJvmOptions: z.string().optional(),
   })
   .strict();
-const ValidatorAppConfigSchema = z
+const SvValidatorAppConfigSchema = z
   .object({
     walletUser: z.string().optional(),
-    additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-    additionalJvmOptions: z.string().optional(),
+    // TODO(#2389) inline env var into config.yaml
+    sweep: z
+      .object({
+        fromEnv: z.string(),
+      })
+      .optional(),
     auth0: Auth0ConfigSchema.optional(),
   })
-  .strict();
+  .and(ValidatorAppConfigSchema);
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 // things here are declared optional even when they aren't, to allow partial overrides of defaults
@@ -81,9 +102,10 @@ const SingleSvConfigSchema = z
     cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
+    mediator: SvMediatorConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
-    validatorApp: ValidatorAppConfigSchema.optional(),
+    validatorApp: SvValidatorAppConfigSchema.optional(),
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,

@@ -70,9 +70,9 @@ class SequencerPruningTrigger(
               Future.unit
             } { _ =>
               {
-                logger.debug("Attempt pruning our sequencer...")
+                logger.info("Attempt pruning our sequencer...")
                 prune().map { prunedResult =>
-                  logger.debug(s"Completed pruning our sequencer with result: $prunedResult")
+                  logger.info(s"Completed pruning our sequencer with result: $prunedResult")
                 }
               }
             }

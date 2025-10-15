@@ -70,7 +70,7 @@ class CachingScanStore(
   // TODO(#800) remove when amulet expiry works again
   override def getTotalAmuletBalance(
       asOfEndOfRound: Long
-  )(implicit tc: TraceContext): Future[BigDecimal] = {
+  )(implicit tc: TraceContext): Future[Option[BigDecimal]] = {
     getCache(
       "totalAmuletBalance",
       cacheConfig.totalAmuletBalance,

@@ -19,7 +19,7 @@ import { amuletRules, getAmuletRulesResponse } from './mocks/data';
 import BigNumber from 'bignumber.js';
 
 const spliceInstanceNames = config.spliceInstanceNames;
-const scanUrl = window.splice_config.services.scan.url;
+const scanUrl = window.splice_config.services.scan.url + '/api/scan';
 
 const AppWithConfig: React.FC = () => {
   return (

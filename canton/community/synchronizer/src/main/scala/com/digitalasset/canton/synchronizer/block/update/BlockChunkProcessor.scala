@@ -162,9 +162,7 @@ final class BlockChunkProcessor(
       ) = validationResult
 
       finalInFlightAggregationsWithAggregationExpiry =
-        finalInFlightAggregations.filterNot { case (_, inFlightAggregation) =>
-          inFlightAggregation.expired(lastTsBeforeValidation)
-        }
+        expireInFlightAggregations(finalInFlightAggregations, lastTsBeforeValidation)
       chunkUpdate =
         ChunkUpdate(
           acksByMember,
@@ -196,6 +194,14 @@ final class BlockChunkProcessor(
         )
     } yield (newState, chunkUpdate)
   }
+
+  private def expireInFlightAggregations(
+      finalInFlightAggregations: InFlightAggregations,
+      timestamp: CantonTimestamp,
+  ): InFlightAggregations =
+    finalInFlightAggregations.filterNot { case (_, inFlightAggregation) =>
+      inFlightAggregation.expired(timestamp)
+    }
 
   private def logChunkDetails(
       state: State,
@@ -300,10 +306,15 @@ final class BlockChunkProcessor(
           snapshot.ipsSnapshot,
         )
     } yield {
+      val unexpiredInFlightAggregations = expireInFlightAggregations(
+        state.inFlightAggregations,
+        tickSequencingTimestamp,
+      )
       val newState =
         state.copy(
           lastChunkTs = tickSequencingTimestamp,
           latestSequencerEventTimestamp = Some(tickSequencingTimestamp),
+          inFlightAggregations = unexpiredInFlightAggregations,
         )
       val tickSubmissionOutcome =
         SubmissionOutcome.Deliver(
@@ -329,7 +340,7 @@ final class BlockChunkProcessor(
         invalidAcknowledgements = Seq.empty,
         inFlightAggregationUpdates = Map.empty,
         lastSequencerEventTimestamp = Some(tickSequencingTimestamp),
-        inFlightAggregations = state.inFlightAggregations,
+        inFlightAggregations = unexpiredInFlightAggregations,
         submissionsOutcomes = Seq(tickSubmissionOutcome),
       )
 
@@ -543,12 +554,12 @@ final class BlockChunkProcessor(
     Future {
       value.foreach(_.withTraceContext { implicit traceContext =>
         {
+
           case LedgerBlockEvent.Send(_, signedSubmissionRequest, payloadSize) =>
-            val mc = SequencerMetrics.submissionTypeMetricsContext(
-              signedSubmissionRequest.submissionRequest.batch.allRecipients,
-              signedSubmissionRequest.submissionRequest.sender,
-              logger,
-            )
+            val submissionRequest = signedSubmissionRequest.submissionRequest
+            val sender = submissionRequest.sender
+            val requestType = submissionRequest.requestType
+            val mc = SequencerMetrics.submissionTypeMetricsContext(sender, requestType, logger)
             metrics.block.blockEvents.mark()(mc)
             metrics.block.blockEventBytes.mark(payloadSize.longValue)(mc)
 

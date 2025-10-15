@@ -4,16 +4,24 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
-import { ListDsoRulesVoteRequestsResponse } from '@lfdecentralizedtrust/sv-openapi';
+import {
+  CreateVoteRequest,
+  ListDsoRulesVoteRequestsResponse,
+} from '@lfdecentralizedtrust/sv-openapi';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
+import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  dateTimeFormatISO,
+  getUTCWithOffset,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
+import { dsoInfo } from '@lfdecentralizedtrust/splice-common-test-handlers';
 
 const AppWithConfig = () => {
   return (
@@ -46,6 +54,64 @@ describe('SV user can', () => {
     await screen.findByText('You are on ScratchNet');
   });
 
+  test('browse to the validator onboarding tab', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    expect(await screen.findByText('Validator Onboarding Secrets')).toBeDefined();
+  });
+
+  test('create a new validator secret with party hint', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    const partyHintInput = screen.getByTestId('create-party-hint');
+    await user.type(partyHintInput, 'wrong-input');
+
+    expect(screen.getByTestId('create-validator-onboarding-secret').hasAttribute('disabled')).toBe(
+      true
+    );
+
+    await user.clear(partyHintInput);
+    await user.type(partyHintInput, 'correct-input-123');
+
+    expect(screen.getByTestId('create-validator-onboarding-secret').hasAttribute('disabled')).toBe(
+      false
+    );
+  });
+
+  test('validator onboarding info has correct format', () => {
+    const validatorOnboardingInfo = onboardingInfo(
+      {
+        partyHint: 'splice-client-2',
+        secret: 'exampleSecret',
+        expiresAt: '2020-01-01 13:57',
+      },
+      'testnet'
+    );
+
+    expect(validatorOnboardingInfo).toBe(
+      `
+splice-client-2
+Network: testnet
+SPONSOR_SV_URL
+http://localhost:3000
+
+Secret
+exampleSecret
+
+Expiration
+2020-01-01 13:57 (${getUTCWithOffset()})
+    `.trim()
+    );
+  });
+
   test('browse to the governance tab', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
@@ -56,7 +122,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('see proper time format in popup', { timeout: 10000 }, async () => {
+  test('see proper time format in popup', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
@@ -124,133 +190,119 @@ describe('An SetConfig request', () => {
     ).toBe(true);
   });
 
-  test(
-    'displays a warning when an SV tries to modify a DsoRules field already changed by another request',
-    { timeout: 10000 },
-    async () => {
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
+  test('displays a warning when an SV tries to modify a DsoRules field already changed by another request', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
 
-      expect(await screen.findByText('Governance')).toBeDefined();
-      await user.click(screen.getByText('Governance'));
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
 
-      expect(await screen.findByText('Vote Requests')).toBeDefined();
-      expect(await screen.findByText('Governance')).toBeDefined();
+    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    expect(await screen.findByText('Governance')).toBeDefined();
 
-      changeAction('SRARC_SetConfig');
+    changeAction('SRARC_SetConfig');
 
-      const input = screen.getByTestId(
-        'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
-      );
-      await user.clear(input);
-      await user.type(input, '481516');
-      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+    const input = screen.getByTestId(
+      'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
+    );
+    await user.clear(input);
+    await user.type(input, '481516');
+    expect(await screen.findByDisplayValue('481516')).toBeDefined();
 
-      const summaryInput = screen.getByTestId('create-reason-summary');
-      await user.type(summaryInput, 'summaryABC');
-      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+    const summaryInput = screen.getByTestId('create-reason-summary');
+    await user.type(summaryInput, 'summaryABC');
+    expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
 
-      const urlInput = screen.getByTestId('create-reason-url');
-      await user.type(urlInput, 'https://vote-request.url');
+    const urlInput = screen.getByTestId('create-reason-url');
+    await user.type(urlInput, 'https://vote-request.url');
 
-      const warning = screen.getByTestId('voterequest-creation-alert');
-      expect(warning).toBeDefined();
-      expect(warning.textContent).toContain(
-        'A Vote Request aiming to change similar fields already exists. ' +
-          'You are therefore not allowed to modify the fields: decentralizedSynchronizer.synchronizers.acsCommitmentReconciliationInterval'
-      );
+    const warning = screen.getByTestId('voterequest-creation-alert');
+    expect(warning).toBeDefined();
+    expect(warning.textContent).toContain(
+      'A Vote Request aiming to change similar fields already exists. ' +
+        'You are therefore not allowed to modify the fields: decentralizedSynchronizer.synchronizers.acsCommitmentReconciliationInterval'
+    );
 
-      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
-      expect(button.getAttribute('disabled')).toBeDefined();
-    }
-  );
+    const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+    expect(button.getAttribute('disabled')).toBeDefined();
+  });
 
-  test(
-    'displays a warning when an SV tries to modify an AmuletRules field already changed by another request',
-    { timeout: 10000 },
-    async () => {
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
+  test('displays a warning when an SV tries to modify an AmuletRules field already changed by another request', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
 
-      expect(await screen.findByText('Governance')).toBeDefined();
-      await user.click(screen.getByText('Governance'));
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
 
-      expect(await screen.findByText('Vote Requests')).toBeDefined();
-      expect(await screen.findByText('Governance')).toBeDefined();
+    expect(await screen.findByText('Vote Requests')).toBeDefined();
 
-      changeAction('CRARC_SetConfig');
+    changeAction('CRARC_SetConfig');
 
-      const input = screen.getByTestId('transferConfig.createFee.fee-value');
-      await user.clear(input);
-      await user.type(input, '481516');
-      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+    const input = screen.getByTestId('transferConfig.createFee.fee-value');
+    await user.clear(input);
+    await user.type(input, '481516');
+    expect(await screen.findByDisplayValue('481516')).toBeDefined();
 
-      const input2 = screen.getByTestId('create-reason-summary');
-      await user.type(input2, 'summaryABC');
-      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+    const input2 = screen.getByTestId('create-reason-summary');
+    await user.type(input2, 'summaryABC');
+    expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
 
-      const urlInput = screen.getByTestId('create-reason-url');
-      await user.type(urlInput, 'https://vote-request.url');
+    const urlInput = screen.getByTestId('create-reason-url');
+    await user.type(urlInput, 'https://vote-request.url');
 
-      const warning = screen.getByTestId('voterequest-creation-alert');
-      expect(warning).toBeDefined();
-      expect(warning.textContent).toContain(
-        'A Vote Request aiming to change similar fields already exists. ' +
-          'You are therefore not allowed to modify the fields: transferConfig.createFee.fee'
-      );
+    const warning = screen.getByTestId('voterequest-creation-alert');
+    expect(warning).toBeDefined();
+    expect(warning.textContent).toContain(
+      'A Vote Request aiming to change similar fields already exists. ' +
+        'You are therefore not allowed to modify the fields: transferConfig.createFee.fee'
+    );
+    const button = screen.getByTestId('create-voterequest-submit-button');
+    expect(button.getAttribute('disabled')).toBeDefined();
+  });
 
-      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
-      expect(button.getAttribute('disabled')).toBeDefined();
-    }
-  );
+  test('disables the Proceed button in the confirmation dialog if a conflict arises after request creation', async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+        return res(ctx.json<ListDsoRulesVoteRequestsResponse>({ dso_rules_vote_requests: [] }));
+      })
+    );
 
-  test(
-    'disables the Proceed button in the confirmation dialog if a conflict arises after request creation',
-    { timeout: 10000 },
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
-          return res(ctx.json<ListDsoRulesVoteRequestsResponse>({ dso_rules_vote_requests: [] }));
-        })
-      );
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
 
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
 
-      expect(await screen.findByText('Governance')).toBeDefined();
-      await user.click(screen.getByText('Governance'));
+    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    expect(await screen.findByText('Governance')).toBeDefined();
 
-      expect(await screen.findByText('Vote Requests')).toBeDefined();
-      expect(await screen.findByText('Governance')).toBeDefined();
+    changeAction('CRARC_SetConfig');
 
-      changeAction('CRARC_SetConfig');
+    const input = screen.getByTestId('transferConfig.createFee.fee-value');
+    await user.clear(input);
+    await user.type(input, '481516');
+    expect(await screen.findByDisplayValue('481516')).toBeDefined();
 
-      const input = screen.getByTestId('transferConfig.createFee.fee-value');
-      await user.clear(input);
-      await user.type(input, '481516');
-      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+    const input2 = screen.getByTestId('create-reason-summary');
+    await user.type(input2, 'summaryABC');
+    expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
 
-      const input2 = screen.getByTestId('create-reason-summary');
-      await user.type(input2, 'summaryABC');
-      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+    const urlInput = screen.getByTestId('create-reason-url');
+    await user.type(urlInput, 'https://vote-request.url');
+    expect(await screen.findByDisplayValue('https://vote-request.url')).toBeDefined();
 
-      const urlInput = screen.getByTestId('create-reason-url');
-      await user.type(urlInput, 'https://vote-request.url');
-      expect(await screen.findByDisplayValue('https://vote-request.url')).toBeDefined();
+    expect(await screen.findByText('Send Request to Super Validators')).toBeDefined();
+    await user.click(screen.getByText('Send Request to Super Validators'));
 
-      expect(await screen.findByText('Send Request to Super Validators')).toBeDefined();
-      await user.click(screen.getByText('Send Request to Super Validators'));
+    server.use(
+      rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+        return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
+      })
+    );
 
-      server.use(
-        rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
-          return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
-        })
-      );
-
-      const button = screen.getByRole('button', { name: 'Proceed' });
-      expect(button.getAttribute('disabled')).toBeDefined();
-    }
-  );
+    const button = screen.getByRole('button', { name: 'Proceed' });
+    expect(button.getAttribute('disabled')).toBeDefined();
+  });
 });
 
 describe('An AddFutureAmuletConfigSchedule request', () => {
@@ -290,4 +342,63 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     expect(await screen.queryByText('encoded_secret')).toBeDefined();
     expect(await screen.queryByText('candidate_secret')).toBeNull();
   });
+});
+
+describe('SetAmuletRules', () => {
+  test(
+    'should not send the transfer fee steps that are set to 0',
+    async () => {
+      let calledCreate: (body: CreateVoteRequest) => void;
+      const createPromise: Promise<CreateVoteRequest> = new Promise(
+        resolve => (calledCreate = resolve)
+      );
+      server.use(
+        rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, async (req, res, ctx) => {
+          calledCreate(await req.json());
+          return res(ctx.json({}));
+        })
+      );
+
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      changeAction('CRARC_SetConfig');
+
+      const summaryInput = screen.getByTestId('create-reason-summary');
+      await user.type(summaryInput, 'summaryABC');
+
+      const urlInput = screen.getByTestId('create-reason-url');
+      await user.type(urlInput, 'https://vote-request.url');
+
+      const initialSteps =
+        dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue.transferConfig.transferFee
+          .steps;
+      expect(initialSteps.length).toBe(3); // Sanity check
+
+      // editting the second element (.1) of the transferFees
+      const input = screen.getByTestId('transferConfig.transferFee.steps.1._2-value');
+      await user.clear(input);
+      await user.type(input, '0');
+
+      const sendButton = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      await user.click(sendButton);
+      const proceedButton = screen.getByRole('button', { name: 'Proceed' });
+      await user.click(proceedButton);
+
+      const calledWithBody = await createPromise;
+      expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (calledWithBody.action as any).value.amuletRulesAction.value.newConfig.transferConfig
+          .transferFee.steps
+        // the second element is gone
+      ).toStrictEqual(initialSteps.filter((_, i) => i !== 1));
+    },
+    { timeout: 20000 }
+  );
 });

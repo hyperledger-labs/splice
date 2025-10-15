@@ -128,9 +128,9 @@ function _retry_until_success() {
         exit 1
     fi
 
-    # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # with 5 second sleep + 1 second kubectl timeout, this is roughly 15 minutes
     # See also max_wait which caps the overall wait time
-    local -i -r max_retries=$((100))
+    local -i -r max_retries=$((150))
     local -i num_retries=0
     local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
     local -i -r start_time=$(date +%s)
@@ -696,6 +696,9 @@ function subcmd_create() {
         #### Enable Firewall Access
         subcmd_cluster_update_access
 
+        ### Enable Http Load Balancing
+        subcmd_cluster_enable_http_load_balancing
+
         #### Delete default firewall rules, if they exist.
         if (gcloud compute firewall-rules delete\
                          default-allow-rdp \
@@ -911,6 +914,19 @@ function subcmd_cluster_enable_workload_identity() {
         --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
         --workload-metadata=GKE_METADATA
 }
+
+subcommand_whitelist[cluster_enable_http_load_balancing]='Enable http load balancing for the cluster.'
+
+function subcmd_cluster_enable_http_load_balancing() {
+    if ! gcloud container clusters describe "${GCP_CLUSTER_NAME}" --format="value(addonsConfig.httpLoadBalancing)" | grep -q "disabled=True"; then
+        _info "Http Load Balancing is already enabled for the cluster."
+        return
+    fi
+
+    _info "Enabling http load balancing for the cluster ${GCP_CLUSTER_NAME}."
+    gcloud container clusters update "${GCP_CLUSTER_NAME}" --update-addons=HttpLoadBalancing=ENABLED
+}
+
 ###
 
 subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'
@@ -1346,15 +1362,14 @@ function _unlock() {
 }
 
 function _check_stateful_sets() {
-    # Checks if any StatefulSets EXCEPT those with a prometheus image (which are part of the infra stack)
+    # Checks if any StatefulSets EXCEPT those in the observability namespace (which are part of the infra stack)
     # are currently deployed
     # grep exits with return code 1 if it finds no matches so we account for that
-    query_result=$(kubectl get StatefulSets -A -o json 2> /dev/null | jq '.items[].spec.template.spec.containers[].image' |  { grep -v prometheus || test $? = 1; })
-    echo "$query_result"
+    kubectl get statefulset -A -o json | jq '.items[] | select(.metadata.namespace != "observability" and .metadata.namespace != "gmp-system" and .metadata.namespace != "gke-managed-cim")'
 }
 
 function _check_reset_and_unlock() {
-    s=$(_check_stateful_sets)
+    s="$(_check_stateful_sets)"
 
     if [ -n "$s" ]; then
         echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"
@@ -2157,13 +2172,12 @@ function subcmd_purge_unused_dbs() {
 subcommand_whitelist[set_operator_deployment_reference]="Set the git reference for the operator deployment in the cluster config file"
 function subcmd_set_operator_deployment_reference() {
 
-    # TODO(#1062): remove the ignored parameter once the base version for migration tests is >= 0.4.2
     if [ "$#" -lt 1 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> [<ignored>]"
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
-    if [ "$#" -gt 2 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> [<ignored>]"
+    if [ "$#" -gt 1 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
     deployment_config=$(cat <<EOF

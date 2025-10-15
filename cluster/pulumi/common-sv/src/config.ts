@@ -51,13 +51,13 @@ export interface StaticSvConfig {
   onboardingName: string;
   validatorWalletUser?: string;
   auth0ValidatorAppName: string;
-  auth0ValidatorAppClientId?: string;
   auth0SvAppName: string;
-  auth0SvAppClientId?: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
   scanBigQuery?: ScanBigQueryConfig;
+  svIdKeySecretName?: string;
+  cometBftGovernanceKeySecretName?: string;
 }
 
 export type SequencerPruningConfig = {

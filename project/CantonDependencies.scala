@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250624.13835.0.v78d74d4a"
+  val version: String = "3.3.0-snapshot.20250926.13852.1.v4f3223e3"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -43,7 +43,7 @@ object CantonDependencies {
 
   lazy val circe_version = "0.14.2"
 
-  lazy val scalatest_version = "3.2.11"
+  lazy val scalatest_version = "3.2.19"
   lazy val scalacheck_version = "1.15.4"
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
@@ -157,7 +157,7 @@ object CantonDependencies {
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
   lazy val scalaz_core = "org.scalaz" %% "scalaz-core" % scalaz_version
   lazy val scalatestScalacheck =
-    "org.scalatestplus" %% "scalacheck-1-15" % (scalatest_version + ".0")
+    "org.scalatestplus" %% "scalacheck-1-18" % (scalatest_version + ".0")
   lazy val mockito_scala = "org.mockito" %% "mockito-scala" % mockito_scala_version
   lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % ("3.2.10.0")
 

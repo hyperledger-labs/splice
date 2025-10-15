@@ -140,20 +140,22 @@ export class Dso extends pulumi.ComponentResource {
     const [sv1Conf, ...restSvConfs] = relevantSvConfs;
 
     const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
+      const secretName = conf.svIdKeySecretName ?? conf.nodeName.replaceAll('-', '') + '-id';
       return {
         ...acc,
-        [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replaceAll('-', '')),
+        [conf.onboardingName]: svKeyFromSecret(secretName),
       };
     }, {});
 
     const cometBftGovernanceKeys = relevantSvConfs
       .filter(conf => configForSv(conf.nodeName)?.participant?.kms)
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
+        const secretName =
+          conf.cometBftGovernanceKeySecretName ??
+          conf.nodeName.replaceAll('-', '') + '-cometbft-governance-key';
         return {
           ...acc,
-          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(
-            conf.nodeName.replaceAll('-', '')
-          ),
+          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(secretName),
         };
       }, {});
 
