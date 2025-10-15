@@ -274,7 +274,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       "step forward many rounds", {
         advanceTimeToRoundOpen
         (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
         }
       },
     )(

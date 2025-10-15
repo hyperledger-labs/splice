@@ -76,7 +76,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     }
 
     // advance rounds for the reward triggers to run
-    advanceRoundsByOneTick
+    advanceTimeForRewardAutomationToRunForCurrentRound
 
     // TODO(DACH-NY/canton-network-node#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
     // we must advance rounds until round 3 closes, which is the first round that sv2's scan is guaranteed to have seen.
@@ -100,7 +100,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           }
         }
 
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
 
         val roundForWhichCouponsAreNowRedeemed = n.toLong - 2
         if (roundForWhichCouponsAreNowRedeemed >= 0) {

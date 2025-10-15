@@ -52,7 +52,7 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
       "Wait for all reward coupons to be created",
       _ => {
         // advance rounds for the reward triggers to run
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
         getRewardCoupons(round)
           .filterNot(c =>
             leftoverRewardIds(c.id)
@@ -67,7 +67,7 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
         eventually() {
           ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
         }
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
       }),
     )(
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
@@ -87,6 +87,6 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
 
     // it seems that without this, the round-party-totals aggregations cannot be computed for SV-2,
     // and the scan-txlog script fails because it expects those to be there.
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
   }
 }

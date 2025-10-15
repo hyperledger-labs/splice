@@ -138,7 +138,7 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
     )
 
     // advance rounds for the reward triggers to run
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     eventually() {
       val validatorLivenessActivityRecordRounds =
@@ -163,7 +163,7 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       actAndCheck(
         "Advance rounds so that issuing rounds 0 and 1 no longer exist",
         (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
         },
       )(
         "ValidatorLivenessActivityRecord contracts for round 0 and 1 should be expired",
