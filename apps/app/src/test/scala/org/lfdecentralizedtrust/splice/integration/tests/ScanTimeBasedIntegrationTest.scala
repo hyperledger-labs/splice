@@ -47,6 +47,10 @@ class ScanTimeBasedIntegrationTest
           _.copy(initialRound = initialRound)
         )(config)
       )
+      .withAdditionalSetup { implicit env =>
+        // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
+        advanceTimeForRewardAutomationToRunForCurrentRound
+      }
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {

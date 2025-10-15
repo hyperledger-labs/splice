@@ -29,7 +29,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
   private val triggerState =
     new AtomicReference[Option[RoundBasedRewardTrigger.RoundBasedTriggerState]](None)
 
-  protected val isNewSchedulingLogicEnabled: Boolean =
+  private val isNewSchedulingLogicEnabled: Boolean =
     context.config.enableNewRewardTriggerScheduling
 
   // if the new logic is disable then use the old behaviour that uses increased polling intervals
@@ -42,7 +42,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
         val tasksToRun = retrieveAvailableTasksForRound()
         if (triggerState.get().exists(_.workStillToBeDone)) {
           logger.info(s"Running tasks ${triggerState.get()}")
-          updateState(_.copy(startedWork = true))
+          updateState(_.copy(startedWorkForRound = true))
           tasksToRun
         } else {
           tasksToRun.map(tasks => {
@@ -66,7 +66,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
                   RoundBasedRewardTrigger.RoundBasedTriggerState(
                     roundNumber,
                     minScheduledTimeToRunAt,
-                    startedWork = false,
+                    startedWorkForRound = false,
                     workStillToBeDone = true,
                   )
                 )
@@ -75,7 +75,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
                 logger.info(
                   s"Running for $tasks because the calculated run time $minScheduledTimeToRunAt is now (between $minRunTime and $maxRunTime)."
                 )
-                updateState(_.copy(startedWork = true))
+                updateState(_.copy(startedWorkForRound = true))
                 tasks
               } else {
                 logger.info(
@@ -111,7 +111,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
                 val state = triggerState.get()
                 previousSchedulingRoundStillOpen match {
                   case Some(previousRound) =>
-                    val triggerRanForPreviousRound = state.exists(_.startedWork)
+                    val triggerRanForPreviousRound = state.exists(_.startedWorkForRound)
                     val triggerHasNoWorkLeftForPreviousRound = state.exists(!_.workStillToBeDone)
                     val previousRoundWasScheduledWithinTheWantedInterval = state
                       .exists(
@@ -161,7 +161,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     super.performWorkIfAvailable().map { workStillNeedsToBeDone =>
       updateState { state =>
-        if (state.startedWork) {
+        if (state.startedWorkForRound) {
           state.copy(
             workStillToBeDone = workStillNeedsToBeDone
           )
@@ -197,10 +197,11 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
 object RoundBasedRewardTrigger {
 
   private final case class RoundBasedTriggerState(
+      // the round number we currently are processing, all tasks for smaller round numbers are not used for scheduling
       roundNumber: Long,
       // the earliest time the trigger is allowed to run for this round, it can run multiple times after that depending on the value of `workStillToBeDone`
       earliestTimeTriggerCanRun: Instant,
-      startedWork: Boolean,
+      startedWorkForRound: Boolean,
       // starts with true and is set to the value of workDone returned by the trigger
       workStillToBeDone: Boolean,
   )
