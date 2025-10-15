@@ -168,10 +168,8 @@ trait TimeTestUtil extends TestCommon {
       )
       .map(_.contract.payload.targetClosesAt)
       .min
-    if (now.isBefore(nearestClose)) {
-      // We subtract 1 second to ensure we are before the close time
-      advanceTime(Duration.between(now, nearestClose.minusSeconds(1)))
-    }
+    // We subtract 1 second to ensure we are before the close time
+    advanceTime(Duration.between(now, nearestClose.minusSeconds(1)))
   }
 
   /** This function advances time until at least one mining round that is not
