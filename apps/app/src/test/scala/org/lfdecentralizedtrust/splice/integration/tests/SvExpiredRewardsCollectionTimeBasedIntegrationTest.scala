@@ -51,6 +51,8 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
     )(
       "Wait for all reward coupons to be created",
       _ => {
+        // advance rounds for the reward triggers to run
+        advanceRoundsByOneTick
         getRewardCoupons(round)
           .filterNot(c =>
             leftoverRewardIds(c.id)

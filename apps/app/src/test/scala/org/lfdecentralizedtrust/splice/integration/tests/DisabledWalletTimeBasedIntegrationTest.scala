@@ -74,6 +74,9 @@ class DisabledWalletTimeBasedIntegrationTest
           )
         ) - smallAmount
 
+      // advance rounds for the reward triggers to run
+      advanceRoundsByOneTick
+
       eventually(30.seconds) {
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(SvRewardCoupon.COMPANION)(

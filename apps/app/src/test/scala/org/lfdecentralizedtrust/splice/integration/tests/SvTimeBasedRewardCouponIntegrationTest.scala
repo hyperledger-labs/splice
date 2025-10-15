@@ -123,6 +123,9 @@ class SvTimeBasedRewardCouponIntegrationTest
           .resume()
       )
 
+      // advance rounds for the reward triggers to run
+      advanceRoundsByOneTick
+
       val openRounds = eventually() {
         val openRounds = sv1ScanBackend
           .getOpenAndIssuingMiningRounds()
@@ -131,7 +134,6 @@ class SvTimeBasedRewardCouponIntegrationTest
         openRounds should not be empty
         openRounds
       }
-
       eventually() {
         val expectedSize = openRounds.size.toLong
         val sv1Coupons = sv1WalletClient.listSvRewardCoupons()

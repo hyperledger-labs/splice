@@ -46,6 +46,8 @@ class WalletRewardsTimeBasedIntegrationTest
         openRounds
       }
 
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
       eventually() {
         bobValidatorWalletClient.listAppRewardCoupons() should have size 1
         bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1

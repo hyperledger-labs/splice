@@ -136,6 +136,10 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       sv1ScanBackend,
       aliceValidatorBackend,
     )
+
+    // advance rounds for the reward triggers to run
+    advanceRoundsByOneTick
+
     eventually() {
       val validatorLivenessActivityRecordRounds =
         sv1Backend.participantClient.ledger_api_extensions.acs

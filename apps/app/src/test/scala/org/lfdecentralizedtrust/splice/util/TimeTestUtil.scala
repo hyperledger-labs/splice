@@ -155,6 +155,21 @@ trait TimeTestUtil extends TestCommon {
     )
   }
 
+  def advanceTimeForRewardAutomationToRunForCurrentRound(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    import math.Ordering.Implicits.*
+    val now = sv1Backend.participantClient.ledger_api.time.get().toInstant
+    val (openRounds, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+    openRounds
+      .filter(round =>
+        now <= round.contract.payload.targetClosesAt && now >=
+          round.contract.payload.opensAt
+      )
+      .map(_.contract.payload.targetClosesAt)
+      .foreach(close => advanceTime(Duration.between(now, close)))
+  }
+
   /** This function advances time until at least one mining round that is not
     *  past its target closing time is open. The function fails if no open
     *  mining round exists where this is possible.

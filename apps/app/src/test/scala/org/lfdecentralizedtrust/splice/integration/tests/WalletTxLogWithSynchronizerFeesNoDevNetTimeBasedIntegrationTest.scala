@@ -46,15 +46,19 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
       actAndCheck(
         "Advance enough rounds for SV1 to claim rewards", {
           (0 to 3).foreach { _ =>
+            advanceRoundsByOneTick
             eventually() {
               ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
             }
-            advanceRoundsByOneTick
           }
         },
       )(
         "Wait for SV rewards to be collected",
-        _ => sv1WalletClient.balance().unlockedQty should be > BigDecimal(0),
+        _ => {
+          // advance rounds for the reward triggers to run
+          advanceRoundsByOneTick
+          sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
+        },
       )
 
       val transferAmount = BigDecimal(100)
