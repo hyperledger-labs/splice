@@ -284,7 +284,10 @@ spec:
             }
             canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
             canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
-              type="none"
+              type = "self-signed"
+              user = "ledger-api-user"
+              audience = "https://ledger_api.example.com"
+              secret = "unsafe"
             }
         - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
           value: ledger-api-user
