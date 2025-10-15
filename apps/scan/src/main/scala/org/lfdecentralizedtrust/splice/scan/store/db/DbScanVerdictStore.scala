@@ -235,7 +235,10 @@ class DbScanVerdictStore(
                 } yield ()
               })
               .map(_ => ())
-          } else DBIO.successful(())
+          } else {
+            logger.info(s"Already ingested verdicts: ${items.map(_._1.updateId)}, ignoring.")
+            DBIO.successful(())
+          }
       } yield ()
 
       futureUnlessShutdownToFuture(

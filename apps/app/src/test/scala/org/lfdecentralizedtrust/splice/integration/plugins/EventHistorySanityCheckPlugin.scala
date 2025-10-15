@@ -64,8 +64,8 @@ class EventHistorySanityCheckPlugin(
     forAll(others) { otherScan =>
       val otherScanHistory = paginateEventHistory(otherScan, None, Chain.empty).toVector
       val minSize = Math.min(founderHistory.size, otherScanHistory.size)
-      val otherComparable = otherScanHistory.take(minSize)
-      val founderComparable = founderHistory.take(minSize)
+      val (otherComparable, otherRestDebug) = otherScanHistory.splitAt(minSize)
+      val (founderComparable, founderRestDebug) = founderHistory.splitAt(minSize)
       val different = otherComparable
         .zip(founderComparable)
         .collect {
@@ -73,7 +73,12 @@ class EventHistorySanityCheckPlugin(
             otherItem -> founderItem
         }
 
-      different should be(empty)
+      // custom error message to help debugging
+      if (different.nonEmpty) {
+        val debug: Seq[(Option[EventHistoryItem], Option[EventHistoryItem])] =
+          otherRestDebug.map(Some(_)).zipAll(founderRestDebug.map(Some(_)), None, None)
+        fail(s"Mismatched Events: $different. The ones that come after are: $debug")
+      }
     }
   }
 
