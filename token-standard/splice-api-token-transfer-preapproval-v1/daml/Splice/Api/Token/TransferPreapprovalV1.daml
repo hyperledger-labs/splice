@@ -1,0 +1,190 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Instruct transfers of holdings between parties.
+module Splice.Api.Token.TransferPreapprovalV1 where
+
+import qualified DA.Map as Map
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+
+{-
+
+Ideas left out:
+- network wide blanket approvals:
+    - tricky wrt confidentiality: DSO must only be an observer
+    - do not replace registry-specific preapprovals: registries want their
+      own preapprovals to support featured app markers and reward sharing
+    - more complex management: wallets need to understand them as distinct
+      from registry-specific preapprovals, and know how to allocate them and
+      how to display them.
+- volume-bounded approvals: too complex to implement as they require mutable
+  on-ledger state, which likely results in contention
+
+- allowing to not create the intermediate TransferInstruction:
+    - not done to avoid
+
+
+
+-}
+
+
+-- TransferPreapproval
+------------------------
+
+-- | Specification of which incoming transfers are pre-approved by a receiver.
+data PreapprovalSpecification = PreapprovalSpecification with
+  admin : Party
+    -- ^ Admin party of the holidings whose transfers are preapproved.
+  receiver : Party
+    -- ^ Receiver that preapproves incoming transfers.
+  senderFilter : [Party]
+    -- ^ Optional filter for which parties are allowed to send funds.
+    -- Empty list means no filter is applied.
+  idFilter : [Text]
+    -- ^ Optional filter on the instrument identifiers that are preapproved.
+    -- Empty list means no filter is applied.
+  minAmount : Optional Decimal
+    -- ^ Optional lower bound on the amount whose transfer is preapproved.
+  maxAmount : Optional Decimal
+    -- ^ Optional upper bound on the amount whose transfer is preapproved.
+
+
+-- | View for `TransferPreapproval`.
+data TransferPreapprovalView = TransferPreapprovalView with
+    specification : PreapprovalSpecification
+      -- ^ Specification of which transfers are preapproved.
+    requestedAt : Time
+      -- ^ When the preapproval was requested to be created.
+    expiresAt : Time
+      -- ^ When the preapproval expires.
+    meta : Metadata
+      -- ^ Additional metadata specific to the preapproval, used for extensibility.
+  deriving (Show, Eq)
+
+-- | An interface for tracking the status of a transfer instruction,
+-- i.e., a request to a registry app to execute a transfer.
+--
+-- Registries MAY evolve the transfer instruction in multiple steps. They SHOULD
+-- do so using only the choices on this interface, so that wallets can reliably
+-- parse the transaction history and determine whether the instruction ultimately
+-- succeeded or failed.
+interface TransferPreapproval where
+  viewtype TransferPreapprovalView
+
+  -- FIX
+  transferPreapproval_acceptImpl : ContractId TransferPreapproval -> TransferPreapproval_Accept -> Update TransferPreapprovalResult
+  transferPreapproval_rejectImpl : ContractId TransferPreapproval -> TransferPreapproval_Reject -> Update TransferPreapprovalResult
+  transferPreapproval_withdrawImpl : ContractId TransferPreapproval -> TransferPreapproval_Withdraw -> Update TransferPreapprovalResult
+  transferPreapproval_updateImpl : ContractId TransferPreapproval -> TransferPreapproval_Update -> Update TransferPreapprovalResult
+
+{-
+  nonconsuming choice TransferPreapproval_AcceptTransfer : TransferPreapprovalResult
+    -- ^ Allow the sender to accept a preapproved transfer in the name of the receiver.
+    with
+      sender : Party
+        -- ^ Sender of the transfer.
+      transferInstructionCid : ContractId TransferInstruction
+        -- ^ The transfer instruction contract to be accepted.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller sender
+    do transferPreapproval_acceptTransferImpl this self arg
+
+  -- QUESTION: do we need this in addition to direct transfers?
+  -- transfer instruction? That would allow for smaller txs, but complicates tx
+  -- history parsing.
+-}
+
+  nonconsuming choice TransferPreapproval_Transfer : TransferPreapprovalResult
+    -- ^ Perform a preapproved direct transfer to the receiver.
+    with
+      transfer : Transfer
+        -- ^ The transfer instruction contract to be accepted.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller transfer.sender
+    do transferPreapproval_acceptTransferImpl this self arg
+
+
+  choice TransferPreapproval_Renew : TransferPreapprovalResult
+    -- ^ Renew the preapproval as the receiver.
+    --
+    -- IMPL. IDEA:
+    --
+    with
+      specification : PreapprovalSpecification
+      requestedAt : Time
+      expiresAt : Optional Time
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).transfer.receiver
+    do transferPreapproval_renewImpl this self arg
+
+  choice TransferPreapproval_Withdraw : TransferPreapprovalResult
+    -- ^ Withdraw the transfer preapproval.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).receiver
+    do transferPreapproval_withdrawImpl this self arg
+
+
+
+-- Preapproval Factory
+----------------------
+
+-- | A factory contract to create transfer preapprovals.
+interface PreapprovalFactory where
+  viewtype PreapprovalFactoryView
+
+  transferFactory_transferImpl : ContractId PreapprovalFactory -> PreapprovalFactory_Transfer -> Update TransferPreapprovalResult
+  transferFactory_publicFetchImpl : ContractId PreapprovalFactory -> PreapprovalFactory_PublicFetch -> Update PreapprovalFactoryView
+
+  nonconsuming choice PreapprovalFactory_CreatePreapproval : TransferPreapprovalResult
+    -- ^ Create a new transfer preapproval.
+    -- Implementations MUST ensure that this choice fails if `transfer.executeBefore` is in the past.
+    --
+    -- Implementations MAY limit the number of active preapprovals per receiver.
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      preapproval : Preapproval
+        -- ^ The transfer to execute.
+      extraArgs : ExtraArgs
+        -- ^ The extra arguments to pass to the transfer implementation.
+    controller transfer.sender
+    do transferFactory_transferImpl this self arg
+
+  nonconsuming choice PreapprovalFactory_PublicFetch : PreapprovalFactoryView
+    -- ^ Fetch the view of the factory contract.
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      actor : Party
+        -- ^ The party fetching the contract.
+    controller actor
+    do transferFactory_publicFetchImpl this self arg
+
+-- | View for `PreapprovalFactory`.
+data PreapprovalFactoryView = PreapprovalFactoryView
+  with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instruments for
+      -- which this transfer factory can be used.
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer factory, used for extensibility.
+  deriving (Show, Eq)
