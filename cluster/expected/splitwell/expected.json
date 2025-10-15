@@ -229,38 +229,6 @@
   },
   {
     "custom": true,
-    "id": "splitwell/cluster-ingress-splitwell-uis",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "splitwell/participant-3",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "splitwell/splitwell-app",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "splitwell/validator-splitwell",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",

@@ -8,6 +8,7 @@ import { DeploySvRunbook, isDevNet } from '../common/src/config';
 // as we have no pulumi runtime
 import {
   activeVersion,
+  allowDowngrade,
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   MigrationInfo,
@@ -87,6 +88,7 @@ export function runSvCantonForSvs<T>(
         return {
           id: id,
           version: activeVersion,
+          allowDowngrade: allowDowngrade,
           // This doesn't actually matter, this is only used for down/refresh.
           sequencer: { enableBftSequencer: false },
         };

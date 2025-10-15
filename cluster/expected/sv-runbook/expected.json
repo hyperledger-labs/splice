@@ -441,14 +441,6 @@
   },
   {
     "custom": true,
-    "id": "sv/apps-pg",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",

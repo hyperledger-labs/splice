@@ -3252,14 +3252,6 @@
   },
   {
     "custom": true,
-    "id": "observability/grafana-pg",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "network": "projects/da-cn-devnet/global/networks/default"

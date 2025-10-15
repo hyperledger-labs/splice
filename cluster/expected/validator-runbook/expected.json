@@ -287,30 +287,6 @@
   },
   {
     "custom": true,
-    "id": "validator/postgres",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "validator/participant-3",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "validator/party-allocator",
-    "inputs": {},
-    "name": "read-sv-app-release",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
