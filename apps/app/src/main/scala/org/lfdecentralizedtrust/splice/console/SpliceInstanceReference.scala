@@ -258,7 +258,11 @@ class ParticipantClientReference(
     val pkgs = this.ledger_api.packages.list()
     if (!pkgs.map(_.packageId).contains(hash)) {
       discard[String](this.dars.upload(path, vetAllPackages = false))
-      this.synchronizers.list_connected().foreach { sync =>
+      val connected = this.synchronizers.list_connected()
+      if (connected.isEmpty) {
+        logger.error(s"Trying to vet $path on ${this.id} but not connected to any synchronizer")
+      }
+      connected.foreach { sync =>
         this.topology.vetted_packages.propose_delta(
           this.id,
           adds = dar.all

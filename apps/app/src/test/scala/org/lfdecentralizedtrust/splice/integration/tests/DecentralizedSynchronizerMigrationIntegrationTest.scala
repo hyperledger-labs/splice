@@ -491,8 +491,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       ),
       enableBftSequencer = true,
     )() {
-      aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
+      // Upload after starting validator which connects to global
+      // synchronizers as upload_dar_unless_exists vets on all
+      // connected synchronizers.
+      aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty, charlieUserParty)
       val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
