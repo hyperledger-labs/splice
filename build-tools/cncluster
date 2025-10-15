@@ -1365,7 +1365,7 @@ function _check_stateful_sets() {
     # Checks if any StatefulSets EXCEPT those in the observability namespace (which are part of the infra stack)
     # are currently deployed
     # grep exits with return code 1 if it finds no matches so we account for that
-    kubectl get statefulset -A -o json | jq '.items[] | select(.metadata.namespace != "observability" and .metadata.namespace != "gmp-system")'
+    kubectl get statefulset -A -o json | jq '.items[] | select(.metadata.namespace != "observability" and .metadata.namespace != "gmp-system" and .metadata.namespace != "gke-managed-cim")'
 }
 
 function _check_reset_and_unlock() {
