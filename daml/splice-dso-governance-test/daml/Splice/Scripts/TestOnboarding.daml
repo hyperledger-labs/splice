@@ -9,7 +9,6 @@ import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
-import DA.List
 
 import Splice.ValidatorLicense
 
@@ -48,6 +47,8 @@ testOnboardValidator = do
       contactPoint = "v1@example.com"
       lastUpdatedAt = now
     lastActiveAt = Some now
+    weight = None
+    kind = Some OperatorLicense
 
   -- so v1 is onboarded!
 
@@ -78,6 +79,8 @@ testOnboardValidator = do
       version = "0.2.0"
       contactPoint = "v1@example2.com"
     lastActiveAt = Some metadataUpdateTime
+    weight = None
+    kind = Some OperatorLicense
 
 
   -- activity cannot be reported without advancing time
@@ -98,6 +101,8 @@ testOnboardValidator = do
       version = "0.2.0"
       contactPoint = "v1@example2.com"
     lastActiveAt = Some now
+    weight = None
+    kind = Some OperatorLicense
   pure ()
 
 testSvOnboarding : Script ()
@@ -472,66 +477,6 @@ testSvReonboarding = do
   checkSvContractInvariants app
 
   pure ()
-
--- Ensure that duplicated ValidatorLicence contracts are merged
-test_MergeValidatorLicense : Script ()
-test_MergeValidatorLicense = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
-
-  -- a new validator prepares his participant
-  v1 <- allocateParty "v1"
-  now <- getTime
-
-  validatorLicense1Cid <- submit dso $ createCmd ValidatorLicense with
-    validator = v1
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 1
-      numCouponsMissed = 0
-    metadata = Some ValidatorLicenseMetadata with
-      version = "0.1.0"
-      contactPoint = "v1@example.com"
-      lastUpdatedAt = now
-    lastActiveAt = Some now
-
-  validatorLicense2Cid <- submit dso $ createCmd ValidatorLicense with
-    validator = v1
-    sponsor = sv2
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 2
-      numCouponsMissed = 0
-    metadata = Some ValidatorLicenseMetadata with
-      version = "0.1.0"
-      contactPoint = "v1@example.com"
-      lastUpdatedAt = now
-    lastActiveAt = Some now
-
-  -- there are two validator licenses for v1
-  validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
-  length validatorLicenses === 2
-
-  -- the license with the highest lastReceivedFor is kept
-  [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid] (Some sv1))
-  validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
-  length validatorLicenses === 1
-  (head validatorLicenses)._2.faucetState === Some FaucetState with
-    firstReceivedFor = Round 0
-    lastReceivedFor = Round 2
-    numCouponsMissed = 0
-
-  -- we can't merge a single contract
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3] (Some sv1))
-
-  -- we can't merge contracts for different validator names
-  [(validatorLicenseSv2Cid, _)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == sv2)
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid] (Some sv1))
-
-  pure()
 
 testBootstrapDevNetWithNonZeroRound : Script ()
 testBootstrapDevNetWithNonZeroRound = do

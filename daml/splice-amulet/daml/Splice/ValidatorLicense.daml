@@ -12,6 +12,9 @@ import Splice.Round
 import Splice.Types
 import Splice.Util
 
+data LicenseKind = OperatorLicense | NonOperatorLicense
+  deriving (Eq, Show)
+
 data FaucetState = FaucetState with
     firstReceivedFor : Round -- ^ The first round for which a coupon was received.
     lastReceivedFor : Round -- ^ The last round for which a coupon was received.
@@ -56,6 +59,8 @@ template ValidatorLicense with
     faucetState : Optional FaucetState
     metadata : Optional ValidatorLicenseMetadata
     lastActiveAt : Optional Time -- ^ Last time this validator was active. Tracked to get a view on the set of validator nodes that are up and running.
+    weight : Optional Decimal -- ^ Weight of the activity records produced by this license. Determined through SV votes. If not set, weight is 1.0
+    kind : Optional LicenseKind -- ^ Type of license. If not set, kind is OperatorLicense
   where
     signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
     observer validator -- not a signatory to simplify the creation of the license as part of onboarding
@@ -99,6 +104,7 @@ template ValidatorLicense with
           dso
           validator
           round = openRound.round
+          weight
 
         return ValidatorLicense_RecordValidatorLivenessActivityResult with ..
 
@@ -147,6 +153,8 @@ template ValidatorLicense with
            lastActiveAt = Some now
          pure (ValidatorLicense_ReportActiveResult licenseCid)
 
+defaultValidatorLicenseWeight : Decimal
+defaultValidatorLicenseWeight = 1.0
 
 metadataUpdateMinInterval : RelTime
 metadataUpdateMinInterval = hours 1
@@ -198,6 +206,7 @@ template ValidatorLivenessActivityRecord with
     dso : Party
     validator : Party
     round : Round
+    weight : Optional Decimal
   where
     signatory dso
     observer validator
