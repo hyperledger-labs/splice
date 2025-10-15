@@ -799,16 +799,16 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     // using `User-Agent` fails the following check, it cleans away the /java
     // so we have to use RawHeader to simulate the actual client case
     invalidUserAgentHeader.value shouldBe "OpenAPI-Generator/0.0.1/java"
-    val response = loggerFactory.assertLoggedWarningsAndErrorsSeq(
-      Http()
-        .singleRequest(
-          Get(
-            s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
-          ).withHeaders(invalidUserAgentHeader)
-        )
-        .futureValue,
-      forAll(_) { _.message shouldNot include("Illegal 'user-agent' header") },
-    )
+
+    // SuppressingLogger does not catch the warning (from pekko-http)
+    // if present, it's seen in checkErrors instead
+    val response = Http()
+      .singleRequest(
+        Get(
+          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
+        ).withHeaders(invalidUserAgentHeader)
+      )
+      .futureValue
     response.status shouldBe StatusCodes.OK
   }
 
