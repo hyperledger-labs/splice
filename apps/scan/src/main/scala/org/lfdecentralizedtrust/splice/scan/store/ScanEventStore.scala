@@ -61,27 +61,29 @@ class ScanEventStore(
       currentMigrationId: Long,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[Event]] = {
-    val verdictsF = verdictStore.listVerdicts(
-      afterO = afterO,
-      includeImportUpdates = false,
-      limit = limit.limit,
-    )
-    val updatesF = updateHistory.getUpdatesWithoutImportUpdates(afterO, limit)
-
     for {
+      // the cap must be computed before, to not include events that shouldn't be included in the response
       currentCap <- resolveCurrentMigrationCap(
         verdictStore.lastIngestedRecordTime,
         updateHistory.lastIngestedRecordTime,
         currentMigrationId,
       )
+      (updatesAll, verdictsAll) <- {
+        // launch them in parallel
+        val verdictsF = verdictStore.listVerdicts(
+          afterO = afterO,
+          includeImportUpdates = false,
+          limit = limit.limit,
+        )
+        val updatesF = updateHistory.getUpdatesWithoutImportUpdates(afterO, limit)
+        verdictsF.flatMap(verdicts => updatesF.map(_ -> verdicts))
+      }
       isAllowed = ScanEventStore.allowF(afterO, currentMigrationId, currentCap)
-      verdicts <- verdictsF
-      cappedVerdicts = verdicts.filter(v => isAllowed(v.migrationId, v.recordTime))
+      cappedVerdicts = verdictsAll.filter(v => isAllowed(v.migrationId, v.recordTime))
       // Fetch views only for filtered verdicts
       verdictsWithViews <- Future.traverse(cappedVerdicts)(v =>
         verdictStore.listTransactionViews(v.rowId).map(views => v -> views)
       )
-      updatesAll <- updatesF
     } yield {
       val verdictEntries: Iterator[((Long, CantonTimestamp), Verdict)] =
         verdictsWithViews.iterator.map { case (v, views) =>
