@@ -782,3 +782,42 @@ values for ``splice-participant`` or ``splice-validator``:
       - name: my-extra-container
         image: busybox
         command: [ "sh", "-c", "echo 'example extra container'" ]
+
+.. _helm-validator-volume-ownership:
+
+Working around volume ownership issues
+--------------------------------------
+
+The containers in the ``splice-validator`` chart run as non-root users (specifically, user:group 1001:1001) for security reasons.
+The pod mounts volumes for use by the containers, and these volumes need to be owned by the user that the containers run as.
+The Helm chart uses an ``fsGroup`` `security context <https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>`_ to ensure that the mounted volumes are owned by the correct user.
+In certain environments, however, this does not work as expected and the mounted volumes are owned by root.
+If you encounter this issue, you can work around it by creating init containers that change the ownership of the mounted volumes to the correct user.
+You can do this by adding the following to your ``validator-values.yaml`` file:
+
+For the `/domain-upgrade-dump` volume which is always required (for synchronizer upgrades):
+
+.. code-block:: yaml
+
+    extraInitContainers:
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+
+
+When recovering from identities backup, the `//participant-bootstrapping-dump` is also required:
+
+.. code-block:: yaml
+
+    extraInitContainers:
+        - name: chown-participant-bootstrapping-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "cp /participant-bootstrapping-dump-secret/content /participant-bootstrapping-dump/ && chown -R 1001:1001 /participant-bootstrapping-dump"]
+          volumeMounts:
+            - name: participant-bootstrapping-dump-secret
+              mountPath: /participant-bootstrapping-dump-secret
+            - name: participant-bootstrapping-dump-volume
+              mountPath: /participant-bootstrapping-dump
