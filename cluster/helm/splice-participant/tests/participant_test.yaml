@@ -203,7 +203,11 @@ tests:
       - equal:
           path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
           value: |
-            canton.participants.participant.ledger-api.auth-services=[]
+            canton.participants.participant.ledger-api.auth-services=[{
+              type = unsafe-jwt-hmac-256
+              target-audience = "https://ledger_api.example.com"
+              secret = "unsafe"
+            }]
       - notExists:
           path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_JWKS_URL')].value
       - notExists:
