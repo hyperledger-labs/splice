@@ -111,9 +111,8 @@ class AppUpgradeIntegrationTest
           }))
       })
       .addConfigTransform((_, config) =>
-        ConfigTransforms.updateInitialTickDuration(
-          // required for reward triggers and amulet merging to run
-          NonNegativeFiniteDuration.ofSeconds(60)
+        ConfigTransforms.updateAllAutomationConfigs(
+          _.copy(enableNewRewardTriggerScheduling = false)
         )(config)
       )
 
@@ -368,12 +367,6 @@ class AppUpgradeIntegrationTest
           forExactly(1, sv1PackagesAfterUpgrade) { pkg =>
             withClue(s"Package ${pkg.packageId}") {
               pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
-            }
-          }
-
-          clue("Issuing rounds are open for rewards to be collected") {
-            eventuallySucceeds(timeUntilSuccess = 4.minutes) { // 4 ticks
-              sv1ScanBackend.getOpenAndIssuingMiningRounds()._2 should not be empty
             }
           }
 
@@ -667,7 +660,6 @@ object AppUpgradeIntegrationTest {
       "SV2_SCAN_URL" -> "http://127.0.0.1:5112",
       "SV3_SCAN_URL" -> "http://127.0.0.1:5212",
       "SV4_SCAN_URL" -> "http://127.0.0.1:5312",
-      "SPLICE_APP_SV_INITIAL_TICK_DURATION" -> "60s",
     ).!
     if (result != 0) {
       throw new RuntimeException(s"Command $cmd returned: $result")

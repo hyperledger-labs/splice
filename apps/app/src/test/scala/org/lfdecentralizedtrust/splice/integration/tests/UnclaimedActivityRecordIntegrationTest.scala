@@ -40,7 +40,7 @@ class UnclaimedActivityRecordIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         // for reward triggers to run
-        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofSeconds(5))(config)
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofSeconds(1))(config)
       )
 
   override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
@@ -257,8 +257,6 @@ class UnclaimedActivityRecordIntegrationTest
         },
       )
     }
-
-    advanceRoundsByOneTickViaAutomation()
 
     clue("Amulet gets minted") {
       eventually() {

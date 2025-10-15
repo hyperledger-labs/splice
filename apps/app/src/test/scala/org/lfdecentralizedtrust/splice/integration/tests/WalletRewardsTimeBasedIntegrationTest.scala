@@ -36,19 +36,17 @@ class WalletRewardsTimeBasedIntegrationTest
       eventually()(bobWalletClient.list().amulets should have size 1)
       p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0)
 
-      def openRounds = {
+      val openRounds = eventually() {
         import math.Ordering.Implicits.*
-        sv1ScanBackend
+        val openRounds = sv1ScanBackend
           .getOpenAndIssuingMiningRounds()
           ._1
           .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
-      }
-
-      eventually() {
         openRounds should not be empty
+        openRounds
       }
 
-      advanceRoundsByOneTick
+      advanceTimeForRewardAutomationToRunForCurrentRound
 
       eventually() {
         bobValidatorWalletClient.listAppRewardCoupons() should have size 1
@@ -70,7 +68,8 @@ class WalletRewardsTimeBasedIntegrationTest
       val prevBalance = bobValidatorWalletClient.balance().unlockedQty
 
       // Bob's validator collects rewards
-      // it takes 2 more ticks for the IssuingMiningRound 1 to be created and open.
+      // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
+      advanceRoundsByOneTick
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
