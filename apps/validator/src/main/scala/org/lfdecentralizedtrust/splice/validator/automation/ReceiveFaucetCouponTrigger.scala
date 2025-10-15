@@ -148,7 +148,7 @@ object ReceiveFaucetCouponTrigger {
         param("round", _.round),
       )
 
-    override def scheduleAtMaxTime: Instant =
+    override def scheduleAtMaxTargetTime: Instant =
       opensAt.plus(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
 
     def closesAt: Instant = round.payload.targetClosesAt

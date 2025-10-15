@@ -26,7 +26,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
     mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[T] {
-  private val nextRunTime =
+  private val triggerState =
     new AtomicReference[Option[RoundBasedRewardTrigger.RoundBasedTriggerState]](None)
 
   protected val isNewSchedulingLogicEnabled: Boolean =
@@ -40,75 +40,108 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
     if (isNewSchedulingLogicEnabled) {
       if (shouldRun) {
         val tasksToRun = retrieveAvailableTasksForRound()
-        if (nextRunTime.get().exists(_.workStillToBeDone)) {
-          logger.info(s"Running tasks ${nextRunTime.get()}")
+        if (triggerState.get().exists(_.workStillToBeDone)) {
+          logger.info(s"Running tasks ${triggerState.get()}")
           updateState(_.copy(startedWork = true))
           tasksToRun
         } else {
           tasksToRun.map(tasks => {
             val tasksToUseForScheduling =
               tasks.filter(task =>
-                nextRunTime.get().forall { state =>
+                triggerState.get().forall { state =>
                   task.roundNumber > state.roundNumber
                 }
               )
+            def scheduleTasksBetween(
+                roundNumber: Long,
+                minRunTime: Instant,
+                maxRunTime: Instant,
+            ) = {
+              val minScheduledTimeToRunAt = randomInstantBetween(
+                minRunTime,
+                maxRunTime,
+              )
+              triggerState.set(
+                Some(
+                  RoundBasedRewardTrigger.RoundBasedTriggerState(
+                    roundNumber,
+                    minScheduledTimeToRunAt,
+                    startedWork = false,
+                    workStillToBeDone = true,
+                  )
+                )
+              )
+              if (shouldRun) {
+                logger.info(
+                  s"Running for $tasks because the calculated run time $minScheduledTimeToRunAt is now (between $minRunTime and $maxRunTime)."
+                )
+                updateState(_.copy(startedWork = true))
+                tasks
+              } else {
+                logger.info(
+                  s"Will run for $tasks at min time $minScheduledTimeToRunAt (computed for interval between $minRunTime and $maxRunTime)."
+                )
+                Seq.empty
+              }
+            }
+
             val previousSchedulingRoundStillOpen =
               tasks
-                .find(task => nextRunTime.get().map(_.roundNumber).contains(task.roundNumber))
+                .find(task => triggerState.get().map(_.roundNumber).contains(task.roundNumber))
                 .filter(_.closesAt.isAfter(context.clock.now.toInstant))
             val schedulingRound = tasksToUseForScheduling
               .minByOption(_.opensAt)
+
+            def closingTimeForRoundWIthBuffer(round: T) = {
+              round.closesAt.minus(
+                context.config.rewardOperationRoundsCloseBufferDuration.asJava
+              )
+            }
+
             schedulingRound match {
               case Some(schedulingRound) =>
-                val lastRunWasForAnOlderRound =
-                  nextRunTime.get().forall(_.roundNumber < schedulingRound.roundNumber)
-                if (lastRunWasForAnOlderRound) {
-                  val minRunTime = Seq(schedulingRound.opensAt, context.clock.now.toInstant).max
-                  val maxRunTime = (
-                    previousSchedulingRoundStillOpen
-                      .map(
-                        _.closesAt.minus(
-                          context.config.rewardOperationRoundsCloseBufferDuration.asJava
-                        )
+                val minRunTime = Seq(schedulingRound.opensAt, context.clock.now.toInstant).max
+                val previousRoundClosingTimeWithBuffer = previousSchedulingRoundStillOpen
+                  .map(round => closingTimeForRoundWIthBuffer(round))
+                val maxRunTime = (
+                  previousRoundClosingTimeWithBuffer.toList :+ schedulingRound.scheduleAtMaxTargetTime
+                ).min
+                scheduleTasksBetween(schedulingRound.roundNumber, minRunTime, maxRunTime)
+              case None =>
+                val state = triggerState.get()
+                previousSchedulingRoundStillOpen match {
+                  case Some(previousRound) =>
+                    val triggerRanForPreviousRound = state.exists(_.startedWork)
+                    val triggerHasNoWorkLeftForPreviousRound = state.exists(!_.workStillToBeDone)
+                    val previousRoundWasScheduledWithinTheWantedInterval = state
+                      .exists(
+                        _.earliestTimeTriggerCanRun.isBefore(previousRound.scheduleAtMaxTargetTime)
                       )
-                      .toList :+ schedulingRound.scheduleAtMaxTime
-                  ).min
-                  val minScheduledTimeToRunAt = randomInstantBetween(
-                    minRunTime,
-                    maxRunTime,
-                  )
-                  nextRunTime.set(
-                    Some(
-                      RoundBasedRewardTrigger.RoundBasedTriggerState(
-                        schedulingRound.roundNumber,
-                        minScheduledTimeToRunAt,
-                        startedWork = false,
-                        workStillToBeDone = true,
+                    // task is still available but we already ran within the wanted timeframe, this means the task most likely failed, so we should reschedule before the closing time
+                    if (
+                      triggerRanForPreviousRound && triggerHasNoWorkLeftForPreviousRound && previousRoundWasScheduledWithinTheWantedInterval
+                    ) {
+                      val maxSchedulingTime = closingTimeForRoundWIthBuffer(previousRound)
+                      logger.info(
+                        s"Rescheduling for previous round ${previousRound.roundNumber} that is still open and we already ran for, before closing time with buffer $maxSchedulingTime."
                       )
-                    )
-                  )
-                  if (shouldRun) {
-                    logger.info(
-                      s"Running for $tasks because the calculated run time $minScheduledTimeToRunAt is now (between $minRunTime and $maxRunTime)."
-                    )
-                    updateState(_.copy(startedWork = true))
-                    tasks
-                  } else {
-                    logger.info(
-                      s"Will run for $tasks at min time $minScheduledTimeToRunAt (computed for interval between $minRunTime and $maxRunTime)."
+                      scheduleTasksBetween(
+                        previousRound.roundNumber,
+                        context.clock.now.toInstant,
+                        maxSchedulingTime,
+                      )
+                    } else {
+                      logger.warn(
+                        s"Trigger ran before round closing time but task is stil available, will not rerun ${triggerState.get()}."
+                      )
+                      Seq.empty
+                    }
+                  case None =>
+                    logger.debug(
+                      s"No new rounds to schedule for, last ran for ${triggerState.get()}."
                     )
                     Seq.empty
-                  }
-                } else {
-                  logger.info(
-                    s"Running for $tasks as the round still matches the next run ${nextRunTime.get()}."
-                  )
-                  updateState(_.copy(startedWork = true))
-                  tasks
                 }
-              case None =>
-                logger.debug(s"No new rounds to schedule for, last ran for ${nextRunTime.get()}.")
-                Seq.empty
             }
           })
         }
@@ -121,7 +154,7 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
   private def updateState(
       u: RoundBasedRewardTrigger.RoundBasedTriggerState => RoundBasedRewardTrigger.RoundBasedTriggerState
   ): Unit =
-    nextRunTime.updateAndGet(_.map(u)).discard
+    triggerState.updateAndGet(_.map(u)).discard
 
   protected def retrieveAvailableTasksForRound()(implicit tc: TraceContext): Future[Seq[T]]
 
@@ -138,10 +171,12 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
     }
 
   private def shouldRun = {
-    nextRunTime
+    triggerState
       .get()
       .fold(true) { state =>
-        state.runAt.isBefore(context.clock.now.toInstant) || state.runAt.equals(
+        state.earliestTimeTriggerCanRun.isBefore(
+          context.clock.now.toInstant
+        ) || state.earliestTimeTriggerCanRun.equals(
           context.clock.now.toInstant
         )
       }
@@ -161,17 +196,19 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
 
 object RoundBasedRewardTrigger {
 
-  final case class RoundBasedTriggerState(
+  private final case class RoundBasedTriggerState(
       roundNumber: Long,
-      runAt: Instant,
+      // the earliest time the trigger is allowed to run for this round, it can run multiple times after that depending on the value of `workStillToBeDone`
+      earliestTimeTriggerCanRun: Instant,
       startedWork: Boolean,
+      // starts with true and is set to the value of workDone returned by the trigger
       workStillToBeDone: Boolean,
   )
 
   trait RoundBasedTask {
     def roundNumber: Long
     def opensAt: Instant
-    def scheduleAtMaxTime: Instant
+    def scheduleAtMaxTargetTime: Instant
     def closesAt: Instant
 
   }

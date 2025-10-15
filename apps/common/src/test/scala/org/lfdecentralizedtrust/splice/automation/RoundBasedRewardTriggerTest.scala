@@ -11,7 +11,8 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.scalatest.wordspec.AsyncWordSpec
 
-import java.time.Instant
+import java.time.{Duration, Instant}
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -51,11 +52,9 @@ class RoundBasedRewardTriggerTest
           (task1, TaskNoop)
         )
       )
-      trigger.performWorkIfAvailable().futureValue
-      trigger.timesTriggerRan shouldBe 0
+      triggerDoesNotRun(trigger)
       clock.advance(8.seconds.toJava)
-      trigger.performWorkIfAvailable().futureValue
-      trigger.timesTriggerRan shouldBe 0
+      triggerDoesNotRun(trigger)
       clock.advance(13.seconds.toJava)
       trigger.performWorkIfAvailable().futureValue
       trigger.timesTriggerRan shouldBe 1
@@ -160,14 +159,16 @@ class RoundBasedRewardTriggerTest
         Seq(
           (task1, TaskNoop),
           (
-            task1.copy(roundNumber = 2, opensAt = now, scheduleAtMaxTime = now.plusSeconds(20)),
+            task1
+              .copy(roundNumber = 2, opensAt = now, scheduleAtMaxTargetTime = now.plusSeconds(20)),
             TaskNoop,
           ),
         ),
         Seq(
           (task1, TaskNoop),
           (
-            task1.copy(roundNumber = 2, opensAt = now, scheduleAtMaxTime = now.plusSeconds(20)),
+            task1
+              .copy(roundNumber = 2, opensAt = now, scheduleAtMaxTargetTime = now.plusSeconds(20)),
             TaskNoop,
           ),
         ),
@@ -187,6 +188,51 @@ class RoundBasedRewardTriggerTest
       trigger.performWorkIfAvailable().futureValue
       trigger.timesTriggerRan shouldBe 3
     }
+
+    "run after the max target time and before closing time for task that is still available" in {
+      val now = clock.now.toInstant
+      val task1 =
+        RoundBasedRewardTriggerTest.TestTask(
+          1,
+          now.plusSeconds(1),
+          now.plusSeconds(5),
+          now.plus(10, ChronoUnit.DAYS),
+        )
+      val trigger = testTrigger(
+        Iterator
+          .continually(
+            Seq(task1 -> TaskNoop)
+          )
+          .take(20)
+          .toSeq*
+      )
+
+      triggerDoesNotRun(trigger)
+
+      clock.advance(6.seconds.toJava)
+      triggerDoesRun(trigger)
+
+      // task gets scheduled
+      clock.advance(1.seconds.toJava)
+      triggerDoesNotRun(trigger)
+
+      clock.advance(Duration.of(10, ChronoUnit.DAYS))
+      triggerDoesRun(trigger)
+      triggerDoesNotRun(trigger)
+
+    }
+  }
+
+  private def triggerDoesNotRun(trigger: TestTrigger) = {
+    val previousRuns = trigger.timesTriggerRan
+    trigger.performWorkIfAvailable().futureValue
+    trigger.timesTriggerRan shouldBe previousRuns
+  }
+
+  private def triggerDoesRun(trigger: TestTrigger) = {
+    val previousRuns = trigger.timesTriggerRan
+    trigger.performWorkIfAvailable().futureValue
+    trigger.timesTriggerRan shouldBe (previousRuns + 1)
   }
 
   private val lf = loggerFactory
@@ -247,7 +293,7 @@ object RoundBasedRewardTriggerTest {
   case class TestTask(
       roundNumber: Long,
       opensAt: Instant,
-      scheduleAtMaxTime: Instant,
+      scheduleAtMaxTargetTime: Instant,
       closesAt: Instant,
   ) extends RoundBasedRewardTrigger.RoundBasedTask
       with PrettyPrinting {
