@@ -33,6 +33,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DsoRules.Utils
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
@@ -205,6 +206,9 @@ data DsoRules_GrantFeaturedAppRightResult = DsoRules_GrantFeaturedAppRightResult
 data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResult
 
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
+    validatorLicense : ContractId ValidatorLicense
+
+data DsoRules_GrantValidatorLicenseResult = DsoRules_GrantValidatorLicenseResult with
     validatorLicense : ContractId ValidatorLicense
 
 data DsoRules_MergeValidatorLicenseResult = DsoRules_MergeValidatorLicenseResult with
@@ -979,28 +983,50 @@ template DsoRules with
           faucetState = None
           metadata = fmap (\version -> ValidatorLicenseMetadata with version; contactPoint = fromOptional "" contactPoint; lastUpdatedAt = now) version
           lastActiveAt = Some now
+          weight = None -- An individual SV can only create a license with the default weight.
+          kind = Some OperatorLicense
         return DsoRules_OnboardValidatorResult with ..
 
+    -- Grant ValidatorLicense to a party that is not an validator node operator
+    ---------------------------------------------------------------------------
+
+    nonconsuming choice DsoRules_GrantValidatorLicense : DsoRules_GrantValidatorLicenseResult
+      with
+        sponsor : Party
+        validator : Party
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        now <- getTime
+        validatorLicense <- create ValidatorLicense with
+          dso
+          sponsor
+          validator
+          faucetState = None
+          metadata = None
+          lastActiveAt = Some now
+          weight = None
+          kind = Some NonOperatorLicense
+        return DsoRules_GrantValidatorLicenseResult with ..
+
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
-      -- ^ Note: removes the old duplicated licenses and creates a new one with the highest lastReceivedFor round
-      -- There should never be duplicates going forward.
+      -- ^ Removes the old duplicated licenses and creates a new one with merged fields having value:
+      -- - lastReceivedFor: max value among all licenses
+      -- - weight: min value among all licenses
+      -- - kind: `Some OperatorLicense` if any license has `None` or `Some OperatorLicense`
       with
         validatorLicenseCids : [ContractId ValidatorLicense]
         sv : Optional Party
       controller sv
       do _ <- getAndValidateSvParty this sv
-         require "Number of validatorLicense contracts to merge is >= 2" (length validatorLicenseCids >= 2)
          validatorLicenses <- forA validatorLicenseCids $ fetchAndArchive (ForDso this.dso)
-         require "All validatorLicenses map to the same validator" ( length (dedup (map (.validator) validatorLicenses)) == 1)
-         -- We don't attempt to merge the fields in the validator licence since there is no good
-         -- way to do so and none of the fields other than lastReceivedFor round are crucial and for that
-         -- taking the max is the correct merge.
-         cid <- create $ maximumOn (\license ->
-                     case license.faucetState of
-                         None    -> Round 0
-                         Some r  -> r.lastReceivedFor) validatorLicenses
-         pure $ DsoRules_MergeValidatorLicenseResult cid
 
+         mergedLicense <- case mergeValidatorLicenses validatorLicenses of
+           Left err -> abort err
+           Right license -> pure license
+
+         cid <- create mergedLicense
+         pure $ DsoRules_MergeValidatorLicenseResult cid
 
     -- SV onboarding
     ----------------
