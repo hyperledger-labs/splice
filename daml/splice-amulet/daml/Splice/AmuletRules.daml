@@ -23,6 +23,7 @@ import DA.Time
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.TransferPreapprovalV1 qualified as Api.Token.TransferPreapprovalV1
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee)
@@ -1456,6 +1457,26 @@ template TransferPreapproval
   where
     signatory receiver, provider, dso
     ensure (expiresAt > validFrom) && (lastRenewedAt >= validFrom)
+
+
+    interface instance Api.Token.TransferPreapprovalV1.TransferPreapproval for TransferPreapproval where
+      view = Api.Token.TransferPreapprovalV1.TransferPreapprovalView with
+        specification = Api.Token.TransferPreapprovalV1.PreapprovalSpecification with
+          admin = dso
+          receiver
+          senderFilter = []
+          idFilter = []
+          minAmount = None
+          maxAmount = None
+        requestedAt = lastRenewedAt
+        expiresAt
+        meta = emptyMetadata
+
+      -- FIXME
+      transferPreapproval_renewImpl _self _arg = error "implement"
+      transferPreapproval_withdrawImpl _self _arg = error "implement"
+      transferPreapproval_rejectImpl _self _arg = error "implement"
+
 
     nonconsuming choice TransferPreapproval_Fetch : TransferPreapproval
       with
