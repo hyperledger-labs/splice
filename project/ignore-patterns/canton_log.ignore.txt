@@ -151,4 +151,7 @@ ACS_COMMITMENT_DEGRADATION
 # TODO(#2689) remove once fix consumed
 the set of package dependencies is not self consistent, the extra dependencies are.*54f85eb
 
+# TODO(#2706) Investigate and remove once fixed
+Waiting for allocation of.*on synchronizer splitwell.*timed out
+
 # Make sure to have a trailing newline
