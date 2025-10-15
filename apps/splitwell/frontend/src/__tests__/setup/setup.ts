@@ -24,8 +24,6 @@ declare global {
   }
 }
 
-window.happyDOM.settings.enableJavaScriptEvaluation = true;
-
 export const server: SetupServer = buildServer(window.splice_config.services);
 
 // Start server before all tests

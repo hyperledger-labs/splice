@@ -26,8 +26,6 @@ declare global {
   }
 }
 
-window.happyDOM.settings.enableJavaScriptEvaluation = true;
-
 export const svUrl: string = window.splice_config.services.sv.url;
 export const server: SetupServer = buildServer(svUrl);
 

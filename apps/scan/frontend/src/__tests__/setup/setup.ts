@@ -23,8 +23,6 @@ export type Services = Config['services'];
 window.splice_config = config;
 export const server: SetupServer = buildServer(window.splice_config.services);
 
-window.happyDOM.settings.enableJavaScriptEvaluation = true;
-
 // Start server before all tests
 beforeAll(() => {
   setupIntersectionMocking(vi.fn);
