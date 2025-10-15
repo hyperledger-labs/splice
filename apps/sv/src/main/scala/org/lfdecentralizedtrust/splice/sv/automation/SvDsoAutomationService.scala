@@ -368,17 +368,15 @@ class SvDsoAutomationService(
       )
     )
 
-    config.scan.foreach { scan =>
-      registerTrigger(
-        new PublishScanConfigTrigger(
-          triggerContext,
-          dsoStore,
-          connection(SpliceLedgerConnectionPriority.Low),
-          scan,
-          upgradesConfig,
-        )
+    registerTrigger(
+      new PublishScanConfigTrigger(
+        triggerContext,
+        dsoStore,
+        connection(SpliceLedgerConnectionPriority.Low),
+        config.scan,
+        upgradesConfig,
       )
-    }
+    )
 
     config.followAmuletConversionRateFeed.foreach { c =>
       registerTrigger(

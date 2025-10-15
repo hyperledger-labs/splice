@@ -41,7 +41,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SequencerPruningTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    scanConfig: Option[SvScanConfig],
+    scanConfig: SvScanConfig,
     upgradesConfig: UpgradesConfig,
     sequencerAdminConnection: SequencerAdminConnection,
     mediatorAdminConnection: MediatorAdminConnection,
@@ -65,27 +65,15 @@ class SequencerPruningTrigger(
   private def createScanConnection()(implicit
       tc: TraceContext
   ): Future[BackfillingScanConnection] =
-    scanConfig match {
-      case None =>
-        Future.failed(
-          Status.UNAVAILABLE
-            .withDescription(
-              "This application is not configured to connect to a scan service. " +
-                " Check the application configuration or use the scan API to query votes information."
-            )
-            .asRuntimeException()
-        )
-      case Some(scanConfig) =>
-        ScanConnection
-          .singleUncached(
-            ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
-            upgradesConfig,
-            clock,
-            context.retryProvider,
-            loggerFactory,
-            retryConnectionOnInitialFailure = true,
-          )
-    }
+    ScanConnection
+      .singleUncached(
+        ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
+        upgradesConfig,
+        clock,
+        context.retryProvider,
+        loggerFactory,
+        retryConnectionOnInitialFailure = true,
+      )
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
