@@ -17,6 +17,20 @@ Upcoming
       and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
       can act on your behalf.
 
+  - Reward collection
+
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
+
+  - SV app
+
+    - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out of range values.
+
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
 0.4.20
 ------
 
