@@ -8,7 +8,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import org.apache.pekko.http.scaladsl.model.headers.`User-Agent`
+import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
@@ -795,7 +795,10 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     import env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
-    val invalidUserAgentHeader = `User-Agent`("OpenAPI-Generator/0.0.1/java")
+    val invalidUserAgentHeader = RawHeader("User-Agent", "OpenAPI-Generator/0.0.1/java")
+    // using `User-Agent` fails the following check, it cleans away the /java
+    // so we have to use RawHeader to simulate the actual client case
+    invalidUserAgentHeader.value shouldBe "OpenAPI-Generator/0.0.1/java"
     val response = loggerFactory.assertLoggedWarningsAndErrorsSeq(
       Http()
         .singleRequest(
