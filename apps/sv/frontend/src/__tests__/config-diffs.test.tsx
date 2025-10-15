@@ -57,7 +57,7 @@ describe('SV can see AmuletRules config diffs', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction(action);
+    await changeAction(action);
 
     const input = screen.getByTestId('transferConfig.createFee.fee-value');
     await userEvent.type(input, '42');
@@ -120,7 +120,7 @@ describe('SV can see DsoRules config diffs', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction(action);
+    await changeAction(action);
 
     const input = screen.getByTestId(
       'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
