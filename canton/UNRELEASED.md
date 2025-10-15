@@ -409,7 +409,7 @@ To consume the update, re-generate any client code generated from the protobuf d
   ```
   canton.sequencers.sequencer.parameters.sequencer-api-limits = {
     "com.digitalasset.canton.sequencer.api.v30.SequencerService/DownloadTopologyStateForInit" : 10,
-    "com.digitalasset.canton.sequencer.api.v30.SequencerService/SubscribeV2" : 1000,
+    "com.digitalasset.canton.sequencer.api.v30.SequencerService/Subscribe" : 1000,
   }
   ```
 - Authorization of the calls made by the IDP Admins has been tightened. It is no longer possible for them to grant
