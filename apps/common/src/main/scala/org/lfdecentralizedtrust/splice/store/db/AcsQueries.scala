@@ -153,7 +153,7 @@ trait AcsQueries extends AcsJdbcTypes {
                and o.migration_id = acs.migration_id
                and acs.package_name = ${packageQualifiedName.packageName}
                and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-               and """ ++ where ++ sql"""
+               and (""" ++ where ++ sql""")
        where sd.id = $storeId and o.migration_id = $migrationId
        """ ++ orderLimit).toActionBuilder
       .as[AcsQueries.SelectFromAcsTableResultWithOffset]

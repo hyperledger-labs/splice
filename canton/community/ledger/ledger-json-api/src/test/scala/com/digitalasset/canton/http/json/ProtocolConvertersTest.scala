@@ -30,12 +30,9 @@ import magnolify.scalacheck.semiauto.ArbitraryDerivation
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
-// TODO(#23504) remove
-@nowarn("cat=deprecation")
 class ProtocolConvertersTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   import StdGenerators.*
   import Arbitraries.*
@@ -70,8 +67,7 @@ class ProtocolConvertersTest extends AnyWordSpec with BaseTest with HasExecution
     JsMapping(converters.InterfaceView),
     JsMapping(converters.Event),
     JsMapping(converters.Transaction),
-    JsMapping(converters.TransactionTree),
-    JsMapping(converters.SubmitAndWaitTransactionTreeResponse),
+    JsMapping(converters.SubmitAndWaitTransactionTreeResponseLegacy),
     JsMapping(converters.SubmitAndWaitTransactionResponse),
     JsMapping(converters.SubmitAndWaitForReassignmentResponse),
     JsMapping(converters.SubmitAndWaitForTransactionRequest),
@@ -84,7 +80,7 @@ class ProtocolConvertersTest extends AnyWordSpec with BaseTest with HasExecution
     JsMapping(converters.Reassignment),
     JsMapping(converters.GetUpdatesResponse),
     JsMapping(converters.GetUpdateTreesResponseLegacy),
-    JsMapping(converters.GetTransactionResponse),
+    JsMapping(converters.GetTransactionResponseLegacy),
 //    JsMapping(converters.PrepareSubmissionRequest),//we only need toJson
 //    JsMapping(converters.PrepareSubmissionResponse), // we only need toJson
 //    JsMapping(converters.ExecuteSubmissionRequest), // we only need fromJson
@@ -148,10 +144,6 @@ object Arbitraries {
     nonEmptyScalaPbOneOf(
       ArbitraryDerivation[lapi.topology_transaction.TopologyEvent.Event]
     )
-  implicit val arbTreeEventKind: Arbitrary[lapi.transaction.TreeEvent.Kind] =
-    nonEmptyScalaPbOneOf(
-      ArbitraryDerivation[lapi.transaction.TreeEvent.Kind]
-    )
   implicit val arbTreeEventLegacyKind: Arbitrary[LegacyDTOs.TreeEvent.Kind] = {
     val arb = ArbitraryDerivation[LegacyDTOs.TreeEvent.Kind]
     Arbitrary {
@@ -178,6 +170,29 @@ object Arbitraries {
         arb.arbitrary.sample.filter(_ != Update.Empty)
       ).getOrElse(
         throw new RuntimeException("Failed to generate non-empty GetUpdateTreesResponse.Update")
+      )
+    }
+  }
+  implicit val arbSubmitAndWaitTransactionTreeResponseLegacy
+      : Arbitrary[LegacyDTOs.SubmitAndWaitForTransactionTreeResponse] = {
+    val arb = ArbitraryDerivation[LegacyDTOs.SubmitAndWaitForTransactionTreeResponse]
+    Arbitrary {
+      retryUntilSome(
+        arb.arbitrary.sample.filter(_.transaction.isDefined)
+      ).getOrElse(
+        throw new RuntimeException(
+          "Failed to generate non-empty SubmitAndWaitForTransactionTreeResponse"
+        )
+      )
+    }
+  }
+  implicit val arbGetTransactionResponseLegacy: Arbitrary[LegacyDTOs.GetTransactionResponse] = {
+    val arb = ArbitraryDerivation[LegacyDTOs.GetTransactionResponse]
+    Arbitrary {
+      retryUntilSome(
+        arb.arbitrary.sample.filter(_.transaction.isDefined)
+      ).getOrElse(
+        throw new RuntimeException("Failed to generate non-empty GetTransactionResponse")
       )
     }
   }

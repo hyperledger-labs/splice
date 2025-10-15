@@ -14,7 +14,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
@@ -423,7 +423,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val onboarding @ OnboardingResult(externalParty, _, _) =
         onboardExternalParty(validatorBackend)
       walletClient.tap(50.0)
-      createTransferPreapprovalIfNotExists(walletClient)
+      createTransferPreapprovalEnsuringItExists(walletClient, validatorBackend)
       createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
       eventually() {
         validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty
@@ -491,8 +491,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       ),
       enableBftSequencer = true,
     )() {
-      aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
+      // Upload after starting validator which connects to global
+      // synchronizers as upload_dar_unless_exists vets on all
+      // connected synchronizers.
+      aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty, charlieUserParty)
       val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
@@ -601,11 +604,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             // reset to not crash other tests
             {
               clue(
-                s"reset confirmationRequestsMaxRate to ${domainDynamicParams.confirmationRequestsMaxRate} to not crash other tests"
+                s"reset domain parameters to old values confirmationRequestsMaxRate=${domainDynamicParams.confirmationRequestsMaxRate},mediatorReactionTimeout=${domainDynamicParams.mediatorReactionTimeout}"
               ) {
-                changeDomainRatePerParticipant(
+                changeDomainParameters(
                   allNodes.map(_.oldParticipantConnection),
                   domainDynamicParams.confirmationRequestsMaxRate,
+                  domainDynamicParams.mediatorReactionTimeout,
                 )
               }
               deleteDirectoryRecursively(migrationDumpDir.toFile)
@@ -1128,9 +1132,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     }
   }
 
-  private def changeDomainRatePerParticipant(
+  private def changeDomainParameters(
       nodes: Seq[ParticipantAdminConnection],
-      rate: NonNegativeInt,
+      confirmationRequestsMaxRate: NonNegativeInt,
+      mediatorReactionTimeout: com.digitalasset.canton.time.NonNegativeFiniteDuration,
   )(implicit
       env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
@@ -1140,7 +1145,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         node
           .ensureDomainParameters(
             decentralizedSynchronizerId,
-            _.tryUpdate(confirmationRequestsMaxRate = rate),
+            _.tryUpdate(
+              confirmationRequestsMaxRate = confirmationRequestsMaxRate,
+              mediatorReactionTimeout = mediatorReactionTimeout,
+            ),
+            forceChanges = ForceFlags(ForceFlag.AllowOutOfBoundsValue),
           )
       }
       .futureValue
@@ -1364,6 +1373,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           Map("fake-key-1" -> "fake-value-1"),
           s"fake-idp-enabled-${suffix}",
           false,
+          executeAs = Set(someParties(0)),
+          executeAsAnyParty = true,
         )
         if (createNewParties) {
           participant.ledger_api.users.create(

@@ -58,6 +58,7 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   TrafficControlParameters,
 }
@@ -187,6 +188,8 @@ class SV1Initializer(
             // TODO(#2110) Rethink this when we enable sequencer connection pools.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
+            // TODO(#2666) Make the delays configurable.
+            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           ),
           manualConnect = false,
           synchronizerId = None,
@@ -453,9 +456,8 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v34)
+        val initialValues = DynamicSynchronizerParameters.initialValues(ProtocolVersion.v34)
         val values = initialValues.tryUpdate(
-          topologyChangeDelay = config.topologyChangeDelayDuration.toInternal,
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),

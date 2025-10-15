@@ -1,8 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2
-import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequestView
@@ -155,7 +155,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       participantClient.ledger_api.state.acs.of_party(
         party = party,
         filterInterfaces = Seq(holdingv1.Holding.TEMPLATE_ID).map(templateId =>
-          Identifier(
+          TemplateId(
             templateId.getPackageId,
             templateId.getModuleName,
             templateId.getEntityName,
@@ -190,7 +190,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
         party = party,
         filterInterfaces =
           Seq(transferinstructionv1.TransferInstruction.TEMPLATE_ID).map(templateId =>
-            Identifier(
+            TemplateId(
               templateId.getPackageId,
               templateId.getModuleName,
               templateId.getEntityName,

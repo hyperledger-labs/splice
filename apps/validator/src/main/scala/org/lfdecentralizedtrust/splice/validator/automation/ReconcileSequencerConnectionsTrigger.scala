@@ -19,6 +19,7 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -102,6 +103,8 @@ class ReconcileSequencerConnectionsTrigger(
                         ),
                         patience,
                       ),
+                      // TODO(#2666) Make the delays configurable.
+                      sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                     )
                 }
                 participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(

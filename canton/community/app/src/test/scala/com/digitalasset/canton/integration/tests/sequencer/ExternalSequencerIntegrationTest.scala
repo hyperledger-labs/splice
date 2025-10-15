@@ -24,9 +24,9 @@ import com.digitalasset.canton.integration.bootstrap.{
 import com.digitalasset.canton.integration.plugins.UseExternalProcess.ShutdownPhase
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UseExternalProcess,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -185,9 +185,8 @@ private[tests] final case class QuickSequencerReconnection(
 class ExternalReferenceSequencerIntegrationTest
     extends ExternalSequencerIntegrationTest("reference") {
 
-  override protected lazy val sequencerPlugin
-      : UseCommunityReferenceBlockSequencer[DbConfig.Postgres] =
-    new UseCommunityReferenceBlockSequencer[Postgres](loggerFactory)
+  override protected lazy val sequencerPlugin: UseReferenceBlockSequencer[DbConfig.Postgres] =
+    new UseReferenceBlockSequencer[Postgres](loggerFactory)
 }
 
 class ExternalBftOrderingSequencerIntegrationTest

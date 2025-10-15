@@ -18,7 +18,6 @@ multiValidator:
 sv:
   synchronizer:
     skipInitialization: true
-    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
@@ -130,6 +129,13 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomSequencerJvmFlag"
+      cloudSql:
+        tier: "sequencer-override-tier"
+    mediator:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomMediatorJvmFlag"
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -210,10 +216,17 @@ validators:
       enable: true
       maxParties: 1234
       parallelism: 321
+      preapprovalRetries: 9876
+      preapprovalRetryDelayMs: 42
     participant:
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME
           value: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE
+      additionalJvmOptions: -Dparticipantoption
+    validatorApp:
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
       additionalJvmOptions: -Dparticipantoption
   extra-validator:
     namespace: validator

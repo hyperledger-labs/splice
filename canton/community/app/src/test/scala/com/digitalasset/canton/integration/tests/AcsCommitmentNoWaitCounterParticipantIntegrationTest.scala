@@ -8,14 +8,11 @@ import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommand
   WaitCommitments,
 }
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{DbConfig, SynchronizerTimeTrackerConfig}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeProportion
+import com.digitalasset.canton.config.{CommitmentSendDelay, DbConfig, SynchronizerTimeTrackerConfig}
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.examples.java.iou.Iou
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -89,7 +86,15 @@ trait AcsCommitmentNoWaitCounterParticipantIntegrationTest
         ConfigTransforms.updateMaxDeduplicationDurations(maxDedupDuration),
       )
       .updateTestingConfig(
-        _.focus(_.maxCommitmentSendDelayMillis).replace(Some(NonNegativeInt.zero))
+        _.focus(_.commitmentSendDelay)
+          .replace(
+            Some(
+              CommitmentSendDelay(
+                Some(NonNegativeProportion.zero),
+                Some(NonNegativeProportion.zero),
+              )
+            )
+          )
       )
       .withSetup { implicit env =>
         import env.*
@@ -491,7 +496,7 @@ trait AcsCommitmentNoWaitCounterParticipantIntegrationTest
 class AcsCommitmentNoWaitCounterParticipantIntegrationTestPostgres
     extends AcsCommitmentNoWaitCounterParticipantIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
   override val isInMemory = false
 }
 

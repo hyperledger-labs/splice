@@ -4,7 +4,6 @@
 package com.digitalasset.canton.integration
 
 import cats.syntax.option.*
-import com.digitalasset.canton.BaseTest.testedProtocolVersion
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel
@@ -15,6 +14,7 @@ import com.digitalasset.canton.config.{
   *,
 }
 import com.digitalasset.canton.console.FeatureFlag
+import com.digitalasset.canton.http.{HttpServerConfig, JsonApiConfig, WebsocketConfig}
 import com.digitalasset.canton.participant.config.{
   ParticipantNodeConfig,
   RemoteParticipantConfig,
@@ -39,6 +39,7 @@ import monocle.macros.syntax.lens.*
 import monocle.macros.{GenLens, GenPrism}
 
 import scala.concurrent.duration.*
+import scala.jdk.DurationConverters.*
 import scala.util.Random
 
 /** Utilities for transforming instances of [[CantonConfig]]. A transform itself is merely a
@@ -127,8 +128,7 @@ object ConfigTransforms {
       _.focus(_.monitoring.logging.api.warnBeyondLoad).replace(Some(10000)),
       // disable exit on fatal error in tests
       ConfigTransforms.setExitOnFatalFailures(false),
-      // TODO(i26481): adjust when the new connection pool is stable
-      ConfigTransforms.setConnectionPool(testedProtocolVersion >= ProtocolVersion.dev),
+      ConfigTransforms.setConnectionPool(true),
     )
 
   lazy val dontWarnOnDeprecatedPV: Seq[ConfigTransform] = Seq(
@@ -250,6 +250,8 @@ object ConfigTransforms {
       _.focus(_.ledgerApi.internalPort)
         .replace(nextPort.some)
         .focus(_.adminApi.internalPort)
+        .replace(nextPort.some)
+        .focus(_.httpLedgerApi.server.internalPort)
         .replace(nextPort.some)
         .focus(_.monitoring.grpcHealthServer)
         .modify(_.map(_.copy(internalPort = nextPort.some)))
@@ -665,6 +667,18 @@ object ConfigTransforms {
         .replace(config.NonNegativeFiniteDuration(maxDeduplicationDuration))
     )
 
+  def updateTargetTimestampForwardTolerance(
+      targetTimestampForwardTolerance: scala.concurrent.duration.FiniteDuration
+  ): ConfigTransform = updateTargetTimestampForwardTolerance(targetTimestampForwardTolerance.toJava)
+
+  def updateTargetTimestampForwardTolerance(
+      targetTimestampForwardTolerance: java.time.Duration
+  ): ConfigTransform =
+    ConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.parameters.reassignmentsConfig.targetTimestampForwardTolerance)
+        .replace(config.NonNegativeFiniteDuration(targetTimestampForwardTolerance))
+    )
+
   /** Flag the provided participants as being replicated. Keep in mind to actually work they need to
     * be configured to share the same database (see
     * [[com.digitalasset.canton.integration.plugins.UseSharedStorage]]).
@@ -852,7 +866,7 @@ object ConfigTransforms {
 
   /** Use the new sequencer connection pool if 'value' is true. Otherwise use the former transports.
     */
-  private def setConnectionPool(value: Boolean): ConfigTransform =
+  def setConnectionPool(value: Boolean): ConfigTransform =
     updateAllSequencerConfigs { case (_name, config) =>
       config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
     }.compose(updateAllMediatorConfigs { case (_name, config) =>
@@ -860,4 +874,27 @@ object ConfigTransforms {
     }).compose(updateAllParticipantConfigs { case (_name, config) =>
       config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
     })
+
+  /** Must be applied before the default config transformers */
+  def enableHttpLedgerApi: ConfigTransform = updateAllParticipantConfigs_(
+    _.copy(httpLedgerApi = JsonApiConfig(server = HttpServerConfig()))
+  )
+
+  /** Must be applied before the default config transformers */
+  def enableHttpLedgerApi(
+      participantName: String,
+      websocketConfig: Option[WebsocketConfig] = None,
+      pathPrefix: Option[String] = None,
+  ): ConfigTransform =
+    updateParticipantConfig(participantName)(config =>
+      config.copy(httpLedgerApi =
+        JsonApiConfig(
+          server = HttpServerConfig(
+            pathPrefix = pathPrefix
+          ),
+          websocketConfig = websocketConfig,
+        )
+      )
+    )
+
 }

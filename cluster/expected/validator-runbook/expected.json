@@ -137,14 +137,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "enableServerSideApply": "true"
@@ -527,20 +519,26 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "config": {
+          "jsonLedgerApiUrl": "http://participant-3:7575",
+          "keyDirectory": "/keys",
+          "maxParties": 1234,
+          "parallelism": 321,
+          "preapprovalRetries": 9876,
+          "preapprovalRetryDelayMs": 42,
+          "scanApiUrl": "http://scan-app.sv-1:5012",
+          "token": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}",
+          "userId": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}",
+          "validatorApiUrl": "http://validator-app:5003"
+        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "jsonLedgerApiUrl": "http://participant-3:7575",
-        "keysDirectory": "/keys",
-        "maxParties": 1234,
-        "parallelism": 321,
-        "scanApiUrl": "http://scan-app.sv-1:5012",
         "tolerations": [
           {
             "effect": "NoSchedule",
             "key": "cn_apps",
             "operator": "Exists"
           }
-        ],
-        "validatorApiUrl": "http://validator-app:5003"
+        ]
       },
       "version": "0.3.20"
     },
@@ -650,6 +648,13 @@
       "namespace": "validator",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME",
+            "value": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME"
+          }
+        ],
+        "additionalJvmOptions": "-Dparticipantoption",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {

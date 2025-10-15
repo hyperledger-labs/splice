@@ -109,7 +109,7 @@ object ValidatorAppBootstrap {
           testingConfigInternal,
           clock,
           validatorMetrics,
-          new CommunityStorageFactory(validatorConfig.storage),
+          new StorageSingleFactory(validatorConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

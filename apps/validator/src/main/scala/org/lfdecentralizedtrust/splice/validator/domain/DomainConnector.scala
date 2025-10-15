@@ -23,6 +23,7 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnections,
+  SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -138,7 +139,7 @@ class DomainConnector(
           if (connections.isEmpty) {
             throw Status.NOT_FOUND
               .withDescription(
-                s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
+                s"sequencer connections for migration id $migrationId is empty at $time, validate with your SV sponsor that your migration id is correct"
               )
               .asRuntimeException()
           } else {
@@ -147,7 +148,7 @@ class DomainConnector(
                 case None =>
                   throw Status.NOT_FOUND
                     .withDescription(
-                      s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
+                      s"sequencer connections for migration id $migrationId is empty at $time, validate with your SV sponsor that your migration id is correct"
                     )
                     .asRuntimeException()
                 case Some(nonEmptyConnections) =>
@@ -160,6 +161,8 @@ class DomainConnector(
                     ),
                     // TODO(#2110) Rethink this when we enable sequencer connection pools.
                     sequencerLivenessMargin = NonNegativeInt.zero,
+                    // TODO(#2666) Make the delays configurable.
+                    sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                   )
               }
             }.toMap

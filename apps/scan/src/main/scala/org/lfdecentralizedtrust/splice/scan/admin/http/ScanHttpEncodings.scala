@@ -337,6 +337,7 @@ sealed trait ScanHttpEncodings {
       http.observers.asJava,
       http.createdAt.toInstant,
       /* acsDelta = */ false,
+      /* representativePackageId = */ templateId.getPackageId,
     )
   }
 
@@ -579,6 +580,7 @@ object ScanHttpEncodings {
                     assign.createdEvent.getObservers,
                     assign.createdEvent.createdAt,
                     assign.createdEvent.isAcsDelta,
+                    assign.createdEvent.getRepresentativePackageId,
                   )
                 ),
               )
@@ -629,6 +631,7 @@ object ScanHttpEncodings {
           created.getObservers,
           created.createdAt,
           created.isAcsDelta,
+          created.getRepresentativePackageId,
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
         val newNodeId = mapping(exercised.getNodeId)

@@ -9,6 +9,11 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
+export const ValidatorAppConfigSchema = z.object({
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
+});
+
 export const ParticipantConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
@@ -29,13 +34,17 @@ export const ValidatorNodeConfigSchema = z.object({
     })
     .optional(),
   participant: ParticipantConfigSchema.optional(),
+  validatorApp: ValidatorAppConfigSchema.optional(),
 });
 export const PartyAllocatorConfigSchema = z.object({
   enable: z.boolean(),
   parallelism: z.number().default(30),
   maxParties: z.number().default(1000000),
+  preapprovalRetries: z.number().default(120),
+  preapprovalRetryDelayMs: z.number().default(1000),
 });
 export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
+
 export type ValidatorNodeConfig = z.infer<typeof ValidatorNodeConfigSchema>;
 export const ValidatorConfigSchema = z
   .object({

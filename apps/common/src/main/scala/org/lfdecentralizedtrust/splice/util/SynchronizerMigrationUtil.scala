@@ -7,6 +7,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection
@@ -38,6 +39,8 @@ final object SynchronizerMigrationUtil {
         confirmationRequestsMaxRate = NonNegativeInt.zero,
         mediatorReactionTimeout = NonNegativeFiniteDuration.Zero,
       ),
+      forceChanges =
+        ForceFlags(ForceFlag.AllowOutOfBoundsValue), // required for mediatorReactionTimeout = 0
     )
 
   def ensureSynchronizerIsUnpaused(

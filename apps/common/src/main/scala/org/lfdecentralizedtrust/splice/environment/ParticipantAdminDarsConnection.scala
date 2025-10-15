@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse_
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -25,7 +24,6 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.HasParticipantId
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
@@ -43,13 +41,8 @@ trait ParticipantAdminDarsConnection {
   def uploadDarFiles(
       pkg: Seq[UploadablePackage],
       retryFor: RetryFor,
-      vetTheDar: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    uploadDarsLocally(
-      pkg,
-      retryFor,
-      vetTheDar,
-    )
+    uploadDarsLocally(pkg, retryFor)
   }
 
   def uploadDarFileWithVettingOnAllConnectedSynchronizers(
@@ -66,7 +59,6 @@ trait ParticipantAdminDarsConnection {
       _ <- uploadDarsLocally(
         Seq(UploadablePackage.fromByteString(path.getFileName.toString, darFile)),
         retryFor,
-        vetTheDar = false,
       )
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
@@ -76,7 +68,7 @@ trait ParticipantAdminDarsConnection {
     } yield ()
 
   def vetDars(
-      domainId: SynchronizerId,
+      synchronizerId: SynchronizerId,
       dars: Seq[DarResource],
       fromDate: Option[Instant],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
@@ -84,53 +76,64 @@ trait ParticipantAdminDarsConnection {
       tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
-    ensureTopologyMapping[VettedPackages](
-      // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
-      TopologyStoreId.Authorized,
-      s"dars ${dars.map(_.packageId)} are vetted in the authorized store with from $fromDate",
-      topologyTransactionType =>
-        EitherT(
-          getVettingState(None, topologyTransactionType).map { vettedPackages =>
-            if (
-              dars
-                .forall(dar => vettedPackages.mapping.packages.exists(_.packageId == dar.packageId))
-            ) {
-              // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
-              Right(vettedPackages)
-            } else {
-              Left(vettedPackages)
-            }
-          }
-        ),
-      currentVettingState =>
-        Right(
-          updateVettingStateForDars(
-            dars = dars,
-            packageValidFrom = cantonFromDate,
-            currentVetting = currentVettingState,
-          )
-        ),
+
+    retryProvider.retry(
       RetryFor.Automation,
-      maxSubmissionDelay = maxVettingDelay,
-    ).flatMap(_ =>
-      retryProvider.waitUntil(
-        RetryFor.Automation,
-        s"vet_dars_on_sync",
-        s"Dars ${dars.map(_.packageId)} are vetted on synchronizer $domainId",
-        getVettingState(domainId, AuthorizedState).map { vettingState =>
-          val packagesNotVetted = dars.filterNot(dar =>
-            vettingState.mapping.packages.exists(_.packageId == dar.packageId)
-          )
-          if (packagesNotVetted.nonEmpty) {
-            throw Status.NOT_FOUND
-              .withDescription(
-                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on synchronizer $domainId"
+      "dar_vetting",
+      s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
+      lookupVettingState(
+        Some(synchronizerId),
+        TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+      ).flatMap {
+        case None =>
+          for {
+            participantId <- getParticipantId()
+            _ <- ensureInitialMapping(
+              Right(
+                updateVettingStateForDars(
+                  dars,
+                  cantonFromDate,
+                  VettedPackages.tryCreate(
+                    participantId,
+                    Seq.empty,
+                  ),
+                )
               )
-              .asRuntimeException
-          }
-        },
-        logger,
-      )
+            )
+          } yield ()
+        case Some(_) =>
+          ensureTopologyMapping[VettedPackages](
+            TopologyStoreId.Synchronizer(synchronizerId),
+            s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
+            topologyTransactionType =>
+              EitherT(
+                getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
+                  if (
+                    dars
+                      .forall(dar =>
+                        vettedPackages.mapping.packages.exists(_.packageId == dar.packageId)
+                      )
+                  ) {
+                    // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
+                    Right(vettedPackages)
+                  } else {
+                    Left(vettedPackages)
+                  }
+                }
+              ),
+            currentVettingState =>
+              Right(
+                updateVettingStateForDars(
+                  dars = dars,
+                  packageValidFrom = cantonFromDate,
+                  currentVetting = currentVettingState,
+                )
+              ),
+            RetryFor.Automation,
+            maxSubmissionDelay = maxVettingDelay,
+          ).map(_ => ())
+      },
+      logger,
     )
   }
 
@@ -227,23 +230,33 @@ trait ParticipantAdminDarsConnection {
   def getVettingState(
       domain: Option[SynchronizerId],
       topologyTransactionType: TopologyTransactionType,
-  )(implicit tc: TraceContext): Future[TopologyResult[VettedPackages]] = {
+  )(implicit tc: TraceContext): Future[TopologyResult[VettedPackages]] =
+    lookupVettingState(domain, topologyTransactionType).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(s"No package vetting state found for domain $domain")
+          .asRuntimeException
+      )
+    )
+
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def lookupVettingState(
+      domain: Option[SynchronizerId],
+      topologyTransactionType: TopologyTransactionType,
+  )(implicit tc: TraceContext): Future[Option[TopologyResult[VettedPackages]]] = {
     for {
       participantId <- getParticipantId()
       vettedState <- listVettedPackages(participantId, domain, topologyTransactionType)
     } yield {
       vettedState match {
-        case Seq() =>
-          throw Status.NOT_FOUND
-            .withDescription(s"No package vetting state found for domain $domain")
-            .asRuntimeException
-        case Seq(state) => state
+        case Seq() => None
+        case Seq(state) => Some(state)
         case other =>
           logger.warn(
             s"Vetted state contains multiple entries on domain $domain for $participantId: $other. Will use the last entry"
           )
           // TODO(DACH-NY/canton-network-node#18175) - remove once canton can handle this and fixed the issue
-          other.maxBy(_.base.serial)
+          Some(other.maxBy(_.base.serial))
       }
     }
   }
@@ -258,30 +271,32 @@ trait ParticipantAdminDarsConnection {
   private def uploadDarsLocally(
       dars: Seq[UploadablePackage],
       retryFor: RetryFor,
-      vetTheDar: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
       existingDars <- listDars().map(_.map(_.mainPackageId))
       darsToUploads = dars.filterNot(dar => existingDars.contains(dar.packageId))
-      _ <- darsToUploads.parTraverse_(uploadDar(_, vetTheDar, retryFor))
+      _ <- MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(5))(darsToUploads)(
+        uploadDar(_, retryFor)
+      )
     } yield {}
   }
 
-  private def uploadDar(dar: UploadablePackage, vetTheDar: Boolean, retryFor: RetryFor)(implicit
+  private def uploadDar(dar: UploadablePackage, retryFor: RetryFor)(implicit
       tc: TraceContext
   ) = {
     retryProvider.retry(
       retryFor,
       "upload_dar",
-      s"Upload dar ${dar.packageId} with vetting $vetTheDar",
+      s"Upload dar ${dar.packageId} (without vetting)",
       runCmd(
         ParticipantAdminCommands.Package
           .UploadDar(
-            dar.resourcePath,
-            vetAllPackages = vetTheDar,
-            synchronizeVetting = vetTheDar,
+            darPath = dar.resourcePath,
+            synchronizerId = None,
+            vetAllPackages = false,
+            synchronizeVetting = false,
             description = "",
             expectedMainPackageId = dar.packageId,
             requestHeaders = Map.empty,

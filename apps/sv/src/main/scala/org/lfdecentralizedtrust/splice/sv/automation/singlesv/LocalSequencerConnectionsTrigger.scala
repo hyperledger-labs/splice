@@ -19,6 +19,7 @@ import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -110,6 +111,8 @@ class LocalSequencerConnectionsTrigger(
             // TODO(#2110) Rethink this when we enable sequencer connection pools.
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
+            // TODO(#2666) Make the delays configurable.
+            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           )
           if (
             ParticipantAdminConnection.dropSequencerId(

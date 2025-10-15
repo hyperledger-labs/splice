@@ -17,10 +17,10 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.digitalasset.daml.lf.value as lf
 import com.digitalasset.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MaybeCachedContract
 import org.lfdecentralizedtrust.splice.util.JavaDecodeUtil
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ledger.api.validation.ValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext

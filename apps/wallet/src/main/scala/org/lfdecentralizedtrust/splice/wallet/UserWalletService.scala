@@ -91,7 +91,8 @@ class UserWalletService(
       SpliceCircuitBreaker(
         "treasury",
         params.circuitBreakers.mediumPriority,
-        logger,
+        clock,
+        loggerFactory,
       ),
     ),
     treasuryConfig,

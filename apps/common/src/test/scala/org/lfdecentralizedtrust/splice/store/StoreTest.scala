@@ -651,6 +651,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       observers.map(_.toProtoPrimitive).asJava,
       contract.createdAt,
       false,
+      contract.identifier.getPackageId,
     )
   }
 
@@ -737,6 +738,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         created.getObservers,
         created.createdAt,
         created.isAcsDelta(),
+        created.getTemplateId.getPackageId,
       )
     case exercised: ExercisedEvent =>
       new ExercisedEvent(

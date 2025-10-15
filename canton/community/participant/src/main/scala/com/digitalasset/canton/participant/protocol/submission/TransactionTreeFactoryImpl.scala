@@ -31,10 +31,9 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.collection.MapsUtil
-import com.digitalasset.canton.util.{ErrorUtil, LfTransactionUtil, MonadUtil}
+import com.digitalasset.canton.util.{ContractHasher, ErrorUtil, LfTransactionUtil, MonadUtil}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.transaction.ContractStateMachine.KeyInactive
 import com.digitalasset.daml.lf.transaction.Transaction.{
@@ -54,7 +53,7 @@ import java.util.UUID
 import scala.annotation.{nowarn, tailrec}
 import scala.collection.immutable.SortedSet
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Factory class that can create the [[com.digitalasset.canton.data.GenTransactionTree]]s from a
   * [[com.digitalasset.canton.protocol.WellFormedTransaction]].
@@ -71,6 +70,7 @@ class TransactionTreeFactoryImpl(
     synchronizerId: PhysicalSynchronizerId,
     override val cantonContractIdVersion: CantonContractIdVersion,
     cryptoOps: HashOps & HmacOps,
+    hasher: ContractHasher,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends TransactionTreeFactory
@@ -165,22 +165,17 @@ class TransactionTreeFactoryImpl(
         )
       }
 
-      rootViews <- createRootViews(rootViewDecompositions, state, contractOfId).mapK(
-        FutureUnlessShutdown.outcomeK
-      )
+      rootViews <- createRootViews(rootViewDecompositions, state, contractOfId)
 
       _ <-
         if (validatePackageVettings) {
-          val commandExecutionPackages = requiredPackagesByParty(rootViewDecompositions)
-          val inputContractPackages = inputContractPackagesByParty(rootViews)
-          val packagesByParty =
-            MapsUtil.mergeMapsOfSets(commandExecutionPackages, inputContractPackages)
+          val requiredPackageByParty = requiredPackagesByParty(rootViewDecompositions)
           UsableSynchronizers
             .checkPackagesVetted(
               synchronizerId = synchronizerId,
               snapshot = topologySnapshot,
-              requiredPackagesByParty = packagesByParty,
-              metadata.ledgerTime,
+              requiredPackagesByParty = requiredPackageByParty,
+              ledgerTime = metadata.ledgerTime,
             )
             .leftMap[TransactionTreeConversionError](_.transformInto[UnknownPackageError])
         } else EitherT.rightT[FutureUnlessShutdown, TransactionTreeConversionError](())
@@ -241,37 +236,13 @@ class TransactionTreeFactoryImpl(
     }
   }
 
-  /** @return set of packages required for input contract consistency checking, by party */
-  private def inputContractPackagesByParty(
-      rootViews: Seq[TransactionView]
-  ): Map[LfPartyId, Set[PackageId]] = {
-
-    def viewPartyPackages(view: TransactionView): Map[LfPartyId, Set[PackageId]] = {
-      val inputPackages = checked(view.viewParticipantData.tryUnwrap).coreInputs.values
-        .map(_.contract.templateId.packageId)
-        .toSet
-      val informees = checked(view.viewCommonData.tryUnwrap).viewConfirmationParameters.informees
-      val viewMap = informees.map(_ -> inputPackages).toMap
-      val subviewMap = viewsPartyPackages(view.subviews.unblindedElements)
-      MapsUtil.mergeMapsOfSets(subviewMap, viewMap)
-    }
-
-    def viewsPartyPackages(views: Seq[TransactionView]): Map[LfPartyId, Set[PackageId]] =
-      views.foldLeft(Map.empty[LfPartyId, Set[PackageId]]) { case (acc, view) =>
-        MapsUtil.mergeMapsOfSets(acc, viewPartyPackages(view))
-      }
-
-    viewsPartyPackages(rootViews)
-
-  }
-
   private def createRootViews(
       decompositions: Seq[TransactionViewDecomposition.NewView],
       state: State,
       contractOfId: ContractInstanceOfId,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionTreeConversionError, Seq[TransactionView]] = {
+  ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, Seq[TransactionView]] = {
 
     // collect all contract ids referenced
     val preloadCids = Set.newBuilder[LfContractId]
@@ -302,9 +273,9 @@ class TransactionTreeFactoryImpl(
       .flatMap { preloaded =>
         def fromPreloaded(
             cid: LfContractId
-        ): EitherT[Future, ContractLookupError, GenContractInstance] =
+        ): EitherT[FutureUnlessShutdown, ContractLookupError, GenContractInstance] =
           preloaded.get(cid) match {
-            case Some(value) => EitherT.fromEither(value)
+            case Some(value) => EitherT.fromEither[FutureUnlessShutdown](value)
             case None =>
               // if we ever missed a contract during prefetching due to mistake, then we can
               // fallback to the original loader
@@ -327,7 +298,7 @@ class TransactionTreeFactoryImpl(
       contractOfId: ContractInstanceOfId,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionTreeConversionError, TransactionView] = {
+  ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, TransactionView] = {
     state.signalRollbackScope(view.rbContext.rollbackScope)
 
     // reset to a fresh state with projected resolver before visiting the subtree
@@ -355,15 +326,11 @@ class TransactionTreeFactoryImpl(
     val subviewIndex = TransactionSubviews.indices(nbSubViews).iterator
     val createdInView = mutable.Set.empty[LfContractId]
 
-    def fromEither[A <: TransactionTreeConversionError, B](
-        either: Either[A, B]
-    ): EitherT[Future, TransactionTreeConversionError, B] =
-      EitherT.fromEither(either.leftWiden[TransactionTreeConversionError])
-
     for {
       // Compute salts
-      viewCommonDataSalt <- fromEither(state.nextSalt())
-      viewParticipantDataSalt <- fromEither(state.nextSalt())
+      viewCommonDataSalt <- EitherT.fromEither[FutureUnlessShutdown](state.nextSalt())
+      viewParticipantDataSalt <- EitherT.fromEither[FutureUnlessShutdown](state.nextSalt())
+
       _ <- MonadUtil.sequentialTraverse_(view.allNodes) {
         case childView: TransactionViewDecomposition.NewView =>
           // Compute subviews, recursively
@@ -378,50 +345,57 @@ class TransactionTreeFactoryImpl(
               }
             }
 
-        case TransactionViewDecomposition.SameView(lfActionNode, nodeId, rbContext) =>
+        case TransactionViewDecomposition.SameView(lfActionNode, nodeId, rbContext) => {
+
           val rbScope = rbContext.rollbackScope
-          val suffixedNode = lfActionNode match {
-            case createNode: LfNodeCreate =>
-              val suffixedNode = updateStateWithContractCreation(
-                nodeId,
-                createNode,
-                viewParticipantDataSalt,
-                viewPosition,
-                createIndex,
-                state,
-              )
-              coreCreatedBuilder += (suffixedNode -> rbScope)
-              createdInView += suffixedNode.coid
-              createIndex += 1
-              suffixedNode
-            case lfNode: LfActionNode =>
-              val suffixedNode = trySuffixNode(state)(nodeId -> lfNode)
-              coreOtherBuilder += ((nodeId, lfNode) -> rbScope)
-              suffixedNode
-          }
 
-          suffixedNode.keyOpt.foreach { case LfGlobalKeyWithMaintainers(gkey, maintainers) =>
-            state.keyVersionAndMaintainers += (gkey -> (suffixedNode.version -> maintainers))
-          }
+          for {
 
-          state.signalRollbackScope(rbScope)
-
-          EitherT.fromEither[Future]({
-            for {
-              resolutionForModeOff <- suffixedNode match {
-                case lookupByKey: LfNodeLookupByKey
-                    if state.csmState.mode == ContractKeyUniquenessMode.Off =>
-                  val gkey = lookupByKey.key.globalKey
-                  state.currentResolver.get(gkey).toRight(MissingContractKeyLookupError(gkey))
-                case _ => Right(KeyInactive) // dummy value, as resolution is not used
-              }
-              nextState <- state.csmState
-                .handleNode((), suffixedNode, resolutionForModeOff)
-                .leftMap(ContractKeyResolutionError.apply)
-            } yield {
-              state.csmState = nextState
+            suffixedNode <- lfActionNode match {
+              case createNode: LfNodeCreate =>
+                updateStateWithContractCreation(
+                  nodeId,
+                  createNode,
+                  viewParticipantDataSalt,
+                  viewPosition,
+                  createIndex,
+                  state,
+                ).map { suffixedNode =>
+                  coreCreatedBuilder += (suffixedNode -> rbScope)
+                  createdInView += suffixedNode.coid
+                  createIndex += 1
+                  suffixedNode
+                }
+              case lfNode: LfActionNode =>
+                val suffixedNode = trySuffixNode(state)(nodeId -> lfNode)
+                coreOtherBuilder += ((nodeId, lfNode) -> rbScope)
+                EitherT.pure[FutureUnlessShutdown, TransactionTreeConversionError](suffixedNode)
             }
-          })
+
+            _ = suffixedNode.keyOpt.foreach { case LfGlobalKeyWithMaintainers(gkey, maintainers) =>
+              state.keyVersionAndMaintainers += (gkey -> (suffixedNode.version -> maintainers))
+            }
+
+            _ = state.signalRollbackScope(rbScope)
+
+            _ <- EitherT.fromEither[FutureUnlessShutdown]({
+              for {
+                resolutionForModeOff <- suffixedNode match {
+                  case lookupByKey: LfNodeLookupByKey
+                      if state.csmState.mode == ContractKeyUniquenessMode.Off =>
+                    val gkey = lookupByKey.key.globalKey
+                    state.currentResolver.get(gkey).toRight(MissingContractKeyLookupError(gkey))
+                  case _ => Right(KeyInactive) // dummy value, as resolution is not used
+                }
+                nextState <- state.csmState
+                  .handleNode((), suffixedNode, resolutionForModeOff)
+                  .leftMap(ContractKeyResolutionError.apply)
+              } yield {
+                state.csmState = nextState
+              }
+            })
+          } yield ()
+        }
       }
       _ = state.signalRollbackScope(view.rbContext.rollbackScope)
 
@@ -445,14 +419,14 @@ class TransactionTreeFactoryImpl(
 
       // Compute the parameters of the view
       seed = view.rootSeed
-      packagePreference <- EitherT.fromEither[Future](buildPackagePreference(view))
+      packagePreference <- EitherT.fromEither[FutureUnlessShutdown](buildPackagePreference(view))
       actionDescription = createActionDescription(suffixedRootNode, seed, packagePreference)
       viewCommonData = createViewCommonData(view, viewCommonDataSalt).fold(
         ErrorUtil.internalError,
         identity,
       )
       viewKeyInputs = state.csmState.globalKeyInputs
-      resolvedK <- EitherT.fromEither[Future](
+      resolvedK <- EitherT.fromEither[FutureUnlessShutdown](
         resolvedKeys(
           viewKeyInputs,
           state.keyVersionAndMaintainers,
@@ -472,7 +446,7 @@ class TransactionTreeFactoryImpl(
       )
 
       // fast-forward the former state over the subtree
-      nextCsmState <- EitherT.fromEither[Future](
+      nextCsmState <- EitherT.fromEither[FutureUnlessShutdown](
         previousCsmState
           .advance(
             // advance ignores the resolver in mode Strict
@@ -511,7 +485,9 @@ class TransactionTreeFactoryImpl(
       viewPosition: ViewPosition,
       createIndex: Int,
       state: State,
-  )(implicit traceContext: TraceContext): LfNodeCreate = {
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, LfNodeCreate] = {
 
     val cantonContractInst = checked(
       LfTransactionUtil
@@ -547,37 +523,45 @@ class TransactionTreeFactoryImpl(
       case _: CantonContractIdV2Version =>
         CreationTime.Now
     }
-    val ContractIdSuffixer.RelativeSuffixResult(
-      suffixedCreateNode,
-      localContractId,
-      relativeSuffix,
-      authenticationData,
-    ) = contractIdSuffixer
-      .relativeSuffixForLocalContract(
-        contractSalt,
-        creationTime,
-        createNodeWithSuffixedArg,
-      )
-      .valueOr(err => throw new IllegalArgumentException(s"Failed to compute contract ID: $err"))
+    hasher
+      .hash(createNodeWithSuffixedArg, contractIdSuffixer.contractHashingMethod)
+      .map { contractHash =>
+        val ContractIdSuffixer.RelativeSuffixResult(
+          suffixedCreateNode,
+          localContractId,
+          relativeSuffix,
+          authenticationData,
+        ) = contractIdSuffixer
+          .relativeSuffixForLocalContract(
+            contractSalt,
+            creationTime,
+            createNodeWithSuffixedArg,
+            contractHash,
+          )
+          .valueOr(err =>
+            throw new IllegalArgumentException(s"Failed to compute contract ID: $err")
+          )
 
-    state.setSuffixFor(localContractId, relativeSuffix)
+        state.setSuffixFor(localContractId, relativeSuffix)
 
-    val inst = LfFatContractInst.fromCreateNode(
-      create = suffixedCreateNode,
-      createTime = creationTime,
-      authenticationData = authenticationData.toLfBytes,
-    )
-    val createdInfo = ContractInstance
-      .create(inst)
-      .valueOr(err =>
-        throw new IllegalArgumentException(
-          s"Failed to create contract instance well formed instrument: $err"
+        val inst = LfFatContractInst.fromCreateNode(
+          create = suffixedCreateNode,
+          createTime = creationTime,
+          authenticationData = authenticationData.toLfBytes,
         )
-      )
+        val createdInfo = ContractInstance
+          .create(inst)
+          .valueOr(err =>
+            throw new IllegalArgumentException(
+              s"Failed to create contract instance well formed instrument: $err"
+            )
+          )
 
-    state.setCreatedContractInfo(suffixedCreateNode.coid, createdInfo)
-    state.addSuffixedNode(nodeId, suffixedCreateNode)
-    suffixedCreateNode
+        state.setCreatedContractInfo(suffixedCreateNode.coid, createdInfo)
+        state.addSuffixedNode(nodeId, suffixedCreateNode)
+        suffixedCreateNode
+      }
+      .leftMap(error => FailedToHashContact(error))
   }
 
   private def trySuffixNode(
@@ -680,7 +664,10 @@ class TransactionTreeFactoryImpl(
     */
   private def resolvedKeys(
       viewKeyInputs: Map[LfGlobalKey, KeyInput],
-      keyVersionAndMaintainers: collection.Map[LfGlobalKey, (LfLanguageVersion, Set[LfPartyId])],
+      keyVersionAndMaintainers: collection.Map[
+        LfGlobalKey,
+        (LfSerializationVersion, Set[LfPartyId]),
+      ],
       subviewKeyResolutions: collection.Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]],
   )(implicit
       traceContext: TraceContext
@@ -726,7 +713,7 @@ class TransactionTreeFactoryImpl(
       salt: Salt,
       contractOfId: ContractInstanceOfId,
       rbContextCore: RollbackContext,
-  ): EitherT[Future, TransactionTreeConversionError, ViewParticipantData] = {
+  ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, ViewParticipantData] = {
 
     val consumedInCore =
       coreOtherNodes.mapFilter { case (an, rbScopeOther) =>
@@ -768,7 +755,7 @@ class TransactionTreeFactoryImpl(
 
     def withInstance(
         contractId: LfContractId
-    ): EitherT[Future, ContractLookupError, InputContract] = {
+    ): EitherT[FutureUnlessShutdown, ContractLookupError, InputContract] = {
       val cons = consumedInCore.contains(contractId)
       createdContractInfo.get(contractId) match {
         case Some(info) =>
@@ -784,7 +771,7 @@ class TransactionTreeFactoryImpl(
         .leftWiden[TransactionTreeConversionError]
         .map(_.toMap)
       viewParticipantData <- EitherT
-        .fromEither[Future](
+        .fromEither[FutureUnlessShutdown](
           ViewParticipantData.create(cryptoOps)(
             coreInputs = coreInputsWithInstances,
             createdCore = created,
@@ -880,7 +867,6 @@ class TransactionTreeFactoryImpl(
       decompositions <- EitherT.right(decompositionsF)
       decomposition = checked(decompositions.head)
       view <- createView(decomposition, rootPosition, state, contractOfId)
-        .mapK(FutureUnlessShutdown.outcomeK)
       suffixedNodes = state.suffixedNodes() transform {
         // Recover the children
         case (nodeId, ne: LfNodeExercises) =>
@@ -958,6 +944,7 @@ object TransactionTreeFactoryImpl {
       synchronizerId: PhysicalSynchronizerId,
       cantonContractIdVersion: CantonContractIdVersion,
       cryptoOps: HashOps & HmacOps,
+      hasher: ContractHasher,
       loggerFactory: NamedLoggerFactory,
   )(implicit ex: ExecutionContext): TransactionTreeFactoryImpl =
     new TransactionTreeFactoryImpl(
@@ -965,6 +952,7 @@ object TransactionTreeFactoryImpl {
       synchronizerId,
       cantonContractIdVersion,
       cryptoOps,
+      hasher,
       loggerFactory,
     )
 
@@ -1032,13 +1020,14 @@ object TransactionTreeFactoryImpl {
     var createdContractsInView: collection.Set[LfContractId] = Set.empty
 
     /** An [[com.digitalasset.canton.protocol.LfGlobalKey]] stores neither the
-      * [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used during serialization nor
-      * the maintainers, which we need to cache in case no contract is found.
+      * [[com.digitalasset.canton.protocol.LfSerializationVersion]] to be used during serialization
+      * nor the maintainers, which we need to cache in case no contract is found.
       *
       * Out parameter that stores version and maintainers for all keys that have been referenced by
       * an already-processed node.
       */
-    val keyVersionAndMaintainers: mutable.Map[LfGlobalKey, (LfLanguageVersion, Set[LfPartyId])] =
+    val keyVersionAndMaintainers
+        : mutable.Map[LfGlobalKey, (LfSerializationVersion, Set[LfPartyId])] =
       mutable.Map.empty
 
     /** Out parameter for the [[com.digitalasset.daml.lf.transaction.ContractStateMachine.State]]

@@ -1668,6 +1668,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("io", "grpc", _*) => MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
+    // Don't really care about the notice file so just take any.
+    case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }

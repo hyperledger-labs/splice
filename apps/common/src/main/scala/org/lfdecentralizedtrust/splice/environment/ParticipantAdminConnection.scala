@@ -39,7 +39,13 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
-import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  NodeIdentity,
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -112,6 +118,11 @@ class ParticipantAdminConnection(
   def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[SynchronizerId] =
+    getPhysicalSynchronizerId(synchronizerAlias).map(_.logical)
+
+  def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] =
     // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make
     // a new request to the sequencer to query the domain id. ListConnectedSynchronizers
     // on the other hand relies on a cache
@@ -122,7 +133,7 @@ class ParticipantAdminConnection(
         throw Status.NOT_FOUND
           .withDescription(s"Domain with alias $synchronizerAlias is not connected")
           .asRuntimeException()
-      )(_.synchronizerId.logical)
+      )(_.physicalSynchronizerId)
     )
 
   /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
@@ -132,9 +143,14 @@ class ParticipantAdminConnection(
   def getSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[SynchronizerId] =
+    getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias).map(_.logical)
+
+  def getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
-    ).map(_.logical)
+    )
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
@@ -310,7 +326,6 @@ class ParticipantAdminConnection(
         filterSynchronizerId,
         timestamp,
         observer,
-        Map.empty,
         force,
       )
     ).discard
@@ -329,7 +344,8 @@ class ParticipantAdminConnection(
             acsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             allowContractIdSuffixRecomputation = false,
-          )
+          ),
+        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
       logger,
     )

@@ -5,6 +5,9 @@ FROM node:22-alpine-3.21@sha256:6b2127043c2faa4f15cdcdeb65a39fc9afbecf5559301898
 
 LABEL org.opencontainers.image.base.name="node/22-alpine-3.21"
 
+# to get envsubst
+RUN apk update && apk add gettext
+
 COPY entrypoint.sh .
 COPY target/bundle.js ./party-allocator/
 COPY target/LICENSE .

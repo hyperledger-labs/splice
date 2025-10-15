@@ -206,15 +206,31 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false, {
-        logicalDecoding: !!baseConfig.scanBigQuery,
-      });
+    : postgres.installPostgres(
+        xns,
+        'postgres',
+        'postgres',
+        activeVersion,
+        spliceConfig.pulumiProjectConfig.cloudSql,
+        false,
+        {
+          logicalDecoding: !!baseConfig.scanBigQuery,
+        }
+      );
 
   const appsPostgres =
     defaultPostgres ||
-    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true, {
-      logicalDecoding: !!baseConfig.scanBigQuery,
-    });
+    postgres.installPostgres(
+      xns,
+      `cn-apps-pg`,
+      `cn-apps-pg`,
+      activeVersion,
+      spliceConfig.pulumiProjectConfig.cloudSql,
+      true,
+      {
+        logicalDecoding: !!baseConfig.scanBigQuery,
+      }
+    );
 
   const canton = buildCrossStackCantonDependencies(
     decentralizedSynchronizerUpgradeConfig,
@@ -407,14 +423,6 @@ function installSvApp(
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
-  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
-    ? [
-        {
-          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-        },
-      ]
-    : [];
   const bftSequencerConnectionEnvVars =
     !config.participant || config.participant.bftSequencerConnection
       ? []
@@ -424,9 +432,9 @@ function installSvApp(
             value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
           },
         ];
-  const additionalEnvVars = (config.svApp?.additionalEnvVars || [])
-    .concat(topologyChangeDelayEnvVars)
-    .concat(bftSequencerConnectionEnvVars);
+  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
+    bftSequencerConnectionEnvVars
+  );
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,

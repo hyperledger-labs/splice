@@ -199,7 +199,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
+          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; party-allocator/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all Splice DARs here, just in case
@@ -334,6 +334,9 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          aws_kms,
+          aws_sts,
+          gcp_kms,
           daml_metrics,
           daml_tracing,
           daml_executors,
@@ -1550,7 +1553,10 @@ object BuildCommon {
   lazy val `canton-community-reference-driver` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-community-reference-driver", file("canton/community/drivers/reference"))
+      .apply(
+        "canton-community-reference-driver",
+        file("canton/community/reference-sequencer-driver/"),
+      )
       .dependsOn(
         `canton-util-external`,
         `canton-community-common` % "compile->compile;test->test",
