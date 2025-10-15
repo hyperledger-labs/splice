@@ -21,6 +21,8 @@ export function validatorLicensesHandler(baseUrl: string): RestHandler {
         },
         metadata: { version: '1', lastUpdatedAt: aTimestamp, contactPoint: 'nowhere' },
         lastActiveAt: aTimestamp,
+        weight: null,
+        kind: null,
       };
       return {
         contract_id: id,

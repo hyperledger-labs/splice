@@ -9,6 +9,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
 import qualified DA.Map as Map
+import DA.Optional (fromOptional)
 import qualified DA.Set as Set
 import qualified DA.Text as T
 import Daml.Script
@@ -264,7 +265,8 @@ runNextIssuanceD app amuletPrice = do
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
-          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
+          optTotalValidatorFaucetCoupons = None
+          optTotalValidatorLivenessActivityRecords = Some (intToDecimal (length validatorFaucetCoupons) + sum [ fromOptional defaultValidatorLicenseWeight c.weight | (_, c) <- validatorLivenessActivityRecords ])
 
     -- create issuing mining round
     submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with

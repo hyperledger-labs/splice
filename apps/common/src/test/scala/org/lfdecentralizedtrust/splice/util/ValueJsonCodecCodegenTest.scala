@@ -64,6 +64,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         Optional.empty(),
         Optional.empty(),
         Optional.empty(),
+        Optional.empty(),
+        Optional.empty(),
       )
       // with (one) optional field set
       val decodedOptionalSet: JavaApi.DamlRecord = ValueJsonCodecCodegen
@@ -81,6 +83,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         Optional.empty(),
         Optional.empty(),
         Optional.of(java.time.Instant.EPOCH),
+        Optional.empty(),
+        Optional.empty(),
       )
     }
 
