@@ -253,12 +253,12 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
       class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
         class="jsondiffpatch-property-name">decentralizedSynchronizer</div><ul
         class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
-        data-key="activeSynchronizer" class="jsondiffpatch-unchanged"><div
-          class="jsondiffpatch-property-name">activeSynchronizer</div><div
-          class="jsondiffpatch-value"><pre>"global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81"</pre></div></li><li
-          data-key="fees" class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">fees</div><div
-            class="jsondiffpatch-value"><pre>{
+      data-key="activeSynchronizer" class="jsondiffpatch-unchanged"><div
+        class="jsondiffpatch-property-name">activeSynchronizer</div><div
+        class="jsondiffpatch-value"><pre>"global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81"</pre></div></li><li
+      data-key="fees" class="jsondiffpatch-unchanged"><div
+        class="jsondiffpatch-property-name">fees</div><div
+        class="jsondiffpatch-value"><pre>{
   "baseRateTrafficLimits": {
     "burstAmount": "400000",
     "burstWindow": {
@@ -269,12 +269,12 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
   "readVsWriteScalingFactor": "4",
   "minTopupAmount": "200000"
 }</pre></div></li><li data-key="requiredSynchronizers"
-          class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
-            class="jsondiffpatch-property-name">requiredSynchronizers</div><ul
-            class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
-            data-key="map" class="jsondiffpatch-modified"><div
-              class="jsondiffpatch-property-name">map</div><div
-                class="jsondiffpatch-value jsondiffpatch-left-value"><pre>[
+      class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
+        class="jsondiffpatch-property-name">requiredSynchronizers</div><ul
+        class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
+      data-key="map" class="jsondiffpatch-modified"><div
+        class="jsondiffpatch-property-name">map</div><div
+        class="jsondiffpatch-value jsondiffpatch-left-value"><pre>[
   [
     "global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81",
     {}
@@ -292,14 +292,13 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
   "_values": [
     {}
   ]
-}</pre></div></li></ul></li></ul></li><li 
-      data-key="featuredAppActivityMarkerAmount"
-      class="jsondiffpatch-unchanged"><div
-        class="jsondiffpatch-property-name">featuredAppActivityMarkerAmount</div><div
-        class="jsondiffpatch-value"><pre>null</pre></div></li><li
-      data-key="issuanceCurve" class="jsondiffpatch-unchanged"><div
-        class="jsondiffpatch-property-name">issuanceCurve</div><div
-        class="jsondiffpatch-value"><pre>{
+}</pre></div></li></ul></li></ul></li><li data-key="featuredAppActivityMarkerAmount"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">featuredAppActivityMarkerAmount</div><div
+      class="jsondiffpatch-value"><pre>null</pre></div></li><li
+    data-key="issuanceCurve" class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">issuanceCurve</div><div
+      class="jsondiffpatch-value"><pre>{
   "initialValue": {
     "amuletToIssuePerYear": "40000000000.0",
     "validatorRewardPercentage": "0.05",
@@ -386,39 +385,39 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
       class="jsondiffpatch-property-name">transferConfig</div><ul
       class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
-        data-key="createFee"
-        class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
-          class="jsondiffpatch-property-name">createFee</div><ul
-          class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
-              data-key="fee" class="jsondiffpatch-modified"><div
-                class="jsondiffpatch-property-name">fee</div><div
-                class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalCreateFee}"</pre></div><div
-                class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementCreateFee}"</pre></div></li></ul></li><li
-          data-key="extraFeaturedAppRewardAmount" class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">extraFeaturedAppRewardAmount</div><div
-            class="jsondiffpatch-value"><pre>"1.0"</pre></div></li><li
-          data-key="holdingFee" class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">holdingFee</div><div
-            class="jsondiffpatch-value"><pre>{
+    data-key="createFee"
+    class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
+      class="jsondiffpatch-property-name">createFee</div><ul
+      class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
+    data-key="fee" class="jsondiffpatch-modified"><div
+      class="jsondiffpatch-property-name">fee</div><div
+      class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalCreateFee}"</pre></div><div
+      class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementCreateFee}"</pre></div></li></ul></li><li
+    data-key="extraFeaturedAppRewardAmount" class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">extraFeaturedAppRewardAmount</div><div
+      class="jsondiffpatch-value"><pre>"1.0"</pre></div></li><li
+    data-key="holdingFee" class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">holdingFee</div><div
+      class="jsondiffpatch-value"><pre>{
   "rate": "0.0000190259"
 }</pre></div></li><li data-key="lockHolderFee"
-          class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">lockHolderFee</div><div
-            class="jsondiffpatch-value"><pre>{
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">lockHolderFee</div><div
+      class="jsondiffpatch-value"><pre>{
   "fee": "0.005"
 }</pre></div></li><li data-key="maxNumInputs"
-          class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">maxNumInputs</div><div
-            class="jsondiffpatch-value"><pre>"100"</pre></div></li><li
-          data-key="maxNumLockHolders" class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">maxNumLockHolders</div><div
-            class="jsondiffpatch-value"><pre>"50"</pre></div></li><li
-          data-key="maxNumOutputs" class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">maxNumOutputs</div><div
-            class="jsondiffpatch-value"><pre>"100"</pre></div></li><li
-          data-key="transferFee" class="jsondiffpatch-unchanged"><div
-            class="jsondiffpatch-property-name">transferFee</div><div
-            class="jsondiffpatch-value"><pre>{
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">maxNumInputs</div><div
+      class="jsondiffpatch-value"><pre>"100"</pre></div></li><li
+    data-key="maxNumLockHolders" class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">maxNumLockHolders</div><div
+      class="jsondiffpatch-value"><pre>"50"</pre></div></li><li
+    data-key="maxNumOutputs" class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">maxNumOutputs</div><div
+      class="jsondiffpatch-value"><pre>"100"</pre></div></li><li
+    data-key="transferFee" class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">transferFee</div><div
+      class="jsondiffpatch-value"><pre>{
   "initialRate": "0.01",
   "steps": [
     {
