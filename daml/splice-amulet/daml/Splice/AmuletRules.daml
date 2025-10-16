@@ -1470,14 +1470,16 @@ template TransferPreapproval
           idFilter = []
           minAmount = None
           maxAmount = None
+        walletProvider = provider
+        status = Api.Token.TransferPreapprovalV1.PS_Active
         requestedAt = lastRenewedAt
         expiresAt
         meta = emptyMetadata
 
       -- FIXME
       transferPreapproval_renewImpl _self _arg = error "implement"
-      transferPreapproval_withdrawImpl _self _arg = error "implement"
-      transferPreapproval_rejectImpl _self _arg = error "implement"
+      transferPreapproval_acceptImpl _self _arg = error "implement"
+      transferPreapproval_cancelImpl _self _arg = error "implement"
 
     interface instance Api.Token.TransferInstructionV1.TransferFactory for TransferPreapproval where
       view = Api.Token.TransferInstructionV1.TransferFactoryView with
