@@ -417,11 +417,9 @@ spec:
               done
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-secret
+        - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
-        - name: participant-bootstrapping-dump-volume
-          emptyDir: {}
       {{- end }}
       {{- if .Values.migration.attachPvc }}
         - name: domain-upgrade-dump-volume
