@@ -195,7 +195,9 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
               name="sv"
               validators={{
                 onBlur: ({ value }) => validateSvSelection(value),
-                onChange: ({ value }) => validateSvSelection(value),
+                onChange: ({ value }) => {
+                  return validateSvSelection(value);
+                },
               }}
             >
               {field => (
@@ -203,6 +205,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                   title="Member"
                   options={svOptions}
                   id="update-sv-reward-weight-member"
+                  onChange={() => form.resetField('weight')}
                 />
               )}
             </form.AppField>

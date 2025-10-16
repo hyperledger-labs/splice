@@ -175,8 +175,6 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const changes = configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges, false);
   const changedFields = changes.filter(c => c.currentValue !== c.newValue);
 
-  const hasChangedFields = changedFields.length > 0;
-
   const baseConfig = dsoConfig;
   const newConfig = buildDsoRulesConfigFromChanges(changes);
   const dsoAction: DsoRules_ActionRequiringConfirmation = {
@@ -294,7 +292,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       )}
 
       <JsonDiffAccordion>
-        {dsoConfigToCompareWith[1] && hasChangedFields ? (
+        {dsoConfigToCompareWith[1] ? (
           <PrettyJsonDiff
             changes={{
               newConfig: dsoAction.value.newConfig,
@@ -302,9 +300,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               actualConfig: dsoConfigToCompareWith[1],
             }}
           />
-        ) : (
-          <Typography>No changes</Typography>
-        )}
+        ) : null}
       </JsonDiffAccordion>
 
       <form.AppForm>

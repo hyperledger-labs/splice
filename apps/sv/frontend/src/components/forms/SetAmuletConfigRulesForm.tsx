@@ -168,8 +168,6 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
     allAmuletConfigChanges,
     false
   );
-  const changedFields = changes.filter(c => c.currentValue !== c.newValue);
-  const hasChangedFields = changedFields.length > 0;
 
   const baseConfig = amuletConfig;
   const newConfig = buildAmuletRulesConfigFromChanges(changes);
@@ -291,7 +289,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
       )}
 
       <JsonDiffAccordion>
-        {amuletConfigToCompareWith && amuletConfigToCompareWith[1] && hasChangedFields ? (
+        {amuletConfigToCompareWith && amuletConfigToCompareWith[1] ? (
           <PrettyJsonDiff
             changes={{
               newConfig: dsoAction.value.newConfig,
@@ -299,9 +297,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
               actualConfig: amuletConfigToCompareWith[1],
             }}
           />
-        ) : (
-          <Typography>No changes</Typography>
-        )}
+        ) : null}
       </JsonDiffAccordion>
 
       <form.AppForm>
