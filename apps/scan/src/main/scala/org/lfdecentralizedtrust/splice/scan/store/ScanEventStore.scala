@@ -32,16 +32,18 @@ class ScanEventStore(
       updateId: String,
       currentMigrationId: Long,
   )(implicit tc: TraceContext): Future[Option[Event]] = {
-    val fUpdate = updateHistory.getUpdate(updateId)
-    val fVerdict = verdictStore.getVerdictByUpdateId(updateId)
     for {
+      // the cap must be computed before, to not include events that shouldn't be included in the response
       currentCap <- resolveCurrentMigrationCap(
         verdictStore.lastIngestedRecordTime,
         updateHistory.lastIngestedRecordTime,
         currentMigrationId,
       )
-      updateO <- fUpdate
-      verdictO <- fVerdict
+      (verdictO, updateO) <- {
+        updateHistory
+          .getUpdate(updateId)
+          .flatMap(update => verdictStore.getVerdictByUpdateId(updateId).map(_ -> update))
+      }
       verdictWithViewsO <- verdictO match {
         case Some(v) => verdictStore.listTransactionViews(v.rowId).map(views => Some((v, views)))
         case None => Future.successful(None)

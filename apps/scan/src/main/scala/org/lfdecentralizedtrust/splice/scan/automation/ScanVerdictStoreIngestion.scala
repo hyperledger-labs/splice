@@ -130,7 +130,8 @@ class ScanVerdictStoreIngestion(
             ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
             Success(
               TaskSuccess(
-                s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: $batch"
+                s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: ${batch
+                    .map(_.updateId)}"
               )
             )
           case Failure(ex) =>

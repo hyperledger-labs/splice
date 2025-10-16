@@ -17,10 +17,11 @@ import io.circe.Json
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
-import java.util.concurrent.atomic.AtomicReference
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
@@ -68,10 +69,11 @@ object DbScanVerdictStore {
 
   def apply(
       storage: com.digitalasset.canton.resource.Storage,
+      updateHistory: UpdateHistory,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): DbScanVerdictStore =
     storage match {
-      case db: DbStorage => new DbScanVerdictStore(db, loggerFactory)
+      case db: DbStorage => new DbScanVerdictStore(db, updateHistory, loggerFactory)
       case other =>
         throw new RuntimeException(s"Unsupported storage type $other for DbScanVerdictStore")
     }
@@ -79,6 +81,7 @@ object DbScanVerdictStore {
 
 class DbScanVerdictStore(
     storage: DbStorage,
+    updateHistory: UpdateHistory,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -89,6 +92,8 @@ class DbScanVerdictStore(
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
 
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
+
+  private def historyId = updateHistory.historyId
 
   override protected def timeouts = new ProcessingTimeout
 
@@ -149,6 +154,7 @@ class DbScanVerdictStore(
   private def sqlInsertVerdictReturningId(rowT: VerdictT) = {
     sql"""
       insert into #${Tables.verdicts}(
+        history_id,
         migration_id,
         domain_id,
         record_time,
@@ -160,6 +166,7 @@ class DbScanVerdictStore(
         submitting_parties,
         transaction_root_views
       ) values (
+        $historyId,
         ${rowT.migrationId},
         ${rowT.domainId},
         ${rowT.recordTime},
@@ -206,23 +213,22 @@ class DbScanVerdictStore(
 
     if (items.isEmpty) Future.unit
     else {
-      val (headVerdict, _) = items.headOption.getOrElse(
-        throw new RuntimeException("insertVerdictAndTransactionViews called with empty items")
-      )
-      val checkExists = sql"""
-             select exists(
-               select 1
+      val checkExist = (sql"""
+               select update_id
                from #${Tables.verdicts}
-               where update_id = ${headVerdict.updateId}
-             )
-           """.as[Boolean].head
+               where history_id = $historyId
+                 and update_id IN """ ++ inClause(items.map(_._1.updateId))).as[String]
 
       val action: DBIO[Unit] = for {
-        alreadyExists <- checkExists
+        alreadyExisting <- checkExist.map(_.toSet)
+        nonExisting = items.filter(item => !alreadyExisting.contains(item._1.updateId))
+        _ = logger.info(
+          s"Already ingested verdicts: $alreadyExisting. Non-existing: ${nonExisting.map(_._1.updateId)}."
+        )
         _ <-
-          if (!alreadyExists) {
+          if (nonExisting.nonEmpty) {
             DBIO
-              .sequence(items.map { case (verdict, mkViews) =>
+              .sequence(nonExisting.map { case (verdict, mkViews) =>
                 for {
                   idOpt <- sqlInsertVerdictReturningId(verdict)
                   rowId <- idOpt match {
@@ -236,7 +242,6 @@ class DbScanVerdictStore(
               })
               .map(_ => ())
           } else {
-            logger.info(s"Already ingested verdicts: ${items.map(_._1.updateId)}, ignoring.")
             DBIO.successful(())
           }
       } yield ()
@@ -248,7 +253,7 @@ class DbScanVerdictStore(
             "scanVerdict.insertVerdictAndTransactionViews.batch",
           )
       ).map { _ =>
-        val maxRt = items.map(_._1.recordTime).reduceOption((a, b) => if (a >= b) a else b)
+        val maxRt = items.map(_._1.recordTime).maxOption
         maxRt.foreach(advanceLastIngestedRecordTime)
       }
     }
@@ -273,7 +278,7 @@ class DbScanVerdictStore(
               submitting_parties,
               transaction_root_views
             from #${Tables.verdicts}
-            where update_id = $updateId
+            where history_id = $historyId and update_id = $updateId
             limit 1
           """.as[VerdictT].headOption,
         "scanVerdict.getVerdictByUpdateId",
@@ -317,7 +322,7 @@ class DbScanVerdictStore(
         submitting_parties,
         transaction_root_views
       from #${Tables.verdicts}
-      where """ ++ afterFilter ++
+      where history_id = $historyId and """ ++ afterFilter ++
         sql" order by " ++ orderBy ++ sql" limit $limit)"
     }
 
@@ -338,8 +343,8 @@ class DbScanVerdictStore(
     val orderBy =
       if (includeImportUpdates) sql"migration_id, record_time, update_id"
       else sql"migration_id, record_time"
-    val finalQuery = verdictsQuery(filters, orderBy, limit)
-    storage.query(finalQuery.toActionBuilder.as[VerdictT], "scanVerdict.listVerdicts")
+    val finalQuery = verdictsQuery(filters, orderBy, limit).toActionBuilder.as[VerdictT]
+    storage.query(finalQuery, "scanVerdict.listVerdicts")
   }
 
   def listTransactionViews(verdictRowId: Long)(implicit
