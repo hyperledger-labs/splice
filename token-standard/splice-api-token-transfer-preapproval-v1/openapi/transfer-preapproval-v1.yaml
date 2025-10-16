@@ -3,18 +3,22 @@
 
 openapi: 3.0.0
 info:
-  title: transfer instruction off-ledger API
+  title: Transfer preapproval management off-ledger API
   description: |
-    Implemented by token registries for the purpose of supporting the initiation
-    of asset transfers; e.g. to settle off-ledger obligations.
+    Implemented by token registries for the purpose of managing the set
+    of transfer preapprovals.
+
+    These preapprovals will be used to determine how to best execute a
+    transfer instructed via the separate transfer-preapproval API.
   version: 1.0.0
 paths:
 
-  /registry/transfer-instruction/v1/transfer-factory:
+  /registry/transfer-preapproval/v1/preapproval-factory:
     post:
-      operationId: "getTransferFactory"
+      # FIXME: reconsider naming 'Transfer' prefix or not, once done so on in the Daml interface definition
+      operationId: "getPreapprovalFactory"
       description: |
-        Get the factory and choice context for executing a direct transfer.
+        Get the factory and choice context for creating a transfer pre-approval.
       requestBody:
         required: true
         content:
@@ -27,21 +31,53 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TransferFactoryWithChoiceContext"
+                $ref: "#/components/schemas/PreapprovalFactoryWithChoiceContext"
+        # FIXME: check whether we can add a dedicated error for too many preapprovals
+        # FIXME: consider adding an info endpoint, or extending the registry metadata info to learn about the number of allowed preapprovals
         "400":
           $ref: "#/components/responses/400"
         "404":
           $ref: "#/components/responses/404"
 
 
-  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/accept:
+  /registry/transfer-preapproval/v1/{preapprovalId}/choice-contexts/renew:
+    post:
+      operationId: "getTransferInstructionRenewContext"
+      description: |
+        Get the choice context to renew a preapproval.
+      parameters:
+        - name: preapprovalId
+          description: "The contract ID of the preapproval to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-preapproval/v1/{preapprovalId}/choice-contexts/accept:
     post:
       operationId: "getTransferInstructionAcceptContext"
       description: |
-        Get the choice context to accept a transfer instruction.
+        Get the choice context to accept a preapproval.
       parameters:
-        - name: transferInstructionId
-          description: "The contract ID of the transfer instruction to accept."
+        - name: preapprovalId
+          description: "The contract ID of the preapproval to accept."
           in: path
           required: true
           schema:
@@ -64,44 +100,14 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/reject:
-    post:
-      operationId: "getTransferInstructionRejectContext"
-      description: |
-        Get the choice context to reject a transfer instruction.
-      parameters:
-        - name: transferInstructionId
-          description: "The contract ID of the transfer instruction to reject."
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/GetChoiceContextRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChoiceContext"
-        "400":
-          $ref: "#/components/responses/400"
-        "404":
-          $ref: "#/components/responses/404"
-
-  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/withdraw:
+  /registry/transfer-preapproval/v1/{preapprovalId}/choice-contexts/cancel:
     post:
       operationId: "getTransferInstructionWithdrawContext"
       description: |
-        Get the choice context to withdraw a transfer instruction.
+        Get the choice context to cancel a preapproval.
       parameters:
-        - name: transferInstructionId
-          description: "The contract ID of the transfer instruction to withdraw."
+        - name: preapprovalId
+          description: "The contract ID of the preapproval to cancel."
           in: path
           required: true
           schema:
@@ -176,9 +182,9 @@ components:
           additionalProperties:
             type: string
 
-    TransferFactoryWithChoiceContext:
+    PreapprovalFactoryWithChoiceContext:
       description: |
-        The transfer factory contract together with the choice context required to exercise the choice
+        The preapproval factory contract together with the choice context required to exercise the choice
         provided by the factory. Typically used to implement the generic initiation of on-ledger workflows
         via a Daml interface.
 
@@ -189,26 +195,12 @@ components:
         factoryId:
           description: "The contract ID of the contract implementing the factory interface."
           type: string
-        transferKind:
-          description: |
-            The kind of transfer workflow that will be used:
-            * `offer`: offer a transfer to the receiver and only transfer if they accept
-            * `direct`: transfer directly to the receiver without asking them for approval.
-              Only chosen if the receiver has pre-approved direct transfers.
-            * `self`: a self-transfer where the sender and receiver are the same party.
-              No approval is required, and the transfer is typically immediate.
-          type: string
-          enum:
-            - "self"
-            - "direct"
-            - "offer"
         choiceContext:
           $ref: "#/components/schemas/ChoiceContext"
       required:
         [
           "factoryId",
           "choiceContext",
-          "transferKind",
         ]
 
     ChoiceContext:
