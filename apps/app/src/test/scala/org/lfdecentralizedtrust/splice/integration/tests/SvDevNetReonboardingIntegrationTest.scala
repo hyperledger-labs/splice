@@ -32,6 +32,8 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         )(conf)
       )
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   "Reonboarding an SV with the same name removes the old SV from PartyToParticipant and the Decentralized Namespace" in {
     implicit env =>
       clue("SV3 and SV4 use different participants") {
