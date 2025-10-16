@@ -1458,7 +1458,7 @@ function subcmd_debug_shell() {
   fi
   repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
 
-  local SHELL_COMMAND="${1:-/bin/bash}"
+  local SHELL_COMMAND="${*:-/bin/bash}"
 
   _info "Deploying debug pod on version $VERSION_NUMBER"
   kubectl apply --wait -f - <<EOF
@@ -2181,14 +2181,13 @@ subcommand_whitelist[psql]=""
 function subcmd_psql() {
   _cluster_must_exist
 
-  if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-    _error "Usage: $SCRIPTNAME psql <namespace> <application> [search_path]"
+  if [ $# -ne 2 ]; then
+    _error "Usage: $SCRIPTNAME psql <namespace> <application>"
     exit 1
   fi
 
   local NAMESPACE="$1"
   local APPLICATION="$2"
-  local SEARCH_PATH=${3:-}
 
   _info "Retrieving DB connection info from pod description..."
   local DB_INIT_COMMAND
@@ -2297,16 +2296,29 @@ function subcmd_psql() {
     exit 1
   fi
 
-  subcmd_debug_shell " \
-    /bin/env
-      PGPASSWORD=$DB_PASSWORD \
-      ${SEARCH_PATH:+PGOPTIONS=--search_path=$SEARCH_PATH} \
-      psql \
-        --host=$DB_HOST \
-        --port=$DB_PORT \
-        --username=$DB_USERNAME \
-        --dbname=$DB_NAME \
-  "
+  case "${APPLICATION}" in
+    participant-*)
+      local SEARCH_PATH="participant"
+      ;;
+    sequencer-*)
+      local SEARCH_PATH="sequencer"
+      ;;
+    mediator-*)
+      local SEARCH_PATH="mediator"
+      ;;
+    *)
+      local SEARCH_PATH="$DB_NAME"
+      ;;
+  esac
+
+  subcmd_debug_shell /bin/env \
+    PGPASSWORD="$DB_PASSWORD" \
+    PGOPTIONS="--search_path=${SEARCH_PATH},public" \
+    psql \
+      --host="$DB_HOST" \
+      --port="$DB_PORT" \
+      --username="$DB_USERNAME" \
+      --dbname="$DB_NAME"
 }
 
 ################################
