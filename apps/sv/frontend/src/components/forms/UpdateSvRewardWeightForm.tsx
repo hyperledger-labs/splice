@@ -17,6 +17,7 @@ import {
   validateUrl,
   validateWeight,
 } from './formValidators';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   createProposalActions,
   getInitialExpiration,
@@ -150,7 +151,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
               {field => (
                 <field.DateField
                   title="Threshold Deadline"
-                  description="This is the last day voters can vote on this proposal"
+                  description={THRESHOLD_DEADLINE_SUBTITLE}
                   id="update-sv-reward-weight-expiry-date"
                 />
               )}
