@@ -724,6 +724,15 @@ const SetAmuletConfigValueTable: React.FC<{
   confirmationDialogProps,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const dsoConfigToCompareWith = getAmuletConfigToCompareWith(
+    effectiveAt,
+    voteRequestResultTableType,
+    votesHooks,
+    amuletAction,
+    dsoInfosQuery
+  );
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -733,16 +742,6 @@ const SetAmuletConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const dsoConfigToCompareWith = dsoInfosQuery.data
-    ? getAmuletConfigToCompareWith(
-        effectiveAt,
-        voteRequestResultTableType,
-        votesHooks,
-        amuletAction,
-        dsoInfosQuery
-      )
-    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -760,22 +759,23 @@ const SetAmuletConfigValueTable: React.FC<{
         .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
-  const unfoldedAccordions = dsoConfigToCompareWith
-    ? [
-        {
-          title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
-          content: (
-            <PrettyJsonDiff
-              changes={{
-                newConfig: amuletAction.value.newConfig,
-                baseConfig: amuletAction.value.baseConfig,
-                actualConfig: dsoConfigToCompareWith[1],
-              }}
-            />
-          ),
-        },
-      ]
-    : [];
+  const unfoldedAccordions =
+    dsoInfosQuery.data && dsoConfigToCompareWith
+      ? [
+          {
+            title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
+            content: (
+              <PrettyJsonDiff
+                changes={{
+                  newConfig: amuletAction.value.newConfig,
+                  baseConfig: amuletAction.value.baseConfig,
+                  actualConfig: dsoConfigToCompareWith[1],
+                }}
+              />
+            ),
+          },
+        ]
+      : [];
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
@@ -836,6 +836,15 @@ const SetDsoConfigValueTable: React.FC<{
   confirmationDialogProps,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const dsoConfigToCompareWith = getDsoConfigToCompareWith(
+    effectiveAt,
+    voteRequestResultTableType,
+    votesHooks,
+    dsoAction,
+    dsoInfosQuery
+  );
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -845,14 +854,6 @@ const SetDsoConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const dsoConfigToCompareWith = getDsoConfigToCompareWith(
-    effectiveAt,
-    voteRequestResultTableType,
-    votesHooks,
-    dsoAction,
-    dsoInfosQuery
-  );
 
   const inflightVoteRequests: [string, DsoRulesConfig][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
