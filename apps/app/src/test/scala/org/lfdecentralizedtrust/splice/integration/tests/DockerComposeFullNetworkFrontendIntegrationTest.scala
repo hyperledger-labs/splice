@@ -95,6 +95,14 @@ class DockerComposeFullNetworkFrontendIntegrationTest
 
           }
         }
+        clue("full network (SV) stack should bind to localhost by default") {
+          withComposeFullNetwork() { () =>
+            var binding = getPortBinding("splice-sv-nginx-1", "80")
+            binding should startWith("127.0.0.1")
+            binding = getPortBinding("splice-validator-nginx-1", "80")
+            binding should startWith("127.0.0.1")
+          }
+        }
       }
     } finally {
       Seq("build-tools/splice-compose.sh", "stop_network", "-D", "-f").!
@@ -134,14 +142,6 @@ class DockerComposeFullNetworkFrontendIntegrationTest
   "docker-compose networking bindings work" in { implicit env =>
     registerHttpConnectionPoolsCleanup(env)
 
-    clue("full network (SV) stack should bind to localhost by default") {
-      withComposeFullNetwork() { () =>
-        var binding = getPortBinding("splice-sv-nginx-1", "80")
-        binding should startWith("127.0.0.1")
-        binding = getPortBinding("splice-validator-nginx-1", "80")
-        binding should startWith("127.0.0.1")
-      }
-    }
     clue("full network (SV) stack should bind to 0.0.0.0 with -E flag") {
       withComposeFullNetwork(startFlags = Seq("-E")) { () =>
         var binding = getPortBinding("splice-sv-nginx-1", "80")
