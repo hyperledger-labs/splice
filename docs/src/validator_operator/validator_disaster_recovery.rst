@@ -236,7 +236,7 @@ of at least one of the parties hosted on your node. To address this, you can usu
       val participantId = participant.id // ID of the new participant
       participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
 
-   For this command a list of all parties can be found by running <party-id> can be found by first running:
+   You can list all parties that are currently on the old node by running:
 
    .. code::
 
