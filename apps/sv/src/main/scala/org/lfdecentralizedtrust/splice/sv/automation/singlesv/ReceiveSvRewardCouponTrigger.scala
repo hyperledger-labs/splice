@@ -99,7 +99,7 @@ class ReceiveSvRewardCouponTrigger(
       val beneficiariesWithoutLatestPackages =
         extraBeneficiaries.diff(beneficiariesWithLatestVettedPackages)
       if (beneficiariesWithoutLatestPackages.isEmpty) {
-        logger.info(s"All beneficiaries vetted the latest packages.")
+        logger.debug(s"All beneficiaries vetted the latest packages.")
       } else {
         logger.warn(
           s"Beneficiaries did not vet the latest packages: $beneficiariesWithoutLatestPackages"
