@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.21
+------
 
   - Deployment
 
@@ -23,15 +23,21 @@ Upcoming
       an init container using the ``extraInitContainers`` helm value to achieve the same effect as before, as documented in
       :ref:`this section <helm-validator-volume-ownership>`.
 
-
   - Reward collection
 
     - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
 
-  - SV app
+  - Scan
+
+      - Add the ``v0/events`` API. This API returns events that contain only mediator verdicts for private transactions, or combine mediator verdicts and associated updates by ``update_id`` visible to the DSO.
+        Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
+
+  - SV
 
     - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
       only logging a warning and not publishing an updated value for out of range values.
+
+    - UI usability improvements.
 
   - Monitoring
 
