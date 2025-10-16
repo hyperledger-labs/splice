@@ -240,6 +240,8 @@ class RoundBasedRewardTriggerTest
       tasks: mutable.Queue[Seq[(RoundBasedRewardTriggerTest.TestTask, TaskOutcome)]]
   ) extends RoundBasedRewardTrigger[RoundBasedRewardTriggerTest.TestTask] {
 
+    assert(!isRewardOperationTrigger, "new sheduling logic must be enabled")
+
     private val lastRunTime = new AtomicReference[Option[Instant]](None)
     private val tasksRunningFor =
       new AtomicReference[Seq[(RoundBasedRewardTriggerTest.TestTask, TaskOutcome)]](Seq.empty)
