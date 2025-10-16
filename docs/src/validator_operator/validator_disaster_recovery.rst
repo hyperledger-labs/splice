@@ -236,19 +236,20 @@ of at least one of the parties hosted on your node. To address this, you can usu
       val participantId = participant.id // ID of the new participant
       participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
 
+   The available options for <participant-permission> are ``Submission``, ``Confirmation``, and ``Observation``. These must be prefixed by ``ParticipantPermission.``.
+   
    You can list all parties that are currently on the old node by running:
 
    .. code::
 
       val parties = participant.parties.list (<participantIdentifier>)
   
-   Then you can map the party to a variable using a command asa such where <index> is the 0 based index of the party in the list:
+   You can assign a party to a variable using the following command, where <index> is the zero-based position of the party in the list:
     
     .. code::
   
         val partyId = parties(<index>).party
     
-    The available options for <participant-permission> are ``Submission``, ``Confirmation``, and ``Observation``.
 
 2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
    If your parties have been migrated to the new node already, take a new identities dump from the new node.
