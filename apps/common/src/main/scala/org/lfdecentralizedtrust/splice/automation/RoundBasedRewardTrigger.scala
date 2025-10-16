@@ -29,15 +29,13 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
   private val triggerState =
     new AtomicReference[Option[RoundBasedRewardTrigger.RoundBasedTriggerState]](None)
 
-  private val isNewSchedulingLogicEnabled: Boolean =
-    context.config.enableNewRewardTriggerScheduling
-
   // if the new logic is disable then use the old behaviour that uses increased polling intervals
-  override protected def isRewardOperationTrigger: Boolean = !isNewSchedulingLogicEnabled
+  override protected def isRewardOperationTrigger: Boolean =
+    !context.config.enableNewRewardTriggerScheduling
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   override protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]] = {
-    if (isNewSchedulingLogicEnabled) {
+    if (context.config.enableNewRewardTriggerScheduling) {
       if (shouldRun) {
         val tasksToRun = retrieveAvailableTasksForRound()
         if (triggerState.get().exists(_.workStillToBeDone)) {
