@@ -20,6 +20,7 @@ import { useAppForm } from '../../hooks/form';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
 import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigFromChanges';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   buildPendingConfigFields,
   configFormDataToConfigChanges,
@@ -229,7 +230,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
             {field => (
               <field.DateField
                 title="Threshold Deadline"
-                description="This is the last day voters can vote on this proposal"
+                description={THRESHOLD_DEADLINE_SUBTITLE}
                 id="set-dso-config-rules-expiry-date"
               />
             )}

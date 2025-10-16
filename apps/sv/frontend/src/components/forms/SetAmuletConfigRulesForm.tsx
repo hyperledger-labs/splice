@@ -5,6 +5,7 @@ import {
   ActionRequiringConfirmation,
   AmuletRules_ActionRequiringConfirmation,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   buildAmuletRulesPendingConfigFields,
   configFormDataToConfigChanges,
@@ -227,7 +228,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
             {field => (
               <field.DateField
                 title="Threshold Deadline"
-                description="This is the last day voters can vote on this proposal"
+                description={THRESHOLD_DEADLINE_SUBTITLE}
                 id="set-amulet-config-rules-expiry-date"
               />
             )}
