@@ -213,24 +213,22 @@ class DbScanVerdictStore(
 
     if (items.isEmpty) Future.unit
     else {
-      val (headVerdict, _) = items.headOption.getOrElse(
-        throw new RuntimeException("insertVerdictAndTransactionViews called with empty items")
-      )
-      val checkExists = sql"""
-             select exists(
-               select 1
+      val checkExist = (sql"""
+               select update_id
                from #${Tables.verdicts}
                where history_id = $historyId
-                 and update_id = ${headVerdict.updateId}
-             )
-           """.as[Boolean].head
+                 and update_id IN """ ++ inClause(items.map(_._1.updateId))).as[String]
 
       val action: DBIO[Unit] = for {
-        alreadyExists <- checkExists
+        alreadyExisting <- checkExist.map(_.toSet)
+        nonExisting = items.filter(item => !alreadyExisting.contains(item._1.updateId))
+        _ = logger.info(
+          s"Already ingested verdicts: $alreadyExisting. Non-existing: ${nonExisting.map(_._1.updateId)}."
+        )
         _ <-
-          if (!alreadyExists) {
+          if (nonExisting.nonEmpty) {
             DBIO
-              .sequence(items.map { case (verdict, mkViews) =>
+              .sequence(nonExisting.map { case (verdict, mkViews) =>
                 for {
                   idOpt <- sqlInsertVerdictReturningId(verdict)
                   rowId <- idOpt match {
@@ -244,7 +242,6 @@ class DbScanVerdictStore(
               })
               .map(_ => ())
           } else {
-            logger.info(s"Already ingested verdicts: ${items.map(_._1.updateId)}, ignoring.")
             DBIO.successful(())
           }
       } yield ()
@@ -256,7 +253,7 @@ class DbScanVerdictStore(
             "scanVerdict.insertVerdictAndTransactionViews.batch",
           )
       ).map { _ =>
-        val maxRt = items.map(_._1.recordTime).reduceOption((a, b) => if (a >= b) a else b)
+        val maxRt = items.map(_._1.recordTime).maxOption
         maxRt.foreach(advanceLastIngestedRecordTime)
       }
     }
@@ -346,8 +343,8 @@ class DbScanVerdictStore(
     val orderBy =
       if (includeImportUpdates) sql"migration_id, record_time, update_id"
       else sql"migration_id, record_time"
-    val finalQuery = verdictsQuery(filters, orderBy, limit)
-    storage.query(finalQuery.toActionBuilder.as[VerdictT], "scanVerdict.listVerdicts")
+    val finalQuery = verdictsQuery(filters, orderBy, limit).toActionBuilder.as[VerdictT]
+    storage.query(finalQuery, "scanVerdict.listVerdicts")
   }
 
   def listTransactionViews(verdictRowId: Long)(implicit
