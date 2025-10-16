@@ -407,5 +407,3 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
     output = AllocationInstructionResult_Completed with allocationCid
     meta
 
-requireExpectedAdminMatch : Party -> Party -> Update ()
-requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)

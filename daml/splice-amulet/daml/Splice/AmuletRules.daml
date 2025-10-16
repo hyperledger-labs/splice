@@ -23,6 +23,7 @@ import DA.Time
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 import Splice.Api.Token.TransferPreapprovalV1 qualified as Api.Token.TransferPreapprovalV1
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -1477,6 +1478,16 @@ template TransferPreapproval
       transferPreapproval_withdrawImpl _self _arg = error "implement"
       transferPreapproval_rejectImpl _self _arg = error "implement"
 
+    interface instance Api.Token.TransferInstructionV1.TransferFactory for TransferPreapproval where
+      view = Api.Token.TransferInstructionV1.TransferFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      transferFactory_transferImpl _self _arg = error "implement"
+      transferFactory_publicFetchImpl _self arg = do
+        requireExpectedAdminMatch arg.expectedAdmin dso
+        pure (view $ toInterface @Api.Token.TransferInstructionV1.TransferFactory this)
+
 
     nonconsuming choice TransferPreapproval_Fetch : TransferPreapproval
       with
@@ -1662,3 +1673,85 @@ unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
   pure PaymentTransferContext with
     amuletRules
     context = context with featuredAppRight = None
+
+
+-- Token standard admin checks
+------------------------------
+
+-- FIXME: push to utils
+requireExpectedAdminMatch : Party -> Party -> Update ()
+requireExpectedAdminMatch expected actual = require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
+
+
+-- Transfer
+-----------
+
+-- FIXME: adjust sectioning and sharing with external party amulet rules
+
+tokenStdTransfer
+  : Party
+  -> Api.Token.TransferInstructionV1.Transfer
+  -> Api.Token.MetadataV1.ExtraArgs
+  -> Update Api.Token.TransferInstructionV1.TransferInstructionResult
+tokenStdTransfer dso transfer extraArgs = do
+  -- == validate each field of the transfer specification ==
+  -- sender: nothing to validate
+  -- receiver: validate preapproval if given
+  optPreapprovalCid <- lookupFromContextU @(ContractId TransferPreapproval) extraArgs.context transferPreapprovalContextKey
+  forA_ optPreapprovalCid \preapprovalCid ->
+    fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
+  -- instrumentId:
+  let expectedInstrumentId = amuletInstrumentId dso
+  require
+    ("Expected instrumentId " <> show expectedInstrumentId <> " matches actual instrumentId " <> show transfer.instrumentId)
+    (expectedInstrumentId == transfer.instrumentId)
+  -- amount:
+  require "Amount must be positive" (transfer.amount > 0.0)
+  -- requestedAt:
+  assertDeadlineExceeded "Transfer.requestedAt" transfer.requestedAt
+  -- executeBefore:
+  assertWithinDeadline "Transfer.executeBefore" transfer.executeBefore
+  -- inputHoldingCids: note that their detailed validation is done in the transfer itself
+  require "At least one holding must be provided" (not $ null transfer.inputHoldingCids)
+
+  -- use a payment context with featuring so the preapproval provider can be featured
+  paymentContext <- paymentFromChoiceContext dso extraArgs.context
+  -- execute a direct transfer
+  -- inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
+  -- result <- exercise preapprovalCid TransferPreapproval_Send
+  --   with
+  --     sender = transfer.sender
+  --     context = paymentContext
+  --     inputs
+  --     amount = transfer.amount
+  --     description = reason
+
+  assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
+  transferResult <- exercisePaymentTransfer dso context Transfer with
+    sender
+    provider
+    inputs
+    outputs =
+      [ TransferOutput with
+          receiver
+          receiverFeeRatio = 0.0
+          amount = amount
+          lock = None
+      ]
+    beneficiaries = None
+      -- We don't make this configurable. Rewards should
+      -- go to the party hosting the receiver. Allowing the sender
+      -- to configure arbitrary beneficiaries doesn't make sense.
+      -- If needed, we could extend preapprovals to track beneficiaries later.
+  let meta = optionalMetadata reasonMetaKey identity description (fromOptional emptyMetadata transferResult.meta).values
+  -- strip metadata to avoid duplicating it needlessly
+  let result = transferResult with meta = None
+  pure (TransferPreapproval_SendResult result (Some (Metadata meta)))
+
+
+  -- return result
+  pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+    senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
+    output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
+      receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
+    meta = copyOnlyBurnMeta result.meta
