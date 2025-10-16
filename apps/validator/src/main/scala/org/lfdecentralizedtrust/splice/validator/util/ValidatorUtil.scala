@@ -30,7 +30,6 @@ import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerC
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
 
 private[validator] object ValidatorUtil {
 
@@ -314,7 +313,15 @@ private[validator] object ValidatorUtil {
             // these commands could fail with PERMISSION_DENIED errors (#4425).
             Seq(Status.Code.PERMISSION_DENIED),
           )
-          _ <- connection.deleteUser(endUserName).recover { case NonFatal(_) => () }
+          _ <- connection
+            .getUser(endUserName)
+            .flatMap { _ =>
+              connection.deleteUser(endUserName)
+            }
+            .recover { case ex: Throwable =>
+              logger.debug(s"Skipping user deletion for '$endUserName' due to an error.", ex)
+              ()
+            }
         } yield {
           logger.info(s"User $endUserName offboarded")
           ()
