@@ -350,11 +350,9 @@ spec:
       {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-secret
+        - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
-        - name: participant-bootstrapping-dump-volume
-          emptyDir: {}
       {{- end }}
       {{- if $requiresMigrationPvc }}
         - name: domain-upgrade-dump-volume
