@@ -137,7 +137,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       scanBackend: ScanAppBackendReference,
       scanClient: ScanAppClientReference,
   ): Assertion = {
-    val historyFromStore = scanBackend.appState.store.updateHistory
+    val historyFromStore = scanBackend.appState.automation.updateHistory
       .getAllUpdates(
         None,
         PageLimit.tryCreate(1000),

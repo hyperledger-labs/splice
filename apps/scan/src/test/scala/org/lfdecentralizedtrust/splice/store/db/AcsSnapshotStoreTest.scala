@@ -3,12 +3,13 @@ package org.lfdecentralizedtrust.splice.store.db
 import cats.data.NonEmptyVector
 import com.daml.ledger.javaapi.data.Unit as damlUnit
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HistoryMetrics,
   PageLimit,
   StoreErrors,
   StoreTest,
@@ -24,6 +25,7 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import io.grpc.StatusRuntimeException
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.scalatest.Succeeded
 
@@ -1026,6 +1028,7 @@ class AcsSnapshotStoreTest
       loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
+      HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
     updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }

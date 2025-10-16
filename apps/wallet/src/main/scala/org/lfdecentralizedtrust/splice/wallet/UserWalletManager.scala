@@ -31,7 +31,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{UserWalletStore, WalletStor
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -53,7 +53,7 @@ class UserWalletManager(
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     treasuryConfig: TreasuryConfig,
-    storage: Storage,
+    storage: DbStorage,
     retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
     packageVersionSupport: PackageVersionSupport,

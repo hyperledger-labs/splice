@@ -209,3 +209,9 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     ImportUpdatesBackfilling.completed.close()
   }
 }
+
+object HistoryMetrics {
+  def apply(metricsFactory: LabeledMetricsFactory, currentMigrationId: Long) = new HistoryMetrics(
+    metricsFactory
+  )(MetricsContext("current_migration_id" -> currentMigrationId.toString))
+}
