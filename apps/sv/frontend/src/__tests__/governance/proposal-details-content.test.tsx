@@ -933,7 +933,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      // expect(within(votingForm).getByTestId('submit-vote-button').textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');

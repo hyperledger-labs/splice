@@ -423,6 +423,16 @@ const AddFutureConfigValueTable: React.FC<{
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.newScheduleItem._1,
+        votesHooks,
+        amuletRulesAction.value.newScheduleItem._2,
+        voteRequestResultTableType
+      )
+    : undefined;
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -434,16 +444,6 @@ const AddFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const amuletConfigToCompareWith = dsoInfosQuery.data
-    ? findAmuletRulesScheduleItemToCompareAgainst(
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-        amuletRulesAction.value.newScheduleItem._1,
-        votesHooks,
-        amuletRulesAction.value.newScheduleItem._2,
-        voteRequestResultTableType
-      )
-    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -543,6 +543,16 @@ const RemoveFutureConfigValueTable: React.FC<{
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.scheduleTime,
+        votesHooks,
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
+        voteRequestResultTableType
+      )
+    : undefined;
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -554,15 +564,6 @@ const RemoveFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  const amuletConfigToCompareWith = dsoInfosQuery.data
-    ? findAmuletRulesScheduleItemToCompareAgainst(
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-        amuletRulesAction.value.scheduleTime,
-        votesHooks,
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
-        voteRequestResultTableType
-      )
-    : undefined;
 
   // TODO(DACH-NY/canton-network-node#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
   return (
@@ -615,6 +616,16 @@ const UpdateFutureConfigValueTable: React.FC<{
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.scheduleItem._1,
+        votesHooks,
+        amuletRulesAction.value.scheduleItem._2,
+        voteRequestResultTableType
+      )
+    : undefined;
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -626,16 +637,6 @@ const UpdateFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const amuletConfigToCompareWith = dsoInfosQuery.data
-    ? findAmuletRulesScheduleItemToCompareAgainst(
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-        amuletRulesAction.value.scheduleItem._1,
-        votesHooks,
-        amuletRulesAction.value.scheduleItem._2,
-        voteRequestResultTableType
-      )
-    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
