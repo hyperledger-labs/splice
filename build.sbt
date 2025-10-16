@@ -388,22 +388,21 @@ lazy val `splice-api-token-transfer-preapproval-v1-daml` =
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
-      // FIXME: enable when the OpenAPI spec is ready
-      // templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
-      // Compile / sourceGenerators +=
-      //   Def.taskDyn {
-      //     val transferPreapprovalOpenApiFile =
-      //       baseDirectory.value / "openapi/transfer-preapproval-v1.yaml"
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val transferPreapprovalOpenApiFile =
+            baseDirectory.value / "openapi/transfer-preapproval-v1.yaml"
 
-      //     BuildCommon.TS.generateOpenApiClient(
-      //       unscopedNpmName = "transfer-preapproval-openapi",
-      //       openApiSpec = "transfer-preapproval-v1.yaml",
-      //       cacheFileDependencies = Set(transferPreapprovalOpenApiFile),
-      //       directory = "openapi-ts-client",
-      //       subPath = "openapi",
-      //     )
-      //   },
-      // cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+          BuildCommon.TS.generateOpenApiClient(
+            unscopedNpmName = "transfer-preapproval-openapi",
+            openApiSpec = "transfer-preapproval-v1.yaml",
+            cacheFileDependencies = Set(transferPreapprovalOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
     )
     .dependsOn(`canton-bindings-java`)
 

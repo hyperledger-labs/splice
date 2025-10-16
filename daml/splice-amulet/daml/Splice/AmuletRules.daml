@@ -1501,9 +1501,9 @@ template TransferPreapproval
       controller p
       do pure this
 
-    -- ^ Transfer amulet to the receiver
+    -- Transfer amulet to the receiver
     --
-    -- DEPRECATED: use the `TransferFactory_Transfer` method instead
+    -- DEPRECATED: use the `TransferFactory_Transfer` method from the `TransferFactory` interface instead
     nonconsuming choice TransferPreapproval_Send : TransferPreapproval_SendResult
       with
         context : PaymentTransferContext
