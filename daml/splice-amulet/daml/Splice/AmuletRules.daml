@@ -1736,7 +1736,7 @@ tokenStdTransfer dso provider transfer extraArgs = do
   -- FIXME: enforce
   -- assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
 
-  transferResult <- exercisePaymentTransfer dso paymentContext Transfer with
+  result <- exercisePaymentTransfer dso paymentContext Transfer with
     sender = transfer.sender
     provider
     inputs
@@ -1754,7 +1754,6 @@ tokenStdTransfer dso provider transfer extraArgs = do
       -- If needed, we could extend preapprovals to track beneficiaries later.
   -- let meta = optionalMetadata reasonMetaKey identity description (fromOptional emptyMetadata transferResult.meta).values
   -- strip metadata to avoid duplicating it needlessly
-  let result = transferResult with meta = None
   -- pure (TransferPreapproval_SendResult result (Some (Metadata meta)))
 
 

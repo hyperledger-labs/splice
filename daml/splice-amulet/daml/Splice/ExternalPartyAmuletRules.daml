@@ -111,6 +111,8 @@ instance HasCheckedFetch TransferCommandCounter ForOwner where
 -- We externally sign this instead of the transfer itself to support a longer delay between
 -- prepare/execute which would be prevented by signing the transfer directly as that one pins
 -- down the mining rounds that are relatively short lived.
+--
+-- DEPRECATED: in favor of token standard transfers.
 template TransferCommand
   with
     dso : Party
@@ -187,6 +189,18 @@ template TransferCommand
                   result <-
                     try do
                       TransferPreapproval_SendResult result _meta <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender description)
+                      {-
+                      let transfer = Api.Token.TransferInstructionV1.Transfer with
+
+                      result <- exercise transferPreapprovalCid Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                        expectedAdmin = dso
+                        transfer
+                        extraArgs = ExtraArgs with
+
+                          -- FIXME: test that reason arg is checked, and add it
+                          meta = emptyMetadata
+                          context =
+                      -}
                       pure (TransferCommandResultSuccess result)
                     catch
                       (ex : InvalidTransfer) -> mergeInputsAndReportError ex.reason
