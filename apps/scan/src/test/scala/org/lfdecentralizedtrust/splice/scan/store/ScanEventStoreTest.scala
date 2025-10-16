@@ -817,8 +817,8 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
     uh.ingestionSink.initialize().map(_ => uh)
   }
 
-  private def newVerdictStore() =
-    new DbScanVerdictStore(storage.underlying, loggerFactory)
+  private def newVerdictStore(updateHistory: UpdateHistory) =
+    new DbScanVerdictStore(storage.underlying, updateHistory, loggerFactory)
 
   private def insertUpdate(
       updateHistory: UpdateHistory,
@@ -945,7 +945,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
   private def newEventStore(migrationId: Long = domainMigrationId): Future[EventStoreCtx] =
     for {
       uh <- newUpdateHistory(migrationId)
-      vs = newVerdictStore()
+      vs = newVerdictStore(uh)
       es = new ScanEventStore(vs, uh, loggerFactory)
     } yield EventStoreCtx(vs, uh, es)
 
