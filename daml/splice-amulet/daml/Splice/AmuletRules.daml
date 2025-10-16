@@ -1463,6 +1463,7 @@ template TransferPreapproval
     interface instance Api.Token.TransferPreapprovalV1.TransferPreapproval for TransferPreapproval where
       view = Api.Token.TransferPreapprovalV1.TransferPreapprovalView with
         specification = Api.Token.TransferPreapprovalV1.PreapprovalSpecification with
+          -- FIXME: add support for the extended config
           admin = dso
           receiver
           senderFilter = []
@@ -1483,7 +1484,10 @@ template TransferPreapproval
         admin = dso
         meta = emptyMetadata
 
-      transferFactory_transferImpl _self _arg = error "implement"
+      transferFactory_transferImpl _self arg = do
+        requireExpectedAdminMatch arg.expectedAdmin dso
+        tokenStdTransfer dso provider arg.transfer arg.extraArgs
+
       transferFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
         pure (view $ toInterface @Api.Token.TransferInstructionV1.TransferFactory this)
@@ -1495,7 +1499,9 @@ template TransferPreapproval
       controller p
       do pure this
 
-    -- Transfer amulet to the receiver
+    -- ^ Transfer amulet to the receiver
+    --
+    -- DEPRECATED: use the `TransferFactory_Transfer` method instead
     nonconsuming choice TransferPreapproval_Send : TransferPreapproval_SendResult
       with
         context : PaymentTransferContext
@@ -1690,10 +1696,11 @@ requireExpectedAdminMatch expected actual = require ("Expected admin " <> show e
 
 tokenStdTransfer
   : Party
+  -> Party
   -> Api.Token.TransferInstructionV1.Transfer
   -> Api.Token.MetadataV1.ExtraArgs
   -> Update Api.Token.TransferInstructionV1.TransferInstructionResult
-tokenStdTransfer dso transfer extraArgs = do
+tokenStdTransfer dso provider transfer extraArgs = do
   -- == validate each field of the transfer specification ==
   -- sender: nothing to validate
   -- receiver: validate preapproval if given
@@ -1717,7 +1724,7 @@ tokenStdTransfer dso transfer extraArgs = do
   -- use a payment context with featuring so the preapproval provider can be featured
   paymentContext <- paymentFromChoiceContext dso extraArgs.context
   -- execute a direct transfer
-  -- inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
+  inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
   -- result <- exercise preapprovalCid TransferPreapproval_Send
   --   with
   --     sender = transfer.sender
@@ -1726,16 +1733,18 @@ tokenStdTransfer dso transfer extraArgs = do
   --     amount = transfer.amount
   --     description = reason
 
-  assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
-  transferResult <- exercisePaymentTransfer dso context Transfer with
-    sender
+  -- FIXME: enforce
+  -- assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
+
+  transferResult <- exercisePaymentTransfer dso paymentContext Transfer with
+    sender = transfer.sender
     provider
     inputs
     outputs =
       [ TransferOutput with
-          receiver
+          receiver = transfer.receiver
           receiverFeeRatio = 0.0
-          amount = amount
+          amount = transfer.amount
           lock = None
       ]
     beneficiaries = None
@@ -1743,15 +1752,30 @@ tokenStdTransfer dso transfer extraArgs = do
       -- go to the party hosting the receiver. Allowing the sender
       -- to configure arbitrary beneficiaries doesn't make sense.
       -- If needed, we could extend preapprovals to track beneficiaries later.
-  let meta = optionalMetadata reasonMetaKey identity description (fromOptional emptyMetadata transferResult.meta).values
+  -- let meta = optionalMetadata reasonMetaKey identity description (fromOptional emptyMetadata transferResult.meta).values
   -- strip metadata to avoid duplicating it needlessly
   let result = transferResult with meta = None
-  pure (TransferPreapproval_SendResult result (Some (Metadata meta)))
+  -- pure (TransferPreapproval_SendResult result (Some (Metadata meta)))
 
 
   -- return result
   pure Api.Token.TransferInstructionV1.TransferInstructionResult with
-    senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
+    senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
     output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
-      receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
+      receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
     meta = copyOnlyBurnMeta result.meta
+
+-- | Converting a set of holding inputs to inputs for an amulet transfer,
+-- unlocking any expired LockedAmulet holdings on the fly.
+holdingToTransferInputs : ForOwner -> PaymentTransferContext -> [ContractId Api.Token.HoldingV1.Holding] -> Update [TransferInput]
+holdingToTransferInputs forOwner paymentContext inputHoldingCids =
+  forA inputHoldingCids $ \holdingCid -> do
+    holding <- fetchCheckedInterface @Api.Token.HoldingV1.Holding forOwner holdingCid
+    case fromInterface holding of
+      Some (LockedAmulet {}) -> do
+        let lockedAmuletCid : ContractId LockedAmulet = fromInterfaceContractId holdingCid
+        -- We assume the lock is expired, and if not then we rely `LockedAmulet_OwnerExpireLock` to fail
+        result <- exercise lockedAmuletCid LockedAmulet_OwnerExpireLock with
+          openRoundCid = paymentContext.context.openMiningRound
+        pure $ InputAmulet result.amuletSum.amulet
+      None -> pure $ InputAmulet $ coerceContractId holdingCid
