@@ -29,7 +29,7 @@ Release Notes
 
   - Scan
 
-      - Add the ``v0/events`` API. This API returns events that contain only mediator verdicts for private transactions, or combine mediator verdicts and associated updates by ``update_id`` visible to the DSO.
+      - Add the ``v0/events`` API. For private transactions, this API returns events that contain only mediator verdicts. For transactions visible to the DSO (like Amulet transfers), the API combines mediator verdicts and associated updates by ``update_id``.
         Events can be retrieved by ``update_id`` by using ``/v0/events/{update_id}``.
         Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
 
