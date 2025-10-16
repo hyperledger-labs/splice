@@ -17,10 +17,11 @@ import io.circe.Json
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
-import java.util.concurrent.atomic.AtomicReference
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
@@ -68,10 +69,11 @@ object DbScanVerdictStore {
 
   def apply(
       storage: com.digitalasset.canton.resource.Storage,
+      updateHistory: UpdateHistory,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): DbScanVerdictStore =
     storage match {
-      case db: DbStorage => new DbScanVerdictStore(db, loggerFactory)
+      case db: DbStorage => new DbScanVerdictStore(db, updateHistory, loggerFactory)
       case other =>
         throw new RuntimeException(s"Unsupported storage type $other for DbScanVerdictStore")
     }
@@ -79,6 +81,7 @@ object DbScanVerdictStore {
 
 class DbScanVerdictStore(
     storage: DbStorage,
+    updateHistory: UpdateHistory,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -89,6 +92,8 @@ class DbScanVerdictStore(
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
 
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
+
+  private def historyId = updateHistory.historyId
 
   override protected def timeouts = new ProcessingTimeout
 
@@ -149,6 +154,7 @@ class DbScanVerdictStore(
   private def sqlInsertVerdictReturningId(rowT: VerdictT) = {
     sql"""
       insert into #${Tables.verdicts}(
+        history_id,
         migration_id,
         domain_id,
         record_time,
@@ -160,6 +166,7 @@ class DbScanVerdictStore(
         submitting_parties,
         transaction_root_views
       ) values (
+        $historyId,
         ${rowT.migrationId},
         ${rowT.domainId},
         ${rowT.recordTime},
@@ -213,7 +220,8 @@ class DbScanVerdictStore(
              select exists(
                select 1
                from #${Tables.verdicts}
-               where update_id = ${headVerdict.updateId}
+               where history_id = $historyId
+                 and update_id = ${headVerdict.updateId}
              )
            """.as[Boolean].head
 
@@ -273,7 +281,7 @@ class DbScanVerdictStore(
               submitting_parties,
               transaction_root_views
             from #${Tables.verdicts}
-            where update_id = $updateId
+            where history_id = $historyId and update_id = $updateId
             limit 1
           """.as[VerdictT].headOption,
         "scanVerdict.getVerdictByUpdateId",
@@ -317,7 +325,7 @@ class DbScanVerdictStore(
         submitting_parties,
         transaction_root_views
       from #${Tables.verdicts}
-      where """ ++ afterFilter ++
+      where history_id = $historyId and """ ++ afterFilter ++
         sql" order by " ++ orderBy ++ sql" limit $limit)"
     }
 
