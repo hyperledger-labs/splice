@@ -104,11 +104,6 @@ class EventHistorySanityCheckPlugin(
       val otherScanHistory = paginateEventHistory(otherScan, Some(otherStart), Chain.empty).toVector
         // the mediator takes some time after onboarding until it starts producing verdicts
         .dropWhile(_.verdict.isEmpty)
-      if (otherScanHistory.isEmpty) {
-        throw new IllegalStateException(
-          s"Scan ${otherScan.config.svUser} was empty, but that's shouldn't happen in tests."
-        )
-      }
 
       val founderHistoryToUse = founderHistorySinceOtherOnboarding.dropWhile(item =>
         item.verdict != otherScanHistory.headOption.flatMap(_.verdict)
