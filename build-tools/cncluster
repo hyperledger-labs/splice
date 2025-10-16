@@ -1474,6 +1474,8 @@ function subcmd_debug_shell() {
   fi
   repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
 
+  local SHELL_COMMAND="${*:-/bin/bash}"
+
   _info "Deploying debug pod on version $VERSION_NUMBER"
   kubectl apply --wait -f - <<EOF
 apiVersion: v1
@@ -1495,10 +1497,11 @@ spec:
     effect: "NoSchedule"
 EOF
 
+  # shellcheck disable=SC2086
   ( _info "Waiting for debug pod to become ready" && \
     kubectl wait --for=condition=Ready pod splice-debug --timeout=30s && \
     _info "Opening terminal on debug pod" && \
-    kubectl exec -it splice-debug -- /bin/bash ) || true
+    kubectl exec -it splice-debug -- $SHELL_COMMAND ) || true
 
   _info "Deleting debug pod"
   kubectl delete pod splice-debug
@@ -2186,6 +2189,152 @@ $(_get_flux_reference_config "$1" "        ")
 EOF
     )
     _update_cluster_config "$deployment_config" "operatorDeployment"
+}
+
+###
+
+subcommand_whitelist[psql]=""
+function subcmd_psql() {
+  _cluster_must_exist
+
+  if [ $# -ne 2 ]; then
+    _error "Usage: $SCRIPTNAME psql <namespace> <application>"
+    exit 1
+  fi
+
+  local NAMESPACE="$1"
+  local APPLICATION="$2"
+
+  _info "Retrieving DB connection info from pod description..."
+  local DB_INIT_COMMAND
+  DB_INIT_COMMAND=$(
+    kubectl describe pod \
+      --namespace "${NAMESPACE}" \
+      --selector "app=${APPLICATION}" \
+    | grep -i psql \
+    | sed -nE 's/^.*(psql.?*) 2>&1.*$/\1/p'
+  )
+
+  if [ -z "${DB_INIT_COMMAND}" ]; then
+    _error "Application ${APPLICATION} in namespace ${NAMESPACE} does not have an associated database."
+    exit 1
+  fi
+  
+  eval "set -- $DB_INIT_COMMAND"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -h|--host)
+        local DB_HOST="$2"
+        shift 2
+        ;;
+      -h=*|--host=*)
+        local DB_HOST="${1#*=}"
+        shift
+        ;;
+      -p|--port)
+        local DB_PORT="$2"
+        shift 2
+        ;;
+      -p=*|--port=*)
+        local DB_PORT="${1#*=}"
+        shift
+        ;;
+      -U|--username)
+        local DB_USERNAME="$2"
+        shift 2
+        ;;
+      -U=*|--username=*)
+        local DB_USERNAME="${1#*=}"
+        shift
+        ;;
+      -c|--command)
+        local DB_CREATE_STATEMENT="$2"
+        shift 2
+        ;;
+      -c=*|--command=*)
+        local DB_CREATE_STATEMENT="${1#*=}"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [ -z "${DB_HOST:-}" ]; then
+    _error "Failed to retrieve DB hostname from pod description."
+    exit 1
+  fi
+
+  if [ -z "${DB_PORT:-}" ]; then
+    _error "Failed to retrieve DB port from pod description."
+    exit 1
+  fi
+
+  if [ -z "${DB_USERNAME:-}" ]; then
+    _error "Failed to retrieve DB username from pod description."
+    exit 1
+  fi
+
+  # shellcheck disable=SC2086
+  set -- $DB_CREATE_STATEMENT
+  if [ "${1,,}" == "create" ] && [ "${2,,}" == "database" ] && [ -n "$3" ]; then
+    DB_NAME="$3"
+  else
+    _error "Failed to retrieve DB name from pod description."
+    exit 1
+  fi
+
+  local PASSWORD_REF
+  PASSWORD_REF=$(
+    kubectl get deployment \
+      --namespace "${NAMESPACE}" \
+      --output 'jsonpath={.spec.template.spec.initContainers[].env[?(@.name == "PGPASSWORD")].valueFrom.secretKeyRef}' \
+      "${APPLICATION}"
+  )
+  local SECRET_NAME
+  SECRET_NAME=$(jq -r '.name' <<< "$PASSWORD_REF")
+  local SECRET_KEY
+  SECRET_KEY=$(jq -r '.key' <<< "$PASSWORD_REF")
+
+  _info "Retrieving DB password from secret [${SECRET_NAME}]..."
+  local DB_PASSWORD
+  DB_PASSWORD=$(
+    kubectl get secret \
+      --namespace "${NAMESPACE}" \
+      --output "jsonpath={.data.${SECRET_KEY}}" \
+      "${SECRET_NAME}" \
+    | base64 --decode
+  )
+
+  if [ -z "${DB_PASSWORD}" ]; then
+    _error "Failed to retrieve DB password."
+    exit 1
+  fi
+
+  case "${APPLICATION}" in
+    participant-*)
+      local SEARCH_PATH="participant"
+      ;;
+    sequencer-*)
+      local SEARCH_PATH="sequencer"
+      ;;
+    mediator-*)
+      local SEARCH_PATH="mediator"
+      ;;
+    *)
+      local SEARCH_PATH="$DB_NAME"
+      ;;
+  esac
+
+  subcmd_debug_shell /bin/env \
+    PGPASSWORD="$DB_PASSWORD" \
+    PGOPTIONS="--search_path=${SEARCH_PATH},public" \
+    psql \
+      --host="$DB_HOST" \
+      --port="$DB_PORT" \
+      --username="$DB_USERNAME" \
+      --dbname="$DB_NAME"
 }
 
 ################################
