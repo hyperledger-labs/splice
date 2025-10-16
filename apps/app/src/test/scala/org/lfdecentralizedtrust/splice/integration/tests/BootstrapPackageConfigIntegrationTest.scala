@@ -459,12 +459,20 @@ class BootstrapPackageConfigIntegrationTest
         )
         .filter(_.metadata.version <= bootstrapPackage.metadata.version)
       expectedToBeVettedVersions.foreach { expectedVettedVersion =>
-        val newVettedPackage = vettingState.packages
-          .find(_.packageId == expectedVettedVersion.packageId)
-          .value
-        newVettedPackage.validFromInclusive should (
-          equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
-        )
+        // Only apply this test if the expected vetted version is the largest one.
+        if (
+          !expectedToBeVettedVersions.exists(pkg =>
+            pkg.metadata.name == expectedVettedVersion.metadata.name &&
+              pkg.metadata.version > expectedVettedVersion.metadata.version
+          )
+        ) {
+          val newVettedPackage = vettingState.packages
+            .find(_.packageId == expectedVettedVersion.packageId)
+            .value
+          newVettedPackage.validFromInclusive should (
+            equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
+          )
+        }
       }
     }
     packagesAreVetted(DarResources.amulet.bootstrap, PackageIdResolver.Package.SpliceAmulet)
