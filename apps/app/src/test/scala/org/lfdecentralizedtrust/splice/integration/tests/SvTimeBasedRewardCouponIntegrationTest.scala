@@ -332,7 +332,6 @@ class SvTimeBasedRewardCouponIntegrationTest
         removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
         force = ForceFlags(
           ForceFlag.AllowUnvettedDependencies,
-          ForceFlag.AllowUnvetPackageWithActiveContracts,
         ),
         store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
       ),
