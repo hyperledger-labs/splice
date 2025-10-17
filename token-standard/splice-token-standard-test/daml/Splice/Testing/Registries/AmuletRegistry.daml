@@ -221,11 +221,15 @@ registryApi_getTransferFactory registry arg = do
   (optPreapproval, preapprovalC) <- lookupPreapprovalWithContext registry arg.transfer.receiver
   featuredAppRightC <- case optPreapproval of
     None -> pure emptyOpenApiChoiceContext
-    Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
+    Some preapproval -> getFeaturedAppRightContext registry preapproval._2.provider
   let fullContext = withExtraDisclosures extAmuletRulesD
         (transferC <> preapprovalC <> featuredAppRightC)
+  -- FIXME: proper context
   pure EnrichedFactoryChoice with
-    factoryCid = toInterfaceContractId @TransferFactory extAmuletRulesCid
+    factoryCid = case optPreapproval of
+        None -> toInterfaceContractId @TransferFactory extAmuletRulesCid
+        Some preapproval -> toInterfaceContractId @TransferFactory preapproval._1
+
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
     disclosures = fullContext.disclosures
 
@@ -371,7 +375,7 @@ getAmuletRulesTransferContext registry = do
   roundC <- getOpenRoundContext registry
   pure $ rulesC <> roundC
 
-lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional TransferPreapproval, OpenApiChoiceContext)
+lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional (ContractId TransferPreapproval, TransferPreapproval), OpenApiChoiceContext)
 lookupPreapprovalWithContext registry receiver = do
   preapprovals  <- queryFilter @TransferPreapproval receiver (\preapproval -> preapproval.receiver == receiver)
   case preapprovals of
@@ -379,7 +383,7 @@ lookupPreapprovalWithContext registry receiver = do
     (preapprovalCid, preapproval) :: _ ->  do
       preapprovalD <- queryDisclosure' @TransferPreapproval registry.dso preapprovalCid
       pure
-        ( Some preapproval
+        ( Some (preapprovalCid, preapproval)
         , OpenApiChoiceContext with
           disclosures = preapprovalD
           choiceContext = mkAmuletContext $

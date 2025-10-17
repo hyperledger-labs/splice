@@ -1,0 +1,225 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Manage preapprovals for incoming transfers.
+module Splice.Api.Token.TransferPreapprovalV1 where
+
+import Splice.Api.Token.MetadataV1
+
+{-
+
+REVIEWER NOTE:
+
+Core design ideas:
+- make the Preapproval contract implement TransferFactory_Transfer to execute direct transfers
+- add the API below to manage the set of preapprovals
+- add the obvious and easy to implemnet filters for preapprovals, but don't aim to cover all use-cases
+- aim to make preapprovals expire after one year by default
+  - creates about ~ 0.3 TPS per 1M parties with an average of 10 preapprovals per party
+
+
+Amulet implementation concerns:
+- we'll limit the number of allowed preapprovals per party to 10, so that the DSO ACS size is reasonably bounded
+  - soft enforcement via the off-ledger API endpoint failing if there are too many
+  - after the fact enforcement via a DsoRules choice that uses ActionWithConfirmation to cancel the oldest
+    preapproval if there are too many
+
+Ideas left out:
+- network wide blanket approvals:
+    - tricky wrt confidentiality: DSO must only be an observer
+    - does not replace registry-specific preapprovals: registries want their
+      own preapprovals to support featured app markers and reward sharing
+    - more complex management: wallets need to understand them as distinct
+      from registry-specific preapprovals, and know how to allocate them and
+      how to display them.
+- volume-bounded approvals: too complex to implement as they require mutable
+  on-ledger state, which likely results in contention
+
+-}
+
+
+-- TransferPreapproval
+------------------------
+
+-- | Specification of which incoming transfers are pre-approved by a receiver.
+data PreapprovalSpecification = PreapprovalSpecification with
+    admin : Party
+      -- ^ Admin party of the holdings whose transfers are preapproved.
+    receiver : Party
+      -- ^ Receiver that preapproves incoming transfers.
+    senderFilter : [Party]
+      -- ^ Optional filter for which parties are allowed to send funds.
+      -- Empty list means no filter is applied.
+    idFilter : [Text]
+      -- ^ Optional filter on the instrument identifiers that are preapproved.
+      -- Empty list means no filter is applied.
+    minAmount : Optional Decimal
+      -- ^ Optional lower bound on the amount whose transfer is preapproved.
+    maxAmount : Optional Decimal
+      -- ^ Optional upper bound on the amount whose transfer is preapproved.
+  deriving (Eq, Show)
+
+-- FIXME: consdier the naming scheme -- when do we use 'TranferPreapproval' vs 'Preapproval'
+data PreapprovalStatus
+  = PS_Active
+      -- ^ Preapproval is ready to use.
+  | PS_PendingWalletProviderAcceptance
+      -- ^ Pending acceptance by the wallet provider.
+  | PS_PendingInstrumentAdminAcceptance
+      -- ^ Pending acceptance by the instrument admin.
+  deriving (Eq, Show)
+
+-- | View for `TransferPreapproval`.
+data TransferPreapprovalView = TransferPreapprovalView with
+    specification : PreapprovalSpecification
+      -- ^ Specification of which transfers are preapproved.
+    walletProvider : Party
+      -- ^ Wallet provider that should get featured app rewards for incoming
+      -- transfers via this preapproval.
+      --
+      -- QUESTION/FIXME: consider whether it is really right that this field is outside the spec.
+      --   It currently is as the `walletProvider` is not required to determine whether a transfer
+      --   is pre-approved; and the spec contains exactly that data.
+    status : PreapprovalStatus
+      -- ^ Status of the pre-approval.
+    requestedAt : Time
+      -- ^ When the preapproval was requested to be created.
+    expiresAt : Time
+      -- ^ When the preapproval expires.
+    meta : Metadata
+      -- ^ Additional metadata specific to the preapproval, used for extensibility.
+  deriving (Eq, Show)
+
+-- | An interface for reading and managing transfer preapprovals.
+--
+-- Contracts representing preapprovals are expected to also implement the `TransferFactory` interface,
+-- so that `TransferFactory_Transfer` can be used to execute a preapproved transfer.
+--
+-- Note that we do not capture that interface dependency here to maximize the options
+-- for future evoluations.
+interface TransferPreapproval where
+  viewtype TransferPreapprovalView
+
+  transferPreapproval_renewImpl : ContractId TransferPreapproval -> TransferPreapproval_Renew -> Update TransferPreapprovalCreationResult
+  transferPreapproval_acceptImpl : ContractId TransferPreapproval -> TransferPreapproval_Accept -> Update ChoiceExecutionMetadata
+  transferPreapproval_cancelImpl : ContractId TransferPreapproval -> TransferPreapproval_Cancel -> Update ChoiceExecutionMetadata
+
+  choice TransferPreapproval_Renew : TransferPreapprovalCreationResult
+    -- ^ Renew the preapproval as the receiver, wallet provider or instrument admin.
+    --
+    -- Can also be used to update the specification and expiration time.
+    with
+      actor : Party
+        -- ^ The party executing the renewal.
+      specification : PreapprovalSpecification
+        -- ^ New specification of which transfers are preapproved.
+      requestedAt : Time
+        -- ^ When the preapproval was requested to be (re-)created.
+      expiresAt : Optional Time
+        -- ^ New expiration time of the preapproval.
+        --
+        -- Will be capped by the maximal expiration time allowed by the instrument admin;
+        -- and if not provided, the maximal expiration time will be used.
+      extraArgs : ExtraArgs
+        -- ^ Additional data required in order to exercise the choice.
+        --
+        -- Intended to be called with an empty `ChoiceContext` by default.
+        -- Provided for extensibility.
+    controller actor
+    do transferPreapproval_renewImpl this self arg
+
+  choice TransferPreapproval_Accept : ChoiceExecutionMetadata
+    -- ^ Accept the transfer preapproval as the admin or wallet provider.
+    with
+      actor : Party
+        -- ^ The party executing the cancellation.
+      extraArgs : ExtraArgs
+        -- ^ Additional data required in order to exercise the choice.
+    controller actor
+    do transferPreapproval_acceptImpl this self arg
+
+  choice TransferPreapproval_Cancel : ChoiceExecutionMetadata
+    -- ^ Cancel the transfer preapproval as the instrument admin or wallet provider
+    -- depending on whether the status is `PS_PendingWalletProviderAcceptance` or
+    -- `PS_PendingInstrumentAdminAcceptance`
+    with
+      actor : Party
+        -- ^ The party executing the cancellation.
+      extraArgs : ExtraArgs
+        -- ^ Additional data required in order to exercise the choice.
+    controller actor
+    do transferPreapproval_cancelImpl this self arg
+
+
+data TransferPreapprovalCreationResult = TransferPreapprovalCreationResult with
+    preapprovalCid : ContractId TransferPreapproval
+      -- ^ The created preapproval contract.
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of the choice, used for extensibility.
+  deriving (Show, Eq)
+
+
+-- Preapproval Factory
+----------------------
+
+-- | View for `PreapprovalFactory`.
+data PreapprovalFactoryView = PreapprovalFactoryView
+  with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instruments for
+      -- which this transfer factory can be used.
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer factory, used for extensibility.
+  deriving (Show, Eq)
+
+-- | A factory contract to create transfer preapprovals.
+interface PreapprovalFactory where
+  viewtype PreapprovalFactoryView
+
+  preapprovalFactory_preapproveImpl : ContractId PreapprovalFactory -> PreapprovalFactory_Preapprove -> Update TransferPreapprovalCreationResult
+  preapprovalFactory_publicFetchImpl : ContractId PreapprovalFactory -> PreapprovalFactory_PublicFetch -> Update PreapprovalFactoryView
+
+  nonconsuming choice PreapprovalFactory_Preapprove : TransferPreapprovalCreationResult
+    -- ^ Create a new transfer preapproval.
+    --
+    -- Implementations MAY limit the number of active preapprovals per receiver.
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        --
+        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      specification : PreapprovalSpecification
+        -- ^ The preapproval to create.
+      requestedAt : Time
+        -- ^ When the preapproval was requested to be (re-)created.
+      expiresAt : Optional Time
+        -- ^ New expiration time of the preapproval.
+        --
+        -- Will be capped by the maximal expiration time allowed by the instrument admin;
+        -- and if not provided, the maximal expiration time will be used.
+      extraArgs : ExtraArgs
+        -- ^ The extra arguments to pass to the transfer implementation.
+    controller specification.receiver
+    do preapprovalFactory_preapproveImpl this self arg
+
+  nonconsuming choice PreapprovalFactory_PublicFetch : PreapprovalFactoryView
+    -- ^ Fetch the view of the factory contract.
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        --
+        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      actor : Party
+        -- ^ The party fetching the contract.
+    controller actor
+    do preapprovalFactory_publicFetchImpl this self arg

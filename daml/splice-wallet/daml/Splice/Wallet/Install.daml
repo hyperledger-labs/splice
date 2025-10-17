@@ -94,6 +94,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       -- with that of the app provider hosting the receiver which must be passed as an argument.
       let transferContext = context.context with featuredAppRight = providerFeaturedAppRightCid
       let paymentTransferContext = context with context = transferContext
+      -- FIXME: switch to use token standard transers when possible
       result <- catchAll $ exercise transferPreapprovalCid TransferPreapproval_Send with
         sender = executionContext.endUser
         context = paymentTransferContext
