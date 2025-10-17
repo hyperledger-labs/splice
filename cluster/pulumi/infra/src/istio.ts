@@ -100,10 +100,8 @@ function configureIstiod(
         },
         // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
         meshConfig: {
-          // Uncomment to turn on access logging across the entire cluster (we disabled it by default to reduce cost):
-          // accessLogFile: '/dev/stdout',
           // taken from https://github.com/istio/istio/issues/37682
-          accessLogFile: '',
+          accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
           accessLogEncoding: 'JSON',
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
           enablePrometheusMerge: false,
