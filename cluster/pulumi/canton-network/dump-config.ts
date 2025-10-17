@@ -19,7 +19,7 @@ async function main() {
   installCluster.installCluster({
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
-    getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
+    getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
       Promise.resolve('access_token'),
     getCfg: () => cantonNetworkAuth0Config,
   });

@@ -181,7 +181,7 @@ export class Auth0Fetch implements Auth0Client {
   public async getClientAccessToken(
     clientId: string,
     clientSecret: string,
-    audience?: string // FIXME: I don't think it makes sense for this to be optional (and then stop exporting DEFAULT_AUDIENCE private to audiences.ts)
+    audience: string
   ): Promise<string> {
     await pulumi.log.debug('Getting access token for Auth0 client: ' + clientId);
 
@@ -200,10 +200,8 @@ export class Auth0Fetch implements Auth0Client {
       }
     }
 
-    const aud = audience || DEFAULT_AUDIENCE;
-
     await pulumi.log.debug(
-      'Querying access token for Auth0 client: ' + clientId + ' with audience ' + aud
+      'Querying access token for Auth0 client: ' + clientId + ' with audience ' + audience
     );
     const auth0 = new AuthenticationClient({
       domain: this.cfg.auth0Domain,
@@ -212,7 +210,7 @@ export class Auth0Fetch implements Auth0Client {
     });
 
     const tokenResponse = await auth0.oauth.clientCredentialsGrant({
-      audience: aud,
+      audience,
     });
 
     const { expires_in } = tokenResponse.data;
