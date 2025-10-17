@@ -46,7 +46,9 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getAdditionalJvmOptions,
+  svAppSecrets,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   configForSv,
   installSvLoopback,
@@ -62,7 +64,6 @@ import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
-import { svAppSecrets } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -228,19 +229,11 @@ async function installSvAndValidator(
 
   const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
-  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId['sv'];
-  if (!svNameSpaceAuth0Clients) {
-    throw new Error('No SV namespace in auth0 config');
-  }
-  const svUiClientId = svNameSpaceAuth0Clients['sv'];
-  if (!svUiClientId) {
-    throw new Error('No SV ui client id in auth0 config');
-  }
 
   const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
     xns,
     auth0Client,
-    svUiClientId
+    svRunbookConfig.auth0SvAppName
   );
 
   svKeySecret(xns, svKey);

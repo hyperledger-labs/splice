@@ -60,3 +60,20 @@ export function cnsUiSecret(
 
   return uiSecret(auth0Client, ns, 'cns', clientId);
 }
+
+export async function svAppSecrets(
+  ns: ExactNamespace,
+  auth0Client: Auth0Client,
+  auth0SvAppName: string, // FIXME: try to get rid of this
+): Promise<AppAndUiSecrets> {
+
+  const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['sv'];
+  if (!clientId) {
+    throw new Error('No SV ui client id in auth0 config');
+  }
+
+  return {
+    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', auth0SvAppName),
+    uiSecret: uiSecret(auth0Client, ns, 'sv', clientId),
+  };
+}
