@@ -4,7 +4,7 @@ import * as k8s from '@pulumi/kubernetes';
 
 import { ExactNamespace } from '../utils';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
-import { Auth0Client } from './auth0types';
+import { Auth0Client, ClientIdMap } from './auth0types';
 
 export function uiSecret(
   auth0Client: Auth0Client,
@@ -20,11 +20,28 @@ export type AppAndUiSecrets = {
   uiSecret: k8s.core.v1.Secret;
 };
 
+function getSvNameSpaceAuth0Clients(
+  auth0Client: Auth0Client,
+  ns: ExactNamespace
+): ClientIdMap {
+  const auth0Config = auth0Client.getCfg();
+  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId[ns.logicalName];
+  if (!svNameSpaceAuth0Clients) {
+    throw new Error(`No ${ns.logicalName} namespace in auth0 config`);
+  }
+  return svNameSpaceAuth0Clients;
+}
+
 export async function validatorSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
-  clientId: string
 ): Promise<AppAndUiSecrets> {
+
+  const clientId = getSvNameSpaceAuth0Clients(auth0Client, ns)['wallet'];
+  if (!clientId) {
+    throw new Error('No Wallet ui client id in auth0 config');
+  }
+
   return {
     appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
     uiSecret: uiSecret(auth0Client, ns, 'wallet', clientId),
@@ -36,12 +53,7 @@ export function cnsUiSecret(
   auth0Client: Auth0Client,
 ): k8s.core.v1.Secret {
 
-  const auth0Config = auth0Client.getCfg();
-  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId[ns.logicalName];
-  if (!svNameSpaceAuth0Clients) {
-    throw new Error('No SV namespace in auth0 config');
-  }
-  const clientId = svNameSpaceAuth0Clients['cns'];
+  const clientId = getSvNameSpaceAuth0Clients(auth0Client, ns)['cns'];
   if (!clientId) {
     throw new Error('No CNS ui client id in auth0 config');
   }

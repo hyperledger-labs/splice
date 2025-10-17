@@ -352,14 +352,9 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  const walletUiClientId = svNameSpaceAuth0Clients['wallet'];
-  if (!walletUiClientId) {
-    throw new Error('No SV ui client id in auth0 config');
-  }
   const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
     xns,
     auth0Client,
-    walletUiClientId
   );
 
   const sv = installSpliceRunbookHelmChart(
