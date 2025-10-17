@@ -20,7 +20,7 @@ export type AppAndUiSecrets = {
   uiSecret: k8s.core.v1.Secret;
 };
 
-function getSvNameSpaceAuth0Clients(
+function getNameSpaceAuth0Clients(
   auth0Client: Auth0Client,
   ns: ExactNamespace
 ): ClientIdMap {
@@ -37,7 +37,7 @@ export async function validatorSecrets(
   auth0Client: Auth0Client,
 ): Promise<AppAndUiSecrets> {
 
-  const clientId = getSvNameSpaceAuth0Clients(auth0Client, ns)['wallet'];
+  const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['wallet'];
   if (!clientId) {
     throw new Error('No Wallet ui client id in auth0 config');
   }
@@ -53,7 +53,7 @@ export function cnsUiSecret(
   auth0Client: Auth0Client,
 ): k8s.core.v1.Secret {
 
-  const clientId = getSvNameSpaceAuth0Clients(auth0Client, ns)['cns'];
+  const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['cns'];
   if (!clientId) {
     throw new Error('No CNS ui client id in auth0 config');
   }
