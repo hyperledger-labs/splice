@@ -3759,6 +3759,7 @@ components:
         finalization_time:
           description: |
             The finalization_time of the transaction the verdict corresponds to.
+            Note that this time might be different between different scans/mediators.
           type: string
         submitting_parties:
           description: |
