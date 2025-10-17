@@ -5,7 +5,6 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  cnsUiSecret,
   config,
   exactNamespace,
   ExactNamespace,
@@ -486,7 +485,6 @@ async function installSvAndValidator(
         .concat(canton.participant.asDependencies)
         .concat(validatorSecrets)
         .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : [])
-        .concat([cnsUiSecret(xns, auth0Client)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])
         .concat([appsPg]),
     }

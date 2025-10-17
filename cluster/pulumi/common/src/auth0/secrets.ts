@@ -40,18 +40,14 @@ export async function installValidatorSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client
 ): Promise<k8s.core.v1.Secret[]> {
-  const clientId = getUiClientId(auth0Client, ns, 'wallet');
+  const walletUiClientId = getUiClientId(auth0Client, ns, 'wallet');
+  const cnsUiClientId = getUiClientId(auth0Client, ns, 'cns');
 
   return [
     await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
-    uiSecret(auth0Client, ns, 'wallet', clientId),
+    uiSecret(auth0Client, ns, 'wallet', walletUiClientId),
+    uiSecret(auth0Client, ns, 'cns', cnsUiClientId),
   ];
-}
-
-export function cnsUiSecret(ns: ExactNamespace, auth0Client: Auth0Client): k8s.core.v1.Secret {
-  const clientId = getUiClientId(auth0Client, ns, 'cns');
-
-  return uiSecret(auth0Client, ns, 'cns', clientId);
 }
 
 export async function installSvAppSecrets(

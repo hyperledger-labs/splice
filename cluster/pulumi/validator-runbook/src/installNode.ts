@@ -9,7 +9,6 @@ import {
   CLUSTER_HOSTNAME,
   clusterSmallDisk,
   CnInput,
-  cnsUiSecret,
   config,
   daContactPoint,
   DecentralizedSynchronizerUpgradeConfig,
@@ -279,7 +278,6 @@ async function installValidator(
   const dependsOn = imagePullDeps
     .concat(loopback ? loopback : [])
     .concat(validatorSecrets)
-    .concat([cnsUiSecret(xns, auth0Client)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
       onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []
