@@ -6,8 +6,8 @@ import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/doc
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Output } from '@pulumi/pulumi';
 
-import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
-import { Auth0Client } from './auth0types';
+import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0/auth0';
+import { Auth0Client } from './auth0/auth0types';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
 

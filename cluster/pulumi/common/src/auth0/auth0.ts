@@ -16,8 +16,8 @@ import type {
   Auth0Config,
   Auth0ClusterConfig,
 } from './auth0types';
-import { config, isMainNet } from './config';
-import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from './utils';
+import { config, isMainNet } from '../config';
+import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from '../utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
