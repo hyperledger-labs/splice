@@ -34,7 +34,17 @@ export async function validatorSecrets(
 export function cnsUiSecret(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
-  clientId: string
 ): k8s.core.v1.Secret {
+
+  const auth0Config = auth0Client.getCfg();
+  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId[ns.logicalName];
+  if (!svNameSpaceAuth0Clients) {
+    throw new Error('No SV namespace in auth0 config');
+  }
+  const clientId = svNameSpaceAuth0Clients['cns'];
+  if (!clientId) {
+    throw new Error('No CNS ui client id in auth0 config');
+  }
+
   return uiSecret(auth0Client, ns, 'cns', clientId);
 }

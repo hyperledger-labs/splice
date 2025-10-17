@@ -485,11 +485,6 @@ async function installSvAndValidator(
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
   };
 
-  const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
-  if (!cnsUiClientId) {
-    throw new Error('No CNS ui client id in auth0 config');
-  }
-
   const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
@@ -501,7 +496,7 @@ async function installSvAndValidator(
         .concat(canton.participant.asDependencies)
         .concat([svValidatorAppSecret, svValidatorUISecret])
         .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : [])
-        .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
+        .concat([cnsUiSecret(xns, auth0Client)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])
         .concat([appsPg]),
     }
