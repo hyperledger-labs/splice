@@ -92,6 +92,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.SynchronizerAlias
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -295,7 +296,18 @@ class ValidatorApp(
             _ <- appInitStep("Vet packages") {
               for {
                 amuletRules <- scanConnection.getAmuletRules()
-                domainId <- scanConnection.getAmuletRulesDomain()(traceContext)
+                globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
+                  traceContext
+                )
+                // vet on extra synchronizers as well
+                // TODO(#2742) make sure we also vet on later connection + on upgrades (and maybe move below logic)
+                extraSynchronizerAliases: Set[SynchronizerAlias] = config.domains.extra
+                  .map(_.alias)
+                  .toSet
+                allConnectedSynchronizers <- participantAdminConnection.listConnectedDomains()
+                extraSynchronizerIds: Seq[SynchronizerId] = allConnectedSynchronizers
+                  .filter(result => extraSynchronizerAliases.contains(result.synchronizerAlias))
+                  .map(_.physicalSynchronizerId.logical)
                 packageVetting = new PackageVetting(
                   ValidatorPackageVettingTrigger.packages,
                   clock,
@@ -303,7 +315,11 @@ class ValidatorApp(
                   loggerFactory,
                   config.latestPackagesOnly,
                 )
-                _ <- packageVetting.vetCurrentPackages(domainId, amuletRules)
+                _ <-
+                  MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
+                    synchronizerId =>
+                      packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
+                  }
               } yield ()
             }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
