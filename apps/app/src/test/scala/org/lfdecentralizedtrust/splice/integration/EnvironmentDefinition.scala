@@ -17,7 +17,6 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
@@ -182,7 +181,6 @@ case class EnvironmentDefinition(
                 p.topology.vetted_packages.propose(
                   p.id,
                   Seq.empty,
-                  force = ForceFlags(ForceFlag.AllowUnvetPackageWithActiveContracts),
                   store = TopologyStoreId.Synchronizer(connected.synchronizerId),
                 )
               case _ =>
