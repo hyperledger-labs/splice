@@ -100,7 +100,6 @@ function configureIstiod(
         },
         // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
         meshConfig: {
-          // `accessLogFile: '/dev/stdout'` enables access logging across the entire cluster (we disable it by default to reduce cost)
           // taken from https://github.com/istio/istio/issues/37682
           accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
           accessLogEncoding: 'JSON',
