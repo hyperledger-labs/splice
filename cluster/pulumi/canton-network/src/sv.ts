@@ -346,11 +346,6 @@ async function installValidator(
   svApp: Resource,
   scan: Resource
 ) {
-  // const validatorSecrets = await installValidatorSecrets({
-  //   xns,
-  //   auth0Client: svConfig.auth0Client,
-  //   auth0AppName: svConfig.auth0ValidatorAppName,
-  // });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
   const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;

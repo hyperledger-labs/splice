@@ -258,25 +258,3 @@ export async function installValidatorApp(
     { dependsOn }
   );
 }
-
-type ValidatorSecretsConfig = {
-  xns: ExactNamespace;
-  auth0Client: Auth0Client;
-  auth0AppName: string;
-};
-
-// export async function installValidatorSecrets(
-//   config: ValidatorSecretsConfig
-// ): Promise<ValidatorSecrets> {
-//   return {
-//     validatorSecret: await installAuth0Secret(
-//       config.auth0Client,
-//       config.xns,
-//       'validator',
-//       config.auth0AppName
-//     ),
-//     wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-//     cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
-//     auth0Client: config.auth0Client,
-//   };
-// }
