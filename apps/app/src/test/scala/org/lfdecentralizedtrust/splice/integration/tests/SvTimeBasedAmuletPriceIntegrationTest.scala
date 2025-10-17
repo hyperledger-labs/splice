@@ -16,7 +16,7 @@ class SvTimeBasedAmuletPriceIntegrationTest
     initDso()
 
     advanceTimeToRoundOpen
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     val svParties =
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map {
@@ -45,8 +45,8 @@ class SvTimeBasedAmuletPriceIntegrationTest
         },
     )
 
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
 
     clue("Metrics are updated") {
       eventually() {
