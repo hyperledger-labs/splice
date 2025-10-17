@@ -20,10 +20,7 @@ export type AppAndUiSecrets = {
   uiSecret: k8s.core.v1.Secret;
 };
 
-function getNameSpaceAuth0Clients(
-  auth0Client: Auth0Client,
-  ns: ExactNamespace
-): ClientIdMap {
+function getNameSpaceAuth0Clients(auth0Client: Auth0Client, ns: ExactNamespace): ClientIdMap {
   const auth0Config = auth0Client.getCfg();
   const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId[ns.logicalName];
   if (!svNameSpaceAuth0Clients) {
@@ -34,9 +31,8 @@ function getNameSpaceAuth0Clients(
 
 export async function validatorSecrets(
   ns: ExactNamespace,
-  auth0Client: Auth0Client,
+  auth0Client: Auth0Client
 ): Promise<AppAndUiSecrets> {
-
   const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['wallet'];
   if (!clientId) {
     throw new Error('No Wallet ui client id in auth0 config');
@@ -48,11 +44,7 @@ export async function validatorSecrets(
   };
 }
 
-export function cnsUiSecret(
-  ns: ExactNamespace,
-  auth0Client: Auth0Client,
-): k8s.core.v1.Secret {
-
+export function cnsUiSecret(ns: ExactNamespace, auth0Client: Auth0Client): k8s.core.v1.Secret {
   const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['cns'];
   if (!clientId) {
     throw new Error('No CNS ui client id in auth0 config');
@@ -64,9 +56,8 @@ export function cnsUiSecret(
 export async function svAppSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
-  auth0SvAppName: string, // FIXME: try to get rid of this
+  auth0SvAppName: string // FIXME: try to get rid of this
 ): Promise<AppAndUiSecrets> {
-
   const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['sv'];
   if (!clientId) {
     throw new Error('No SV ui client id in auth0 config');

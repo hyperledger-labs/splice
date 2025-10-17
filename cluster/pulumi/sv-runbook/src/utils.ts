@@ -1,9 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import {
-  config,
-  CLUSTER_HOSTNAME,
-} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { config, CLUSTER_HOSTNAME } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { retry } from '@lfdecentralizedtrust/splice-pulumi-common/src/retries';
 import fetch from 'node-fetch';
 

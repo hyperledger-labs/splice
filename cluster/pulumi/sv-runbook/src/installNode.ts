@@ -347,7 +347,7 @@ async function installSvAndValidator(
 
   const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
     xns,
-    auth0Client,
+    auth0Client
   );
 
   const sv = installSpliceRunbookHelmChart(
