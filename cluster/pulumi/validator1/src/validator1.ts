@@ -27,7 +27,6 @@ import {
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
-  installValidatorSecrets,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
 import { spliceConfig } from '../../common/src/config/config';
@@ -77,14 +76,6 @@ export async function installValidator1(
     );
   const validatorDbName = `validator1`;
 
-  const validatorSecrets = validator1Config?.disableAuth
-    ? undefined
-    : await installValidatorSecrets({
-        xns,
-        auth0Client,
-        auth0AppName: 'validator1',
-      });
-
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
   const participant = installParticipant(
@@ -130,7 +121,8 @@ export async function installValidator1(
     topupConfig,
     svValidator: false,
     scanAddress,
-    secrets: validatorSecrets,
+    auth0Client: auth0Client,
+    auth0ValidatorAppName: 'validator1',
     autoAcceptTransfers: autoAcceptTransfers,
     nodeIdentifier: 'validator1',
     participantPruningConfig,

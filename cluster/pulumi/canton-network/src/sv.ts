@@ -51,7 +51,6 @@ import {
 import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import {
   installValidatorApp,
-  installValidatorSecrets,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
@@ -347,11 +346,11 @@ async function installValidator(
   svApp: Resource,
   scan: Resource
 ) {
-  const validatorSecrets = await installValidatorSecrets({
-    xns,
-    auth0Client: svConfig.auth0Client,
-    auth0AppName: svConfig.auth0ValidatorAppName,
-  });
+  // const validatorSecrets = await installValidatorSecrets({
+  //   xns,
+  //   auth0Client: svConfig.auth0Client,
+  //   auth0AppName: svConfig.auth0ValidatorAppName,
+  // });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
   const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
@@ -364,7 +363,7 @@ async function installValidator(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    validatorWalletUsers: svUserIds(validatorSecrets.auth0Client.getCfg()).apply(ids =>
+    validatorWalletUsers: svUserIds(svConfig.auth0Client.getCfg()).apply(ids =>
       ids.concat(svConfig.validatorWalletUser ? [svConfig.validatorWalletUser] : [])
     ),
     dependencies: sv.participant.asDependencies,
@@ -385,7 +384,8 @@ async function installValidator(
     participantAddress: sv.participant.internalClusterAddress,
     decentralizedSynchronizerUrl: bftSequencerConnection ? undefined : decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
-    secrets: validatorSecrets,
+    auth0Client: svConfig.auth0Client,
+    auth0ValidatorAppName: svConfig.auth0ValidatorAppName,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
