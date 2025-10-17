@@ -38,13 +38,14 @@ function getUiClientId(
 
 export async function installValidatorSecrets(
   ns: ExactNamespace,
-  auth0Client: Auth0Client
+  auth0Client: Auth0Client,
+  auth0ValidatorAppName?: string,
 ): Promise<k8s.core.v1.Secret[]> {
   const walletUiClientId = getUiClientId(auth0Client, ns, 'wallet');
   const cnsUiClientId = getUiClientId(auth0Client, ns, 'cns');
 
   return [
-    await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
+    await installAuth0Secret(auth0Client, ns, 'validator', auth0ValidatorAppName || 'validator'),
     uiSecret(auth0Client, ns, 'wallet', walletUiClientId),
     uiSecret(auth0Client, ns, 'cns', cnsUiClientId),
   ];
