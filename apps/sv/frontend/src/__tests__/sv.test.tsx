@@ -176,12 +176,12 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction('CRARC_SetConfig');
+    await changeAction('CRARC_SetConfig');
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
     expect(await screen.findByDisplayValue('0.03')).toBeDefined();
 
-    changeAction('SRARC_SetConfig');
+    await changeAction('SRARC_SetConfig');
 
     expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
     expect(await screen.findByDisplayValue('10')).toBeDefined();
@@ -200,7 +200,8 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction('SRARC_SetConfig');
+    await changeAction('SRARC_SetConfig');
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
 
     const input = screen.getByTestId(
       'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
@@ -236,7 +237,8 @@ describe('An SetConfig request', () => {
 
     expect(await screen.findByText('Vote Requests')).toBeDefined();
 
-    changeAction('CRARC_SetConfig');
+    await changeAction('CRARC_SetConfig');
+    await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
 
     const input = screen.getByTestId('transferConfig.createFee.fee-value');
     await user.clear(input);
@@ -276,7 +278,8 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction('CRARC_SetConfig');
+    await changeAction('CRARC_SetConfig');
+    await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
 
     const input = screen.getByTestId('transferConfig.createFee.fee-value');
     await user.clear(input);
@@ -368,7 +371,7 @@ describe('SetAmuletRules', () => {
       expect(await screen.findByText('Vote Requests')).toBeDefined();
       expect(await screen.findByText('Governance')).toBeDefined();
 
-      changeAction('CRARC_SetConfig');
+      await changeAction('CRARC_SetConfig');
 
       const summaryInput = screen.getByTestId('create-reason-summary');
       await user.type(summaryInput, 'summaryABC');

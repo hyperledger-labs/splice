@@ -8,6 +8,7 @@ import {
   resetIntersectionMocking,
 } from 'react-intersection-observer/test-utils';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { DetachedWindowAPI } from 'happy-dom';
 
 import { buildServer } from '../mocks/server';
 import { config } from './config';
@@ -43,5 +44,6 @@ afterEach(() => {
 declare global {
   interface Window {
     splice_config: typeof config; // (make typescript happy)
+    happyDOM: DetachedWindowAPI;
   }
 }

@@ -123,7 +123,7 @@ describe('Update SV Reward Weight Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBe(null);
   });
 
   test('expiry date must be in the future', async () => {

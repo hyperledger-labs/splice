@@ -81,7 +81,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    changeAction();
+    await changeAction();
 
     expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
@@ -109,7 +109,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    changeAction();
+    await changeAction();
 
     const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
     await user.click(synchronizerUpgradeCheckBox);
@@ -157,7 +157,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    changeAction();
+    await changeAction();
     await fillOutForm(user);
 
     const disabled = screen
@@ -184,7 +184,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    changeAction();
+    await changeAction();
     await fillOutForm(user);
 
     const effectiveAtThresholdCheckBox = screen.getByTestId('checkbox-set-effective-at-threshold');
@@ -240,7 +240,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    changeAction();
+    await changeAction();
     await fillOutForm(user);
 
     const effectiveDateComponent = screen.getByTestId('datetime-picker-vote-request-expiration');
@@ -297,7 +297,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    changeAction();
+    await changeAction();
     await fillOutForm(user);
 
     const synchronizerUpgradeCheckBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
@@ -354,7 +354,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      changeAction();
+      await changeAction();
       await fillOutForm(user);
 
       const effectiveAtThresholdCheckBox = screen.getByTestId(
