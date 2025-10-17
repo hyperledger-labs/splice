@@ -314,6 +314,8 @@ private[validator] object ValidatorUtil {
             // these commands could fail with PERMISSION_DENIED errors (#4425).
             Seq(Status.Code.PERMISSION_DENIED),
           )
+
+          // we delete the user only if it exists
           _ <- connection
             .getUser(endUserName)
             .flatMap { _ =>
@@ -321,7 +323,7 @@ private[validator] object ValidatorUtil {
             }
             .recover { case NonFatal(ex) =>
               logger
-                .debug(s"Skipping user deletion for '$endUserName' due to a non-fatal error.", ex)
+                .warn(s"Skipping user deletion for '$endUserName' due to a non-fatal error.", ex)
               ()
             }
         } yield {
