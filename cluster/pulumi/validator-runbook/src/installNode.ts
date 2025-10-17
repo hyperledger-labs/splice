@@ -284,7 +284,7 @@ async function installValidator(
   const dependsOn = imagePullDeps
     .concat(loopback ? loopback : [])
     .concat([validatorAppSecret, validatorUISecret])
-    .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
+    .concat([cnsUiSecret(xns, auth0Client)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
       onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []
