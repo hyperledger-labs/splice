@@ -67,7 +67,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest
         ) should have size 1,
     )
 
-    actAndCheck("Advancing time by another tick", advanceRoundsByOneTick)(
+    actAndCheck("Advancing time by another tick", advanceRoundsToNextRoundOpening)(
       "round 1 becomes issuing as well",
       _ =>
         getSortedIssuingRounds(

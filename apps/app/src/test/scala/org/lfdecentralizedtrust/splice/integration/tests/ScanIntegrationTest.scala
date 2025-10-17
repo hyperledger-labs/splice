@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
@@ -788,6 +789,27 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         _.message should include("Too Many Requests")
       },
     )
+  }
+
+  "accept invalid user-agent headers" in { implicit env =>
+    import env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+
+    val invalidUserAgentHeader = RawHeader("User-Agent", "OpenAPI-Generator/0.0.1/java")
+    // using `User-Agent` fails the following check, it cleans away the /java
+    // so we have to use RawHeader to simulate the actual client case
+    invalidUserAgentHeader.value shouldBe "OpenAPI-Generator/0.0.1/java"
+
+    // SuppressingLogger does not catch the warning (from pekko-http)
+    // if present, it's seen in checkErrors instead
+    val response = Http()
+      .singleRequest(
+        Get(
+          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
+        ).withHeaders(invalidUserAgentHeader)
+      )
+      .futureValue
+    response.status shouldBe StatusCodes.OK
   }
 
   def triggerTopupAliceAndBob()(implicit env: SpliceTestConsoleEnvironment): (Boolean, Boolean) = {

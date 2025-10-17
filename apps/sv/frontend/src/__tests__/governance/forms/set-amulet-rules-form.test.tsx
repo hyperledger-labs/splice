@@ -79,6 +79,8 @@ describe('Set Amulet Config Rules Form', () => {
       },
       { timeout: 1000 }
     );
+
+    expect(screen.getByTestId('json-diffs-details')).toBeDefined();
   });
 
   test(

@@ -21,7 +21,7 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m <migration_id> [-a] [-b] [-c <scan_address>] [-C <host_scan_address>] [-q <sequencer_address>] [-n <network_name>] [-M] [-i <identities_dump>] [-P <participant_id>] [-w] [-l]"
+  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m <migration_id> [-a] [-b] [-c <scan_address>] [-C <host_scan_address>] [-q <sequencer_address>] [-n <network_name>] [-M] [-i <identities_dump>] [-P <participant_id>] [-w] [-l] [-E]"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. May be empty (\"\") if you are already onboarded."
   echo "  -p <party_hint>: The party hint to use for the validator operator, by default also your participant identifier."
@@ -43,6 +43,7 @@ function usage() {
   echo "  -b: Disable BFT reads&writes and trust a single SV."
   echo "  -c <scan_address>: The full URL of a Scan app. If not provided, it will be derived from the sponsor SV address."
   echo "  -q <sequencer_address>: The full URL of the sequencer. Must be provided if BFT reads&writes are disabled."
+  echo "  -E: Use this flag to bind the Nginx proxy to 0.0.0.0 (external access) instead of 127.0.0.1 (default)."
 }
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -62,7 +63,9 @@ participant_id=""
 restore_identities_dump=""
 local_compose_sv=0
 wait=0
-while getopts 'has:c:C:t:o:n:bq:m:Mp:P:i:wl' arg; do
+HOST_BIND_IP="127.0.0.1"
+
+while getopts 'has:c:C:t:o:n:bq:m:Mp:P:i:wlE' arg; do
   case ${arg} in
     h)
       usage
@@ -112,6 +115,9 @@ while getopts 'has:c:C:t:o:n:bq:m:Mp:P:i:wl' arg; do
       ;;
     l)
       local_compose_sv=1
+      ;;
+    E)
+      HOST_BIND_IP="0.0.0.0"
       ;;
     ?)
       usage
@@ -264,4 +270,7 @@ extra_args=()
 if [ $wait -eq 1 ]; then
   extra_args+=("--wait" "--wait-timeout" "600")
 fi
+
+export HOST_BIND_IP
+
 docker compose -f "${script_dir}/compose.yaml" "${extra_compose_files[@]}" up -d "${extra_args[@]}"

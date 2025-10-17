@@ -70,9 +70,9 @@ services:
       - ${LOCALNET_DIR}/conf/nginx/sv.conf:/etc/nginx/templates/sv.c${SV_PROFILE}f.template
       - ${LOCALNET_DIR}/conf/nginx/swagger-ui:/etc/nginx/includes
     ports:
-      - "${SV_UI_PORT}:${SV_UI_PORT}"
-      - "${APP_PROVIDER_UI_PORT}:${APP_PROVIDER_UI_PORT}"
-      - "${APP_USER_UI_PORT}:${APP_USER_UI_PORT}"
+      - "${HOST_BIND_IP:-127.0.0.1}:${SV_UI_PORT}:${SV_UI_PORT}"
+      - "${HOST_BIND_IP:-127.0.0.1}:${APP_PROVIDER_UI_PORT}:${APP_PROVIDER_UI_PORT}"
+      - "${HOST_BIND_IP:-127.0.0.1}:${APP_USER_UI_PORT}:${APP_USER_UI_PORT}"
     depends_on:
       wallet-web-ui-sv:
         condition: service_healthy

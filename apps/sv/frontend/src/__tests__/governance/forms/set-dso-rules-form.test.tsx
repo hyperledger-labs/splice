@@ -70,6 +70,8 @@ describe('Set DSO Config Rules Form', () => {
     expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
       /Unable to find an element/
     );
+
+    expect(screen.getByTestId('json-diffs-details')).toBeDefined();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -318,37 +320,6 @@ describe('Set DSO Config Rules Form', () => {
       expect(screen.queryByText('Vote History')).toBeDefined();
       expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
     });
-  });
-
-  test('should not render diffs if no changes to config values were made', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <Wrapper>
-        <SetDsoConfigRulesForm />
-      </Wrapper>
-    );
-
-    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
-    await user.type(summaryInput, 'Summary of the proposal');
-
-    const urlInput = screen.getByTestId('set-dso-config-rules-url');
-    await user.type(urlInput, 'https://example.com');
-
-    const jsonDiffs = screen.getByText('JSON Diffs');
-    expect(jsonDiffs).toBeDefined();
-
-    await user.click(jsonDiffs);
-    expect(screen.queryByText('No changes')).toBeDefined();
-
-    const reviewButton = screen.getByTestId('submit-button');
-    await waitFor(async () => {
-      expect(reviewButton.getAttribute('disabled')).toBeNull();
-    });
-
-    expect(jsonDiffs).toBeDefined();
-    await user.click(jsonDiffs);
-    expect(screen.queryByText('No changes')).toBeDefined();
   });
 
   test('should render diffs if changes to config values were made', async () => {

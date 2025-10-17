@@ -4,18 +4,17 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import com.daml.metrics.api.MetricsContext
-import org.lfdecentralizedtrust.splice.automation.PollingTrigger.PollingTriggerState
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.ErrorKind.*
 import org.apache.pekko.Done
+import org.lfdecentralizedtrust.splice.automation.PollingTrigger.PollingTriggerState
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -212,8 +211,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
               })
           }
         }
-        logger.debug(
-          show"Starting trigger polling loop, ${PollingTrigger.ConfigSummary(context.config)}"
+        logger.info(
+          show"Starting trigger polling loop, ${PollingTrigger.ConfigSummary(pollingInterval, pollingJitter, context.config.maxNumSilentPollingRetries)}"
         )
 
         pollingLoop(PollingTrigger.initialPollingTriggerState)
@@ -282,12 +281,16 @@ object PollingTrigger {
   private val initialPollingTriggerState = PollingTriggerState(0)
   private case class PollingTriggerState(numConsecutiveTransientFailures: Int)
 
-  private case class ConfigSummary(config: AutomationConfig) extends PrettyPrinting {
+  private case class ConfigSummary(
+      pollingInterval: NonNegativeFiniteDuration,
+      pollingJitter: Double,
+      maxNumSilentPollingRetries: Int,
+  ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
-        param("pollingInterval", _.config.pollingInterval),
-        param("pollingJitter", _.config.pollingJitter.toString.unquoted),
-        param("maxNumSilentPollingRetries", _.config.maxNumSilentPollingRetries),
+        param("pollingInterval", _.pollingInterval),
+        param("pollingJitter", _.pollingJitter.toString.unquoted),
+        param("maxNumSilentPollingRetries", _.maxNumSilentPollingRetries),
       )
     }
   }

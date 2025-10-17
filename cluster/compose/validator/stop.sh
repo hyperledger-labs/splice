@@ -31,6 +31,7 @@ export SPLICE_APP_UI_NAME_SERVICE_NAME=""
 export SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM=""
 export VALIDATOR_PARTICIPANT_IDENTITIES_DUMP="v" # A non-empty dummy value, just to make the docker-compose spec valid
 export VALIDATOR_NEW_PARTICIPANT_IDENTIFIER=""
+export HOST_BIND_IP=""
 
 # We include also compose-restore-from-id.yaml, so that if that was included in the start and created the init container,
 # that container is also included in the down and removed

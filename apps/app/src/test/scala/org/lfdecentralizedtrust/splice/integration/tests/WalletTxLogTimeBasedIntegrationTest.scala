@@ -78,9 +78,9 @@ class WalletTxLogTimeBasedIntegrationTest
 
         // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
         clue("Advance rounds by 3 ticks.") {
-          advanceRoundsByOneTick
-          advanceRoundsByOneTick
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
         }
 
         clue("Everyone still has their reward coupons") {
@@ -155,7 +155,7 @@ class WalletTxLogTimeBasedIntegrationTest
 
         // Advance time to make sure we capture at least one round change in the tx history.
         val latestRound = eventuallySucceeds() {
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
           sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.last.contract.payload.round.number
         }
 
@@ -176,8 +176,8 @@ class WalletTxLogTimeBasedIntegrationTest
         }
 
         clue("Advance rounds to accumulate holding fees") {
-          advanceRoundsByOneTick
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
         }
 
         val balance0 = charlieWalletClient.balance().unlockedQty
@@ -269,7 +269,7 @@ class WalletTxLogTimeBasedIntegrationTest
       ) {
         actAndCheck(
           "Advance 4 ticks to expire the amulet",
-          Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+          Range(0, 4).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "Wait for amulet to disappear",
           _ => aliceWalletClient.list().amulets should have size (0),
@@ -326,7 +326,7 @@ class WalletTxLogTimeBasedIntegrationTest
       ) {
         actAndCheck(
           "Advance 4 ticks to expire the locked amulet",
-          Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+          Range(0, 4).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "Wait for locked amulet to disappear",
           _ => aliceWalletClient.list().lockedAmulets should have size (0),
@@ -356,7 +356,7 @@ class WalletTxLogTimeBasedIntegrationTest
         val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
 
         val expiryMinutes = 1L
         val tapAmount = 10_000L

@@ -64,9 +64,9 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       val balanceBefore = bobValidatorWalletClient.balance().unlockedQty
       val (_, balanceAfter) = actAndCheck(
         "It takes 3 ticks for the IssuingMiningRound 1 to be created and open.", {
-          advanceRoundsByOneTick
-          advanceRoundsByOneTick
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
         },
       )(
         "Bob's validator collects rewards",

@@ -338,7 +338,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     ports:
-      - 8080:80
+      - "${HOST_BIND_IP:-127.0.0.1}:8080:80"
     depends_on:
       - validator
       - scan

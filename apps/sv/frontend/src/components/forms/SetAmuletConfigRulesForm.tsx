@@ -5,6 +5,7 @@ import {
   ActionRequiringConfirmation,
   AmuletRules_ActionRequiringConfirmation,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   buildAmuletRulesPendingConfigFields,
   configFormDataToConfigChanges,
@@ -167,8 +168,6 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
     allAmuletConfigChanges,
     false
   );
-  const changedFields = changes.filter(c => c.currentValue !== c.newValue);
-  const hasChangedFields = changedFields.length > 0;
 
   const baseConfig = amuletConfig;
   const newConfig = buildAmuletRulesConfigFromChanges(changes);
@@ -227,7 +226,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
             {field => (
               <field.DateField
                 title="Threshold Deadline"
-                description="This is the last day voters can vote on this proposal"
+                description={THRESHOLD_DEADLINE_SUBTITLE}
                 id="set-amulet-config-rules-expiry-date"
               />
             )}
@@ -290,7 +289,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
       )}
 
       <JsonDiffAccordion>
-        {amuletConfigToCompareWith && amuletConfigToCompareWith[1] && hasChangedFields ? (
+        {amuletConfigToCompareWith && amuletConfigToCompareWith[1] ? (
           <PrettyJsonDiff
             changes={{
               newConfig: dsoAction.value.newConfig,
@@ -298,9 +297,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
               actualConfig: amuletConfigToCompareWith[1],
             }}
           />
-        ) : (
-          <Typography>No changes</Typography>
-        )}
+        ) : null}
       </JsonDiffAccordion>
 
       <form.AppForm>

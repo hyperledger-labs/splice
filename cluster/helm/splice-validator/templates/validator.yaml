@@ -27,6 +27,10 @@ spec:
         migration: {{ .Values.migration.id | quote }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
       - name: validator-app
         image: "{{ .Values.imageRepo }}/validator-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).validator_app) }}"
@@ -284,7 +288,10 @@ spec:
             }
             canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
             canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
-              type="none"
+              type = "self-signed"
+              user = "ledger-api-user"
+              audience = "https://ledger_api.example.com"
+              secret = "unsafe"
             }
         - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
           value: ledger-api-user
@@ -343,11 +350,9 @@ spec:
       {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-secret
+        - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
-        - name: participant-bootstrapping-dump-volume
-          emptyDir: {}
       {{- end }}
       {{- if $requiresMigrationPvc }}
         - name: domain-upgrade-dump-volume
@@ -382,24 +387,6 @@ spec:
         {{- end }}
         {{- if .Values.extraInitContainers }}
         {{ .Values.extraInitContainers | toYaml | nindent 8 }}
-        {{- end }}
-        {{- if .Values.participantIdentitiesDumpImport }}
-        - name: chown-participant-bootstrapping-dump
-          image: busybox:1.37.0
-          command: ["sh", "-c", "cp /participant-bootstrapping-dump-secret/content /participant-bootstrapping-dump/ && chown -R 1001:1001 /participant-bootstrapping-dump"]
-          volumeMounts:
-            - name: participant-bootstrapping-dump-secret
-              mountPath: /participant-bootstrapping-dump-secret
-            - name: participant-bootstrapping-dump-volume
-              mountPath: /participant-bootstrapping-dump
-        {{- end }}
-        {{- if $requiresMigrationPvc }}
-        - name: chown-domain-upgrade-dump
-          image: busybox:1.37.0
-          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
-          volumeMounts:
-            - name: domain-upgrade-dump-volume
-              mountPath: /domain-upgrade-dump
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}

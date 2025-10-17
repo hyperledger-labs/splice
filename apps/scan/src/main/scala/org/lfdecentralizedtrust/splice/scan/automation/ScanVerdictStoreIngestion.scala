@@ -29,10 +29,10 @@ import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.metrics.api.MetricsContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
-
 import com.digitalasset.canton.mediator.admin.v30
 
 class ScanVerdictStoreIngestion(
@@ -75,7 +75,10 @@ class ScanVerdictStoreIngestion(
               .maxVerdictRecordTime(migrationId)
               .map(_.getOrElse(CantonTimestamp.MinValue))
           )
-          .map(ts => Some(ts))
+          .map { ts =>
+            logger.info(s"Streaming verdicts starting from $ts")
+            Some(ts)
+          }
           .flatMapConcat(mediatorClient.streamVerdicts)
           .groupedWithin(
             math.max(1, config.mediatorVerdictIngestion.batchSize),
@@ -124,8 +127,13 @@ class ScanVerdictStoreIngestion(
               .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
               .getOrElse(CantonTimestamp.MinValue)
             ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
-            batch.foreach(_ => ingestionMetrics.verdictCount.mark())
-            Success(TaskSuccess(s"inserted ${batch.size} verdicts"))
+            ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
+            Success(
+              TaskSuccess(
+                s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: ${batch
+                    .map(_.updateId)}"
+              )
+            )
           case Failure(ex) =>
             ingestionMetrics.errors.mark()
             Failure(ex)
@@ -190,6 +198,7 @@ class ScanVerdictStoreIngestion(
 }
 
 object ScanVerdictStoreIngestion {
+  // Batches are small enough that we can log the update ids for debuggability
   implicit val prettyVerdictBatch: Pretty[Seq[v30.Verdict]] =
-    Pretty.prettyOfString(batch => s"verdict_store_ingestion_batch(size=${batch.size})")
+    Pretty.prettyOfString(batch => s"verdict_store_ingestion_batch(${batch.map(_.updateId)})")
 }

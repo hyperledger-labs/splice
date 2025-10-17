@@ -29,7 +29,7 @@ class TimeBasedTestNetPreviewIntegrationTest
     actAndCheck(
       "Advance round", {
         (1 to 3).foreach { _ =>
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
           eventually() {
             ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
           }
