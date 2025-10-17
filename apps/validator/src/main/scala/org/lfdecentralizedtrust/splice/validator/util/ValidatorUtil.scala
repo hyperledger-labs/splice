@@ -30,6 +30,7 @@ import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerC
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 private[validator] object ValidatorUtil {
 
@@ -318,8 +319,9 @@ private[validator] object ValidatorUtil {
             .flatMap { _ =>
               connection.deleteUser(endUserName)
             }
-            .recover { case ex: Throwable =>
-              logger.debug(s"Skipping user deletion for '$endUserName' due to an error.", ex)
+            .recover { case NonFatal(ex) =>
+              logger
+                .debug(s"Skipping user deletion for '$endUserName' due to a non-fatal error.", ex)
               ()
             }
         } yield {
