@@ -17,8 +17,8 @@ export function getValidatorAppApiAudience(
   return auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE
 }
 
-export function getParticipantApiAudience(
+export function getLedgerApiAudience(
   auth0Config: Auth0Config,
 ): string {
-  return auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE
+  return auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE // FIXME: consider renaming 'participant' to 'ledger-api', but that would be a more breaking change
 }

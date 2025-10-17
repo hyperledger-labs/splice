@@ -8,7 +8,7 @@ import {
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
-  getParticipantApiAudience,
+  getLedgerApiAudience,
   getParticipantKmsHelmResources,
   InstalledHelmChart,
   installSpliceHelmChart,
@@ -67,7 +67,7 @@ export function installSvParticipant(
     },
     auth: {
       ...participantValues.auth,
-      targetAudience: getParticipantApiAudience(auth0Config),
+      targetAudience: getLedgerApiAudience(auth0Config),
       jwksUrl: `https://${auth0Config.auth0Domain}/.well-known/jwks.json`,
     },
     ...kmsValues,

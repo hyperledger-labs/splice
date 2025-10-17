@@ -16,7 +16,7 @@ import {
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
   spliceConfig,
-  getParticipantApiAudience,
+  getLedgerApiAudience,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
@@ -68,7 +68,7 @@ export function installParticipant(
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: getParticipantApiAudience(auth0Config),
+      targetAudience: getLedgerApiAudience(auth0Config),
     },
   };
 
