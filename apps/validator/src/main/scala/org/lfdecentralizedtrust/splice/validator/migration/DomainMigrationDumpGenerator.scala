@@ -39,6 +39,7 @@ class DomainMigrationDumpGenerator(
   private val darExporter = new DarExporter(participantConnection)
   private val participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
 
+  // This is the safe option used for migrations
   def generateDomainDump(
       migrationId: Long,
       domain: SynchronizerId,
@@ -67,6 +68,7 @@ class DomainMigrationDumpGenerator(
         acsTimestamp = acsTimestamp,
         dars = dars,
         createdAt = createdAt,
+        synchronizerWasPaused = true,
       )
       logger.info(
         show"Finished generating $result"
@@ -75,6 +77,7 @@ class DomainMigrationDumpGenerator(
     }
   }
 
+  // This is the safe option used for DR
   def getDomainDataSnapshot(
       timestamp: Instant,
       domain: SynchronizerId,
@@ -111,6 +114,7 @@ class DomainMigrationDumpGenerator(
         acsTimestamp = timestamp,
         dars = dars,
         createdAt = Instant.now(),
+        synchronizerWasPaused = false,
       )
     }
   }

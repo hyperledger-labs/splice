@@ -650,6 +650,8 @@ class DbMultiDomainAcsStoreTest
       DomainMigrationInfo(
         migrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

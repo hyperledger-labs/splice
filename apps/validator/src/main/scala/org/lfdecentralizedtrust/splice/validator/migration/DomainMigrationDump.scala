@@ -24,6 +24,8 @@ final case class DomainMigrationDump(
     acsTimestamp: Instant,
     dars: Seq[Dar],
     createdAt: Instant,
+    // true if we exported for a proper migration, false for DR.
+    synchronizerWasPaused: Boolean,
 ) extends PrettyPrinting {
   override def pretty: Pretty[DomainMigrationDump.this.type] =
     Pretty.prettyNode(
@@ -36,6 +38,7 @@ final case class DomainMigrationDump(
       param("acsTimestamp", _.acsTimestamp),
       param("darsSize", _.dars.size),
       param("createdAt", _.createdAt),
+      param("synchronizerWasPaused", _.synchronizerWasPaused),
     )
 
   def toHttp: http.DomainMigrationDump = http.DomainMigrationDump(
@@ -50,6 +53,7 @@ final case class DomainMigrationDump(
     migrationId = migrationId,
     domainId = domainId.toProtoPrimitive,
     createdAt = createdAt.toString,
+    synchronizerWasPaused = Some(synchronizerWasPaused),
   )
 }
 
@@ -87,5 +91,6 @@ object DomainMigrationDump {
     acsTimestamp = Instant.parse(response.acsTimestamp),
     dars = dars,
     createdAt = createdAt,
+    synchronizerWasPaused = response.synchronizerWasPaused.getOrElse(false),
   )
 }

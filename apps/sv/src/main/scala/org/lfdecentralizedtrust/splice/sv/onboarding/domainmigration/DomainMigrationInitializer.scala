@@ -168,6 +168,7 @@ class DomainMigrationInitializer(
           acsRecordTime = Some(
             CantonTimestamp.assertFromInstant(migrationDump.domainDataSnapshot.acsTimestamp)
           ),
+          synchronizerWasPaused = migrationDump.domainDataSnapshot.synchronizerWasPaused,
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)

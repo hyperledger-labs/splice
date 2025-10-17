@@ -374,6 +374,8 @@ class DbValidatorStoreTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId = mkParticipantId("ValidatorStoreTest"),
     )

@@ -975,6 +975,8 @@ class ScanAggregatorTest
       DomainMigrationInfo(
         0,
         None,
+        // FIXME
+        synchronizerWasPaused = true,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
       enableImportUpdateBackfill = true,
