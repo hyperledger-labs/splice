@@ -94,7 +94,7 @@ class ScanEventHistoryIntegrationTest
     }
 
     // Basic checks for page limit and encoding
-    val smallerLimit = eventHistory.size - 1
+    val smallerLimit = if (eventHistory.size == 1) 1 else eventHistory.size - 1
     val withCompactEncoding = sv1ScanBackend.getEventHistory(
       count = smallerLimit,
       after = Some(cursorBeforeTap),
