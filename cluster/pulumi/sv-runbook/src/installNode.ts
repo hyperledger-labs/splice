@@ -22,7 +22,7 @@ import {
   CLUSTER_HOSTNAME,
   svKeySecret,
   svKeyFromSecret,
-  validatorSecrets,
+  installValidatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
   imagePullSecret,
@@ -46,7 +46,7 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getAdditionalJvmOptions,
-  svAppSecrets,
+  installSvAppSecrets,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
@@ -230,7 +230,7 @@ async function installSvAndValidator(
   const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
 
-  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
+  const svAppSecrets = await installSvAppSecrets(
     xns,
     auth0Client,
     svRunbookConfig.auth0SvAppName
@@ -345,7 +345,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
+  const validatorSecrets = await installValidatorSecrets(
     xns,
     auth0Client
   );
@@ -360,7 +360,8 @@ async function installSvAndValidator(
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
         .concat(canton.decentralizedSynchronizer.dependencies)
-        .concat([svAppSecret, svAppUISecret, appsPg])
+        .concat(svAppSecrets)
+        .concat([appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
         .concat(
           cometBftGovernanceKey ? svCometBftGovernanceKeySecret(xns, cometBftGovernanceKey) : []
@@ -398,7 +399,8 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svAppSecret, appsPg])
+        .concat(svAppSecrets)
+        .concat([appsPg])
         .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : []),
     }
   );
@@ -482,7 +484,7 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svValidatorAppSecret, svValidatorUISecret])
+        .concat(validatorSecrets)
         .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : [])
         .concat([cnsUiSecret(xns, auth0Client)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])

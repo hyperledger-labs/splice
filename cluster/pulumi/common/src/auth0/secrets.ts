@@ -15,11 +15,6 @@ export function uiSecret(
   return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId);
 }
 
-export type AppAndUiSecrets = {
-  appSecret: k8s.core.v1.Secret;
-  uiSecret: k8s.core.v1.Secret;
-};
-
 function getNameSpaceAuth0Clients(auth0Client: Auth0Client, ns: ExactNamespace): ClientIdMap {
   const auth0Config = auth0Client.getCfg();
   const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId[ns.logicalName];
@@ -29,19 +24,19 @@ function getNameSpaceAuth0Clients(auth0Client: Auth0Client, ns: ExactNamespace):
   return svNameSpaceAuth0Clients;
 }
 
-export async function validatorSecrets(
+export async function installValidatorSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client
-): Promise<AppAndUiSecrets> {
+): Promise<k8s.core.v1.Secret[]> {
   const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['wallet'];
   if (!clientId) {
     throw new Error('No Wallet ui client id in auth0 config');
   }
 
-  return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
-    uiSecret: uiSecret(auth0Client, ns, 'wallet', clientId),
-  };
+  return [
+    await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
+    uiSecret(auth0Client, ns, 'wallet', clientId),
+  ];
 }
 
 export function cnsUiSecret(ns: ExactNamespace, auth0Client: Auth0Client): k8s.core.v1.Secret {
@@ -53,18 +48,18 @@ export function cnsUiSecret(ns: ExactNamespace, auth0Client: Auth0Client): k8s.c
   return uiSecret(auth0Client, ns, 'cns', clientId);
 }
 
-export async function svAppSecrets(
+export async function installSvAppSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
   auth0SvAppName: string // FIXME: try to get rid of this
-): Promise<AppAndUiSecrets> {
+): Promise<k8s.core.v1.Secret[]> {
   const clientId = getNameSpaceAuth0Clients(auth0Client, ns)['sv'];
   if (!clientId) {
     throw new Error('No SV ui client id in auth0 config');
   }
 
-  return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', auth0SvAppName),
-    uiSecret: uiSecret(auth0Client, ns, 'sv', clientId),
-  };
+  return [
+    await installAuth0Secret(auth0Client, ns, 'sv', auth0SvAppName),
+    uiSecret(auth0Client, ns, 'sv', clientId),
+  ];
 }

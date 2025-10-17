@@ -32,7 +32,7 @@ import {
   SPLICE_ROOT,
   setupBootstrapping,
   spliceInstanceNames,
-  validatorSecrets,
+  installValidatorSecrets,
   ValidatorTopupConfig,
   InstalledHelmChart,
   ansDomainPrefix,
@@ -183,7 +183,7 @@ async function installValidator(
     throw new Error('No validator namespace in auth0 config');
   }
 
-  const { appSecret: validatorAppSecret, uiSecret: validatorUISecret } = await validatorSecrets(
+  const validatorSecrets = await installValidatorSecrets(
     xns,
     auth0Client
   );
@@ -278,7 +278,7 @@ async function installValidator(
   }
   const dependsOn = imagePullDeps
     .concat(loopback ? loopback : [])
-    .concat([validatorAppSecret, validatorUISecret])
+    .concat(validatorSecrets)
     .concat([cnsUiSecret(xns, auth0Client)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
