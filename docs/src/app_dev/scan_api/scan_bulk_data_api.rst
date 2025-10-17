@@ -400,6 +400,7 @@ The response returns a list of objects, each of which may include an ``update`` 
 * **domain_id** : The synchronization domain that processed the transaction. If both an update and verdict are returned, this will agree with the update's ``synchronizer_id`` field.
 * **record_time**: The time at which the update the verdict pertains to was sequenced. If both an update and verdict are returned, they will agree.
 * **finalization_time**: The time at which the mediator finished gathering all the confirmations required to compute its verdict.
+  ⚠️ This time might be different between different scans/mediators.
 * **submitting_parties**: The parties on whose behalf the transaction was submitted.
 * **verdict_result**: The final result computed by the mediator, whether the result was unspecified, accepted, or rejected.
 * **mediator_group**: An opaque ID for the group of mediators which validated this transaction, including the one on the SV node.
