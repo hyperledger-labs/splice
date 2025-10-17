@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
-import { Auth0Config } from '@lfdecentralizedtrust/splice-pulumi-common/src/auth0types';
+import { Auth0Config } from '@lfdecentralizedtrust/splice-pulumi-common/src/auth0/auth0types';
 
 import {
   SecretsFixtureMap,

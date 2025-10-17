@@ -7,6 +7,8 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
+import { config, isMainNet } from '../config';
+import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from '../utils';
 import type {
   Auth0Client,
   Auth0SecretMap,
@@ -16,8 +18,6 @@ import type {
   Auth0Config,
   Auth0ClusterConfig,
 } from './auth0types';
-import { config, isMainNet } from '../config';
-import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from '../utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
