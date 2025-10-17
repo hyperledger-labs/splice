@@ -43,6 +43,8 @@ import scala.concurrent.Future
 import scala.util.Try
 import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+
 import scala.jdk.OptionConverters.*
 
 class WalletIntegrationTest
@@ -70,6 +72,26 @@ class WalletIntegrationTest
             )
           )
         )
+      )
+      // Need to load the latest intead of the initial package version, as otherwise we don't vet the right
+      // splice amulet version -- need to validate that though!
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+          c.copy(
+            appInstances = c.appInstances.transform {
+              case ("splitwell", instance) =>
+                instance.copy(dars =
+                  Seq(
+                    java.nio.file.Paths.get(
+                      // FIXME: don't hardcode -- and generally find a better solution once I understand more about the problem.
+                      s"daml/dars/splitwell-0.1.9.dar"
+                    )
+                  )
+                )
+              case (_, instance) => instance
+            }
+          )
+        )(config)
       )
       // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
@@ -434,6 +456,7 @@ class WalletIntegrationTest
       aliceWalletClient.tap(50)
       val (_, requestId) = actAndCheck(
         "Create payment request on private domain",
+        // FIXME: this fails if we only vet the most recent version -- however I don't know how this works with per-synchronizer vetting, as I'd expect
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,

@@ -207,7 +207,7 @@ class PackageVetting(
             DarResources.lookupAllPackageVersions(pkg.packageName).map(_.metadata.version)
           val configPackageVersion = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
           allPackageVersions
-            .filter(_ <= configPackageVersion)
+            .filter(_ == configPackageVersion)
             .map(version => time -> (pkg -> version))
         }
       }
