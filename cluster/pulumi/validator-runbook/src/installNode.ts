@@ -182,15 +182,10 @@ async function installValidator(
   if (!validatorNameSpaceAuth0Clients) {
     throw new Error('No validator namespace in auth0 config');
   }
-  const walletUiClientId = validatorNameSpaceAuth0Clients['wallet'];
-  if (!walletUiClientId) {
-    throw new Error('No wallet ui client id in auth0 config');
-  }
 
   const { appSecret: validatorAppSecret, uiSecret: validatorUISecret } = await validatorSecrets(
     xns,
-    auth0Client,
-    walletUiClientId
+    auth0Client
   );
 
   const validatorValuesFromYamlFiles = {
