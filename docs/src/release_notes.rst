@@ -64,6 +64,11 @@ Release Notes
 
       - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
 
+  - Validator
+
+      - ``/v0/admin/users/offboard``:
+        Offboarding a user now also deletes the ledger API user in the participant node.
+
 
 0.4.19
 ------
