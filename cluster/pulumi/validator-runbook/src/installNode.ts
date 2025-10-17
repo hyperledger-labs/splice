@@ -37,6 +37,7 @@ import {
   ansDomainPrefix,
   failOnAppVersionMismatch,
   networkWideConfig,
+  getValidatorAppApiAudience,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -257,7 +258,7 @@ async function installValidator(
     ...validatorValuesWithOnboardingOverride,
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
-      audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      audience: getValidatorAppApiAudience(auth0Client.getCfg()),
     },
   };
 

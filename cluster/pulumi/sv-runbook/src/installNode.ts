@@ -35,7 +35,6 @@ import {
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
-  DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
   ansDomainPrefix,
   svUserIds,
@@ -46,6 +45,8 @@ import {
   networkWideConfig,
   getAdditionalJvmOptions,
   installSvAppSecrets,
+  getSvAppApiAudience,
+  getValidatorAppApiAudience,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
@@ -329,7 +330,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, svValues),
     auth: {
       ...svValues.auth,
-      audience: auth0Config.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+      audience: getSvAppApiAudience(auth0Config),
     },
   };
 
@@ -436,7 +437,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
-      audience: auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      audience: getValidatorAppApiAudience(auth0Config),
     },
   };
 

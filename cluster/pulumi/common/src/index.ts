@@ -4,6 +4,7 @@ export * from './config';
 export * from './auth0/auth0';
 export * from './auth0/auth0types';
 export * from './auth0/secrets';
+export * from './auth0/audiences';
 export * from './backup';
 export * from './domainFees';
 export * from './domainMigration';

@@ -18,10 +18,9 @@ import type {
   Auth0Config,
   Auth0ClusterConfig,
 } from './auth0types';
+import { DEFAULT_AUDIENCE } from './audiences';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
-
-export const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 /* Access tokens deployed into a cluster need to have a lifetime at
  * least as long as the cluster is expected to run. This means that
@@ -182,7 +181,7 @@ export class Auth0Fetch implements Auth0Client {
   public async getClientAccessToken(
     clientId: string,
     clientSecret: string,
-    audience?: string
+    audience?: string // FIXME: I don't think it makes sense for this to be optional (and then stop exporting DEFAULT_AUDIENCE private to audiences.ts)
   ): Promise<string> {
     await pulumi.log.debug('Getting access token for Auth0 client: ' + clientId);
 

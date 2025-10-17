@@ -11,14 +11,12 @@ import {
   CnInput,
   config,
   daContactPoint,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
   getAdditionalJvmOptions,
-  installAuth0Secret,
-  installAuth0UISecret,
+  getValidatorAppApiAudience,
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
@@ -230,7 +228,7 @@ export async function installValidatorApp(
       enablePostgresMetrics: true,
       auth: config.disableAuth ? undefined
         : {
-          audience: config.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+          audience: getValidatorAppApiAudience(config.auth0Client.getCfg()),
           jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`
         },
       walletSweep,
