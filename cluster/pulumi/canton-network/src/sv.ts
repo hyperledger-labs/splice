@@ -24,8 +24,6 @@ import {
   imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
-  installAuth0Secret,
-  installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
   installSpliceHelmChart,

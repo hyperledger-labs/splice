@@ -6,7 +6,7 @@ import { ExactNamespace } from '../utils';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client, ClientIdMap } from './auth0types';
 
-export function uiSecret(
+function uiSecret(
   auth0Client: Auth0Client,
   ns: ExactNamespace,
   appName: string,
