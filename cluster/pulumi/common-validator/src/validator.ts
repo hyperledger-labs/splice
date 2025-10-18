@@ -134,12 +134,9 @@ export async function installValidatorApp(
 
   const config = { ...baseConfig, backupConfig };
 
-  const validatorSecrets: Secret[] = baseConfig.disableAuth ? []
-    : await installValidatorSecrets(
-      config.xns,
-      config.auth0Client,
-      config.auth0ValidatorAppName,
-    );
+  const validatorSecrets: Secret[] = baseConfig.disableAuth
+    ? []
+    : await installValidatorSecrets(config.xns, config.auth0Client, config.auth0ValidatorAppName);
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     !config.svValidator && config.participantBootstrapDump
@@ -226,11 +223,12 @@ export async function installValidatorApp(
       additionalJvmOptions: getAdditionalJvmOptions(config.additionalJvmOptions),
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       enablePostgresMetrics: true,
-      auth: config.disableAuth ? undefined
+      auth: config.disableAuth
+        ? undefined
         : {
-          audience: getValidatorAppApiAudience(config.auth0Client.getCfg()),
-          jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`
-        },
+            audience: getValidatorAppApiAudience(config.auth0Client.getCfg()),
+            jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
+          },
       walletSweep,
       autoAcceptTransfers,
       contactPoint: daContactPoint,

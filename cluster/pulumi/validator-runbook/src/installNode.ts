@@ -183,10 +183,7 @@ async function installValidator(
     throw new Error('No validator namespace in auth0 config');
   }
 
-  const validatorSecrets = await installValidatorSecrets(
-    xns,
-    auth0Client
-  );
+  const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {

@@ -230,11 +230,7 @@ async function installSvAndValidator(
   const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
 
-  const svAppSecrets = await installSvAppSecrets(
-    xns,
-    auth0Client,
-    svRunbookConfig.auth0SvAppName
-  );
+  const svAppSecrets = await installSvAppSecrets(xns, auth0Client, svRunbookConfig.auth0SvAppName);
 
   svKeySecret(xns, svKey);
 
@@ -345,10 +341,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  const validatorSecrets = await installValidatorSecrets(
-    xns,
-    auth0Client
-  );
+  const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const sv = installSpliceRunbookHelmChart(
     xns,
