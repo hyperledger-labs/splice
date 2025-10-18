@@ -38,7 +38,7 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
     installNode.installNode(migrationId, sv.nodeName, {
       getSecrets: () => Promise.resolve(secrets),
       /* eslint-disable @typescript-eslint/no-unused-vars */
-      getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
+      getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
         Promise.resolve('access_token'),
       getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
     });

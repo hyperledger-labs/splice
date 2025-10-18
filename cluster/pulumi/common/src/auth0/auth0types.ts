@@ -34,7 +34,7 @@ export interface Auth0Client {
   getClientAccessToken: (
     clientId: string,
     clientSecret: string,
-    audience?: string
+    audience: string
   ) => Promise<string>;
   getCfg: () => Auth0Config;
 }

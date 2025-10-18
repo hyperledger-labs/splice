@@ -165,11 +165,8 @@ export async function installSplitwell(
       postgresName: validatorPostgres.instanceName,
     },
     scanAddress: scanAddress,
-    secrets: {
-      xns: xns,
-      auth0Client: auth0Client,
-      auth0AppName: 'splitwell_validator',
-    },
+    auth0Client: auth0Client,
+    auth0ValidatorAppName: 'splitwell_validator',
     validatorWalletUsers: pulumi.output([validatorWalletUser]),
     validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
