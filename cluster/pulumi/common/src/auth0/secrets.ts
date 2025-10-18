@@ -12,7 +12,7 @@ export function uiSecret(
   appName: string,
   clientId: string
 ): k8s.core.v1.Secret {
-  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId);
+  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, clientId);
 }
 
 function getNameSpaceAuth0Clients(auth0Client: Auth0Client, ns: ExactNamespace): ClientIdMap {

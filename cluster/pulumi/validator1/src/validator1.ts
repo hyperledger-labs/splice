@@ -146,7 +146,7 @@ export async function installValidator1(
       activeVersion,
       {
         dependsOn: imagePullDeps.concat([
-          await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
+          await installAuth0UISecret(auth0Client, xns, 'splitwell'),
         ]),
       }
     );

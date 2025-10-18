@@ -367,7 +367,7 @@ export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
-  clientName: string
+  clientName?: string  // TODO: remove this after applying once
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
   const namespaceClientIds = auth0Client.getCfg().namespaceToUiToClientId[xns.logicalName];
@@ -376,18 +376,18 @@ export async function installAuth0UISecret(
   }
   const id = lookupClientSecrets(secrets, namespaceClientIds, secretNameApp).client_id;
 
-  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id);
+  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, id, clientName);
 }
 
 export function installAuth0UiSecretWithClientId(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
-  clientName: string,
-  clientId: string | Promise<string>
+  clientId: string | Promise<string>,
+  clientName?: string // TODO: remove this, and the alias, after applying once
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
-    `splice-auth0-ui-secret-${xns.logicalName}-${clientName}`,
+    `splice-auth0-ui-secret-${xns.logicalName}-${secretNameApp}`,
     {
       metadata: {
         name: `splice-app-${secretNameApp}-ui-auth`,
@@ -400,6 +400,7 @@ export function installAuth0UiSecretWithClientId(
     },
     {
       dependsOn: xns.ns,
+      aliases: clientName ? [`splice-auth0-ui-secret-${xns.logicalName}-${clientName}`] : []
     }
   );
 }
