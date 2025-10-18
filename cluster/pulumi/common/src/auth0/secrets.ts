@@ -10,9 +10,10 @@ export function uiSecret(
   auth0Client: Auth0Client,
   ns: ExactNamespace,
   appName: string,
-  clientId: string
+  clientId: string,
+  clientName?: string // TODO: remove this after applying once
 ): k8s.core.v1.Secret {
-  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, clientId);
+  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, clientId, clientName);
 }
 
 function getNameSpaceAuth0Clients(auth0Client: Auth0Client, ns: ExactNamespace): ClientIdMap {
@@ -54,12 +55,13 @@ export async function installValidatorSecrets(
 export async function installSvAppSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
-  auth0SvAppName: string // FIXME: try to get rid of this
+  auth0SvAppName: string, // FIXME: try to get rid of this
+  uiSecretClientName?: string // // TODO: remove this after applying once
 ): Promise<k8s.core.v1.Secret[]> {
   const clientId = getUiClientId(auth0Client, ns, 'sv');
 
   return [
     await installAuth0Secret(auth0Client, ns, 'sv', auth0SvAppName),
-    uiSecret(auth0Client, ns, 'sv', clientId),
+    uiSecret(auth0Client, ns, 'sv', clientId, uiSecretClientName),
   ];
 }

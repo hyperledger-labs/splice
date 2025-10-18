@@ -29,6 +29,7 @@ import {
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
   installSpliceHelmChart,
+  installSvAppSecrets,
   installValidatorOnboardingSecret,
   networkWideConfig,
   participantBootstrapDumpSecretName,
@@ -49,9 +50,7 @@ import {
   SvParticipant,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
-import {
-  installValidatorApp,
-} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
+import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
@@ -130,13 +129,12 @@ export async function installSvNode(
   const loopback = installSvLoopback(xns);
   const imagePullDeps = imagePullSecret(xns);
 
-  const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
-    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.auth0SvAppName),
-  ];
-
-  const auth0UISecrets: pulumi.Resource[] = [
-    await installAuth0UISecret(baseConfig.auth0Client, xns, 'sv', baseConfig.nodeName),
-  ];
+  const auth0Secrets: CnInput<pulumi.Resource>[] = await installSvAppSecrets(
+    xns,
+    baseConfig.auth0Client,
+    baseConfig.auth0SvAppName,
+    baseConfig.nodeName
+  );
 
   const periodicBackupConfig: BackupConfig | undefined = baseConfig.periodicBackupConfig
     ? {
@@ -172,8 +170,7 @@ export async function installSvNode(
     ? await fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
     : undefined;
 
-  const dependsOn: CnInput<pulumi.Resource>[] = auth0BackendSecrets
-    .concat(auth0UISecrets)
+  const dependsOn: CnInput<pulumi.Resource>[] = auth0Secrets
     .concat(
       config.onboarding.type == 'join-with-key'
         ? installSvKeySecret(xns, config.onboarding.keys)
@@ -346,7 +343,6 @@ async function installValidator(
   svApp: Resource,
   scan: Resource
 ) {
-
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
   const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
 
