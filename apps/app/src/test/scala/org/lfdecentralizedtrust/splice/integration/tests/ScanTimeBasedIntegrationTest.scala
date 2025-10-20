@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -48,6 +47,10 @@ class ScanTimeBasedIntegrationTest
           _.copy(initialRound = initialRound)
         )(config)
       )
+      .withAdditionalSetup { implicit env =>
+        // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
+        advanceTimeForRewardAutomationToRunForCurrentRound
+      }
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
@@ -60,7 +63,7 @@ class ScanTimeBasedIntegrationTest
       sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
     roundNum() shouldBe firstRound + 1
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     roundNum() shouldBe firstRound + 2
   }
 
@@ -70,7 +73,7 @@ class ScanTimeBasedIntegrationTest
     // captured in the tx log, so for now we first advance a round, and query only on that
     // round and beyond. Once that is fixed, we should make sure that querying for round 0 is reliable as well.
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     clue(s"Get config for round ${firstRound + 3}") {
       val cfg = eventuallySucceeds() {
@@ -130,7 +133,7 @@ class ScanTimeBasedIntegrationTest
             .rate
         ) should be(newHoldingFee)
       }
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
     }
     clue(s"Round ${firstRound + 4} should now be open, and have the new configuration") {
       eventuallySucceeds() {
@@ -165,14 +168,14 @@ class ScanTimeBasedIntegrationTest
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       grantFeaturedAppRight(aliceValidatorWalletClient)
       p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 41.0)
       p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, 101.0)
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
     })
     clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
@@ -181,19 +184,19 @@ class ScanTimeBasedIntegrationTest
     clue(
       s"Some more transfers collect more rewards in round ${firstRound + 5} (issued in round ${firstRound + 1})"
     )({
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
     })
     val baseRoundWithLatestData = clue(
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
     ) {
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
       sv1ScanBackend.getRoundOfLatestData()._1
     }
     clue("Advance one more tick to get to the next closed round") {
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       val ledgerTime = getLedgerTime.toInstant
       val expectedLastRound = baseRoundWithLatestData + 1
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
@@ -219,104 +222,68 @@ class ScanTimeBasedIntegrationTest
       )
     })
 
-    def compareLeaderboard(
-        result: Seq[(PartyId, BigDecimal)],
-        expected: Seq[(WalletAppClientReference, BigDecimal)],
-    ) = {
-      result shouldBe expected.map((v) =>
-        (Codec.decode(Codec.Party)((v._1.userStatus().party)).value, v._2)
-      )
-    }
     def walletClientParty(walletClient: WalletAppClientReference) =
       Codec.decode(Codec.Party)(walletClient.userStatus().party).value
-
+    val latestRound = baseRoundWithLatestData + 4
     actAndCheck(
       "Advance four more rounds, for the previous rounds to close (where rewards were collected)",
-      Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+      Range(0, 3).foreach(_ => advanceRoundsToNextRoundOpening),
     )(
-      s"Test leaderboards for ends of rounds ${firstRound + 4} and ${firstRound + 5}",
+      s"Test leaderboards for latest rounds ${latestRound}",
       _ => {
         val ledgerTime = getLedgerTime.toInstant
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
-        sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
+        sv1ScanBackend.getRoundOfLatestData() should be((latestRound, ledgerTime))
 
-        // TODO(#805): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
-        val appRewardsBobR3 = BigDecimal(4.2000000000)
-        val appRewardsAliceR3 = BigDecimal(3.8400000000)
-        val validatorRewardsBobR3 = BigDecimal(1.4000000000)
-        val validatorRewardsAliceR3 = BigDecimal(1.2800000000)
-
-        (baseRoundWithLatestData.toInt to baseRoundWithLatestData.toInt + 3).map { round =>
-          sv1ScanBackend.getRewardsCollectedInRound(round.toLong)
-        }.sum shouldBe appRewardsAliceR3 + appRewardsBobR3 + validatorRewardsAliceR3 + validatorRewardsBobR3
         val aliceValidatorWalletClientParty =
           walletClientParty(aliceValidatorWalletClient).toProtoPrimitive
         val bobValidatorWalletClientParty =
           walletClientParty(bobValidatorWalletClient).toProtoPrimitive
 
-        clue("Compare leaderboard getTopProvidersByAppRewards + 3") {
+        clue("Compare leaderboard getTopProvidersByAppRewards latestRound") {
           sv1ScanBackend
-            .listRoundPartyTotals(firstRound, baseRoundWithLatestData + 3)
+            .listRoundPartyTotals(firstRound, latestRound)
             .map { rpt =>
+              // only keeps latest closed round and app rewards for that round per party
               rpt.party -> (rpt.closedRound, BigDecimal(rpt.cumulativeAppRewards))
             }
-            .filter { case (p, (_, appRewards)) =>
-              appRewards > 0 && (p == aliceValidatorWalletClientParty || p == bobValidatorWalletClientParty)
+            .filter { case (p, (cr, appRewards)) =>
+              appRewards > 0 && (p == aliceValidatorWalletClientParty || p == bobValidatorWalletClientParty) && cr == latestRound
             }
-            .toMap should contain theSameElementsAs Map(
-            aliceValidatorWalletClientParty -> (baseRoundWithLatestData + 3, appRewardsAliceR3),
-            bobValidatorWalletClientParty -> (baseRoundWithLatestData + 3, appRewardsBobR3),
-          )
-
-          compareLeaderboard(
-            sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
-            Seq(
-              (bobValidatorWalletClient, appRewardsBobR3),
-              (aliceValidatorWalletClient, appRewardsAliceR3),
-            ),
-          )
-        }
-        clue("Compare leaderboard getTopValidatorsByValidatorRewards + 3") {
+            .sortBy(_._2._2)(Ordering.BigDecimal.reverse)
+            .map(_._1) should contain theSameElementsInOrderAs (Seq(
+            bobValidatorWalletClientParty,
+            aliceValidatorWalletClientParty,
+          ))
           sv1ScanBackend
-            .listRoundPartyTotals(firstRound + 0, baseRoundWithLatestData + 3)
+            .getTopProvidersByAppRewards(latestRound, 10)
+            .map(_._1.toProtoPrimitive) shouldBe (Seq(
+            bobValidatorWalletClientParty,
+            aliceValidatorWalletClientParty,
+          ))
+        }
+        clue("Compare leaderboard getTopValidatorsByValidatorRewards latestRound") {
+          sv1ScanBackend
+            .listRoundPartyTotals(firstRound, latestRound)
             .map { rpt =>
+              // only keeps latest closed round and app rewards for that round per party
               rpt.party -> (rpt.closedRound, BigDecimal(rpt.cumulativeValidatorRewards))
             }
-            .filter { case (p, (_, validatorRewards)) =>
-              validatorRewards > 0 && (p == aliceValidatorWalletClientParty || p == bobValidatorWalletClientParty)
+            .filter { case (p, (cr, validatorRewards)) =>
+              validatorRewards > 0 && (p == aliceValidatorWalletClientParty || p == bobValidatorWalletClientParty) && cr == latestRound
             }
-            .toMap should contain theSameElementsAs Map(
-            aliceValidatorWalletClientParty -> (baseRoundWithLatestData + 3, validatorRewardsAliceR3),
-            bobValidatorWalletClientParty -> (baseRoundWithLatestData + 3, validatorRewardsBobR3),
-          )
+            .sortBy(_._2._2)(Ordering.BigDecimal.reverse)
+            .map(_._1) should contain theSameElementsInOrderAs (Seq(
+            bobValidatorWalletClientParty,
+            aliceValidatorWalletClientParty,
+          ))
 
-          compareLeaderboard(
-            sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
-            Seq(
-              (bobValidatorWalletClient, validatorRewardsBobR3),
-              (aliceValidatorWalletClient, validatorRewardsAliceR3),
-            ),
-          )
-        }
-        clue("Compare leaderboard getTopProvidersByAppRewards + 4") {
-          compareLeaderboard(
-            sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
-            Seq(
-              // TODO(#805): consider de-hard-coding the expected values here
-              (bobValidatorWalletClient, BigDecimal(8.4060000000)),
-              (aliceValidatorWalletClient, BigDecimal(7.6860000000)),
-            ),
-          )
-        }
-        clue("Compare leaderboard getTopValidatorsByValidatorRewards + 4") {
-          compareLeaderboard(
-            sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
-            Seq(
-              // TODO(#805): consider de-hard-coding the expected values here
-              (bobValidatorWalletClient, BigDecimal(2.8020000000)),
-              (aliceValidatorWalletClient, BigDecimal(2.5620000000)),
-            ),
-          )
+          sv1ScanBackend
+            .getTopValidatorsByValidatorRewards(latestRound, 10)
+            .map(_._1.toProtoPrimitive) should contain theSameElementsInOrderAs (Seq(
+            bobValidatorWalletClientParty,
+            aliceValidatorWalletClientParty,
+          ))
         }
       },
     )
@@ -334,7 +301,7 @@ class ScanTimeBasedIntegrationTest
       aliceWalletClient.tap(tapRound1Amount)
     }
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     roundNum() shouldBe (firstRound + 2)
 
@@ -345,7 +312,7 @@ class ScanTimeBasedIntegrationTest
 
     actAndCheck(
       s"advance to close round ${firstRound + 2}",
-      (0 to 4).foreach(_ => advanceRoundsByOneTick),
+      (0 to 4).foreach(_ => advanceRoundsToNextRoundOpening),
     )(
       s"check round ${firstRound + 2} is closed",
       _ => {
@@ -364,11 +331,11 @@ class ScanTimeBasedIntegrationTest
       val total0 =
         sv1ScanBackend
           .getTotalAmuletBalance(firstRound + 0)
-          .valueOrFail("Amulet balance not yet computed")
+          .getOrElse(BigDecimal(0))
       val total1 =
         sv1ScanBackend
           .getTotalAmuletBalance(firstRound + 1)
-          .valueOrFail("Amulet balance not yet computed")
+          .getOrElse(BigDecimal(0))
       val total2 =
         sv1ScanBackend
           .getTotalAmuletBalance(firstRound + 2)

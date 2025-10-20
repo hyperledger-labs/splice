@@ -372,6 +372,8 @@ In general, processing the updates involves the following steps:
 
 * And ensure that parsing does not break when new fields or templates are introduced.
 
+.. _scan_events_api:
+
 Events
 ~~~~~~
 

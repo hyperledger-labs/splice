@@ -4,6 +4,7 @@
 import { Box, Typography } from '@mui/material';
 import { ConfigChange } from '../../utils/types';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 
 interface BaseProposalSummaryProps {
   actionName: string;
@@ -59,8 +60,8 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
 
         <ProposalField
           id="expiryDate"
-          title="Expiry Date"
-          subtitle="This is the last day voters can vote on this proposal"
+          title="Threshold Deadline"
+          subtitle={THRESHOLD_DEADLINE_SUBTITLE}
           value={expiryDate}
         />
 

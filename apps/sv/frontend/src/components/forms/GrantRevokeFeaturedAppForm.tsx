@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useAppForm } from '../../hooks/form';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import { CommonProposalFormData, SupportedActionTag } from '../../utils/types';
 import { ContractId } from '@daml/types';
 import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet';
@@ -170,7 +171,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
               {field => (
                 <field.DateField
                   title="Threshold Deadline"
-                  description="This is the last day voters can vote on this proposal"
+                  description={THRESHOLD_DEADLINE_SUBTITLE}
                   id={`${testIdPrefix}-expiry-date`}
                 />
               )}
@@ -197,7 +198,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => <field.TextArea title="Proposal Summary" id={`${testIdPrefix}-summary`} />}
+              {field => <field.ProposalSummaryField id={`${testIdPrefix}-summary`} />}
             </form.AppField>
 
             <form.AppField

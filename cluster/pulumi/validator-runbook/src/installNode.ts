@@ -164,6 +164,7 @@ async function installValidator(
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
+    false, // We don't currently support non-auth for validator-runbook
     activeVersion,
     postgres,
     {
@@ -245,6 +246,8 @@ async function installValidator(
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
+    additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
+    additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret
@@ -297,7 +300,7 @@ async function installValidator(
     { dependsOn: dependsOn }
   );
   if (validatorConfig?.partyAllocator.enable) {
-    installPartyAllocator(xns, [validatorChart]);
+    installPartyAllocator(xns, validatorConfig.partyAllocator, [validatorChart]);
   }
   return validatorChart;
 }

@@ -9,6 +9,11 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
+export const ValidatorAppConfigSchema = z.object({
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
+});
+
 export const ParticipantConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
@@ -29,7 +34,18 @@ export const ValidatorNodeConfigSchema = z.object({
     })
     .optional(),
   participant: ParticipantConfigSchema.optional(),
+  validatorApp: ValidatorAppConfigSchema.optional(),
+  disableAuth: z.boolean().default(false), // Note that this is currently ignored everywhere except for validator1, where it is used for testing only
 });
+export const PartyAllocatorConfigSchema = z.object({
+  enable: z.boolean(),
+  parallelism: z.number().default(30),
+  maxParties: z.number().default(1000000),
+  preapprovalRetries: z.number().default(120),
+  preapprovalRetryDelayMs: z.number().default(1000),
+});
+export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
+
 export type ValidatorNodeConfig = z.infer<typeof ValidatorNodeConfigSchema>;
 export const ValidatorConfigSchema = z
   .object({
@@ -41,11 +57,7 @@ export const ValidatorConfigSchema = z
     migrateParty: z.boolean().default(false),
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),
-    partyAllocator: z
-      .object({
-        enable: z.boolean(),
-      })
-      .default({ enable: false }),
+    partyAllocator: PartyAllocatorConfigSchema.default({ enable: false }),
   })
   .and(ValidatorNodeConfigSchema);
 
@@ -61,3 +73,6 @@ const allValidators = Object.keys(allValidatorsConfig);
 export const deployedValidators = DeployValidatorRunbook
   ? allValidators
   : allValidators.filter(validator => validator !== 'validator-runbook');
+
+export const validatorRunbookStackName = (name: string): string =>
+  name === 'validator-runbook' ? name : `validators.${name}`;

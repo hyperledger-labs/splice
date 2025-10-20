@@ -4,6 +4,7 @@ import com.digitalasset.base.error.ErrorCode
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.time.SimClock
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.pattern.CircuitBreakerOpenException
@@ -26,6 +27,8 @@ class SpliceCircuitBreakerTest
 
   private implicit val scheduler: Scheduler = actorSystem.scheduler
 
+  val clock = new SimClock(loggerFactory = loggerFactory)
+
   private def createCircuitBreaker(): SpliceCircuitBreaker = {
     val config = CircuitBreakerConfig(
       maxFailures = 2,
@@ -34,8 +37,9 @@ class SpliceCircuitBreakerTest
       maxResetTimeout = NonNegativeFiniteDuration.ofSeconds(1),
       exponentialBackoffFactor = 1.0,
       randomFactor = 0.0,
+      resetFailuresAfter = NonNegativeFiniteDuration.ofMinutes(1),
     )
-    SpliceCircuitBreaker("test", config, logger)
+    SpliceCircuitBreaker("test", config, clock, loggerFactory)
   }
 
   "SpliceCircuitBreaker" should {
@@ -154,6 +158,28 @@ class SpliceCircuitBreakerTest
       }
 
       cb.isClosed shouldBe true
+    }
+
+    "failures reset after resetFailuresAfter time elapsed" in {
+      val cb = createCircuitBreaker()
+      val future1 = cb.withCircuitBreaker(Future.failed(new RuntimeException("test failure 1")))
+      whenReady(future1.failed) { ex =>
+        ex shouldBe a[RuntimeException]
+        cb.isClosed shouldBe true
+      }
+      clock.advance(java.time.Duration.ofMinutes(1))
+      // Second failure does not open the circuit breaker as it is after resetFailuresAfter
+      val future2 = cb.withCircuitBreaker(Future.failed(new RuntimeException("test failure 2")))
+      whenReady(future2.failed) { ex =>
+        ex shouldBe a[RuntimeException]
+        cb.isClosed shouldBe true
+      }
+      // Third failure is not after resetFailuresAfter so the last 2 failures now exceed the failure threshold and it opens.
+      val future3 = cb.withCircuitBreaker(Future.failed(new RuntimeException("test failure 3")))
+      whenReady(future3.failed) { ex =>
+        ex shouldBe a[RuntimeException]
+        cb.isOpen shouldBe true
+      }
     }
   }
 }

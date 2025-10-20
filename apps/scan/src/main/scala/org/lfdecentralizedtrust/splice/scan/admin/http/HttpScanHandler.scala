@@ -33,13 +33,14 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
   DamlValueEncoding,
+  ErrorResponse,
+  EventHistoryRequest,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
   UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
-  EventHistoryRequest,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -49,7 +50,6 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
-
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -413,8 +413,15 @@ class HttpScanHandler(
             HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
           )
       } yield {
-        definitions.GetTotalAmuletBalanceResponse(
-          Codec.encode(total)
+        total.fold(
+          v0.ScanResource.GetTotalAmuletBalanceResponse
+            .NotFound(ErrorResponse(s"No total amulet balance found for round $asOfEndOfRound"))
+        )(total =>
+          v0.ScanResource.GetTotalAmuletBalanceResponse.OK(
+            definitions.GetTotalAmuletBalanceResponse(
+              Codec.encode(total)
+            )
+          )
         )
       }
     }
@@ -447,7 +454,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAmuletConfigForRound") { _ => _ =>
       store
         .getAmuletConfigForRound(round)
-        .map(cfg => {
+        .map { cfg =>
           val transferFee = cfg.transferFee.getOrElse(throw new RuntimeException("No transfer fee"))
           v0.ScanResource.GetAmuletConfigForRoundResponse.OK(
             definitions.GetAmuletConfigForRoundResponse(
@@ -464,7 +471,7 @@ class HttpScanHandler(
               ),
             )
           )
-        })
+        }
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
   }
@@ -516,14 +523,20 @@ class HttpScanHandler(
       store
         .getTopProvidersByAppRewards(asOfEndOfRound, limit)
         .map(res =>
-          v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
-            definitions
-              .GetTopProvidersByAppRewardsResponse(
-                res
-                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
-                  .toVector
-              )
-          )
+          if (res.isEmpty) {
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse.NotFound(
+              ErrorResponse(s"No top providers by app rewards found for round $asOfEndOfRound")
+            )
+          } else {
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
+              definitions
+                .GetTopProvidersByAppRewardsResponse(
+                  res
+                    .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                    .toVector
+                )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -542,14 +555,22 @@ class HttpScanHandler(
       store
         .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
         .map(res =>
-          v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
-            definitions
-              .GetTopValidatorsByValidatorRewardsResponse(
-                res
-                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
-                  .toVector
+          if (res.isEmpty) {
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.NotFound(
+              ErrorResponse(
+                s"No top validators by validator rewards found for round $asOfEndOfRound"
               )
-          )
+            )
+          } else {
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
+              definitions
+                .GetTopValidatorsByValidatorRewardsResponse(
+                  res
+                    .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                    .toVector
+                )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -589,21 +610,29 @@ class HttpScanHandler(
       store
         .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
         .map(validatorTraffic =>
-          v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
-            definitions.GetTopValidatorsByPurchasedTrafficResponse(
-              validatorTraffic
-                .map(t =>
-                  definitions.ValidatorPurchasedTraffic(
-                    Codec.encode(t.validator),
-                    t.numPurchases,
-                    t.totalTrafficPurchased,
-                    Codec.encode(t.totalCcSpent),
-                    t.lastPurchasedInRound,
-                  )
-                )
-                .toVector
+          if (validatorTraffic.isEmpty) {
+            v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.NotFound(
+              ErrorResponse(
+                s"No top validators by purchased traffic found for round $asOfEndOfRound"
+              )
             )
-          )
+          } else {
+            v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
+              definitions.GetTopValidatorsByPurchasedTrafficResponse(
+                validatorTraffic
+                  .map(t =>
+                    definitions.ValidatorPurchasedTraffic(
+                      Codec.encode(t.validator),
+                      t.numPurchases,
+                      t.totalTrafficPurchased,
+                      Codec.encode(t.totalCcSpent),
+                      t.lastPurchasedInRound,
+                    )
+                  )
+                  .toVector
+              )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")

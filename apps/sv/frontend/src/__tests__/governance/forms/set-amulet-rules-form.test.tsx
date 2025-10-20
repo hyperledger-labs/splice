@@ -4,6 +4,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { rest } from 'msw';
 import { SvConfigProvider } from '../../../utils';
 import App from '../../../App';
 import { svPartyId } from '../../mocks/constants';
@@ -11,6 +12,8 @@ import { Wrapper } from '../../helpers';
 import { SetAmuletConfigRulesForm } from '../../../components/forms/SetAmuletConfigRulesForm';
 import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { server, svUrl } from '../../setup/setup';
+import { PROPOSAL_SUMMARY_SUBTITLE, PROPOSAL_SUMMARY_TITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -33,11 +36,11 @@ describe('SV user can', () => {
   });
 });
 
-describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
+describe('Set Amulet Config Rules Form', () => {
   test('should render all Set Amulet Config Rules Form components', () => {
     render(
       <Wrapper>
-        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm />
       </Wrapper>
     );
 
@@ -51,6 +54,10 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
+
+    const summarySubtitle = screen.getByTestId('set-amulet-config-rules-summary-subtitle');
+    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
     const urlInput = screen.getByTestId('set-amulet-config-rules-url');
     expect(urlInput).toBeDefined();
@@ -72,6 +79,8 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
       },
       { timeout: 1000 }
     );
+
+    expect(screen.getByTestId('json-diffs-details')).toBeDefined();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -79,7 +88,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     render(
       <Wrapper>
-        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm />
       </Wrapper>
     );
 
@@ -114,7 +123,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm />
       </Wrapper>
     );
 
@@ -142,7 +151,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     render(
       <Wrapper>
-        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm />
       </Wrapper>
     );
 
@@ -173,7 +182,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     render(
       <Wrapper>
-        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm />
       </Wrapper>
     );
 
@@ -198,7 +207,7 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     render(
       <Wrapper>
-        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm />
       </Wrapper>
     );
 
@@ -226,6 +235,126 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText('Proposal Summary')).toBeDefined();
+    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
+  });
+
+  test('should show error on form if submission fails', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
+    await user.type(c2Input, '9.99');
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); // Review proposal
+    await user.click(submitButton); // Submit proposal
+
+    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
+    expect(screen.getByText(/Submission failed/)).toBeDefined();
+    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+  });
+
+  test('should redirect to governance page after successful submission', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
+    await user.type(c2Input, '9.99');
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); // Review proposal
+    await user.click(submitButton); // Submit proposal
+
+    await waitFor(() => {
+      expect(screen.queryByText('Action Required')).toBeDefined();
+      expect(screen.queryByText('Inflight Votes')).toBeDefined();
+      expect(screen.queryByText('Vote History')).toBeDefined();
+      expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
+    });
+  });
+
+  test('should render diffs if changes to config values were made', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
+    await user.type(c1Input, '99');
+
+    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
+    await user.type(c2Input, '9.99');
+
+    const jsonDiffs = screen.getByText('JSON Diffs');
+    expect(jsonDiffs).toBeDefined();
+
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+
+    const reviewButton = screen.getByTestId('submit-button');
+    await waitFor(async () => {
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+
+    expect(jsonDiffs).toBeDefined();
+    await user.click(jsonDiffs);
+    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
   });
 });

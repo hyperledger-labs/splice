@@ -39,17 +39,18 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   protected val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
 
-  protected val isDevNet: Boolean
+  protected val isDevNet: Boolean = true
 
+  protected lazy val isAuth0: Boolean = true
   protected val auth0: Auth0Util
 
   protected val validatorName: String
   protected val validatorAuth0Secret: String
   protected val validatorAuth0Audience: String
   protected val validatorWalletUser: String
-  protected val includeSplitwellTests = true
+  protected lazy val includeSplitwellTests = true
 
-  private lazy val walletUiUrl =
+  protected lazy val walletUiUrl =
     s"https://wallet.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val ansUiUrl =
     s"https://cns.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
@@ -66,13 +67,13 @@ abstract class ValidatorPreflightIntegrationTestBase
 
     TraceContext.withNewTraceContext(implicit traceContext => {
       try {
-        addUser("alice-validator")
-        addUser("bob-validator")
-        addUser("charlie-validator")
+        addUser("alice")
+        addUser("bob")
+        addUser("charlie")
       } catch {
         case NonFatal(e) =>
           // Logging the error, as an exception in this method will abort the test suite with no log output.
-          logger.error("addUser {alice,bob,charlie}-validator beforeEach failed", e)
+          logger.error("addUser {alice,bob,charlie} beforeEach failed", e)
           throw e
       }
     })
@@ -107,24 +108,28 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   protected def limitValidatorUsers() = {
-    val users = eventuallySucceeds()(validatorClient(suppressErrors = false).listUsers())
-    val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
-    val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
-    if (users.length > offboardThreshold) {
-      logger.info(
-        s"Validator has ${users.length} users, offboarding some to get below ${targetNumber}"
-      )
-      users
-        .filter(_ != validatorWalletUser)
-        .take(users.length - targetNumber)
-        .foreach { user =>
-          {
-            logger.debug(s"Offboarding user: ${user}")
-            eventuallySucceeds()(validatorClient(suppressErrors = false).offboardUser(user))
+    // We skip offboarding users on non-auth0 validators. We don't use those on any long-running clusters,
+    // where number of users becomes an issue.
+    if (isAuth0) {
+      val users = eventuallySucceeds()(validatorClient(suppressErrors = false).listUsers())
+      val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
+      val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
+      if (users.length > offboardThreshold) {
+        logger.info(
+          s"Validator has ${users.length} users, offboarding some to get below ${targetNumber}"
+        )
+        users
+          .filter(_ != validatorWalletUser)
+          .take(users.length - targetNumber)
+          .foreach { user =>
+            {
+              logger.debug(s"Offboarding user: ${user}")
+              eventuallySucceeds()(validatorClient(suppressErrors = false).offboardUser(user))
+            }
           }
-        }
-    } else {
-      logger.debug(s"Only ${users.length} users onboarded, not offboarding any")
+      } else {
+        logger.debug(s"Only ${users.length} users onboarded, not offboarding any")
+      }
     }
   }
 
@@ -135,24 +140,31 @@ abstract class ValidatorPreflightIntegrationTestBase
       this.getClass.getSimpleName()
     )
 
+  private def logout()(implicit webDriver: WebDriverType) = {
+    clue("Logging out") {
+      click on "logout-button"
+      eventually() {
+        (find(id("oidc-login-button")).isDefined || find(
+          id("user-id-field")
+        ).isDefined) shouldBe true
+      }
+    }
+  }
+
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
 
   checkValidatorIsConnectedToSvRunbook()
 
   "run through runbook against cluster validator" in { implicit env =>
-    val aliceUser = auth0Users.get("alice-validator").value
-    val bobUser = auth0Users.get("bob-validator").value
-    val charlieUser = auth0Users.get("charlie-validator").value
-
     val alicePartyId = withFrontEnd("alice-validator") { implicit webDriver =>
-      val alicePartyId = loginAndOnboardToWalletUi(aliceUser)
+      val alicePartyId = loginAndOnboardToWalletUi("alice")
       findAll(className("amulets-table-row")) should have size 0
       alicePartyId
     }
 
     val bobPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
-      val bobPartyId = loginAndOnboardToWalletUi(bobUser)
+      val bobPartyId = loginAndOnboardToWalletUi("bob")
       findAll(className("amulets-table-row")) should have size 0
       bobPartyId
     }
@@ -171,10 +183,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         }
       }
 
-      clue("Logging out") {
-        click on "logout-button"
-        waitForQuery(id("oidc-login-button"))
-      }
+      logout()
     }
 
     withFrontEnd("bob-validator") { implicit webDriver =>
@@ -223,37 +232,37 @@ abstract class ValidatorPreflightIntegrationTestBase
         )
       }
 
-      clue("Logging out") {
-        click on "logout-button"
-        waitForQuery(id("oidc-login-button"))
-      }
+      logout()
     }
 
-    clue("Onboard charlie manually to share a party with Bob") {
-      validatorClient().onboardUser(charlieUser.id, Some(PartyId.tryFromProtoPrimitive(bobPartyId)))
-    }
-
-    withFrontEnd("charlie-validator") { implicit webDriver =>
-      clue("Charlie should be able to login without onboarding and share a party with Bob") {
-        auth0Login(
-          charlieUser,
-          walletUiUrl,
-          () => {
-            logger.debug(
-              s"Checking party ID for charlie: ${find(className("party-id"))} (bob's is ${bobPartyId}"
-            )
-            find(className("party-id")) should not be None
-            val charliePartyId = seleniumText(find(className("party-id")))
-            logger.debug(
-              s"Checking party ID for charlie (it's not none): ${charliePartyId} (bob's is ${bobPartyId}"
-            )
-            charliePartyId should be(bobPartyId)
-          },
+    if (isAuth0) {
+      val charlieUser = auth0Users.get("charlie").value
+      clue("Onboard charlie manually to share a party with Bob") {
+        validatorClient().onboardUser(
+          charlieUser.id,
+          Some(PartyId.tryFromProtoPrimitive(bobPartyId)),
         )
       }
-      clue("Logging out") {
-        click on "logout-button"
-        waitForQuery(id("oidc-login-button"))
+
+      withFrontEnd("charlie-validator") { implicit webDriver =>
+        clue("Charlie should be able to login without onboarding and share a party with Bob") {
+          auth0Login(
+            charlieUser,
+            walletUiUrl,
+            () => {
+              logger.debug(
+                s"Checking party ID for charlie: ${find(className("party-id"))} (bob's is ${bobPartyId}"
+              )
+              find(className("party-id")) should not be None
+              val charliePartyId = seleniumText(find(className("party-id")))
+              logger.debug(
+                s"Checking party ID for charlie (it's not none): ${charliePartyId} (bob's is ${bobPartyId}"
+              )
+              charliePartyId should be(bobPartyId)
+            },
+          )
+        }
+        logout()
       }
     }
   }
@@ -263,11 +272,11 @@ abstract class ValidatorPreflightIntegrationTestBase
     if (includeSplitwellTests) {
       val groupName = "troika"
 
-      val aliceUser = auth0Users.get("alice-validator").value
-      val bobUser = auth0Users.get("bob-validator").value
+      val aliceUser = auth0Users.get("alice").value
+      val bobUser = auth0Users.get("bob").value
 
       val bobUserPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
-        val bobUserPartyId = loginAndOnboardToWalletUi(bobUser)
+        val bobUserPartyId = loginAndOnboardToWalletUi("bob")
         if (isDevNet) {
           tapAmulets(710)
         }
@@ -275,7 +284,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       }
 
       val (aliceUserPartyId, invite) = withFrontEnd("alice-validator") { implicit webDriver =>
-        val aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser)
+        val aliceUserPartyId = loginAndOnboardToWalletUi("alice")
         loginToSplitwellUi(aliceUser)
 
         (aliceUserPartyId, createGroupAndInviteLink(groupName))
@@ -355,10 +364,8 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   "test the Name Service UI of a validator" in { implicit env =>
-    val aliceUser = auth0Users.get("alice-validator").value
-
     withFrontEnd("alice-validator") { implicit webDriver =>
-      loginAndOnboardToWalletUi(aliceUser)
+      loginAndOnboardToWalletUi("alice")
 
       if (isDevNet) {
         // On DevNet-like clusters, we test the full ANS entry creation flow
@@ -369,15 +376,22 @@ abstract class ValidatorPreflightIntegrationTestBase
 
         tapAmulets(100)
         reserveAnsNameFor(
-          () =>
-            auth0Login(
-              aliceUser,
-              ansUiUrl,
-              () => {
-                waitForQuery(id("entry-name-field"))
-                find(id("entry-name-field")) should not be empty
-              },
-            ),
+          () => {
+            if (isAuth0) {
+              auth0Login(
+                auth0Users.get("alice").value,
+                ansUiUrl,
+                () => {
+                  waitForQuery(id("entry-name-field"))
+                  find(id("entry-name-field")) should not be empty
+                },
+              )
+            } else {
+              go to ansUiUrl
+              waitForQuery(id("user-id-field"))
+              loginOnceConfirmedToBeAtUrl("alice")
+            }
+          },
           ansName,
           "1.0000000000",
           "USD",
@@ -386,8 +400,9 @@ abstract class ValidatorPreflightIntegrationTestBase
         )
       } else {
         // On non-DevNet clusters, we only test logging in to the directory UI
+        isAuth0 shouldBe true // We don't currently test non-auth0 on non-devnet clusters
         auth0Login(
-          aliceUser,
+          auth0Users.get("alice").value,
           ansUiUrl,
           () => {
             waitForQuery(id("entry-name-field"))
@@ -399,46 +414,52 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   "can dump participant identities of validator" in { _ =>
-    eventuallySucceeds() {
-      validatorClient(suppressErrors = false).dumpParticipantIdentities()
+    if (isAuth0) {
+      eventuallySucceeds() {
+        validatorClient(suppressErrors = false).dumpParticipantIdentities()
+      }
     }
   }
 
   "connect to all sequencers stated in latest DsoRules contract" in { implicit env =>
-    val sv1ScanClient = scancl("sv1Scan")
-    eventually() {
-      val connections = inside(sv1ScanClient.listDsoSequencers()) {
-        case Seq(DomainSequencers(_, connections)) => connections
-      }
-      connections should not be empty
-      val latestMigrationId = connections.map(_.migrationId).max
-      val availableConnections = connections.filter(connection =>
-        connection.migrationId == latestMigrationId &&
-          connection.url != "" &&
-          // added 60s grace period for the polling trigger interval 30s + other latency
-          env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
-      )
-      val (expectedSequencerConnections, _) =
-        Endpoint
-          .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
+    if (isAuth0) {
+      val sv1ScanClient = scancl("sv1Scan")
+      eventually() {
+        val connections = inside(sv1ScanClient.listDsoSequencers()) {
+          case Seq(DomainSequencers(_, connections)) => connections
+        }
+        connections should not be empty
+        val latestMigrationId = connections.map(_.migrationId).max
+        val availableConnections = connections.filter(connection =>
+          connection.migrationId == latestMigrationId &&
+            connection.url != "" &&
+            // added 60s grace period for the polling trigger interval 30s + other latency
+            env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
+        )
+        val (expectedSequencerConnections, _) =
+          Endpoint
+            .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
+            .value
+
+        val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
+        val connectedEndpointSet =
+          domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
+
+        connectedEndpointSet should contain allElementsOf expectedSequencerConnections.map(
+          _.toString
+        )
+
+        domainConnectionConfig.sequencerConnections.sequencerTrustThreshold shouldBe Thresholds
+          .sequencerConnectionsSizeThreshold(
+            domainConnectionConfig.sequencerConnections.connections.size
+          )
           .value
-
-      val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
-      val connectedEndpointSet =
-        domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
-
-      connectedEndpointSet should contain allElementsOf expectedSequencerConnections.map(_.toString)
-
-      domainConnectionConfig.sequencerConnections.sequencerTrustThreshold shouldBe Thresholds
-        .sequencerConnectionsSizeThreshold(
-          domainConnectionConfig.sequencerConnections.connections.size
-        )
-        .value
-      domainConnectionConfig.sequencerConnections.submissionRequestAmplification.factor shouldBe Thresholds
-        .sequencerSubmissionRequestAmplification(
-          domainConnectionConfig.sequencerConnections.connections.size
-        )
-        .value
+        domainConnectionConfig.sequencerConnections.submissionRequestAmplification.factor shouldBe Thresholds
+          .sequencerSubmissionRequestAmplification(
+            domainConnectionConfig.sequencerConnections.connections.size
+          )
+          .value
+      }
     }
   }
 
@@ -460,9 +481,13 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   private def loginAndOnboardToWalletUi(
-      user: Auth0User
+      username: String
   )(implicit webDriver: WebDriverType): String = {
-    loginAndOnboardToUiViaAuth0(user, walletUiUrl)
+    if (isAuth0) {
+      loginAndOnboardToUiViaAuth0(auth0Users.get(username).value, walletUiUrl)
+    } else {
+      loginAndOnboardNoAuth(username, walletUiUrl)
+    }
   }
 
   private def loginToSplitwellUi(
@@ -476,6 +501,31 @@ abstract class ValidatorPreflightIntegrationTestBase
       )
       waitForQuery(id("logged-in-user"))
     }
+  }
+
+  private def loginAndOnboardNoAuth(
+      username: String,
+      url: String,
+  )(implicit webDriver: WebDriverType): String = {
+    go to url
+    waitForQuery(id("user-id-field"))
+    loginOnceConfirmedToBeAtUrl(username)
+    eventually() {
+      (find(id("onboard-button")).isDefined || find(id("logout-button")).isDefined) shouldBe true
+    }
+    if (find(id("onboard-button")).isDefined) {
+      actAndCheck()(
+        "Onboard wallet user", {
+          click on "onboard-button"
+        },
+      )(
+        "Party ID is displayed after onboarding finishes",
+        _ => {
+          findAll(className("party-id")) should have size 1
+        },
+      )
+    }
+    copyPartyId()
   }
 
   private def loginAndOnboardToUiViaAuth0(
@@ -523,7 +573,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
   override protected val validatorName = "validator"
   override protected val validatorAuth0Secret = sys.env("SPLICE_OAUTH_TEST_CLIENT_ID_VALIDATOR")
   override protected val validatorAuth0Audience = "https://validator.example.com/api"
-  override protected val includeSplitwellTests = false
+  override protected lazy val includeSplitwellTests = false
 
   override protected val validatorWalletUser = sys.env("SPLICE_OAUTH_TEST_VALIDATOR_WALLET_USER")
 
@@ -556,4 +606,21 @@ class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTe
     sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_VALIDATOR1")
   override protected val validatorAuth0Audience = sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE")
   override protected val validatorWalletUser = sys.env("SPLICE_OAUTH_DEV_VALIDATOR_WALLET_USER")
+  override protected lazy val isAuth0 = checkIfAuth0()
+  override protected lazy val includeSplitwellTests = isAuth0
+
+  def checkIfAuth0(): Boolean = {
+    withFrontEnd("alice-validator") { implicit webDriver =>
+      go to walletUiUrl
+      eventually() {
+        if (find(id("logout-button")).isDefined) {
+          eventuallyClickOn(id("logout-button"))
+        }
+        if (!find(id("user-id-field")).isDefined && !find(id("oidc-login-button")).isDefined) {
+          fail()
+        }
+        find(id("oidc-login-button")).isDefined
+      }
+    }
+  }
 }

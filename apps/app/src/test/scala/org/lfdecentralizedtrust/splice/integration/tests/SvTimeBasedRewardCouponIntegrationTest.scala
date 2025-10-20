@@ -123,6 +123,8 @@ class SvTimeBasedRewardCouponIntegrationTest
           .resume()
       )
 
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
       val openRounds = eventually() {
         val openRounds = sv1ScanBackend
           .getOpenAndIssuingMiningRounds()
@@ -131,7 +133,6 @@ class SvTimeBasedRewardCouponIntegrationTest
         openRounds should not be empty
         openRounds
       }
-
       eventually() {
         val expectedSize = openRounds.size.toLong
         val sv1Coupons = sv1WalletClient.listSvRewardCoupons()
@@ -158,8 +159,8 @@ class SvTimeBasedRewardCouponIntegrationTest
       }
 
       // advance enough rounds to claim one SvRewardCoupon
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
       eventually() {
         val expectedSize = (openRounds.size - 1).toLong
         sv1WalletClient.listSvRewardCoupons() should have size expectedSize
@@ -337,7 +338,7 @@ class SvTimeBasedRewardCouponIntegrationTest
 
         eventually() {
           clue("No SvRewardCoupon should be issued to Alice's participant") {
-            advanceRoundsByOneTick
+            advanceRoundsToNextRoundOpening
             sv4RewardCouponTrigger.runOnce().futureValue
             val openRounds = eventually() {
               val openRounds = sv1ScanBackend

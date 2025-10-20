@@ -5,7 +5,8 @@ import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
+import { configureCloudArmorPolicy } from './cloudArmor';
+import { cloudArmorConfig, clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
 import { installExtraCustomResources } from './extraCustomResources';
 import {
   getNotificationChannel,
@@ -42,6 +43,8 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
+
+configureCloudArmorPolicy(cloudArmorConfig);
 
 installExtraCustomResources();
 

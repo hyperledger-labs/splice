@@ -83,10 +83,16 @@ class DbSvSvStore(
             acsStoreId,
             domainMigrationId,
             sql"""
-            template_id_qualified_name = ${QualifiedName(
+              template_id_qualified_name = ${QualifiedName(
                 ValidatorOnboarding.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
-              and onboarding_secret = ${lengthLimited(secret)}
+              and (
+                onboarding_secret = ${lengthLimited(secret)}
+                or (
+                  onboarding_secret like '{%'
+                  and (onboarding_secret::jsonb ->> 'secret') = ${lengthLimited(secret)}
+                )
+              )
           """,
           ).headOption,
           "lookupValidatorOnboardingBySecretWithOffset",
@@ -109,10 +115,16 @@ class DbSvSvStore(
               acsStoreId,
               domainMigrationId,
               sql"""
-                  template_id_qualified_name = ${QualifiedName(
+                template_id_qualified_name = ${QualifiedName(
                   UsedSecret.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
-                    and onboarding_secret = ${lengthLimited(secret)}
+                and (
+                  onboarding_secret = ${lengthLimited(secret)}
+                  or (
+                    onboarding_secret like '{%'
+                    and (onboarding_secret::jsonb ->> 'secret') = ${lengthLimited(secret)}
+                  )
+                )
                 """,
             ).headOption,
             "lookupUsedSecretWithOffset",
