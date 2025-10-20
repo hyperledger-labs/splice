@@ -34,14 +34,6 @@ export interface PredefinedWafRule {
   sensitivityLevel?: 'off' | 'low' | 'medium' | 'high';
 }
 
-// TODO (DACH-NY/canton-network-internal#2115) replace this placeholder config
-// with the real yaml structure we want to use
-export interface ApiThrottleConfig {
-  endpoint: ApiEndpoint;
-  throttle: ThrottleConfig;
-  action: 'throttle' | 'ban';
-}
-
 /**
  * Creates a Cloud Armor security policy
  * @param cac loaded configuration
