@@ -469,7 +469,14 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     )
 
     clue("Offboarding alice again - offboarding should be idempotent") {
-      aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser)
+      loggerFactory.assertLogs(
+        {
+          aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser)
+        },
+        _.warningMessage should include(
+          "Skipping user deletion"
+        ),
+      )
       assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend, aliceUserParty)
     }
 
