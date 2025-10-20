@@ -1574,6 +1574,7 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
+            FeaturedAppActivityMarker.COMPANION,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
