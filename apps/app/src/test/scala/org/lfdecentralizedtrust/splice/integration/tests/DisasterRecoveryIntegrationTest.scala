@@ -94,10 +94,7 @@ class DisasterRecoveryIntegrationTest
       // Disable user allocation
       .withPreSetup(_ => ())
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       .addConfigTransforms(
         (_, conf) =>
           updateAutomationConfig(ConfigurableApp.Sv)(

@@ -7,6 +7,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.common.sequencer.SequencerConnectClient
 import com.digitalasset.canton.common.sequencer.SequencerConnectClient.SynchronizerClientBootstrapInfo
 import com.digitalasset.canton.common.sequencer.grpc.GrpcSequencerConnectClient
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   CryptoConfig,
   CryptoProvider,
@@ -18,8 +19,8 @@ import com.digitalasset.canton.console.LocalSequencerReference
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.networking.Endpoint
@@ -137,7 +138,7 @@ trait SequencerConnectServiceIntegrationTest
           Some(cryptoProvider.supportedSignatureFormatsForProtocol(testedProtocolVersion)),
       )
       val expectedSynchronizerParameters = defaultSynchronizerParametersConfig
-        .toStaticSynchronizerParameters(CryptoConfig(), testedProtocolVersion)
+        .toStaticSynchronizerParameters(CryptoConfig(), testedProtocolVersion, NonNegativeInt.zero)
         .value
 
       fetchedSynchronizerParameters shouldBe expectedSynchronizerParameters
@@ -164,7 +165,10 @@ trait SequencerConnectServiceIntegrationTest
 
       val grpcSequencerConnectClient = getSequencerConnectClient()
 
-      grpcSequencerConnectClient.getSynchronizerId(daName.unwrap).futureValueUS.value shouldBe daId
+      grpcSequencerConnectClient
+        .getSynchronizerId(daName.unwrap)
+        .futureValueUS
+        .value shouldBe daId
     }
 
     "respond to is active requests" in { implicit env =>
@@ -202,6 +206,7 @@ trait GrpcSequencerConnectServiceIntegrationTest extends SequencerConnectService
         transportSecurity = false,
         customTrustCertificates = None,
         SequencerAlias.Default,
+        None,
       )
 
     new GrpcSequencerConnectClient(
@@ -267,7 +272,7 @@ class GrpcSequencerConnectServiceIntegrationTestPostgresReference
     extends GrpcSequencerConnectServiceIntegrationTestPostgres {
 
   override lazy val sequencerPlugin =
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
 
   override protected def localSequencer(implicit
       env: TestConsoleEnvironment

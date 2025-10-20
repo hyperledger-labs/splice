@@ -8,7 +8,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
 import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
@@ -310,7 +310,7 @@ class NodeInitializer(
       authorizedStoreSnapshot: ByteString
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
     for {
-      _ <- connection.importTopologySnapshot(authorizedStoreSnapshot, AuthorizedStore)
+      _ <- connection.importTopologySnapshot(authorizedStoreSnapshot, Authorized)
       _ = logger.info(s"AuthorizedStore snapshot is imported")
     } yield ()
 }

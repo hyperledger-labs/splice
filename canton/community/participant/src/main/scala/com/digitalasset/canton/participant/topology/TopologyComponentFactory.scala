@@ -10,16 +10,16 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
   TopologyConfig,
 }
-import com.digitalasset.canton.crypto.{Crypto, SynchronizerCryptoPureApi}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.crypto.SynchronizerCrypto
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.UnsafeOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing
+import com.digitalasset.canton.participant.sync.LogicalSynchronizerUpgradeCallback
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
-import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.store.SequencedEventStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.client.*
@@ -29,18 +29,16 @@ import com.digitalasset.canton.topology.processing.{
   TopologyTransactionProcessor,
 }
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
-import com.digitalasset.canton.topology.store.{PackageDependencyResolverUS, TopologyStore}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.store.{PackageDependencyResolver, TopologyStore}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.version.ProtocolVersion
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.ExecutionContext
 
 class TopologyComponentFactory(
-    synchronizerId: SynchronizerId,
-    protocolVersion: ProtocolVersion,
-    crypto: Crypto,
+    psid: PhysicalSynchronizerId,
+    crypto: SynchronizerCrypto,
     clock: Clock,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
@@ -52,14 +50,15 @@ class TopologyComponentFactory(
     topologyStore: TopologyStore[SynchronizerStore],
     loggerFactory: NamedLoggerFactory,
 ) {
-
   def createTopologyProcessorFactory(
-      staticSynchronizerParameters: StaticSynchronizerParameters,
       partyNotifier: LedgerServerPartyNotifier,
       missingKeysAlerter: MissingKeysAlerter,
+      sequencerConnectionSuccessorListener: SequencerConnectionSuccessorListener,
       topologyClient: SynchronizerTopologyClientWithInit,
       recordOrderPublisher: RecordOrderPublisher,
+      lsuCallback: LogicalSynchronizerUpgradeCallback,
       sequencedEventStore: SequencedEventStore,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
       ledgerApiStore: LedgerApiStore,
   ): TopologyTransactionProcessor.Factory = new TopologyTransactionProcessor.Factory {
     override def create(
@@ -70,20 +69,20 @@ class TopologyComponentFactory(
     ): FutureUnlessShutdown[TopologyTransactionProcessor] = {
 
       val participantTerminateProcessing = new ParticipantTopologyTerminateProcessing(
-        synchronizerId,
-        protocolVersion,
         recordOrderPublisher,
         topologyStore,
-        recordOrderPublisher.initTimestamp,
+        initialRecordTime = recordOrderPublisher.initTimestamp,
         participantId,
-        unsafeOnlinePartyReplication.exists(_.pauseSynchronizerIndexingDuringPartyReplication),
+        pauseSynchronizerIndexingDuringPartyReplication = unsafeOnlinePartyReplication.nonEmpty,
+        synchronizerPredecessor = synchronizerPredecessor,
+        lsuCallback,
         loggerFactory,
       )
       val terminateTopologyProcessingFUS =
         for {
           topologyEventPublishedOnInitialRecordTime <- FutureUnlessShutdown.outcomeF(
             ledgerApiStore.topologyEventOffsetPublishedOnRecordTime(
-              synchronizerId,
+              psid.logical,
               recordOrderPublisher.initTimestamp,
             )
           )
@@ -97,8 +96,7 @@ class TopologyComponentFactory(
 
       terminateTopologyProcessingFUS.map { terminateTopologyProcessing =>
         val processor = new TopologyTransactionProcessor(
-          synchronizerId,
-          new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
+          crypto.pureCrypto,
           topologyStore,
           acsCommitmentScheduleEffectiveTime,
           terminateTopologyProcessing,
@@ -110,6 +108,7 @@ class TopologyComponentFactory(
         // subscribe party notifier to topology processor
         processor.subscribe(partyNotifier.attachToTopologyProcessor())
         processor.subscribe(missingKeysAlerter.attachToTopologyProcessor())
+        processor.subscribe(sequencerConnectionSuccessorListener)
         processor.subscribe(topologyClient)
         processor
       }
@@ -117,43 +116,30 @@ class TopologyComponentFactory(
   }
 
   def createInitialTopologySnapshotValidator(
-      staticSynchronizerParameters: StaticSynchronizerParameters,
-      topologyConfig: TopologyConfig,
+      topologyConfig: TopologyConfig
   )(implicit
       executionContext: ExecutionContext,
       materializer: Materializer,
   ): InitialTopologySnapshotValidator =
     new InitialTopologySnapshotValidator(
-      new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
+      crypto.pureCrypto,
       topologyStore,
       validateInitialSnapshot = topologyConfig.validateInitialTopologySnapshot,
-      timeouts,
-      loggerFactory,
-    )
-
-  def createTopologyClient(
-      packageDependencyResolver: PackageDependencyResolverUS
-  )(implicit executionContext: ExecutionContext): SynchronizerTopologyClientWithInit =
-    new StoreBasedSynchronizerTopologyClient(
-      clock,
-      synchronizerId,
-      topologyStore,
-      packageDependencyResolver,
-      timeouts,
-      futureSupervisor,
       loggerFactory,
     )
 
   def createCachingTopologyClient(
-      packageDependencyResolver: PackageDependencyResolverUS
+      packageDependencyResolver: PackageDependencyResolver,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[SynchronizerTopologyClientWithInit] =
     CachingSynchronizerTopologyClient.create(
       clock,
-      synchronizerId,
+      crypto.staticSynchronizerParameters,
       topologyStore,
+      synchronizerPredecessor,
       packageDependencyResolver,
       caching,
       batching,
@@ -164,7 +150,7 @@ class TopologyComponentFactory(
 
   def createTopologySnapshot(
       asOf: CantonTimestamp,
-      packageDependencyResolver: PackageDependencyResolverUS,
+      packageDependencyResolver: PackageDependencyResolver,
       preferCaching: Boolean,
   )(implicit executionContext: ExecutionContext): TopologySnapshot = {
     val snapshot = new StoreBasedTopologySnapshot(

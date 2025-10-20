@@ -8,7 +8,6 @@ import com.digitalasset.canton.config.{
   CachingConfigs,
   LocalNodeParametersConfig,
   NonNegativeFiniteDuration,
-  SessionSigningKeysConfig,
   WatchdogConfig,
 }
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
@@ -27,6 +26,4 @@ final case class SpliceParametersConfig(
   override def alphaVersionSupport: Boolean = false
 
   override def watchdog: Option[WatchdogConfig] = None
-
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

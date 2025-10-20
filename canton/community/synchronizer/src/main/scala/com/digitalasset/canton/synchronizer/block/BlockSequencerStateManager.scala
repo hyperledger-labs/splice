@@ -40,12 +40,10 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   DeliverableSubmissionOutcome,
   InFlightAggregationUpdates,
   InFlightAggregations,
-  ProgressSupervisor,
   SequencerIntegration,
-  SubmissionOutcome,
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.store.TrafficConsumedStore
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, Traced}
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -111,7 +109,7 @@ trait BlockSequencerStateManagerBase extends FlagCloseable {
   *   the maximum number of block info updates to batch in a single write
   */
 final case class AsyncWriterParameters(
-    enabled: Boolean = false,
+    enabled: Boolean = true,
     trafficBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
     aggregationBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
     blockInfoBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
@@ -208,7 +206,7 @@ private[block] abstract class AsyncWriter[Q <: Iterable[?]](
               } else {
                 // 1b something left to do, so we pick up the queue and notify anyone who is waiting
                 // on the queue being picked up
-                queueSubmitted.outcome(())
+                queueSubmitted.outcome(()).discard
                 AsyncAppendWorkHandle(
                   dispatchQueue(pending, Some(queueCompleted)),
                   FutureUnlessShutdown.unit,
@@ -499,8 +497,6 @@ class BlockSequencerStateManager(
     headState: AtomicReference[HeadState],
     streamInstrumentationConfig: BlockSequencerStreamInstrumentationConfig,
     blockMetrics: BlockMetrics,
-    progressSupervisorO: Option[ProgressSupervisor],
-    sequencerId: SequencerId,
 )(implicit executionContext: ExecutionContext)
     extends BlockSequencerStateManagerBase
     with NamedLogging
@@ -532,26 +528,26 @@ class BlockSequencerStateManager(
       bug.internalStateFor(head.blockEphemeralState)
     }
 
-    def instrumentFlow[In, Out, Mat](
+    def finalFlow[In, Out, Mat](
         original: Flow[In, Out, Mat],
         flowName: String,
     ): Flow[In, Out, Mat] =
       if (streamInstrumentationConfig.isEnabled)
         original.buffered(
-          blockMetrics.streamBufferSize,
+          blockMetrics.stramBufferSize,
           streamInstrumentationConfig.bufferSize.value,
         )(MetricsContext("element" -> flowName))
       else original
 
     Flow[BlockEvents]
       .via(
-        instrumentFlow(checkBlockHeight(head.block.height), "check_block_height")
+        finalFlow(checkBlockHeight(head.block.height), "check_block_height")
       )
       .via(
-        instrumentFlow(chunkBlock(bug), "chunk_block")
+        finalFlow(chunkBlock(bug), "chunk_block")
       )
       .via(
-        instrumentFlow(processChunk(bug)(bugState), "process_chunk")
+        finalFlow(processChunk(bug)(bugState), "process_chunk")
       )
   }
 
@@ -582,13 +578,14 @@ class BlockSequencerStateManager(
           noTracingLogger.error(msg)
           throw new SequencerUnexpectedStateChange(msg)
         } else {
-          implicit val traceContext: TraceContext = TraceContext.ofBatch(blockEvents.events)(logger)
+          implicit val traceContext: TraceContext =
+            TraceContext.ofBatch("check_block_height")(blockEvents.events)(logger)
           // Set the current block height to the new block's height instead of + 1 of the previous value
           // so that we support starting from an arbitrary block height
           logger.debug(
             s"Processing block $height with ${blockEvents.events.size} block events.${blockEvents.events
                 .map(_.value)
-                .collectFirst { case LedgerBlockEvent.Send(timestamp, _, _) =>
+                .collectFirst { case LedgerBlockEvent.Send(timestamp, _, _, _) =>
                   s" First timestamp in block: $timestamp"
                 }
                 .getOrElse("")}"
@@ -609,7 +606,7 @@ class BlockSequencerStateManager(
   private def processChunk(bug: BlockUpdateGenerator)(
       initialState: bug.InternalState
   ): Flow[Traced[BlockChunk], Traced[OrderedBlockUpdate], NotUsed] = {
-    implicit val traceContext: TraceContext = TraceContext.empty // TODO(i28037): improve tracing
+    implicit val traceContext: TraceContext = TraceContext.empty
     Flow[Traced[BlockChunk]].statefulMapAsyncUSAndDrain(initialState) { (state, tracedChunk) =>
       implicit val traceContext: TraceContext = tracedChunk.traceContext
       tracedChunk.traverse(blockChunk => Nested(bug.processBlockChunk(state, blockChunk))).value
@@ -705,7 +702,9 @@ class BlockSequencerStateManager(
 
     def writeSequential() = {
       val trafficConsumedFUS = EitherT.right[String](
-        trafficConsumedStore.store(trafficConsumedUpdates)
+        synchronizeWithClosing("trafficConsumedStore.store")(
+          trafficConsumedStore.store(trafficConsumedUpdates)
+        )
       )
       val blockSequencerWritesFUS =
         dbSequencerIntegration.blockSequencerWrites(update.submissionsOutcomes)
@@ -713,8 +712,10 @@ class BlockSequencerStateManager(
         dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
       )
       val inFlightAggregationUpdatesFUS = EitherT.right[String](
-        store.storeInflightAggregations(inFlightAggregationUpdates =
-          update.inFlightAggregationUpdates
+        synchronizeWithClosing("storeInflightAggregations")(
+          store.storeInflightAggregations(inFlightAggregationUpdates =
+            update.inFlightAggregationUpdates
+          )
         )
       )
       (for {
@@ -751,13 +752,6 @@ class BlockSequencerStateManager(
 
     writeET
       .map { _ =>
-        progressSupervisorO.foreach { supervisor =>
-          update.submissionsOutcomes.filter(isAddressingThisSequencer).foreach {
-            case outcome: DeliverableSubmissionOutcome =>
-              supervisor.arm(outcome.sequencingTime)(outcome.submissionTraceContext)
-            case _ =>
-          }
-        }
         val newHead = priorHead.copy(chunk = newState)
         updateHeadState(priorHead, newHead)
         update.acknowledgements.foreach { case (member, timestamp) =>
@@ -894,19 +888,12 @@ class BlockSequencerStateManager(
   )(implicit traceContext: TraceContext): Unit =
     if (enableInvariantCheck) blockState.checkInvariant()
 
-  private def isAddressingThisSequencer(outcome: SubmissionOutcome): Boolean =
-    outcome match {
-      case x: DeliverableSubmissionOutcome => x.deliverToMembers.contains(sequencerId)
-      case _ => false
-    }
-
 }
 
 object BlockSequencerStateManager {
 
   def create(
-      synchronizerId: SynchronizerId,
-      sequencerId: SequencerId,
+      synchronizerId: PhysicalSynchronizerId,
       store: SequencerBlockStore,
       trafficConsumedStore: TrafficConsumedStore,
       asyncWriterParameters: AsyncWriterParameters,
@@ -916,7 +903,6 @@ object BlockSequencerStateManager {
       loggerFactory: NamedLoggerFactory,
       streamInstrumentationConfig: BlockSequencerStreamInstrumentationConfig,
       blockMetrics: BlockMetrics,
-      progressSupervisorO: Option[ProgressSupervisor],
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -926,9 +912,12 @@ object BlockSequencerStateManager {
       ErrorLoggingContext.fromTracedLogger(logger)
     timeouts.unbounded
       .awaitUS(s"Reading the head of the $synchronizerId sequencer state")(store.readHead)
-      .map { headBlock =>
+      .map { headBlockO =>
+        val headBlock = headBlockO.getOrElse(BlockEphemeralState.empty)
         new AtomicReference[HeadState]({
-          logger.debug(s"Initialized the block sequencer with head block ${headBlock.latestBlock}")
+          logger.debug(
+            s"Initialized the block sequencer with head block ${headBlock.latestBlock}"
+          )
           HeadState.fullyProcessed(headBlock)
         })
       }
@@ -944,8 +933,6 @@ object BlockSequencerStateManager {
           headState = headState,
           streamInstrumentationConfig = streamInstrumentationConfig,
           blockMetrics = blockMetrics,
-          progressSupervisorO = progressSupervisorO,
-          sequencerId = sequencerId,
         )
       }
   }

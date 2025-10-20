@@ -4,7 +4,7 @@
 package com.digitalasset.canton.protocol
 
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
-import com.digitalasset.canton.protocol.WellFormedTransaction.{State, WithSuffixes, WithoutSuffixes}
+import com.digitalasset.canton.protocol.WellFormedTransaction.{Stage, WithSuffixes, WithoutSuffixes}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, LfPackageName, LfPartyId}
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.value.Value
@@ -18,11 +18,10 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
   val lfAbs: LfContractId = suffixedId(0, 0)
 
   val contractInst = contractInstance()
-  val serContractInst = asSerializableRaw(contractInst)
 
   def createNode(
       cid: LfContractId,
-      contractInstance: LfContractInst = ExampleTransactionFactory.contractInstance(),
+      contractInstance: LfThinContractInst = ExampleTransactionFactory.contractInstance(),
       signatories: Set[LfPartyId] = Set(signatory),
       key: Option[LfGlobalKeyWithMaintainers] = None,
   ): LfNodeCreate =
@@ -50,7 +49,7 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
   private def nid(i: Int): String = """NodeId\(""" + i.toString + """.*\)"""
 
   val malformedExamples
-      : TableFor4[String, (LfVersionedTransaction, TransactionMetadata), State, String] =
+      : TableFor4[String, (LfVersionedTransaction, TransactionMetadata), Stage, String] =
     Table(
       ("Description", "Transaction and seeds", "Suffixing", "Expected Error Message"),
       (
@@ -144,56 +143,7 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
         "Create shadows previously referenced id",
         factory.versionedTransactionWithSeeds(Seq(0, 1), fetchNode(lfAbs), createNode(lfAbs)),
         WithSuffixes,
-        s"Contract id 0000000000000000000000000000000000000000000000000000000000000000000000 created in node ${nid(1)} is referenced before in ${nid(0)}",
-      ),
-      (
-        "Unsuffixed discriminator appears with suffix in value",
-        factory.versionedTransactionWithSeeds(
-          Seq(0),
-          createNode(
-            unsuffixedId(0),
-            contractInstance = contractInstance(capturedIds = Seq(suffixedId(0, 1))),
-          ),
-        ),
-        WithoutSuffixes,
-        s"Contract discriminator 0000000000000000000000000000000000000000000000000000000000000000 created in ${nid(0)} is not fresh due to ${nid(0)}",
-      ),
-      (
-        "Unsuffixed discriminator is used earlier with suffix",
-        factory.versionedTransactionWithSeeds(
-          Seq(0, 1),
-          fetchNode(suffixedId(0, 1)),
-          createNode(unsuffixedId(0)),
-        ),
-        WithoutSuffixes,
-        s"Contract discriminator 0000000000000000000000000000000000000000000000000000000000000000 created in ${nid(1)} is not fresh due to ${nid(0)}",
-      ),
-      (
-        "Unsuffixed discriminator is used with suffix in later node",
-        factory.versionedTransactionWithSeeds(
-          Seq(0, 1),
-          createNode(unsuffixedId(1)),
-          exerciseNode(suffixedId(0, 1), 2),
-          fetchNode(suffixedId(1, -1)),
-        ),
-        WithoutSuffixes,
-        s"Contract discriminator 0001000000000000000000000000000000000000000000000000000000000000 created in ${nid(0)} is not fresh due to contract Id 000001000000000000000000000000000000000000000000000000000000000000ffffffff in ${nid(2)}",
-      ),
-      (
-        "Unsuffixed discriminator is referenced with suffix in later node",
-        factory.versionedTransactionWithSeeds(
-          Seq(0, 1),
-          createNode(unsuffixedId(1)),
-          ExampleTransactionFactory.exerciseNode(
-            suffixedId(0, 0),
-            signatories = Set(signatory),
-            actingParties = Set(signatory),
-            exerciseResult =
-              Some(contractInstance(capturedIds = Seq(suffixedId(1, -1))).unversioned.arg),
-          ),
-        ),
-        WithoutSuffixes,
-        s"Contract discriminator 0001000000000000000000000000000000000000000000000000000000000000 created in ${nid(0)} is not fresh due to contract Id 000001000000000000000000000000000000000000000000000000000000000000ffffffff in ${nid(1)}",
+        s"Contract id ${lfAbs.coid} created in node ${nid(1)} is referenced before in ${nid(0)}",
       ),
       (
         "Missing signatory",
@@ -242,7 +192,7 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
             exerciseResult = None,
             keyOpt = None,
             byKey = false,
-            version = ExampleTransactionFactory.transactionVersion,
+            version = ExampleTransactionFactory.serializationVersion,
           ),
         ),
         WithoutSuffixes,
@@ -299,7 +249,7 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
     )
 
   // Well-formed transactions are mostly covered by ExampleTransactionFactoryTest. So we test only a special cases here.
-  val wellformedExamples: TableFor3[String, (LfVersionedTransaction, TransactionMetadata), State] =
+  val wellformedExamples: TableFor3[String, (LfVersionedTransaction, TransactionMetadata), Stage] =
     Table(
       ("Description", "Transaction and seeds", "Suffixing"),
       (
@@ -320,11 +270,11 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
         description must {
           "be reported as malformed" in {
             WellFormedTransaction
-              .normalizeAndCheck(transaction, metadata, state)
+              .check(transaction, metadata, state)
               .left
               .value should fullyMatch regex expectedError
             an[IllegalArgumentException] must be thrownBy
-              WellFormedTransaction.normalizeAndAssert(transaction, metadata, WithoutSuffixes)
+              WellFormedTransaction.checkOrThrow(transaction, metadata, WithoutSuffixes)
           }
         }
     }
@@ -333,7 +283,7 @@ class WellFormedTransactionTest extends AnyWordSpec with BaseTest with HasExecut
       description must {
         "be accepted as well-formed" in {
           WellFormedTransaction
-            .normalizeAndCheck(transaction, metadata, state)
+            .check(transaction, metadata, state)
             .value shouldBe a[WellFormedTransaction[_]]
         }
       }

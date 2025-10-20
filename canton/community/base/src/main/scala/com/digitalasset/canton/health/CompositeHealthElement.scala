@@ -70,9 +70,6 @@ trait CompositeHealthElement[ID, HE <: HealthElement] extends HealthElement {
     * If an dependency triggers a concurrent state refresh, then the state refresh may see an
     * inconsistent set of dependencies and therefore derive an inconsistent state. This however is
     * only temporary as in this case another state refresh will be triggered at the end.
-    * @param pokeForEachNewDependency
-    *   if true (default), each new dependency in the add map will poke the listeners. if false, the
-    *   listeners will only be poked after the last new dependency has been added.
     */
   protected def alterDependencies(
       remove: Set[ID],

@@ -217,6 +217,11 @@ class LedgerServerPartyNotifier(
                   logger.debug(
                     s"Not applying duplicate party metadata update with submission ID $submissionId"
                   )
+                  // It is normally removed after we've stored the new metadata it into the DB,
+                  // but since there's nothing to store in this case, it won't happen, so remove it now
+                  update.participantId.foreach(pid =>
+                    pendingAllocationData.remove((update.partyId, pid)).discard
+                  )
                   None
                 }
             }

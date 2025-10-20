@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.validator.automation
 
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.PartyToParticipant
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -36,7 +36,7 @@ class TopologyMetricsTrigger(
       synchronizerId <- scanConnection.getAmuletRulesDomain()(tc)
       partyMappings <-
         participantAdminConnection.listPartyToParticipant(
-          store = Some(TopologyStoreId.SynchronizerStore(synchronizerId))
+          store = Some(TopologyStoreId.Synchronizer(synchronizerId))
         )
     } yield {
       updateMetrics(partyMappings)

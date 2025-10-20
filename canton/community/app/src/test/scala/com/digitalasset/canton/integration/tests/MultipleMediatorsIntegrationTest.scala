@@ -22,8 +22,8 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkTopologyDescription,
 }
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -46,7 +46,6 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SendPolicy,
 }
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   NamespaceDelegation,
   OwnerToKeyMapping,
@@ -81,13 +80,13 @@ trait MultipleMediatorsBaseTest { this: BaseTest & HasProgrammableSequencer =>
 
     sequencer.topology.transactions.load(
       med2Identity,
-      TopologyStoreId.Synchronizer(sequencer.synchronizer_id),
+      sequencer.synchronizer_id,
       ForceFlag.AlienMember,
     )
     eventually() {
       sequencer.topology.transactions
         .list(
-          store = TopologyStoreId.Synchronizer(sequencer.synchronizer_id),
+          store = sequencer.physical_synchronizer_id,
           filterNamespace = mediator.namespace.filterString,
         )
         .result
@@ -182,7 +181,7 @@ class MultipleMediatorsIntegrationTest
     with MultipleMediatorsBaseTest
     with OperabilityTestHelpers {
 
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
   // we need to register the ProgrammableSequencer after the ReferenceBlockSequencer
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 

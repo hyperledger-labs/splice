@@ -9,6 +9,7 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.*
@@ -24,8 +25,8 @@ abstract class DatabaseSequencerApiTest extends SequencerApiTest {
     val crypto = TestingIdentityFactory(
       TestingTopology(),
       loggerFactory,
-      DynamicSynchronizerParameters.initialValues(clock, testedProtocolVersion),
-    ).forOwnerAndSynchronizer(owner = mediatorId, synchronizerId)
+      DynamicSynchronizerParameters.initialValues(testedProtocolVersion),
+    ).forOwnerAndSynchronizer(owner = mediatorId, psid)
     val metrics = SequencerMetrics.noop("database-sequencer-test")
 
     // we explicitly pass the parallel executor service to use as the execution context
@@ -44,8 +45,6 @@ abstract class DatabaseSequencerApiTest extends SequencerApiTest {
       loggerFactory = loggerFactory,
       sequencerMember = sequencerId,
       blockSequencerMode = false,
-      useRecipientsTableForReads = false,
-      bufferEventsWithPayloads = false,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(),
       sequencerMetrics = metrics,
@@ -56,10 +55,10 @@ abstract class DatabaseSequencerApiTest extends SequencerApiTest {
       DefaultProcessingTimeouts.testing,
       storage,
       sequencerStore,
+      sequencingTimeLowerBoundExclusive =
+        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
       clock,
-      synchronizerId,
       sequencerId,
-      testedProtocolVersion,
       crypto,
       metrics,
       loggerFactory,

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
 import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -57,7 +57,7 @@ class AcsExporter(
         participantId <- participantAdminConnection.getId()
         parties <- participantAdminConnection
           .listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(domain).some,
+            store = TopologyStoreId.Synchronizer(domain).some,
             filterParticipant = participantId.toProtoPrimitive,
           )
           .map(_.map(_.mapping.partyId))

@@ -15,12 +15,11 @@ import com.digitalasset.canton.sequencer.admin.v30.{
   TlsPeerEndpoint,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.PeerNetworkStatus
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.{
   P2PEndpoint,
   TlsP2PEndpoint,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleRef
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -30,7 +29,11 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Consensus,
   P2PNetworkOut,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.unit.modules.fakeIgnoringModule
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
+  BftSequencerBaseTest,
+  fakeIgnoringModule,
+}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Promise
@@ -75,7 +78,7 @@ class BftOrderingSequencerAdminServiceTest extends AsyncWordSpec with BftSequenc
                 ),
                 any[Boolean => Unit],
               )
-          )(any[MetricsContext])
+          )(any[TraceContext], any[MetricsContext])
           response.added shouldBe true
         }
     }
@@ -115,7 +118,7 @@ class BftOrderingSequencerAdminServiceTest extends AsyncWordSpec with BftSequenc
                 P2PEndpoint.Id("localhost", Port.tryCreate(1234), transportSecurity = true),
                 any[Boolean => Unit],
               )
-          )(any[MetricsContext])
+          )(any[TraceContext], any[MetricsContext])
           response.removed shouldBe true
         }
     }
@@ -141,7 +144,7 @@ class BftOrderingSequencerAdminServiceTest extends AsyncWordSpec with BftSequenc
         .map { response =>
           verify(p2PNetworkOutAdminSpy).asyncSend(
             P2PNetworkOut.Admin.GetStatus(any[PeerNetworkStatus => Unit])
-          )(any[MetricsContext])
+          )(any[TraceContext], any[MetricsContext])
           response.statuses shouldBe empty
         }
     }
@@ -167,7 +170,7 @@ class BftOrderingSequencerAdminServiceTest extends AsyncWordSpec with BftSequenc
         .map { response =>
           verify(consensusAdminSpy).asyncSend(
             Consensus.Admin.GetOrderingTopology(any[(EpochNumber, Set[BftNodeId]) => Unit])
-          )(any[MetricsContext])
+          )(any[TraceContext], any[MetricsContext])
           response.sequencerIds shouldBe empty
         }
     }

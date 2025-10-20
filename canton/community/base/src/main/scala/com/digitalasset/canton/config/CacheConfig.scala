@@ -67,7 +67,6 @@ final case class CacheConfigWithTimeout(
     expireAfterTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(10),
 ) extends UniformCantonConfigValidation {
 
-  // TODO(#24566): Use scheduler instead of expireAfter
   def buildScaffeine()(implicit executionContext: ExecutionContext): Scaffeine[Any, Any] =
     Scaffeine()
       .maximumSize(maximumSize.value)
@@ -80,6 +79,29 @@ object CacheConfigWithTimeout {
       : CantonConfigValidator[CacheConfigWithTimeout] = {
     import CantonConfigValidatorInstances.*
     CantonConfigValidatorDerivation[CacheConfigWithTimeout]
+  }
+}
+
+/** Configuration settings for a cache where elements are only evicted when the maximum size is
+  * reached.
+  *
+  * @param maximumSize
+  *   the maximum size of the cache
+  */
+final case class CacheConfigWithSizeOnly(
+    maximumSize: PositiveNumeric[Long]
+) extends UniformCantonConfigValidation {
+  def buildScaffeine()(implicit executionContext: ExecutionContext): Scaffeine[Any, Any] =
+    Scaffeine()
+      .maximumSize(maximumSize.value)
+      .executor(executionContext.execute(_))
+}
+
+object CacheConfigWithSizeOnly {
+  implicit val cacheConfigWithWSizeOnlyCantonConfigValidator
+      : CantonConfigValidator[CacheConfigWithSizeOnly] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[CacheConfigWithSizeOnly]
   }
 }
 
@@ -98,8 +120,14 @@ object CacheConfigWithTimeout {
   */
 final case class SessionEncryptionKeyCacheConfig(
     enabled: Boolean,
-    senderCache: CacheConfigWithTimeout,
-    receiverCache: CacheConfigWithTimeout,
+    senderCache: CacheConfigWithTimeout = CacheConfigWithTimeout(
+      maximumSize = PositiveNumeric.tryCreate(10000),
+      expireAfterTimeout = PositiveFiniteDuration.ofSeconds(10),
+    ),
+    receiverCache: CacheConfigWithTimeout = CacheConfigWithTimeout(
+      maximumSize = PositiveNumeric.tryCreate(10000),
+      expireAfterTimeout = PositiveFiniteDuration.ofSeconds(10),
+    ),
 ) extends UniformCantonConfigValidation
 
 object SessionEncryptionKeyCacheConfig {
@@ -134,7 +162,10 @@ final case class CachingConfigs(
     keyCache: CacheConfig = CachingConfigs.defaultKeyCache,
     sessionEncryptionKeyCache: SessionEncryptionKeyCacheConfig =
       CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+    publicKeyConversionCache: CacheConfig = CachingConfigs.defaultPublicKeyConversionCache,
     packageVettingCache: CacheConfig = CachingConfigs.defaultPackageVettingCache,
+    packageDependencyCache: CacheConfig = CachingConfigs.defaultPackageDependencyCache,
+    packageUpgradeCache: CacheConfigWithSizeOnly = CachingConfigs.defaultPackageUpgradeCache,
     memberCache: CacheConfig = CachingConfigs.defaultMemberCache,
     kmsMetadataCache: CacheConfig = CachingConfigs.kmsMetadataCache,
     finalizedMediatorConfirmationRequests: CacheConfig =
@@ -158,24 +189,28 @@ object CachingConfigs {
   val defaultParticipantCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
   val defaultKeyCache: CacheConfig = CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
+  val defaultPublicKeyConversionCache: CacheConfig = CacheConfig(
+    maximumSize = PositiveNumeric.tryCreate(10000),
+    expireAfterAccess = NonNegativeFiniteDuration.ofMinutes(60),
+  )
   val defaultSessionEncryptionKeyCacheConfig: SessionEncryptionKeyCacheConfig =
     SessionEncryptionKeyCacheConfig(
-      enabled = true,
-      senderCache = CacheConfigWithTimeout(
-        maximumSize = PositiveNumeric.tryCreate(10000),
-        expireAfterTimeout = PositiveFiniteDuration.ofSeconds(10),
-      ),
-      receiverCache = CacheConfigWithTimeout(
-        maximumSize = PositiveNumeric.tryCreate(10000),
-        expireAfterTimeout = PositiveFiniteDuration.ofSeconds(10),
-      ),
+      enabled = true
     )
   val defaultPackageVettingCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(10000))
+  val defaultPackageDependencyCache: CacheConfig =
+    CacheConfig(
+      maximumSize = PositiveNumeric.tryCreate(10000),
+      NonNegativeFiniteDuration.ofMinutes(15),
+    )
+  val defaultPackageUpgradeCache: CacheConfigWithSizeOnly = CacheConfigWithSizeOnly(
+    maximumSize = PositiveNumeric.tryCreate(10000)
+  )
   val defaultMemberCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
   val kmsMetadataCache: CacheConfig =
-    CacheConfig(maximumSize = PositiveNumeric.tryCreate(20))
+    CacheConfig.apply(maximumSize = PositiveNumeric.tryCreate(20))
   val defaultFinalizedMediatorConfirmationRequestsCache =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
   val defaultSequencerPayloadCache: CacheConfigWithMemoryBounds =

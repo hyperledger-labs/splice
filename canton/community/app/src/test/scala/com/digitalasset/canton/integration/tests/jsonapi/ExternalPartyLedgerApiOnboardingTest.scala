@@ -4,16 +4,12 @@
 package com.digitalasset.canton.integration.tests.jsonapi
 
 import com.daml.ledger.api.v2.admin.party_management_service.GenerateExternalPartyTopologyResponse
-import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SignatureFormat, SigningAlgorithmSpec}
-import com.digitalasset.canton.http.{HttpServerConfig, JsonApiConfig}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
-  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
-  TestConsoleEnvironment,
 }
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
@@ -24,21 +20,8 @@ import java.security.KeyPairGenerator
 import java.util.Base64
 
 class ExternalPartyLedgerApiOnboardingTest extends CommunityIntegrationTest with SharedEnvironment {
-  import monocle.macros.syntax.lens.*
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
-      .addConfigTransform(
-        ConfigTransforms.updateParticipantConfig("participant1")(
-          // TODO(#27556): align config and port behaviour with ledger api / admin api
-          _.focus(
-            _.httpLedgerApi
-          ).replace(
-            Some(
-              JsonApiConfig(server = HttpServerConfig(port = Some(UniquePortGenerator.next.unwrap)))
-            )
-          )
-        )
-      )
       .withSetup { implicit env =>
         import env.*
 
@@ -72,35 +55,11 @@ class ExternalPartyLedgerApiOnboardingTest extends CommunityIntegrationTest with
     )
   }
 
-  private def verifyPartyCanBeAddressed(
-      name: String
-  )(implicit env: TestConsoleEnvironment): Unit = {
-    import env.*
-    val module = "Canton.Internal.Ping"
-    val party = participant1.parties.list(name).loneElement.party
-    val pkg = participant1.packages.find_by_module(module).loneElement.packageId
-    participant1.ledger_api.commands.submit(
-      actAs = Seq(participant1.adminParty),
-      commands = Seq(
-        ledger_api_utils.create(
-          pkg,
-          module,
-          "Ping",
-          Map[String, Any](
-            "id" -> "HelloYellow",
-            "initiator" -> participant1.adminParty,
-            "responder" -> party,
-          ),
-        )
-      ),
-    )
-  }
-
   "onboard new single node hosted party via JSON api" in { implicit env =>
     // Send a JSON API request via HttpClient to verify that the JSON API works
     import env.*
     val port =
-      participant1.config.httpLedgerApi.flatMap(_.server.port).valueOrFail("Port must be set")
+      participant1.config.httpLedgerApi.server.internalPort.valueOrFail("JSON API must be enabled")
 
     val jsonBody =
       """{
@@ -177,7 +136,6 @@ class ExternalPartyLedgerApiOnboardingTest extends CommunityIntegrationTest with
     eventually() {
       participant1.parties.hosted("Alice") should not be empty
     }
-    verifyPartyCanBeAddressed("Alice")
 
   }
 
@@ -203,41 +161,10 @@ class ExternalPartyLedgerApiOnboardingTest extends CommunityIntegrationTest with
       txs.topologyTransactions.map((_, Seq.empty[com.digitalasset.canton.crypto.Signature])),
       multiSignatures = Seq(generateSignature(txs.multiHash.getCryptographicEvidence)),
     )
-    verifyPartyCanBeAddressed("Bob")
 
   }
 
-  "onboard a new multi-hosted party entirely using lapi " in { implicit env =>
-    import env.*
-
-    val txs = participant1.ledger_api.parties.generate_topology(
-      sequencer1.synchronizer_id,
-      "David",
-      signingPublicKey,
-      otherConfirmingParticipantIds = Seq(participant2.id),
-      confirmationThreshold = NonNegativeInt.two,
-    )
-
-    participant1.ledger_api.parties.allocate_external(
-      sequencer1.synchronizer_id,
-      txs.topologyTransactions.map((_, Seq.empty[com.digitalasset.canton.crypto.Signature])),
-      multiSignatures = Seq(generateSignature(txs.multiHash.getCryptographicEvidence)),
-    )
-
-    participant2.ledger_api.parties.allocate_external(
-      sequencer1.synchronizer_id,
-      txs.topologyTransactions.map(x => (x, Seq.empty)),
-      multiSignatures = Seq(),
-    )
-
-    eventually() {
-      Seq(participant1, participant2).foreach(_.parties.hosted("David") should not be empty)
-    }
-    verifyPartyCanBeAddressed("David")
-
-  }
-
-  "onboard a new multi-hosted party with lapi request, admin api response" in { implicit env =>
+  "onboard a new multi-hosted party" in { implicit env =>
     import env.*
 
     val txs = participant1.ledger_api.parties.generate_topology(
@@ -272,7 +199,6 @@ class ExternalPartyLedgerApiOnboardingTest extends CommunityIntegrationTest with
     eventually() {
       Seq(participant1, participant2).foreach(_.parties.hosted("Charlie") should not be empty)
     }
-    verifyPartyCanBeAddressed("Charlie")
 
   }
 

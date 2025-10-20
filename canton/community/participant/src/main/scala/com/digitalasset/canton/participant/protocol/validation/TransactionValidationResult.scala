@@ -4,9 +4,11 @@
 package com.digitalasset.canton.participant.protocol.validation
 
 import cats.data.EitherT
+import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{SubmitterMetadata, ViewPosition}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.participant.protocol.LedgerEffectAbsolutizer.ViewAbsoluteLedgerEffect
 import com.digitalasset.canton.participant.protocol.conflictdetection.{ActivenessResult, CommitSet}
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
 import com.digitalasset.canton.participant.protocol.validation.InternalConsistencyChecker.ErrorWithInternalConsistencyCheck
@@ -15,7 +17,7 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.{LfPartyId, WorkflowId}
 
 final case class TransactionValidationResult(
-    transactionId: TransactionId,
+    transactionId: UpdateId,
     submitterMetadataO: Option[SubmitterMetadata],
     workflowIdO: Option[WorkflowId],
     contractConsistencyResultE: Either[List[ReferenceToFutureContractError], Unit],
@@ -23,19 +25,20 @@ final case class TransactionValidationResult(
     authorizationResult: Map[ViewPosition, String],
     modelConformanceResultET: EitherT[
       FutureUnlessShutdown,
-      ModelConformanceChecker.ErrorWithSubTransaction,
+      ModelConformanceChecker.ErrorWithSubTransaction[ViewAbsoluteLedgerEffect],
       ModelConformanceChecker.Result,
     ],
     internalConsistencyResultE: Either[ErrorWithInternalConsistencyCheck, Unit],
     consumedInputsOfHostedParties: Map[LfContractId, Set[LfPartyId]],
-    witnessed: Map[LfContractId, SerializableContract],
-    createdContracts: Map[LfContractId, SerializableContract],
+    witnessed: Map[LfContractId, GenContractInstance],
+    createdContracts: Map[LfContractId, NewContractInstance],
     transient: Map[LfContractId, Set[LfPartyId]],
     activenessResult: ActivenessResult,
     viewValidationResults: Map[ViewPosition, ViewValidationResult],
     timeValidationResultE: Either[TimeCheckFailure, Unit],
     hostedWitnesses: Set[LfPartyId],
     replayCheckResult: Option[String],
+    validatedExternalTransactionHash: Option[Hash],
 ) {
 
   def commitSet(

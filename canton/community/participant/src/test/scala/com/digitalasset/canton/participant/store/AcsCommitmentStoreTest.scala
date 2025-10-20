@@ -32,7 +32,12 @@ import com.digitalasset.canton.protocol.messages.{
 import com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants
 import com.digitalasset.canton.store.PrunableByTimeTest
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.{
   BaseTest,
   CloseableTest,
@@ -54,9 +59,9 @@ trait CommitmentStoreBaseTest
     with CloseableTest
     with HasExecutionContext {
 
-  protected lazy val synchronizerId: SynchronizerId = SynchronizerId(
+  protected lazy val synchronizerId: PhysicalSynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::synchronizer")
-  )
+  ).toPhysical
 
   protected lazy val crypto: SymbolicCrypto = SymbolicCrypto.create(
     testedReleaseProtocolVersion,
@@ -171,7 +176,7 @@ trait CommitmentStoreBaseTest
       testedProtocolVersion,
     )
   lazy val dummySigned: SignedProtocolMessage[AcsCommitment] =
-    SignedProtocolMessage.from(dummyCommitmentMsg, testedProtocolVersion, dummySignature)
+    SignedProtocolMessage.from(dummyCommitmentMsg, dummySignature)
 
   lazy val alice: LfPartyId = LfPartyId.assertFromString("Alice")
   lazy val bob: LfPartyId = LfPartyId.assertFromString("bob")
@@ -277,12 +282,12 @@ trait AcsCommitmentStoreTest
     "correctly compute matched periods in the outstanding table" in {
       val store = mk()
       for {
-        outstanding <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstanding <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         _ <- store.markOutstanding(periods(1, 5), remoteId1And2NESet)
         outstandingMarked <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
         _ <- store.markSafe(remoteId, periods(1, 2))
@@ -293,7 +298,7 @@ trait AcsCommitmentStoreTest
         outstandingAfter <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
       } yield {
@@ -314,14 +319,14 @@ trait AcsCommitmentStoreTest
     "correctly store surrounding commits in their correct state when marking period" in {
       val store = mk()
       for {
-        outstanding <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstanding <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         _ <- store.markOutstanding(periods(1, 5), remoteIdNESet)
         _ <- store.markUnsafe(remoteId, periods(1, 5))
         _ <- store.markSafe(remoteId, periods(2, 4))
         outstandingAfter <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
       } yield {
@@ -337,24 +342,24 @@ trait AcsCommitmentStoreTest
     "correctly perform state transition in the the outstanding table" in {
       val store = mk()
       for {
-        outstanding <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstanding <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         _ <- store.markOutstanding(periods(1, 5), remoteIdNESet)
         _ <- store.markUnsafe(remoteId, periods(1, 5))
         outstandingUnsafe <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
         // we are allowed to transition from state Mismatched to state Matched
         _ <- store.markSafe(remoteId, periods(1, 5))
-        outstandingSafe <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstandingSafe <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         // we are not allowed to transition from state Matched to state Mismatch
         _ <- store.markUnsafe(remoteId, periods(1, 5))
         outstandingStillSafe <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
         _ <- store.markOutstanding(periods(1, 5), remoteIdNESet)
@@ -592,11 +597,15 @@ trait AcsCommitmentStoreTest
             ),
           )
         )
-        found1 <- store.searchComputedBetween(ts(0), ts(1), Seq(remoteId))
+        found1 <- store.searchComputedBetween(ts(0), ts(1), NonEmpty.from(Seq(remoteId)))
         found2 <- store.searchComputedBetween(ts(0), ts(2))
-        found3 <- store.searchComputedBetween(ts(1), ts(1))
+        found3 <- store.searchComputedBetween(ts(1).minusMillis(1), ts(1))
         found4 <- store.searchComputedBetween(ts(0), ts(0))
-        found5 <- store.searchComputedBetween(ts(2), ts(2), Seq(remoteId, remoteId2))
+        found5 <- store.searchComputedBetween(
+          ts(2).minusMillis(1),
+          ts(2),
+          NonEmpty.from(Seq(remoteId, remoteId2)),
+        )
 
       } yield {
         found1.toSet shouldBe Set((period(0, 1), remoteId, hashedDummyCommitment))
@@ -626,7 +635,7 @@ trait AcsCommitmentStoreTest
         testedProtocolVersion,
       )
       val dummySigned2 =
-        SignedProtocolMessage.from(dummyMsg2, testedProtocolVersion, dummySignature)
+        SignedProtocolMessage.from(dummyMsg2, dummySignature)
       val dummyMsg3 = AcsCommitment.create(
         synchronizerId,
         remoteId2,
@@ -636,7 +645,7 @@ trait AcsCommitmentStoreTest
         testedProtocolVersion,
       )
       val dummySigned3 =
-        SignedProtocolMessage.from(dummyMsg3, testedProtocolVersion, dummySignature)
+        SignedProtocolMessage.from(dummyMsg3, dummySignature)
 
       for {
         _ <- store.storeReceived(dummySigned).failOnShutdown
@@ -644,9 +653,9 @@ trait AcsCommitmentStoreTest
         _ <- store.storeReceived(dummySigned3).failOnShutdown
         found1 <- store.searchReceivedBetween(ts(0), ts(1))
         found2 <-
-          store.searchReceivedBetween(ts(0), ts(1), Seq(remoteId))
+          store.searchReceivedBetween(ts(0), ts(1), NonEmpty.from(Seq(remoteId)))
         found3 <-
-          store.searchReceivedBetween(ts(0), ts(3), Seq(remoteId, remoteId2))
+          store.searchReceivedBetween(ts(0), ts(3), NonEmpty.from(Seq(remoteId, remoteId2)))
       } yield {
         found1.toSet shouldBe Set(dummySigned, dummySigned3)
         found2.toSet shouldBe Set(dummySigned)
@@ -709,7 +718,7 @@ trait AcsCommitmentStoreTest
         testedProtocolVersion,
       )
       val dummySigned2 =
-        SignedProtocolMessage.from(dummyMsg2, testedProtocolVersion, dummySignature)
+        SignedProtocolMessage.from(dummyMsg2, dummySignature)
 
       for {
         _ <- store.storeReceived(dummySigned).failOnShutdown
@@ -833,7 +842,7 @@ trait AcsCommitmentStoreTest
         _ <- store.markOutstanding(periods(0, 1), remoteIdNESet)
         _ <- store.markOutstanding(periods(0, 2), remoteIdNESet)
         _ <- store.markSafe(remoteId, periods(1, 2))
-        outstandingWithId <- store.outstanding(ts(0), ts(2), Seq(remoteId))
+        outstandingWithId <- store.outstanding(ts(0), ts(2), NonEmpty.from(Seq(remoteId)))
 
         outstandingWithoutId <- store.outstanding(ts(0), ts(2))
       } yield {
@@ -1134,15 +1143,15 @@ trait CommitmentQueueTest extends CommitmentStoreBaseTest {
         at20with41 <- queue.peekThrough(ts(20))
       } yield {
         // We don't really care how the priority queue breaks the ties, so just use sets here
-        at5.toSet shouldBe Set(c11, c12)
-        at10.toSet shouldBe Set(c11, c12, c21)
-        at10with22.toSet shouldBe Set(c11, c12, c21, c22)
-        at10with32.toSet shouldBe Set(c11, c12, c21, c22)
-        at15.toSet shouldBe Set(c11, c12, c21, c22, c32)
-        at15AfterDelete.toSet shouldBe Set(c21, c22, c32)
-        at15with31.toSet shouldBe Set(c21, c22, c32, c31)
+        at5.toSet shouldBe Set(c11, c12).map(_.toQueuedAcsCommitment)
+        at10.toSet shouldBe Set(c11, c12, c21).map(_.toQueuedAcsCommitment)
+        at10with22.toSet shouldBe Set(c11, c12, c21, c22).map(_.toQueuedAcsCommitment)
+        at10with32.toSet shouldBe Set(c11, c12, c21, c22).map(_.toQueuedAcsCommitment)
+        at15.toSet shouldBe Set(c11, c12, c21, c22, c32).map(_.toQueuedAcsCommitment)
+        at15AfterDelete.toSet shouldBe Set(c21, c22, c32).map(_.toQueuedAcsCommitment)
+        at15with31.toSet shouldBe Set(c21, c22, c32, c31).map(_.toQueuedAcsCommitment)
         at20AfterDelete shouldBe List.empty
-        at20with41 shouldBe List(c41)
+        at20with41 shouldBe List(c41).map(_.toQueuedAcsCommitment)
       }).failOnShutdown
     }
 
@@ -1179,16 +1188,16 @@ trait CommitmentQueueTest extends CommitmentStoreBaseTest {
         at20with41 <- queue.peekThroughAtOrAfter(ts(20))
       } yield {
         // We don't really care how the priority queue breaks the ties, so just use sets here
-        at5.toSet shouldBe Set(c11, c12, c21)
-        at10.toSet shouldBe Set(c21)
-        at10with22.toSet shouldBe Set(c21, c22)
+        at5.toSet shouldBe Set(c11, c12, c21).map(_.toQueuedAcsCommitment)
+        at10.toSet shouldBe Set(c21).map(_.toQueuedAcsCommitment)
+        at10with22.toSet shouldBe Set(c21, c22).map(_.toQueuedAcsCommitment)
         at15.toSet shouldBe empty
-        at10with32.toSet shouldBe Set(c21, c22, c32)
-        at15with32.toSet shouldBe Set(c32)
-        at15AfterDelete.toSet shouldBe Set(c32)
-        at15with31.toSet shouldBe Set(c32, c31)
+        at10with32.toSet shouldBe Set(c21, c22, c32).map(_.toQueuedAcsCommitment)
+        at15with32.toSet shouldBe Set(c32).map(_.toQueuedAcsCommitment)
+        at15AfterDelete.toSet shouldBe Set(c32).map(_.toQueuedAcsCommitment)
+        at15with31.toSet shouldBe Set(c32, c31).map(_.toQueuedAcsCommitment)
         at20AfterDelete shouldBe List.empty
-        at20with41 shouldBe List(c41)
+        at20with41 shouldBe List(c41).map(_.toQueuedAcsCommitment)
       }
     }
 
@@ -1284,14 +1293,21 @@ trait CommitmentQueueTest extends CommitmentStoreBaseTest {
         )
       } yield {
         // We don't really care how the priority queue breaks the ties, so just use sets here
-        at05.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3)
-        at010.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3)
-        at510.toSet shouldBe Set(dummyCommitmentMsg3)
+        at05.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3).map(
+          _.toQueuedAcsCommitment
+        )
+        at010.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3).map(
+          _.toQueuedAcsCommitment
+        )
+        at510.toSet shouldBe Set(dummyCommitmentMsg3).map(_.toQueuedAcsCommitment)
         at1015 shouldBe empty
-        at1015after.toSet shouldBe Set(dummyCommitmentMsg2)
-        at510after.toSet shouldBe Set(dummyCommitmentMsg3)
-        at515after.toSet shouldBe Set(dummyCommitmentMsg3, dummyCommitmentMsg2)
+        at1015after.toSet shouldBe Set(dummyCommitmentMsg2).map(_.toQueuedAcsCommitment)
+        at510after.toSet shouldBe Set(dummyCommitmentMsg3).map(_.toQueuedAcsCommitment)
+        at515after.toSet shouldBe Set(dummyCommitmentMsg3, dummyCommitmentMsg2).map(
+          _.toQueuedAcsCommitment
+        )
         at015after.toSet shouldBe Set(dummyCommitmentMsg3, dummyCommitmentMsg2, dummyCommitmentMsg)
+          .map(_.toQueuedAcsCommitment)
       }
     }
 

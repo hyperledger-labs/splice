@@ -13,7 +13,7 @@ import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedIncompleteUnassigned
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
   DbConfig,
   NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
@@ -26,11 +26,11 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.util.TestUtils.hasPersistence
 import com.digitalasset.canton.integration.util.{AcsInspection, EntitySyntax, PartiesAllocator}
@@ -76,6 +76,8 @@ object SynchronizerChangeIntegrationTest {
   final case class Config(
       simClock: Boolean,
       assignmentExclusivityTimeout: NonNegativeFiniteDuration,
+      targetTimestampForwardTolerance: NonNegativeFiniteDuration =
+        NonNegativeFiniteDuration.tryOfSeconds(30),
   )
 }
 
@@ -108,6 +110,11 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
         simClockTransform, // required such that late message processing warning isn't emitted
         _.focus(_.monitoring.logging.delayLoggingThreshold)
           .replace(NonNegativeFiniteDurationConfig.ofDays(100)),
+      )
+      .addConfigTransform(
+        ConfigTransforms.updateTargetTimestampForwardTolerance(
+          config.targetTimestampForwardTolerance.duration
+        )
       )
       .addConfigTransforms(additionalConfigTransforms*)
       .withSetup(setUp)
@@ -144,22 +151,17 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
     )
 
     darPaths.foreach { darPath =>
-      participants.all.foreach(p => p.dars.upload(darPath))
+      participants.all.foreach { p =>
+        p.dars.upload(darPath, synchronizerId = iouSynchronizerId)
+      }
+      Seq(participant4, participant5).foreach(p =>
+        p.dars.upload(darPath, synchronizerId = paintSynchronizerId)
+      )
     }
 
     // Advance the simClock to trigger time-proof requests, if present
     val clock = environment.simClock
     clock.foreach(_.advance(java.time.Duration.ofSeconds(5)))
-
-    val partyAssignment: Set[(PartyId, ParticipantReference)] =
-      Set(alice -> P5, alice -> P2, painter -> P4, painter -> P3, bank -> P1).map {
-        case (party, participant) => (party.toPartyId(), participant)
-      }
-
-    logger.debug(s"Waiting to see topology assignments for $alice, $bank and $painter")
-    List(P1, P2, P3, P4, P5).foreach { x =>
-      x.parties.await_topology_observed(partyAssignment)
-    }
   }
 
   protected def withUniqueParties[T](
@@ -191,8 +193,8 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
   def P4(implicit env: FixtureParam): LocalParticipantReference = env.participant4
   def P5(implicit env: FixtureParam): LocalParticipantReference = env.participant5
 
-  def iouSynchronizerId(implicit env: FixtureParam): SynchronizerId = env.daId
-  def paintSynchronizerId(implicit env: FixtureParam): SynchronizerId = env.acmeId
+  def iouSynchronizerId(implicit env: FixtureParam): PhysicalSynchronizerId = env.daId
+  def paintSynchronizerId(implicit env: FixtureParam): PhysicalSynchronizerId = env.acmeId
 
   val PaintModule: String = "Paint"
   val IouModule: String = "Iou"
@@ -223,7 +225,7 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
       JavaDecodeUtil
         .decodeAllCreated(Iou.COMPANION)(
           P1.ledger_api.javaapi.commands
-            .submit_flat(Seq(bank), createIouCmd)
+            .submit(Seq(bank), createIouCmd)
         )
         .loneElement
     }
@@ -332,15 +334,10 @@ abstract class SynchronizerChangeSimClockIntegrationTest
       SynchronizerChangeIntegrationTest.Config(
         simClock = true,
         assignmentExclusivityTimeout = NonNegativeFiniteDuration.tryOfMinutes(10L),
+        targetTimestampForwardTolerance = NonNegativeFiniteDuration.tryOfSeconds(30),
       )
     )
     with SecurityTestSuite {
-
-  override protected def additionalConfigTransforms: Seq[ConfigTransform] = Seq(
-    ConfigTransforms.updateAllParticipantConfigs_(
-      _.focus(_.parameters.reassignmentTimeProofFreshnessProportion).replace(NonNegativeInt.zero)
-    )
-  )
 
   // Workaround to avoid false errors reported by IDEA.
   implicit def tagToContainer(tag: EvidenceTag): Tag = new TagContainer(tag)
@@ -377,24 +374,25 @@ abstract class SynchronizerChangeSimClockIntegrationTest
             s"An assignment for $reassignmentId is triggered automatically after the exclusivity timeout"
           )
 
+          // Get reassignment from the store
+          val unassignedEvent = getIncompleteUnassignedContracts(participants, painter)
+          val exclusivityDeadline = CantonTimestamp
+            .fromProtoTimestamp(unassignedEvent.assignmentExclusivity.value)
+            .value
+
           val margin = NonNegativeFiniteDuration.tryOfSeconds(1)
 
           // Advance clock just before the exclusivity timeout
-          clock.advance(exclusivityTimeout.unwrap.minus(margin.unwrap))
+          clock.advanceTo(exclusivityDeadline.minus(margin.unwrap))
           participants.foreach(_.testing.fetch_synchronizer_times())
           checkIncompleteUnassignedContracts(
             participants,
             painter,
           ) // assignment did not happen yet
 
-          // Get reassignment from the store
-          val unassignedEvent = getIncompleteUnassignedContracts(participants, painter)
-
-          val targetTimestamp = CantonTimestamp
-            .fromProtoTimestamp(unassignedEvent.assignmentExclusivity.value)
-            .value + exclusivityTimeout
           // Advance clock to the exclusivity timeout so that the automatic assignment can be triggered
-          clock.advanceTo(targetTimestamp)
+          clock.advanceTo(exclusivityDeadline)
+
           participants.foreach(_.testing.fetch_synchronizer_times())
 
           // The reassignment store should be empty once the automatic assignment has completed
@@ -608,7 +606,7 @@ abstract class SynchronizerChangeSimClockIntegrationTest
 
           P4.ledger_api.commands.submit_assign(
             painter,
-            unassignedEvent.unassignId,
+            unassignedEvent.reassignmentId,
             paintSynchronizerId,
             iouSynchronizerId,
           )
@@ -658,7 +656,7 @@ class SynchronizerChangeSimClockIntegrationTestPostgres
     extends SynchronizerChangeSimClockIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(
@@ -796,7 +794,7 @@ trait SynchronizerChangeRealClockIntegrationTest
                   createdEventO.exists(e => e.contractId == paintOfferId.toProtoPrimitive)
                 }
                 .map(_._1)
-              synchronizerIdOfContract shouldBe Some(paintSynchronizerId.toProtoPrimitive)
+              synchronizerIdOfContract shouldBe Some(paintSynchronizerId.logical.toProtoPrimitive)
 
             }
           }
@@ -819,7 +817,7 @@ trait SynchronizerChangeRealClockIntegrationTest
                 }
                 .map(_._1)
 
-              synchronizerId.value shouldBe iouSynchronizerId.toProtoPrimitive
+              synchronizerId.value shouldBe iouSynchronizerId.logical.toProtoPrimitive
             }
           }
         }
@@ -865,22 +863,23 @@ trait SynchronizerChangeRealClockIntegrationTest
                 Seq(paintOfferId),
                 sourceId,
                 targetId,
+                timeout = None, // not waiting for other participants to observe the unassign
               )
 
           def assign(participant: ParticipantReference, party: PartyId): Unit =
             participant.ledger_api.commands.submit_assign(
               party,
-              paintOfferUnassignedEvent.unassignId,
+              paintOfferUnassignedEvent.reassignmentId,
               sourceId,
               targetId,
-              timeout = 10 seconds,
+              timeout = None, // not waiting for other participants to observe the assign
             )
 
           // Wait until P5 sees the unassignment result so that assignments do not fail with `UnassignmentIncomplete`
           eventually() {
             P5.ledger_api.state.acs
               .incomplete_unassigned_of_party(painter)
-              .map(_.unassignId) should contain(paintOfferUnassignedEvent.unassignId)
+              .map(_.reassignmentId) should contain(paintOfferUnassignedEvent.reassignmentId)
           }
 
           logger.info(s"Racy assignments of $paintOfferUnassignedEvent occur")
@@ -907,14 +906,6 @@ trait SynchronizerChangeRealClockIntegrationTest
                 logEntry.errorMessage should include(
                   "Rejected transaction is referring to locked contracts"
                 )
-              },
-            ),
-            (
-              LogEntryOptionality.OptionalMany,
-              logEntry => {
-                logEntry.errorMessage should (include("Cannot assign") and include(
-                  "can initiate before exclusivity timeout"
-                ))
               },
             ),
           )
@@ -1009,7 +1000,7 @@ class SynchronizerChangeRealClockIntegrationTestPostgres
     extends SynchronizerChangeRealClockIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(

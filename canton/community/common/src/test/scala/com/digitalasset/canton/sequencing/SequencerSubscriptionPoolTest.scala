@@ -14,6 +14,7 @@ class SequencerSubscriptionPoolTest
     with HasExecutionContext
     with FailOnShutdown
     with ConnectionPoolTestHelpers {
+
   "SequencerSubscriptionPool" should {
     "initialize in the happy path" in {
       val nbConnections = PositiveInt.tryCreate(10)
@@ -25,8 +26,7 @@ class SequencerSubscriptionPoolTest
         trustThreshold = trustThreshold,
         index => mkConnectionAttributes(synchronizerIndex = 1, sequencerIndex = index),
         livenessMargin = livenessMargin,
-      ) { (connectionPool, subscriptionPool, listener) =>
-        connectionPool.start()
+      ) { (subscriptionPool, listener) =>
         subscriptionPool.start()
 
         clue("normal start") {
@@ -56,8 +56,7 @@ class SequencerSubscriptionPoolTest
         trustThreshold = trustThreshold,
         index => mkConnectionAttributes(synchronizerIndex = 1, sequencerIndex = index),
         livenessMargin = livenessMargin,
-      ) { (connectionPool, subscriptionPool, listener) =>
-        connectionPool.start()
+      ) { (subscriptionPool, listener) =>
         subscriptionPool.start()
 
         listener.shouldStabilizeOn(ComponentHealthState.Ok())
@@ -98,8 +97,7 @@ class SequencerSubscriptionPoolTest
         trustThreshold = trustThreshold,
         index => mkConnectionAttributes(synchronizerIndex = 1, sequencerIndex = index),
         livenessMargin = livenessMargin,
-      ) { (connectionPool, subscriptionPool, listener) =>
-        connectionPool.start()
+      ) { (subscriptionPool, listener) =>
         subscriptionPool.start()
 
         clue("normal start") {
@@ -137,12 +135,10 @@ class SequencerSubscriptionPoolTest
         clue("Remove 2 more to go below the trust threshold") {
           initialPool.slice(4, 6).foreach(_.connection.fatal(reason = "test"))
 
-          listener.shouldStabilizeOn(
-            ComponentHealthState.failed(
-              "only 4 subscription(s) available, trust threshold = 5"
-            )
-          )
-          subscriptionPool.nbSubscriptions shouldBe NonNegativeInt.tryCreate(4)
+          // Subscription pool gets closed because the threshold is no longer reachable
+          listener.shouldStabilizeOn(ComponentHealthState.failed("Component is closed"))
+          // It does not make sense to check for the number of remaining subscriptions in the pool at this point
+          // since the pool has been closed.
         }
       }
     }

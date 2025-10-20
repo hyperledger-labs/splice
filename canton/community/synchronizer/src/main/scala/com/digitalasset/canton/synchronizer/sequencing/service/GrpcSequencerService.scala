@@ -28,6 +28,7 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParametersLookup
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.SynchronizerParametersLookup.SequencerSynchronizerParameters
 import com.digitalasset.canton.sequencer.api.v30
+import com.digitalasset.canton.sequencer.api.v30.{GetTimeRequest, GetTimeResponse}
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
@@ -212,7 +213,6 @@ class GrpcSequencerService(
 
     // This has to run at the beginning, because it reads from a thread-local.
     val senderFromMetadata = authenticationCheck.lookupCurrentMember()
-
     def parseAndValidate(
         maxRequestSize: MaxRequestSize
     ): Either[SequencerDeliverError, SignedContent[SubmissionRequest]] = for {
@@ -249,7 +249,7 @@ class GrpcSequencerService(
       _ <- sequencer.sendAsyncSigned(request)
     } yield v30.SendAsyncResponse()
 
-    val resET = performUnlessClosingEitherUSF(functionFullName)(sendET.leftMap { err =>
+    val resET = synchronizeWithClosing(functionFullName)(sendET.leftMap { err =>
       logger.info(s"Rejecting submission request by $senderFromMetadata with $err")
       err.toCantonRpcError
     })
@@ -433,18 +433,18 @@ class GrpcSequencerService(
       Some(SerializableTraceContext(event.traceContext).toProtoV30),
     )
 
-  override def subscribeV2(
-      request: v30.SubscriptionRequestV2,
+  override def subscribe(
+      request: v30.SubscriptionRequest,
       responseObserver: StreamObserver[v30.SubscriptionResponse],
   ): Unit =
-    subscribeInternalV2[v30.SubscriptionResponse](
+    subscribeInternal[v30.SubscriptionResponse](
       request,
       responseObserver,
       toVersionSubscriptionResponseV0,
     )
 
-  private def subscribeInternalV2[T](
-      request: v30.SubscriptionRequestV2,
+  private def subscribeInternal[T](
+      request: v30.SubscriptionRequest,
       responseObserver: StreamObserver[T],
       toSubscriptionResponse: SequencedSerializedEvent => T,
   ): Unit = {
@@ -452,11 +452,11 @@ class GrpcSequencerService(
     withServerCallStreamObserver(responseObserver) { observer =>
       val resultE = for {
         subscriptionRequest <-
-          SubscriptionRequestV2
+          SubscriptionRequest
             .fromProtoV30(request)
             .left
             .map(err => invalidRequest(err.toString))
-        SubscriptionRequestV2(member, timestamp) = subscriptionRequest
+        SubscriptionRequest(member, timestamp) = subscriptionRequest
         _ = logger.debug(
           s"Received subscription request from $member for timestamp (inclusive) $timestamp"
         )
@@ -473,7 +473,7 @@ class GrpcSequencerService(
       val createSubscriptionP =
         PromiseUnlessShutdown.unsupervised[Either[Status, GrpcManagedSubscription[?]]]()
       observer.setOnCancelHandler { () =>
-        logger.debug(s"Subscription cancelled by client ${request.member}.")
+        logger.info(s"Subscription cancelled by client ${request.member}.")
         // Instead upon cancellation, we close the subscription once/if it has been successfully created.
         createSubscriptionP.future.onComplete {
           case Success(Outcome(Right(subscription))) =>
@@ -589,7 +589,7 @@ class GrpcSequencerService(
 
     logger.info(s"$member subscribes from timestamp=$timestamp")
     val subscription = new GrpcManagedSubscription(
-      handler => directSequencerSubscriptionFactory.createV2(timestamp, member, handler),
+      handler => directSequencerSubscriptionFactory.create(timestamp, member, handler),
       observer,
       member,
       expireAt,
@@ -689,8 +689,13 @@ class GrpcSequencerService(
     case _ => false
   }
 
-  override def onClosed(): Unit =
+  override def onClosed(): Unit = {
+    acknowledgementConflate.foreach { cache =>
+      cache.invalidateAll()
+      cache.cleanUp()
+    }
     subscriptionPool.close()
+  }
 
   /** Return the currently known traffic state for a member. Callers must be authorized to request
     * the traffic state.
@@ -724,5 +729,20 @@ class GrpcSequencerService(
     } yield v30.GetTrafficStateForMemberResponse(trafficO.map(_.toProtoV30))
 
     EitherTUtil.toFuture(result.onShutdown(Left(AbortedDueToShutdown.Error().asGrpcError)))
+  }
+
+  override def getTime(request: GetTimeRequest): Future[GetTimeResponse] = {
+    // This call is authenticated but does not require special authorization.
+
+    // Traffic is not impacted as no events are emitted.
+
+    // The returned information is expected to be readily available and served from transient memory,
+    //  hence this call is expected to be fast and impose minimal load on sequencers,
+    //  so network-level rate limiting is enough to secure it against denial-of-service attacks;
+    //  for this reason we don't apply application-level rate limiting.
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    sequencer.sequencingTime
+      .map(time => GetTimeResponse(time.map(_.toProtoPrimitive)))
+      .onShutdown(throw AbortedDueToShutdown.Error().asGrpcError)
   }
 }

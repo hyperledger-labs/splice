@@ -38,7 +38,7 @@ object OnboardingStateForSequencer extends VersioningCompanion[OnboardingStateFo
   override def name: String = "onboarding state for sequencer"
 
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.OnboardingStateForSequencer
     )(
       supportedProtoVersion(_)(fromProtoV30),

@@ -5,6 +5,7 @@ package com.digitalasset.canton.openapi
 
 import com.daml.ledger.api.v2
 import com.digitalasset.canton.http.json.v2 as json
+import com.digitalasset.canton.http.json.v2.LegacyDTOs
 import com.digitalasset.canton.openapi.json.{JSON, model as openapi}
 import io.circe.{Decoder, Encoder}
 import io.swagger.parser.OpenAPIParser
@@ -16,7 +17,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.LoggerFactory
 
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 import scala.util.Using
@@ -46,7 +46,6 @@ import scala.util.control.NonFatal
   *
   * Do not forget to regenerate the openapi definitions (openapi.yaml). See GenerateJSONApiDocs.
   */
-@nowarn("cat=deprecation")
 class OpenapiTypesTest extends AnyWordSpec with Matchers {
   // this can be increased locally
   // with 100 examples tests take 5 minutes on my machine
@@ -144,7 +143,7 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
   // reason is that magnolia generates multiple lines of code for arbitrary instances generation
   object Mappings {
 
-    import StdGenerators.*
+    import com.digitalasset.canton.http.json.StdGenerators.*
     import CantonGenerators.*
     import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
     import com.digitalasset.canton.http.json.v2.JsCommandServiceCodecs.*
@@ -164,16 +163,10 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
 
     // as stated above this split is needed to ensure that mappings initialization do not exceed max 64kB method size
     val allMappings =
-      JsMappings.value ++ GrpcMappings1.value ++ GrpcMappings2.value ++ GrpcMappings3.value ++ GrpcMappings4.value
+      JsMappings1.value ++ JsMappings2.value ++ GrpcMappings1.value ++ GrpcMappings2.value ++ GrpcMappings3.value ++ GrpcMappings4.value
 
     object GrpcMappings1 {
       val value: Seq[Mapping[_, _]] = Seq(
-        Mapping[
-          v2.admin.party_management_service.AllocatePartyRequest,
-          openapi.AllocatePartyRequest,
-        ](
-          openapi.AllocatePartyRequest.fromJson
-        ),
         Mapping[
           v2.admin.party_management_service.AllocatePartyResponse,
           openapi.AllocatePartyResponse,
@@ -363,7 +356,7 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         Mapping[v2.transaction_filter.Filters, openapi.Filters](
           openapi.Filters.fromJson
         ),
-        Mapping[v2.state_service.GetActiveContractsRequest, openapi.GetActiveContractsRequest](
+        Mapping[LegacyDTOs.GetActiveContractsRequest, openapi.GetActiveContractsRequest](
           openapi.GetActiveContractsRequest.fromJson
         ),
         Mapping[
@@ -440,11 +433,11 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
 
     object GrpcMappings2 {
       val value: Seq[Mapping[_, _]] = Seq(
-        Mapping[v2.update_service.GetTransactionByIdRequest, openapi.GetTransactionByIdRequest](
+        Mapping[LegacyDTOs.GetTransactionByIdRequest, openapi.GetTransactionByIdRequest](
           openapi.GetTransactionByIdRequest.fromJson
         ),
         Mapping[
-          v2.update_service.GetTransactionByOffsetRequest,
+          LegacyDTOs.GetTransactionByOffsetRequest,
           openapi.GetTransactionByOffsetRequest,
         ](
           openapi.GetTransactionByOffsetRequest.fromJson
@@ -455,7 +448,7 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         Mapping[v2.update_service.GetUpdateByOffsetRequest, openapi.GetUpdateByOffsetRequest](
           openapi.GetUpdateByOffsetRequest.fromJson
         ),
-        Mapping[v2.update_service.GetUpdatesRequest, openapi.GetUpdatesRequest](
+        Mapping[LegacyDTOs.GetUpdatesRequest, openapi.GetUpdatesRequest](
           openapi.GetUpdatesRequest.fromJson
         ),
         Mapping[v2.admin.user_management_service.GetUserResponse, openapi.GetUserResponse](
@@ -574,22 +567,40 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
           openapi.ParticipantAdmin.fromJson
         ),
         Mapping[
-          json.JsSchema.JsTopologyEvent.ParticipantAuthorizationAdded,
+          v2.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationAdded,
           openapi.ParticipantAuthorizationAdded,
         ](
           openapi.ParticipantAuthorizationAdded.fromJson
         ),
         Mapping[
-          json.JsSchema.JsTopologyEvent.ParticipantAuthorizationChanged,
+          v2.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationChanged,
           openapi.ParticipantAuthorizationChanged,
         ](
           openapi.ParticipantAuthorizationChanged.fromJson
         ),
         Mapping[
-          json.JsSchema.JsTopologyEvent.ParticipantAuthorizationRevoked,
+          v2.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationRevoked,
           openapi.ParticipantAuthorizationRevoked,
         ](
           openapi.ParticipantAuthorizationRevoked.fromJson
+        ),
+        Mapping[
+          v2.topology_transaction.ParticipantAuthorizationAdded,
+          openapi.ParticipantAuthorizationAdded1,
+        ](
+          openapi.ParticipantAuthorizationAdded1.fromJson
+        ),
+        Mapping[
+          v2.topology_transaction.ParticipantAuthorizationChanged,
+          openapi.ParticipantAuthorizationChanged1,
+        ](
+          openapi.ParticipantAuthorizationChanged1.fromJson
+        ),
+        Mapping[
+          v2.topology_transaction.ParticipantAuthorizationRevoked,
+          openapi.ParticipantAuthorizationRevoked1,
+        ](
+          openapi.ParticipantAuthorizationRevoked1.fromJson
         ),
         Mapping[
           v2.transaction_filter.ParticipantAuthorizationTopologyFormat,
@@ -611,6 +622,9 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         ),
         Mapping[com.google.protobuf.any.Any, openapi.ProtoAny](
           openapi.ProtoAny.fromJson
+        ),
+        Mapping[json.js.PrefetchContractKey, openapi.PrefetchContractKey](
+          openapi.PrefetchContractKey.fromJson
         ),
         Mapping[json.JsUpdate.Reassignment, openapi.Reassignment1](
           openapi.Reassignment1.fromJson
@@ -639,7 +653,7 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         Mapping[v2.admin.user_management_service.Right, openapi.Right](
           openapi.Right.fromJson
         ),
-        Mapping[v2.interactive.interactive_submission_service.Signature, openapi.Signature](
+        Mapping[v2.crypto.Signature, openapi.Signature](
           openapi.Signature.fromJson
         ),
         Mapping[
@@ -648,8 +662,8 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         ](
           openapi.SinglePartySignatures.fromJson
         ),
-        Mapping[com.google.rpc.status.Status, openapi.Status](
-          openapi.Status.fromJson
+        Mapping[com.google.rpc.status.Status, openapi.JsStatus](
+          openapi.JsStatus.fromJson
         ),
         Mapping[
           v2.command_service.SubmitAndWaitForReassignmentRequest,
@@ -678,6 +692,9 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         ](
           openapi.TemplateFilter.fromJson
         ),
+        Mapping[v2.topology_transaction.TopologyEvent, openapi.TopologyEvent](
+          openapi.TopologyEvent.fromJson
+        ),
         Mapping[v2.transaction_filter.TopologyFormat, openapi.TopologyFormat](
           openapi.TopologyFormat.fromJson
         ),
@@ -688,10 +705,13 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         Mapping[json.JsUpdate.TopologyTransaction, openapi.TopologyTransaction](
           openapi.TopologyTransaction.fromJson
         ),
+        Mapping[v2.topology_transaction.TopologyTransaction, openapi.JsTopologyTransaction](
+          openapi.JsTopologyTransaction.fromJson
+        ),
         Mapping[v2.trace_context.TraceContext, openapi.TraceContext](
           openapi.TraceContext.fromJson
         ),
-        Mapping[v2.transaction_filter.TransactionFilter, openapi.TransactionFilter](
+        Mapping[LegacyDTOs.TransactionFilter, openapi.TransactionFilter](
           openapi.TransactionFilter.fromJson
         ),
         Mapping[v2.transaction_filter.TransactionFormat, openapi.TransactionFormat](
@@ -776,6 +796,105 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
           openapi.WildcardFilter.fromJson
         ),
         Mapping[
+          v2.interactive.interactive_submission_service.ExecuteSubmissionAndWaitResponse,
+          openapi.ExecuteSubmissionAndWaitResponse,
+        ](
+          openapi.ExecuteSubmissionAndWaitResponse.fromJson
+        ),
+        Mapping[v2.package_reference.VettedPackages, openapi.VettedPackages](
+          openapi.VettedPackages.fromJson
+        ),
+        Mapping[v2.package_reference.VettedPackage, openapi.VettedPackage](
+          openapi.VettedPackage.fromJson
+        ),
+        Mapping[
+          v2.package_service.PackageMetadataFilter,
+          openapi.PackageMetadataFilter,
+        ](
+          openapi.PackageMetadataFilter.fromJson
+        ),
+        Mapping[
+          v2.package_service.TopologyStateFilter,
+          openapi.TopologyStateFilter,
+        ](
+          openapi.TopologyStateFilter.fromJson
+        ),
+        Mapping[
+          v2.package_service.ListVettedPackagesResponse,
+          openapi.ListVettedPackagesResponse,
+        ](
+          openapi.ListVettedPackagesResponse.fromJson
+        ),
+        Mapping[
+          v2.package_service.ListVettedPackagesRequest,
+          openapi.ListVettedPackagesRequest,
+        ](
+          openapi.ListVettedPackagesRequest.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.UpdateVettedPackagesResponse,
+          openapi.UpdateVettedPackagesResponse,
+        ](
+          openapi.UpdateVettedPackagesResponse.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.UpdateVettedPackagesRequest,
+          openapi.UpdateVettedPackagesRequest,
+        ](
+          openapi.UpdateVettedPackagesRequest.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.UpdateVettedPackagesRequest,
+          openapi.UpdateVettedPackagesRequest,
+        ](
+          openapi.UpdateVettedPackagesRequest.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.VettedPackagesRef,
+          openapi.VettedPackagesRef,
+        ](
+          openapi.VettedPackagesRef.fromJson
+        ),
+        Mapping[v2.version_service.PackageFeature, openapi.PackageFeature](
+          openapi.PackageFeature.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.VettedPackagesChange,
+          openapi.VettedPackagesChange,
+        ](
+          openapi.VettedPackagesChange.fromJson
+        ),
+        Mapping[v2.admin.package_management_service.VettedPackagesChange.Vet, openapi.Vet1](
+          openapi.Vet1.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.VettedPackagesChange.Operation.Vet,
+          openapi.Vet,
+        ](
+          openapi.Vet.fromJson
+        ),
+        Mapping[v2.admin.package_management_service.VettedPackagesChange.Unvet, openapi.Unvet1](
+          openapi.Unvet1.fromJson
+        ),
+        Mapping[
+          v2.admin.package_management_service.VettedPackagesChange.Operation.Unvet,
+          openapi.Unvet,
+        ](
+          openapi.Unvet.fromJson
+        ),
+        Mapping[
+          v2.package_reference.PriorTopologySerial,
+          openapi.PriorTopologySerial,
+        ](
+          openapi.PriorTopologySerial.fromJson
+        ),
+        Mapping[
+          v2.package_reference.PriorTopologySerial.Serial.Prior,
+          openapi.Prior,
+        ](
+          openapi.Prior.fromJson
+        ),
+        Mapping[
           v2.admin.party_management_service.AllocateExternalPartyRequest.SignedTransaction,
           openapi.SignedTransaction,
         ](
@@ -819,14 +938,20 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
       )
     }
 
-    object JsMappings {
-      val value: Seq[Mapping[_, _]] = {
+    object JsMappings1 {
+      val value: Seq[Mapping[_, _]] =
         Seq(
           Mapping[json.JsCommands, openapi.JsCommands](
             openapi.JsCommands.fromJson
           ),
           Mapping[json.JsGetActiveContractsResponse, openapi.JsGetActiveContractsResponse](
             openapi.JsGetActiveContractsResponse.fromJson
+          ),
+          Mapping[
+            json.js.AllocatePartyRequest,
+            openapi.AllocatePartyRequest,
+          ](
+            openapi.AllocatePartyRequest.fromJson
           ),
           Mapping[json.JsContractEntry.JsActiveContract, openapi.JsActiveContract](
             openapi.JsActiveContract.fromJson
@@ -875,64 +1000,94 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
           Mapping[json.JsGetUpdatesResponse, openapi.JsGetUpdatesResponse](
             openapi.JsGetUpdatesResponse.fromJson
           ),
-          Mapping[json.JsGetUpdateTreesResponse, openapi.JsGetUpdateTreesResponse](
-            openapi.JsGetUpdateTreesResponse.fromJson
-          ),
-          Mapping[json.JsContractEntry.JsIncompleteAssigned, openapi.JsIncompleteAssigned](
-            openapi.JsIncompleteAssigned.fromJson
-          ),
-          Mapping[json.JsContractEntry.JsIncompleteUnassigned, openapi.JsIncompleteUnassigned](
-            openapi.JsIncompleteUnassigned.fromJson
-          ),
-          Mapping[json.JsSchema.JsInterfaceView, openapi.JsInterfaceView](
-            openapi.JsInterfaceView.fromJson
-          ),
-          Mapping[json.JsPrepareSubmissionRequest, openapi.JsPrepareSubmissionRequest](
-            openapi.JsPrepareSubmissionRequest.fromJson
-          ),
-          Mapping[json.JsPrepareSubmissionResponse, openapi.JsPrepareSubmissionResponse](
-            openapi.JsPrepareSubmissionResponse.fromJson
-          ),
-          Mapping[
-            json.JsSchema.JsReassignmentEvent.JsReassignmentEvent,
-            openapi.JsReassignmentEvent,
-          ](
-            openapi.JsReassignmentEvent.fromJson
-          ),
-          Mapping[json.JsSchema.JsReassignment, openapi.JsReassignment](
-            openapi.JsReassignment.fromJson
-          ),
-          Mapping[json.JsSchema.JsStatus, openapi.JsStatus](openapi.JsStatus.fromJson),
-          Mapping[
-            json.JsSubmitAndWaitForReassignmentResponse,
-            openapi.JsSubmitAndWaitForReassignmentResponse,
-          ](openapi.JsSubmitAndWaitForReassignmentResponse.fromJson),
-          Mapping[
-            json.JsSubmitAndWaitForTransactionRequest,
-            openapi.JsSubmitAndWaitForTransactionRequest,
-          ](openapi.JsSubmitAndWaitForTransactionRequest.fromJson),
-          Mapping[
-            json.JsSubmitAndWaitForTransactionResponse,
-            openapi.JsSubmitAndWaitForTransactionResponse,
-          ](openapi.JsSubmitAndWaitForTransactionResponse.fromJson),
-          Mapping[
-            json.JsSubmitAndWaitForTransactionTreeResponse,
-            openapi.JsSubmitAndWaitForTransactionTreeResponse,
-          ](openapi.JsSubmitAndWaitForTransactionTreeResponse.fromJson),
-          Mapping[json.JsSchema.JsTopologyTransaction, openapi.JsTopologyTransaction](
-            openapi.JsTopologyTransaction.fromJson
-          ),
-          Mapping[json.JsSchema.JsTransaction, openapi.JsTransaction](
-            openapi.JsTransaction.fromJson
-          ),
-          Mapping[json.JsSchema.JsTransactionTree, openapi.JsTransactionTree](
-            openapi.JsTransactionTree.fromJson
-          ),
-          Mapping[json.JsSchema.JsReassignmentEvent.JsUnassignedEvent, openapi.JsUnassignedEvent](
-            openapi.JsUnassignedEvent.fromJson
-          ),
         )
-      }
+    }
+
+    object JsMappings2 {
+      val value: Seq[Mapping[_, _]] = Seq(
+        Mapping[json.JsGetUpdateTreesResponse, openapi.JsGetUpdateTreesResponse](
+          openapi.JsGetUpdateTreesResponse.fromJson
+        ),
+        Mapping[json.JsContractEntry.JsIncompleteAssigned, openapi.JsIncompleteAssigned](
+          openapi.JsIncompleteAssigned.fromJson
+        ),
+        Mapping[json.JsContractEntry.JsIncompleteUnassigned, openapi.JsIncompleteUnassigned](
+          openapi.JsIncompleteUnassigned.fromJson
+        ),
+        Mapping[json.JsSchema.JsInterfaceView, openapi.JsInterfaceView](
+          openapi.JsInterfaceView.fromJson
+        ),
+        Mapping[json.JsPrepareSubmissionRequest, openapi.JsPrepareSubmissionRequest](
+          openapi.JsPrepareSubmissionRequest.fromJson
+        ),
+        Mapping[json.JsPrepareSubmissionResponse, openapi.JsPrepareSubmissionResponse](
+          openapi.JsPrepareSubmissionResponse.fromJson
+        ),
+        Mapping[
+          json.JsSchema.JsReassignmentEvent.JsReassignmentEvent,
+          openapi.JsReassignmentEvent,
+        ](
+          openapi.JsReassignmentEvent.fromJson
+        ),
+        Mapping[json.JsSchema.JsReassignment, openapi.JsReassignment](
+          openapi.JsReassignment.fromJson
+        ),
+        Mapping[
+          json.JsSubmitAndWaitForReassignmentResponse,
+          openapi.JsSubmitAndWaitForReassignmentResponse,
+        ](openapi.JsSubmitAndWaitForReassignmentResponse.fromJson),
+        Mapping[
+          json.JsSubmitAndWaitForTransactionRequest,
+          openapi.JsSubmitAndWaitForTransactionRequest,
+        ](openapi.JsSubmitAndWaitForTransactionRequest.fromJson),
+        Mapping[
+          json.JsSubmitAndWaitForTransactionResponse,
+          openapi.JsSubmitAndWaitForTransactionResponse,
+        ](openapi.JsSubmitAndWaitForTransactionResponse.fromJson),
+        Mapping[
+          json.JsSubmitAndWaitForTransactionTreeResponse,
+          openapi.JsSubmitAndWaitForTransactionTreeResponse,
+        ](openapi.JsSubmitAndWaitForTransactionTreeResponse.fromJson),
+        Mapping[json.JsSchema.JsTransaction, openapi.JsTransaction](
+          openapi.JsTransaction.fromJson
+        ),
+        Mapping[json.JsSchema.JsTransactionTree, openapi.JsTransactionTree](
+          openapi.JsTransactionTree.fromJson
+        ),
+        Mapping[json.JsSchema.JsReassignmentEvent.JsUnassignedEvent, openapi.JsUnassignedEvent](
+          openapi.JsUnassignedEvent.fromJson
+        ),
+        Mapping[
+          json.JsExecuteSubmissionAndWaitRequest,
+          openapi.JsExecuteSubmissionAndWaitRequest,
+        ](
+          openapi.JsExecuteSubmissionAndWaitRequest.fromJson
+        ),
+        Mapping[
+          json.JsExecuteSubmissionAndWaitForTransactionRequest,
+          openapi.JsExecuteSubmissionAndWaitForTransactionRequest,
+        ](
+          openapi.JsExecuteSubmissionAndWaitForTransactionRequest.fromJson
+        ),
+        Mapping[
+          json.JsExecuteSubmissionAndWaitForTransactionResponse,
+          openapi.JsExecuteSubmissionAndWaitForTransactionResponse,
+        ](
+          openapi.JsExecuteSubmissionAndWaitForTransactionResponse.fromJson
+        ),
+        Mapping[
+          LegacyDTOs.GetUpdatesRequest,
+          openapi.GetUpdatesRequest,
+        ](
+          openapi.GetUpdatesRequest.fromJson
+        ),
+        Mapping[
+          LegacyDTOs.TransactionFilter,
+          openapi.TransactionFilter,
+        ](
+          openapi.TransactionFilter.fromJson
+        ),
+      )
     }
   }
 }

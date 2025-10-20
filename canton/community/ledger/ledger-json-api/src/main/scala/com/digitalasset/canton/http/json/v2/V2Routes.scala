@@ -4,17 +4,22 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.DamlDefinitionsView
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.client.services.version.VersionClient
 import com.digitalasset.canton.ledger.participant.state.PackageSyncService
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.platform.PackagePreferenceBackend
+import com.digitalasset.canton.tracing.{TraceContext, W3CTraceContext}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.stream.Materializer
-import sttp.tapir.server.pekkohttp.PekkoHttpServerInterpreter
+import sttp.model.Header
+import sttp.tapir.server.interceptor.RequestInterceptor
+import sttp.tapir.server.pekkohttp.{PekkoHttpServerInterpreter, PekkoHttpServerOptions}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class V2Routes(
     commandService: JsCommandService,
@@ -45,8 +50,11 @@ class V2Routes(
   private val docs =
     new JsApiDocsService(versionClient, serverEndpoints.map(_.endpoint), loggerFactory)
 
+  private val pekkoOptions = PekkoHttpServerOptions.default
+    .prependInterceptor(new RequestInterceptors(loggerFactory).loggingInterceptor())
+
   val v2Routes: Route =
-    PekkoHttpServerInterpreter()(ec).toRoute(serverEndpoints)
+    PekkoHttpServerInterpreter(pekkoOptions)(ec).toRoute(serverEndpoints)
 
   val docsRoute = PekkoHttpServerInterpreter()(ec).toRoute(docs.endpoints())
 }
@@ -56,19 +64,28 @@ object V2Routes {
       ledgerClient: LedgerClient,
       metadataServiceEnabled: Boolean,
       packageSyncService: PackageSyncService,
+      packagePreferenceBackend: PackagePreferenceBackend,
       executionContext: ExecutionContext,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ws: WebsocketConfig,
       esf: ExecutionSequencerFactory,
       materializer: Materializer,
+      authInterceptor: AuthInterceptor,
   ): V2Routes = {
     implicit val ec: ExecutionContext = executionContext
 
-    val schemaProcessors = new SchemaProcessors(
-      packageSyncService.getPackageMetadataSnapshot(_).packages
+    val schemaProcessors = new SchemaProcessorsImpl(
+      packageSyncService.getPackageMetadataSnapshot(_).packages,
+      loggerFactory,
     )
-    val protocolConverters = new ProtocolConverters(schemaProcessors)
+
+    val transcodePackageIdResolver = TranscodePackageIdResolver.topologyStateBacked(
+      packagePreferenceBackend,
+      packageSyncService.getPackageMetadataSnapshot(_),
+      loggerFactory,
+    )
+    val protocolConverters = new ProtocolConverters(schemaProcessors, transcodePackageIdResolver)
     val commandService =
       new JsCommandService(ledgerClient, protocolConverters, loggerFactory)
 
@@ -79,16 +96,17 @@ object V2Routes {
     val stateService =
       new JsStateService(ledgerClient, protocolConverters, loggerFactory)
     val partyManagementService =
-      new JsPartyManagementService(ledgerClient.partyManagementClient, loggerFactory)
+      new JsPartyManagementService(
+        ledgerClient.partyManagementClient,
+        protocolConverters,
+        loggerFactory,
+      )
 
     val jsPackageService =
       new JsPackageService(
         ledgerClient.packageService,
         ledgerClient.packageManagementClient,
         loggerFactory,
-      )(
-        executionContext,
-        materializer,
       )
 
     val updateService =
@@ -124,4 +142,40 @@ object V2Routes {
       loggerFactory,
     )(executionContext)
   }
+}
+
+class RequestInterceptors(val loggerFactory: NamedLoggerFactory) extends NamedLogging {
+  def loggingInterceptor() =
+    RequestInterceptor.transformServerRequest { request =>
+      val incomingHeaders = request.headers.map(h => (h.name, h.value)).toMap
+      val extractedW3cTrace = W3CTraceContext.fromHeaders(incomingHeaders)
+      val uriScheme = request.uri.scheme.getOrElse("")
+
+      def logIncomingRequest()(implicit traceContext: TraceContext): Unit =
+        logger.debug(s"Incoming request ($uriScheme): ${request.showShort}")
+
+      extractedW3cTrace match {
+        case Some(trace) =>
+          implicit val tc: TraceContext = trace.toTraceContext
+          logIncomingRequest()
+          Future.successful(request)
+
+        case None =>
+          implicit val newTraceContext: TraceContext = TraceContext.createNew("request")
+          logger.trace(s"No TraceContext in headers, created new for ${request.showShort}")
+          logIncomingRequest()
+
+          val enrichedHeaders = request.headers ++ W3CTraceContext
+            .extractHeaders(newTraceContext)
+            .map { case (name, value) => Header(name, value) }
+
+          Future.successful(
+            request.withOverride(
+              headersOverride = Some(enrichedHeaders),
+              protocolOverride = None,
+              connectionInfoOverride = None,
+            )
+          )
+      }
+    }
 }

@@ -5,14 +5,14 @@ package com.digitalasset.canton.integration.tests.multisynchronizer
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{LocalSequencerReference, ParticipantReference}
 import com.digitalasset.canton.examples.java.iou.Iou
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{
@@ -43,13 +43,13 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.{BaseTest, SynchronizerAlias, config}
-import monocle.macros.syntax.lens.*
 import org.scalatest.Assertion
 
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 
 /*
@@ -91,10 +91,7 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
     EnvironmentDefinition.P3_S1M1_S1M1
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
-        ConfigTransforms.updateAllParticipantConfigs_(
-          _.focus(_.parameters.reassignmentTimeProofFreshnessProportion)
-            .replace(NonNegativeInt.zero)
-        ),
+        ConfigTransforms.updateTargetTimestampForwardTolerance(10.minutes),
       )
       .withSetup { implicit env =>
         import env.*
@@ -115,7 +112,8 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
         participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
 
-        participants.all.dars.upload(BaseTest.CantonExamplesPath)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = daId)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = acmeId)
 
         programmableSequencers.put(
           daName,
@@ -297,12 +295,12 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
 
       val bobIou = participant1.ledger_api.javaapi.state.acs.await(Iou.COMPANION)(bob)
 
-      val unassignId =
+      val reassignmentId =
         participant1.ledger_api.commands
           .submit_unassign(bob, Seq(bobIou.id.toLf), daId, acmeId)
-          .unassignId
+          .reassignmentId
 
-      participant1.ledger_api.commands.submit_assign(bob, unassignId, daId, acmeId)
+      participant1.ledger_api.commands.submit_assign(bob, reassignmentId, daId, acmeId)
 
       // Only P1 is a reassigning participant
       daConfirmations shouldBe Map(participant1.id -> 1)
@@ -386,12 +384,12 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
         val aliceIou = participant1.ledger_api.javaapi.state.acs
           .await(Iou.COMPANION)(alice, synchronizerFilter = Some(daId))
 
-        val unassignId =
+        val reassignmentId =
           participant1.ledger_api.commands
             .submit_unassign(alice, Seq(aliceIou.id.toLf), daId, acmeId)
-            .unassignId
+            .reassignmentId
 
-        participant1.ledger_api.commands.submit_assign(alice, unassignId, daId, acmeId)
+        participant1.ledger_api.commands.submit_assign(alice, reassignmentId, daId, acmeId)
 
         programmableSequencers(daName).resetPolicy()
         programmableSequencers(acmeName).resetPolicy()
@@ -463,9 +461,9 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
       val expiredDecisionTimeout = parameters.decisionTimeout.plusSeconds(1)
       val progressTimeP = Promise[Unit]()
 
-      val unassignId = participant1.ledger_api.commands
+      val reassignmentId = participant1.ledger_api.commands
         .submit_unassign(alice, Seq(aliceIou.id.toLf), daId, acmeId)
-        .unassignId
+        .reassignmentId
 
       // Assignment will not go through because we need two confirmations
       val failingAssignmentConfirmationCounter = new AtomicLong(0)
@@ -481,7 +479,7 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
         {
           val failingAssignmentF = Future {
             failingAssignment(
-              unassignId = unassignId,
+              reassignmentId = reassignmentId,
               source = daId,
               target = acmeId,
               submittingParty = alice,
@@ -501,7 +499,7 @@ sealed trait ReassignmentsConfirmationThresholdIntegrationTest
 
           // Unassignment should now go through
           programmableSequencers(acmeName).resetPolicy()
-          participant1.ledger_api.commands.submit_assign(alice, unassignId, daId, acmeId)
+          participant1.ledger_api.commands.submit_assign(alice, reassignmentId, daId, acmeId)
         },
         reassignmentFailureLogAssertions,
       )
@@ -514,7 +512,7 @@ class ReassignmentsConfirmationThresholdIntegrationTestPostgres
     extends ReassignmentsConfirmationThresholdIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))

@@ -115,6 +115,7 @@ class SequencerWriter(
     rateLimitManagerO: Option[SequencerRateLimitManager],
     clock: Clock,
     expectedCommitMode: Option[CommitMode],
+    blockSequencerMode: Boolean,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -231,7 +232,7 @@ class SequencerWriter(
       initialSnapshot: Option[SequencerInitialState] = None,
       resetWatermarkTo: => ResetWatermark,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, WriterStartupError, Unit] =
-    performUnlessClosingEitherUSF[WriterStartupError, Unit](functionFullName) {
+    synchronizeWithClosing(functionFullName) {
       def createStoreAndRunCrashRecovery()
           : EitherT[FutureUnlessShutdown, WriterStartupError, SequencerWriterStore] = {
         // only retry errors that are flagged as retryable
@@ -284,9 +285,16 @@ class SequencerWriter(
                         runRecovery(writerStore, resetWatermarkToValue)
                       )
                       _ <- EitherT.right(generalStore.resetAndPreloadBuffer())
-                      _ <- EitherT
-                        .right[WriterStartupError](waitForOnline(onlineTimestamp))
-                        .mapK(FutureUnlessShutdown.outcomeK)
+                      _ <-
+                        if (blockSequencerMode) {
+                          // In blockSequencerMode, time is determined by the underlying ordering service, so we can't
+                          // reliably wait here for the online timestamp.
+                          EitherTUtil.unitUS[WriterStartupError]
+                        } else {
+                          EitherT
+                            .right[WriterStartupError](waitForOnline(onlineTimestamp))
+                            .mapK(FutureUnlessShutdown.outcomeK)
+                        }
                     } yield ()
                   }
               } yield writerStore
@@ -314,7 +322,7 @@ class SequencerWriter(
       )(_.send(submission))
 
     EitherT(
-      performUnlessClosingUSF(functionFullName)(sendET.value)
+      synchronizeWithClosing(functionFullName)(sendET.value)
     )
   }
 
@@ -331,7 +339,7 @@ class SequencerWriter(
           )
           .leftWiden[SequencerDeliverError]
       )(_.blockSequencerWrite(outcome))
-    EitherT(performUnlessClosingUSF(functionFullName)(sendET.value))
+    EitherT(synchronizeWithClosing(functionFullName)(sendET.value))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -364,7 +372,7 @@ class SequencerWriter(
       onlineTimestamp <- store.goOnline(
         goOnlineAt
       ) // actual online timestamp depends on other instances
-      _ = if (clock.isSimClock && clock.now < onlineTimestamp) {
+      _ = if (clock.isSimClock && clock.now < onlineTimestamp && !blockSequencerMode) {
         logger.debug(s"The sequencer will not start unless sim clock moves to $onlineTimestamp")
         logger.debug(
           s"In order to prevent deadlocking in tests the clock's timestamp will now be advanced to $onlineTimestamp"
@@ -412,8 +420,8 @@ class SequencerWriter(
 
   private def setupWriterRecovery(doneF: Future[Unit]): Unit =
     doneF.onComplete { result =>
-      withNewTraceContext { implicit traceContext =>
-        performUnlessClosing(functionFullName) { // close will take care of shutting down a running writer if close is invoked
+      withNewTraceContext("setup_writer_recovery") { implicit traceContext =>
+        synchronizeWithClosingSync(functionFullName) { // close will take care of shutting down a running writer if close is invoked
           // close the running writer and reset the reference
           val closed = runningWriterRef
             .getAndSet(None)
@@ -461,8 +469,8 @@ class SequencerWriter(
     store.goOffline()
   }
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = withNewTraceContext {
-    implicit traceContext =>
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    withNewTraceContext("close_sequencer_writer") { implicit traceContext =>
       logger.debug("Shutting down sequencer writer")
       val sequencerFlow = runningWriterRef.get()
       Seq(
@@ -474,7 +482,7 @@ class SequencerWriter(
           timeouts.closing,
         ),
       )
-  }
+    }
 }
 
 object SequencerWriter {
@@ -518,6 +526,7 @@ object SequencerWriter {
       protocolVersion: ProtocolVersion,
       loggerFactory: NamedLoggerFactory,
       blockSequencerMode: Boolean,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       metrics: SequencerMetrics,
   )(implicit materializer: Materializer, executionContext: ExecutionContext): SequencerWriter = {
     implicit val loggingContext: ErrorLoggingContext = ErrorLoggingContext(
@@ -541,6 +550,7 @@ object SequencerWriter {
           protocolVersion,
           metrics,
           blockSequencerMode,
+          sequencingTimeLowerBoundExclusive,
         )
           .toMat(Sink.ignore)(Keep.both)
           .mapMaterializedValue(m => new RunningSequencerWriterFlow(m._1, m._2.void))
@@ -561,6 +571,7 @@ object SequencerWriter {
       rateLimitManagerO,
       clock,
       writerConfig.commitModeValidation,
+      blockSequencerMode,
       processingTimeout,
       loggerFactory,
     )

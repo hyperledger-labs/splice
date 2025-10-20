@@ -9,11 +9,12 @@ import com.digitalasset.canton.HasTempDirectory
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.plugins.{
   PostgresDumpRestore,
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   HasCycleUtils,
   SharedEnvironment,
@@ -36,7 +37,7 @@ final class RecordReplayIntegrationTest
 
   private val postgresPlugin = new UsePostgres(loggerFactory)
   registerPlugin(postgresPlugin)
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   private val postgresDumpRestore = PostgresDumpRestore(postgresPlugin, forceLocal = false)
 
@@ -54,7 +55,10 @@ final class RecordReplayIntegrationTest
   private val SendReplayParallelism = 10
 
   override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P1_S1M1
+    EnvironmentDefinition.P1_S1M1.addConfigTransform(
+      // TODO(i26481): Enable new connection pool (test uses replay subscriptions)
+      ConfigTransforms.disableConnectionPool
+    )
 
   "replaying events and submission requests is functionally working" in { implicit env =>
     import env.*
@@ -151,7 +155,11 @@ final class RecordReplayIntegrationTest
       // Wait until all sequencer events have been output as transactions through the ledger API.
       eventually() {
         participant1.ledger_api.updates
-          .flat(Set(participant1.adminParty), 2 * NumberOfRecordedWorkflows, txOffsetBeforeReplay)
+          .transactions(
+            partyIds = Set(participant1.adminParty),
+            completeAfter = 2 * NumberOfRecordedWorkflows,
+            beginOffsetExclusive = txOffsetBeforeReplay,
+          )
           .size should be >= 2 * NumberOfRecordedWorkflows
       }
 
@@ -174,7 +182,7 @@ final class RecordReplayIntegrationTest
 
     withClue("Replay the sequencer submissions from the participant and mediator") {
       val mediatorSendReplayConfig = {
-        val replaySendsConfig = SequencerSends(usePekko = true)
+        val replaySendsConfig = SequencerSends(loggerFactory, usePekko = true)
         MediatorNodeBootstrap.replaySequencerConfig.set { case `mediatorId` =>
           ReplayConfig(tempDirectory.path, replaySendsConfig)
         }
@@ -184,7 +192,7 @@ final class RecordReplayIntegrationTest
       }
 
       val participantSendReplayConfig = {
-        val replaySendsConfig = SequencerSends(usePekko = true)
+        val replaySendsConfig = SequencerSends(loggerFactory, usePekko = true)
 
         participant1.start()
         participant1.underlying.value.replaySequencerConfig

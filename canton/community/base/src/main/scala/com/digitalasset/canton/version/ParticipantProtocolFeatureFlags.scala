@@ -10,8 +10,6 @@ object ParticipantProtocolFeatureFlags {
   /** Feature flags supported by participant node for each PV
     */
   val supportedFeatureFlagsByPV: Map[ProtocolVersion, Set[ParticipantTopologyFeatureFlag]] = Map(
-    ProtocolVersion.v33 -> Set(
-      ParticipantTopologyFeatureFlag.ExternalSigningLocalContractsInSubview
-    )
+    ProtocolVersion.v34 -> Set.empty
   )
 }

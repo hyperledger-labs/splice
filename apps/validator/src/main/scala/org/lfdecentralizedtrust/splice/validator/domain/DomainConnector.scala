@@ -16,12 +16,14 @@ import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfi
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnections,
+  SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -137,7 +139,7 @@ class DomainConnector(
           if (connections.isEmpty) {
             throw Status.NOT_FOUND
               .withDescription(
-                s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
+                s"sequencer connections for migration id $migrationId is empty at $time, validate with your SV sponsor that your migration id is correct"
               )
               .asRuntimeException()
           } else {
@@ -146,7 +148,7 @@ class DomainConnector(
                 case None =>
                   throw Status.NOT_FOUND
                     .withDescription(
-                      s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
+                      s"sequencer connections for migration id $migrationId is empty at $time, validate with your SV sponsor that your migration id is correct"
                     )
                     .asRuntimeException()
                 case Some(nonEmptyConnections) =>
@@ -157,6 +159,10 @@ class DomainConnector(
                       Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                       config.sequencerRequestAmplificationPatience,
                     ),
+                    // TODO(#2110) Rethink this when we enable sequencer connection pools.
+                    sequencerLivenessMargin = NonNegativeInt.zero,
+                    // TODO(#2666) Make the delays configurable.
+                    sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                   )
               }
             }.toMap

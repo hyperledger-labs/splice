@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.{
   *,
 }
 import com.digitalasset.canton.console.FeatureFlag
+import com.digitalasset.canton.http.{HttpServerConfig, JsonApiConfig, WebsocketConfig}
 import com.digitalasset.canton.participant.config.{
   ParticipantNodeConfig,
   RemoteParticipantConfig,
@@ -28,15 +29,9 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.{
   BftSequencer,
   SequencerHighAvailabilityConfig,
 }
-import com.digitalasset.canton.synchronizer.sequencer.SequencerWriterConfig.HighThroughput
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
-import com.digitalasset.canton.synchronizer.sequencer.{
-  BlockSequencerConfig,
-  ProgressSupervisorConfig,
-  SequencerConfig,
-}
+import com.digitalasset.canton.synchronizer.sequencer.{BlockSequencerConfig, SequencerConfig}
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveFiniteDuration}
-import com.digitalasset.canton.util.BytesUnit
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import com.digitalasset.canton.{BaseTest, UniquePortGenerator, config}
 import com.typesafe.config.ConfigValueFactory
@@ -44,6 +39,7 @@ import monocle.macros.syntax.lens.*
 import monocle.macros.{GenLens, GenPrism}
 
 import scala.concurrent.duration.*
+import scala.jdk.DurationConverters.*
 import scala.util.Random
 
 /** Utilities for transforming instances of [[CantonConfig]]. A transform itself is merely a
@@ -132,6 +128,7 @@ object ConfigTransforms {
       _.focus(_.monitoring.logging.api.warnBeyondLoad).replace(Some(10000)),
       // disable exit on fatal error in tests
       ConfigTransforms.setExitOnFatalFailures(false),
+      ConfigTransforms.setConnectionPool(true),
     )
 
   lazy val dontWarnOnDeprecatedPV: Seq[ConfigTransform] = Seq(
@@ -253,6 +250,8 @@ object ConfigTransforms {
       _.focus(_.ledgerApi.internalPort)
         .replace(nextPort.some)
         .focus(_.adminApi.internalPort)
+        .replace(nextPort.some)
+        .focus(_.httpLedgerApi.server.internalPort)
         .replace(nextPort.some)
         .focus(_.monitoring.grpcHealthServer)
         .modify(_.map(_.copy(internalPort = nextPort.some)))
@@ -668,6 +667,18 @@ object ConfigTransforms {
         .replace(config.NonNegativeFiniteDuration(maxDeduplicationDuration))
     )
 
+  def updateTargetTimestampForwardTolerance(
+      targetTimestampForwardTolerance: scala.concurrent.duration.FiniteDuration
+  ): ConfigTransform = updateTargetTimestampForwardTolerance(targetTimestampForwardTolerance.toJava)
+
+  def updateTargetTimestampForwardTolerance(
+      targetTimestampForwardTolerance: java.time.Duration
+  ): ConfigTransform =
+    ConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.parameters.reassignmentsConfig.targetTimestampForwardTolerance)
+        .replace(config.NonNegativeFiniteDuration(targetTimestampForwardTolerance))
+    )
+
   /** Flag the provided participants as being replicated. Keep in mind to actually work they need to
     * be configured to share the same database (see
     * [[com.digitalasset.canton.integration.plugins.UseSharedStorage]]).
@@ -786,6 +797,11 @@ object ConfigTransforms {
       )
   }
 
+  val disableUpgradeValidation: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.disableUpgradeValidation).replace(true)
+    )
+
   /** Enables remote mediators
     *
     * Alternatively use [[EnvironmentDefinition.buildBaseEnvironmentDefinition]] with `withRemote =
@@ -804,8 +820,8 @@ object ConfigTransforms {
   }
 
   def defaultsForNodes: Seq[ConfigTransform] =
-    setProtocolVersion(ProtocolVersion.v33) :+
-      ConfigTransforms.updateAllInitialProtocolVersion(ProtocolVersion.v33)
+    setProtocolVersion(ProtocolVersion.v34) :+
+      ConfigTransforms.updateAllInitialProtocolVersion(ProtocolVersion.v34)
 
   def setTopologyTransactionRegistrationTimeout(
       timeout: config.NonNegativeFiniteDuration
@@ -821,61 +837,64 @@ object ConfigTransforms {
     ),
   )
 
-  def unsafeEnableOnlinePartyReplication: Seq[ConfigTransform] = Seq(
-    updateAllParticipantConfigs_(
-      _.focus(_.parameters.unsafeOnlinePartyReplication)
-        .replace(Some(UnsafeOnlinePartyReplicationConfig()))
-    ),
+  def unsafeEnableOnlinePartyReplication(
+      participantsWithOnPRInterceptor: Map[
+        String,
+        UnsafeOnlinePartyReplicationConfig.TestInterceptor,
+      ] = Map.empty
+  ): Seq[ConfigTransform] = Seq(
+    updateAllParticipantConfigs { case (name, config) =>
+      config
+        .focus(_.parameters.unsafeOnlinePartyReplication)
+        .replace(
+          Some(
+            UnsafeOnlinePartyReplicationConfig(
+              testInterceptor = participantsWithOnPRInterceptor.get(name)
+            )
+          )
+        )
+    },
     updateAllSequencerConfigs_(
       _.focus(_.parameters.unsafeEnableOnlinePartyReplication).replace(true)
     ),
   )
 
-  def enableSequencerProgressSupervisor: ConfigTransform =
-    updateAllSequencerConfigs_(
-      _.focus(_.parameters.progressSupervisor).replace(Some(ProgressSupervisorConfig()))
+  def setDelayLoggingThreshold(duration: config.NonNegativeFiniteDuration): ConfigTransform =
+    _.focus(_.monitoring.logging.delayLoggingThreshold).replace(duration)
+
+  def disableConnectionPool: ConfigTransform = setConnectionPool(false)
+
+  /** Use the new sequencer connection pool if 'value' is true. Otherwise use the former transports.
+    */
+  def setConnectionPool(value: Boolean): ConfigTransform =
+    updateAllSequencerConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    }.compose(updateAllMediatorConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    }).compose(updateAllParticipantConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    })
+
+  /** Must be applied before the default config transformers */
+  def enableHttpLedgerApi: ConfigTransform = updateAllParticipantConfigs_(
+    _.copy(httpLedgerApi = JsonApiConfig(server = HttpServerConfig()))
+  )
+
+  /** Must be applied before the default config transformers */
+  def enableHttpLedgerApi(
+      participantName: String,
+      websocketConfig: Option[WebsocketConfig] = None,
+      pathPrefix: Option[String] = None,
+  ): ConfigTransform =
+    updateParticipantConfig(participantName)(config =>
+      config.copy(httpLedgerApi =
+        JsonApiConfig(
+          server = HttpServerConfig(
+            pathPrefix = pathPrefix
+          ),
+          websocketConfig = websocketConfig,
+        )
+      )
     )
 
-  def useRecipientsTableForSequencerReads: ConfigTransform =
-    updateAllSequencerConfigs_(
-      _.focus(_.sequencer).modify {
-        case db: SequencerConfig.External =>
-          db.focus(_.block.reader.useRecipientsTableForReads)
-            .replace(true)
-            .focus(_.block.writer)
-            .modify {
-              case highThroughput: HighThroughput =>
-                highThroughput.copy(bufferedEventsMaxMemory = BytesUnit.zero)
-              case other => other
-            }
-        case other => other
-      }
-    )
-
-  def sequencerBufferEventsWithoutPayloads: ConfigTransform = {
-    def setWriterParameters(
-        sequencerConfig: SequencerConfig
-    ): SequencerConfig = sequencerConfig match {
-      case external: SequencerConfig.External =>
-        external
-          .focus(_.block.writer)
-          .modify(_.modify(bufferEventsWithPayloads = false, bufferPayloads = true))
-      case bft: SequencerConfig.BftSequencer =>
-        bft
-          .focus(_.block.writer)
-          .modify(_.modify(bufferEventsWithPayloads = false, bufferPayloads = true))
-      case other => other
-    }
-
-    updateAllSequencerConfigs_(
-      _.focus(_.sequencer).modify(setWriterParameters)
-    )
-  }
-
-  def zeroReassignmentTimeProofFreshnessProportion: ConfigTransform =
-    ConfigTransforms.updateAllParticipantConfigs_(
-      // Always send time proofs for reassignments to avoid using outdated topology snapshots.
-      // We don't want to change the default to avoid potential time proof flooding in production.
-      _.focus(_.parameters.reassignmentTimeProofFreshnessProportion).replace(NonNegativeInt.zero)
-    )
 }

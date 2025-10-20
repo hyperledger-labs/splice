@@ -72,13 +72,6 @@ object CommitMode {
   *   the maximum memory the events buffer will use for caching events
   * @param bufferedEventsPreloadBatchSize
   *   the batch size for load events into the events buffer at the start of the sequencer
-  * @param bufferEventsWithPayloads
-  *   whether to keep payloads within events when buffering. Disabling this will allow to buffer
-  *   significantly more events at cost of having to reload payloads from the database.
-  * @param bufferPayloads
-  *   whether to pass payloads from buffered events into DbSequencerStore.payloadCache. When enabled
-  *   this spares reloading payloads from the database. Only works when bufferEventsWithPayloads =
-  *   false.
   */
 sealed trait SequencerWriterConfig {
   this: {
@@ -94,8 +87,6 @@ sealed trait SequencerWriterConfig {
         checkpointBackfillParallelism: PositiveInt,
         bufferedEventsMaxMemory: BytesUnit,
         bufferedEventsPreloadBatchSize: PositiveInt,
-        bufferEventsWithPayloads: Boolean,
-        bufferPayloads: Boolean,
     ): SequencerWriterConfig
   } =>
 
@@ -108,8 +99,6 @@ sealed trait SequencerWriterConfig {
   val commitModeValidation: Option[CommitMode]
   val bufferedEventsMaxMemory: BytesUnit
   val bufferedEventsPreloadBatchSize: PositiveInt
-  val bufferEventsWithPayloads: Boolean
-  val bufferPayloads: Boolean
 
   /** how frequently to generate counter checkpoints for all members */
   val checkpointInterval: NonNegativeFiniteDuration
@@ -127,8 +116,6 @@ sealed trait SequencerWriterConfig {
       checkpointBackfillParallelism: PositiveInt = this.checkpointBackfillParallelism,
       bufferedEventsMaxMemory: BytesUnit = this.bufferedEventsMaxMemory,
       bufferedEventsPreloadBatchSize: PositiveInt = this.bufferedEventsPreloadBatchSize,
-      bufferEventsWithPayloads: Boolean = this.bufferEventsWithPayloads,
-      bufferPayloads: Boolean = this.bufferPayloads,
   ): SequencerWriterConfig =
     copy(
       payloadQueueSize,
@@ -142,8 +129,6 @@ sealed trait SequencerWriterConfig {
       checkpointBackfillParallelism,
       bufferedEventsMaxMemory,
       bufferedEventsPreloadBatchSize,
-      bufferEventsWithPayloads,
-      bufferPayloads,
     )
 }
 
@@ -169,10 +154,6 @@ object SequencerWriterConfig {
   val DefaultBufferedEventsMaxMemory: BytesUnit = BytesUnit.MB(2L)
   val DefaultBufferedEventsPreloadBatchSize: PositiveInt = PositiveInt.tryCreate(50)
 
-  // TODO(#17456): this is only set to "false" for testing
-  val DefaultBufferEventsWithPayloads: Boolean = false
-  val DefaultBufferPayloads: Boolean = false
-
   /** Use to have events immediately flushed to the database. Useful for decreasing latency however
     * at a high throughput a large number of writes will be detrimental for performance.
     */
@@ -190,8 +171,6 @@ object SequencerWriterConfig {
       override val bufferedEventsMaxMemory: BytesUnit = DefaultBufferedEventsMaxMemory,
       override val bufferedEventsPreloadBatchSize: PositiveInt =
         DefaultBufferedEventsPreloadBatchSize,
-      override val bufferEventsWithPayloads: Boolean = DefaultBufferEventsWithPayloads,
-      override val bufferPayloads: Boolean = DefaultBufferPayloads,
   ) extends SequencerWriterConfig
       with UniformCantonConfigValidation
 
@@ -214,8 +193,6 @@ object SequencerWriterConfig {
       override val bufferedEventsMaxMemory: BytesUnit = DefaultBufferedEventsMaxMemory,
       override val bufferedEventsPreloadBatchSize: PositiveInt =
         DefaultBufferedEventsPreloadBatchSize,
-      override val bufferEventsWithPayloads: Boolean = DefaultBufferEventsWithPayloads,
-      override val bufferPayloads: Boolean = DefaultBufferPayloads,
   ) extends SequencerWriterConfig
       with UniformCantonConfigValidation
 }

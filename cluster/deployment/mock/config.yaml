@@ -18,7 +18,6 @@ multiValidator:
 sv:
   synchronizer:
     skipInitialization: true
-    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:

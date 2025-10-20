@@ -65,7 +65,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       auth0Users += (name -> user)
     }
 
-    TraceContext.withNewTraceContext(implicit traceContext => {
+    TraceContext.withNewTraceContext("beforeEach")(implicit traceContext => {
       try {
         addUser("alice")
         addUser("bob")

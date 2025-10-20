@@ -5,12 +5,13 @@ package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
 import com.digitalasset.canton.admin.sequencer.v30.SequencerStatusServiceGrpc
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
+import com.digitalasset.canton.config.AdminTokenConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
-import com.digitalasset.canton.crypto.{Crypto, SynchronizerCryptoClient, SynchronizerCryptoPureApi}
+import com.digitalasset.canton.crypto.{Crypto, SynchronizerCrypto, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
@@ -23,7 +24,8 @@ import com.digitalasset.canton.lifecycle.{
   LifeCycle,
   PromiseUnlessShutdown,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NodeLoggingUtil}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.ratelimiting.StreamCounterCheck
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonMutableHandlerRegistry}
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.SynchronizerParametersLookup.SequencerSynchronizerParameters
@@ -42,8 +44,8 @@ import com.digitalasset.canton.sequencing.client.{
   SequencerClientImplPekko,
 }
 import com.digitalasset.canton.store.{
+  IndexedPhysicalSynchronizer,
   IndexedStringStore,
-  IndexedSynchronizer,
   SendTrackerStore,
   SequencedEventStore,
 }
@@ -83,6 +85,7 @@ import com.digitalasset.canton.synchronizer.sequencing.topology.{
 import com.digitalasset.canton.synchronizer.server.DynamicGrpcServer
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{
   InitialTopologySnapshotValidator,
@@ -101,14 +104,14 @@ import com.digitalasset.canton.topology.transaction.{
   SynchronizerTrustCertificate,
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell, StackTraceUtil}
+import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseVersion}
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.ServerServiceDefinition
 import org.apache.pekko.actor.ActorSystem
-import org.slf4j.event.Level
 
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 
 object SequencerNodeBootstrap {
 
@@ -140,7 +143,7 @@ class SequencerNodeBootstrap(
       storage: Storage,
       crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
+      adminTokenDispenser: CantonAdminTokenDispenser,
       nodeId: UniqueIdentifier,
       manager: AuthorizedTopologyManager,
       healthReporter: GrpcHealthReporter,
@@ -150,14 +153,15 @@ class SequencerNodeBootstrap(
       storage,
       crypto,
       adminServerRegistry,
-      adminToken,
+      adminTokenDispenser,
       SequencerId(nodeId),
       manager,
       healthReporter,
       healthService,
     )
 
-  override protected val adminTokenConfig: Option[String] = config.adminApi.adminToken
+  override protected val adminTokenConfig: AdminTokenConfig =
+    config.adminApi.adminTokenConfig
 
   private val synchronizerTopologyManager = new SingleUseCell[SynchronizerTopologyManager]()
   private val topologyClient = new SingleUseCell[SynchronizerTopologyClient]()
@@ -173,15 +177,21 @@ class SequencerNodeBootstrap(
   ): Option[SynchronizerTopologyClient] =
     storeId match {
       case SynchronizerStore(synchronizerId) =>
-        topologyClient.get.filter(_.synchronizerId == synchronizerId)
+        topologyClient.get.filter(_.psid == synchronizerId)
       case _ => None
     }
+
+  override protected lazy val lookupActivePSId: PSIdLookup =
+    synchronizerId =>
+      synchronizerTopologyManager.get
+        .map(_.psid)
+        .filter(_.logical == synchronizerId)
 
   private class WaitForSequencerToSynchronizerInit(
       storage: Storage,
       crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
+      adminTokenDispenser: CantonAdminTokenDispenser,
       sequencerId: SequencerId,
       manager: AuthorizedTopologyManager,
       healthReporter: GrpcHealthReporter,
@@ -194,7 +204,7 @@ class SequencerNodeBootstrap(
       )
       with GrpcSequencerInitializationService.Callback {
 
-    override def getAdminToken: Option[String] = Some(adminToken.secret)
+    override def getAdminToken: Option[String] = Some(adminTokenDispenser.getCurrentToken.secret)
 
     // add initialization service
     private val (initializationServiceDef, _) = adminServerRegistry.addService(
@@ -228,6 +238,7 @@ class SequencerNodeBootstrap(
         arguments.metrics.trafficControl.purchaseCache.closeAcquired()
         arguments.metrics.trafficControl.consumedCache.closeAcquired()
         arguments.metrics.eventBuffer.closeAcquired()
+        arguments.metrics.memberCache.closeAcquired()
         arguments.metrics.payloadCache.closeAcquired()
       }
     })
@@ -287,13 +298,11 @@ class SequencerNodeBootstrap(
                 new SynchronizerTopologyManager(
                   sequencerId.uid,
                   clock,
-                  crypto,
+                  SynchronizerCrypto(crypto, existing.synchronizerParameters),
                   existing.synchronizerParameters,
-                  store = createSynchronizerTopologyStore(
-                    existing.synchronizerId,
-                    existing.synchronizerParameters.protocolVersion,
-                  ),
+                  store = createSynchronizerTopologyStore(existing.synchronizerId),
                   outboxQueue = new SynchronizerOutboxQueue(loggerFactory),
+                  disableOptionalTopologyChecks = config.topology.disableOptionalTopologyChecks,
                   exitOnFatalFailures = parameters.exitOnFatalFailures,
                   timeouts,
                   futureSupervisor,
@@ -311,7 +320,7 @@ class SequencerNodeBootstrap(
         .map(_.flatten)
 
     private def finalizeInitialization(
-        synchronizerId: SynchronizerId,
+        synchronizerId: PhysicalSynchronizerId,
         staticSynchronizerParameters: StaticSynchronizerParameters,
     ): EitherT[FutureUnlessShutdown, String, Unit] = {
       logger.info(s"Finalizing initialization for synchronizer $synchronizerId")
@@ -326,14 +335,13 @@ class SequencerNodeBootstrap(
     }
 
     private def createSynchronizerTopologyStore(
-        synchronizerId: SynchronizerId,
-        protocolVersion: ProtocolVersion,
+        synchronizerId: PhysicalSynchronizerId
     ): TopologyStore[SynchronizerStore] = {
       val store =
         TopologyStore(
           SynchronizerStore(synchronizerId),
           storage,
-          protocolVersion,
+          synchronizerId.protocolVersion,
           timeouts,
           loggerFactory,
         )
@@ -353,9 +361,9 @@ class SequencerNodeBootstrap(
         adminServerRegistry.removeServiceU(initializationServiceDef)
         new StartupNode(
           storage,
-          crypto,
+          SynchronizerCrypto(crypto, result.staticSynchronizerParameters),
           adminServerRegistry,
-          adminToken,
+          adminTokenDispenser,
           sequencerId,
           result.sequencerFactory,
           result.staticSynchronizerParameters,
@@ -365,7 +373,7 @@ class SequencerNodeBootstrap(
           result.topologyAndSequencerSnapshot,
           () =>
             finalizeInitialization(
-              result.synchronizerTopologyManager.synchronizerId,
+              result.synchronizerTopologyManager.psid,
               result.staticSynchronizerParameters,
             ),
           healthReporter,
@@ -406,17 +414,17 @@ class SequencerNodeBootstrap(
               )
             )
             store = createSynchronizerTopologyStore(
-              synchronizerId,
-              request.synchronizerParameters.protocolVersion,
+              PhysicalSynchronizerId(synchronizerId, request.synchronizerParameters)
             )
             outboxQueue = new SynchronizerOutboxQueue(loggerFactory)
             topologyManager = new SynchronizerTopologyManager(
               sequencerId.uid,
               clock,
-              crypto,
+              SynchronizerCrypto(crypto, request.synchronizerParameters),
               request.synchronizerParameters,
               store,
               outboxQueue,
+              disableOptionalTopologyChecks = config.topology.disableOptionalTopologyChecks,
               exitOnFatalFailures = parameters.exitOnFatalFailures,
               timeouts,
               futureSupervisor,
@@ -436,9 +444,9 @@ class SequencerNodeBootstrap(
 
   private class StartupNode(
       storage: Storage,
-      crypto: Crypto,
+      crypto: SynchronizerCrypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
+      adminTokenDispenser: CantonAdminTokenDispenser,
       sequencerId: SequencerId,
       sequencerFactory: SequencerFactory,
       staticSynchronizerParameters: StaticSynchronizerParameters,
@@ -456,11 +464,11 @@ class SequencerNodeBootstrap(
         bootstrapStageCallback,
       )
       with HasCloseContext {
-    override def getAdminToken: Option[String] = Some(adminToken.secret)
+    override def getAdminToken: Option[String] = Some(adminTokenDispenser.getCurrentToken.secret)
     // save one argument and grab the synchronizerId from the store ...
-    private val synchronizerId = synchronizerTopologyManager.synchronizerId
+    private val psid = synchronizerTopologyManager.psid
     private val synchronizerLoggerFactory =
-      loggerFactory.append("synchronizerId", synchronizerId.toString)
+      loggerFactory.append("synchronizerId", psid.toString)
 
     preinitializedServer.foreach(x => addCloseable(x.publicServer))
 
@@ -469,7 +477,6 @@ class SequencerNodeBootstrap(
     ): EitherT[FutureUnlessShutdown, String, Option[RunningNode[SequencerNode]]] = {
 
       val synchronizerOutboxFactory = new SynchronizerOutboxFactorySingleCreate(
-        synchronizerId,
         sequencerId,
         authorizedTopologyManager,
         synchronizerTopologyManager,
@@ -484,7 +491,7 @@ class SequencerNodeBootstrap(
 
       addCloseable(synchronizerOutboxFactory)
 
-      performUnlessClosingEitherUSF("starting up runtime") {
+      synchronizeWithClosing("starting up runtime") {
         val indexedStringStore = IndexedStringStore.create(
           storage,
           parameters.cachingConfigs.indexedStrings,
@@ -493,13 +500,13 @@ class SequencerNodeBootstrap(
         )
         addCloseable(indexedStringStore)
         for {
-          indexedSynchronizer <- EitherT.right[String](
-            IndexedSynchronizer.indexed(indexedStringStore)(synchronizerId)
+          physicalSynchronizerIdx <- EitherT.right[String](
+            IndexedPhysicalSynchronizer.indexed(indexedStringStore)(psid)
           )
+
           sequencedEventStore = SequencedEventStore(
             storage,
-            indexedSynchronizer,
-            staticSynchronizerParameters.protocolVersion,
+            physicalSynchronizerIdx,
             timeouts,
             loggerFactory,
           )
@@ -510,10 +517,9 @@ class SequencerNodeBootstrap(
                 EitherT.rightT[FutureUnlessShutdown, String](Set.empty[Member])
               case Some((initialTopologyTransactions, sequencerSnapshot)) =>
                 val topologySnapshotValidator = new InitialTopologySnapshotValidator(
-                  new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
+                  crypto.pureCrypto,
                   synchronizerTopologyStore,
                   validateInitialSnapshot = config.topology.validateInitialTopologySnapshot,
-                  parameters.processingTimeouts,
                   loggerFactory,
                 )
                 for {
@@ -524,7 +530,7 @@ class SequencerNodeBootstrap(
                     .map { snapshot =>
                       logger.debug("Uploading sequencer snapshot to sequencer driver")
                       val initialState = SequencerInitialState(
-                        synchronizerId,
+                        psid,
                         snapshot,
                         initialTopologyTransactions.result.view
                           .map(tx => (tx.sequenced.value, tx.validFrom.value)),
@@ -594,10 +600,11 @@ class SequencerNodeBootstrap(
             .right(
               TopologyTransactionProcessor.createProcessorAndClientForSynchronizer(
                 synchronizerTopologyStore,
-                synchronizerId,
-                new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
+                synchronizerPredecessor = None,
+                crypto.pureCrypto,
                 parameters,
                 clock,
+                crypto.staticSynchronizerParameters,
                 futureSupervisor,
                 synchronizerLoggerFactory,
               )(topologyHeadInitializer)
@@ -606,13 +613,14 @@ class SequencerNodeBootstrap(
           _ = addCloseable(topologyProcessor)
           _ = addCloseable(topologyClient)
           _ = ips.add(topologyClient)
+
           _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
             SequencerNodeBootstrap.this.topologyClient.putIfAbsent(topologyClient).isEmpty,
             "Unexpected state during initialization: topology client shouldn't have been set before",
           )
 
           memberAuthServiceFactory = MemberAuthenticationServiceFactory(
-            synchronizerId,
+            psid,
             clock,
             config.publicApi.nonceExpirationInterval.asJava,
             config.publicApi.maxTokenExpirationInterval.asJava,
@@ -627,13 +635,13 @@ class SequencerNodeBootstrap(
           syncCryptoWithOptionalSessionKeys = SynchronizerCryptoClient
             .createWithOptionalSessionKeys(
               sequencerId,
-              synchronizerId,
+              psid,
               topologyClient,
               staticSynchronizerParameters,
               crypto,
-              new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
-              parameters.sessionSigningKeys,
+              cryptoConfig,
               parameters.batchingConfig.parallelism,
+              parameters.cachingConfigs.publicKeyConversionCache,
               parameters.processingTimeouts,
               futureSupervisor,
               loggerFactory,
@@ -646,12 +654,12 @@ class SequencerNodeBootstrap(
           // sequencer authentication uses a different set of signing keys and thus should not use session keys
           syncCryptoForAuthentication = SynchronizerCryptoClient.create(
             sequencerId,
-            synchronizerId,
+            psid.logical,
             topologyClient,
             staticSynchronizerParameters,
             crypto,
-            new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
             parameters.batchingConfig.parallelism,
+            parameters.cachingConfigs.publicKeyConversionCache,
             parameters.processingTimeouts,
             futureSupervisor,
             loggerFactory,
@@ -664,7 +672,6 @@ class SequencerNodeBootstrap(
 
           synchronizerParamsLookup = SynchronizerParametersLookup
             .forSequencerSynchronizerParameters(
-              staticSynchronizerParameters,
               config.publicApi.overrideMaxRequestSize,
               topologyClient,
               loggerFactory,
@@ -673,6 +680,7 @@ class SequencerNodeBootstrap(
           topologyStateForInitializationService =
             new StoreBasedTopologyStateForInitializationService(
               synchronizerTopologyStore,
+              config.parameters.sequencingTimeLowerBoundExclusive,
               synchronizerLoggerFactory,
             )
 
@@ -680,7 +688,6 @@ class SequencerNodeBootstrap(
             SequencerSynchronizerParameters
           ] =
             SynchronizerParametersLookup.forSequencerSynchronizerParameters(
-              staticSynchronizerParameters,
               config.publicApi.overrideMaxRequestSize,
               topologyClient,
               loggerFactory,
@@ -736,57 +743,17 @@ class SequencerNodeBootstrap(
               sequencerAuthInterceptor,
             )
           }
-          progressSupervisorO = parameters.progressSupervisor.filter(_.enabled).map {
-            supervisorConfig =>
-              logger.info("Progress supervisor enabled for sequencer")
-              val warningState: AtomicBoolean = new AtomicBoolean(false)
-              new ProgressSupervisor(
-                logLevel = Level.DEBUG,
-                logAfter = supervisorConfig.stuckDetectionTimeout.duration,
-                futureSupervisor = futureSupervisor,
-                loggerFactory = loggerFactory,
-                warnAction = {
-                  if (warningState.compareAndSet(false, true)) {
-                    logger.error(
-                      s"Sequencer looks to be stuck, switching logging level from ${NodeLoggingUtil.originalRootLoggerLevel} to DEBUG for ${supervisorConfig.logAtDebugLevelDuration} seconds..."
-                    )
-                    logger.warn(s"Stack traces:\n${StackTraceUtil.formatStackTrace()}")
-                    NodeLoggingUtil.setLevel(level = "DEBUG")
-                    scheduler
-                      .schedule(
-                        (() => {
-                          val levelBefore = Some(NodeLoggingUtil.originalRootLoggerLevel)
-                            .map(_.toString)
-                            .getOrElse("INFO")
-                          NodeLoggingUtil.setLevel(level = levelBefore)
-                          logger.info(
-                            s"Switching logging back to $levelBefore"
-                          )
-                          warningState.set(false)
-                        }): Runnable,
-                        supervisorConfig.logAtDebugLevelDuration.asJava.toSeconds,
-                        java.util.concurrent.TimeUnit.SECONDS,
-                      )
-                      .discard
-                  } else {
-                    logger.debug(
-                      "Not triggering progress monitor again as we are already in warning state"
-                    )
-                  }
-                },
-              )
-          }
+
           sequencer <- EitherT
             .right[String](
               sequencerFactory.create(
-                synchronizerId,
                 sequencerId,
                 clock,
                 clock,
                 syncCryptoWithOptionalSessionKeys,
                 futureSupervisor,
-                progressSupervisorO,
                 config.trafficConfig,
+                config.parameters.sequencingTimeLowerBoundExclusive,
                 runtimeReadyPromise.futureUS,
                 topologyAndSequencerSnapshot.flatMap { case (_, sequencerSnapshot) =>
                   sequencerSnapshot
@@ -809,11 +776,20 @@ class SequencerNodeBootstrap(
           )
           _ = sequencerServiceCell.putIfAbsent(sequencerService)
 
+          directPool = new DirectSequencerConnectionXPool(
+            sequencer,
+            psid,
+            sequencerId,
+            staticSynchronizerParameters,
+            parameters.processingTimeouts,
+            loggerFactory,
+          )
+
           _ = addCloseable(sequencedEventStore)
           sequencerClient = new SequencerClientImplPekko[
             DirectSequencerClientTransport.SubscriptionError
           ](
-            synchronizerId,
+            psid,
             sequencerId,
             SequencerTransports.default(
               sequencerId,
@@ -822,16 +798,15 @@ class SequencerNodeBootstrap(
                 parameters.processingTimeouts,
                 loggerFactory,
                 staticSynchronizerParameters.protocolVersion,
-                progressSupervisorO,
               ),
             ),
+            connectionPool = directPool,
             parameters.sequencerClient,
             arguments.testingConfig,
-            staticSynchronizerParameters.protocolVersion,
             synchronizerParamsLookup,
             parameters.processingTimeouts,
             // Since the sequencer runtime trusts itself, there is no point in validating the events.
-            SequencedEventValidatorFactory.noValidation(synchronizerId, warn = false),
+            SequencedEventValidatorFactory.noValidation(psid, warn = false),
             clock,
             RequestSigner(
               syncCryptoWithOptionalSessionKeys,
@@ -874,7 +849,7 @@ class SequencerNodeBootstrap(
             parameters,
             timeTracker,
             arguments.metrics,
-            indexedSynchronizer,
+            physicalSynchronizerIdx,
             syncCryptoWithOptionalSessionKeys,
             syncCryptoForAuthentication,
             synchronizerTopologyManager,
@@ -914,13 +889,12 @@ class SequencerNodeBootstrap(
             config,
             clock,
             sequencerRuntime,
-            adminToken,
+            adminTokenDispenser,
             synchronizerLoggerFactory,
             server,
             (healthService.dependencies ++ sequencerPublicApiHealthService.dependencies).map(
               _.toComponentStatus
             ),
-            staticSynchronizerParameters.protocolVersion,
           )
           addCloseable(node)
           Some(new RunningNode(bootstrapStageCallback, node))
@@ -1024,14 +998,17 @@ class SequencerNode(
     config: SequencerNodeConfig,
     override protected val clock: Clock,
     val sequencer: SequencerRuntime,
-    override val adminToken: CantonAdminToken,
+    override val adminTokenDispenser: CantonAdminTokenDispenser,
     protected val loggerFactory: NamedLoggerFactory,
     sequencerNodeServer: DynamicGrpcServer,
     healthData: => Seq[ComponentStatus],
-    protocolVersion: ProtocolVersion,
 ) extends CantonNode
     with NamedLogging
     with HasUptime {
+
+  // Provide access such that it can be modified in tests
+  @VisibleForTesting
+  def streamCounterCheck: Option[StreamCounterCheck] = sequencerNodeServer.streamCounterCheck
 
   override type Status = SequencerNodeStatus
 
@@ -1046,8 +1023,8 @@ class SequencerNode(
     val ports = Map("public" -> config.publicApi.port, "admin" -> config.adminApi.port)
 
     SequencerNodeStatus(
-      sequencer.synchronizerId.unwrap,
-      sequencer.synchronizerId,
+      sequencer.psid.logical.unwrap,
+      sequencer.psid,
       uptime(),
       ports,
       activeMembers,
@@ -1056,7 +1033,6 @@ class SequencerNode(
       admin = sequencer.adminStatus,
       healthData,
       ReleaseVersion.current,
-      protocolVersion,
     )
   }
 

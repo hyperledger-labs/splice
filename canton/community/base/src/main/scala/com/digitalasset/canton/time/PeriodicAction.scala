@@ -22,14 +22,14 @@ class PeriodicAction(
 ) extends NamedLogging
     with FlagCloseable {
 
-  TraceContext.withNewTraceContext(setupNextCheck()(_))
+  TraceContext.withNewTraceContext(description)(setupNextCheck()(_))
 
   private def runCheck()(implicit traceContext: TraceContext): Unit =
-    performUnlessClosingUSF(s"run-$description")(check(traceContext))
+    synchronizeWithClosing(s"run-$description")(check(traceContext))
       .onComplete(_ => setupNextCheck())
 
   private def setupNextCheck()(implicit traceContext: TraceContext): Unit =
-    performUnlessClosing(s"setup-$description") {
+    synchronizeWithClosingSync(s"setup-$description") {
       val _ = clock.scheduleAfter(_ => runCheck(), interval.duration)
     }.discard
 

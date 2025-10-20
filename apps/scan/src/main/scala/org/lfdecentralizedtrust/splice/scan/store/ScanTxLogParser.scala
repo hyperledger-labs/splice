@@ -54,8 +54,8 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, synchronizerId: SynchronizerId, root: TreeEvent)(
-      implicit tc: TraceContext
+  private def parseTree(tree: Transaction, synchronizerId: SynchronizerId, root: Event)(implicit
+      tc: TraceContext
   ): State = {
     // TODO(DACH-NY/canton-network-node#2930) add more checks on the nodes, at least that the DSO party is correct
     root match {
@@ -270,7 +270,7 @@ class ScanTxLogParser(
   }
 
   private def parseTrees(
-      tree: TransactionTree,
+      tree: Transaction,
       synchronizerId: SynchronizerId,
       rootsNodeIds: List[Integer],
   )(implicit
@@ -280,7 +280,7 @@ class ScanTxLogParser(
     roots.foldMap(parseTree(tree, synchronizerId, _))
   }
 
-  override def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit
+  override def tryParse(tx: Transaction, domain: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootNodeIds.asScala.toList).entries
@@ -299,7 +299,7 @@ class ScanTxLogParser(
     )
 
   private def fromAnsEntryPaymentCollection[Marker, Res](
-      tree: TransactionTree,
+      tree: Transaction,
       exercised: ExercisedEvent,
       synchronizerId: SynchronizerId,
       paymentCollectionTemplate: codegen.ContractCompanion[?, ?, Marker],
@@ -355,7 +355,7 @@ object ScanTxLogParser {
     }
 
     private def getAmuletFromSummary(
-        tx: TransactionTree,
+        tx: Transaction,
         ccsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
     ) = {
       val amuletCid = ccsum.amulet
@@ -369,8 +369,8 @@ object ScanTxLogParser {
     }
 
     def fromAmuletCreateSummary(
-        tx: TransactionTree,
-        event: TreeEvent,
+        tx: Transaction,
+        event: Event,
         synchronizerId: SynchronizerId,
         acsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
         activityType: TransactionType,
@@ -475,7 +475,7 @@ object ScanTxLogParser {
     }
 
     def fromTransfer(
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
         synchronizerId: SynchronizerId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
@@ -531,8 +531,8 @@ object ScanTxLogParser {
     }
 
     private def transferTxLogEntry(
-        tx: TransactionTree,
-        event: TreeEvent,
+        tx: Transaction,
+        event: Event,
         synchronizerId: SynchronizerId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
     ): TransferTxLogEntry = {
@@ -772,7 +772,7 @@ object ScanTxLogParser {
     }
 
     def fromCollectEntryPayment(
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
         producedAmulet: codegen.ContractId[AmuletCreate.T],
         synchronizerId: SynchronizerId,
@@ -794,8 +794,8 @@ object ScanTxLogParser {
     }
 
     private def fromAmuletArchiveEvent(
-        tx: TransactionTree,
-        event: TreeEvent,
+        tx: Transaction,
+        event: Event,
         producedAmulet: codegen.ContractId[AmuletCreate.T],
         synchronizerId: SynchronizerId,
         rootEventId: String,
@@ -863,8 +863,8 @@ object ScanTxLogParser {
     }
 
     def fromClosedMiningRoundCreate(
-        tx: TransactionTree,
-        event: TreeEvent,
+        tx: Transaction,
+        event: Event,
         synchronizerId: SynchronizerId,
         round: ClosedMiningRoundCreate.ContractType,
     ): State = {

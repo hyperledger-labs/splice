@@ -44,7 +44,7 @@ class SymbolicCrypto(
     process(description)(fn(_).valueOr(err => sys.error(s"Failed operation $description: $err")))
 
   private def process[A](description: String)(fn: TraceContext => FutureUnlessShutdown[A]): A =
-    TraceContext.withNewTraceContext { implicit traceContext =>
+    TraceContext.withNewTraceContext("process") { implicit traceContext =>
       timeouts.default.await(description) {
         fn(traceContext)
           .onShutdown(sys.error("aborted due to shutdown"))
@@ -83,7 +83,7 @@ class SymbolicCrypto(
     processE("generate symbolic encryption keypair") { implicit traceContext =>
       // We don't care about the encryption key specification in symbolic crypto
       privateCrypto
-        .generateEncryptionKeypair(privateCrypto.defaultEncryptionKeySpec)
+        .generateEncryptionKeypair(privateCrypto.encryptionKeySpecs.default)
     }
 
   def sign(

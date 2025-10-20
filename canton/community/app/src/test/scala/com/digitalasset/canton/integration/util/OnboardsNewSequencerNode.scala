@@ -3,9 +3,12 @@
 
 package com.digitalasset.canton.integration.util
 
+import com.digitalasset.canton.config
 import com.digitalasset.canton.console.{InstanceReference, SequencerReference}
 import com.digitalasset.canton.integration.TestConsoleEnvironment
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
+
+import scala.concurrent.duration.DurationInt
 
 trait OnboardsNewSequencerNode {
 
@@ -17,7 +20,7 @@ trait OnboardsNewSequencerNode {
   ): Unit = ()
 
   protected def onboardNewSequencer(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       newSequencerReference: SequencerReference,
       existingSequencerReference: SequencerReference,
       synchronizerOwners: Set[InstanceReference],
@@ -29,17 +32,19 @@ trait OnboardsNewSequencerNode {
       // user-manual-entry-begin: DynamicallyOnboardBftSequencer
       bootstrap
         .onboard_new_sequencer(
-          synchronizerId,
+          synchronizerId.logical,
           newSequencerReference,
           existingSequencerReference,
           synchronizerOwners,
+          // Avoid issues if things are slow
+          customCommandTimeout = Some(config.NonNegativeDuration.tryFromDuration(2.minutes)),
           isBftSequencer = true,
         )
       // user-manual-entry-end: DynamicallyOnboardBftSequencer
     } else {
       bootstrap
         .onboard_new_sequencer(
-          synchronizerId,
+          synchronizerId.logical,
           newSequencerReference,
           existingSequencerReference,
           synchronizerOwners,

@@ -7,14 +7,15 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.PekkoEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.db.DbOutputMetadataStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.memory.InMemoryOutputMetadataStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders.BlacklistLeaderSelectionPolicyState
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Env
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BlockNumber,
   EpochNumber,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.pekko.PekkoModuleSystem.PekkoEnv
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 
@@ -91,7 +92,7 @@ trait OutputMetadataStore[E <: Env[E]] extends AutoCloseable {
   protected final val lastConsecutiveActionName: String = "get last consecutive block metadata"
 
   @VisibleForTesting
-  def loadNumberOfRecords(implicit
+  private[data] def loadNumberOfRecords(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[OutputMetadataStore.NumberOfRecords]
   protected def loadNumberOfRecordsName: String = s"load number of records"
@@ -134,6 +135,23 @@ trait OutputMetadataStore[E <: Env[E]] extends AutoCloseable {
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[Option[OutputMetadataStore.LowerBound]]
   protected val getLowerBoundActionName: String = s"get lower bound"
+
+  def insertLeaderSelectionPolicyState(
+      epochNumber: EpochNumber,
+      leaderSelectionPolicy: BlacklistLeaderSelectionPolicyState,
+  )(implicit traceContext: TraceContext): E#FutureUnlessShutdownT[Unit]
+
+  protected final def insertLeaderSelectionPolicyStateActionName(epochNumber: EpochNumber): String =
+    s"insert leader selection policy state for epoch $epochNumber"
+
+  def getLeaderSelectionPolicyState(
+      epochNumber: EpochNumber
+  )(implicit
+      traceContext: TraceContext
+  ): E#FutureUnlessShutdownT[Option[BlacklistLeaderSelectionPolicyState]]
+
+  protected final def getLeaderSelectionPolicyStateActionName(epochNumber: EpochNumber): String =
+    s"get leader selection policy state for epoch $epochNumber"
 }
 
 object OutputMetadataStore {

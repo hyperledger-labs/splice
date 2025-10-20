@@ -10,7 +10,7 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.UseCommunityReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -367,7 +367,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
           actAs = Set(),
           readAs = Set(erwin),
           participantAdmin = true,
-        )
+        ) shouldBe expectedWithReadAs
 
       participant1.ledger_api.users.rights.list("admin1") shouldBe expectedWithReadAs
 
@@ -381,7 +381,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
           actAs = Set(),
           readAs = Set(),
           identityProviderAdmin = true,
-        )
+        ) shouldBe expectedWithIdp
 
       participant1.ledger_api.users.rights.list("admin1") shouldBe expectedWithIdp
 
@@ -393,7 +393,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
         .grant(
           "admin1",
           executeAs = Set(fiona),
-        )
+        ) shouldBe expectedWithExecuteAs
 
       participant1.ledger_api.users.rights.list("admin1") shouldBe expectedWithExecuteAs
     }
@@ -403,7 +403,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
 
       // look into authorized store, so we don't have to wait until stuff propagated
       def findParty(str: String) = participant1.topology.party_to_participant_mappings
-        .list_from_authorized(filterParty = str)
+        .list(daId, filterParty = str)
         .map(_.item.partyId)
         .headOption
         .valueOrFail(s"where is $str")
@@ -435,7 +435,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
           actAs = Set(),
           readAs = Set(erwin),
           participantAdmin = true,
-        )
+        ) shouldBe expectedWithoutReadAs
 
       participant1.ledger_api.users.rights.list("admin1") shouldBe expectedWithoutReadAs
 
@@ -449,7 +449,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
           actAs = Set(),
           readAs = Set(),
           identityProviderAdmin = true,
-        )
+        ) shouldBe expectedWithoutIdp
 
       participant1.ledger_api.users.rights.list("admin1") shouldBe expectedWithoutIdp
 
@@ -461,7 +461,7 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
         .revoke(
           "admin1",
           executeAs = Set(fiona),
-        )
+        ) shouldBe expectedWithoutExecuteAs
 
       participant1.ledger_api.users.rights.list("admin1") shouldBe expectedWithoutExecuteAs
     }
@@ -469,11 +469,11 @@ trait UserManagementIntegrationTest extends CommunityIntegrationTest with Shared
 }
 
 class UserManagementReferenceIntegrationTestDefault extends UserManagementIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }
 
 class UserManagementReferenceIntegrationTestPostgres extends UserManagementIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 trait UserManagementNoExtraAdminIntegrationTest
@@ -502,5 +502,5 @@ trait UserManagementNoExtraAdminIntegrationTest
 
 class UserManagementNoExtraAdminReferenceIntegrationTestPostgres
     extends UserManagementNoExtraAdminIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

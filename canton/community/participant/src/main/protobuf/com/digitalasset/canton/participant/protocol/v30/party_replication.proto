@@ -1,0 +1,67 @@
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package com.digitalasset.canton.participant.protocol.v30;
+
+import "com/digitalasset/canton/admin/participant/v30/active_contract.proto";
+import "scalapb/scalapb.proto";
+
+/**
+ * Party replication protocol message sent by the target participant to the source participant.
+ */
+message PartyReplicationTargetParticipantMessage {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+
+  // The Initialize instruction must be the first message to the source participant
+  // and must never be sent as the second or later message.
+  message Initialize {
+    option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+    // The ACS contract ordinal (0-based) to send as part of the first SendAcsUpTo instruction.
+    uint32 initial_contract_ordinal_inclusive = 1;
+  }
+
+  // SendAcsUpTo instructs the source participant to send ordered ACS contracts up to a specified
+  // maximum ordinal.
+  // This instruction lets the target participant flow-control the rate of ACS ingestion.
+  message SendAcsUpTo {
+    option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+    // ACS contract ordinal (0-based) deterministic on the source participant. This serves as a
+    // watermark specifying up to which contract ordinal inclusively the source participant is expected
+    // to send ACS contracts.
+    // Required
+    uint32 max_contract_ordinal_inclusive = 1;
+  }
+
+  oneof instruction {
+    Initialize initialize = 1;
+    SendAcsUpTo send_acs_up_to = 2;
+  }
+}
+
+/**
+ * Party replication protocol message sent by the source participant to the target participant.
+ */
+message PartyReplicationSourceParticipantMessage {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+
+  // Batch of ACS contracts previously requested by the target participant.
+  message AcsBatch {
+    option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+
+    // The portion of the ACS in the batch expressed as nonempty list
+    // TODO(#24326) - Use a Ledger API representation instead.
+    // Required
+    repeated com.digitalasset.canton.admin.participant.v30.ActiveContractOld contracts = 1;
+  }
+
+  message EndOfACS {
+    option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  }
+
+  oneof data_or_status {
+    AcsBatch acs_batch = 1;
+    EndOfACS end_of_acs = 2;
+  }
+}

@@ -5,12 +5,15 @@ package com.digitalasset.canton.console.commands
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import cats.syntax.parallel.*
+import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.admin.api.client.commands.{TopologyAdminCommands, VaultAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.ListKeyOwnersResult
+import com.digitalasset.canton.checked
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
+  ConsoleCommandResult,
   ConsoleEnvironment,
   FeatureFlag,
   FeatureFlagFilter,
@@ -24,7 +27,13 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{Member, MemberCode, SynchronizerId}
+import com.digitalasset.canton.topology.transaction.{
+  SignedTopologyTransaction,
+  TopologyChangeOp,
+  TopologyMapping,
+  TopologyTransaction,
+}
+import com.digitalasset.canton.topology.{ExternalParty, Member, MemberCode, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.version.ProtocolVersion
@@ -219,6 +228,8 @@ class SecretKeyAdministration(
 
     val newKey = regenerateKey(currentKey, newName)
 
+    // Backup should be performed here if necessary
+
     // Rotate the key for the node in the topology management
     instance.topology.owner_to_key_mappings.rotate_key(
       owner,
@@ -242,7 +253,7 @@ class SecretKeyAdministration(
     // Find the current keys
     val currentKeys = findPublicKeys(instance.topology, owner)
 
-    currentKeys.foreach { currentKey =>
+    val replacements = currentKeys.map { currentKey =>
       val newKey =
         regenerateKey(
           currentKey,
@@ -251,7 +262,12 @@ class SecretKeyAdministration(
             consoleEnvironment.environment.clock,
           ),
         )
+      (currentKey, newKey)
+    }
 
+    // Perform a backup here if necessary
+
+    replacements.foreach { case (currentKey, newKey) =>
       // Rotate the key for the node in the topology management
       instance.topology.owner_to_key_mappings.rotate_key(
         owner,
@@ -367,7 +383,7 @@ class SecretKeyAdministration(
       }
     }
 
-  @Help.Summary("Download key pair and save it to a file")
+  @Help.Summary("Download key pair and save it to a file", FeatureFlag.Preview)
   @Help.Description(
     """Download the key pair with the private and public key in its binary representation and store it in a file.
       |fingerprint: The identifier of the key pair to download
@@ -404,7 +420,174 @@ class SecretKeyAdministration(
       if (answer.exists(_.toLowerCase == "yes")) deleteKey()
     }
   }
+}
 
+/** Global keys operations (e.g., for external parties in tests)
+  */
+class GlobalSecretKeyAdministration(
+    override protected val consoleEnvironment: ConsoleEnvironment,
+    override protected val loggerFactory: NamedLoggerFactory,
+) extends Helpful
+    with FeatureFlagFilter {
+
+  private implicit val ec: ExecutionContext = consoleEnvironment.environment.executionContext
+  private implicit val tc: TraceContext = TraceContext.empty
+  private implicit val ce: ConsoleEnvironment = consoleEnvironment
+
+  @Help.Summary("Sign the given hash on behalf of the external party")
+  @Help.Description(
+    """Sign the given hash on behalf of the external party
+      |
+      |The arguments are:
+      |  - hash: Hash to be signed
+      |  - party: Party who should sign
+      |
+      |Fails if the corresponding keys are not in the global crypto.
+      |"""
+  )
+  def sign(hash: ByteString, party: ExternalParty): Seq[Signature] = consoleEnvironment.run(
+    ConsoleCommandResult.fromEitherTUS(
+      party.signingFingerprints.forgetNE
+        .parTraverse(
+          consoleEnvironment.tryGlobalCrypto.privateCrypto
+            .signBytes(hash, _, SigningKeyUsage.ProtocolOnly)
+        )
+        .leftMap(_.toString)
+    )
+  )
+
+  @Help.Summary("Sign the given hash on behalf of the external party")
+  @Help.Description(
+    """Sign the given hash on behalf of the external party
+      |
+      |The arguments are:
+      |  - hash: Hash to be signed
+      |  - key: Fingerprint of the key that should sign
+      |  - Usage: Usage of the key (e.g., Protocol or Namespace)
+      |
+      |Fails if the corresponding keys are not in the global crypto.
+      |"""
+  )
+  def sign(
+      hash: ByteString,
+      key: Fingerprint,
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  ): Signature = consoleEnvironment.run(
+    ConsoleCommandResult.fromEitherTUS(
+      consoleEnvironment.tryGlobalCrypto.privateCrypto
+        .signBytes(hash, key, usage)
+        .leftMap(_.toString)
+    )
+  )
+
+  @Help.Summary("Sign the given topology transaction on behalf of the external party")
+  @Help.Description(
+    """Sign the given topology transaction on behalf of the external party
+      |
+      |The arguments are:
+      |  - tx: Transaction to be signed
+      |  - party: Party who should sign
+      |  - protocolVersion: Protocol version of the synchronizer
+      |
+      |Fails if the corresponding keys are not in the global crypto.
+      |"""
+  )
+  def sign[Op <: TopologyChangeOp, M <: TopologyMapping](
+      tx: TopologyTransaction[Op, M],
+      party: ExternalParty,
+      protocolVersion: ProtocolVersion,
+  ): SignedTopologyTransaction[Op, M] = {
+    val signature: Signature = consoleEnvironment.run(
+      ConsoleCommandResult.fromEitherTUS(
+        consoleEnvironment.tryGlobalCrypto.privateCrypto
+          .sign(tx.hash.hash, party.fingerprint, SigningKeyUsage.NamespaceOnly)
+          .leftMap(_.toString)
+      )
+    )
+
+    SignedTopologyTransaction
+      .withSignature(
+        tx,
+        signature,
+        isProposal = true,
+        protocolVersion,
+      )
+  }
+
+  object keys {
+    object secret {
+      @Help.Summary("Download key pair")
+      @Help.Description("Can be deserialized as a CryptoKeyPair")
+      def download(
+          fingerprint: Fingerprint,
+          protocolVersion: ProtocolVersion = ProtocolVersion.latest,
+          password: Option[String] = None,
+      ): ByteString = {
+        val cmd =
+          LocalSecretKeyAdministration.download(
+            consoleEnvironment.tryGlobalCrypto,
+            fingerprint,
+            protocolVersion,
+            password,
+          )
+
+        consoleEnvironment.run(ConsoleCommandResult.fromEitherTUS(cmd))
+      }
+
+      @Help.Summary("Store a key into the global store")
+      def store(keys: Seq[PrivateKey]): Unit = {
+        val extendedCryptoStore =
+          consoleEnvironment.tryGlobalCrypto.cryptoPrivateStore.toExtended.getOrElse {
+            consoleEnvironment.raiseError("The global crypto does not support importing keys")
+          }
+
+        val cmd = keys
+          .parTraverse_(
+            extendedCryptoStore.storePrivateKey(_, None)
+          )
+          .leftMap(_.toString)
+
+        consoleEnvironment.run(ConsoleCommandResult.fromEitherTUS(cmd))
+      }
+
+      @Help.Summary("Generate a key")
+      @Help.Description("Generate a key and store it into the global store")
+      def generate_key(
+          keySpec: SigningKeySpec =
+            consoleEnvironment.tryGlobalCrypto.privateCrypto.signingKeySpecs.default,
+          usage: NonEmpty[Set[SigningKeyUsage]],
+          name: Option[KeyName] = None,
+      ): SigningPublicKey = consoleEnvironment.run(
+        ConsoleCommandResult.fromEitherTUS(
+          consoleEnvironment.tryGlobalCrypto
+            .generateSigningKey(keySpec, usage, name)
+            .leftMap(_.toString)
+        )
+      )
+
+      @Help.Summary("Generate keys")
+      @Help.Description("Generate keys and store them into the global store")
+      def generate_keys(
+          count: PositiveInt,
+          keySpec: SigningKeySpec =
+            consoleEnvironment.tryGlobalCrypto.privateCrypto.signingKeySpecs.default,
+          usage: NonEmpty[Set[SigningKeyUsage]],
+          name: Option[KeyName] = None,
+      ): NonEmpty[Seq[SigningPublicKey]] = {
+        val keys = Seq.fill(count.value)(
+          consoleEnvironment.run(
+            ConsoleCommandResult.fromEitherTUS(
+              consoleEnvironment.tryGlobalCrypto
+                .generateSigningKey(keySpec, usage, name)
+                .leftMap(_.toString)
+            )
+          )
+        )
+
+        NonEmptyUtil.fromUnsafe(checked(keys))
+      }
+    }
+  }
 }
 
 class PublicKeyAdministration(
@@ -546,7 +729,6 @@ class KeyAdministrationGroup(
   @Help.Summary("Manage secret keys")
   @Help.Group("Secret keys")
   def secret: SecretKeyAdministration = secretAdmin
-
 }
 
 class LocalSecretKeyAdministration(
@@ -558,74 +740,72 @@ class LocalSecretKeyAdministration(
 )(implicit executionContext: ExecutionContext)
     extends SecretKeyAdministration(instance, runner, consoleEnvironment, loggerFactory) {
 
-  private def run[V](eitherT: EitherT[FutureUnlessShutdown, String, V], action: String): V = {
-    import TraceContext.Implicits.Empty.*
-    consoleEnvironment.environment.config.parameters.timeouts.processing.default
-      .await(action)(
-        eitherT.onShutdown(throw new RuntimeException("aborted due to shutdown.")).value
-      ) match {
-      case Left(error) =>
-        throw new IllegalArgumentException(s"Problem while $action. Error: $error")
-      case Right(value) => value
-    }
-  }
-
   @Help.Summary("Download key pair")
   override def download(
       fingerprint: Fingerprint,
       protocolVersion: ProtocolVersion = ProtocolVersion.latest,
       password: Option[String] = None,
   ): ByteString =
-    TraceContext.withNewTraceContext { implicit traceContext =>
-      val cmd = for {
-        cryptoPrivateStore <- crypto.cryptoPrivateStore.toExtended
-          .toRight(
-            "The selected crypto provider does not support exporting of private keys."
-          )
-          .toEitherT[FutureUnlessShutdown]
-        privateKey <- cryptoPrivateStore
-          .exportPrivateKey(fingerprint)
-          .leftMap(_.toString)
-          .subflatMap(_.toRight(s"no private key found for [$fingerprint]"))
-          .leftMap(err => s"Error retrieving private key [$fingerprint] $err")
-        publicKey <- crypto.cryptoPublicStore
-          .publicKey(fingerprint)
-          .toRight(s"Error retrieving public key [$fingerprint]: no public key found")
-        keyPair: CryptoKeyPair[PublicKey, PrivateKey] = (publicKey, privateKey) match {
-          case (pub: SigningPublicKey, pkey: SigningPrivateKey) =>
-            new SigningKeyPair(pub, pkey)
-          case (pub: EncryptionPublicKey, pkey: EncryptionPrivateKey) =>
-            new EncryptionKeyPair(pub, pkey)
-          case _ => sys.error("public and private keys must have same purpose")
-        }
+    TraceContext.withNewTraceContext("download_key_pair") { implicit traceContext =>
+      val cmd =
+        LocalSecretKeyAdministration.download(crypto, fingerprint, protocolVersion, password)
 
-        // Encrypt the keypair if a password is provided
-        keyPairBytes = password match {
-          case Some(password) =>
-            crypto.pureCrypto
-              .encryptWithPassword(keyPair.toByteString(protocolVersion), password)
-              .fold(
-                err => sys.error(s"Failed to encrypt key pair for export: $err"),
-                _.toByteString(protocolVersion),
-              )
-          case None => keyPair.toByteString(protocolVersion)
-        }
-      } yield keyPairBytes
-      run(cmd, "exporting key pair")
+      consoleEnvironment.run(ConsoleCommandResult.fromEitherTUS(cmd)(consoleEnvironment))
     }
 
-  @Help.Summary("Download key pair and save it to a file")
+  @Help.Summary("Download key pair and save it to a file", FeatureFlag.Preview)
   override def download_to(
       fingerprint: Fingerprint,
       outputFile: String,
       protocolVersion: ProtocolVersion = ProtocolVersion.latest,
       password: Option[String] = None,
-  ): Unit =
-    run(
-      EitherT.rightT(writeToFile(outputFile, download(fingerprint, protocolVersion, password))),
-      "saving key pair to file",
-    )
+  ): Unit = writeToFile(outputFile, download(fingerprint, protocolVersion, password))
+}
 
+object LocalSecretKeyAdministration {
+  def download(
+      crypto: Crypto,
+      fingerprint: Fingerprint,
+      protocolVersion: ProtocolVersion = ProtocolVersion.latest,
+      password: Option[String] = None,
+  )(implicit
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): EitherT[FutureUnlessShutdown, String, ByteString] =
+    for {
+      cryptoPrivateStore <- crypto.cryptoPrivateStore.toExtended
+        .toRight(
+          "The selected crypto provider does not support exporting of private keys."
+        )
+        .toEitherT[FutureUnlessShutdown]
+      privateKey <- cryptoPrivateStore
+        .exportPrivateKey(fingerprint)
+        .leftMap(_.toString)
+        .subflatMap(_.toRight(s"no private key found for [$fingerprint]"))
+        .leftMap(err => s"Error retrieving private key [$fingerprint] $err")
+      publicKey <- crypto.cryptoPublicStore
+        .publicKey(fingerprint)
+        .toRight(s"Error retrieving public key [$fingerprint]: no public key found")
+      keyPair: CryptoKeyPair[PublicKey, PrivateKey] = (publicKey, privateKey) match {
+        case (pub: SigningPublicKey, pkey: SigningPrivateKey) =>
+          SigningKeyPair.create(pub, pkey)
+        case (pub: EncryptionPublicKey, pkey: EncryptionPrivateKey) =>
+          EncryptionKeyPair.create(pub, pkey)
+        case _ => sys.error("public and private keys must have same purpose")
+      }
+
+      // Encrypt the keypair if a password is provided
+      keyPairBytes = password match {
+        case Some(password) =>
+          crypto.pureCrypto
+            .encryptWithPassword(keyPair.toByteString(protocolVersion), password)
+            .fold(
+              err => sys.error(s"Failed to encrypt key pair for export: $err"),
+              _.toByteString(protocolVersion),
+            )
+        case None => keyPair.toByteString(protocolVersion)
+      }
+    } yield keyPairBytes
 }
 
 class LocalKeyAdministrationGroup(

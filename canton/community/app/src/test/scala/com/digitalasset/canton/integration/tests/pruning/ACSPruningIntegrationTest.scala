@@ -6,10 +6,7 @@ package com.digitalasset.canton.integration.tests.pruning
 import com.digitalasset.canton.config.{CantonConfig, DbConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 import java.time.Duration as JDuration
@@ -77,7 +74,7 @@ trait ACSPruningIntegrationTest
 
 class AcsPruningIntegrationTestPostgres extends ACSPruningIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 //class AcsPruningIntegrationTestH2 extends ACSPruningIntegrationTest {

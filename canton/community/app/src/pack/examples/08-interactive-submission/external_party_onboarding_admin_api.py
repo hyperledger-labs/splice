@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 # [Imports start]
@@ -68,7 +68,7 @@ def build_signed_topology_transaction(
                 transaction_hashes=hashes,
                 signatures=[
                     crypto_pb2.Signature(
-                        format=crypto_pb2.SignatureFormat.SIGNATURE_FORMAT_RAW,
+                        format=crypto_pb2.SignatureFormat.SIGNATURE_FORMAT_DER,
                         signature=signature,
                         signed_by=signed_by,
                         signing_algorithm_spec=crypto_pb2.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_256,
@@ -148,7 +148,7 @@ def onboard_external_party(
     # Wrap the public key in a Canton protobuf message
     signing_public_key = crypto_pb2.SigningPublicKey(
         # Must match the format to which the key was exported to above
-        format=crypto_pb2.CryptoKeyFormat.CRYPTO_KEY_FORMAT_DER,
+        format=crypto_pb2.CryptoKeyFormat.CRYPTO_KEY_FORMAT_DER_X509_SUBJECT_PUBLIC_KEY_INFO,
         public_key=public_key_bytes,
         # Must match the scheme of the key
         scheme=crypto_pb2.SigningKeyScheme.SIGNING_KEY_SCHEME_EC_DSA_P256,
@@ -264,7 +264,7 @@ def onboard_external_party(
                 signed_party_to_participant_transaction,
             ],
             store=common_pb2.StoreId(
-                synchronizer=common_pb2.StoreId.Synchronizer(
+                synchronizer=common_pb2.Synchronizer(
                     id=synchronizer_id,
                 )
             ),
@@ -272,7 +272,6 @@ def onboard_external_party(
     )
     topology_write_client.AddTransactions(add_transactions_request)
     # [Loaded all three transactions onto the participant node]
-
 
     # [Authorize hosting from the confirming node]
     topology_write_client.Authorize(
@@ -287,7 +286,7 @@ def onboard_external_party(
             # - as well as signatures from any other hosting participant
             must_fully_authorize=False,
             store=common_pb2.StoreId(
-                synchronizer=common_pb2.StoreId.Synchronizer(
+                synchronizer=common_pb2.Synchronizer(
                     id=synchronizer_id,
                 ),
             ),
@@ -321,7 +320,7 @@ def wait_to_observe_party_to_participant(
             topology_manager_read_service_pb2.ListPartyToParticipantRequest(
                 base_query=topology_manager_read_service_pb2.BaseQuery(
                     store=common_pb2.StoreId(
-                        synchronizer=common_pb2.StoreId.Synchronizer(
+                        synchronizer=common_pb2.Synchronizer(
                             id=synchronizer_id,
                         )
                     ),
@@ -360,7 +359,7 @@ def build_party_to_key_transaction(
         topology_manager_read_service_pb2.ListPartyToKeyMappingRequest(
             base_query=topology_manager_read_service_pb2.BaseQuery(
                 store=common_pb2.StoreId(
-                    synchronizer=common_pb2.StoreId.Synchronizer(id=synchronizer_id)
+                    synchronizer=common_pb2.Synchronizer(id=synchronizer_id)
                 ),
                 head_state=empty_pb2.Empty(),
             ),

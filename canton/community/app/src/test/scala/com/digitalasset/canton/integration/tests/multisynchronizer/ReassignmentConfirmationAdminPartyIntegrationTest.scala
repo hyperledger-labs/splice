@@ -6,11 +6,11 @@ package com.digitalasset.canton.integration.tests.multisynchronizer
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.LocalSequencerReference
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{
@@ -43,6 +43,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
+import scala.concurrent.duration.DurationInt
 
 /*
 This test checks that the admin party of the submitting participant is required for reassignments.
@@ -65,6 +66,11 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
     EnvironmentDefinition.P2_S1M1_S1M1
       // We want to trigger time out
       .addConfigTransforms(ConfigTransforms.useStaticTime)
+      .addConfigTransforms(
+        // Because we play with the simClock, ensure we have enough forward tolerance
+        // on the target timestamp to not impact up unassigments.
+        ConfigTransforms.updateTargetTimestampForwardTolerance(1.hours)
+      )
       .withSetup { implicit env =>
         import env.*
 
@@ -83,15 +89,29 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
 
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
         participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
-        participants.all.dars.upload(BaseTest.CantonExamplesPath)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = daId)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = acmeId)
 
         signatory = participant1.parties.enable(
           "signatory",
           synchronizeParticipants = Seq(participant2),
+          synchronizer = daName,
         )
+        participant1.parties.enable(
+          "signatory",
+          synchronizeParticipants = Seq(participant2),
+          synchronizer = acmeName,
+        )
+
         observer = participant2.parties.enable(
           "observer",
           synchronizeParticipants = Seq(participant1),
+          synchronizer = daName,
+        )
+        participant2.parties.enable(
+          "observer",
+          synchronizeParticipants = Seq(participant1),
+          synchronizer = acmeName,
         )
 
         programmableSequencers.put(
@@ -117,15 +137,15 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
         countConfirmationResponsesPolicy(acmeConfirmations)
       )
 
-      val unassignId = participant2.ledger_api.commands
+      val reassignmentId = participant2.ledger_api.commands
         .submit_unassign(observer, Seq(iou.id.toLf), daId, acmeId)
-        .unassignId
+        .reassignmentId
 
       // The observer doesn't confirm the unassignment, but the admin party of participant2 will confirm. Therefor the counter will increase
       daConfirmations(participant2) shouldBe 1
 
       participant2.ledger_api.commands
-        .submit_assign(observer, unassignId, daId, acmeId)
+        .submit_assign(observer, reassignmentId, daId, acmeId)
 
       acmeConfirmations(participant2) shouldBe 1
     }
@@ -156,9 +176,9 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
 
       programmableSequencers(daName).resetPolicy()
 
-      val unassignId = participant2.ledger_api.commands
+      val reassignmentId = participant2.ledger_api.commands
         .submit_unassign(observer, Seq(iou.id.toLf), daId, acmeId)
-        .unassignId
+        .reassignmentId
 
       val assignmentCounter = new AtomicLong(0)
       programmableSequencers(acmeName).setPolicy_("drop confirmation response")(
@@ -170,7 +190,7 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
           participant2.ledger_api.commands
             .submit_assign_async(
               observer,
-              unassignId,
+              reassignmentId,
               daId,
               acmeId,
               commandId = commandId,
@@ -183,7 +203,7 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
       participant2.ledger_api.commands
         .submit_assign(
           observer,
-          unassignId,
+          reassignmentId,
           daId,
           acmeId,
         )
@@ -191,7 +211,7 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
       participant2.ledger_api.state.acs
         .active_contracts_of_party(party = observer)
         .find(_.createdEvent.value.contractId == iou.id.contractId)
-        .map(_.synchronizerId) shouldBe Some(acmeId.toProtoPrimitive)
+        .map(_.synchronizerId) shouldBe Some(acmeId.logical.toProtoPrimitive)
     }
   }
 
@@ -301,7 +321,7 @@ class ReassignmentConfirmationAdminPartyIntegrationTestPostgres
     extends ReassignmentConfirmationAdminPartyIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2")).map(_.map(InstanceName.tryCreate))

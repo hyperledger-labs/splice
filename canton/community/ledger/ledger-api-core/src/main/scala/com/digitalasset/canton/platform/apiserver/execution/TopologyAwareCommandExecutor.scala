@@ -35,8 +35,8 @@ import com.digitalasset.canton.platform.apiserver.execution.TopologyAwareCommand
 }
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.RoutingFailed
-import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.store.packagemeta.PackageMetadata
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPackageVersion, LfPartyId, checked}
@@ -94,9 +94,7 @@ private[execution] class TopologyAwareCommandExecutor(
         packageMetadataSnapshot.packageIdVersionMap,
       )
 
-    logDebug(
-      show"Attempting pass 1 of $pkgSelectionDesc - using the submitter party: $submitterParty"
-    )
+    logDebug(s"Attempting pass 1 of $pkgSelectionDesc - using the submitter party")
     pass1(
       submitterParty = submitterParty,
       commands = commands,
@@ -162,9 +160,7 @@ private[execution] class TopologyAwareCommandExecutor(
             routingSynchronizerState = routingSynchronizerState,
           )
         )
-      _ = logDebug(
-        s"Using package preference set for pass 1: ${packagePreferenceSetPass1.map(_.show).mkString("[", ", ", "]")}"
-      )
+      _ = logTrace(s"Using package preference set for pass 1: $packagePreferenceSetPass1")
       commandsWithPackageSelectionForPass1 =
         commands.copy(packagePreferenceSet = packagePreferenceSetPass1)
       commandInterpretationResult <- EitherT(
@@ -230,9 +226,7 @@ private[execution] class TopologyAwareCommandExecutor(
       )
       (preselectedSynchronizerId, packagePreferenceSetPass2) =
         preselectedSynchronizerAndPreferenceSet
-      _ = logDebug(
-        s"Using package preference set for pass 2: ${packagePreferenceSetPass2.map(_.show).mkString("[", ", ", "]")}"
-      )
+      _ = logTrace(s"Using package preference set for pass 2: $packagePreferenceSetPass2")
       interpretationResult <- EitherT(
         commandInterpreter.interpret(
           commands.copy(packagePreferenceSet = packagePreferenceSetPass2),
@@ -277,13 +271,14 @@ private[execution] class TopologyAwareCommandExecutor(
       routingSynchronizerState: RoutingSynchronizerState,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[LfPackageId]] =
     for {
-      packageMap: Map[SynchronizerId, Map[LfPartyId, Set[PackageId]]] <- syncService.packageMapFor(
-        submitters = Option.unless(forExternallySigned)(submitterParty).iterator.toSet,
-        informees = Set(submitterParty),
-        vettingValidityTimestamp = CantonTimestamp(vettingValidityTimestamp),
-        prescribedSynchronizer = prescribedSynchronizerIdO,
-        routingSynchronizerState = routingSynchronizerState,
-      )
+      packageMap: Map[PhysicalSynchronizerId, Map[LfPartyId, Set[PackageId]]] <- syncService
+        .packageMapFor(
+          submitters = Option.unless(forExternallySigned)(submitterParty).iterator.toSet,
+          informees = Set(submitterParty),
+          vettingValidityTimestamp = CantonTimestamp(vettingValidityTimestamp),
+          prescribedSynchronizer = prescribedSynchronizerIdO,
+          routingSynchronizerState = routingSynchronizerState,
+        )
 
       vettedPackagesForTheSubmitter = packageMap.view.mapValues(
         _.getOrElse(
@@ -359,7 +354,7 @@ private[execution] class TopologyAwareCommandExecutor(
       routingSynchronizerState: RoutingSynchronizerState,
   )(implicit
       loggingContextWithTrace: LoggingContextWithTrace
-  ): FutureUnlessShutdown[(SynchronizerId, Set[LfPackageId])] = {
+  ): FutureUnlessShutdown[(PhysicalSynchronizerId, Set[LfPackageId])] = {
     val draftTransaction = interpretationResultFromPass1.transaction
     val packageIndexSnapshot: Map[PackageId, (PackageName, canton.LfPackageVersion)] =
       packageMetadataSnapshot.packageIdVersionMap
@@ -385,7 +380,10 @@ private[execution] class TopologyAwareCommandExecutor(
       .toSet
 
     for {
-      synchronizersPartiesVettingState: Map[SynchronizerId, Map[LfPartyId, Set[PackageId]]] <-
+      synchronizersPartiesVettingState: Map[
+        PhysicalSynchronizerId,
+        Map[LfPartyId, Set[PackageId]],
+      ] <-
         syncService
           .packageMapFor(
             submitters = Option
@@ -434,15 +432,15 @@ private[execution] class TopologyAwareCommandExecutor(
   private def computePerSynchronizerPackagePreferenceSet(
       rootPackageNames: Set[LfPackageName],
       prescribedSynchronizerIdO: Option[SynchronizerId],
-      synchronizersPartiesVettingState: Map[SynchronizerId, Map[LfPartyId, Set[PackageId]]],
+      synchronizersPartiesVettingState: Map[PhysicalSynchronizerId, Map[LfPartyId, Set[PackageId]]],
       packageMetadataSnapshot: PackageMetadata,
       draftPartyPackages: Map[LfPartyId, Set[LfPackageName]],
       userSpecifiedPreferenceMap: PackagesForName,
   )(implicit
       loggingContextWithTrace: LoggingContextWithTrace
-  ): Either[StatusRuntimeException, NonEmpty[Map[SynchronizerId, Set[LfPackageId]]]] = {
-    logDebug(
-      s"Computing per-synchronizer package preference sets using the draft transaction's party-packages: $draftPartyPackages"
+  ): Either[StatusRuntimeException, NonEmpty[Map[PhysicalSynchronizerId, Set[LfPackageId]]]] = {
+    logTrace(
+      s"Computing per-synchronizer package preference sets using the draft transaction's party-packages ($draftPartyPackages)"
     )
     val (discardedSyncs, availableSyncs) = PackagePreferenceBackend
       .computePerSynchronizerPackageCandidates(
@@ -563,6 +561,10 @@ private[execution] class TopologyAwareCommandExecutor(
   private def logDebug(msg: => String)(implicit
       loggingContext: LoggingContextWithTrace
   ): Unit = logger.debug(s"Phase 1: $msg")
+
+  private def logTrace(msg: => String)(implicit
+      loggingContextWithTrace: LoggingContextWithTrace
+  ): Unit = logger.trace(s"Phase 1: $msg")
 }
 
 private[execution] object TopologyAwareCommandExecutor {
