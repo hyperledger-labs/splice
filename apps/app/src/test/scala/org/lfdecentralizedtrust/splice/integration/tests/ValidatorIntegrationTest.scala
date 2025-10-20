@@ -448,21 +448,29 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     aliceWalletClient.tap(tapAmount)
     assertUserFullyOnboarded(aliceWalletClient, aliceValidatorBackend)
 
+    val aliceUserParty = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+      .get(aliceWalletClient.config.ledgerApiUser)
+      .primaryParty
+      .value
+
     actAndCheck(
       "Offboard a user",
       aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser),
     )(
       "Wait for the validator and wallet to report the user offboarded",
       _ => {
+        val usersWhoRemain = (testUsers ++ aliceValidatorBackend.config.validatorWalletUsers)
+          .filter(_ != aliceWalletClient.config.ledgerApiUser)
+
         val usernames = aliceValidatorBackend.listUsers()
-        usernames should contain theSameElementsAs (testUsers ++ aliceValidatorBackend.config.validatorWalletUsers)
-        assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
+        usernames should contain theSameElementsAs usersWhoRemain
+        assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend, aliceUserParty)
       },
     )
 
     clue("Offboarding alice again - offboarding should be idempotent") {
       aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser)
-      assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
+      assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend, aliceUserParty)
     }
 
     actAndCheck(

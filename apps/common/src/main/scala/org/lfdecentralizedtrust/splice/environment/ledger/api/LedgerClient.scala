@@ -375,6 +375,17 @@ private[environment] class LedgerClient(
     } yield res
   }
 
+  def deleteUser(
+      userId: String,
+      identityProviderId: Option[String],
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val request = v1User.DeleteUserRequest(userId, identityProviderId.getOrElse(""))
+    for {
+      stub <- withCredentialsAndTraceContext(userManagementServiceStub)
+      res <- stub.deleteUser(request).map(_ => ())
+    } yield res
+  }
+
   def listUsersProto(
       pageToken: Option[String],
       pageSize: Int,

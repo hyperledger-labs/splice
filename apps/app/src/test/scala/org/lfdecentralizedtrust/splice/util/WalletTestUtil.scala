@@ -155,6 +155,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   def assertUserFullyOffboarded(
       walletAppClient: WalletAppClientReference,
       validatorAppBackend: ValidatorAppBackendReference,
+      endUserParty: PartyId,
   ): org.scalatest.Assertion = {
     // Wallet must report that user is not onboarded
     val status =
@@ -174,15 +175,13 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     status.userOnboarded shouldBe false
     status.userWalletInstalled shouldBe false
 
-    val endUserParty = validatorAppBackend.participantClientWithAdminToken.ledger_api.users
-      .get(walletAppClient.config.ledgerApiUser)
-      .primaryParty
-      .value
+    // Assert that the user is no longer present in the participant's user list
+    val userList = validatorAppBackend.participantClientWithAdminToken.ledger_api.users.list()
+    userList.users.map(_.id) should not contain walletAppClient.config.ledgerApiUser
 
     // Validator user must not have any rights for the end user party
     val ledgerApi = validatorAppBackend.participantClientWithAdminToken.ledger_api
-    val validatorRights = ledgerApi.users.rights
-      .list(validatorAppBackend.config.ledgerApiUser)
+    val validatorRights = ledgerApi.users.rights.list(validatorAppBackend.config.ledgerApiUser)
     validatorRights.readAs should not contain endUserParty
     validatorRights.actAs should not contain endUserParty
 
