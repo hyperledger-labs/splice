@@ -61,7 +61,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
                 .listValidatorLivenessActivityRecords()
                 .map(_.payload.round.number) should contain(currentRound)
             }
-            advanceRoundsByOneTick
+            advanceRoundsToNextRoundOpening
           }),
         )(
           "Wait for all reward coupons",
@@ -93,7 +93,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
 
         actAndCheck(
           "Advance rounds again to collect rewards",
-          Seq(2, 3).foreach(_ => advanceRoundsByOneTick),
+          Seq(2, 3).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "Earn rewards",
           _ => {

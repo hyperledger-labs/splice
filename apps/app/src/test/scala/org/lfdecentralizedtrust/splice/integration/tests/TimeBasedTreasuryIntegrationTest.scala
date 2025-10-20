@@ -51,11 +51,11 @@ class TimeBasedTreasuryIntegrationTest
     checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
 
     // advance by two ticks, so the issuing round of round 1 is created
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
 
     // advance time such that issuing round 1 is open to rewards collection.
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     eventually()({
       // app rewards are automatically collected
@@ -79,7 +79,7 @@ class TimeBasedTreasuryIntegrationTest
 
       checkBalance(aliceWalletClient, Some(1), exactly(110), exactly(0), exactly(0))
       // leads to archival of open round 0
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
 
       lockAmulets(
         aliceValidatorBackend,
@@ -101,7 +101,7 @@ class TimeBasedTreasuryIntegrationTest
       )
 
       // leads to latest round being round 3
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
 
       checkBalance(
         aliceWalletClient,
@@ -132,13 +132,13 @@ class TimeBasedTreasuryIntegrationTest
       }
 
       // advancing the rounds so the rewards would be collectable.
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
           // reward is now collectable..
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
         },
         entries => {
           forAtLeast(1, entries)( // however, we see that we choose not to the validator reward..
@@ -182,7 +182,7 @@ class TimeBasedTreasuryIntegrationTest
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
         // trigger automation.
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
       },
       entries => {
         forAtLeast(
