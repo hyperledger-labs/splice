@@ -323,7 +323,7 @@ private[validator] object ValidatorUtil {
             }
             .recover { case NonFatal(ex) =>
               logger
-                .warn(s"Skipping user deletion for '$endUserName' due to a non-fatal error.", ex)
+                .debug(s"Skipping user deletion for '$endUserName' due to a non-fatal error.", ex)
               ()
             }
         } yield {
