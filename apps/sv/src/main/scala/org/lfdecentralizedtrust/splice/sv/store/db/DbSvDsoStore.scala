@@ -1533,6 +1533,59 @@ class DbSvDsoStore(
       )
     }
 
+  override def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+      tc: TraceContext
+  ): Future[Boolean] =
+    waitUntilAcsIngested {
+      futureUnlessShutdownToFuture(
+        storage
+          .query(
+            sql"""
+            select count(contract_id) as num_markers
+              from (
+                select contract_id
+                  from dso_acs_store
+                 where
+                   store_id = $acsStoreId and
+                   migration_id = $domainMigrationId and
+                   template_id_qualified_name = ${QualifiedName(
+                FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
+                 limit $threshold
+              ) as markers;
+                   """.toActionBuilder.as[Int],
+            "exceedsFeaturedAppActivityMarkerCount",
+          )
+      ).map(results => results.contains(threshold))
+    }
+
+  override def listFeaturedAppActivityMarkersByContractIdHash(
+      contractIdHashLbIncl: Int,
+      contractIdHashUbIncl: Int,
+      limit: Int,
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.amulet.FeaturedAppActivityMarker.ContractId,
+    splice.amulet.FeaturedAppActivityMarker,
+  ]]] =
+    for {
+      result <- storage
+        .query(
+          selectFromAcsTable(
+            DsoTables.acsTableName,
+            acsStoreId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
+              AND $contractIdHashLbIncl <= stable_int32_hash(contract_id)
+              AND stable_int32_hash(contract_id) <= $contractIdHashUbIncl
+            """,
+            orderLimit = sql"""order by stable_int32_hash(contract_id) limit $limit""",
+          ),
+          "listFeaturedAppActivityMarkersByContractIdHash",
+        )
+    } yield result.map(contractFromRow(FeaturedAppActivityMarker.COMPANION)(_))
+
   override def close(): Unit = {
     dsoStoreMetrics.close()
     super.close()
