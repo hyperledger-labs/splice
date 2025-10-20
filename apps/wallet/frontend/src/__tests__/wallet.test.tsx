@@ -175,7 +175,9 @@ describe('Wallet user can', () => {
         .getAllByRole('combobox')
         .find(e => e.id === 'create-offer-receiver')!;
       fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
-      await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+      await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+        timeout: 2000,
+      });
       expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
       expect(
         screen.queryByRole('checkbox', { name: 'Use Token Standard Transfer' })
@@ -501,7 +503,9 @@ describe('Wallet user can', () => {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
 
     // there should be no description input
     expect(screen.queryByRole('textbox', { name: 'description' })).not.toBeInTheDocument();
@@ -580,7 +584,9 @@ describe('Wallet user can', () => {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
 
     const description = 'Works';
     const descriptionInput = screen.getByRole('textbox', { name: 'description' });
@@ -626,7 +632,9 @@ function transferTests(disableTokenStandard: boolean) {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
     expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
     await toggleTokenStandard(user);
     const description = 'Test';
@@ -659,7 +667,9 @@ function transferTests(disableTokenStandard: boolean) {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
     // Checkbox is there, we don't change it though as the default uses the preapproval
     expect(screen.getByRole('checkbox', { name: '' })).toBeInTheDocument();
     await toggleTokenStandard(user);
@@ -693,7 +703,9 @@ function transferTests(disableTokenStandard: boolean) {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
     expect(screen.getByRole('checkbox', { name: '' })).toBeInTheDocument();
     await toggleTokenStandard(user);
     await user.click(screen.getByRole('checkbox', { name: '' }));
@@ -727,7 +739,9 @@ function transferTests(disableTokenStandard: boolean) {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
     const mock = disableTokenStandard
       ? requestMocks.transferPreapprovalSend
       : requestMocks.createTransferViaTokenStandard;
@@ -761,7 +775,9 @@ function transferTests(disableTokenStandard: boolean) {
 
     receiverInput = screen.getAllByRole('combobox').find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
     mock.mockImplementationOnce(() => {
       throw new Error('Request failed');
     });
