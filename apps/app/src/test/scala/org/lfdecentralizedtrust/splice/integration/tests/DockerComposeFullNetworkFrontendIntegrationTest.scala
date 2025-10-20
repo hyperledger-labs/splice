@@ -5,6 +5,10 @@ import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTe
 
 import scala.concurrent.duration.*
 import scala.sys.process.*
+import java.io.{BufferedReader, InputStreamReader}
+import scala.util.Try
+import java.lang.ProcessBuilder
+import scala.jdk.CollectionConverters.*
 
 class DockerComposeFullNetworkFrontendIntegrationTest
     extends FrontendIntegrationTest("frontend")
@@ -91,9 +95,60 @@ class DockerComposeFullNetworkFrontendIntegrationTest
 
           }
         }
+        clue("full network (SV) stack should bind to localhost by default") {
+          withComposeFullNetwork() { () =>
+            var binding = getPortBinding("splice-sv-nginx-1", "80")
+            binding should startWith("127.0.0.1")
+            binding = getPortBinding("splice-validator-nginx-1", "80")
+            binding should startWith("127.0.0.1")
+          }
+        }
       }
     } finally {
       Seq("build-tools/splice-compose.sh", "stop_network", "-D", "-f").!
+    }
+  }
+
+  def getPortBinding(containerName: String, internalPort: String): String = {
+    val command = Seq("docker", "port", containerName, internalPort)
+    val process = new ProcessBuilder(command.asJava).start()
+    val reader = new BufferedReader(new InputStreamReader(process.getInputStream))
+    val output = Try(reader.readLine()).toOption.getOrElse("")
+    if (process.waitFor() != 0 || output.isEmpty) {
+      fail(
+        s"Could not get port binding for $containerName:$internalPort. Is the container running?"
+      )
+    }
+    output
+  }
+
+  def withComposeFullNetwork[A](startFlags: Seq[String] = Seq.empty)(
+      test: () => A
+  ): A = {
+    try {
+      val command =
+        (Seq("build-tools/splice-compose.sh", "start_network", "-w") ++ startFlags).asJava
+
+      val builder = new ProcessBuilder(command)
+      if (builder.! != 0) {
+        fail("Failed to start docker-compose full network")
+      }
+      test()
+    } finally {
+      Seq("build-tools/splice-compose.sh", "stop_network", "-D", "-f").!
+    }
+  }
+
+  "docker-compose networking bindings work" in { implicit env =>
+    registerHttpConnectionPoolsCleanup(env)
+
+    clue("full network (SV) stack should bind to 0.0.0.0 with -E flag") {
+      withComposeFullNetwork(startFlags = Seq("-E")) { () =>
+        var binding = getPortBinding("splice-sv-nginx-1", "80")
+        binding should startWith("0.0.0.0")
+        binding = getPortBinding("splice-validator-nginx-1", "80")
+        binding should startWith("0.0.0.0")
+      }
     }
   }
 

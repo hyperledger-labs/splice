@@ -11,23 +11,39 @@ Release Notes
 Upcoming
 --------
 
+  - SV app
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+
+0.4.21
+------
+
   - Deployment
 
-    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments,
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments
       and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
       can act on your behalf.
 
+    - The ``chown`` init containers in the validator and SV helm charts have been replaced by setting the ``fsGroup`` in the security context of the pods.
+      This overcomes certain security policies that disallow init containers from having ``chown`` capabilities, and in most environments should
+      achieve the same effect. In certain environments, the ``fsGroup`` directive might be ignored. In that case, you can add
+      an init container using the ``extraInitContainers`` helm value to achieve the same effect as before, as documented in
+      :ref:`this section <helm-validator-volume-ownership>`.
+
   - Reward collection
 
-    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses retries will happen more aggressively.
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses, retries will happen more aggressively.
 
-  - SV app
+  - Scan
+
+    - Add the ``v0/events`` API. For private transactions, this API returns events that contain only mediator verdicts. For transactions visible to the DSO (like Amulet transfers), the API combines mediator verdicts and associated updates by ``update_id``.
+      Events can be retrieved by ``update_id`` by using ``/v0/events/{update_id}``.
+      Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
 
     - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
       only logging a warning and not publishing an updated value for out of range values.
-      
-    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
-      All updates involving the DSO party will still be stored and returned by Scan.
 
   - Monitoring
 
@@ -42,6 +58,8 @@ Upcoming
     - Fix a bug where the setting the affinity for the ``splice-cometbft`` and ``splice-global-domain`` helm charts would remove the anti affinity for the ``cometbft`` and the ``sequencer`` deployment. This ensures that if multiple SVs are run on the same nodes, not more than one ``cometbft`` pod can be deployed on the same node and that no more than one ``sequencer`` pod can be deployed to the same node (a ``cometbft`` pod can still share a node with a ``sequencer`` pod). This can be disabled by setting the ``enableAntiAffinity`` helm value to ``false`` (default ``true``).
 
     - Replace ``-Dscala.concurrent.context.minThreads=8`` with ``-Dscala.concurrent.context.numThreads=8`` and set ``-XX:ActiveProcessorCount=8``  in the ``defaultJvmOptions`` for all the helm charts that deploy scala apps. This should ensure that the internal execution contexts spawn 8 threads to handle processing and that the JVM is configured for 8 CPUs as well. The previous behavior would spawn up to number of available processors, which can be up to the number of CPUs on the actual node if no CPU limit is set. This should avoid overloading the nodes during heavy processing.
+
+    - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
 
   - SV
 

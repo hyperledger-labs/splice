@@ -197,6 +197,9 @@ object ConfigTransforms {
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
       disableZeroFees(),
+      updateAllAutomationConfigs(
+        _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
+      ),
     )
   }
 
@@ -336,6 +339,12 @@ object ConfigTransforms {
   def updateInitialTickDuration(tick: NonNegativeFiniteDuration): ConfigTransform = {
     ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
       _.copy(initialTickDuration = tick)
+    ) compose ConfigTransforms.updateAllAutomationConfigs(config =>
+      if (config.pollingInterval.toInternal > tick.toInternal)
+        config.copy(
+          pollingInterval = tick
+        )
+      else config
     )
   }
 
