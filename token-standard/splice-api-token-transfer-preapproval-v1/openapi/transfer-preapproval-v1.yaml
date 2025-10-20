@@ -1,0 +1,277 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+openapi: 3.0.0
+info:
+  title: Transfer preapproval management off-ledger API
+  description: |
+    Implemented by token registries for the purpose of managing the set
+    of transfer preapprovals.
+
+    These preapprovals will be used to determine how to best execute a
+    transfer instructed via the separate transfer-preapproval API.
+  version: 1.0.0
+paths:
+
+  /registry/transfer-preapproval/v1/preapproval-factory:
+    post:
+      # FIXME: reconsider naming 'Transfer' prefix or not, once done so on in the Daml interface definition
+      operationId: "getPreapprovalFactory"
+      description: |
+        Get the factory and choice context for creating a transfer pre-approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetFactoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreapprovalFactoryWithChoiceContext"
+        # FIXME: check whether we can add a dedicated error for too many preapprovals
+        # FIXME: consider adding an info endpoint, or extending the registry metadata info to learn about the number of allowed preapprovals
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+
+  /registry/transfer-preapproval/v1/{preapprovalId}/choice-contexts/renew:
+    post:
+      operationId: "getTransferInstructionRenewContext"
+      description: |
+        Get the choice context to renew a preapproval.
+      parameters:
+        - name: preapprovalId
+          description: "The contract ID of the preapproval to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-preapproval/v1/{preapprovalId}/choice-contexts/accept:
+    post:
+      operationId: "getTransferInstructionAcceptContext"
+      description: |
+        Get the choice context to accept a preapproval.
+      parameters:
+        - name: preapprovalId
+          description: "The contract ID of the preapproval to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-preapproval/v1/{preapprovalId}/choice-contexts/cancel:
+    post:
+      operationId: "getTransferInstructionWithdrawContext"
+      description: |
+        Get the choice context to cancel a preapproval.
+      parameters:
+        - name: preapprovalId
+          description: "The contract ID of the preapproval to cancel."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+components:
+  responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "404":
+      description: "not found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # Note: intentionally not shared with the other APIs to keep the self-contained, and because not all OpenAPI codegens support such shared definitions.
+    GetFactoryRequest:
+      type: object
+      properties:
+        choiceArguments:
+          type: object
+          description: |
+            The arguments that are intended to be passed to the choice provided by the factory.
+            To avoid repeating the Daml type definitions, they are specified as JSON objects.
+            However the concrete format is given by how the choice arguments are encoded using the Daml JSON API
+            (with the `extraArgs.context` and `extraArgs.meta` fields set to the empty object).
+
+            The choice arguments are provided so that the registry can also provide choice-argument
+            specific contracts, e.g., the configuration for a specific instrument-id.
+        excludeDebugFields:
+          description: "If set to true, the response will not include debug fields."
+          default: false
+          type: boolean
+      required:
+        [
+          "choiceArguments",
+        ]
+
+    GetChoiceContextRequest:
+      description: |
+        A request to get the context for executing a choice on a contract.
+      type: object
+      properties:
+        meta:
+          description: |
+            Metadata that will be passed to the choice, and should be incorporated
+            into the choice context. Provided for extensibility.
+          type: object
+          additionalProperties:
+            type: string
+
+    PreapprovalFactoryWithChoiceContext:
+      description: |
+        The preapproval factory contract together with the choice context required to exercise the choice
+        provided by the factory. Typically used to implement the generic initiation of on-ledger workflows
+        via a Daml interface.
+
+        Clients SHOULD avoid reusing the same `FactoryWithChoiceContext` for exercising multiple choices,
+        as the choice context MAY be specific to the choice being exercised.
+      type: object
+      properties:
+        factoryId:
+          description: "The contract ID of the contract implementing the factory interface."
+          type: string
+        choiceContext:
+          $ref: "#/components/schemas/ChoiceContext"
+      required:
+        [
+          "factoryId",
+          "choiceContext",
+        ]
+
+    ChoiceContext:
+      description: |
+        The context required to exercise a choice on a contract via an interface.
+        Used to retrieve additional reference data that is passed in via disclosed contracts,
+        which are in turn referred to via their contract ID in the `choiceContextData`.
+      type: object
+      properties:
+        choiceContextData:
+          description: "The additional data to use when exercising the choice."
+          type: object
+        disclosedContracts:
+          description: |
+            The contracts that are required to be disclosed to the participant node for exercising
+            the choice.
+          type: array
+          items:
+            $ref: "#/components/schemas/DisclosedContract"
+      required:
+        [
+          "choiceContextData",
+          "disclosedContracts",
+        ]
+
+    # Note: intentionally not shared with the other APIs to keep the self-contained, and because not all OpenAPI codegens support such shared definitions.
+    DisclosedContract:
+      type: object
+      properties:
+        templateId:
+          type: string
+        contractId:
+          type: string
+        createdEventBlob:
+          type: string
+        synchronizerId:
+          description: |
+            The synchronizer to which the contract is currently assigned.
+            If the contract is in the process of being reassigned, then a "409" response is returned.
+          type: string
+        debugPackageName:
+          description: |
+            The name of the Daml package that was used to create the contract.
+            Use this data only if you trust the provider, as it might not match the data in the
+            `createdEventBlob`.
+          type: string
+        debugPayload:
+          description: |
+            The contract arguments that were used to create the contract.
+            Use this data only if you trust the provider, as it might not match the data in the
+            `createdEventBlob`.
+          type: object
+        debugCreatedAt:
+          description: |
+            The ledger effective time at which the contract was created.
+            Use this data only if you trust the provider, as it might not match the data in the
+            `createdEventBlob`.
+          type: string
+          format: date-time
+      required:
+        [
+          "templateId",
+          "contractId",
+          "createdEventBlob",
+          "synchronizerId"
+        ]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

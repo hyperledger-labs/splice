@@ -10,9 +10,6 @@ module Splice.Amulet.TwoStepTransfer (
   prepareTwoStepTransfer,
   executeTwoStepTransfer,
   abortTwoStepTransfer,
-
-  -- * Shared support code
-  holdingToTransferInputs,
 ) where
 
 import DA.Assert
@@ -49,21 +46,6 @@ data TwoStepTransfer = TwoStepTransfer with
 -- the time of locking the amulet and the time of executing the actual transfer.
 feeReserveMultiplier : Decimal
 feeReserveMultiplier = 4.0
-
--- | Converting a set of holding inputs to inputs for an amulet transfer,
--- unlocking any expired LockedAmulet holdings on the fly.
-holdingToTransferInputs : ForOwner -> PaymentTransferContext -> [ContractId Holding] -> Update [TransferInput]
-holdingToTransferInputs forOwner paymentContext inputHoldingCids =
-  forA inputHoldingCids $ \holdingCid -> do
-    holding <- fetchCheckedInterface @Holding forOwner holdingCid
-    case fromInterface holding of
-      Some (LockedAmulet {}) -> do
-        let lockedAmuletCid : ContractId LockedAmulet = fromInterfaceContractId holdingCid
-        -- We assume the lock is expired, and if not then we rely `LockedAmulet_OwnerExpireLock` to fail
-        result <- exercise lockedAmuletCid LockedAmulet_OwnerExpireLock with
-          openRoundCid = paymentContext.context.openMiningRound
-        pure $ InputAmulet result.amuletSum.amulet
-      None -> pure $ InputAmulet $ coerceContractId holdingCid
 
 -- | Prepare a two-step transfer of amulet by locking the funds.
 prepareTwoStepTransfer
