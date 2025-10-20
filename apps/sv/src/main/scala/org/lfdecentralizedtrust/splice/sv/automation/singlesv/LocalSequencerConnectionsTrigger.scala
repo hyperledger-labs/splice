@@ -14,11 +14,12 @@ import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -102,13 +103,22 @@ class LocalSequencerConnectionsTrigger(
               transportSecurity = internalSequencerClientConfig.tlsConfig.isDefined,
               customTrustCertificates = None,
               SequencerAlias.Default,
+              sequencerId = None,
             )
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
             PositiveInt.tryCreate(1),
+            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
+            // TODO(#2666) Make the delays configurable.
+            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           )
-          if (conf.sequencerConnections == newConnections) {
+          if (
+            ParticipantAdminConnection.dropSequencerId(
+              conf.sequencerConnections
+            ) == ParticipantAdminConnection.dropSequencerId(newConnections)
+          ) {
             logger.trace(
               "already set SynchronizerConnectionConfig.sequencerConnections to the local sequencer only."
             )

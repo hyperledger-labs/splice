@@ -18,6 +18,8 @@ class GrpcInternalSequencerConnectionXTest
     with FailOnShutdown
     with ConnectionPoolTestHelpers {
 
+  import ConnectionPoolTestHelpers.*
+
   "GrpcInternalSequencerConnectionX" should {
     "be validated in the happy path" in {
       val responses = TestResponses(
@@ -119,33 +121,54 @@ class GrpcInternalSequencerConnectionXTest
       }
     }
 
-    "retry if the server is unavailable during any request" in {
+    "fail validation if an expected sequencer ID is specified and it is incorrect" in {
       val responses = TestResponses(
-        apiResponses = Seq(failureUnavailable, correctApiResponse),
-        handshakeResponses = Seq(failureUnavailable, successfulHandshake),
-        synchronizerAndSeqIdResponses = Seq(failureUnavailable, correctSynchronizerIdResponse1),
-        staticParametersResponses = Seq(failureUnavailable, correctStaticParametersResponse),
+        apiResponses = Seq(correctApiResponse),
+        handshakeResponses = Seq(successfulHandshake),
+        synchronizerAndSeqIdResponses = Seq(correctSynchronizerIdResponse1),
       )
-      withConnection(responses) { (connection, listener) =>
-        loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          {
-            connection.start().valueOrFail("start connection")
-            listener.shouldStabilizeOn(SequencerConnectionXState.Validated)
-            connection.attributes shouldBe Some(correctConnectionAttributes)
-          },
-          LogEntry.assertLogSeq(
-            Seq(
-              (
-                _.warningMessage should include(
-                  "Request failed for server-test-0. Is the server running?"
-                ),
-                "Request failure",
+      val expectedSequencerIdO = Some(testSequencerId(666))
+      withConnection(responses, expectedSequencerIdO = expectedSequencerIdO) {
+        (connection, listener) =>
+          loggerFactory.assertLoggedWarningsAndErrorsSeq(
+            {
+              connection.start().valueOrFail("start connection")
+              listener.shouldStabilizeOn(SequencerConnectionXState.Fatal)
+              connection.attributes shouldBe None
+            },
+            LogEntry.assertLogSeq(
+              Seq(
+                (
+                  _.warningMessage should include(
+                    s"Validation failure: Connection is not on expected sequencer:" +
+                      s" expected $expectedSequencerIdO, got ${testSequencerId(1)}"
+                  ),
+                  "Protocol handshake fails",
+                )
               )
-            )
-          ),
-        )
+            ),
+          )
 
-        responses.assertAllResponsesSent()
+          responses.assertAllResponsesSent()
+      }
+    }
+
+    "pass validation if an expected sequencer ID is specified and it is correct" in {
+      val responses = TestResponses(
+        apiResponses = Seq(correctApiResponse),
+        handshakeResponses = Seq(successfulHandshake),
+        synchronizerAndSeqIdResponses = Seq(correctSynchronizerIdResponse1),
+        staticParametersResponses = Seq(correctStaticParametersResponse),
+      )
+      val expectedSequencerIdO = Some(testSequencerId(1))
+      withConnection(responses, expectedSequencerIdO = expectedSequencerIdO) {
+        (connection, listener) =>
+          connection.start().valueOrFail("start connection")
+
+          listener.shouldStabilizeOn(SequencerConnectionXState.Validated)
+          connection.attributes shouldBe Some(correctConnectionAttributes)
+
+          responses.assertAllResponsesSent()
       }
     }
 

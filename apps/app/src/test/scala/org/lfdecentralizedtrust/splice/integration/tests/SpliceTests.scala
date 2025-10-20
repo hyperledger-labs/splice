@@ -167,11 +167,13 @@ object SpliceTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    protected lazy val skipAcsSnapshotChecks: Boolean = false
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
           sanityChecksIgnoredRootCreates,
           sanityChecksIgnoredRootExercises,
+          skipAcsSnapshotChecks,
           loggerFactory,
         )
       )
@@ -226,11 +228,13 @@ object SpliceTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    protected lazy val skipAcsSnapshotChecks: Boolean = false
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
           sanityChecksIgnoredRootCreates,
           sanityChecksIgnoredRootExercises,
+          skipAcsSnapshotChecks,
           loggerFactory,
         )
       )

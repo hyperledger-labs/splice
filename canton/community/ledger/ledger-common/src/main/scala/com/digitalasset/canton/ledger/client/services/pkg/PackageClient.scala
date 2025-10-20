@@ -11,19 +11,24 @@ import com.daml.ledger.api.v2.package_service.{
   GetPackageStatusResponse,
   ListPackagesRequest,
   ListPackagesResponse,
+  ListVettedPackagesRequest,
+  ListVettedPackagesResponse,
 }
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 
-final class PackageClient(service: PackageServiceStub) {
+final class PackageClient(
+    service: PackageServiceStub,
+    getDefaultToken: () => Option[String] = () => None,
+) {
 
   def listPackages(
       token: Option[String] = None
   )(implicit traceContext: TraceContext): Future[ListPackagesResponse] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .listPackages(ListPackagesRequest())
 
   def getPackage(
@@ -31,7 +36,7 @@ final class PackageClient(service: PackageServiceStub) {
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[GetPackageResponse] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .getPackage(GetPackageRequest(packageId = packageId))
 
   def getPackageStatus(
@@ -39,8 +44,16 @@ final class PackageClient(service: PackageServiceStub) {
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[GetPackageStatusResponse] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .getPackageStatus(
         GetPackageStatusRequest(packageId = packageId)
       )
+
+  def listVettedPackages(
+      request: ListVettedPackagesRequest,
+      token: Option[String] = None,
+  )(implicit traceContext: TraceContext): Future[ListVettedPackagesResponse] =
+    LedgerClient
+      .stubWithTracing(service, token)
+      .listVettedPackages(request)
 }

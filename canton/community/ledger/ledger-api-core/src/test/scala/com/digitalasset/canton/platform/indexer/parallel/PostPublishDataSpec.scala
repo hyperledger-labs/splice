@@ -6,14 +6,20 @@ package com.digitalasset.canton.platform.indexer.parallel
 import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageIds
 import com.digitalasset.canton.ledger.participant.state.Update.{
   RepairTransactionAccepted,
   SequencedCommandRejected,
   SequencedTransactionAccepted,
   UnSequencedCommandRejected,
 }
-import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, TransactionMeta}
+import com.digitalasset.canton.ledger.participant.state.{
+  CompletionInfo,
+  TestAcsChangeFactory,
+  TransactionMeta,
+}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
+import com.digitalasset.canton.protocol.TestUpdateId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.crypto
@@ -37,7 +43,7 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
   private val commandId = Ref.CommandId.assertFromString(UUID.randomUUID().toString)
   private val offset = Offset.tryFromLong(15)
   private val submissionId = Some(Ref.SubmissionId.assertFromString(UUID.randomUUID().toString))
-  private val updateId = Ref.TransactionId.fromLong(15000)
+  private val updateId = TestUpdateId("15000")
   private val someHash =
     crypto.Hash.assertFromString("01cf85cfeb36d628ca2e6f583fa2331be029b6b28e877e1008fb3f862306c086")
   private val transactionMeta = TransactionMeta(
@@ -71,9 +77,11 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractMetadata = Map.empty,
+        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         recordTime = cantonTime2,
+        acsChangeFactory = TestAcsChangeFactory(),
+        internalContractIds = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
@@ -102,9 +110,11 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractMetadata = Map.empty,
+        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         recordTime = cantonTime2,
+        acsChangeFactory = TestAcsChangeFactory(),
+        internalContractIds = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
@@ -117,10 +127,12 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractMetadata = Map.empty,
+        contractAuthenticationData = Map.empty,
+        representativePackageIds = RepresentativePackageIds.Empty,
         synchronizerId = synchronizerId,
         repairCounter = RepairCounter(65),
         recordTime = cantonTime2,
+        internalContractIds = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,

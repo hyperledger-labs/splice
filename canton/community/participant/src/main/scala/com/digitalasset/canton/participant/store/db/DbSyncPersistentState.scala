@@ -8,24 +8,30 @@ import cats.data.EitherT
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi}
+import com.digitalasset.canton.crypto.{CryptoPureApi, SynchronizerCrypto}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.PackageDependencyResolver
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
+import com.digitalasset.canton.participant.store.memory.PackageMetadataView
 import com.digitalasset.canton.participant.store.{
   AcsCounterParticipantConfigStore,
   AcsInspection,
   ContractStore,
-  SyncPersistentState,
+  LogicalSyncPersistentState,
+  PhysicalSyncPersistentState,
 }
 import com.digitalasset.canton.participant.topology.ParticipantTopologyValidation
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.DbSequencedEventStore
-import com.digitalasset.canton.store.memory.InMemorySendTrackerStore
-import com.digitalasset.canton.store.{IndexedStringStore, IndexedSynchronizer}
+import com.digitalasset.canton.store.packagemeta.PackageMetadata
+import com.digitalasset.canton.store.{
+  IndexedPhysicalSynchronizer,
+  IndexedStringStore,
+  IndexedSynchronizer,
+  SendTrackerStore,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.store.db.DbTopologyStore
@@ -43,23 +49,84 @@ import com.digitalasset.canton.util.ReassignmentTag
 
 import scala.concurrent.ExecutionContext
 
-class DbSyncPersistentState(
-    participantId: ParticipantId,
-    override val indexedSynchronizer: IndexedSynchronizer,
-    val staticSynchronizerParameters: StaticSynchronizerParameters,
-    clock: Clock,
+class DbLogicalSyncPersistentState(
+    override val synchronizerIdx: IndexedSynchronizer,
     storage: DbStorage,
-    crypto: Crypto,
     parameters: ParticipantNodeParameters,
     indexedStringStore: IndexedStringStore,
-    contractStore: ContractStore,
     acsCounterParticipantConfigStore: AcsCounterParticipantConfigStore,
-    packageDependencyResolver: PackageDependencyResolver,
+    contractStore: ContractStore,
     ledgerApiStore: Eval[LedgerApiStore],
     val loggerFactory: NamedLoggerFactory,
     val futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext)
-    extends SyncPersistentState
+    extends LogicalSyncPersistentState {
+
+  private val timeouts = parameters.processingTimeouts
+
+  override val enableAdditionalConsistencyChecks: Boolean =
+    parameters.enableAdditionalConsistencyChecks
+
+  override val activeContractStore: DbActiveContractStore =
+    new DbActiveContractStore(
+      storage,
+      synchronizerIdx,
+      Option.when(enableAdditionalConsistencyChecks)(
+        parameters.activationFrequencyForWarnAboutConsistencyChecks
+      ),
+      parameters.stores.journalPruning.toInternal,
+      indexedStringStore,
+      timeouts,
+      loggerFactory,
+    )
+
+  override val acsCommitmentStore = new DbAcsCommitmentStore(
+    storage,
+    synchronizerIdx,
+    acsCounterParticipantConfigStore,
+    timeouts,
+    loggerFactory,
+    ledgerApiStore.map(_.stringInterningView),
+  )
+
+  override val acsInspection: AcsInspection =
+    new AcsInspection(
+      lsid,
+      activeContractStore,
+      contractStore,
+      ledgerApiStore,
+    )
+
+  override val reassignmentStore: DbReassignmentStore = new DbReassignmentStore(
+    storage,
+    ReassignmentTag.Target(synchronizerIdx),
+    indexedStringStore,
+    futureSupervisor,
+    exitOnFatalFailures = parameters.exitOnFatalFailures,
+    parameters.batchingConfig,
+    timeouts,
+    loggerFactory,
+  )
+
+  override def close(): Unit =
+    LifeCycle.close(activeContractStore, acsCommitmentStore)(logger)
+}
+
+class DbPhysicalSyncPersistentState(
+    participantId: ParticipantId,
+    override val physicalSynchronizerIdx: IndexedPhysicalSynchronizer,
+    val staticSynchronizerParameters: StaticSynchronizerParameters,
+    clock: Clock,
+    storage: DbStorage,
+    crypto: SynchronizerCrypto,
+    parameters: ParticipantNodeParameters,
+    packageMetadataView: PackageMetadataView,
+    ledgerApiStore: Eval[LedgerApiStore],
+    logicalSyncPersistentState: LogicalSyncPersistentState,
+    val loggerFactory: NamedLoggerFactory,
+    val futureSupervisor: FutureSupervisor,
+)(implicit ec: ExecutionContext)
+    extends PhysicalSyncPersistentState
     with AutoCloseable
     with NoTracing {
 
@@ -68,69 +135,35 @@ class DbSyncPersistentState(
   private val timeouts = parameters.processingTimeouts
   private val batching = parameters.batchingConfig
 
-  override def enableAdditionalConsistencyChecks: Boolean =
-    parameters.enableAdditionalConsistencyChecks
-
-  val reassignmentStore: DbReassignmentStore = new DbReassignmentStore(
-    storage,
-    ReassignmentTag.Target(indexedSynchronizer),
-    indexedStringStore,
-    ReassignmentTag.Target(staticSynchronizerParameters.protocolVersion),
-    pureCryptoApi,
-    futureSupervisor,
-    exitOnFatalFailures = parameters.exitOnFatalFailures,
-    parameters.batchingConfig,
-    timeouts,
-    loggerFactory,
-  )
-  val activeContractStore: DbActiveContractStore =
-    new DbActiveContractStore(
-      storage,
-      indexedSynchronizer,
-      enableAdditionalConsistencyChecks,
-      parameters.stores.journalPruning.toInternal,
-      indexedStringStore,
-      timeouts,
-      loggerFactory,
-    )
   val sequencedEventStore = new DbSequencedEventStore(
     storage,
-    indexedSynchronizer,
-    staticSynchronizerParameters.protocolVersion,
+    physicalSynchronizerIdx,
     timeouts,
     loggerFactory,
   )
   val requestJournalStore: DbRequestJournalStore = new DbRequestJournalStore(
-    indexedSynchronizer,
+    physicalSynchronizerIdx,
     storage,
     insertBatchAggregatorConfig = batching.aggregator,
     replaceBatchAggregatorConfig = batching.aggregator,
     timeouts,
     loggerFactory,
   )
-  val acsCommitmentStore = new DbAcsCommitmentStore(
-    storage,
-    indexedSynchronizer,
-    acsCounterParticipantConfigStore,
-    staticSynchronizerParameters.protocolVersion,
-    timeouts,
-    loggerFactory,
-  )
 
   val parameterStore: DbSynchronizerParameterStore =
     new DbSynchronizerParameterStore(
-      indexedSynchronizer.synchronizerId,
+      physicalSynchronizerIdx.synchronizerId,
       storage,
       timeouts,
       loggerFactory,
     )
-  // TODO(i5660): Use the db-based send tracker store
-  val sendTrackerStore = new InMemorySendTrackerStore()
+
+  val sendTrackerStore: SendTrackerStore = SendTrackerStore()
 
   val submissionTrackerStore =
     new DbSubmissionTrackerStore(
       storage,
-      indexedSynchronizer,
+      physicalSynchronizerIdx,
       parameters.stores.journalPruning.toInternal,
       timeouts,
       loggerFactory,
@@ -139,7 +172,7 @@ class DbSyncPersistentState(
   override val topologyStore =
     new DbTopologyStore(
       storage,
-      SynchronizerStore(indexedSynchronizer.synchronizerId),
+      SynchronizerStore(physicalSynchronizerIdx.synchronizerId),
       staticSynchronizerParameters.protocolVersion,
       timeouts,
       loggerFactory,
@@ -154,6 +187,7 @@ class DbSyncPersistentState(
     staticSynchronizerParameters = staticSynchronizerParameters,
     store = topologyStore,
     outboxQueue = synchronizerOutboxQueue,
+    disableOptionalTopologyChecks = parameters.disableOptionalTopologyChecks,
     exitOnFatalFailures = parameters.exitOnFatalFailures,
     timeouts = timeouts,
     futureSupervisor = futureSupervisor,
@@ -163,6 +197,7 @@ class DbSyncPersistentState(
     override def validatePackageVetting(
         currentlyVettedPackages: Set[LfPackageId],
         nextPackageIds: Set[LfPackageId],
+        dryRunSnapshot: Option[PackageMetadata],
         forceFlags: ForceFlags,
     )(implicit
         traceContext: TraceContext
@@ -170,9 +205,12 @@ class DbSyncPersistentState(
       validatePackageVetting(
         currentlyVettedPackages,
         nextPackageIds,
-        packageDependencyResolver,
-        acsInspections = () => Map(indexedSynchronizer.synchronizerId -> acsInspection),
+        packageMetadataView,
+        dryRunSnapshot,
+        acsInspections =
+          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
         forceFlags,
+        parameters.disableUpgradeValidation,
       )
 
     override def checkCannotDisablePartyWithActiveContracts(
@@ -184,7 +222,8 @@ class DbSyncPersistentState(
       checkCannotDisablePartyWithActiveContracts(
         partyId,
         forceFlags,
-        acsInspections = () => Map(indexedSynchronizer.synchronizerId -> acsInspection),
+        acsInspections =
+          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
       )
 
     override def checkInsufficientSignatoryAssigningParticipantsForParty(
@@ -202,7 +241,7 @@ class DbSyncPersistentState(
         nextThreshold,
         nextConfirmingParticipants,
         forceFlags,
-        () => Map(indexedSynchronizer.synchronizerId -> reassignmentStore),
+        () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.reassignmentStore),
         () => ledgerApiStore.value.ledgerEnd,
       )
 
@@ -215,7 +254,8 @@ class DbSyncPersistentState(
       checkInsufficientParticipantPermissionForSignatoryParty(
         partyId,
         forceFlags,
-        acsInspections = () => Map(indexedSynchronizer.synchronizerId -> acsInspection),
+        acsInspections =
+          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
       )
   }
 
@@ -223,23 +263,12 @@ class DbSyncPersistentState(
     LifeCycle.close(
       topologyStore,
       topologyManager,
-      reassignmentStore,
-      activeContractStore,
       sequencedEventStore,
       requestJournalStore,
-      acsCommitmentStore,
       parameterStore,
       sendTrackerStore,
       submissionTrackerStore,
     )(logger)
 
   override def isMemory: Boolean = false
-
-  override def acsInspection: AcsInspection =
-    new AcsInspection(
-      indexedSynchronizer.synchronizerId,
-      activeContractStore,
-      contractStore,
-      ledgerApiStore,
-    )
 }

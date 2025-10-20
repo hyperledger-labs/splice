@@ -15,16 +15,16 @@ import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransacti
   AuthorizationLevel,
   TopologyEvent,
 }
+import com.digitalasset.canton.protocol.UpdateId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactions.PositiveSignedTopologyTransactions
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
-import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{LedgerParticipantId, LedgerTransactionId, LfPartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
+import com.digitalasset.canton.{LedgerParticipantId, LfPartyId}
 
 private[protocol] object TopologyTransactionDiff {
 
   /** Compute a set of topology events from the old state and the current state
-    * @param synchronizerId
+    * @param psid
     *   synchronizer on which the topology transactions were sequenced
     * @param oldRelevantState
     *   Previous topology state
@@ -37,11 +37,10 @@ private[protocol] object TopologyTransactionDiff {
     *   participant
     */
   private[protocol] def apply(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       oldRelevantState: PositiveSignedTopologyTransactions,
       currentRelevantState: PositiveSignedTopologyTransactions,
       localParticipantId: ParticipantId,
-      protocolVersion: ProtocolVersion,
   ): Option[TopologyTransactionDiff] = {
 
     val before = partyToParticipant(oldRelevantState)
@@ -81,7 +80,7 @@ private[protocol] object TopologyTransactionDiff {
       .map(
         TopologyTransactionDiff(
           _,
-          updateId(synchronizerId, protocolVersion, oldRelevantState, currentRelevantState),
+          updateId(psid, oldRelevantState, currentRelevantState),
           requiresLocalParticipantPartyReplication =
             locallyAddedPartiesExistingOnOtherParticipants(added).nonEmpty,
         )
@@ -89,18 +88,17 @@ private[protocol] object TopologyTransactionDiff {
   }
 
   private[protocol] def updateId(
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
+      synchronizerId: PhysicalSynchronizerId,
       oldRelevantState: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
       currentRelevantState: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-  ): LedgerTransactionId = {
+  ): UpdateId = {
 
     val builder = Hash.build(HashPurpose.TopologyUpdateId, HashAlgorithm.Sha256)
     def addToBuilder(
         stateTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]]
     ): Unit =
       stateTransactions
-        .map(_.hashOfSignatures(protocolVersion).toHexString)
+        .map(_.hashOfSignatures(synchronizerId.protocolVersion).toHexString)
         .sorted // for not relying on retrieval order
         .foreach(builder.add)
 
@@ -113,7 +111,7 @@ private[protocol] object TopologyTransactionDiff {
 
     val hash = builder.finish()
 
-    LedgerTransactionId.assertFromString(hash.toHexString)
+    UpdateId(hash)
   }
 
   private def partyToParticipant(
@@ -153,6 +151,6 @@ private[protocol] object TopologyTransactionDiff {
 
 private[protocol] final case class TopologyTransactionDiff(
     topologyEvents: NonEmpty[Set[TopologyEvent]],
-    transactionId: LedgerTransactionId,
+    transactionId: UpdateId,
     requiresLocalParticipantPartyReplication: Boolean,
 )

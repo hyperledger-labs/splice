@@ -8,7 +8,7 @@ import cats.syntax.parallel.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
 import com.digitalasset.canton.config.TopologyConfig
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
@@ -31,13 +31,13 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
 trait SynchronizerOutboxDispatchHelper extends NamedLogging {
-  protected def synchronizerId: SynchronizerId
+  protected def psid: PhysicalSynchronizerId
 
   protected def memberId: Member
 
-  protected def protocolVersion: ProtocolVersion
+  final protected def protocolVersion: ProtocolVersion = psid.protocolVersion
 
-  protected def crypto: Crypto
+  protected def crypto: SynchronizerCrypto
 
   protected def topologyConfig: TopologyConfig
 
@@ -62,7 +62,7 @@ trait SynchronizerOutboxDispatchHelper extends NamedLogging {
       transactions: Seq[GenericSignedTopologyTransaction]
   ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]] =
     FutureUnlessShutdown.pure(
-      transactions.filter(x => x.mapping.restrictedToSynchronizer.forall(_ == synchronizerId))
+      transactions.filter(x => x.mapping.restrictedToSynchronizer.forall(_ == psid.logical))
     )
 
   protected def isFailedState(response: TopologyTransactionsBroadcast.State): Boolean =

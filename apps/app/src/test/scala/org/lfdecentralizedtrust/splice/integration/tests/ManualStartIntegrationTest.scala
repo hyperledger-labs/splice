@@ -53,10 +53,7 @@ class ManualStartIntegrationTest
       // This test makes sure apps can automatically initialize Canton instances.
       // The Splice apps in this test should therefore completely ignore the shared canton instances
       // (which are auto-initialized), and only use the manually started fresh Canton instances.
-      .addConfigTransforms(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransforms((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
       .addConfigTransform((_, conf) =>
         conf.copy(validatorApps =

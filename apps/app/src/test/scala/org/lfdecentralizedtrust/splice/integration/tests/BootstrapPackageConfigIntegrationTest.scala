@@ -462,7 +462,7 @@ class BootstrapPackageConfigIntegrationTest
         val newVettedPackage = vettingState.packages
           .find(_.packageId == expectedVettedVersion.packageId)
           .value
-        newVettedPackage.validFrom should (
+        newVettedPackage.validFromInclusive should (
           equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
         )
       }

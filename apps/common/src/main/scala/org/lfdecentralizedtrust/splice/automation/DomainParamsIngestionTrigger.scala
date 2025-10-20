@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.store.DomainParamsStore
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -38,7 +38,7 @@ final class DomainParamsIngestionTrigger(
       case Success(synchronizerId) =>
         participantAdminConnection
           .lookupSynchronizerParametersState(
-            TopologyStoreId.SynchronizerStore(synchronizerId),
+            TopologyStoreId.Synchronizer(synchronizerId),
             synchronizerId,
             AuthorizedState,
           )

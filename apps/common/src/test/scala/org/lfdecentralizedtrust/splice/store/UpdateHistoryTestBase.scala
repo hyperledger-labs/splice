@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Transaction}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   Reassignment,
@@ -66,7 +66,7 @@ abstract class UpdateHistoryTestBase
 
   /** Ingests an import update for a transaction previously ingested using the [[create]] call */
   protected def importUpdate(
-      tx: TransactionTree,
+      tx: Transaction,
       offset: Long,
       store: UpdateHistory,
   ) = {
@@ -183,7 +183,7 @@ abstract class UpdateHistoryTestBase
   // Universal end offset (strictly larger than any offset used in this suite)
   protected val endOffset = "9".repeat(16)
 
-  protected def singleRootEvent(tree: TransactionTree): TreeEvent = {
+  protected def singleRootEvent(tree: Transaction): Event = {
     val rootEventIds = tree.getRootNodeIds.asScala
     rootEventIds.length should be(1)
     val rootEventId = rootEventIds.headOption.value
@@ -343,7 +343,7 @@ object UpdateHistoryTestBase {
     }
   }
 
-  private def withoutLostData(tree: TransactionTree, mode: LostDataMode): TransactionTree = {
+  private def withoutLostData(tree: Transaction, mode: LostDataMode): Transaction = {
     // TODO(#640) - remove this data loss
     // we recalculate the last descendant id because it's lost during the ingestion and it's recalculated based on the visible events
     val nodesWithChildren = tree.getEventsById.asScala.view.map {
@@ -351,7 +351,7 @@ object UpdateHistoryTestBase {
         nodeId.intValue() -> tree.getChildNodeIds(event).asScala.toSeq.map(_.intValue())
       case (nodeId, _) => nodeId.intValue() -> Seq.empty
     }.toMap
-    new TransactionTree(
+    new Transaction(
       /*updateId = */ tree.getUpdateId,
       /*commandId = */ if (mode == LostInScanApi) { "" }
       else {
@@ -359,11 +359,10 @@ object UpdateHistoryTestBase {
       }, // Command IDs are participant-local, so not preserved for backfills
       /*workflowId = */ tree.getWorkflowId,
       /*effectiveAt = */ tree.getEffectiveAt,
-      /*offset = */ tree.getOffset,
-      /*eventsById = */ tree.getEventsById.asScala.view
-        .mapValues(withoutLostData(nodesWithChildren, _))
-        .toMap
+      /*events = */ tree.getEvents.asScala
+        .map(withoutLostData(nodesWithChildren, _))
         .asJava,
+      /*offset = */ tree.getOffset,
       /*synchronizerId = */ tree.getSynchronizerId,
 
       // We don't care about tracing information in the update history.
@@ -375,8 +374,8 @@ object UpdateHistoryTestBase {
 
   private def withoutLostData(
       nodesWithChildren: Map[Int, Seq[Int]],
-      event: TreeEvent,
-  ): TreeEvent = {
+      event: Event,
+  ): Event = {
     event match {
       case created: CreatedEvent =>
         withoutLostData(created)
@@ -414,6 +413,8 @@ object UpdateHistoryTestBase {
       /*signatories = */ created.getSignatories,
       /*observers = */ created.getObservers,
       /*createdAt = */ created.getCreatedAt,
+      /*acsDelta = */ false, // Not preserved
+      /*representativePackageId = */ created.getRepresentativePackageId,
     )
   }
 
@@ -443,6 +444,7 @@ object UpdateHistoryTestBase {
       ),
       /*exerciseResult = */ exercised.getExerciseResult,
       /*implementedInterfaces = */ exercised.getImplementedInterfaces,
+      /*acsDelta = */ false, // Not preserved
     )
   }
 

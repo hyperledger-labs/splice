@@ -5,8 +5,8 @@ package com.digitalasset.canton.integration.tests.sequencer.bftordering
 
 import com.digitalasset.canton.MockedNodeParameters
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveDouble
-import com.digitalasset.canton.config.{ProcessingTimeout, SessionSigningKeysConfig}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -14,11 +14,12 @@ import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.synchronizer.block.AsyncWriterParameters
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.{
-  BftBlockOrdererConfig,
-  BftSequencerFactory,
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing.BftSequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  SequencerNodeParameterConfig,
+  SequencerNodeParameters,
 }
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.synchronizer.sequencer.{
   BlockSequencerConfig,
@@ -44,13 +45,12 @@ class BftSequencerApiTest extends SequencerApiTest with RateLimitManagerTesting 
         ProcessingTimeout()
       ),
       protocol = CantonNodeParameters.Protocol.Impl(
-        sessionSigningKeys = SessionSigningKeysConfig.disabled,
         alphaVersionSupport = false,
         betaVersionSupport = true,
         dontWarnOnDeprecatedPV = false,
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
-      asyncWriter = AsyncWriterParameters(enabled = true),
+      asyncWriter = AsyncWriterParameters(),
     )
 
   override final def createSequencer(crypto: SynchronizerCryptoClient)(implicit
@@ -77,14 +77,14 @@ class BftSequencerApiTest extends SequencerApiTest with RateLimitManagerTesting 
 
     factory
       .create(
-        synchronizerId,
-        SequencerId(synchronizerId.uid),
+        SequencerId(psid.uid),
         clock,
         driverClock,
         crypto,
         FutureSupervisor.Noop,
-        progressSupervisorO = None,
         SequencerTrafficConfig(),
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS

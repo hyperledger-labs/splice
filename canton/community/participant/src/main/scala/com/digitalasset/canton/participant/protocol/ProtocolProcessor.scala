@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.{EitherT, NonEmptyChain}
+import cats.data.{EitherT, Nested, NonEmptyChain}
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
@@ -20,7 +20,7 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.{CommitSetUpdate, SequencedUpdate}
+import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   PromiseUnlessShutdownFactory,
@@ -28,6 +28,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.participant.event.AcsChangeSupport
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.Phase37Synchronizer.RequestOutcome
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
@@ -57,13 +58,16 @@ import com.digitalasset.canton.sequencing.{AsyncResult, HandlerResult}
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SubmissionTopologyHelper, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SubmissionTopologyHelper,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 import com.google.common.annotations.VisibleForTesting
 
@@ -103,8 +107,6 @@ abstract class ProtocolProcessor[
     ephemeral: SyncEphemeralState,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClientSend,
-    synchronizerId: SynchronizerId,
-    protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     promiseFactory: PromiseUnlessShutdownFactory,
@@ -114,13 +116,13 @@ abstract class ProtocolProcessor[
       ephemeral,
       crypto,
       sequencerClient,
-      protocolVersion,
-      synchronizerId,
     )
     with RequestProcessor[RequestViewType] {
 
   import ProtocolProcessor.*
   import com.digitalasset.canton.util.ShowUtil.*
+
+  private val protocolVersion = sequencerClient.protocolVersion
 
   def testingConfig: TestingConfigInternal
 
@@ -164,18 +166,19 @@ abstract class ProtocolProcessor[
     for {
       mediator <- chooseMediator(recentSnapshot.ipsSnapshot, explicitMediatorGroupIndex)
         .leftMap(steps.embedNoMediatorError)
-      submission <- steps.createSubmission(submissionParam, mediator, ephemeral, recentSnapshot)
+      submissionPair <- steps.createSubmission(submissionParam, mediator, ephemeral, recentSnapshot)
+      (submission, pendingSubmission) = submissionPair
       _ = logger.debug(
         s"Topology snapshot timestamp at submission: ${recentSnapshot.ipsSnapshot.timestamp}"
       )
       result <- {
         submission match {
           case untracked: steps.UntrackedSubmission =>
-            submitWithoutTracking(submissionParam, untracked).tapLeft(submissionError =>
-              logger.warn(s"Failed to submit submission due to $submissionError")
+            submitWithoutTracking(submissionParam, untracked, pendingSubmission).tapLeft(
+              submissionError => logger.warn(s"Failed to submit submission due to $submissionError")
             )
           case tracked: steps.TrackedSubmission =>
-            submitWithTracking(submissionParam, tracked)
+            submitWithTracking(submissionParam, tracked, pendingSubmission)
         }
       }
     } yield result
@@ -232,28 +235,27 @@ abstract class ProtocolProcessor[
   private def submitWithoutTracking(
       submissionParam: SubmissionParam,
       untracked: steps.UntrackedSubmission,
+      pendingSubmission: steps.PendingSubmissionData,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SubmissionError, FutureUnlessShutdown[SubmissionResult]] = {
     val result = for {
 
       maxSequencingTime <- EitherT
-        .right(
-          untracked.maxSequencingTimeO
-            .getOrElse(sequencerClient.generateMaxSequencingTime)
-        )
+        .right(untracked.maxSequencingTimeO.getOrElse(sequencerClient.generateMaxSequencingTime))
 
-      sendResultAndResultArgs <- submitInternal(
+      sendResult <- submitInternal(
         submissionParam,
         untracked.pendingSubmissionId,
         MessageId.randomMessageId(),
         untracked.batch,
         maxSequencingTime,
         untracked.embedSubmissionError,
+        pendingSubmission,
       )
-      (sendResult, resultArgs) = sendResultAndResultArgs
       result <- EitherT.fromEither[FutureUnlessShutdown](sendResult match {
-        case SendResult.Success(deliver) => Right(steps.createSubmissionResult(deliver, resultArgs))
+        case SendResult.Success(deliver) =>
+          Right(steps.createSubmissionResult(deliver, pendingSubmission))
         case SendResult.Error(error) =>
           Left(untracked.embedSubmissionError(SequencerDeliverError(error)))
         case SendResult.Timeout(sequencerTime) =>
@@ -273,20 +275,21 @@ abstract class ProtocolProcessor[
   private def submitWithTracking(
       submissionParam: SubmissionParam,
       tracked: steps.TrackedSubmission,
+      pendingSubmission: steps.PendingSubmissionData,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SubmissionError, FutureUnlessShutdown[SubmissionResult]] = {
     val maxSequencingTimeF =
       tracked.maxSequencingTimeO.getOrElse(sequencerClient.generateMaxSequencingTime)
-
     EitherT
       .right(maxSequencingTimeF)
-      .flatMap(submitWithTracking(submissionParam, tracked, _))
+      .flatMap(submitWithTracking(submissionParam, tracked, pendingSubmission, _))
   }
 
   private def submitWithTracking(
       submissionParam: SubmissionParam,
       tracked: steps.TrackedSubmission,
+      pendingSubmission: steps.PendingSubmissionData,
       maxSequencingTime: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
@@ -295,7 +298,7 @@ abstract class ProtocolProcessor[
     val inFlightSubmission = InFlightSubmission(
       changeIdHash = tracked.changeIdHash,
       submissionId = tracked.submissionId,
-      submissionSynchronizerId = synchronizerId,
+      submissionSynchronizerId = sequencerClient.psid.logical,
       messageUuid = messageUuid,
       rootHashO = None,
       sequencingInfo =
@@ -382,6 +385,7 @@ abstract class ProtocolProcessor[
             preparedBatch.batch,
             maxSequencingTime,
             preparedBatch.embedSequencerRequestError,
+            pendingSubmission,
           ).leftMap { submissionError =>
             logger.warn(s"Failed to submit submission due to $submissionError")
             preparedBatch.submissionErrorTrackingData(submissionError)
@@ -391,11 +395,12 @@ abstract class ProtocolProcessor[
           // we would observe the sequencing here only if the participant has not crashed.
           // We therefore delegate observing the sequencing to the MessageDispatcher,
           // which can rely on the SequencedEventStore for persistence.
-          unlessError(submittedEF, mayHaveBeenSent = true) { case (sendResult, resultArgs) =>
+          unlessError(submittedEF, mayHaveBeenSent = true) { sendResult =>
             val submissionResult = sendResult match {
               case SendResult.Success(deliver) =>
-                steps.createSubmissionResult(deliver, resultArgs)
-              case _: SendResult.NotSequenced => tracked.onDefinitiveFailure
+                steps.createSubmissionResult(deliver, pendingSubmission)
+              case _: SendResult.NotSequenced =>
+                tracked.onDefinitiveFailure
             }
             FutureUnlessShutdown.pure(submissionResult)
           }
@@ -432,12 +437,13 @@ abstract class ProtocolProcessor[
       batch: Batch[DefaultOpenEnvelope],
       maxSequencingTime: CantonTimestamp,
       embedSubmissionError: SequencerRequestError => steps.SubmissionSendError,
+      pendingSubmission: steps.PendingSubmissionData,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
     FutureUnlessShutdown,
     steps.SubmissionSendError,
-    (SendResult, steps.SubmissionResultArgs),
+    SendResult,
   ] = {
     implicit val metricsContext: MetricsContext = metricsContextForSubmissionParam(submissionParam)
 
@@ -446,30 +452,21 @@ abstract class ProtocolProcessor[
         .removePendingSubmission(steps.pendingSubmissions(ephemeral), submissionId)
         .discard[Option[steps.PendingSubmissionData]]
 
+    logger.info(
+      s"Phase 1 completed: Submitting ${batch.envelopes.length} envelopes for ${steps.requestKind} request, ${steps
+          .submissionDescription(submissionParam)}"
+    )
+
+    // use the send callback and a promise to capture the eventual sequenced event read by the submitter
+    // We use a promise produced by the passed-in promise factory instead of `SendCallback.future` so that
+    // we stop waiting for the result as soon as the promise factory (typically the connected synchronizer) is closed.
+    // This way, we can safely wrap the submission in a `performUnlessClosing*F` call without getting into
+    // tricky shutdown order dependencies.
+    val sendResultP = promiseFactory.mkPromise[SendResult](
+      "sequenced-event-send-result",
+      futureSupervisor,
+    )
     for {
-      // The pending submission must be registered before the request is sent, to avoid races
-      resultArgs <- steps
-        .updatePendingSubmissions(
-          steps.pendingSubmissions(ephemeral),
-          submissionParam,
-          submissionId,
-        )
-        .mapK(FutureUnlessShutdown.outcomeK)
-
-      _ = logger.info(
-        s"Phase 1 completed: Submitting ${batch.envelopes.length} envelopes for ${steps.requestKind} request, ${steps
-            .submissionDescription(submissionParam)}"
-      )
-
-      // use the send callback and a promise to capture the eventual sequenced event read by the submitter
-      // We use a promise produced by the passed-in promise factory instead of `SendCallback.future` so that
-      // we stop waiting for the result as soon as the promise factory (typically the connected synchronizer) is closed.
-      // This way, we can safely wrap the submission in a `performUnlessClosing*F` call without getting into
-      // tricky shutdown order dependencies.
-      sendResultP = promiseFactory.mkPromise[SendResult](
-        "sequenced-event-send-result",
-        futureSupervisor,
-      )
       _ <- sequencerClient
         .send(
           batch,
@@ -503,17 +500,20 @@ abstract class ProtocolProcessor[
       }
       _ <- EitherT.right(sendResult match {
         case SendResult.Success(deliver) =>
-          schedulePendingSubmissionRemoval(deliver.timestamp, submissionId).map(decisionTimeTick =>
-            steps.setDecisionTimeTickRequest(
-              steps.pendingSubmissions(ephemeral),
-              submissionId,
-              decisionTimeTick,
-            )
-          )
+          // We only need to schedule a removal if the submission data actually contains something
+          (pendingSubmission: Option[?]) match {
+            case None => FutureUnlessShutdown.unit
+            case Some(_) =>
+              schedulePendingSubmissionRemoval(deliver.timestamp, submissionId).map(
+                decisionTimeTick =>
+                  steps.setDecisionTimeTickRequest(pendingSubmission, decisionTimeTick)
+              )
+          }
         case SendResult.Error(_) | SendResult.Timeout(_) =>
+          removePendingSubmission()
           FutureUnlessShutdown.unit
       })
-    } yield sendResult -> resultArgs
+    } yield sendResult
   }
 
   /** Schedules removal of the pending submission once the request tracker has advanced to the
@@ -553,6 +553,7 @@ abstract class ProtocolProcessor[
                   List,
                   (
                     Set.empty[LfPartyId],
+                    participantId,
                     LocalRejectError.TimeRejects.LocalTimeout
                       .Reject()
                       .toLocalReject(protocolVersion),
@@ -643,7 +644,7 @@ abstract class ProtocolProcessor[
       val rootHash = batch.rootHashMessage.rootHash
       val freshOwnTimelyTxF = ephemeral.submissionTracker.register(rootHash, requestId)
 
-      val processedET = performUnlessClosingEitherUSF(
+      val processedET = synchronizeWithClosing(
         s"ProtocolProcess.processRequest(rc=$rc, sc=$sc, traceId=${traceContext.traceId})"
       ) {
         // registering the request has to be done synchronously
@@ -667,7 +668,6 @@ abstract class ProtocolProcessor[
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   @VisibleForTesting
   private[protocol] def processRequestInternal(
       ts: CantonTimestamp,
@@ -713,7 +713,7 @@ abstract class ProtocolProcessor[
         )
       } else FutureUnlessShutdown.unit
 
-    performUnlessClosingEitherUSF(
+    synchronizeWithClosing(
       s"$functionFullName(rc=$rc, sc=$sc, traceId=${traceContext.traceId})"
     ) {
       val preliminaryChecksET = for {
@@ -727,7 +727,7 @@ abstract class ProtocolProcessor[
               _.leftMap(_ =>
                 steps.embedRequestError(
                   UnableToGetDynamicSynchronizerParameters(
-                    snapshot.synchronizerId,
+                    snapshot.psid,
                     snapshot.ipsSnapshot.timestamp,
                   )
                 )
@@ -751,7 +751,6 @@ abstract class ProtocolProcessor[
           logger.warn(s"Request $rc: Decryption error: $decryptionError")
         }
         decryptionErrors = rawDecryptionErrors.map(ViewMessageError(_))
-
         (incorrectRootHashes, viewsWithCorrectRootHash) = checkRootHash(
           decryptedViewsWithSignatures
         )
@@ -784,16 +783,27 @@ abstract class ProtocolProcessor[
         )
         (incorrectRecipients, viewsWithCorrectRootHashAndRecipients) = checkRecipientsResult
 
-        (fullViewsWithCorrectRootHashAndRecipients, incorrectDecryptedViews) =
-          steps.computeFullViews(viewsWithCorrectRootHashAndRecipients)
+        (
+          viewsWithCorrectRootHashAndRecipientsAndAbsoluteLedgerEffects,
+          incorrectAbsolutizationViews,
+        ) = steps.absolutizeLedgerEffects(
+          viewsWithCorrectRootHashAndRecipients
+        )
+
+        (
+          fullViewsWithCorrectRootHashAndRecipientsAndAbsoluteLedgerEffects,
+          incorrectFullViews,
+        ) = steps.computeFullViews(viewsWithCorrectRootHashAndRecipientsAndAbsoluteLedgerEffects)
 
         malformedPayloads =
-          decryptionErrors ++ incorrectRootHashes ++ incorrectRecipients ++ incorrectDecryptedViews
+          decryptionErrors ++ incorrectRootHashes ++ incorrectRecipients ++ incorrectAbsolutizationViews ++ incorrectFullViews
 
-        _ <- NonEmpty.from(fullViewsWithCorrectRootHashAndRecipients) match {
+        _ <- NonEmpty.from(
+          fullViewsWithCorrectRootHashAndRecipientsAndAbsoluteLedgerEffects
+        ) match {
           case None =>
             /*
-              If fullViewsWithCorrectRootHashAndRecipients is empty, it does not necessarily mean that we have a
+              If fullViewsWithCorrectRootHashAndRecipientsAndAbsoluteLedgerEffects is empty, it does not necessarily mean that we have a
               malicious submitter (e.g., if there is concurrent topology change). Hence, if we have a submission data,
               then we will aim to generate a command completion.
              */
@@ -847,7 +857,7 @@ abstract class ProtocolProcessor[
 
           case Some(goodViewsWithSignatures) =>
             // All views with the same correct root hash declare the same mediator, so it's enough to look at the head
-            val (firstView, _) = goodViewsWithSignatures.head1
+            val (firstView, _, _) = goodViewsWithSignatures.head1
 
             val observeFUS = submissionDataForTrackerO match {
               case Some(submissionDataForTracker) =>
@@ -1063,6 +1073,7 @@ abstract class ProtocolProcessor[
         )
         .leftMap(err => steps.embedRequestError(RequestTrackerError(err)))
 
+      // TODO(i12928): non-authenticated contracts will crash the participant
       _ <- steps
         .authenticateInputContracts(parsedRequest)
         .mapK(FutureUnlessShutdown.outcomeK)
@@ -1165,16 +1176,17 @@ abstract class ProtocolProcessor[
         } else {
           signedResponsesTo match {
             case Some((spm, recipients)) =>
+              lazy val (approved, rejected, abstained) = spm.message.responses.foldLeft((0, 0, 0)) {
+                case ((app, rej, abst), response) =>
+                  response.localVerdict match {
+                    case LocalApprove() => (app + 1, rej, abst)
+                    case _: LocalReject => (app, rej + 1, abst)
+                    case _: LocalAbstain => (app, rej, abst + 1)
+                  }
+              }
               val messageId = sequencerClient.generateMessageId
               logger.info(
-                s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId ${val (approved, rejected) =
-                    spm.message.responses.foldLeft((0, 0)) { case ((app, rej), response) =>
-                      response.localVerdict match {
-                        case LocalApprove() => (app + 1, rej)
-                        case _: LocalReject => (app, rej + 1)
-                      }
-                    }
-                  s"approved=$approved, rejected=$rejected" }"
+                s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId approved=$approved, rejected=$rejected, abstained=$abstained"
               )
               EitherT.right[steps.RequestError](
                 sendResponses(requestId, Seq(spm -> recipients), Some(messageId))
@@ -1260,7 +1272,7 @@ abstract class ProtocolProcessor[
     val content = event.event.content
     val ts = content.timestamp
 
-    val processedET = performUnlessClosingEitherUSFAsync(
+    val processedET = synchronizeWithClosing(
       s"ProtocolProcess.processResult(sc=$counter, traceId=${traceContext.traceId}"
     ) {
       val resultEnvelopes =
@@ -1278,8 +1290,8 @@ abstract class ProtocolProcessor[
         show"Got result for ${steps.requestKind.unquoted} request at $requestId: $resultEnvelopes"
       )
 
-      processResultInternal1(event, result, requestId, ts, counter)
-    }(_.value)
+      Nested(processResultInternal1(event, result, requestId, ts, counter))
+    }.value
 
     handlerResultForConfirmationResult(ts, processedET)
   }
@@ -1301,18 +1313,26 @@ abstract class ProtocolProcessor[
     val snapshotTs = requestId.unwrap
 
     for {
-      snapshot <- EitherT.right(
+      // Check against future-dated request IDs to prevent a deadlock due to waiting for a topology snapshot in the future.
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        requestId.unwrap < resultTs,
+        (),
+        steps.embedResultError(
+          FutureRequestId(requestId, resultTs)
+        ),
+      )
+      requestSnapshot <- EitherT.right(
         crypto.ips.awaitSnapshotUSSupervised(s"await crypto snapshot $snapshotTs")(snapshotTs)
       )
 
       synchronizerParameters <- EitherT(
-        snapshot
+        requestSnapshot
           .findDynamicSynchronizerParameters()
           .map(
             _.leftMap(_ =>
               steps.embedResultError(
                 UnableToGetDynamicSynchronizerParameters(
-                  synchronizerId,
+                  sequencerClient.psid,
                   requestId.unwrap,
                 )
               )
@@ -1462,7 +1482,7 @@ abstract class ProtocolProcessor[
     //  A dishonest sequencer or mediator could break this assumption.
 
     // Some more synchronization is done in the Phase37Synchronizer.
-    val res = performUnlessClosingEitherUSF(
+    val res = synchronizeWithClosing(
       s"$functionFullName(sc=$sc, traceId=${traceContext.traceId})"
     )(
       EitherT(
@@ -1525,11 +1545,11 @@ abstract class ProtocolProcessor[
       locallyRejected <- EitherT.right(locallyRejectedF)
       _ = checkContradictoryMediatorApprove(locallyRejected, verdict)
 
-      commitAndEvent <- pendingRequestDataOrReplayData match {
+      commitAndEventFactory <- pendingRequestDataOrReplayData match {
         case Wrapped(pendingRequestData) =>
           for {
-            commitSetAndContractsAndEvent <- steps
-              .getCommitSetAndContractsToBeStoredAndEvent(
+            commitSetAndContractsAndEventFactory <- steps
+              .getCommitSetAndContractsToBeStoredAndEventFactory(
                 event,
                 verdict,
                 pendingRequestData,
@@ -1541,7 +1561,7 @@ abstract class ProtocolProcessor[
               commitSetOF,
               contractsToBeStored,
               eventO,
-            ) = commitSetAndContractsAndEvent
+            ) = commitSetAndContractsAndEventFactory
 
             val isApproval = verdict.isApprove
 
@@ -1553,13 +1573,13 @@ abstract class ProtocolProcessor[
         case _: CleanReplayData =>
           val commitSetOF =
             Option.when(verdict.isApprove)(FutureUnlessShutdown.pure(CommitSet.empty))
-          val eventO = None
+          val eventFactoryO = None
 
           EitherT.pure[FutureUnlessShutdown, steps.ResultError](
-            (commitSetOF, Seq.empty, eventO)
+            (commitSetOF, Seq.empty, eventFactoryO)
           )
       }
-      (commitSetOF, contractsToBeStored, eventO) = commitAndEvent
+      (commitSetOF, contractsToBeStored, eventFactoryO) = commitAndEventFactory
 
       commitTime = resultTs
       commitSetF <- signalResultToRequestTracker(
@@ -1576,17 +1596,20 @@ abstract class ProtocolProcessor[
 
       _ <- ifThenET(!cleanReplay) {
         logger.info(
-          show"Finalizing ${steps.requestKind.unquoted} request=${requestId.unwrap} with event $eventO."
+          show"Finalizing ${steps.requestKind.unquoted} request=${requestId.unwrap}."
         )
         for {
           commitSet <- EitherT.right[steps.ResultError](commitSetF)
-          eventWithCommitSetO = eventO.map {
-            case commitSetUpdate: CommitSetUpdate =>
-              commitSetUpdate.withCommitSet(commitSet)
-
-            case u: SequencedUpdate => u
-          }
-          _ = logger.info(show"About to wrap up request $requestId")
+          // TODO(#27996) getting the internal contract ids will not be done here and will be part of indexing
+          internalContractIdsForStoredContracts <- EitherT.right[steps.ResultError](
+            ephemeral.contractStore.lookupBatchedNonCachedInternalIds(
+              contractsToBeStored.map(_.contractId)
+            )
+          )
+          eventO = eventFactoryO.map(
+            _(AcsChangeSupport.fromCommitSet(commitSet))(internalContractIdsForStoredContracts)
+          )
+          _ = logger.info(show"About to wrap up request $requestId with event $eventO")
           requestTimestamp = requestId.unwrap
           _unit <- EitherT.right[steps.ResultError](
             terminateRequest(
@@ -1594,7 +1617,7 @@ abstract class ProtocolProcessor[
               requestSequencerCounter,
               requestTimestamp,
               commitTime,
-              eventWithCommitSetO,
+              eventO,
             )
           )
         } yield pendingSubmissionDataO.foreach(steps.postProcessResult(verdict, _))
@@ -1904,7 +1927,7 @@ object ProtocolProcessor {
   }
 
   final case class UnableToGetDynamicSynchronizerParameters(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       ts: CantonTimestamp,
   ) extends RequestProcessingError
       with ResultProcessingError {
@@ -1950,6 +1973,14 @@ object ProtocolProcessor {
   final case class TimeoutResultTooEarly(requestId: RequestId) extends ResultProcessingError {
     override protected def pretty: Pretty[TimeoutResultTooEarly] = prettyOfClass(
       unnamedParam(_.requestId)
+    )
+  }
+
+  final case class FutureRequestId(requestId: RequestId, resultTs: CantonTimestamp)
+      extends ResultProcessingError {
+    override protected def pretty: Pretty[FutureRequestId] = prettyOfClass(
+      param("request id", _.requestId),
+      param("result timestamp", _.resultTs),
     )
   }
 

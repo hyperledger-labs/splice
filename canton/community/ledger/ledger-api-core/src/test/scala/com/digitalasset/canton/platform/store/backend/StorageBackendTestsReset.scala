@@ -3,7 +3,10 @@
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForUpdatesLedgerEffects
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
+import com.digitalasset.canton.platform.store.backend.common.EventIdSourceLegacy.CreateStakeholder
+import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForUpdatesLedgerEffectsLegacy
+import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.PaginationInput
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -40,18 +43,33 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
       // 1: party allocation
       dtoPartyEntry(offset(1)),
       // 2: transaction with create node
-      dtoCreate(offset(2), 1L, hashCid("#3")),
-      DbDto.IdFilterCreateStakeholder(1L, someTemplateId.toString, someParty.toString),
+      dtoCreateLegacy(offset(2), 1L, hashCid("#3")),
+      DbDto.IdFilterCreateStakeholder(
+        1L,
+        someTemplateId.toString,
+        someParty.toString,
+        first_per_sequential_id = true,
+      ),
       dtoCompletion(offset(2)),
       // 3: transaction with exercise node and retroactive divulgence
-      dtoExercise(offset(3), 2L, true, hashCid("#3")),
+      dtoExerciseLegacy(offset(3), 2L, true, hashCid("#3")),
       dtoCompletion(offset(3)),
       // 4: assign event
-      dtoAssign(offset(4), 4L, hashCid("#4")),
-      DbDto.IdFilterAssignStakeholder(4L, someTemplateId.toString, someParty.toString),
+      dtoAssignLegacy(offset(4), 4L, hashCid("#4")),
+      DbDto.IdFilterAssignStakeholder(
+        4L,
+        someTemplateId.toString,
+        someParty,
+        first_per_sequential_id = true,
+      ),
       // 5: unassign event
-      dtoUnassign(offset(5), 5L, hashCid("#5")),
-      DbDto.IdFilterUnassignStakeholder(5L, someTemplateId.toString, someParty.toString),
+      dtoUnassignLegacy(offset(5), 5L, hashCid("#5")),
+      DbDto.IdFilterUnassignStakeholder(
+        5L,
+        someTemplateId.toString,
+        someParty,
+        first_per_sequential_id = true,
+      ),
       // 6: topology transaction
       dtoPartyToParticipant(offset(6), 6L),
       // String interning
@@ -70,14 +88,14 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
 
     def events =
       executeSql(
-        backend.event.fetchEventPayloadsLedgerEffects(
-          EventPayloadSourceForUpdatesLedgerEffects.Create
-        )(List(1L), Some(Set.empty))
+        backend.event.fetchEventPayloadsLedgerEffectsLegacy(
+          EventPayloadSourceForUpdatesLedgerEffectsLegacy.Create
+        )(Ids(List(1L)), Some(Set.empty))
       ) ++
         executeSql(
-          backend.event.fetchEventPayloadsLedgerEffects(
-            EventPayloadSourceForUpdatesLedgerEffects.Consuming
-          )(List(2L), Some(Set.empty))
+          backend.event.fetchEventPayloadsLedgerEffectsLegacy(
+            EventPayloadSourceForUpdatesLedgerEffectsLegacy.Consuming
+          )(Ids(List(2L)), Some(Set.empty))
         )
 
     def parties = executeSql(backend.party.knownParties(None, 10))
@@ -87,46 +105,55 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
     )
 
     def filterIds = executeSql(
-      backend.event.updateStreamingQueries.fetchIdsOfCreateEventsForStakeholder(
+      backend.event.updateStreamingQueries.fetchEventIdsLegacy(CreateStakeholder)(
         stakeholderO = Some(someParty),
         templateIdO = None,
-        startExclusive = 0,
-        endInclusive = 1000,
-        limit = 1000,
+      )(_)(
+        PaginationInput(
+          startExclusive = 0,
+          endInclusive = 1000,
+          limit = 1000,
+        )
       )
     )
 
     def assignEvents = executeSql(
-      backend.event.assignEventBatch(
-        eventSequentialIds = List(4),
+      backend.event.assignEventBatchLegacy(
+        eventSequentialIds = Ids(List(4)),
         allFilterParties = Some(Set.empty),
       )
     )
 
     def unassignEvents = executeSql(
-      backend.event.unassignEventBatch(
-        eventSequentialIds = List(5),
+      backend.event.unassignEventBatchLegacy(
+        eventSequentialIds = Ids(List(5)),
         allFilterParties = Some(Set.empty),
       )
     )
 
     def assignIds = executeSql(
-      backend.event.fetchAssignEventIdsForStakeholder(
+      backend.event.fetchAssignEventIdsForStakeholderLegacy(
         stakeholderO = Some(someParty),
         templateId = None,
-        startExclusive = 0L,
-        endInclusive = 1000L,
-        1000,
+      )(_)(
+        PaginationInput(
+          startExclusive = 0L,
+          endInclusive = 1000L,
+          1000,
+        )
       )
     )
 
-    def unassignIds = executeSql(
-      backend.event.fetchUnassignEventIdsForStakeholder(
+    def reassignmentIds = executeSql(
+      backend.event.fetchUnassignEventIdsForStakeholderLegacy(
         stakeholderO = Some(someParty),
         templateId = None,
-        startExclusive = 0L,
-        endInclusive = 1000L,
-        1000,
+      )(_)(
+        PaginationInput(
+          startExclusive = 0L,
+          endInclusive = 1000L,
+          1000,
+        )
       )
     )
 
@@ -140,7 +167,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
     assignEvents should not be empty
     unassignEvents should not be empty
     assignIds should not be empty
-    unassignIds should not be empty
+    reassignmentIds should not be empty
 
     // Reset
     executeSql(backend.reset.resetAll)
@@ -159,7 +186,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
     assignEvents shouldBe empty
     unassignEvents shouldBe empty
     assignIds shouldBe empty
-    unassignIds shouldBe empty
+    reassignmentIds shouldBe empty
   }
 
   // Some queries are protected to never return data beyond the current ledger end.

@@ -63,7 +63,7 @@ object RejectionGenerators {
           languageVersion,
           allowedLanguageVersions,
         )
-      case e: Package.SelfConsistency =>
+      case e: Package.DarSelfConsistency =>
         LedgerApiErrors.InternalError.PackageSelfConsistency(e)
     }
 
@@ -156,16 +156,6 @@ object RejectionGenerators {
         case LfInterpretationError.Upgrade(error: LfInterpretationError.Upgrade.ValidationFailed) =>
           CommandExecutionErrors.Interpreter.UpgradeError.ValidationFailed
             .Reject(renderedMessage, error)
-        case LfInterpretationError.Upgrade(
-              error: LfInterpretationError.Upgrade.DowngradeDropDefinedField
-            ) =>
-          CommandExecutionErrors.Interpreter.UpgradeError.DowngradeDropDefinedField
-            .Reject(renderedMessage, error)
-        case LfInterpretationError.Upgrade(
-              error: LfInterpretationError.Upgrade.DowngradeFailed
-            ) =>
-          CommandExecutionErrors.Interpreter.UpgradeError.DowngradeFailed
-            .Reject(renderedMessage, error)
         case LfInterpretationError.Crypto(
               error: LfInterpretationError.Crypto.MalformedByteEncoding
             ) =>
@@ -180,6 +170,11 @@ object RejectionGenerators {
               error: LfInterpretationError.Crypto.MalformedSignature
             ) =>
           CommandExecutionErrors.Interpreter.CryptoError.MalformedSignature
+            .Reject(renderedMessage, error)
+        case LfInterpretationError.Crypto(
+              error: LfInterpretationError.Crypto.MalformedContractId
+            ) =>
+          CommandExecutionErrors.Interpreter.CryptoError.MalformedContractId
             .Reject(renderedMessage, error)
         case LfInterpretationError.Dev(_, err) =>
           CommandExecutionErrors.Interpreter.InterpretationDevError

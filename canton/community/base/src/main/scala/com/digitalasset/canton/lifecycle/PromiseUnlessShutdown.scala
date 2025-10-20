@@ -36,16 +36,9 @@ object PromiseUnlessShutdown {
       futureSupervisor: FutureSupervisor,
       logAfter: Duration = 10.seconds,
       logLevel: Level = Level.DEBUG,
-      warnAction: => Unit = (),
   )(implicit ecl: ErrorLoggingContext): PromiseUnlessShutdown[A] = {
     val supervisedPromise =
-      new SupervisedPromise[UnlessShutdown[A]](
-        description,
-        futureSupervisor,
-        logAfter,
-        logLevel,
-        warnAction,
-      )
+      new SupervisedPromise[UnlessShutdown[A]](description, futureSupervisor, logAfter, logLevel)
     wrap(supervisedPromise)
   }
 
@@ -91,7 +84,7 @@ object PromiseUnlessShutdown {
     }
 
     override def run()(implicit traceContext: TraceContext): Unit =
-      WeakReference.unapply(promiseRef).foreach(_.shutdown())
+      WeakReference.unapply(promiseRef).foreach(_.shutdown_())
   }
 }
 
@@ -156,14 +149,30 @@ object PromiseUnlessShutdownImpl {
 
     /** Tries to complete the promise with `value` as a [[UnlessShutdown.Outcome]]. Does nothing if
       * the promise has already been completed.
+      * @return
+      *   False if the promise has already been completed, or true otherwise.
       */
-    def outcome(value: A): Unit =
+    def outcome(value: A): Boolean =
+      self.trySuccess(UnlessShutdown.Outcome(value))
+
+    /** Tries to complete the promise with `value` as a [[UnlessShutdown.Outcome]]. Does nothing if
+      * the promise has already been completed.
+      */
+    def outcome_(value: A): Unit =
       self.trySuccess(UnlessShutdown.Outcome(value)).discard[Boolean]
 
     /** Tries to complete the promise with [[UnlessShutdown.AbortedDueToShutdown]]. Does nothing if
       * the promise has already been completed.
+      * @return
+      *   False if the promise has already been completed, or true otherwise.
       */
-    def shutdown(): Unit =
+    def shutdown(): Boolean =
+      self.trySuccess(UnlessShutdown.AbortedDueToShutdown)
+
+    /** Tries to complete the promise with [[UnlessShutdown.AbortedDueToShutdown]]. Does nothing if
+      * the promise has already been completed.
+      */
+    def shutdown_(): Unit =
       self.trySuccess(UnlessShutdown.AbortedDueToShutdown).discard[Boolean]
   }
   // Use `implicit def` instead of `implicit class` so that self.type is inferred for the Ops type parameter.

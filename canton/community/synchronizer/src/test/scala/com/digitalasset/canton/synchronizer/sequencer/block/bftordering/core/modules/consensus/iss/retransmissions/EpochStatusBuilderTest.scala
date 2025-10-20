@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions
 
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   EpochNumber,
@@ -55,7 +55,7 @@ class EpochStatusBuilderTest extends AnyWordSpec with BftSequencerBaseTest {
         Consensus.RetransmissionsMessage.SegmentStatus(epoch0, segmentIndex = 0, inProgressSegment)
       )
       epochStatusBuilder.epochStatus shouldBe Some(
-        ConsensusStatus.EpochStatus(
+        ConsensusStatus.EpochStatus.create(
           myId,
           epoch0,
           Seq(inProgressSegment, completeSegment, inViewChangeSegment),

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.topology.store
 
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.canton.BaseTest.*
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.SigningPublicKey
@@ -40,7 +41,7 @@ class TopologyStoreTestData(
       op,
       serial,
       mapping,
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
     )
     val signingKeyIdsNE = NonEmptyUtil.fromUnsafe(signingKeys).map(_.id).toSet
     val keysWithUsage = TopologyManager
@@ -52,7 +53,7 @@ class TopologyStoreTestData(
     val signatures = NonEmpty
       .from(
         keysWithUsage.toSeq.map { case (keyId, usage) =>
-          factory.cryptoApi.crypto.privateCrypto
+          factory.syncCryptoClient.crypto.privateCrypto
             .sign(tx.hash.hash, keyId, usage)
             .value
             .onShutdown(fail("shutdown"))(
@@ -63,17 +64,12 @@ class TopologyStoreTestData(
         }
       )
       .getOrElse(fail("no keys provided"))
-      .toSet
 
-    SignedTopologyTransaction.tryCreate[Op, M](
+    SignedTopologyTransaction.withSignatures[Op, M](
       tx,
       signatures = signatures,
       isProposal = isProposal,
-    )(
-      SignedTopologyTransaction.versioningTable
-        .protocolVersionRepresentativeFor(
-          ProtocolVersion.v33
-        )
+      ProtocolVersion.v34,
     )
   }
 
@@ -108,12 +104,9 @@ class TopologyStoreTestData(
   val dns_p1p2 = DecentralizedNamespaceDefinition.computeNamespace(
     Set(p1Namespace, p2Namespace)
   )
-  val da_p1p2_synchronizerId = SynchronizerId(
-    UniqueIdentifier.tryCreate(
-      "da",
-      dns_p1p2,
-    )
-  )
+  val da_p1p2_physicalSynchronizerId =
+    SynchronizerId(UniqueIdentifier.tryCreate("da", dns_p1p2)).toPhysical
+  val da_p1p2_synchronizerId = da_p1p2_physicalSynchronizerId.logical
 
   val medKey = factory.SigningKeys.key4
   val medNamespace = Namespace(medKey.fingerprint)
@@ -125,9 +118,9 @@ class TopologyStoreTestData(
     Set(p1Namespace, seqNamespace)
   )
 
-  val synchronizer1_p1p2_synchronizerId = SynchronizerId(
-    UniqueIdentifier.tryCreate("synchronizer1", dns_p1p2)
-  )
+  val synchronizer1_p1p2_physicalSynchronizerId =
+    SynchronizerId(UniqueIdentifier.tryCreate("synchronizer1", dns_p1p2)).toPhysical
+  val synchronizer1_p1p2_synchronizerId = synchronizer1_p1p2_physicalSynchronizerId.logical
   val med1Id = MediatorId(UniqueIdentifier.tryCreate("mediator1", medNamespace))
   val med2Id = MediatorId(UniqueIdentifier.tryCreate("mediator2", medNamespace))
   val seq1Id = SequencerId(UniqueIdentifier.tryCreate("sequencer1", seqNamespace))
@@ -157,7 +150,6 @@ class TopologyStoreTestData(
       synchronizer1_p1p2_synchronizerId,
       DynamicSynchronizerParameters
         .initialValues(
-          topologyChangeDelay = NonNegativeFiniteDuration.Zero,
           protocolVersion = testedProtocolVersion,
           mediatorReactionTimeout = NonNegativeFiniteDuration.Zero,
         ),
@@ -170,13 +162,12 @@ class TopologyStoreTestData(
       synchronizer1_p1p2_synchronizerId,
       DynamicSynchronizerParameters
         .initialValues(
-          topologyChangeDelay = NonNegativeFiniteDuration.Zero,
-          protocolVersion = testedProtocolVersion,
+          protocolVersion = testedProtocolVersion
         ),
     )
   )(dnd_p1p2_keys*)
   val otk_p1 = makeSignedTx(
-    OwnerToKeyMapping(p1Id, NonEmpty(Seq, p1Key, factory.EncryptionKeys.key1))
+    OwnerToKeyMapping.tryCreate(p1Id, NonEmpty(Seq, p1Key, factory.EncryptionKeys.key1))
   )((p1Key))
   val p1_permission_daSynchronizer = makeSignedTx(
     ParticipantSynchronizerPermission(
@@ -231,10 +222,10 @@ class TopologyStoreTestData(
       .getOrElse(fail())
   )(p1Key, seqKey)
   val otk_p2_proposal = makeSignedTx(
-    OwnerToKeyMapping(p2Id, NonEmpty(Seq, p1Key, factory.EncryptionKeys.key1)),
+    OwnerToKeyMapping.tryCreate(p2Id, NonEmpty(Seq, p1Key, factory.EncryptionKeys.key1)),
     isProposal = true,
     serial = PositiveInt.tryCreate(2),
-  )(p1Key)
+  )(p2Key)
   val ptp_fred_p1 = makeSignedTx(
     PartyToParticipant.tryCreate(
       partyId = `fred::p2Namepsace`,

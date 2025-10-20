@@ -143,7 +143,7 @@ class UpdateHistoryIntegrationTest
               aliceUserParty,
               Set(update.contractId.contractId),
             ) shouldBe Map(
-            update.contractId.contractId -> synchronizerId
+            update.contractId.contractId -> synchronizerId.logical
           )
         },
     )

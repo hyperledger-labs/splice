@@ -8,33 +8,38 @@ import cats.data.EitherT
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.BaseTest.getResourcePath
 import com.digitalasset.canton.buildinfo.BuildInfo
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.config.{PackageMetadataViewConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{CachingConfigs, PackageMetadataViewConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.admin.PackageService.DarMainPackageId
 import com.digitalasset.canton.participant.admin.PackageServiceTest.{
-  AdminWorkflowsPath,
-  readAdminWorkflows,
-  readAdminWorkflowsBytes,
+  PingAdminWorkflowPath,
   readCantonExamples,
   readCantonExamplesBytes,
+  readPingAdminWorkflow,
+  readPingAdminWorkflowBytes,
 }
 import com.digitalasset.canton.participant.admin.data.UploadDarData
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.store.DamlPackageStore
-import com.digitalasset.canton.participant.store.memory.InMemoryDamlPackageStore
+import com.digitalasset.canton.participant.store.memory.{
+  InMemoryDamlPackageStore,
+  MutablePackageMetadataViewImpl,
+}
 import com.digitalasset.canton.participant.util.DAMLe
+import com.digitalasset.canton.platform.apiserver.services.admin.PackageUpgradeValidator
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.DefaultTestIdentities
+import com.digitalasset.canton.topology.{DefaultTestIdentities, SynchronizerId}
 import com.digitalasset.canton.util.{BinaryFileUtil, MonadUtil}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext, LfPackageId}
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.archive.testing.Encode
 import com.digitalasset.daml.lf.archive.{DamlLf, Dar as LfDar, DarParser, DarWriter}
+import com.digitalasset.daml.lf.data.Bytes
 import com.digitalasset.daml.lf.language.{Ast, LanguageMajorVersion, LanguageVersion}
 import com.digitalasset.daml.lf.testing.parser.Implicits.SyntaxHelper
 import com.digitalasset.daml.lf.testing.parser.ParserParameters
@@ -64,15 +69,17 @@ object PackageServiceTest {
   def readCantonExamplesBytes(): Array[Byte] =
     Files.readAllBytes(Paths.get(BaseTest.CantonExamplesPath))
 
-  private val AdminWorkflowsPath = getResourcePath("dar/AdminWorkflows.dar")
-  def loadAdminWorkflowsDar(): archive.Dar[Archive] =
-    loadDar(AdminWorkflowsPath)
+  private[admin] val PingAdminWorkflowPath = getResourcePath(
+    AdminWorkflowServices.PingDarResourceFileName
+  )
+  def loadPingAdminWorkflowDar(): archive.Dar[Archive] =
+    loadDar(PingAdminWorkflowPath)
 
-  def readAdminWorkflows(): List[DamlLf.Archive] =
-    loadAdminWorkflowsDar().all
+  def readPingAdminWorkflow(): List[DamlLf.Archive] =
+    loadPingAdminWorkflowDar().all
 
-  def readAdminWorkflowsBytes(): Array[Byte] =
-    Files.readAllBytes(Paths.get(AdminWorkflowsPath))
+  def readPingAdminWorkflowBytes(): Array[Byte] =
+    Files.readAllBytes(Paths.get(PingAdminWorkflowPath))
 
   def badDarPath: String =
     ("community" / "participant" / "src" / "test" / "resources" / "daml" / "illformed.dar").toString
@@ -82,22 +89,28 @@ object PackageServiceTest {
 
 }
 
-class PackageServiceTest
+abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     extends AsyncWordSpec
     with BaseTest
     with HasActorSystem
     with HasExecutionContext {
+
   private val examplePackages: List[Archive] = readCantonExamples()
-  private val adminWorkflowPackages: List[Archive] = readAdminWorkflows()
+  private val adminWorkflowPackages: List[Archive] = readPingAdminWorkflow()
   private val bytes = PackageServiceTest.readCantonExamplesBytes()
   private val description = String255.tryCreate("CantonExamples")
   private val participantId = DefaultTestIdentities.participant1
 
-  private class Env(now: CantonTimestamp) {
+  protected class Env(now: CantonTimestamp) {
     val packageStore = new InMemoryDamlPackageStore(loggerFactory)
     private val processingTimeouts = ProcessingTimeout()
     val packageDependencyResolver =
-      new PackageDependencyResolver(packageStore, processingTimeouts, loggerFactory)
+      new PackageDependencyResolver.Impl(
+        participantId,
+        packageStore,
+        processingTimeouts,
+        loggerFactory,
+      )
     private val engine =
       DAMLe.newEngine(
         enableLfDev = false,
@@ -106,26 +119,34 @@ class PackageServiceTest
         paranoidMode = true,
       )
 
-    val sut: PackageService = PackageService
-      .createAndInitialize(
-        clock = new SimClock(start = now, loggerFactory = loggerFactory),
-        engine = engine,
-        packageDependencyResolver = packageDependencyResolver,
-        enableUpgradeValidation = true,
-        futureSupervisor = FutureSupervisor.Noop,
-        loggerFactory = loggerFactory,
-        metrics = ParticipantTestMetrics,
-        exitOnFatalFailures = true,
-        packageMetadataViewConfig = PackageMetadataViewConfig(),
-        packageOps = new PackageOpsForTesting(participantId, loggerFactory),
-        timeouts = processingTimeouts,
-      )
-      .futureValueUS
+    val clock = new SimClock(start = now, loggerFactory = loggerFactory)
+    val mutablePackageMetadataView = new MutablePackageMetadataViewImpl(
+      clock,
+      packageDependencyResolver.damlPackageStore,
+      new PackageUpgradeValidator(CachingConfigs.defaultPackageUpgradeCache, loggerFactory),
+      loggerFactory,
+      PackageMetadataViewConfig(),
+      processingTimeouts,
+      futureSupervisor,
+      exitOnFatalFailures = false,
+    )
+    mutablePackageMetadataView.refreshState.futureValueUS
+    val sut: PackageService = PackageService(
+      clock = clock,
+      engine = engine,
+      mutablePackageMetadataView = mutablePackageMetadataView,
+      packageDependencyResolver = packageDependencyResolver,
+      enableStrictDarValidation = enableStrictDarValidation,
+      loggerFactory = loggerFactory,
+      metrics = ParticipantTestMetrics,
+      packageOps = new PackageOpsForTesting(participantId, loggerFactory),
+      timeouts = processingTimeouts,
+    )
   }
 
   private val uploadTime = CantonTimestamp.now()
 
-  private def withEnv[T](test: Env => Future[T]): Future[T] = {
+  protected def withEnv[T](test: Env => Future[T]): Future[T] = {
     val env = new Env(uploadTime)
     test(env)
   }
@@ -137,6 +158,31 @@ class PackageServiceTest
 
   private lazy val expectedPackageIds: Set[LfPackageId] =
     examplePackages.map(DamlPackageStore.readPackageId).toSet
+
+  protected lazy val mainPkg: Archive = createLfArchive { implicit parserParameters =>
+    p"""
+      metadata ( 'main-package' : '1.0.0' )
+      module Mod {
+        val string: Text = "main-package";
+     }"""
+  }
+
+  protected lazy val extraPkg: Archive = createLfArchive { implicit parserParameters =>
+    p"""
+      metadata ( 'extra-package' : '1.0.0' )
+      module Mod {
+        val string: Text = "extra-package";
+     }"""
+  }
+
+  protected lazy val missingPkg: Archive = createLfArchive { implicit parserParameters =>
+    p"""
+        metadata ( 'missing-package' : '1.0.0' )
+        module Mod {
+          val string: Text = '-missing-':Mod:Text;
+        }
+      """
+  }
 
   "PackageService" should {
 
@@ -152,8 +198,7 @@ class PackageServiceTest
             darBytes = payload,
             description = Some("CantonExamples"),
             submissionIdO = None,
-            vetAllPackages = false,
-            synchronizeVetting = PackageVettingSynchronization.NoSync,
+            vettingInfo = None,
             expectedMainPackageId = None,
           )
           .value
@@ -178,8 +223,7 @@ class PackageServiceTest
             darBytes = ByteString.copyFrom(bytes),
             description = Some("some/path/CantonExamples.dar"),
             submissionIdO = None,
-            vetAllPackages = false,
-            synchronizeVetting = PackageVettingSynchronization.NoSync,
+            vettingInfo = None,
             expectedMainPackageId = None,
           )
           .value
@@ -207,9 +251,9 @@ class PackageServiceTest
       )
       val test = UploadDarData(
         bytes = BinaryFileUtil
-          .readByteStringFromFile(AdminWorkflowsPath)
-          .valueOrFail("could not load admin workflows"),
-        description = Some("AdminWorkflows"),
+          .readByteStringFromFile(PingAdminWorkflowPath)
+          .valueOrFail("could not load ping admin workflow"),
+        description = Some(AdminWorkflowServices.PingDarResourceName),
         expectedMainPackageId = None,
       )
 
@@ -218,8 +262,7 @@ class PackageServiceTest
           .upload(
             Seq(examples, test),
             submissionIdO = None,
-            vetAllPackages = false,
-            synchronizeVetting = PackageVettingSynchronization.NoSync,
+            vettingInfo = None,
           )
           .value
           .map(_.valueOrFail("upload multiple dars"))
@@ -233,7 +276,9 @@ class PackageServiceTest
         forAll(
           Seq(
             String255.tryCreate("CantonExamples") -> readCantonExamplesBytes(),
-            String255.tryCreate("AdminWorkflows") -> readAdminWorkflowsBytes(),
+            String255.tryCreate(
+              AdminWorkflowServices.PingDarResourceName
+            ) -> readPingAdminWorkflowBytes(),
           )
         ) { case (name, bytes) =>
           val dar = dars.flatten.find(_.descriptor.name == name).value
@@ -254,8 +299,7 @@ class PackageServiceTest
               darBytes = ByteString.copyFrom(bytes),
               description = Some("some/path/CantonExamples.dar"),
               submissionIdO = None,
-              vetAllPackages = false,
-              synchronizeVetting = PackageVettingSynchronization.NoSync,
+              vettingInfo = None,
               expectedMainPackageId = expected.map(LfPackageId.assertFromString),
             )
             .value
@@ -276,6 +320,8 @@ class PackageServiceTest
         } yield succeed
     }
 
+    val psid = SynchronizerId.tryFromString("test::synchronizer").toPhysical
+
     "validate DAR and packages from bytes" in withEnvUS { env =>
       import env.*
 
@@ -284,6 +330,7 @@ class PackageServiceTest
           .validateDar(
             ByteString.copyFrom(bytes),
             "some/path/CantonExamples.dar",
+            psid,
           )
           .value
           .map(_.valueOrFail("couldn't validate a dar file"))
@@ -308,8 +355,7 @@ class PackageServiceTest
             darBytes = ByteString.copyFrom(bytes),
             description = Some("some/path/CantonExamples.dar"),
             submissionIdO = None,
-            vetAllPackages = false,
-            synchronizeVetting = PackageVettingSynchronization.NoSync,
+            vettingInfo = None,
             expectedMainPackageId = None,
           )
           .valueOrFail("appending dar")
@@ -317,7 +363,7 @@ class PackageServiceTest
       } yield {
         // test for explict dependencies
         deps match {
-          case Left(value) => fail(value)
+          case Left((value, _)) => fail(value)
           case Right(loaded) =>
             // all direct dependencies should be part of this
             (dependencyIds -- loaded) shouldBe empty
@@ -337,6 +383,7 @@ class PackageServiceTest
           sut.validateDar(
             payload,
             badDarPath,
+            psid,
           )
         )("append illformed.dar").failOnShutdown
       } yield {
@@ -358,11 +405,10 @@ class PackageServiceTest
       for {
         error <- leftOrFail(
           sut.upload(
-            payload,
-            Some(badDarPath),
-            None,
-            vetAllPackages = false,
-            synchronizeVetting = PackageVettingSynchronization.NoSync,
+            darBytes = payload,
+            description = Some(badDarPath),
+            submissionIdO = None,
+            vettingInfo = None,
             expectedMainPackageId = None,
           )
         )("append illformed.dar").failOnShutdown
@@ -396,17 +442,22 @@ class PackageServiceTest
     }
 
     val unknownDarId = DarMainPackageId.tryCreate("darid")
+    val psid = SynchronizerId.tryFromString("test::synchronizer").toPhysical
 
     "requested by PackageService.unvetDar" should {
       "reject the request with an error" in withEnv(
-        rejectOnMissingDar(_.unvetDar(unknownDarId), unknownDarId, "DAR archive unvetting")
+        rejectOnMissingDar(
+          _.unvetDar(unknownDarId, psid),
+          unknownDarId,
+          "DAR archive unvetting",
+        )
       )
     }
 
     "requested by PackageService.vetDar" should {
       "reject the request with an error" in withEnv(
         rejectOnMissingDar(
-          _.vetDar(unknownDarId, PackageVettingSynchronization.NoSync),
+          _.vetDar(unknownDarId, PackageVettingSynchronization.NoSync, psid),
           unknownDarId,
           "DAR archive vetting",
         )
@@ -415,7 +466,11 @@ class PackageServiceTest
 
     "requested by PackageService.removeDar" should {
       "reject the request with an error" in withEnv(
-        rejectOnMissingDar(_.removeDar(unknownDarId), unknownDarId, "DAR archive removal")
+        rejectOnMissingDar(
+          _.removeDar(unknownDarId, psids = Set.empty),
+          unknownDarId,
+          "DAR archive removal",
+        )
       )
     }
 
@@ -434,8 +489,7 @@ class PackageServiceTest
                 darBytes = payload,
                 description = Some(darName),
                 submissionIdO = None,
-                vetAllPackages = false,
-                synchronizeVetting = PackageVettingSynchronization.NoSync,
+                vettingInfo = None,
                 expectedMainPackageId = None,
               )
             )
@@ -443,13 +497,8 @@ class PackageServiceTest
       for {
         results <- Future.sequence(concurrentDarUploadsF.map(_.value.failOnShutdown))
       } yield {
-        // Only one upload should have succeeded, i.e. the first stored DAR
-        results.collect { case Right(_) => () }.size shouldBe 1
-        // Expect the other results to be failures due to incompatible upgrades
-        results.collect {
-          case Left(_: PackageServiceErrors.Validation.Upgradeability.Error) => succeed
-          case Left(other) => fail(s"Unexpected $other")
-        }.size shouldBe (upgradeIncompatibleDars.size - 1)
+        // All uploads should succeed
+        results.collect { case Right(_) => () }.size shouldBe upgradeIncompatibleDars.size
       }
     }
   }
@@ -496,13 +545,131 @@ class PackageServiceTest
     Encode.encodeArchive(selfPkgId -> pkg, lfVersion)
   }
 
-  private def encodeDarArchive(archive: Archive): ByteString =
+  protected def encodeDarArchive(archive: Archive, dependencies: (String, Archive)*): ByteString =
+    encodeDarArchive("archive.dalf" -> archive, dependencies*)
+
+  protected def encodeDarArchive(
+      main: (String, Archive),
+      dependencies: (String, Archive)*
+  ): ByteString = {
+    val (name, archive) = main
+
     Using(ByteString.newOutput()) { os =>
       DarWriter.encode(
         BuildInfo.damlLibrariesVersion,
-        LfDar(("archive.dalf", archive.toByteArray), List()),
+        LfDar(
+          (name, Bytes.fromByteString(archive.toByteString)),
+          dependencies.map { case (nm, arc) => (nm, Bytes.fromByteString(arc.toByteString)) }.toList,
+        ),
         os,
       )
       os.toByteString
     }.success.value
+  }
+}
+
+class PackageServiceTestWithoutStrictDarValidation extends BasePackageServiceTest(false) {
+
+  "strict Dar validation disabled" should {
+    "fail uploads with missing package dependencies" in withEnv { env =>
+      import env.*
+
+      val payload = encodeDarArchive("main.dalf" -> missingPkg)
+
+      for {
+        error <- leftOrFail(
+          sut.upload(
+            darBytes = payload,
+            description = Some("missing-package.dar"),
+            submissionIdO = None,
+            vettingInfo = None,
+            expectedMainPackageId = None,
+          )
+        )("uploading dar with missing packages").failOnShutdown
+      } yield {
+        inside(error) { case _: PackageServiceErrors.Validation.DarSelfConsistency.Error =>
+          succeed
+        }
+      }
+    }
+
+    "allow uploads with extra package dependencies" in withEnv { env =>
+      import env.*
+
+      val payload = encodeDarArchive("main.dalf" -> mainPkg, "extra.dalf" -> extraPkg)
+
+      loggerFactory.assertLogs(
+        SuppressionRule.LoggerNameContains("PackageServiceTestWithoutStrictDarValidation") &&
+          SuppressionRule.Level(org.slf4j.event.Level.WARN)
+      )(
+        (for {
+          _ <- sut
+            .upload(
+              darBytes = payload,
+              description = Some("extra-package.dar"),
+              submissionIdO = None,
+              vettingInfo = None,
+              expectedMainPackageId = None,
+            )
+            .valueOrFail("uploading dar with extra package")
+        } yield {
+          succeed
+        }).unwrap.map(_.failOnShutdown),
+        err => {
+          err.message should include(
+            "the set of package dependencies {''} is not self consistent, the extra dependencies are"
+          )
+        },
+      )
+    }
+  }
+}
+
+class PackageServiceTestWithStrictDarValidation extends BasePackageServiceTest(true) {
+
+  "strict Dar validation enabled" should {
+    "fail uploads with missing package dependencies" in withEnv { env =>
+      import env.*
+
+      val payload = encodeDarArchive("main.dalf" -> missingPkg)
+
+      for {
+        error <- leftOrFail(
+          sut.upload(
+            darBytes = payload,
+            description = Some("missing-package.dar"),
+            submissionIdO = None,
+            vettingInfo = None,
+            expectedMainPackageId = None,
+          )
+        )("uploading dar with missing packages").failOnShutdown
+      } yield {
+        inside(error) { case _: PackageServiceErrors.Validation.DarSelfConsistency.Error =>
+          succeed
+        }
+      }
+    }
+
+    "fail uploads with extra package dependencies" in withEnv { env =>
+      import env.*
+
+      val payload = encodeDarArchive("main.dalf" -> mainPkg, "extra.dalf" -> extraPkg)
+
+      for {
+        error <- leftOrFail(
+          sut.upload(
+            darBytes = payload,
+            description = Some("extra-package.dar"),
+            submissionIdO = None,
+            vettingInfo = None,
+            expectedMainPackageId = None,
+          )
+        )("uploading dar with extra package").failOnShutdown
+      } yield {
+        inside(error) { case _: PackageServiceErrors.Validation.DarSelfConsistency.Error =>
+          succeed
+        }
+      }
+    }
+  }
 }

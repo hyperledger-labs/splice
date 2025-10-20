@@ -30,7 +30,7 @@ trait PackageUsableMixin {
     val observer = observerParticipant.id.adminParty
     val cmd = cmdBuilder(submitter, observer)
 
-    submittingParticipant.ledger_api.javaapi.commands.submit_flat(
+    submittingParticipant.ledger_api.javaapi.commands.submit(
       Seq(submitter),
       cmd,
       Some(synchronizerId),
@@ -60,7 +60,7 @@ trait PackageUsableMixin {
       .filter(Many.COMPANION)(submittingParticipant.id.adminParty)
     val cmds = contracts.map(_.id.exerciseArchive().commands.loneElement)
     submittingParticipant.ledger_api.javaapi.commands
-      .submit_flat(Seq(submittingParticipant.id.adminParty), cmds)
+      .submit(Seq(submittingParticipant.id.adminParty), cmds)
   }
 
 }

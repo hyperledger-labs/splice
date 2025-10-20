@@ -14,8 +14,8 @@ import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSu
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
-  CachingConfigs,
   ProcessingTimeout,
+  SessionEncryptionKeyCacheConfig,
   StorageConfig,
   TestingConfigInternal,
 }
@@ -32,7 +32,6 @@ import com.digitalasset.canton.lifecycle.{
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.participant.admin.PackageDependencyResolver
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
@@ -71,9 +70,9 @@ import com.digitalasset.canton.sequencing.client.{
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
-import com.digitalasset.canton.store.IndexedSynchronizer
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SynchronizerTimeTracker, WallClock}
+import com.digitalasset.canton.store.{IndexedPhysicalSynchronizer, IndexedSynchronizer}
+import com.digitalasset.canton.time.{SynchronizerTimeTracker, WallClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -126,9 +125,9 @@ class ProtocolProcessorTest
     UniqueIdentifier.tryFromProtoPrimitive("participant::other-participant")
   )
   private val party = PartyId(UniqueIdentifier.tryFromProtoPrimitive("party::participant"))
-  private val synchronizer = DefaultTestIdentities.synchronizerId
+  private val psid = DefaultTestIdentities.physicalSynchronizerId
   private val topology: TestingTopology = TestingTopology.from(
-    Set(synchronizer),
+    Set(psid),
     Map(
       party.toLf -> Map(
         participant -> ParticipantPermission.Submission
@@ -145,8 +144,10 @@ class ProtocolProcessorTest
   )
   private val crypto =
     TestingIdentityFactory(topology, loggerFactory, TestSynchronizerParameters.defaultDynamic)
-      .forOwnerAndSynchronizer(participant, synchronizer)
+      .forOwnerAndSynchronizer(participant, psid)
   private val mockSequencerClient = mock[SequencerClientSend]
+  when(mockSequencerClient.psid).thenAnswer(psid)
+  when(mockSequencerClient.protocolVersion).thenAnswer(psid.protocolVersion)
   when(
     mockSequencerClient.send(
       any[Batch[DefaultOpenEnvelope]],
@@ -173,11 +174,10 @@ class ProtocolProcessorTest
               Deliver.create(
                 None,
                 CantonTimestamp.Epoch,
-                synchronizer,
+                psid,
                 Some(messageId),
                 Batch.filterOpenEnvelopesFor(batch, participant, Set.empty),
                 None,
-                testedProtocolVersion,
                 Option.empty[TrafficReceipt],
               )
             )
@@ -199,18 +199,16 @@ class ProtocolProcessorTest
   when(trm.pretty).thenAnswer(Pretty.adHocPrettyInstance[ConfirmationResultMessage])
   when(trm.verdict).thenAnswer(Verdict.Approve(testedProtocolVersion))
   when(trm.rootHash).thenAnswer(rootHash)
-  when(trm.synchronizerId).thenAnswer(DefaultTestIdentities.synchronizerId)
+  when(trm.synchronizerId).thenAnswer(DefaultTestIdentities.physicalSynchronizerId)
 
   private val requestId = RequestId(CantonTimestamp.Epoch)
   private val requestSc = SequencerCounter(0)
   private val resultSc = SequencerCounter(1)
   private val rc = RequestCounter(0)
   private val parameters = DynamicSynchronizerParametersWithValidity(
-    DynamicSynchronizerParameters
-      .initialValues(NonNegativeFiniteDuration.Zero, testedProtocolVersion),
+    DynamicSynchronizerParameters.initialValues(testedProtocolVersion),
     CantonTimestamp.MinValue,
     None,
-    synchronizer,
   )
 
   private val sessionKeyMapTest = NonEmpty(
@@ -218,7 +216,7 @@ class ProtocolProcessorTest
     new AsymmetricEncrypted[SecureRandomness](
       ByteString.EMPTY,
       // this is only a placeholder, the data is not encrypted
-      crypto.pureCrypto.defaultEncryptionAlgorithmSpec,
+      crypto.pureCrypto.encryptionAlgorithmSpecs.default,
       Fingerprint.tryFromString("dummy"),
     ),
   )
@@ -251,8 +249,6 @@ class ProtocolProcessorTest
       SyncEphemeralState,
       ParticipantNodeEphemeralState,
   ) = {
-
-    val packageDependencyResolver = mock[PackageDependencyResolver]
     val clock = new WallClock(timeouts, loggerFactory)
 
     val nodePersistentState = timeouts.default.await("creating node persistent state")(
@@ -274,24 +270,32 @@ class ProtocolProcessorTest
 
     val contractStore = new InMemoryContractStore(timeouts, loggerFactory)
 
-    val persistentState =
-      new InMemorySyncPersistentState(
+    val logical = new InMemoryLogicalSyncPersistentState(
+      IndexedSynchronizer.tryCreate(psid.logical, 1),
+      enableAdditionalConsistencyChecks = true,
+      new InMemoryIndexedStringStore(minIndex = 1, maxIndex = 1), // only one synchronizer needed
+      contractStore,
+      nodePersistentState.acsCounterParticipantConfigStore,
+      Eval.now(nodePersistentState.ledgerApiStore),
+      loggerFactory,
+    )
+    val physical =
+      new InMemoryPhysicalSyncPersistentState(
         participant,
         clock,
         crypto.crypto,
-        IndexedSynchronizer.tryCreate(synchronizer, 1),
+        IndexedPhysicalSynchronizer.tryCreate(psid, 1),
         defaultStaticSynchronizerParameters,
-        enableAdditionalConsistencyChecks = true,
-        new InMemoryIndexedStringStore(minIndex = 1, maxIndex = 1), // only one synchronizer needed
-        contractStore,
-        nodePersistentState.acsCounterParticipantConfigStore,
-        exitOnFatalFailures = true,
-        packageDependencyResolver,
+        parameters = ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
+        mock[PackageMetadataView],
         Eval.now(nodePersistentState.ledgerApiStore),
+        logical,
         loggerFactory,
         timeouts,
         futureSupervisor,
       )
+
+    val persistentState = new SyncPersistentState(logical, physical, loggerFactory)
 
     val ephemeralState = new AtomicReference[SyncEphemeralState]()
 
@@ -303,8 +307,9 @@ class ProtocolProcessorTest
     val timeTracker = mock[SynchronizerTimeTracker]
     when(timeTracker.requestTick(any[CantonTimestamp], any[Boolean])(any[TraceContext]))
       .thenReturn(SynchronizerTimeTracker.DummyTickRequest)
-    val recordOrderPublisher = new RecordOrderPublisher(
-      synchronizerId = synchronizer,
+    val recordOrderPublisher = RecordOrderPublisher(
+      psid = psid,
+      synchronizerSuccessor = None,
       initSc = SequencerCounter.Genesis,
       initTimestamp = CantonTimestamp.MinValue,
       ledgerApiIndexer = ledgerApiIndexer,
@@ -316,7 +321,7 @@ class ProtocolProcessorTest
       clock = clock,
     )
     val unseqeuncedSubmissionMap = new UnsequencedSubmissionMap[SubmissionTrackingData](
-      synchronizer,
+      psid,
       1000,
       ParticipantTestMetrics.synchronizer.inFlightSubmissionSynchronizerTracker.unsequencedInFlight,
       loggerFactory,
@@ -324,7 +329,7 @@ class ProtocolProcessorTest
     val inFlightSubmissionSynchronizerTracker =
       overrideInFlightSubmissionSynchronizerTrackerO.getOrElse {
         new InFlightSubmissionSynchronizerTracker(
-          synchronizer,
+          psid,
           Eval.now(
             overrideInFlightSubmissionStoreO.getOrElse(nodePersistentState.inFlightSubmissionStore)
           ),
@@ -350,7 +355,9 @@ class ProtocolProcessorTest
         startingPoints,
         ParticipantTestMetrics.synchronizer,
         exitOnFatalFailures = true,
-        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+        // Disable the session encryption key cache: it starts a scheduler that must be closed properly,
+        // otherwise we see RejectedExecutionException warnings during shutdown.
+        SessionEncryptionKeyCacheConfig(enabled = false),
         timeouts,
         loggerFactory,
         FutureSupervisor.Noop,
@@ -377,8 +384,6 @@ class ProtocolProcessorTest
         ephemeralState.get(),
         crypto,
         sequencerClient,
-        synchronizerId = DefaultTestIdentities.synchronizerId,
-        testedProtocolVersion,
         loggerFactory,
         FutureSupervisor.Noop,
         FlagCloseable.withCloseContext(logger, timeouts),
@@ -408,14 +413,13 @@ class ProtocolProcessorTest
     viewHash = viewHash,
     sessionKeys = sessionKeyMapTest,
     encryptedView = encryptedView,
-    synchronizerId = DefaultTestIdentities.synchronizerId,
+    synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
     SymmetricKeyScheme.Aes128Gcm,
     testedProtocolVersion,
   )
   private lazy val rootHashMessage = RootHashMessage(
     rootHash,
-    DefaultTestIdentities.synchronizerId,
-    testedProtocolVersion,
+    DefaultTestIdentities.physicalSynchronizerId,
     TestViewType,
     testTopologyTimestamp,
     SerializedRootHashMessagePayload.empty,
@@ -437,7 +441,7 @@ class ProtocolProcessorTest
   private lazy val unsequencedSubmission = InFlightSubmission(
     changeIdHash = changeIdHash,
     submissionId = Some(subId),
-    submissionSynchronizerId = synchronizer,
+    submissionSynchronizerId = psid,
     messageUuid = UUID.randomUUID(),
     rootHashO = Some(rootHash),
     sequencingInfo = UnsequencedSubmission(
@@ -451,8 +455,7 @@ class ProtocolProcessorTest
           Some(subId),
         ),
         TransactionSubmissionTrackingData.TimeoutCause,
-        synchronizer,
-        testedProtocolVersion,
+        psid,
       ),
     ),
     TraceContext.empty,
@@ -532,7 +535,7 @@ class ProtocolProcessorTest
         TestingTopology(mediatorGroups = Set.empty),
         loggerFactory,
         parameters.parameters,
-      ).forOwnerAndSynchronizer(participant, synchronizer)
+      ).forOwnerAndSynchronizer(participant, psid)
       val (sut, persistent, ephemeral, _) = testProcessingSteps(crypto = crypto2)
       val topo2 = crypto2.currentSnapshotApproximation.ipsSnapshot
       val res = sut.submit(1, topo2).onShutdown(fail("submission shutdown")).value.futureValue
@@ -675,7 +678,7 @@ class ProtocolProcessorTest
         viewHash = viewHash1,
         sessionKeys = sessionKeyMapTest,
         encryptedView = encryptedViewWrongRH,
-        synchronizerId = DefaultTestIdentities.synchronizerId,
+        synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
         SymmetricKeyScheme.Aes128Gcm,
         testedProtocolVersion,
       )
@@ -710,7 +713,7 @@ class ProtocolProcessorTest
         viewHash = viewHash,
         sessionKeys = sessionKeyMapTest,
         encryptedView = EncryptedView(TestViewType)(Encrypted.fromByteString(ByteString.EMPTY)),
-        synchronizerId = DefaultTestIdentities.synchronizerId,
+        synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
         viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
         protocolVersion = testedProtocolVersion,
       )
@@ -783,7 +786,7 @@ class ProtocolProcessorTest
         topology.copy(mediatorGroups = Set.empty), // Topology without any mediator active
         loggerFactory,
         parameters.parameters,
-      ).forOwnerAndSynchronizer(participant, synchronizer)
+      ).forOwnerAndSynchronizer(participant, psid)
 
       val (sut, _persistent, _ephemeral, _) = testProcessingSteps(crypto = testCrypto)
       loggerFactory

@@ -4,11 +4,14 @@
 package com.digitalasset.canton.synchronizer.config
 
 import com.daml.jwt.JwtTimestampLeeway
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
-import io.netty.handler.ssl.SslContext
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
+
+import scala.concurrent.duration.Duration
 
 /** The public server configuration ServerConfig used by the synchronizer.
   *
@@ -31,6 +34,8 @@ import io.netty.handler.ssl.SslContext
   *     expiration intervals. If disabled, the token expiration interval will be constant.
   * @param overrideMaxRequestSize
   *   overrides the default maximum request size in bytes on the sequencer node
+  * @param stream
+  *   optional stream limit config
   */
 // TODO(i4056): Client authentication over TLS is currently unsupported,
 //  because there is a token based protocol to authenticate clients. This may change in the future.
@@ -45,6 +50,9 @@ final case class PublicServerConfig(
     maxTokenExpirationInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
     useExponentialRandomTokenExpiration: Boolean = false,
     overrideMaxRequestSize: Option[NonNegativeInt] = None,
+    override val maxTokenLifetime: NonNegativeDuration = config.NonNegativeDuration(Duration.Inf),
+    override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
+    stream: Option[StreamLimitConfig] = None,
 ) extends ServerConfig
     with UniformCantonConfigValidation {
 
@@ -52,7 +60,7 @@ final case class PublicServerConfig(
 
   override def jwtTimestampLeeway: Option[JwtTimestampLeeway] = None
 
-  override def adminToken: Option[String] = None
+  override def adminTokenConfig: AdminTokenConfig = AdminTokenConfig()
 
   lazy val clientConfig: SequencerApiClientConfig = SequencerApiClientConfig(
     address,

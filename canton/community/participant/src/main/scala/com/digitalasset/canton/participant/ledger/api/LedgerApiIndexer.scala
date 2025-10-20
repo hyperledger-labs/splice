@@ -31,7 +31,7 @@ import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.cache.OnlyForTestingTransactionInMemoryStore
 import com.digitalasset.canton.platform.{
   InMemoryState,
-  LedgerApiServer,
+  LedgerApiServerInternals,
   ResourceCloseable,
   ResourceOwnerFlagCloseableOps,
 }
@@ -116,7 +116,7 @@ object LedgerApiIndexer {
     initializationLogger.info(s"Creating Ledger API Indexer storage, num-indexer: $numIndexer")
     val res = (for {
       (inMemoryState, inMemoryStateUpdaterFlow) <-
-        LedgerApiServer
+        LedgerApiServerInternals
           .createInMemoryStateAndUpdater(
             ledgerApiIndexerConfig.ledgerParticipantId,
             commandProgressTracker,
@@ -145,8 +145,7 @@ object LedgerApiIndexer {
         DbSupport.DataSourceProperties(
           connectionPool = IndexerConfig
             .createConnectionPoolConfig(
-              ingestionParallelism =
-                ledgerApiIndexerConfig.indexerConfig.ingestionParallelism.unwrap,
+              indexerConfig = ledgerApiIndexerConfig.indexerConfig,
               connectionTimeout =
                 ledgerApiIndexerConfig.serverConfig.databaseConnectionTimeout.underlying,
             ),

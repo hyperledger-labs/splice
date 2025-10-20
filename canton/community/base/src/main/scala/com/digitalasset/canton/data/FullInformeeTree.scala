@@ -38,10 +38,10 @@ final case class FullInformeeTree private (tree: GenTransactionTree)(
 
   @transient override protected lazy val companionObj: FullInformeeTree.type = FullInformeeTree
 
-  lazy val transactionId: TransactionId = TransactionId.fromRootHash(tree.rootHash)
+  lazy val transactionId: UpdateId = UpdateId.fromRootHash(tree.rootHash)
 
   private lazy val commonMetadata: CommonMetadata = checked(tree.commonMetadata.tryUnwrap)
-  lazy val synchronizerId: SynchronizerId = commonMetadata.synchronizerId
+  lazy val synchronizerId: PhysicalSynchronizerId = commonMetadata.synchronizerId
   lazy val mediator: MediatorGroupRecipient = commonMetadata.mediator
 
   lazy val informeesAndThresholdByViewPosition: Map[ViewPosition, ViewConfirmationParameters] =
@@ -67,7 +67,7 @@ object FullInformeeTree extends VersioningCompanionContextPVValidation2[FullInfo
   override val name: String = "FullInformeeTree"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.FullInformeeTree)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.FullInformeeTree)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
     )

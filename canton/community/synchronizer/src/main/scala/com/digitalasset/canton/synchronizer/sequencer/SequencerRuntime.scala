@@ -5,23 +5,17 @@ package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
 import cats.syntax.parallel.*
-import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCryptoClient}
+import com.digitalasset.canton.data.SynchronizerSuccessor
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
-import com.digitalasset.canton.networking.grpc.ratelimiting.LimitResult.FullMethodName
-import com.digitalasset.canton.networking.grpc.ratelimiting.{
-  RateLimitingInterceptor,
-  StreamCounterCheck,
-}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencer.admin.v30.{
@@ -35,11 +29,9 @@ import com.digitalasset.canton.sequencing.handlers.{
   EnvelopeOpener,
   StripSignature,
 }
-import com.digitalasset.canton.sequencing.protocol.SequencerErrors.Overloaded
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
-import com.digitalasset.canton.store.{IndexedSynchronizer, SequencerCounterTrackerStore}
+import com.digitalasset.canton.store.{IndexedPhysicalSynchronizer, SequencerCounterTrackerStore}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.SequencerRuntime.SequencerStreamCounterCheck
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
   SequencerAdminStatus,
   SequencerHealthStatus,
@@ -61,16 +53,19 @@ import com.digitalasset.canton.topology.processing.{
 import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.topology.transaction.{
   MediatorSynchronizerState,
   SequencerSynchronizerState,
   SynchronizerTrustCertificate,
+  SynchronizerUpgradeAnnouncement,
+  TopologyChangeOp,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
 import com.digitalasset.canton.{SequencerCounter, config}
 import com.google.common.annotations.VisibleForTesting
-import io.grpc.{ServerInterceptor, ServerInterceptors, ServerServiceDefinition}
+import io.grpc.{ServerInterceptors, ServerServiceDefinition}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -102,12 +97,12 @@ object SequencerAuthenticationConfig {
 class SequencerRuntime(
     sequencerId: SequencerId,
     val sequencer: Sequencer,
-    client: SequencerClient,
+    @VisibleForTesting val client: SequencerClient,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     localNodeParameters: SequencerNodeParameters,
-    timeTracker: SynchronizerTimeTracker,
+    val timeTracker: SynchronizerTimeTracker,
     val metrics: SequencerMetrics,
-    indexedSynchronizer: IndexedSynchronizer,
+    physicalIndexedSynchronizer: IndexedPhysicalSynchronizer,
     val syncCrypto: SynchronizerCryptoClient,
     val syncCryptoForAuthentication: SynchronizerCryptoClient,
     synchronizerTopologyManager: SynchronizerTopologyManager,
@@ -134,7 +129,7 @@ class SequencerRuntime(
 
   override protected def timeouts: ProcessingTimeout = localNodeParameters.processingTimeouts
 
-  def synchronizerId: SynchronizerId = indexedSynchronizer.synchronizerId
+  def psid: PhysicalSynchronizerId = physicalIndexedSynchronizer.synchronizerId
 
   def initialize()(implicit
       traceContext: TraceContext
@@ -247,26 +242,9 @@ class SequencerRuntime(
     )
   }
 
-  val streamCounterCheck: Option[StreamCounterCheck] =
-    if (localNodeParameters.sequencerApiLimits.nonEmpty) {
-      Some(
-        new SequencerStreamCounterCheck(
-          localNodeParameters.sequencerApiLimits,
-          localNodeParameters.warnOnUndefinedLimits,
-          loggerFactory,
-        )
-      )
-    } else None
-
-  private val rateLimitInterceptors: List[ServerInterceptor] = streamCounterCheck match {
-    case Some(check) => List(new RateLimitingInterceptor(List(check.check)), check)
-    case None => List.empty
-  }
-
   def sequencerServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = {
     def interceptAuthentication(
-        svcDef: ServerServiceDefinition,
-        additionalInterceptors: Seq[ServerInterceptor],
+        svcDef: ServerServiceDefinition
     ) = {
       import scala.jdk.CollectionConverters.*
 
@@ -274,7 +252,7 @@ class SequencerRuntime(
       val interceptors =
         (List(
           authenticationServices.authenticationServerInterceptor
-        ) ++ additionalInterceptors).asJava
+        )).asJava
 
       ServerInterceptors.intercept(svcDef, interceptors)
     }
@@ -283,7 +261,7 @@ class SequencerRuntime(
       ServerInterceptors.intercept(
         v30.SequencerConnectServiceGrpc.bindService(
           new GrpcSequencerConnectService(
-            synchronizerId,
+            psid,
             sequencerId,
             staticSynchronizerParameters,
             synchronizerTopologyManager,
@@ -299,8 +277,7 @@ class SequencerRuntime(
       v30.SequencerAuthenticationServiceGrpc
         .bindService(authenticationServices.sequencerAuthenticationService, ec),
       interceptAuthentication(
-        v30.SequencerServiceGrpc.bindService(sequencerService, ec),
-        rateLimitInterceptors,
+        v30.SequencerServiceGrpc.bindService(sequencerService, ec)
       ),
       ApiInfoServiceGrpc.bindService(
         new GrpcApiInfoService(
@@ -311,8 +288,7 @@ class SequencerRuntime(
     ) :++ sequencerChannelServiceO
       .map(svc =>
         interceptAuthentication(
-          v30.SequencerChannelServiceGrpc.bindService(svc, ec),
-          rateLimitInterceptors,
+          v30.SequencerChannelServiceGrpc.bindService(svc, ec)
         )
       )
       .toList
@@ -322,7 +298,7 @@ class SequencerRuntime(
   protected[canton] val topologyManagerSequencerCounterTrackerStore: SequencerCounterTrackerStore =
     SequencerCounterTrackerStore(
       storage,
-      indexedSynchronizer,
+      physicalIndexedSynchronizer,
       timeouts,
       loggerFactory,
     )
@@ -356,15 +332,42 @@ class SequencerRuntime(
     }
   })
 
+  logger.info("Subscribing to topology transactions for logical synchronizer upgrade announcements")
+  topologyProcessor.subscribe(new TopologyTransactionProcessingSubscriber {
+
+    override def observed(
+        sequencedTimestamp: SequencedTime,
+        effectiveTimestamp: EffectiveTime,
+        sequencerCounter: SequencerCounter,
+        transactions: Seq[GenericSignedTopologyTransaction],
+    )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+      val removeO = transactions
+        .find(tx =>
+          tx.operation == TopologyChangeOp.Remove && tx.mapping.code == Code.SynchronizerUpgradeAnnouncement
+        )
+        .map(_ => Option.empty[SynchronizerSuccessor])
+      val replaceO = transactions.collectFirst {
+        case tx
+            if tx.operation == TopologyChangeOp.Replace && tx.mapping.code == Code.SynchronizerUpgradeAnnouncement =>
+          tx.mapping.select[SynchronizerUpgradeAnnouncement].map(_.successor)
+      }
+      // Some(Some(successor)) - replacement, otherwise Some(None) - removal, otherwise None - noop
+      // Replace op takes precedence over Remove op
+      replaceO
+        .orElse(removeO)
+        .foreach(sequencer.updateSynchronizerSuccessor(_, effectiveTimestamp))
+      FutureUnlessShutdown.unit
+    }
+  })
+
   logger.info("Subscribing to topology transactions for time-advancing broadcast")
   topologyProcessor.subscribe(
     new TimeAdvancingTopologySubscriber(
       clock,
       client,
       topologyClient,
-      synchronizerId,
+      psid,
       sequencerId,
-      staticSynchronizerParameters.protocolVersion,
       loggerFactory,
     )
   )
@@ -373,7 +376,6 @@ class SequencerRuntime(
     maybeSynchronizerOutboxFactory
       .map(
         _.createOnlyOnce(
-          staticSynchronizerParameters.protocolVersion,
           topologyClient,
           client,
           timeTracker,
@@ -382,11 +384,11 @@ class SequencerRuntime(
         )
       )
 
-  private val topologyHandler = topologyProcessor.createHandler(synchronizerId)
+  private val topologyHandler = topologyProcessor.createHandler(psid)
   private val trafficProcessor =
     new TrafficControlProcessor(
       syncCrypto,
-      synchronizerId,
+      psid,
       sequencer.rateLimitManager.flatMap(_.balanceKnownUntil),
       loggerFactory,
     )
@@ -427,9 +429,16 @@ class SequencerRuntime(
       _ <- synchronizerOutboxO
         .map(_.startup())
         .getOrElse(EitherT.rightT[FutureUnlessShutdown, String](()))
+      // Note: we use head snapshot as we want the latest announced upgrade anyway, an overlapping update is idempotent
+      synchronizerUpgradeO <- EitherT.right(
+        topologyClient.headSnapshot.synchronizerUpgradeOngoing()
+      )
     } yield {
+      synchronizerUpgradeO.foreach { case (successor, effectiveTime) =>
+        sequencer.updateSynchronizerSuccessor(Some(successor), effectiveTime)
+      }
       logger.info("Sequencer runtime initialized")
-      runtimeReadyPromise.outcome(())
+      runtimeReadyPromise.outcome_(())
     }
 
   override def onClosed(): Unit =
@@ -446,22 +455,4 @@ class SequencerRuntime(
       authenticationServices.memberAuthenticationService,
       sequencer,
     )(logger)
-}
-
-object SequencerRuntime {
-  private class SequencerStreamCounterCheck(
-      initialLimits: Map[String, NonNegativeInt],
-      warnOnUndefinedLimits: Boolean,
-      loggerFactory: NamedLoggerFactory,
-  ) extends StreamCounterCheck(initialLimits, warnOnUndefinedLimits, loggerFactory) {
-    override protected def errorFactory(methodName: FullMethodName, limit: NonNegativeInt)(implicit
-        traceContext: TraceContext
-    ): RpcError = {
-      val err = Overloaded(
-        s"Reached the limit of concurrent streams for $methodName. Please try again later"
-      )
-      err.log()
-      err.toCantonRpcError
-    }
-  }
 }

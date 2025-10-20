@@ -80,12 +80,11 @@ sealed trait AcsImportNoSynchronizerConnectionIntegrationTest
         .offset
     )
 
-    participant1.parties
-      .export_acs(
-        parties = Set(alice),
-        exportFilePath = acsFilename.canonicalPath,
-        ledgerOffset = aliceAcsOffset,
-      )
+    participant1.repair.export_acs(
+      parties = Set(alice),
+      exportFilePath = acsFilename.canonicalPath,
+      ledgerOffset = aliceAcsOffset,
+    )
   }
 
   "register synchronizer" should {
@@ -93,32 +92,32 @@ sealed trait AcsImportNoSynchronizerConnectionIntegrationTest
       import env.*
 
       participant2.synchronizers.register(sequencer1, daName, manualConnect = false)
-      participant2.synchronizers.list_registered().map { case (config, _) =>
+      participant2.synchronizers.list_registered().map { case (config, _, _) =>
         config.synchronizerAlias
-      } shouldBe Seq(
-        daName
-      )
+      } shouldBe Seq(daName)
       participant2.synchronizers.list_connected() shouldBe empty
 
       participant3.synchronizers.register(sequencer1, daName, manualConnect = true)
-      participant3.synchronizers.list_registered().map { case (config, _) =>
+      participant3.synchronizers.list_registered().map { case (config, _, _) =>
         config.synchronizerAlias
-      } shouldBe Seq(
-        daName
-      )
+      } shouldBe Seq(daName)
+
       participant3.synchronizers.list_connected() shouldBe empty
     }
 
     "allow importing the ACS" in { implicit env =>
       import env.*
 
-      participant2.dars.upload(CantonExamplesPath)
-      participant3.dars.upload(CantonExamplesPath)
+      participant2.dars.upload(CantonExamplesPath, vetAllPackages = false)
+      val examplesMainPackageId =
+        participant3.dars.upload(CantonExamplesPath, vetAllPackages = false)
 
       participant2.repair.import_acs(acsFilename.canonicalPath)
       participant3.repair.import_acs(acsFilename.canonicalPath)
 
       participants.all.synchronizers.reconnect_all()
+      participant2.dars.vetting.enable(examplesMainPackageId)
+      participant3.dars.vetting.enable(examplesMainPackageId)
 
       Seq(participant1, participant2).foreach(
         _.topology.party_to_participant_mappings.propose_delta(

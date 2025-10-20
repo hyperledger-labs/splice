@@ -54,7 +54,10 @@ object PartyManagementClient {
   }
 }
 
-final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
+final class PartyManagementClient(
+    service: PartyManagementServiceStub,
+    getDefaultToken: () => Option[String] = () => None,
+)(implicit
     ec: ExecutionContext
 ) {
 
@@ -62,7 +65,7 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
       token: Option[String] = None
   )(implicit traceContext: TraceContext): Future[ParticipantId] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .getParticipantId(PartyManagementClient.getParticipantIdRequest)
       .map(r => ParticipantId(Ref.ParticipantId.assertFromString(r.participantId)))
 
@@ -72,7 +75,7 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
       pageSize: Int = 1000,
   )(implicit traceContext: TraceContext): Future[(List[PartyDetails], String)] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .listKnownParties(PartyManagementClient.listKnownPartiesRequest(pageToken, pageSize))
       .map(resp =>
         (resp.partyDetails.view.map(PartyManagementClient.details).toList, resp.nextPageToken)
@@ -83,21 +86,24 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[List[PartyDetails]] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .getParties(PartyManagementClient.getPartiesRequest(parties))
       .map(_.partyDetails.view.map(PartyManagementClient.details).toList)
 
   def allocateParty(
       hint: Option[String],
+      synchronizerId: Option[String] = None,
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[PartyDetails] =
     LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
       .allocateParty(
         AllocatePartyRequest(
           partyIdHint = hint.getOrElse(""),
           localMetadata = None,
           identityProviderId = "",
+          synchronizerId = synchronizerId.getOrElse(""),
+          userId = "",
         )
       )
       .map(_.partyDetails.getOrElse(sys.error("No PartyDetails in response.")))
@@ -105,6 +111,8 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
 
   /** Utility method for json services
     */
-  def serviceStub(token: Option[String] = None)(implicit traceContext: TraceContext) =
-    LedgerClient.stubWithTracing(service, token)
+  def serviceStub(token: Option[String] = None)(implicit
+      traceContext: TraceContext
+  ): PartyManagementServiceStub =
+    LedgerClient.stubWithTracing(service, token.orElse(getDefaultToken()))
 }

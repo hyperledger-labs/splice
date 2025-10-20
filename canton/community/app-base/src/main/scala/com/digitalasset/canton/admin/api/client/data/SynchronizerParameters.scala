@@ -13,12 +13,8 @@ import com.digitalasset.canton.admin.api.client.data.crypto.{
   RequiredSigningSpecs,
   SymmetricKeyScheme,
 }
+import com.digitalasset.canton.config.CryptoConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.{
-  CryptoConfig,
-  NonNegativeFiniteDuration,
-  PositiveDurationSeconds,
-}
 import com.digitalasset.canton.crypto.SignatureFormat
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters.InvalidDynamicSynchronizerParameters
@@ -37,11 +33,12 @@ import com.digitalasset.canton.time.{
   Clock,
   NonNegativeFiniteDuration as InternalNonNegativeFiniteDuration,
   PositiveSeconds,
+  RemoteClock,
+  SimClock,
 }
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.version.{ProtoVersion, ProtocolVersion}
 import com.digitalasset.canton.{ProtoDeserializationError, config, crypto as SynchronizerCrypto}
-import com.google.common.annotations.VisibleForTesting
 import io.scalaland.chimney.dsl.*
 
 import scala.Ordering.Implicits.*
@@ -54,15 +51,29 @@ final case class StaticSynchronizerParameters(
     requiredHashAlgorithms: NonEmpty[Set[HashAlgorithm]],
     requiredCryptoKeyFormats: NonEmpty[Set[CryptoKeyFormat]],
     requiredSignatureFormats: NonEmpty[Set[SignatureFormat]],
+    topologyChangeDelay: config.NonNegativeFiniteDuration,
+    enableTransparencyChecks: Boolean,
     protocolVersion: ProtocolVersion,
-) {
+    serial: NonNegativeInt,
+) extends PrettyPrinting {
   def writeToFile(outputFile: String): Unit =
     BinaryFileUtil.writeByteStringToFile(outputFile, toInternal.toByteString)
 
-  private[canton] def toInternal: StaticSynchronizerParametersInternal =
+  def toInternal: StaticSynchronizerParametersInternal =
     this.transformInto[StaticSynchronizerParametersInternal]: @nowarn(
       "msg=Der in object CryptoKeyFormat is deprecated"
     )
+
+  override protected def pretty: Pretty[StaticSynchronizerParameters] = prettyOfClass(
+    param("required signing specs", _.requiredSigningSpecs),
+    param("required encryption specs", _.requiredEncryptionSpecs),
+    param("required symmetric key schemes", _.requiredSymmetricKeySchemes),
+    param("required hash algorithms", _.requiredHashAlgorithms),
+    param("required crypto key formats", _.requiredCryptoKeyFormats),
+    param("topology change delay", _.topologyChangeDelay),
+    param("protocol version", _.protocolVersion),
+    param("serial", _.serial),
+  )
 }
 
 object StaticSynchronizerParameters {
@@ -72,9 +83,10 @@ object StaticSynchronizerParameters {
       config: SynchronizerParametersConfig,
       cryptoConfig: CryptoConfig,
       protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
   ): StaticSynchronizerParameters = {
     val internal = config
-      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion)
+      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion, serial)
       .valueOr(err =>
         throw new IllegalArgumentException(
           s"Cannot instantiate static synchronizer parameters: $err"
@@ -84,23 +96,43 @@ object StaticSynchronizerParameters {
     StaticSynchronizerParameters(internal)
   }
 
-  def defaultsWithoutKMS(protocolVersion: ProtocolVersion): StaticSynchronizerParameters =
-    defaults(CryptoConfig(), protocolVersion)
+  def defaultsWithoutKMS(
+      protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
+      topologyChangeDelay: config.NonNegativeFiniteDuration =
+        StaticSynchronizerParametersInternal.defaultTopologyChangeDelay.toConfig,
+  ): StaticSynchronizerParameters =
+    defaults(CryptoConfig(), protocolVersion, serial, topologyChangeDelay)
 
   // This method is unsafe. Not prefixing by `try` to have nicer docs snippets.
   def defaults(
       cryptoConfig: CryptoConfig,
       protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
+      topologyChangeDelay: config.NonNegativeFiniteDuration =
+        StaticSynchronizerParametersInternal.defaultTopologyChangeDelay.toConfig,
   ): StaticSynchronizerParameters = {
-    val internal = SynchronizerParametersConfig()
-      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion)
+    val internal = SynchronizerParametersConfig(topologyChangeDelay = Some(topologyChangeDelay))
+      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion, serial)
       .valueOr(err =>
         throw new IllegalArgumentException(
           s"Cannot instantiate static synchronizer parameters: $err"
         )
       )
-
     StaticSynchronizerParameters(internal)
+  }
+
+  private[canton] def initialValues(
+      clock: Clock,
+      protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt = NonNegativeInt.zero,
+  ): StaticSynchronizerParameters = {
+    val topologyChangeDelay = clock match {
+      case _: SimClock | _: RemoteClock =>
+        StaticSynchronizerParametersInternal.defaultTopologyChangeDelayNonStandardClock
+      case _ => StaticSynchronizerParametersInternal.defaultTopologyChangeDelay
+    }
+    defaultsWithoutKMS(protocolVersion, serial, topologyChangeDelay.toConfig)
   }
 
   def apply(
@@ -140,6 +172,9 @@ object StaticSynchronizerParameters {
       requiredCryptoKeyFormatsP,
       requiredSignatureFormatsP,
       protocolVersionP,
+      serialP,
+      enableTransparencyChecks,
+      topologyChangeDelayP,
     ) = synchronizerParametersP
 
     for {
@@ -193,8 +228,14 @@ object StaticSynchronizerParameters {
         requiredSignatureFormatsP,
         SynchronizerCrypto.SignatureFormat.fromProtoEnum,
       )
+      topologyChangeDelay <- ProtoConverter.parseRequired(
+        config.NonNegativeFiniteDuration.fromProtoPrimitive("topology_change_delay")(_),
+        "topology_change_delay",
+        topologyChangeDelayP,
+      )
       // Data in the console is not really validated, so we allow for deleted
       protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP, allowDeleted = true)
+      serial <- ProtoConverter.parseNonNegativeInt("serial", serialP)
     } yield StaticSynchronizerParameters(
       StaticSynchronizerParametersInternal(
         SynchronizerCrypto
@@ -205,7 +246,10 @@ object StaticSynchronizerParameters {
         requiredHashAlgorithms,
         requiredCryptoKeyFormats,
         requiredSignatureFormats,
+        topologyChangeDelay.toInternal,
+        enableTransparencyChecks,
         protocolVersion,
+        serial,
       )
     )
   }
@@ -213,20 +257,19 @@ object StaticSynchronizerParameters {
 
 // TODO(#15650) Properly expose new BFT parameters and synchronizer limits
 final case class DynamicSynchronizerParameters(
-    confirmationResponseTimeout: NonNegativeFiniteDuration,
-    mediatorReactionTimeout: NonNegativeFiniteDuration,
-    assignmentExclusivityTimeout: NonNegativeFiniteDuration,
-    topologyChangeDelay: NonNegativeFiniteDuration,
-    ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration,
-    mediatorDeduplicationTimeout: NonNegativeFiniteDuration,
-    reconciliationInterval: PositiveDurationSeconds,
+    confirmationResponseTimeout: config.NonNegativeFiniteDuration,
+    mediatorReactionTimeout: config.NonNegativeFiniteDuration,
+    assignmentExclusivityTimeout: config.NonNegativeFiniteDuration,
+    ledgerTimeRecordTimeTolerance: config.NonNegativeFiniteDuration,
+    mediatorDeduplicationTimeout: config.NonNegativeFiniteDuration,
+    reconciliationInterval: config.PositiveDurationSeconds,
     maxRequestSize: NonNegativeInt,
-    sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
+    sequencerAggregateSubmissionTimeout: config.NonNegativeFiniteDuration,
     trafficControl: Option[TrafficControlParameters],
     onboardingRestriction: OnboardingRestriction,
     acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpParameters],
     participantSynchronizerLimits: ParticipantSynchronizerLimits,
-    preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration,
+    preparationTimeRecordTimeTolerance: config.NonNegativeFiniteDuration,
 ) extends PrettyPrinting {
 
   def decisionTimeout: config.NonNegativeFiniteDuration =
@@ -245,7 +288,7 @@ final case class DynamicSynchronizerParameters(
   // Originally the validation was done on ledgerTimeRecordTimeTolerance, but was moved to preparationTimeRecordTimeTolerance
   // instead when the parameter was introduced
   def compatibleWithNewPreparationTimeRecordTimeTolerance(
-      newPreparationTimeRecordTimeTolerance: NonNegativeFiniteDuration
+      newPreparationTimeRecordTimeTolerance: config.NonNegativeFiniteDuration
   ): Boolean =
     // If false, a new request may receive the same submission time as a previous request and the previous
     // request may be evicted too early from the mediator's deduplication store.
@@ -258,7 +301,6 @@ final case class DynamicSynchronizerParameters(
       param("confirmation response timeout", _.confirmationResponseTimeout),
       param("mediator reaction timeout", _.mediatorReactionTimeout),
       param("assignment exclusivity timeout", _.assignmentExclusivityTimeout),
-      param("topology change delay", _.topologyChangeDelay),
       param("ledger time record time tolerance", _.ledgerTimeRecordTimeTolerance),
       param("mediator deduplication timeout", _.mediatorDeduplicationTimeout),
       param("reconciliation interval", _.reconciliationInterval),
@@ -273,28 +315,27 @@ final case class DynamicSynchronizerParameters(
     )
 
   def update(
-      confirmationResponseTimeout: NonNegativeFiniteDuration = confirmationResponseTimeout,
-      mediatorReactionTimeout: NonNegativeFiniteDuration = mediatorReactionTimeout,
-      assignmentExclusivityTimeout: NonNegativeFiniteDuration = assignmentExclusivityTimeout,
-      topologyChangeDelay: NonNegativeFiniteDuration = topologyChangeDelay,
-      ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration = ledgerTimeRecordTimeTolerance,
-      mediatorDeduplicationTimeout: NonNegativeFiniteDuration = mediatorDeduplicationTimeout,
-      reconciliationInterval: PositiveDurationSeconds = reconciliationInterval,
+      confirmationResponseTimeout: config.NonNegativeFiniteDuration = confirmationResponseTimeout,
+      mediatorReactionTimeout: config.NonNegativeFiniteDuration = mediatorReactionTimeout,
+      assignmentExclusivityTimeout: config.NonNegativeFiniteDuration = assignmentExclusivityTimeout,
+      ledgerTimeRecordTimeTolerance: config.NonNegativeFiniteDuration =
+        ledgerTimeRecordTimeTolerance,
+      mediatorDeduplicationTimeout: config.NonNegativeFiniteDuration = mediatorDeduplicationTimeout,
+      reconciliationInterval: config.PositiveDurationSeconds = reconciliationInterval,
       confirmationRequestsMaxRate: NonNegativeInt = confirmationRequestsMaxRate,
       maxRequestSize: NonNegativeInt = maxRequestSize,
-      sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration =
+      sequencerAggregateSubmissionTimeout: config.NonNegativeFiniteDuration =
         sequencerAggregateSubmissionTimeout,
       trafficControl: Option[TrafficControlParameters] = trafficControl,
       onboardingRestriction: OnboardingRestriction = onboardingRestriction,
       acsCommitmentsCatchUpParameters: Option[AcsCommitmentsCatchUpParameters] =
         acsCommitmentsCatchUp,
-      preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration =
+      preparationTimeRecordTimeTolerance: config.NonNegativeFiniteDuration =
         preparationTimeRecordTimeTolerance,
   ): DynamicSynchronizerParameters = this.copy(
     confirmationResponseTimeout = confirmationResponseTimeout,
     mediatorReactionTimeout = mediatorReactionTimeout,
     assignmentExclusivityTimeout = assignmentExclusivityTimeout,
-    topologyChangeDelay = topologyChangeDelay,
     ledgerTimeRecordTimeTolerance = ledgerTimeRecordTimeTolerance,
     mediatorDeduplicationTimeout = mediatorDeduplicationTimeout,
     reconciliationInterval = reconciliationInterval,
@@ -319,7 +360,6 @@ final case class DynamicSynchronizerParameters(
             InternalNonNegativeFiniteDuration.fromConfig(mediatorReactionTimeout),
           assignmentExclusivityTimeout =
             InternalNonNegativeFiniteDuration.fromConfig(assignmentExclusivityTimeout),
-          topologyChangeDelay = InternalNonNegativeFiniteDuration.fromConfig(topologyChangeDelay),
           ledgerTimeRecordTimeTolerance =
             InternalNonNegativeFiniteDuration.fromConfig(ledgerTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =
@@ -342,16 +382,9 @@ final case class DynamicSynchronizerParameters(
 
 object DynamicSynchronizerParameters {
 
-  /** Default dynamic synchronizer parameters for non-static clocks */
-  @VisibleForTesting
-  def defaultValues(protocolVersion: ProtocolVersion): DynamicSynchronizerParameters =
+  private[canton] def initialValues(protocolVersion: ProtocolVersion) =
     DynamicSynchronizerParameters(
-      DynamicSynchronizerParametersInternal.defaultValues(protocolVersion)
-    )
-
-  private[canton] def initialValues(clock: Clock, protocolVersion: ProtocolVersion) =
-    DynamicSynchronizerParameters(
-      DynamicSynchronizerParametersInternal.initialValues(clock, protocolVersion)
+      DynamicSynchronizerParametersInternal.initialValues(protocolVersion)
     )
 
   def apply(

@@ -4,12 +4,11 @@
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.syntax.either.*
-import com.digitalasset.canton.data.{CantonTimestamp, FullUnassignmentTree, Offset}
+import com.digitalasset.canton.data.UnassignmentData.ReassignmentGlobalOffset
+import com.digitalasset.canton.data.{Offset, UnassignmentData}
 import com.digitalasset.canton.participant.protocol.reassignment.IncompleteReassignmentData.ReassignmentEventGlobalOffset
-import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentData.ReassignmentGlobalOffset
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
-import com.digitalasset.canton.util.ReassignmentTag.Source
+import com.digitalasset.canton.topology.ParticipantId
 
 /** Stores the data for a reassignment that is incomplete, i.e., for which only the assignment or
   * the unassignment was emitted to the indexer.
@@ -36,9 +35,9 @@ object IncompleteReassignmentData {
 
   final case class InternalIncompleteReassignmentData(
       reassignmentId: ReassignmentId,
-      unassignmentRequest: Option[FullUnassignmentTree],
+      unassignmentData: Option[UnassignmentData],
       reassignmentGlobalOffset: Option[ReassignmentGlobalOffset],
-      contract: SerializableContract,
+      contracts: Seq[ContractInstance],
   ) {
     def toIncompleteReassignmentData(
         queryOffset: Offset
@@ -52,7 +51,7 @@ object IncompleteReassignmentData {
         .map(
           IncompleteReassignmentData(
             reassignmentId,
-            unassignmentRequest.map(_.reassigningParticipants),
+            unassignmentData.map(_.reassigningParticipants),
             _,
             queryOffset,
           )
@@ -60,9 +59,8 @@ object IncompleteReassignmentData {
   }
 
   private def create(
-      sourceSynchronizer: Source[SynchronizerId],
-      unassignmentTs: CantonTimestamp,
-      unassignmentRequest: Option[FullUnassignmentTree],
+      reassignmentId: ReassignmentId,
+      unassignmentData: Option[UnassignmentData],
       reassignmentGlobalOffset: Option[ReassignmentGlobalOffset],
       queryOffset: Offset,
   ): Either[String, IncompleteReassignmentData] = {
@@ -75,8 +73,8 @@ object IncompleteReassignmentData {
 
     reassignmentEventGlobalOffsetE.map { reassignmentEventGlobalOffset =>
       IncompleteReassignmentData(
-        ReassignmentId(sourceSynchronizer, unassignmentTs),
-        unassignmentRequest.map(_.reassigningParticipants),
+        reassignmentId,
+        unassignmentData.map(_.reassigningParticipants),
         reassignmentEventGlobalOffset,
         queryOffset,
       )
@@ -84,16 +82,14 @@ object IncompleteReassignmentData {
   }
 
   def tryCreate(
-      sourceSynchronizer: Source[SynchronizerId],
-      unassignmentTs: CantonTimestamp,
-      unassignmentRequest: Option[FullUnassignmentTree],
+      reassignmentId: ReassignmentId,
+      unassignmentData: Option[UnassignmentData],
       reassignmentGlobalOffset: Option[ReassignmentGlobalOffset],
       queryOffset: Offset,
   ): IncompleteReassignmentData =
     create(
-      sourceSynchronizer,
-      unassignmentTs,
-      unassignmentRequest,
+      reassignmentId,
+      unassignmentData,
       reassignmentGlobalOffset,
       queryOffset,
     )

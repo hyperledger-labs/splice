@@ -12,7 +12,7 @@ def main() {
 
   def staticParameters(sequencer: LocalInstanceReference) =
     synchronizerParametersConfig
-      .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v33)
+      .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v34, NonNegativeInt.zero)
       .map(StaticSynchronizerParameters(_))
       .getOrElse(sys.error("whatever"))
 

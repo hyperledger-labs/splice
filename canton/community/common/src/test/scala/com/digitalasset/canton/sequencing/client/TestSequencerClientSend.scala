@@ -14,6 +14,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   MessageId,
   SequencingSubmissionCost,
 }
+import com.digitalasset.canton.topology.{DefaultTestIdentities, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 
@@ -29,6 +30,8 @@ class TestSequencerClientSend(implicit val executionContext: ExecutionContext)
     new java.util.concurrent.LinkedBlockingQueue()
 
   def requests: Iterable[Request] = requestsQueue.asScala
+
+  override def psid: PhysicalSynchronizerId = DefaultTestIdentities.physicalSynchronizerId
 
   override def sendAsync(
       batch: Batch[DefaultOpenEnvelope],

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.topology.store.db
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.SynchronizerCryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.topology.PartyId
@@ -32,7 +31,7 @@ trait DbTopologyStoreTest extends TopologyStoreTest with DbTopologyStoreHelper {
     behave like topologyStore(mkStore)
 
     "properly handle insertion order for large topology snapshots" in {
-      val store = mkStore(testData.synchronizer1_p1p2_synchronizerId)
+      val store = mkStore(testData.synchronizer1_p1p2_physicalSynchronizerId)
 
       val synchronizerSetup = Seq(
         0 -> testData.nsd_p1,
@@ -68,13 +67,9 @@ trait DbTopologyStoreTest extends TopologyStoreTest with DbTopologyStoreHelper {
 
       for {
         _ <- new InitialTopologySnapshotValidator(
-          new SynchronizerCryptoPureApi(
-            defaultStaticSynchronizerParameters,
-            testData.factory.cryptoApi.crypto.pureCrypto,
-          ),
+          testData.factory.syncCryptoClient.crypto.pureCrypto,
           store,
           validateInitialSnapshot = true,
-          timeouts,
           loggerFactory,
         ).validateAndApplyInitialTopologySnapshot(topologySnapshot)
           .valueOrFail("topology bootstrap")

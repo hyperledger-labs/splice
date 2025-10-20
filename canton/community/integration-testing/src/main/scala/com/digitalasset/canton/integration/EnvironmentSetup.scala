@@ -20,11 +20,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
-import com.digitalasset.canton.integration.plugins.{
-  UseH2,
-  UsePostgres,
-  UseReferenceBlockSequencerBase,
-}
+import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
@@ -110,153 +106,154 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
       runPlugins: EnvironmentSetupPlugin[C, E] => Boolean = _ => true,
       testConfigTransform: TestingConfigInternal => TestingConfigInternal = identity,
       testName: Option[String],
-  ): TestConsoleEnvironment[C, E] = TraceContext.withNewTraceContext { tc =>
-    logger.debug(
-      s"Starting creating environment for $suiteName${testName.fold("")(n => s", test '$n'")}:"
-    )(tc)
-    import org.scalactic.source
-    def step[T](name: String)(expr: => T)(implicit pos: source.Position): T = {
-      logger.debug(s"Starting creating environment: $name")(tc)
-      Try(expr) match {
-        case scala.util.Success(value) =>
-          logger.debug(s"Finished creating environment: $name")(tc)
-          value
-        case scala.util.Failure(exception) =>
-          val loc = s"(${pos.fileName}:${pos.lineNumber})"
-          logger.error(s"Failed creating environment: $name $loc", exception)(tc)
-          throw EnvironmentSetupException(
-            s"Creating environment failed at step $name $loc",
-            exception,
-          )
+  ): TestConsoleEnvironment[C, E] = TraceContext.withNewTraceContext("manualCreateEnvironment") {
+    tc =>
+      logger.debug(
+        s"Starting creating environment for $suiteName${testName.fold("")(n => s", test '$n'")}:"
+      )(tc)
+      import org.scalactic.source
+      def step[T](name: String)(expr: => T)(implicit pos: source.Position): T = {
+        logger.debug(s"Starting creating environment: $name")(tc)
+        Try(expr) match {
+          case scala.util.Success(value) =>
+            logger.debug(s"Finished creating environment: $name")(tc)
+            value
+          case scala.util.Failure(exception) =>
+            val loc = s"(${pos.fileName}:${pos.lineNumber})"
+            logger.error(s"Failed creating environment: $name $loc", exception)(tc)
+            throw EnvironmentSetupException(
+              s"Creating environment failed at step $name $loc",
+              exception,
+            )
+        }
       }
-    }
-    val metrics = testInfrastructureEnvironmentMetrics(testName)
-    val testConfig = initialConfig
-    // note: beforeEnvironmentCreate may well have side-effects (e.g. starting databases or docker containers)
-    val pluginConfig = step("Running plugins before") {
-      Timed.value(
-        metrics.environmentCreatePluginsBefore,
-        plugins.foldLeft(testConfig)((config, plugin) =>
-          if (runPlugins(plugin))
-            plugin.beforeEnvironmentCreated(config)
-          else
-            config
-        ),
-      )
-    }
-
-    // Once all the plugins and config transformation is done apply the defaults
-    val finalConfig =
-      configTransform(pluginConfig).withDefaults(new DefaultPorts(), edition)
-
-    val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
-    val environmentFixture: E =
-      step("Creating fixture") {
+      val metrics = testInfrastructureEnvironmentMetrics(testName)
+      val testConfig = initialConfig
+      // note: beforeEnvironmentCreate may well have side-effects (e.g. starting databases or docker containers)
+      val pluginConfig = step("Running plugins before") {
         Timed.value(
-          metrics.environmentCreateFixture,
-          envDef.environmentFactory.create(
-            finalConfig,
-            loggerFactory,
-            testConfigTransform(
-              envDef.testingConfig.copy(
-                metricsFactoryType =
-                  /* If metrics reporters were configured for the test then it's an externally observed test
-                   * therefore actual metrics have to be reported.
-                   * The in memory metrics are used when no reporters are configured and the metrics are
-                   * observed directly in the test scenarios.
-                   *
-                   * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
-                   * which is accessible using env.environment.metricsRegistry
-                   *
-                   * */
-                  if (finalConfig.monitoring.metrics.reporters.isEmpty)
-                    MetricsFactoryType.InMemory(scopedMetricsFactory)
-                  else MetricsFactoryType.External,
-                initializeGlobalOpenTelemetry = false,
-                sequencerTransportSeed = Some(1L),
-              )
+          metrics.environmentCreatePluginsBefore,
+          plugins.foldLeft(testConfig)((config, plugin) =>
+            if (runPlugins(plugin))
+              plugin.beforeEnvironmentCreated(config)
+            else
+              config
+          ),
+        )
+      }
+
+      // Once all the plugins and config transformation is done apply the defaults
+      val finalConfig =
+        configTransform(pluginConfig).withDefaults(new DefaultPorts(), edition)
+
+      val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
+      val environmentFixture: E =
+        step("Creating fixture") {
+          Timed.value(
+            metrics.environmentCreateFixture,
+            envDef.environmentFactory.create(
+              finalConfig,
+              loggerFactory,
+              testConfigTransform(
+                envDef.testingConfig.copy(
+                  metricsFactoryType =
+                    /* If metrics reporters were configured for the test then it's an externally observed test
+                     * therefore actual metrics have to be reported.
+                     * The in memory metrics are used when no reporters are configured and the metrics are
+                     * observed directly in the test scenarios.
+                     *
+                     * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
+                     * which is accessible using env.environment.metricsRegistry
+                     *
+                     * */
+                    if (finalConfig.monitoring.metrics.reporters.isEmpty)
+                      MetricsFactoryType.InMemory(scopedMetricsFactory)
+                    else MetricsFactoryType.External,
+                  initializeGlobalOpenTelemetry = false,
+                  sequencerTransportSeed = Some(1L),
+                )
+              ),
             ),
-          ),
-        )
-      }
-
-    try {
-      val testEnvironment: TestConsoleEnvironment[C, E] = step("Creating test console") {
-        envDef.createTestConsole(environmentFixture, loggerFactory)
-      }
-
-      // In tests, we want to retry some commands to avoid flakiness
-      def commandRetryPolicy(command: GrpcAdminCommand[?, ?, ?])(error: GrpcError): Boolean = {
-        val decodedCantonError = command match {
-          // Command submissions are safe to retry - they are deduplicated by command ID
-          case _: CommandSubmissionService.BaseCommand[?, ?, ?] => error.decodedCantonError
-          case _: CommandService.BaseCommand[?, ?, ?] => error.decodedCantonError
-          // Package operations are idempotent so we can retry them
-          case _: ParticipantAdminCommands.Package.PackageCommand[?, ?, ?] =>
-            error.decodedCantonError
-          // Other commands might not be idempotent
-          case _ => None
+          )
         }
-        // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
-        // so for now we go for an ad-hoc logic here.
-        val shouldRetry = decodedCantonError.exists { err =>
-          // Ideally we'd `case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true`
-          // but unfortunately `error.decodedCantonError` appears to wrap it in a `GenericErrorCode`, so the match doesn't work.
-          // We also cannot pattern match on GenericErrorCode because it's a private class.
-          if (
-            err.code.id == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.id && err.code.category == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.category
-          ) {
-            true
-          } else {
-            err.isRetryable
+
+      try {
+        val testEnvironment: TestConsoleEnvironment[C, E] = step("Creating test console") {
+          envDef.createTestConsole(environmentFixture, loggerFactory)
+        }
+
+        // In tests, we want to retry some commands to avoid flakiness
+        def commandRetryPolicy(command: GrpcAdminCommand[?, ?, ?])(error: GrpcError): Boolean = {
+          val decodedCantonError = command match {
+            // Command submissions are safe to retry - they are deduplicated by command ID
+            case _: CommandSubmissionService.BaseCommand[?, ?, ?] => error.decodedCantonError
+            case _: CommandService.BaseCommand[?, ?, ?] => error.decodedCantonError
+            // Package operations are idempotent so we can retry them
+            case _: ParticipantAdminCommands.Package.PackageCommand[?, ?, ?] =>
+              error.decodedCantonError
+            // Other commands might not be idempotent
+            case _ => None
           }
+          // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
+          // so for now we go for an ad-hoc logic here.
+          val shouldRetry = decodedCantonError.exists { err =>
+            // Ideally we'd `case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true`
+            // but unfortunately `error.decodedCantonError` appears to wrap it in a `GenericErrorCode`, so the match doesn't work.
+            // We also cannot pattern match on GenericErrorCode because it's a private class.
+            if (
+              err.code.id == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.id && err.code.category == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.category
+            ) {
+              true
+            } else {
+              err.isRetryable
+            }
+          }
+
+          logger.debug(
+            s"Got canton error $decodedCantonError from command $command. Retrying: $shouldRetry"
+          )(tc)
+
+          shouldRetry
         }
 
-        logger.debug(
-          s"Got canton error $decodedCantonError from command $command. Retrying: $shouldRetry"
-        )(tc)
-
-        shouldRetry
-      }
-
-      step("Updating retry policy") {
-        testEnvironment.grpcLedgerCommandRunner.setRetryPolicy(commandRetryPolicy)
-        testEnvironment.grpcAdminCommandRunner.setRetryPolicy(commandRetryPolicy)
-      }
-
-      step("Running plugins after") {
-        Timed.value(
-          metrics.environmentCreatePluginsAfter,
-          plugins.foreach(plugin =>
-            if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
-          ),
-        )
-      }
-
-      if (!finalConfig.parameters.manualStart)
-        step("Starting all nodes") {
-          handleStartupLogs(testEnvironment.startAll())
+        step("Updating retry policy") {
+          testEnvironment.grpcLedgerCommandRunner.setRetryPolicy(commandRetryPolicy)
+          testEnvironment.grpcAdminCommandRunner.setRetryPolicy(commandRetryPolicy)
         }
 
-      step("Running setup") {
-        envDef.setups.foreach(setup => setup(testEnvironment))
-      }
-
-      testEnvironment
-    } catch {
-      case NonFatal(ex) =>
-        // attempt to ensure the environment is shutdown if anything in the startup of initialization fails
-        try {
-          environmentFixture.close()
-        } catch {
-          case NonFatal(shutdownException) =>
-            // we suppress the exception thrown by the shutdown as we want to propagate the original
-            // exception, however add it to the suppressed list on this thrown exception
-            ex.addSuppressed(shutdownException)
+        step("Running plugins after") {
+          Timed.value(
+            metrics.environmentCreatePluginsAfter,
+            plugins.foreach(plugin =>
+              if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
+            ),
+          )
         }
-        // rethrow exception
-        throw ex
-    }
+
+        if (!finalConfig.parameters.manualStart)
+          step("Starting all nodes") {
+            handleStartupLogs(testEnvironment.startAll())
+          }
+
+        step("Running setup") {
+          envDef.setups.foreach(setup => setup(testEnvironment))
+        }
+
+        testEnvironment
+      } catch {
+        case NonFatal(ex) =>
+          // attempt to ensure the environment is shutdown if anything in the startup of initialization fails
+          try {
+            environmentFixture.close()
+          } catch {
+            case NonFatal(shutdownException) =>
+              // we suppress the exception thrown by the shutdown as we want to propagate the original
+              // exception, however add it to the suppressed list on this thrown exception
+              ex.addSuppressed(shutdownException)
+          }
+          // rethrow exception
+          throw ex
+      }
   }
 
   /** Creates a new environment manually for a test with the storage plugins disabled, so that we
@@ -286,7 +283,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
         /* the block sequencer makes use of its own db so we don't want to create a new one here since that would
          * set a new state and lead to conflicts with the old db.
          */
-        case _: UseH2 | _: UsePostgres | _: UseReferenceBlockSequencerBase[_] =>
+        case _: UseH2 | _: UsePostgres | _: UseReferenceBlockSequencer[_] =>
           false // to prevent creating a new fresh db, the db is only deleted when the old environment is destroyed.
         case plugin => runPlugins(plugin)
       },

@@ -9,7 +9,16 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.{
+  Epoch,
+  Segment,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.PbftBlockState.*
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.SegmentState.{
+  RetransmissionResult,
+  computeLeaderOfView,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Block
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation.PbftMessageValidatorImpl
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
@@ -23,18 +32,18 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue.{
+  DeduplicationStrategy,
+  EnqueueResult,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.collection.BoundedQueue
 import com.digitalasset.canton.util.collection.BoundedQueue.DropStrategy
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.mutable
-
-import SegmentState.{RetransmissionResult, computeLeaderOfView}
-import EpochState.{Epoch, Segment}
-import PbftBlockState.*
 
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 class SegmentState(
@@ -71,10 +80,26 @@ class SegmentState(
   private var inViewChange: Boolean = false
   private var strongQuorumReachedForCurrentView: Boolean = false
 
-  // TODO(#23484): implement per-node quotas
-  // Drop newest to preserve continuity of messages
-  private val futureViewMessagesQueue: mutable.Queue[SignedMessage[PbftNormalCaseMessage]] =
-    new BoundedQueue(config.consensusQueueMaxSize, DropStrategy.DropNewest)
+  private val rehydratedFutureViewMessages = mutable.Queue[SignedMessage[PbftNormalCaseMessage]]()
+
+  private val futureViewMessagesQueue =
+    new FairBoundedQueue[SignedMessage[PbftNormalCaseMessage]](
+      config.consensusQueueMaxSize,
+      config.consensusQueuePerNodeQuota,
+      // Drop newest to preserve continuity of messages
+      DropStrategy.DropNewest,
+      // We need to deduplicate to protect against nodes spamming with others' messages
+      DeduplicationStrategy.PerNode(
+        Some(metrics.consensus.postponedViewMessagesQueueDuplicatesMeter)
+      ),
+      maxSizeGauge = Some(metrics.consensus.postponedViewMessagesQueueMaxSize),
+      metrics = Some(metrics),
+      sizeGauge = Some(metrics.consensus.postponedViewMessagesQueueSize),
+      dropMeter = Some(metrics.consensus.postponedViewMessagesQueueDropMeter),
+      orderingStageLatencyLabel = Some(
+        metrics.performance.orderingStageLatency.labels.stage.values.consensus.PostponedViewMessagesQueueLatency
+      ),
+    )
   private val viewChangeState = new mutable.HashMap[ViewNumber, PbftViewChangeState]
   private var discardedViewMessagesCount = 0
   private var discardedRetransmittedCommitCertsCount = 0
@@ -90,7 +115,6 @@ class SegmentState(
             clock,
             pbftMessageValidator,
             currentLeader,
-            epochNumber,
             viewNumber,
             abort,
             metrics,
@@ -102,19 +126,21 @@ class SegmentState(
     }
 
   @VisibleForTesting
-  private[bftordering] def getViewChangeState =
+  private[iss] def getViewChangeState =
     viewChangeState.toMap
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def processEvent(
-      event: PbftEvent
+      event: PbftEvent,
+      rehydrated: Boolean = false,
   )(implicit traceContext: TraceContext): Seq[ProcessResult] =
     event match {
       case PbftSignedNetworkMessage(signedMessage) =>
         signedMessage.message match {
           case _: PbftNormalCaseMessage =>
             processNormalCaseMessage(
-              signedMessage.asInstanceOf[SignedMessage[PbftNormalCaseMessage]]
+              signedMessage.asInstanceOf[SignedMessage[PbftNormalCaseMessage]],
+              rehydrated,
             )
           case _: PbftViewChangeMessage =>
             processViewChangeNetworkMessage(
@@ -298,10 +324,9 @@ class SegmentState(
       .toMap
 
   // Normal Case: PrePrepare, Prepare, Commit
-  // Note: We may want to limit the number of messages in the future queue, per node
-  //       When capacity is reached, we can (a) drop new messages, or (b) evict older for newer
   private def processNormalCaseMessage(
-      msg: SignedMessage[PbftNormalCaseMessage]
+      msg: SignedMessage[PbftNormalCaseMessage],
+      rehydrated: Boolean,
   )(implicit traceContext: TraceContext): Seq[ProcessResult] = {
     var result = Seq.empty[ProcessResult]
     if (msg.message.viewNumber < currentViewNumber) {
@@ -311,11 +336,35 @@ class SegmentState(
       )
       discardedViewMessagesCount += 1
     } else if (msg.message.viewNumber > currentViewNumber || inViewChange) {
-      futureViewMessagesQueue.enqueue(msg)
-      logger.info(
-        s"Segment received early PbftNormalCaseMessage; message view = ${msg.message.viewNumber}, " +
-          s"current view = $currentViewNumber, inViewChange = $inViewChange"
-      )
+      if (rehydrated) {
+        logger.debug(
+          s"Segment received rehydrated PbftNormalCaseMessage; peer = ${msg.from} " +
+            s"message view = ${msg.message.viewNumber}, " +
+            s"current view = $currentViewNumber, inViewChange = $inViewChange"
+        )
+        // As rehydrated messages come from the storage, and don't provide the actual sender, use a separate (unbounded)
+        //  queue that cannot be overflown (without overflowing the memory).
+        rehydratedFutureViewMessages.enqueue(msg)
+      } else {
+        val actualSender = msg.message.actualSender.getOrElse(
+          abort("actualSender needs to be provided for PBFT messages sent over network")
+        )
+        logger.info(
+          s"Segment received early PbftNormalCaseMessage; peer = ${msg.from}, actual sender = $actualSender" +
+            s"message view = ${msg.message.viewNumber}, " +
+            s"current view = $currentViewNumber, inViewChange = $inViewChange"
+        )
+        futureViewMessagesQueue.enqueue(actualSender, msg) match {
+          case EnqueueResult.PerNodeQuotaExceeded(nodeId) =>
+            logger.trace(s"Node `$nodeId` exceeded its future view message queue quota")
+          case EnqueueResult.TotalCapacityExceeded =>
+            logger.trace("Future view message queue total capacity has been exceeded")
+          case EnqueueResult.Duplicate(nodeId) =>
+            logger.trace(s"Duplicate future view message for node `$nodeId` has been dropped")
+          case EnqueueResult.Success =>
+            logger.trace("Successfully postponed PbftNormalCaseMessage")
+        }
+      }
     } else
       result = processPbftNormalCaseMessage(msg, msg.message.blockMetadata.blockNumber)
     result
@@ -381,7 +430,6 @@ class SegmentState(
             new PbftViewChangeState(
               membership,
               computeLeader(viewNumber),
-              epochNumber,
               viewNumber,
               segment.slotNumbers,
               metrics,
@@ -448,7 +496,6 @@ class SegmentState(
           new PbftViewChangeState(
             membership,
             computeLeader(nextViewNumber),
-            epochNumber,
             nextViewNumber,
             segment.slotNumbers,
             metrics,
@@ -676,7 +723,8 @@ class SegmentState(
     // during rehydration we can first process previously stored prepares and thus avoid that new conflicting prepares
     // are created as a result of rehydrating the new-view message's pre-prepares.
     val queuedMessages =
-      futureViewMessagesQueue.dequeueAll(_.message.viewNumber == currentViewNumber)
+      rehydratedFutureViewMessages.dequeueAll(_.message.viewNumber == currentViewNumber) ++
+        futureViewMessagesQueue.dequeueAll(_.message.viewNumber == currentViewNumber)
     val futureMessageQueueResults =
       for {
         pbftMessage <- queuedMessages

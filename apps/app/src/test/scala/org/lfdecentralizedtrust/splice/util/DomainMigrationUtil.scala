@@ -7,7 +7,7 @@ import com.digitalasset.canton.config.{ApiLoggingConfig, FullClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
@@ -54,13 +54,13 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     forAllNodesAssert(nodes)("all topology is synced") { node =>
       node.oldParticipantConnection
         .listAllTransactions(
-          TopologyStoreId.SynchronizerStore(synchronizerId)
+          TopologyStoreId.Synchronizer(synchronizerId)
         )
         .map(node -> _)
     } { case (node, topologyState) =>
       node.newParticipantConnection
         .listAllTransactions(
-          TopologyStoreId.SynchronizerStore(synchronizerId)
+          TopologyStoreId.Synchronizer(synchronizerId)
         )
         .futureValue
         .size shouldBe topologyState.size

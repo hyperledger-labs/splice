@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 import cats.data.OptionT
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
@@ -69,7 +69,7 @@ class ReceiveSvRewardCouponTrigger(
           val filterParty = beneficiary.beneficiary.filterString
           participantAdminConnection
             .listPartyToParticipant(
-              store = Some(TopologyStoreId.SynchronizerStore(dsoRules.domain)),
+              store = Some(TopologyStoreId.Synchronizer(dsoRules.domain)),
               filterParty = filterParty,
             )
             .map { txs =>

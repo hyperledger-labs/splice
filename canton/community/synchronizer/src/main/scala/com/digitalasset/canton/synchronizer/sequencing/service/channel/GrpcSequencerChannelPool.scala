@@ -71,7 +71,7 @@ private[channel] final class GrpcSequencerChannelPool(
   )(implicit
       traceContext: TraceContext
   ): Either[String, StreamObserver[v30.ConnectToSequencerChannelRequest]] =
-    performUnlessClosing(functionFullName) {
+    synchronizeWithClosingSync(functionFullName) {
       blocking {
         synchronized {
           val channel = new UninitializedGrpcSequencerChannel(
@@ -110,7 +110,7 @@ private[channel] final class GrpcSequencerChannelPool(
                 tc: TraceContext,
             ): Either[String, GrpcSequencerChannelMemberMessageHandler] = {
               implicit val traceContext: TraceContext = tc
-              performUnlessClosing(functionFullName) {
+              synchronizeWithClosingSync(functionFullName) {
                 blocking {
                   GrpcSequencerChannelPool.this.synchronized {
                     // Remove uninitialized channel even if adding initialized channel fails
@@ -240,7 +240,7 @@ private[channel] final class GrpcSequencerChannelPool(
 
   override def onClosed(): Unit = blocking {
     synchronized {
-      withNewTraceContext { implicit traceContext =>
+      withNewTraceContext("close_grpc_channel") { implicit traceContext =>
         logger.debug("Closing all channels in pool")
         // Wait for the channels to actually close in case they are already in the process of closing
         // in which case FlagClosable doesn't wait.
