@@ -20,7 +20,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.*
 
@@ -52,9 +51,6 @@ class DbExternalPartyWalletStore(
       ),
       domainMigrationInfo,
       participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
     )
     with ExternalPartyWalletStore
     with AcsTables
@@ -64,10 +60,9 @@ class DbExternalPartyWalletStore(
   override def toString: String =
     show"DbExternalPartyWalletStore(externalParty=${key.externalParty})"
 
-  override protected def acsContractFilter
-      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPartyWalletAcsStoreRowData,
-        AcsInterfaceViewRowData.NoInterfacesIngested,
-      ] = ExternalPartyWalletStore.contractFilter(key)
+  override def acsContractFilter: org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+    org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPartyWalletAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = ExternalPartyWalletStore.contractFilter(key)
 
 }

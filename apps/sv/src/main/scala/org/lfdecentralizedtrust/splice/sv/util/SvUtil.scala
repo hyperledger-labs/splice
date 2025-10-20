@@ -180,7 +180,7 @@ object SvUtil {
   def getSV1SynchronizerNodeConfig(
       cometBftNode: Option[CometBftNode],
       localSynchronizerNode: LocalSynchronizerNode,
-      scanConfig: Option[SvScanConfig],
+      scanConfig: SvScanConfig,
       synchronizerId: SynchronizerId,
       clock: Clock,
       migrationId: Long,
@@ -234,7 +234,7 @@ object SvUtil {
           cometBftConfig,
           sequencerConfig.toJava,
           mediatorConfig.toJava,
-          scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
+          Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
         )
       ).asJava

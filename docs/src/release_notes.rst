@@ -8,6 +8,20 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - SV app
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+    - Deployment
+
+      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
+        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
+
+
 0.4.21
 ------
 
@@ -33,12 +47,8 @@ Release Notes
       Events can be retrieved by ``update_id`` by using ``/v0/events/{update_id}``.
       Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
 
-  - SV
-
-    - Published conversion rates are now clamped to the configured range, and the clamped value is published instead of
-      only logging a warning and not publishing an updated value for out-of-range values.
-
-    - UI usability improvements.
+    - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out of range values.
 
   - Monitoring
 

@@ -32,7 +32,7 @@ import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -44,7 +44,7 @@ class SplitwellAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
     store: SplitwellStore,
-    storage: Storage,
+    storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
@@ -65,7 +65,6 @@ class SplitwellAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin = true,
-      ingestUpdateHistoryFromParticipantBegin = true,
       params,
     ) {
 
