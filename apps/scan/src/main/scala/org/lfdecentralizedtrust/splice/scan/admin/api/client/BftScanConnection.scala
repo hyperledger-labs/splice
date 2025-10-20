@@ -806,21 +806,22 @@ object BftScanConnection {
 
   object BftCallConfig {
     def default(connections: ScanConnections): BftCallConfig = {
-
-      if (connections.trustSpecific) {
-        val threshold = connections.threshold.getOrElse((connections.totalNumber / 3) + 1)
-        BftCallConfig(
-          connections = connections.open,
-          requestsToDo = connections.totalNumber,
-          targetSuccess = threshold,
-        )
-      } else {
-        val f = connections.f
-        BftCallConfig(
-          connections = connections.open,
-          requestsToDo = 2 * f + 1,
-          targetSuccess = f + 1,
-        )
+      connections.totalInSubset match {
+        case Some(n) =>
+          // Use the static total number of trusted SVs (n) for the threshold
+          val threshold = connections.threshold.getOrElse((n / 3) + 1)
+          BftCallConfig(
+            connections = connections.open,
+            requestsToDo = connections.open.size,
+            targetSuccess = threshold,
+          )
+        case None =>
+          val f = connections.f
+          BftCallConfig(
+            connections = connections.open,
+            requestsToDo = 2 * f + 1,
+            targetSuccess = f + 1,
+          )
       }
     }
 
@@ -851,8 +852,8 @@ object BftScanConnection {
   case class ScanConnections(
       open: Seq[SingleScanConnection],
       failed: Int,
-      trustSpecific: Boolean = false,
       threshold: Option[Int] = Some(0),
+      totalInSubset: Option[Int] = None,
   ) {
     val totalNumber: Int = open.size + failed
     val f: Int = (totalNumber - 1) / 3
@@ -870,7 +871,7 @@ object BftScanConnection {
       val loggerFactory: NamedLoggerFactory,
   ) extends ScanList {
     override def scanConnections: ScanConnections =
-      ScanConnections(Seq(scanConnection), 0, false, Some(0))
+      ScanConnections(Seq(scanConnection), 0)
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
       SyncCloseable("scan_connection", scanConnection.close())
@@ -1107,8 +1108,8 @@ object BftScanConnection {
       ScanConnections(
         open = currentConnections.values.collect { case Right(conn) => conn }.toSeq,
         failed = currentConnections.values.count(_.isLeft),
-        trustSpecific = true,
         threshold = threshold,
+        totalInSubset = Some(sv_names.size),
       )
     }
 
@@ -1126,12 +1127,7 @@ object BftScanConnection {
       failedConnections: Map[Uri, (Throwable, SvName)],
   ) {
     def scanConnections: ScanConnections =
-      ScanConnections(
-        openConnections.values.map(_._1).toSeq,
-        failedConnections.size,
-        false,
-        Some(0),
-      )
+      ScanConnections(openConnections.values.map(_._1).toSeq, failedConnections.size)
   }
 
   class Bft(
