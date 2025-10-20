@@ -16,6 +16,11 @@ Upcoming
     - The SV app will no longer store the update history and such, will not be able to answer historical queries.
       All updates involving the DSO party will still be stored and returned by Scan.
 
+    - Deployment
+
+      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
+        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
+
 
 0.4.21
 ------
