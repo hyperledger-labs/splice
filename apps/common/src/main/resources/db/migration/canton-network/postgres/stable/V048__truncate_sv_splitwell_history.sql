@@ -9,8 +9,8 @@ BEGIN
 select array_agg(store_name order by store_name) into descriptors
 from update_history_descriptors;
 
-IF descriptors  = '{"DbSvDsoStore", "DbSvSvStore"}' THEN
-    RAISE NOTICE 'Truncating update history tables as only SV app descriptors are present. Descriptors: %', descriptors::text;
+IF (descriptors  = '{"DbSvDsoStore", "DbSvSvStore"}' OR descriptors = '{"DbSplitwellStore"}') THEN
+    RAISE NOTICE 'Truncating update history tables as only SV/Splitwell app descriptors are present. Descriptors: %', descriptors::text;
     EXECUTE 'TRUNCATE TABLE update_history_assignments CASCADE';
     EXECUTE 'TRUNCATE TABLE update_history_unassignments CASCADE';
     EXECUTE 'TRUNCATE TABLE update_history_backfilling CASCADE';
@@ -20,7 +20,7 @@ IF descriptors  = '{"DbSvDsoStore", "DbSvSvStore"}' THEN
     EXECUTE 'TRUNCATE TABLE update_history_last_ingested_offsets CASCADE';
     EXECUTE 'TRUNCATE TABLE update_history_descriptors CASCADE';
 ELSE
-    RAISE NOTICE 'This is not the SV app, NOT truncating update history tables. Descriptors: %', descriptors::text;
+    RAISE NOTICE 'This is not the SV or Splitwell app, NOT truncating update history tables. Descriptors: %', descriptors::text;
 END IF;
 
 END $$;
