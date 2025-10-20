@@ -44,6 +44,10 @@
         sha256 = "ad6675574e75c6984ab79a2ff9f4ee6c4859d46a41a7d73ef35c84f05a00b407";
       }
       {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.11.0/pulumi-resource-kubernetes-v4.11.0-linux-amd64.tar.gz";
+        sha256 = "659ba41363c23cea895e6e8425f7f20e2165d24effe7a7aaa37c545b5eccc5e2";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.21.1/pulumi-resource-kubernetes-v4.21.1-linux-amd64.tar.gz";
         sha256 = "8ddd4ef54778577478e79dc4fcbef3d92ffbf92a5b6fcc4de9e36efe23cd5efd";
       }

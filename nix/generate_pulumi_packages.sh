@@ -32,6 +32,7 @@ plugins=(
   "pulumi/kubernetes-cert-manager=0.0.5"
   "pulumi/kubernetes=4.22.0"
   "pulumi/kubernetes=4.21.1"
+  "pulumi/kubernetes=4.11.1"
   "pulumi/random=4.14.0"
   "pulumi/std=1.7.3"
   "pulumiverse/grafana=0.4.2"
