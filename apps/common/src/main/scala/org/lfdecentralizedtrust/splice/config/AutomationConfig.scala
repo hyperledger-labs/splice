@@ -28,11 +28,16 @@ case class AutomationConfig(
     /** Enabled schedling reward operations unfiromly across the first tick of a round opening.
       */
     enableNewRewardTriggerScheduling: Boolean = true,
+    /** If new reward trigger scheduling is enabled then we calculate the max run time of a trigger based
+      * on the close time of the previous round minus this buffer duration.
+      */
+    rewardOperationRoundsCloseBufferDuration: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(120),
     /** Reward operations can result in spikes overloading sequencers on each round switch so we
       * use a lower polling interval of 1/3 tick with tick = 600s
       */
     rewardOperationPollingInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(200),
+      NonNegativeFiniteDuration.ofSeconds(300),
     /** Reward operations can result in spikes overloading sequencers on each round switch so we
       * use higher jitter.
       */

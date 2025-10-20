@@ -17,10 +17,12 @@ export interface SelectFieldProps {
   title: string;
   options: Option[];
   id: string;
+  onChange?: () => void;
 }
 
 export const SelectField: React.FC<SelectFieldProps> = props => {
   const { title, options, id } = props;
+  const externalOnChange = props.onChange ?? (() => {});
   const field = useFieldContext<string>();
 
   return (
@@ -32,7 +34,10 @@ export const SelectField: React.FC<SelectFieldProps> = props => {
       <FormControl variant="outlined" error={!field.state.meta.isValid} fullWidth>
         <Select
           value={field.state.value}
-          onChange={(e: SelectChangeEvent) => field.handleChange(e.target.value as string)}
+          onChange={(e: SelectChangeEvent) => {
+            field.handleChange(e.target.value as string);
+            externalOnChange();
+          }}
           onBlur={field.handleBlur}
           error={!field.state.meta.isValid}
           id={`${id}-dropdown`}

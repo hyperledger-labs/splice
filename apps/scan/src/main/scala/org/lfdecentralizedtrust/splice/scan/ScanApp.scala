@@ -228,7 +228,7 @@ class ScanApp(
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
       )
-      scanVerdictStore = DbScanVerdictStore(storage, loggerFactory)(ec)
+      scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
       scanEventStore = new ScanEventStore(
         scanVerdictStore,
         updateHistory,

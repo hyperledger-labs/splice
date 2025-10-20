@@ -73,7 +73,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       } catch {
         case NonFatal(e) =>
           // Logging the error, as an exception in this method will abort the test suite with no log output.
-          logger.error("addUser {alice,bob,charlie}-validator beforeEach failed", e)
+          logger.error("addUser {alice,bob,charlie} beforeEach failed", e)
           throw e
       }
     })
@@ -157,10 +157,6 @@ abstract class ValidatorPreflightIntegrationTestBase
   checkValidatorIsConnectedToSvRunbook()
 
   "run through runbook against cluster validator" in { implicit env =>
-//    val aliceUser = auth0Users.get("alice").value
-//    val bobUser = auth0Users.get("bob").value
-//    val charlieUser = auth0Users.get("charlie").value
-
     val alicePartyId = withFrontEnd("alice-validator") { implicit webDriver =>
       val alicePartyId = loginAndOnboardToWalletUi("alice")
       findAll(className("amulets-table-row")) should have size 0
@@ -276,8 +272,8 @@ abstract class ValidatorPreflightIntegrationTestBase
     if (includeSplitwellTests) {
       val groupName = "troika"
 
-      val aliceUser = auth0Users.get("alice-validator").value
-      val bobUser = auth0Users.get("bob-validator").value
+      val aliceUser = auth0Users.get("alice").value
+      val bobUser = auth0Users.get("bob").value
 
       val bobUserPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
         val bobUserPartyId = loginAndOnboardToWalletUi("bob")
