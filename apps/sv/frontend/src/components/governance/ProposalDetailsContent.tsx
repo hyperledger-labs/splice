@@ -113,6 +113,15 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             />
             <Divider sx={{ my: 1 }} />
 
+            <DetailItem
+              label="Contract ID"
+              value={contractId}
+              labelId="proposal-details-contractid-label"
+              valueId="proposal-details-contractid-value"
+              isPartyId
+            />
+            <Divider sx={{ my: 1 }} />
+
             {proposalDetails.action === 'SRARC_OffboardSv' && (
               <OffboardMemberSection memberPartyId={proposalDetails.proposal.memberToOffboard} />
             )}
@@ -324,9 +333,10 @@ interface DetailItemProps {
   value: string | React.ReactNode;
   labelId?: string;
   valueId?: string;
+  isPartyId?: boolean;
 }
 
-const DetailItem = ({ label, value, labelId, valueId }: DetailItemProps) => {
+const DetailItem = ({ label, value, labelId, valueId, isPartyId }: DetailItemProps) => {
   return (
     <Box sx={{ py: 1 }}>
       <Typography
@@ -338,9 +348,13 @@ const DetailItem = ({ label, value, labelId, valueId }: DetailItemProps) => {
       >
         {label}
       </Typography>
-      <Typography variant="body1" id={valueId} data-testid={valueId}>
-        {value}
-      </Typography>
+      {isPartyId ? (
+        <PartyId partyId={`${value}`} id={valueId} data-testid={valueId} />
+      ) : (
+        <Typography variant="body1" id={valueId} data-testid={valueId}>
+          {value}
+        </Typography>
+      )}
     </Box>
   );
 };

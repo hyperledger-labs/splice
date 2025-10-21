@@ -220,6 +220,9 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Feature App/);
 
+    const contractId = screen.getByTestId('proposal-details-contractid-value-input');
+    expect(contractId.getAttribute('value')).toBe(voteRequest.contractId);
+
     const featuredAppSection = screen.getByTestId('proposal-details-feature-app-section');
     expect(featuredAppSection).toBeDefined();
 
