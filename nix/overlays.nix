@@ -4,9 +4,11 @@
     # 7.0.1 causes some issues in the generated package.json which break module resolution.
     version = "6.6.0";
     jarfilename = "${oldAttrs.pname}-${version}.jar";
-    src = super.fetchurl {
-      url = "mirror://maven/org/openapitools/${oldAttrs.pname}/${version}/${jarfilename}";
-      sha256 = "sha256-lxj/eETolGLHXc2bIKNRNvbbJXv+G4dNseMALpneRgk=";
+    src = super.fetchFromGitHub {
+      owner = "OpenAPITools";
+      repo = "openapi-generator";
+      tag = "v${version}";
+      hash = "sha256-IgjlMOHMASijIt5nMqOZcUpxecbWljHh9rA1YUwUmwM=";
     };
   });
   jre = super.openjdk21;
