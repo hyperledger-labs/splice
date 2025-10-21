@@ -164,7 +164,8 @@ function ingressPort(name: string, port: number): IngressPort {
 function configureInternalGatewayService(
   ingressNs: k8s.core.v1.Namespace,
   ingressIp: pulumi.Output<string>,
-  istiod: k8s.helm.v3.Release
+  istiod: k8s.helm.v3.Release,
+  cloudArmorBackendConfig?: k8s.apiextensions.CustomResource
 ) {
   const cluster = gcp.container.getCluster({
     name: CLUSTER_NAME,
@@ -202,7 +203,8 @@ function configureInternalGatewayService(
       ingressPort('sw-lg-gw', 6201),
     ],
     istiod,
-    ''
+    '',
+    cloudArmorBackendConfig
   );
 }
 
@@ -304,7 +306,8 @@ function configureGatewayService(
   externalIPRangesInLB: pulumi.Output<string[]>,
   ingressPorts: IngressPort[],
   istiod: k8s.helm.v3.Release,
-  suffix: string
+  suffix: string,
+  cloudArmorBackendConfig?: k8s.apiextensions.CustomResource
 ) {
   // We limit source IPs in two ways:
   // - For most traffic, we use istio instead of through loadBalancerSourceRanges as the latter has a size limit.
@@ -315,6 +318,17 @@ function configureGatewayService(
   //   These IPs should be provided in externalIPRangesInLB.
 
   const istioPolicies = istioAccessPolicies(ingressNs, externalIPRangesInIstio, suffix);
+
+  // Additional annotations to apply the BackendConfig for Cloud Armor if provided
+  const backendConfigAnnotation: { [key: string]: pulumi.Input<string> } = cloudArmorBackendConfig
+    ? {
+        'cloud.google.com/backend-config': cloudArmorBackendConfig.metadata.name.apply(bcName =>
+          JSON.stringify({ default: bcName })
+        ),
+      }
+    : {};
+  const backendConfigDeps = cloudArmorBackendConfig ? [cloudArmorBackendConfig] : [];
+
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
@@ -355,6 +369,7 @@ function configureGatewayService(
             ingressPort('http2', 80),
             ingressPort('https', 443),
           ].concat(ingressPorts),
+          annotations: backendConfigAnnotation,
         },
         ...infraAffinityAndTolerations,
         // The httpLoadBalancing addon needs to be enabled to use backend service-based network load balancers.
@@ -369,10 +384,10 @@ function configureGatewayService(
       deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
-            const base: pulumi.Resource[] = [ingressNs, istiod];
+            const base: pulumi.Resource[] = [ingressNs, istiod, ...backendConfigDeps];
             return base.concat(policies);
           })
-        : [ingressNs, istiod],
+        : [ingressNs, istiod, ...backendConfigDeps],
     }
   );
   if (infraConfig.istio.enableIngressAccessLogging) {
@@ -631,7 +646,8 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
-  cometBftIngressIp: pulumi.Output<string>
+  cometBftIngressIp: pulumi.Output<string>,
+  cloudArmorBackendConfig?: k8s.apiextensions.CustomResource
 ): pulumi.Resource[] {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
@@ -641,7 +657,12 @@ export function configureIstio(
   });
   const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
-  const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
+  const gwSvc = configureInternalGatewayService(
+    ingressNs.ns,
+    ingressIp,
+    istiod,
+    cloudArmorBackendConfig
+  );
   const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
   const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
   const docsAndReleases = configureDocsAndReleases(true, gateways);
