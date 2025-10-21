@@ -364,6 +364,26 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ),
     )
 
+  protected def appActivityMarker(
+      provider: PartyId,
+      weight: Numeric.Numeric = numeric(1.0),
+      beneficiary: Option[PartyId] = None,
+      contractId: String = nextCid(),
+  ): Contract[
+    amuletCodegen.FeaturedAppActivityMarker.ContractId,
+    amuletCodegen.FeaturedAppActivityMarker,
+  ] =
+    contract(
+      identifier = amuletCodegen.FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID,
+      contractId = new amuletCodegen.FeaturedAppActivityMarker.ContractId(contractId),
+      payload = new amuletCodegen.FeaturedAppActivityMarker(
+        dsoParty.toProtoPrimitive,
+        provider.toProtoPrimitive,
+        beneficiary.getOrElse(provider).toProtoPrimitive,
+        weight,
+      ),
+    )
+
   protected def numeric(value: BigDecimal, scale: Int = 10) = {
     Numeric.assertFromBigDecimal(Numeric.Scale.assertFromInt(scale), value)
   }

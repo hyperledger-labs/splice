@@ -286,6 +286,15 @@ case class EnvironmentDefinition(
   def withBftSequencers: EnvironmentDefinition =
     addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
 
+  def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
+    addConfigTransforms((_, conf) =>
+      ConfigTransforms.updateAllSvAppConfigs_(config =>
+        config.copy(
+          delegatelessAutomationFeaturedAppActivityMarkerMaxAge = NonNegativeFiniteDuration.Zero
+        )
+      )(conf)
+    )
+
   def withAmuletPrice(price: BigDecimal): EnvironmentDefinition =
     addConfigTransforms((_, conf) => ConfigTransforms.setAmuletPrice(price)(conf))
 
@@ -457,6 +466,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withInitializedNodes()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
@@ -465,6 +475,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withInitializedNodes()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =
