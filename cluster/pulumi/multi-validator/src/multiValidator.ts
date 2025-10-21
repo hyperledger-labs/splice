@@ -25,6 +25,7 @@ const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigration
 export class MultiValidator extends MultiNodeDeployment {
   constructor(name: string, args: MultiValidatorArgs, opts?: pulumi.ComponentResourceOptions) {
     const ports = generatePortSequence(5000, numNodesPerInstance, [{ name: 'val', id: 3 }]);
+    // TODO(#2773) consider making this optional so we don't pay for the extra PVCs when we don't anticipate a HDM
     const domainMigrationPvc = new k8s.core.v1.PersistentVolumeClaim(
       `${name}-domain-migration-pvc`,
       {
