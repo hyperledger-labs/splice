@@ -34,8 +34,10 @@ interface MultiNodeDeploymentArgs extends BaseMultiNodeArgs {
     livenessProbe: k8s.types.input.core.v1.Probe;
     readinessProbe: k8s.types.input.core.v1.Probe;
     resources?: k8s.types.input.core.v1.ResourceRequirements;
+    volumeMounts?: k8s.types.input.core.v1.VolumeMount[];
   };
   serviceSpec: k8s.types.input.core.v1.ServiceSpec;
+  volumes?: k8s.types.input.core.v1.Volume[];
 }
 
 export class MultiNodeDeployment extends pulumi.ComponentResource {
@@ -129,6 +131,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     .concat(extraEnvVars || []),
                 },
               ],
+              volumes: args.volumes,
               initContainers: [
                 {
                   name: 'pg-init',
