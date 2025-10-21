@@ -1,6 +1,6 @@
 { use_enterprise }:
 [(self: super: {
-  openapi-generator-cli = (super.openapi-generator-cli.override { jre = super.openjdk21; }).overrideAttrs(oldAttrs: rec {
+  openapi-generator-cli = (super.openapi-generator-cli.override { jre_headless = super.openjdk21; }).overrideAttrs(oldAttrs: rec {
     # 7.0.1 causes some issues in the generated package.json which break module resolution.
     version = "6.6.0";
     jarfilename = "${oldAttrs.pname}-${version}.jar";
@@ -73,6 +73,15 @@
     });
   });
   git-search-replace = super.callPackage ./git-search-replace.nix {};
+  gh = super.gh.overrideAttrs (old: rec {
+    version = "2.82.0";
+    src = super.fetchFromGitHub {
+      owner = "cli";
+      repo = "cli";
+      tag = "v${version}";
+      hash = "sha256-0PheldNAlexi/tXHhhrPLd3YBGmcM1G+guicI2z9RYU=";
+    };
+  });
   sphinx-lint = super.callPackage ./sphinx-lint.nix {};
   jsonnet = super.callPackage ./jsonnet.nix {};
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:

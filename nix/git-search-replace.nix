@@ -4,6 +4,9 @@ python3Packages.buildPythonPackage rec {
   pname = "git-search-replace";
   version = "1.0.3";
 
+  pyproject = true;
+  build-system = [ "setuptools" ];
+
   src = python3Packages.fetchPypi {
     inherit pname version;
     sha256 = "sha256-5L/ygt8FvArw+CdndkuvZAR9QPji7zFVfmogsqZkvBw=";
