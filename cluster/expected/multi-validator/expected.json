@@ -2418,6 +2418,32 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-0-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-0-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
@@ -2574,6 +2600,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2691,7 +2721,13 @@
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -2721,6 +2757,14 @@
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-0-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -2803,6 +2847,32 @@
     "name": "multi-validator-0",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-1-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-1-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -2964,6 +3034,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3081,7 +3155,13 @@
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -3111,6 +3191,14 @@
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-1-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -3193,6 +3281,32 @@
     "name": "multi-validator-1",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-2-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-2-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -3354,6 +3468,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3471,7 +3589,13 @@
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -3501,6 +3625,14 @@
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-2-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -3583,6 +3715,32 @@
     "name": "multi-validator-2",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-3-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-3-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -3744,6 +3902,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3861,7 +4023,13 @@
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -3891,6 +4059,14 @@
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-3-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -3973,6 +4149,32 @@
     "name": "multi-validator-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-4-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-4-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -4134,6 +4336,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4251,7 +4457,13 @@
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -4281,6 +4493,14 @@
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-4-domain-migration-pvc"
+                }
               }
             ]
           }
