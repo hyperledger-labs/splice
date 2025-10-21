@@ -569,6 +569,11 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
         repo: 'https://prometheus-community.github.io/helm-charts',
       },
       values: {
+        serviceMonitor: {
+          enabled: true,
+          namespace: namespaceName,
+          additionalLabels: { release: 'prometheus-grafana-monitoring' },
+        },
         ...infraAffinityAndTolerations,
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
