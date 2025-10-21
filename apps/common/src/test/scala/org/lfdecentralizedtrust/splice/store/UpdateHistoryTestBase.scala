@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.migration.{DomainMigrationInfo, MigrationTimeInfo}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -239,12 +239,13 @@ abstract class UpdateHistoryTestBase
       participantId: ParticipantId = participant1,
       storeName: String = storeName1,
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.NeedsBackfilling,
+      migrationTimeInfo: Option[MigrationTimeInfo] = None,
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
       DomainMigrationInfo(
         domainMigrationId,
-        None,
+        migrationTimeInfo,
       ),
       storeName,
       participantId,

@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
+import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import java.time.Instant
@@ -612,6 +613,83 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           o2 <- store.lookupLastIngestedOffset()
           _ = o2 shouldBe Some(5)
         } yield succeed
+      }
+
+      "tx rollbacks after migrations are handled correctly" in {
+        val t0 = time(1)
+        val t1 = time(2)
+        val store1 = mkStore(party1, migration1, participant1)
+        val store2TimeTooEarly = mkStore(
+          party1,
+          migration2,
+          participant1,
+          migrationTimeInfo = Some(MigrationTimeInfo(t0, synchronizerWasPaused = true)),
+        )
+        val store2TimeCorrect = mkStore(
+          party1,
+          migration2,
+          participant1,
+          migrationTimeInfo = Some(MigrationTimeInfo(t1, synchronizerWasPaused = true)),
+        )
+        for {
+          _ <- initStore(store1)
+          _ <- create(domain1, cid1, offset1, party1, store1, t0)
+          _ <- create(domain1, cid2, offset2, party1, store1, t1)
+          updates1 <- updates(store1)
+          ex <- recoverToExceptionIf[IllegalStateException](initStore(store2TimeTooEarly))
+          _ = ex.getMessage should include("Found List(1, 0, 1, 0, 0) rows")
+          _ <- initStore(store2TimeCorrect)
+          updates2 <- updates(store2TimeCorrect)
+        } yield {
+          checkUpdates(
+            updates1,
+            Seq(
+              ExpectedCreate(cid1, domain1),
+              ExpectedCreate(cid2, domain1),
+            ),
+          )
+          checkUpdates(
+            updates2,
+            Seq(
+              ExpectedCreate(cid1, domain1),
+              ExpectedCreate(cid2, domain1),
+            ),
+          )
+        }
+      }
+
+      "tx rollbacks after DR are handled correctly" in {
+        val t0 = time(1)
+        val t1 = time(2)
+        val store1 = mkStore(party1, migration1, participant1)
+        val store2TimeTooEarly = mkStore(
+          party1,
+          migration2,
+          participant1,
+          migrationTimeInfo = Some(MigrationTimeInfo(t0, synchronizerWasPaused = false)),
+        )
+        for {
+          _ <- initStore(store1)
+          _ <- create(domain1, cid1, offset1, party1, store1, t0)
+          _ <- create(domain1, cid2, offset2, party1, store1, t1)
+          updates1 <- updates(store1)
+          _ <- initStore(store2TimeTooEarly)
+          updates2 <- updates(store2TimeTooEarly)
+        } yield {
+          checkUpdates(
+            updates1,
+            Seq(
+              ExpectedCreate(cid1, domain1),
+              ExpectedCreate(cid2, domain1),
+            ),
+          )
+          checkUpdates(
+            updates2,
+            Seq(
+              ExpectedCreate(cid1, domain1)
+            ),
+          )
+        }
       }
 
     }
