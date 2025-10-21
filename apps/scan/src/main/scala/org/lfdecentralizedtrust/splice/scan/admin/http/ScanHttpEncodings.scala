@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
 }
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOffset, Trees}
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
@@ -467,7 +467,6 @@ object ScanHttpEncodings {
       views.sortBy(_.viewId).toVector.map { v =>
         val quorums: Vector[definitions.Quorum] = v.confirmingParties.asArray
           .getOrElse(Vector.empty)
-          .toVector
           .flatMap { j =>
             val parties = j.hcursor.downField("parties").as[Vector[String]].getOrElse(Vector.empty)
             val threshold = j.hcursor.downField("threshold").as[Int].getOrElse(0)
@@ -489,7 +488,7 @@ object ScanHttpEncodings {
     httpApi.EventHistoryVerdict(
       updateId = verdict.updateId,
       migrationId = verdict.migrationId,
-      domainId = verdict.domainId.toString(),
+      domainId = Codec.encode(verdict.domainId),
       recordTime = formatRecordTime(verdict.recordTime.toInstant),
       finalizationTime = formatRecordTime(verdict.finalizationTime.toInstant),
       submittingParties = verdict.submittingParties.toVector,
