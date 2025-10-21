@@ -115,6 +115,7 @@ export const SvConfigSchema = z.object({
             })
             .optional(),
           externalRateLimits: RateLimitSchema,
+          resources: K8sResourceSchema,
         })
         .optional(),
       synchronizer: z
