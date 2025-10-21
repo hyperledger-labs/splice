@@ -1548,13 +1548,14 @@ class DbSvDsoStore(
                  where
                    store_id = $acsStoreId and
                    migration_id = $domainMigrationId and
+                   package_name = ${FeaturedAppActivityMarker.PACKAGE_NAME} and
                    template_id_qualified_name = ${QualifiedName(
                 FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                  limit $threshold
               ) as markers;
                    """.toActionBuilder.as[Int],
-            "exceedsFeaturedAppActivityMarkerCount",
+            "featuredAppActivityMarkerCountAboveOrEqualTo",
           )
       ).map(results => results.contains(threshold))
     }
