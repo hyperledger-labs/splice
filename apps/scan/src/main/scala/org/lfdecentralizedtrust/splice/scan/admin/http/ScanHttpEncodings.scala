@@ -489,7 +489,7 @@ object ScanHttpEncodings {
     httpApi.EventHistoryVerdict(
       updateId = verdict.updateId,
       migrationId = verdict.migrationId,
-      domainId = verdict.domainId.toString(),
+      domainId = verdict.domainId.toProtoPrimitive,
       recordTime = formatRecordTime(verdict.recordTime.toInstant),
       finalizationTime = formatRecordTime(verdict.finalizationTime.toInstant),
       submittingParties = verdict.submittingParties.toVector,
