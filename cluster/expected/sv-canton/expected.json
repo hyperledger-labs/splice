@@ -2463,11 +2463,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "12Gi"
+            "memory": "18Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "18Gi"
+            "memory": "12Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -2623,11 +2622,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "12Gi"
+            "memory": "18Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "18Gi"
+            "memory": "12Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -4640,11 +4638,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "12Gi"
+            "memory": "18Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "18Gi"
+            "memory": "12Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -4825,11 +4822,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "12Gi"
+            "memory": "18Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "18Gi"
+            "memory": "12Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -6271,11 +6267,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "12Gi"
+            "memory": "18Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "18Gi"
+            "memory": "12Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -6431,11 +6426,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "12Gi"
+            "memory": "18Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "18Gi"
+            "memory": "12Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
