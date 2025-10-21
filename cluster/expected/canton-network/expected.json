@@ -1574,6 +1574,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -2420,6 +2429,15 @@
           "schema": "scan_sv_da_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
         },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {

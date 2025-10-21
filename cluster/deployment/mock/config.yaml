@@ -19,6 +19,13 @@ sv:
   synchronizer:
     skipInitialization: true
     topologyChangeDelay: 250ms
+  scan:
+    resources:
+      requests:
+        cpu: "0.5"
+        memory: '1536Mi'
+      limits:
+        memory: '2048Mi'
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
