@@ -9,7 +9,7 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, Grid, Typography } from '@mui/material';
+import { Button, GridLegacy, Typography } from '@mui/material';
 
 import { useValidatorClient } from '../contexts/ValidatorServiceContext';
 import { useWalletConfig } from '../utils/config';
@@ -41,7 +41,7 @@ const Onboarding: React.FC = () => {
 
   return (
     <BasicLayout>
-      <Grid
+      <GridLegacy
         height="100%"
         container
         spacing={0}
@@ -87,7 +87,7 @@ const Onboarding: React.FC = () => {
           You may also onboard yourself by calling <code>onboardUser()</code> on the validator app
           API.
         </Typography>
-      </Grid>
+      </GridLegacy>
     </BasicLayout>
   );
 };
