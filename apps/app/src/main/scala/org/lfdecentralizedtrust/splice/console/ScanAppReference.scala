@@ -443,6 +443,27 @@ abstract class ScanAppReference(
       )
     }
 
+  def getHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId] = Vector.empty,
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact
+      ),
+      asOfRound: Option[Long] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetHoldingsSummaryAt(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          ownerPartyIds,
+          recordTimeMatch,
+          asOfRound,
+        )
+      )
+    }
+
   def getAggregatedRounds(): Option[ScanAggregator.RoundRange] =
     consoleEnvironment.run {
       httpCommand(

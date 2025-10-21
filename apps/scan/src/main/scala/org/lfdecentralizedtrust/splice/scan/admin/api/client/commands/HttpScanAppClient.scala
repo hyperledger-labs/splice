@@ -1143,6 +1143,44 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetHoldingsSummaryAt(
+      at: java.time.OffsetDateTime,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch],
+      asOfRound: Option[Long],
+  ) extends InternalBaseCommand[
+        http.GetHoldingsSummaryAtResponse,
+        Option[definitions.HoldingsSummaryResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetHoldingsSummaryAtResponse] =
+      client.getHoldingsSummaryAt(
+        definitions.HoldingsSummaryRequest(
+          migrationId,
+          at,
+          recordTimeMatch,
+          ownerPartyIds.map(_.toProtoPrimitive),
+          asOfRound,
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetHoldingsSummaryAtResponse, Either[
+      String,
+      Option[definitions.HoldingsSummaryResponse],
+    ]] = {
+      case http.GetHoldingsSummaryAtResponse.OK(value) =>
+        Right(Some(value))
+      case http.GetHoldingsSummaryAtResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
   object GetAggregatedRounds
       extends InternalBaseCommand[http.GetAggregatedRoundsResponse, Option[
         ScanAggregator.RoundRange
