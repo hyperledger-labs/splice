@@ -902,6 +902,7 @@ object BftScanConnection {
         mat: Materializer,
     ): Future[Unit] = {
       val logger = loggerFactory.getTracedLogger(getClass)
+      logger.info(s"Started initializing TrustSpecificScanList......")
       for {
         // bootstrap connection from one of the seed URLs.
         bootstrapConn <- _bootstrapConnection()
@@ -935,8 +936,15 @@ object BftScanConnection {
     // initial connection to a seed-url // when refresh is called
 
     private def _bootstrapConnection()(implicit
-        ec: ExecutionContext
+        ec: ExecutionContext,
+        tc: TraceContext,
     ): Future[SingleScanConnection] = {
+
+      val logger = loggerFactory.getTracedLogger(getClass)
+      logger.info(
+        s"Creating a bootstrap connection using one of provided svs or already existing connections"
+      )
+
       // check for an existing healthy connection in the current state.
       stateRef.get().values.collectFirst { case Right(conn) => conn } match {
         case Some(existingConnection) =>
@@ -949,7 +957,10 @@ object BftScanConnection {
             .traverse(uri => builder(uri, amuletRulesCacheTimeToLive).transform(Success(_)))
             .map(_.collectFirst { case Success(conn) => conn })
             .flatMap {
-              case Some(newConnection) => Future.successful(newConnection)
+              case Some(newConnection) => {
+                logger.info(s"Created a new bootstrap connection")
+                Future.successful(newConnection)
+              }
               case None =>
                 Future.failed(
                   Status.UNAVAILABLE
@@ -966,6 +977,8 @@ object BftScanConnection {
         tc: TraceContext,
         ec: ExecutionContext,
     ): Future[Seq[DsoScan]] = {
+      val logger = loggerFactory.getTracedLogger(getClass)
+      logger.info(s"Getting all available scans..")
       Bft.getScansInDsoRules(bootstrapConnection)
     }
 
@@ -973,7 +986,7 @@ object BftScanConnection {
         allScans: Seq[DsoScan]
     )(implicit
         ec: ExecutionContext,
-      tc: TraceContext
+        tc: TraceContext,
     ): Future[Map[String, Either[Throwable, SingleScanConnection]]] = {
       val trustedSvsSet = sv_names.toList.toSet
       val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
@@ -995,7 +1008,7 @@ object BftScanConnection {
 
     private def _verifyThreshold(
         connections: Map[String, Either[Throwable, SingleScanConnection]]
-    ): Unit = {
+    )(implicit tc: TraceContext): Unit = {
       val successfulCount = connections.values.count(_.isRight)
       val requiredCount = threshold.getOrElse((sv_names.size / 3) + 1)
 
@@ -1007,6 +1020,9 @@ object BftScanConnection {
               s"Required: $requiredCount, Connected: $successfulCount. Scan apps failed or missing from network: $failedNames."
           )
           .asRuntimeException()
+      } else {
+        val logger = loggerFactory.getTracedLogger(getClass)
+        logger.info(s"created threshold number of scan connections.")
       }
     }
 
@@ -1072,6 +1088,9 @@ object BftScanConnection {
       val currentState = stateRef.get()
       val discoveredUrls = allScans.map(s => s.svName -> s.publicUrl).toMap
 
+      val logger = loggerFactory.getTracedLogger(getClass)
+      logger.info(s"Reconciliating the scan connections")
+
       // for every trusted SV, decide its new connection.
       MonadUtil
         .sequentialTraverse(sv_names.toList) { svName =>
@@ -1079,22 +1098,36 @@ object BftScanConnection {
             // case 1: connection exists. check if it's healthy.
             case (Some(Right(conn)), _) =>
               _checkConnectionHealth(conn).flatMap {
-                case true => Future.successful(Right(conn)) // healthy: keep it
+                case true => {
+                  logger.info(s"Existing scan connection is healthy ${conn.url}")
+                  Future.successful(Right(conn))
+                } // healthy: keep it
                 case false => // unhealthy: reconnect using its discovered URL.
-                  discoveredUrls.get(svName) match {
-                    case Some(url) => builder(url, amuletRulesCacheTimeToLive).map(Right(_))
-                    case None =>
-                      Future.successful(
-                        Left(
-                          new IllegalStateException(
-                            s"SV '$svName' is unhealthy and not found in DSO list."
+                  {
+                    logger.info(
+                      s"Existing scan connection broken ${conn.url}. Attempting to reconnect"
+                    )
+                    discoveredUrls.get(svName) match {
+                      case Some(url) => {
+                        logger.info(s"Created new scan connection to ${url}")
+                        builder(url, amuletRulesCacheTimeToLive).map(Right(_))
+                      }
+                      case None =>
+                        Future.successful(
+                          Left(
+                            new IllegalStateException(
+                              s"SV '$svName' is unhealthy and not found in DSO list."
+                            )
                           )
                         )
-                      )
+                    }
                   }
               }
             // case 2: connection is not currently available. connect now.
-            case (_, Some(url)) => builder(url, amuletRulesCacheTimeToLive).map(Right(_))
+            case (_, Some(url)) => {
+              logger.info(s"Existing scan connection is not available, reconnecting ${url}")
+              builder(url, amuletRulesCacheTimeToLive).map(Right(_))
+            }
             // case 3: no connection and it's not in the DSO list.
             case (_, None) =>
               Future.successful(
