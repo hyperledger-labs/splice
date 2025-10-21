@@ -6,7 +6,13 @@ import dayjs from 'dayjs';
 import React from 'react';
 
 import { Chip, Typography } from '@mui/material';
-import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
+import {
+  DataGrid,
+  GridColDef,
+  GridEventListener,
+  GridRenderCellParams,
+  GridRowParams,
+} from '@mui/x-data-grid';
 
 import {
   ActionRequiringConfirmation,
@@ -28,7 +34,7 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
   openModalWithVoteRequest,
   tableBodyId,
 }) => {
-  const columns = [
+  const columns: GridColDef[] = [
     {
       field: 'action',
       headerName: 'Action',

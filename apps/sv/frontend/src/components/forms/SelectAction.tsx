@@ -74,7 +74,7 @@ export const SelectAction: React.FC = () => {
                       field.handleChange(e.target.value as string)
                     }
                     onBlur={field.handleBlur}
-                    placeholder="Select an action"
+                    // no "placeholder" prop in MUI 7
                   >
                     {createProposalActions.map(actionName => (
                       <MenuItem

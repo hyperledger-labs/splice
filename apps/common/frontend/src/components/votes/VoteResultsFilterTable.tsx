@@ -15,6 +15,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import { Chip, Stack, Typography } from '@mui/material';
 import {
   DataGrid,
+  GridColDef,
   GridEventListener,
   GridFilterItem,
   GridFilterModel,
@@ -145,7 +146,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
     return <p>Error, something went wrong.</p>;
   }
 
-  const columns = [
+  const columns: GridColDef[] = [
     {
       field: 'actionName',
       headerName: 'Action Name',
