@@ -79,22 +79,8 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
-const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
-export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
-  lowResourceSequencer
-    ? {
-        resources: {
-          limits: {
-            cpu: '3',
-            memory: '4Gi',
-          },
-          requests: {
-            cpu: '1',
-            memory: '2Gi',
-          },
-        },
-      }
-    : {};
+export const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
+
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );

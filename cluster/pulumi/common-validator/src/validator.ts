@@ -22,6 +22,7 @@ import {
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  K8sResourceSchema,
   LogLevel,
   networkWideConfig,
   participantBootstrapDumpSecretName,
@@ -80,6 +81,7 @@ type BasicValidatorConfig = {
   participantPruningConfig?: ParticipantPruningConfig;
   deduplicationDuration?: string;
   logLevel?: LogLevel;
+  resources?: K8sResourceSchema;
 };
 
 export type ValidatorInstallConfig = BasicValidatorConfig & {
@@ -236,16 +238,7 @@ export async function installValidatorApp(
       deduplicationDuration: config.deduplicationDuration,
       maxVettingDelay: networkWideConfig?.maxVettingDelay,
       logLevel: config.logLevel,
-      resources: baseConfig.svValidator
-        ? {
-            requests: {
-              memory: '2Gi',
-            },
-            limits: {
-              memory: '4Gi',
-            },
-          }
-        : {},
+      resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
     },
     chartVersion,

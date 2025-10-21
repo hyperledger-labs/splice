@@ -9,7 +9,6 @@ import {
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
-  K8sResourceSchema,
   SvCometBftGovernanceKey,
   SvIdKey,
   ValidatorTopupConfig,
@@ -94,9 +93,6 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
 export const SvConfigSchema = z.object({
   sv: z
     .object({
-      participant: z.object({
-        resources: K8sResourceSchema,
-      }),
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
@@ -115,7 +111,6 @@ export const SvConfigSchema = z.object({
             })
             .optional(),
           externalRateLimits: RateLimitSchema,
-          resources: K8sResourceSchema,
         })
         .optional(),
       synchronizer: z
