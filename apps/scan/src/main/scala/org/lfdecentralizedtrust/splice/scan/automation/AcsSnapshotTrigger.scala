@@ -183,7 +183,8 @@ class AcsSnapshotTrigger(
             s"SynchronizerId with no data in $migrationRecordTimeRange"
           )
         )
-      migrationLastedLongEnough = minTime
+      firstSnapshotTime = computeFirstSnapshotTime(minTime)
+      migrationLastedLongEnough = firstSnapshotTime
         .plus(Duration.ofHours(snapshotPeriodHours.toLong))
         .isBefore(maxTime)
       latestSnapshot <- store
@@ -267,19 +268,26 @@ class AcsSnapshotTrigger(
           logger.info(s"No updates other than ACS imports found. Retrying snapshot creation later.")
           None
         case Some(firstNonAcsImport) =>
-          val firstNonAcsImportRecordTime =
-            firstNonAcsImport.update.update.recordTime.toInstant.atOffset(ZoneOffset.UTC)
-          val (hourForSnapshot, plusDays) = timesToDoSnapshot
-            .find(_ > firstNonAcsImportRecordTime.get(ChronoField.HOUR_OF_DAY)) match {
-            case Some(hour) => hour -> 0 // current day at hour
-            case None => 0 -> 1 // next day at 00:00
-          }
-          val until = firstNonAcsImportRecordTime.toLocalDate
-            .plusDays(plusDays.toLong)
-            .atTime(hourForSnapshot, 0)
-            .toInstant(ZoneOffset.UTC)
-          Some(AcsSnapshotTrigger.Task(CantonTimestamp.assertFromInstant(until), migrationId, None))
+          val firstNonAcsImportRecordTime = firstNonAcsImport.update.update.recordTime
+          Some(
+            AcsSnapshotTrigger
+              .Task(computeFirstSnapshotTime(firstNonAcsImportRecordTime), migrationId, None)
+          )
       }
+  }
+
+  private def computeFirstSnapshotTime(firstNonAcsImportRecordTime: CantonTimestamp) = {
+    val firstSnapshotUTCTime = firstNonAcsImportRecordTime.toInstant.atOffset(ZoneOffset.UTC)
+    val (hourForSnapshot, plusDays) = timesToDoSnapshot
+      .find(_ > firstSnapshotUTCTime.get(ChronoField.HOUR_OF_DAY)) match {
+      case Some(hour) => hour -> 0 // current day at hour
+      case None => 0 -> 1 // next day at 00:00
+    }
+    val until = firstSnapshotUTCTime.toLocalDate
+      .plusDays(plusDays.toLong)
+      .atTime(hourForSnapshot, 0)
+      .toInstant(ZoneOffset.UTC)
+    CantonTimestamp.assertFromInstant(until)
   }
 }
 
