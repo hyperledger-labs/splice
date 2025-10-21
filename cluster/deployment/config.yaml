@@ -125,12 +125,6 @@ sv:
       limits:
         memory: '18Gi'
   scan:
-    resources:
-      requests:
-        cpu: "0.5"
-        memory: '1536Mi'
-      limits:
-        memory: '2048Mi'
     externalRateLimits:
       globalLimits:
         maxTokens: 2147483647
