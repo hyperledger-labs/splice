@@ -2601,7 +2601,7 @@
                 {
                   "matchExpressions": [
                     {
-                      "key": "cn_apps",
+                      "key": "cn_infra",
                       "operator": "Exists"
                     }
                   ]
@@ -2626,7 +2626,7 @@
         "tolerations": [
           {
             "effect": "NoSchedule",
-            "key": "cn_apps",
+            "key": "cn_infra",
             "operator": "Exists"
           }
         ]
