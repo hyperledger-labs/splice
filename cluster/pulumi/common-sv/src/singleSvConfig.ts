@@ -4,6 +4,7 @@ import {
   KmsConfigSchema,
   LogLevelSchema,
   CloudSqlConfigSchema,
+  K8sResourceSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
@@ -19,6 +20,7 @@ const SvCometbftConfigSchema = z
     // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
     snapshotName: z.string().optional(),
+    resources: K8sResourceSchema,
   })
   .strict();
 const EnvVarConfigSchema = z.object({
@@ -33,6 +35,7 @@ const SvMediatorConfigSchema = z
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     cloudSql: CloudSqlWithOverrideConfigSchema,
+    resources: K8sResourceSchema,
   })
   .strict();
 const SvSequencerConfigSchema = z
@@ -40,6 +43,7 @@ const SvSequencerConfigSchema = z
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     cloudSql: CloudSqlWithOverrideConfigSchema,
+    resources: K8sResourceSchema,
   })
   .strict();
 const SvParticipantConfigSchema = z
@@ -49,6 +53,7 @@ const SvParticipantConfigSchema = z
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     cloudSql: CloudSqlWithOverrideConfigSchema,
+    resources: K8sResourceSchema,
   })
   .strict();
 const Auth0ConfigSchema = z
@@ -66,6 +71,7 @@ const SvAppConfigSchema = z
     svIdKeyGcpSecret: z.string().optional(),
     // defaults to {svName}-cometbft-governance-key if not set
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
+    resources: K8sResourceSchema,
   })
   .strict();
 const ScanAppConfigSchema = z
@@ -78,6 +84,7 @@ const ScanAppConfigSchema = z
       .optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
+    resources: K8sResourceSchema,
   })
   .strict();
 const SvValidatorAppConfigSchema = z
@@ -90,6 +97,7 @@ const SvValidatorAppConfigSchema = z
       })
       .optional(),
     auth0: Auth0ConfigSchema.optional(),
+    resources: K8sResourceSchema,
   })
   .and(ValidatorAppConfigSchema);
 // https://docs.cometbft.com/main/explanation/core/running-in-production

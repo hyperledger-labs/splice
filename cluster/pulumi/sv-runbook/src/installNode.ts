@@ -329,6 +329,7 @@ async function installSvAndValidator(
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
+    resources: svConfig.svApp?.resources,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -393,6 +394,7 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
+    resources: svConfig.scanApp?.resources,
   };
 
   const scanValuesWithFixedTokens = {
@@ -439,6 +441,7 @@ async function installSvAndValidator(
     ),
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
+    resources: svConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

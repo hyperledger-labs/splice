@@ -481,6 +481,15 @@
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -834,6 +843,15 @@
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
           "publicUrl": "https://scan.sv.mock.global.canton.network.digitalasset.com"
@@ -1144,6 +1162,15 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scanAddress": "http://scan-app.sv:5012",
         "spliceInstanceNames": {

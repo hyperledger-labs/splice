@@ -403,6 +403,7 @@ async function installValidator(
       ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
     additionalJvmOptions: svConfig.validatorApp?.additionalJvmOptions || '',
+    resources: svConfig.validatorApp?.resources,
   });
 
   return validator;
@@ -532,6 +533,7 @@ function installSvApp(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars,
+    resources: config.svApp?.resources,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -602,7 +604,7 @@ function installScan(
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
-    resources: svsConfig?.scan?.resources,
+    resources: config.scanApp?.resources,
   };
 
   if (svsConfig?.scan?.externalRateLimits) {
