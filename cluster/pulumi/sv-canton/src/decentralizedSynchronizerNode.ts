@@ -121,7 +121,7 @@ abstract class InStackDecentralizedSynchronizerNode
                     },
                   },
                 }
-              : svConfig.mediator?.resources,
+              : svConfig.sequencer?.resources,
           },
           mediator: {
             ...decentralizedSynchronizerValues.mediator,
