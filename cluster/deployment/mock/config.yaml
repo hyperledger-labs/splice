@@ -145,10 +145,9 @@ svs:
       additionalJvmOptions: "-DcustomParticipantJvmFlag"
       resources:
         requests:
-          cpu: "1"
-          memory: '18Gi'
-        limits:
           memory: '12Gi'
+        limits:
+          memory: '18Gi'
     sequencer:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
