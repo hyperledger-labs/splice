@@ -886,6 +886,9 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
     'grafana-pg',
     'grafana-pg-secret',
     { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
-    true // overrideDbSizeFromValues
+    true, // overrideDbSizeFromValues
+    false, // disableProtection
+    undefined, // chart version
+    true // useInfraAffinityAndTolerations
   );
 }
