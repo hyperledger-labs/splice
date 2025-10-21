@@ -972,18 +972,24 @@ object BftScanConnection {
     private def _attemptTrustedConnections(
         allScans: Seq[DsoScan]
     )(implicit
-        ec: ExecutionContext
+        ec: ExecutionContext,
+      tc: TraceContext
     ): Future[Map[String, Either[Throwable, SingleScanConnection]]] = {
       val trustedSvsSet = sv_names.toList.toSet
       val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
-
+      val logger = loggerFactory.getTracedLogger(getClass)
       MonadUtil
-        .sequentialTraverse(targetScans)(scan =>
+        .sequentialTraverse(targetScans) { scan =>
           builder(scan.publicUrl, amuletRulesCacheTimeToLive)
-            .map[Either[Throwable, SingleScanConnection]](Right(_))
-            .recover { case NonFatal(ex) => Left(ex) }
-            .map(result => scan.svName -> result)
-        )
+            .transform {
+              case Success(conn) =>
+                logger.info(s"Connection to trusted sv ${scan.svName} made.")
+                Success(scan.svName -> Right(conn))
+              case Failure(ex) =>
+                logger.warn(s"Could not make connection to sv ${scan.svName}.", ex)
+                Success(scan.svName -> Left(ex))
+            }
+        }
         .map(_.toMap)
     }
 
