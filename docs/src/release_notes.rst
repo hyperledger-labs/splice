@@ -21,6 +21,12 @@ Upcoming
       many (by default 10k) markers, and that minimizes contention using random sampling of batches when the automation
       is in catchup mode because there are too many markers.
       Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
+      
+  - Scan
+
+    - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
+      Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
+      or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
 
 0.4.21
 ------
