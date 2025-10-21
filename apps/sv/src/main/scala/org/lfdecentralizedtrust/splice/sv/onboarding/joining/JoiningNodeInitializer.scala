@@ -175,7 +175,7 @@ class JoiningNodeInitializer(
       migrationInfo =
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId,
-          acsRecordTime = None, // This SV doesn't know about any migrations
+          migrationTimeInfo = None, // This SV doesn't know about any migrations
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)

@@ -67,6 +67,7 @@ class DomainDataSnapshotGenerator(
     acsSnapshot,
     acsTimestamp = timestamp,
     dars,
+    synchronizerWasPaused = false,
   )
 
   // This is the safe version used for migrations that exports at the timestamp where we pause the synchronizer.
@@ -146,6 +147,7 @@ class DomainDataSnapshotGenerator(
       acsSnapshot,
       acsTimestamp,
       dars,
+      synchronizerWasPaused = true,
     )
     logger.info(show"Finished generating $result")
     result

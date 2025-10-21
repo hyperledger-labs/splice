@@ -827,7 +827,10 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
     val participantId = mkParticipantId("ScanEventStoreTest")
     val uh = new UpdateHistory(
       storage.underlying,
-      new DomainMigrationInfo(migrationId, None),
+      new DomainMigrationInfo(
+        migrationId,
+        None,
+      ),
       "scan_event_store_test",
       participantId,
       dsoParty,

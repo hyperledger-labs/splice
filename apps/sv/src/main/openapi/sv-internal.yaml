@@ -648,7 +648,7 @@ components:
           minimum: 1
         party_hint:
           description: |
-            Optional alias for the validator party. If provided, it is persisted in the 
+            Optional alias for the validator party. If provided, it is persisted in the
             onboarding secret and stored in the database as the expected party identifier.
           type: string
 
@@ -676,7 +676,7 @@ components:
           type: string
         party_hint:
           description: |
-            Alias of the validator party. 
+            Alias of the validator party.
             Must match the persisted value in the onboarding secret.
           type: string
 
@@ -1074,6 +1074,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Dar"
+        synchronizer_was_paused:
+          type: boolean
 
     Dar:
       type: object
