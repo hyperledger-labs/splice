@@ -1769,6 +1769,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
           "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com"
@@ -2593,6 +2602,15 @@
           "schema": "sv_sv_da_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-da-1:5012",

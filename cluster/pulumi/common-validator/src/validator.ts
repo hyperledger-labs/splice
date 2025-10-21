@@ -22,6 +22,7 @@ import {
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  K8sResourceSchema,
   LogLevel,
   networkWideConfig,
   participantBootstrapDumpSecretName,
@@ -81,6 +82,7 @@ type BasicValidatorConfig = {
   deduplicationDuration?: string;
   disableAuth?: boolean;
   logLevel?: LogLevel;
+  resources?: K8sResourceSchema;
 };
 
 export type ValidatorInstallConfig = BasicValidatorConfig & {
