@@ -267,7 +267,7 @@ class ManualStartIntegrationTest
           def initializeWithKeyReuse(connection: ParticipantAdminConnection, name: String): Unit = {
             // Eventually, because the query to the server will fail while the server is still starting up
             // Long timeout because Canton is slow to start up
-            eventually(timeUntilSuccess = 60.seconds) {
+            eventually(timeUntilSuccess = 120.seconds) {
 
               val signingKey =
                 connection.generateKeyPair("signing", SigningKeyUsage.All).futureValue
