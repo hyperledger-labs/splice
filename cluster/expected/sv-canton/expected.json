@@ -2463,11 +2463,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "12Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "1Gi"
+            "memory": "18Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -2623,11 +2623,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "12Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "1Gi"
+            "memory": "18Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -4640,11 +4640,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "12Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "1Gi"
+            "memory": "18Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -4825,11 +4825,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "12Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "1Gi"
+            "memory": "18Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -6271,11 +6271,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "12Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "1Gi"
+            "memory": "18Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -6431,11 +6431,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "12Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "1Gi"
+            "memory": "18Gi"
           }
         },
         "serviceAccountName": "sv-canton-migration-4",

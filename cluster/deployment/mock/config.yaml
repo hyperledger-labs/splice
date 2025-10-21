@@ -146,9 +146,9 @@ svs:
       resources:
         requests:
           cpu: "1"
-          memory: '1Gi'
+          memory: '18Gi'
         limits:
-          memory: '2Gi'
+          memory: '12Gi'
     sequencer:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME

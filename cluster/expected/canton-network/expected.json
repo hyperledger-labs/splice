@@ -1888,10 +1888,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
@@ -2722,10 +2723,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-da-1:5012",

@@ -254,16 +254,7 @@ export async function installValidatorApp(
       maxVettingDelay: networkWideConfig?.maxVettingDelay,
       disableAuth: baseConfig.disableAuth || false,
       logLevel: config.logLevel,
-      resources: baseConfig.svValidator
-        ? {
-            requests: {
-              memory: '2Gi',
-            },
-            limits: {
-              memory: '4Gi',
-            },
-          }
-        : {},
+      resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
     },
     chartVersion,
