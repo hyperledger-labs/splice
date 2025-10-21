@@ -8,6 +8,20 @@
 Release Notes
 =============
 
+0.4.22
+------
+
+  - SV
+
+    - Improve throughput of ``FeaturedAppActivityMarkerTrigger``, which converts ``FeaturedAppActivityMarker`` contracts
+      to ``AppRewardCoupon`` contracts as described in `CIP-0047 Featured App Activity Markers <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__.
+      The new implementation uses larger batches (100 markers by default, instead of 5) and
+      parallelizes their execution (by default up to 4x).
+      The work is split between different SVs in a way that completely avoids contention when there are not too
+      many (by default 10k) markers, and that minimizes contention using random sampling of batches when the automation
+      is in catchup mode because there are too many markers.
+      Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
+
 0.4.21
 ------
 
