@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.migration.{
   DomainDataRestorer,
   DomainMigrationInfo,
+  MigrationTimeInfo,
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.store.{
@@ -165,8 +166,11 @@ class DomainMigrationInitializer(
       migrationInfo =
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId,
-          acsRecordTime = Some(
-            CantonTimestamp.assertFromInstant(migrationDump.domainDataSnapshot.acsTimestamp)
+          migrationTimeInfo = Some(
+            MigrationTimeInfo(
+              CantonTimestamp.assertFromInstant(migrationDump.domainDataSnapshot.acsTimestamp),
+              synchronizerWasPaused = migrationDump.domainDataSnapshot.synchronizerWasPaused,
+            )
           ),
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)

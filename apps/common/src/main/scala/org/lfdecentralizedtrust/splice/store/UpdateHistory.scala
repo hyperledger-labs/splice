@@ -737,16 +737,80 @@ class UpdateHistory(
       historyId: Long
   )(implicit tc: TraceContext): Future[Unit] = {
     val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
-    domainMigrationInfo.acsRecordTime match {
-      case Some(acsRecordTime) =>
+    domainMigrationInfo.migrationTimeInfo match {
+      case Some(info) =>
         for {
-          _ <- deleteAcsSnapshotsAfter(historyId, previousMigrationId, acsRecordTime)
-          _ <- deleteRolledBackUpdateHistory(historyId, previousMigrationId, acsRecordTime)
+          _ <-
+            if (info.synchronizerWasPaused) {
+              for {
+                _ <- verifyNoRolledBackAcsSnapshots(
+                  historyId,
+                  previousMigrationId,
+                  info.acsRecordTime,
+                )
+                _ <- verifyNoRolledBackData(historyId, previousMigrationId, info.acsRecordTime)
+              } yield ()
+            } else {
+              for {
+                _ <- deleteAcsSnapshotsAfter(historyId, previousMigrationId, info.acsRecordTime)
+                _ <- deleteRolledBackUpdateHistory(
+                  historyId,
+                  previousMigrationId,
+                  info.acsRecordTime,
+                )
+              } yield ()
+            }
         } yield ()
       case _ =>
         logger.debug("No previous domain migration, not checking or deleting updates")
         Future.unit
     }
+  }
+
+  private[this] def verifyNoRolledBackData(
+      historyId: Long, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val action = DBIO
+      .sequence(
+        Seq(
+          sql"""
+            select count(*) from update_history_creates
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_exercises
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_transactions
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_assignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_unassignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+        )
+      )
+      .map(rows =>
+        if (rows.sum > 0) {
+          throw new IllegalStateException(
+            s"Found $rows rows for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
+              "but the configuration says the domain was paused during the migration. " +
+              "Check the domain migration configuration and the content of the update history database."
+          )
+        } else {
+          logger.debug(
+            s"No updates found for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime"
+          )
+        }
+      )
+    storage.query(action, "verifyNoRolledBackData")
   }
 
   private[this] def deleteRolledBackUpdateHistory(
@@ -840,6 +904,37 @@ class UpdateHistory(
       .queryAndUpdate(
         deleteAction.transactionally,
         "deleteAcsSnapshotsAfter",
+      )
+  }
+
+  def verifyNoRolledBackAcsSnapshots(
+      historyId: Long,
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val action = sql"""
+          select snapshot_record_time from acs_snapshot
+          where history_id = $historyId and migration_id = $migrationId and snapshot_record_time > $recordTime
+        """
+      .as[CantonTimestamp]
+      .map(times =>
+        if (times.length > 0) {
+          throw new IllegalStateException(
+            s"Found acs snapshots at $times for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
+              "but the configuration says the domain was paused during the migration. " +
+              "Check the domain migration configuration and the content of the update history database"
+          )
+        } else {
+          logger.debug(
+            s"No updates found for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime"
+          )
+        }
+      )
+
+    storage
+      .query(
+        action,
+        "verifyNoRolledBackAcsSnapshots",
       )
   }
 
