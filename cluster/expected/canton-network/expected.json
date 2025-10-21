@@ -1769,6 +1769,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
           "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com"
@@ -1879,10 +1888,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
@@ -2594,6 +2604,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        },
         "scan": {
           "internalUrl": "http://scan-app.sv-da-1:5012",
           "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com"
@@ -2704,10 +2723,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-da-1:5012",
