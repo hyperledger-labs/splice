@@ -18,6 +18,7 @@ multiValidator:
 sv:
   synchronizer:
     skipInitialization: true
+    topologyChangeDelay: 250ms
   scan:
     resources:
       requests:
