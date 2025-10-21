@@ -463,11 +463,20 @@ describe('Wallet user can', () => {
   });
 
   test('see two-step transfers in transaction history', async () => {
+    const user = userEvent.setup();
     render(
       <WalletConfigProvider>
         <App />
       </WalletConfigProvider>
     );
+
+    expect(await screen.findByText('Transactions')).toBeDefined();
+
+    const transactionsLink = screen.getByRole('link', { name: 'Transactions' });
+    await user.click(transactionsLink);
+
+    await vi.waitFor(() => expect(screen.findByText('Transaction History')).toBeDefined());
+
     expect(await screen.findByText('(Transfer offer 009a97ffdf… accepted)')).toBeDefined();
     expect(
       await screen.findByText(

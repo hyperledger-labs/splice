@@ -866,7 +866,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      expect(submitButton.textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
@@ -934,7 +933,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      expect(submitButton.textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');

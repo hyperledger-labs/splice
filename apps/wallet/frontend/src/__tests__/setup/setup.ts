@@ -8,6 +8,7 @@ import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 import { buildServer } from '../mocks/server';
 import { config } from './config';
+import { DetachedWindowAPI } from 'happy-dom';
 
 // Provide an implementation for webcrypto when generating insecure jwts in the app
 vi.stubGlobal('crypto', crypto.webcrypto);
@@ -20,6 +21,7 @@ window.splice_config = config;
 declare global {
   interface Window {
     splice_config: typeof config; // (make typescript happy)
+    happyDOM: DetachedWindowAPI;
   }
 }
 

@@ -166,7 +166,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
   }
 
   const voteRequestsData = listVoteRequestsQuery.data ? [...listVoteRequestsQuery.data] : [];
-  const voteRequests = voteRequestsData.sort((a, b) => {
+  const voteRequests = voteRequestsData.toSorted((a, b) => {
     const createdAtA = a.createdAt;
     const createdAtB = b.createdAt;
     if (createdAtA === createdAtB) {

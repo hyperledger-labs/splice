@@ -80,7 +80,7 @@ const SetAmuletRulesConfig: React.FC<{
   return (
     <Stack direction="column" mb={4} spacing={1}>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
-        <Typography variant="h6" mt={4}>
+        <Typography variant="h6" mt={4} data-testid="set-amulet-rules-config-header">
           Configuration
         </Typography>
         <JsonEditor data={configuration!} onChange={setAmuletConfigAction} />
