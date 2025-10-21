@@ -167,6 +167,25 @@ class AcsSnapshotTrigger(
   ): Future[Option[AcsSnapshotTrigger.Task]] = {
     for {
       migrationRecordTimeRange <- updateHistory.getRecordTimeRange(migrationIdToBackfill)
+      maxTime = migrationRecordTimeRange
+        .map(_._2.max)
+        .maxOption
+        .getOrElse(
+          throw new IllegalStateException(
+            s"SynchronizerId with no data in $migrationRecordTimeRange"
+          )
+        )
+      minTime = migrationRecordTimeRange
+        .map(_._2.min)
+        .minOption
+        .getOrElse(
+          throw new IllegalStateException(
+            s"SynchronizerId with no data in $migrationRecordTimeRange"
+          )
+        )
+      migrationLastedLongEnough = minTime
+        .plus(Duration.ofHours(snapshotPeriodHours.toLong))
+        .isBefore(maxTime)
       latestSnapshot <- store
         .lookupSnapshotBefore(migrationIdToBackfill, CantonTimestamp.MaxValue)
       task <- latestSnapshot match {
@@ -176,14 +195,7 @@ class AcsSnapshotTrigger(
         case Some(snapshot)
             if snapshot.snapshotRecordTime.plus(
               Duration.ofHours(snapshotPeriodHours.toLong)
-            ) > migrationRecordTimeRange
-              .map(_._2.max)
-              .maxOption
-              .getOrElse(
-                throw new IllegalStateException(
-                  s"SynchronizerId with no data in $migrationRecordTimeRange"
-                )
-              ) =>
+            ) > maxTime =>
           logger.info(
             s"Backfilling of migration id $migrationIdToBackfill is complete. Trying with next oldest."
           )
@@ -196,6 +208,12 @@ class AcsSnapshotTrigger(
                 .Task(nextSnapshotTime(snapshot), migrationIdToBackfill, Some(snapshot))
             )
           )
+        case None if !migrationLastedLongEnough =>
+          logger.info(
+            s"Migration id $migrationIdToBackfill didn't last more than $snapshotPeriodHours hours (from $minTime to $maxTime), so it won't have any snapshots."
+          )
+          lastCompleteBackfilledMigrationId.set(Right(migrationIdToBackfill))
+          taskToContinueBackfillingACSSnapshots().value
         case None =>
           firstSnapshotForMigrationIdTask(migrationIdToBackfill)
       }
