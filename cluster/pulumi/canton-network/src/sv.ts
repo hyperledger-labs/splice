@@ -593,6 +593,7 @@ function installScan(
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
+    resources: svsConfig?.scan?.resources,
   };
 
   if (svsConfig?.scan?.externalRateLimits) {
