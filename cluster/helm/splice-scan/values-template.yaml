@@ -11,10 +11,10 @@ pod:
 defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=70 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 resources:
   limits:
-    memory: 2048Mi
+    memory: 4Gi
   requests:
-    cpu: "0.5"
-    memory: 1536Mi
+    cpu: "1"
+    memory: 2Gi
 
 metrics:
   enable: false
