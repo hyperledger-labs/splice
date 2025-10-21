@@ -913,15 +913,14 @@ class UpdateHistory(
       recordTime: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Unit] = {
     val action = sql"""
-          select count(*) from acs_snapshot
+          select snapshot_record_time from acs_snapshot
           where history_id = $historyId and migration_id = $migrationId and snapshot_record_time > $recordTime
         """
-      .as[Long]
-      .head
-      .map(rows =>
-        if (rows > 0) {
+      .as[CantonTimestamp]
+      .map(times =>
+        if (times.length > 0) {
           throw new IllegalStateException(
-            s"Found ${rows} acs snapshots for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
+            s"Found acs snapshots at $times for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
               "but the configuration says the domain was paused during the migration. " +
               "Check the domain migration configuration and the content of the update history database"
           )
