@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
+import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
@@ -484,6 +485,27 @@ class ScanTimeBasedIntegrationTest
       partyIds = Some(Vector(aliceUserParty)),
     )
 
+    advanceTime(java.time.Duration.ofMinutes(10))
+
+    val atOrBefore = getLedgerTime
+
+    // afOrBefore should return the same ACS snapshot as the exact time given by snapshotAfter
+    val snapshotAtOrBeforeAfterData = sv1ScanBackend.getAcsSnapshotAt(
+      CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
+      migrationId,
+      recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.AtOrBefore),
+      templates = Some(
+        Vector(
+          PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+          PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
+        )
+      ),
+      partyIds = Some(Vector(aliceUserParty)),
+    )
+
+    snapshotAfterData shouldBe snapshotAtOrBeforeAfterData
+    snapshotAtOrBeforeAfterData.value.recordTime shouldBe snapshotAfter.value
+
     inside(snapshotAfterData) { case Some(data) =>
       val (entries, coins) =
         data.createdEvents.partition(
@@ -507,6 +529,21 @@ class ScanTimeBasedIntegrationTest
       )
       inside(holdingsState) { case Some(holdings) =>
         holdings.createdEvents should be(coins)
+      }
+
+      // afOrBefore should return the same holdingsState as the exact time given by snapshotAfter
+      advanceTime(java.time.Duration.ofMinutes(10))
+      val atOrBefore = getLedgerTime
+
+      val holdingsStateAtOrBefore = sv1ScanBackend.getHoldingsStateAt(
+        CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
+        migrationId,
+        partyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.AtOrBefore),
+      )
+      inside(holdingsStateAtOrBefore) { case Some(holdings) =>
+        holdings.createdEvents should be(coins)
+        holdings.recordTime shouldBe snapshotAfter.value
       }
     }
   }
