@@ -1576,10 +1576,8 @@ class DbSvDsoStore(
             acsStoreId,
             domainMigrationId,
             FeaturedAppActivityMarker.COMPANION,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              AND $contractIdHashLbIncl <= stable_int32_hash(contract_id)
+            where = sql"""
+                  $contractIdHashLbIncl <= stable_int32_hash(contract_id)
               AND stable_int32_hash(contract_id) <= $contractIdHashUbIncl
             """,
             orderLimit = sql"""order by stable_int32_hash(contract_id) limit $limit""",

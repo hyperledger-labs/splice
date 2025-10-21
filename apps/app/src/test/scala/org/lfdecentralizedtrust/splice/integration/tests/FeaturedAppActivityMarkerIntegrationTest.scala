@@ -74,42 +74,48 @@ class FeaturedAppActivityMarkerIntegrationTest
     actAndCheck(
       "Create activity markers", {
         for (i <- 1 to markerMultiplier) {
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              Seq(alice),
-              commands = aliceFeaturedAppRightCid
-                .exerciseFeaturedAppRight_CreateActivityMarker(
-                  Seq(
-                    new featuredapprightv1.AppRewardBeneficiary(
-                      alice.toProtoPrimitive,
-                      BigDecimal(0.2).bigDecimal,
-                    ),
-                    new featuredapprightv1.AppRewardBeneficiary(
-                      charlie.toProtoPrimitive,
-                      BigDecimal(0.8).bigDecimal,
-                    ),
-                  ).asJava
-                )
-                .commands
-                .asScala
-                .toSeq,
-            )
-          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              Seq(bob),
-              commands = bobFeaturedAppRightCid
-                .exerciseFeaturedAppRight_CreateActivityMarker(
-                  Seq(
-                    new featuredapprightv1.AppRewardBeneficiary(
-                      bob.toProtoPrimitive,
-                      BigDecimal(1.0).bigDecimal,
-                    )
-                  ).asJava
-                )
-                .commands
-                .asScala
-                .toSeq,
-            )
+          // Added the 'eventually' here and below because sometimes the command submissions fail due to synchronizers not being
+          // connected early enough. See https://github.com/DACH-NY/cn-test-failures/issues/6024 for some context.
+          eventually(retryOnTestFailuresOnly = false)(
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+              .submitJava(
+                Seq(alice),
+                commands = aliceFeaturedAppRightCid
+                  .exerciseFeaturedAppRight_CreateActivityMarker(
+                    Seq(
+                      new featuredapprightv1.AppRewardBeneficiary(
+                        alice.toProtoPrimitive,
+                        BigDecimal(0.2).bigDecimal,
+                      ),
+                      new featuredapprightv1.AppRewardBeneficiary(
+                        charlie.toProtoPrimitive,
+                        BigDecimal(0.8).bigDecimal,
+                      ),
+                    ).asJava
+                  )
+                  .commands
+                  .asScala
+                  .toSeq,
+              )
+          )
+          eventually(retryOnTestFailuresOnly = false)(
+            bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+              .submitJava(
+                Seq(bob),
+                commands = bobFeaturedAppRightCid
+                  .exerciseFeaturedAppRight_CreateActivityMarker(
+                    Seq(
+                      new featuredapprightv1.AppRewardBeneficiary(
+                        bob.toProtoPrimitive,
+                        BigDecimal(1.0).bigDecimal,
+                      )
+                    ).asJava
+                  )
+                  .commands
+                  .asScala
+                  .toSeq,
+              )
+          )
         }
         // unpause all activity marker triggers here, so they can start to get to work
         env.svs.local.foreach(
