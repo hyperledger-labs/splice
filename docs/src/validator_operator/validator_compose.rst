@@ -185,7 +185,9 @@ AUTH_URL                      The URL of your OIDC provider for obtaining the ``
 AUTH_JWKS_URL                 The URL of your OIDC provider for obtaining the ``jwks.json``, will typically be ``${AUTH_URL}/.well-known/jwks.json``.
 AUTH_WELLKNOWN_URL            The URL of your OIDC provider for obtaining the ``openid-configuration``, will typically be ``${AUTH_URL}/.well-known/openid-configuration``.
 LEDGER_API_AUTH_AUDIENCE      The audience for the participant ledger API. e.g. ``https://ledger_api.example.com``.
-LEDGER_API_AUTH_SCOPE         The scope for the participant ledger API. Optional
+                              This will set the ``ledger-api.auth-services.target-audience`` configuration for the participant.
+LEDGER_API_AUTH_SCOPE         The scope for the participant ledger API.
+                              This will set the participant's ``ledger-api.auth-services.target-scope`` configuration. Optional
 VALIDATOR_AUTH_AUDIENCE       The audience for the validator backend API. e.g. ``https://validator.example.com``.
 VALIDATOR_AUTH_CLIENT_ID      The client id of the OAuth app for the validator app backend.
 VALIDATOR_AUTH_CLIENT_SECRET  The client secret of the OAuth app for the validator app backend.
