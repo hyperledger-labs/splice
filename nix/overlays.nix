@@ -1,16 +1,9 @@
 { use_enterprise }:
 [(self: super: {
-  openapi-generator-cli = (super.openapi-generator-cli.override { jre_headless = super.openjdk21; }).overrideAttrs(oldAttrs: rec {
-    # 7.0.1 causes some issues in the generated package.json which break module resolution.
-    version = "6.6.0";
-    jarfilename = "${oldAttrs.pname}-${version}.jar";
-    src = super.fetchFromGitHub {
-      owner = "OpenAPITools";
-      repo = "openapi-generator";
-      tag = "v${version}";
-      hash = "sha256-IgjlMOHMASijIt5nMqOZcUpxecbWljHh9rA1YUwUmwM=";
-    };
-  });
+  # We need the old version as our code is not compatible with the new one.
+  # Just overwriting the version does not work as they changed the build code to be
+  # incompatible with the new one.
+  openapi-generator-cli = super.callPackage ./openapi-generator-cli.nix {};
   jre = super.openjdk21;
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {inherit use_enterprise;};
