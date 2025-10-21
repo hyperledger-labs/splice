@@ -1064,6 +1064,7 @@ object HttpScanAppClient {
   case class GetAcsSnapshotAt(
       at: java.time.OffsetDateTime,
       migrationId: Long,
+      recordTimeMatch: Option[definitions.AcsRequest.RecordTimeMatch],
       after: Option[Long] = None,
       pageSize: Int = 100,
       partyIds: Option[Vector[PartyId]] = None,
@@ -1080,6 +1081,7 @@ object HttpScanAppClient {
         definitions.AcsRequest(
           migrationId,
           at,
+          recordTimeMatch,
           after,
           pageSize,
           partyIds.map(_.map(_.toProtoPrimitive)),
@@ -1105,6 +1107,7 @@ object HttpScanAppClient {
       at: java.time.OffsetDateTime,
       migrationId: Long,
       partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch],
       after: Option[Long] = None,
       pageSize: Int = 100,
   ) extends InternalBaseCommand[
@@ -1119,6 +1122,7 @@ object HttpScanAppClient {
         definitions.HoldingsStateRequest(
           migrationId,
           at,
+          recordTimeMatch,
           after,
           pageSize,
           partyIds.map(_.toProtoPrimitive),
