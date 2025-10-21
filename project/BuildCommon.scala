@@ -1501,7 +1501,11 @@ object BuildCommon {
           "com.lihaoyi" %% "ujson" % "4.0.2",
         ),
       )
-      .dependsOn(`canton-ledger-api`)
+      .dependsOn(
+        `canton-ledger-api`,
+        `canton-community-testing` % Test,
+        `canton-community-common` % Test,
+      )
   }
 
   lazy val `canton-sequencer-driver-api` = {
