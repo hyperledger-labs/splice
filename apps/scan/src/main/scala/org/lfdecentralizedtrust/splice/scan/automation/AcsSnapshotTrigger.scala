@@ -277,13 +277,13 @@ class AcsSnapshotTrigger(
   }
 
   private def computeFirstSnapshotTime(firstNonAcsImportRecordTime: CantonTimestamp) = {
-    val firstSnapshotUTCTime = firstNonAcsImportRecordTime.toInstant.atOffset(ZoneOffset.UTC)
+    val firstUpdateUTCTime = firstNonAcsImportRecordTime.toInstant.atOffset(ZoneOffset.UTC)
     val (hourForSnapshot, plusDays) = timesToDoSnapshot
-      .find(_ > firstSnapshotUTCTime.get(ChronoField.HOUR_OF_DAY)) match {
+      .find(_ > firstUpdateUTCTime.get(ChronoField.HOUR_OF_DAY)) match {
       case Some(hour) => hour -> 0 // current day at hour
       case None => 0 -> 1 // next day at 00:00
     }
-    val until = firstSnapshotUTCTime.toLocalDate
+    val until = firstUpdateUTCTime.toLocalDate
       .plusDays(plusDays.toLong)
       .atTime(hourForSnapshot, 0)
       .toInstant(ZoneOffset.UTC)
