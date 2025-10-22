@@ -206,6 +206,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
               // and transient disconnects are normal.
               case SyncServiceInjectionError.NotConnectedToAnySynchronizer => true
               case SyncServiceInjectionError.NotConnectedToSynchronizer => true
+              case _ => false
             }
             if (forceRetry) {
               true
