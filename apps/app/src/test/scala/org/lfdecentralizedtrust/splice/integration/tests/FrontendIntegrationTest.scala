@@ -528,7 +528,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
          |""".stripMargin
     inside(webDriver.executeScript(script)) {
       case keys: java.util.List[_] if keys.asScala.forall(_.isInstanceOf[String]) =>
-        keys.asScala.map { case s: String => s }.toSeq
+        keys.asScala.collect { case s: String => s }.toSeq
     }
   }
 
