@@ -1733,6 +1733,8 @@ object BuildCommon {
       val openApiSpecFile = baseDirectory.value / subPath / openApiSpec
       val template = templateDirectory.value
       val outputDir = outputPrefix.fold(baseDirectory.value)(new java.io.File(_)) / directory
+      val version = runCommand(Seq("openapi-generator-cli", "version"), log)
+      println(s"Running openapi-generator-cli version: $version")
       val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         runCommand(
           Seq(
