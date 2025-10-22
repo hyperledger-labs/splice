@@ -204,8 +204,8 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val opentelemetry_version = "1.43.0"
-  lazy val opentelemetry_java_instrumentation_version = "2.9.0"
+  lazy val opentelemetry_version = "1.54.1"
+  lazy val opentelemetry_java_instrumentation_version = "2.20.1"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
   lazy val opentelemetry_sdk_testing =
