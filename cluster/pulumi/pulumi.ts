@@ -9,6 +9,7 @@ import {
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import {spliceEnvConfig} from "@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
@@ -44,6 +45,7 @@ export function pulumiOptsWithPrefix(
   onOutput: (output: string) => void;
   signal: AbortSignal;
   color: 'always';
+  policyPacks: string[];
 } {
   return {
     parallel: 128,
@@ -55,6 +57,7 @@ export function pulumiOptsWithPrefix(
     },
     signal: abortSignal,
     color: 'always',
+    policyPacks: [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
   };
 }
 
