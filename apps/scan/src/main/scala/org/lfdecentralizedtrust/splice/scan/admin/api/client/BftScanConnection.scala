@@ -901,7 +901,7 @@ object BftScanConnection {
         tc: TraceContext,
         mat: Materializer,
     ): Future[Unit] = {
-      val logger = loggerFactory.getTracedLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
       logger.info(s"Started initializing TrustSpecificScanList......")
       for {
         // bootstrap connection from one of the seed URLs.
@@ -940,7 +940,7 @@ object BftScanConnection {
         tc: TraceContext,
     ): Future[SingleScanConnection] = {
 
-      val logger = loggerFactory.getTracedLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
       logger.info(
         s"Creating a bootstrap connection using one of provided svs or already existing connections"
       )
@@ -977,7 +977,7 @@ object BftScanConnection {
         tc: TraceContext,
         ec: ExecutionContext,
     ): Future[Seq[DsoScan]] = {
-      val logger = loggerFactory.getTracedLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
       logger.info(s"Getting all available scans..")
       Bft.getScansInDsoRules(bootstrapConnection)
     }
@@ -990,7 +990,7 @@ object BftScanConnection {
     ): Future[Map[String, Either[Throwable, SingleScanConnection]]] = {
       val trustedSvsSet = sv_names.toList.toSet
       val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
-      val logger = loggerFactory.getTracedLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
       logger.info(
         s"Attempting to connect to trusted SVs. Trusted list: ${trustedSvsSet.mkString(", ")}"
       )
@@ -1027,7 +1027,7 @@ object BftScanConnection {
           )
           .asRuntimeException()
       } else {
-        val logger = loggerFactory.getTracedLogger(getClass)
+        val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
         logger.info(s"created threshold number of scan connections.")
       }
     }
@@ -1040,7 +1040,7 @@ object BftScanConnection {
         tc: TraceContext,
         mat: Materializer,
     ): Future[Unit] = {
-      val logger = loggerFactory.getTracedLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
       logger.info("Starting refresh of TrustSpecificScanList...")
 
       for {
@@ -1094,7 +1094,7 @@ object BftScanConnection {
       val currentState = stateRef.get()
       val discoveredUrls = allScans.map(s => s.svName -> s.publicUrl).toMap
 
-      val logger = loggerFactory.getTracedLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
       logger.info(s"Reconciliating the scan connections")
 
       // for every trusted SV, decide its new connection.
@@ -1428,7 +1428,7 @@ object BftScanConnection {
           // empty ScanList instance. no connections made yet.
           scanList <- Future.successful(
             new TrustSpecificScanList(
-              config.trusted_svs,
+              config.trustedSvs,
               config.seedUrls,
               config.threshold,
               retryProvider,
@@ -1613,7 +1613,7 @@ object BftScanConnection {
     case class TrustSpecific(
         seedUrls: NonEmptyList[Uri], // by default only one seed_url is provided
         threshold: Option[Int] = None, // default to len(seedUrls)/3+1
-        trusted_svs: NonEmptyList[String], // should be at least 1
+        trustedSvs: NonEmptyList[String], // should be at least 1
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
     ) extends BftScanClientConfig {
