@@ -3867,7 +3867,7 @@ class State:
             case "DsoRules_ExpireUnallocatedUnclaimedActivityRecord":
                 return HandleTransactionResult.empty()
             case "DsoRules_ExpireUnclaimedActivityRecord":
-                return HandleTransactionResult.empty()
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "AmuletRules_Fetch":
                 return HandleTransactionResult.empty()
             case "OpenMiningRound_Fetch":
