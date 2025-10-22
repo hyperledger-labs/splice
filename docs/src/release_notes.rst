@@ -94,6 +94,10 @@ Upcoming
 
       - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
 
+  - Validator
+
+       - Validator now supports a new scan-config, that allows to connect to a pre-specified set of SCAN apps. A threshold can be specified, which indicates how many of the SCAN apps need to agree on the result.
+
 
 0.4.19
 ------
