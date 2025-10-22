@@ -1044,7 +1044,6 @@ object BftScanConnection {
       logger.info("Starting refresh of TrustSpecificScanList...")
 
       for {
-        // a fresh bootstrap connection.
         bootstrapConn <- _bootstrapConnection()
 
         tempBftConnection = new BftScanConnection(
