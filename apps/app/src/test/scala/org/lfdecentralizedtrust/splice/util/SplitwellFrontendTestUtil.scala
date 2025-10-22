@@ -26,16 +26,18 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
   )(implicit
       webDriver: WebDriverType
   ) = {
-    inside(find(className("transfer-amount-field"))) { case Some(field) =>
-      field.underlying.click()
-      reactTextInput(field).value = quantity.toString
+    eventually() {
+      inside(find(className("transfer-amount-field"))) { case Some(field) =>
+        field.underlying.click()
+        reactTextInput(field).value = quantity.toString
+      }
+      setAnsField(
+        reactTextInput(find(className("transfer-receiver-field")).value),
+        receiver,
+        receiverPartyId.toProtoPrimitive,
+      )
+      click on className("transfer-link")
     }
-    setAnsField(
-      reactTextInput(find(className("transfer-receiver-field")).value),
-      receiver,
-      receiverPartyId.toProtoPrimitive,
-    )
-    click on className("transfer-link")
   }
 
   def createGroup(groupName: String)(implicit webDriver: WebDriverType) = {
