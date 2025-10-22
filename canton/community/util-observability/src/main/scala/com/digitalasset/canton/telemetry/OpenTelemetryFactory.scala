@@ -16,9 +16,7 @@ import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
 import io.opentelemetry.exporter.zipkin.ZipkinSpanExporter
 import io.opentelemetry.sdk.OpenTelemetrySdk
-import io.opentelemetry.sdk.metrics.`export`.MetricReader
-import io.opentelemetry.sdk.metrics.internal.SdkMeterProviderUtil
-import io.opentelemetry.sdk.metrics.internal.`export`.CardinalityLimitSelector
+import io.opentelemetry.sdk.metrics.`export`.{CardinalityLimitSelector, MetricReader}
 import io.opentelemetry.sdk.metrics.{InstrumentType, SdkMeterProvider, SdkMeterProviderBuilder}
 import io.opentelemetry.sdk.trace.`export`.{
   BatchSpanProcessor,
@@ -42,12 +40,7 @@ object OpenTelemetryFactory {
     val cardinalityLimit = new CardinalityLimitSelector {
       override def getCardinalityLimit(instrumentType: InstrumentType): Int = cardinality
     }
-    SdkMeterProviderUtil
-      .registerMetricReaderWithCardinalitySelector(
-        builder,
-        reader,
-        cardinalityLimit,
-      )
+    builder.registerMetricReader(reader, cardinalityLimit)
     builder
   }
 
