@@ -36,7 +36,7 @@ describe('SV user can', () => {
   });
 });
 
-describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
+describe('Set Amulet Config Rules Form', () => {
   test('should render all Set Amulet Config Rules Form components', () => {
     render(
       <Wrapper>
@@ -79,6 +79,8 @@ describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
       },
       { timeout: 1000 }
     );
+
+    expect(screen.getByTestId('json-diffs-details')).toBeDefined();
   });
 
   test(

@@ -8,6 +8,69 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - Deployment
+
+      - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+
+  - Validator
+
+      - ``/v0/admin/users/offboard``:
+        Offboarding a user now also deletes the ledger API user in the participant node.
+
+0.4.22
+------
+
+  - SV
+
+    - Improve throughput of ``FeaturedAppActivityMarkerTrigger``, which converts ``FeaturedAppActivityMarker`` contracts
+      to ``AppRewardCoupon`` contracts as described in `CIP-0047 Featured App Activity Markers <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__.
+      The new implementation uses larger batches (100 markers by default, instead of 5) and
+      parallelizes their execution (by default up to 4x).
+      The work is split between different SVs in a way that completely avoids contention when there are not too
+      many (by default 10k) markers, and that minimizes contention using random sampling of batches when the automation
+      is in catchup mode because there are too many markers.
+      Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
+
+0.4.21
+------
+
+  - Deployment
+
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments
+      and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
+      can act on your behalf.
+
+    - The ``chown`` init containers in the validator and SV helm charts have been replaced by setting the ``fsGroup`` in the security context of the pods.
+      This overcomes certain security policies that disallow init containers from having ``chown`` capabilities, and in most environments should
+      achieve the same effect. In certain environments, the ``fsGroup`` directive might be ignored. In that case, you can add
+      an init container using the ``extraInitContainers`` helm value to achieve the same effect as before, as documented in
+      :ref:`this section <helm-validator-volume-ownership>`.
+
+  - Reward collection
+
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses, retries will happen more aggressively.
+
+  - Scan
+
+    - Add the ``v0/events`` API. For private transactions, this API returns events that contain only mediator verdicts. For transactions visible to the DSO (like Amulet transfers), the API combines mediator verdicts and associated updates by ``update_id``.
+      Events can be retrieved by ``update_id`` by using ``/v0/events/{update_id}``.
+      Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
+
+  - SV
+
+    - Published conversion rates are now clamped to the configured range, and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out-of-range values.
+
+    - UI usability improvements.
+
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
 0.4.20
 ------
 

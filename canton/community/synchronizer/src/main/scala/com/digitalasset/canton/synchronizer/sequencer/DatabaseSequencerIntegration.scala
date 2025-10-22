@@ -10,9 +10,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.sequencing.protocol.{SequencerDeliverError, SequencerErrors}
 import com.digitalasset.canton.topology.Member
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.retry.NoExceptionRetryPolicy
 import com.digitalasset.canton.util.{MonadUtil, retry}
+import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
@@ -51,8 +52,9 @@ object SequencerIntegration {
   }
 }
 
-trait DatabaseSequencerIntegration extends SequencerIntegration {
+trait DatabaseSequencerIntegration extends SequencerIntegration with Spanning {
   this: DatabaseSequencer =>
+  implicit val tracer: Tracer
 
   private val retryConditionIfOverloaded: retry.Success[Either[SequencerDeliverError, Unit]] =
     new retry.Success({
@@ -63,7 +65,7 @@ trait DatabaseSequencerIntegration extends SequencerIntegration {
     })
   private val retryWithBackoff = retry.Backoff(
     logger = logger,
-    flagCloseable = this,
+    hasSynchronizeWithClosing = this,
     maxRetries = retry.Forever,
     // TODO(#18407): Consider making the values below configurable
     initialDelay = 10.milliseconds,
@@ -77,7 +79,7 @@ trait DatabaseSequencerIntegration extends SequencerIntegration {
       traceContext: TraceContext,
   ): FutureUnlessShutdown[Unit] =
     // TODO(#18394): Batch acknowledgements?
-    performUnlessClosingUSF(functionFullName)(acknowledgements.toSeq.parTraverse_ {
+    synchronizeWithClosing(functionFullName)(acknowledgements.toSeq.parTraverse_ {
       case (member, timestamp) =>
         this.writeAcknowledgementInternal(member, timestamp)
     })
@@ -93,15 +95,17 @@ trait DatabaseSequencerIntegration extends SequencerIntegration {
         case _: SubmissionOutcome.Discard.type =>
           EitherT.pure[FutureUnlessShutdown, String](())
         case outcome: DeliverableSubmissionOutcome =>
-          implicit val success = retryConditionIfOverloaded
-          EitherT(
-            retryWithBackoff.unlessShutdown(
-              this
-                .blockSequencerWriteInternal(outcome)(outcome.submissionTraceContext)
-                .value,
-              NoExceptionRetryPolicy,
+          withSpan("BlockSequencer.write") { implicit traceContext => _ =>
+            implicit val success = retryConditionIfOverloaded
+            EitherT(
+              retryWithBackoff.unlessShutdown(
+                this
+                  .blockSequencerWriteInternal(outcome)(outcome.submissionTraceContext)
+                  .value,
+                NoExceptionRetryPolicy,
+              )
             )
-          )
-            .leftMap(_.toString)
+              .leftMap(_.toString)
+          }(outcome.submissionTraceContext, tracer)
       }
 }

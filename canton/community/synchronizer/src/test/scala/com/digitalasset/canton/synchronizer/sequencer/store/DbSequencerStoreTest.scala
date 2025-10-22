@@ -20,8 +20,6 @@ trait DbSequencerStoreTest extends SequencerStoreTest with MultiTenantedSequence
   ): FutureUnlessShutdown[Unit] =
     DbSequencerStoreTest.cleanSequencerTables(storage)
 
-  // TODO(#27366): Add check the metrics for the events buffer hit/miss
-
   "DbSequencerStore" should {
     behave like sequencerStore(() =>
       new DbSequencerStore(
@@ -34,8 +32,6 @@ trait DbSequencerStoreTest extends SequencerStoreTest with MultiTenantedSequence
         loggerFactory,
         sequencerMember,
         blockSequencerMode = true,
-        useRecipientsTableForReads = false,
-        bufferEventsWithPayloads = false,
         cachingConfigs = CachingConfigs(),
         batchingConfig = BatchingConfig(
           // Required to test the pruning query batching
@@ -55,52 +51,6 @@ trait DbSequencerStoreTest extends SequencerStoreTest with MultiTenantedSequence
         loggerFactory,
         sequencerMember,
         blockSequencerMode = true,
-        useRecipientsTableForReads = false,
-        bufferEventsWithPayloads = false,
-        cachingConfigs = CachingConfigs(),
-        batchingConfig = BatchingConfig(
-          // Required to test the pruning query batching
-          maxPruningTimeInterval = PositiveFiniteDuration.ofSeconds(1)
-        ),
-        sequencerMetrics = sequencerMetrics(),
-      )
-    )
-  }
-  "DbSequencerStore with recipient table reads" should {
-    behave like sequencerStore(() =>
-      new DbSequencerStore(
-        storage,
-        testedProtocolVersion,
-        bufferedEventsMaxMemory = BytesUnit.zero, // test with cache is below
-        bufferedEventsPreloadBatchSize =
-          SequencerWriterConfig.DefaultBufferedEventsPreloadBatchSize,
-        timeouts,
-        loggerFactory,
-        sequencerMember,
-        blockSequencerMode = true,
-        useRecipientsTableForReads = true,
-        bufferEventsWithPayloads = false,
-        cachingConfigs = CachingConfigs(),
-        batchingConfig = BatchingConfig(
-          // Required to test the pruning query batching
-          maxPruningTimeInterval = PositiveFiniteDuration.ofSeconds(1)
-        ),
-        sequencerMetrics = sequencerMetrics(),
-      )
-    )
-    behave like multiTenantedSequencerStore(() =>
-      new DbSequencerStore(
-        storage,
-        testedProtocolVersion,
-        bufferedEventsMaxMemory = BytesUnit.zero, // HA mode does not support events cache
-        bufferedEventsPreloadBatchSize =
-          SequencerWriterConfig.DefaultBufferedEventsPreloadBatchSize,
-        timeouts,
-        loggerFactory,
-        sequencerMember,
-        blockSequencerMode = true,
-        useRecipientsTableForReads = true,
-        bufferEventsWithPayloads = false,
         cachingConfigs = CachingConfigs(),
         batchingConfig = BatchingConfig(
           // Required to test the pruning query batching
@@ -122,8 +72,6 @@ trait DbSequencerStoreTest extends SequencerStoreTest with MultiTenantedSequence
         loggerFactory,
         sequencerMember,
         blockSequencerMode = true,
-        useRecipientsTableForReads = false,
-        bufferEventsWithPayloads = false,
         cachingConfigs = CachingConfigs(),
         batchingConfig = BatchingConfig(
           // Required to test the pruning query batching

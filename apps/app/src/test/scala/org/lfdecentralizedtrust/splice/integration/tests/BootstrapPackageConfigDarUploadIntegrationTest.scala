@@ -38,10 +38,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       // Technically a single SV test but withCanton doesn't handle that atm.
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(initialPackageConfig = initialPackageConfig)

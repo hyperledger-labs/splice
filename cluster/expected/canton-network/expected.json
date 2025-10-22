@@ -1574,6 +1574,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -1612,10 +1621,6 @@
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -1764,6 +1769,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
           "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com"
@@ -1838,6 +1852,7 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -1873,10 +1888,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
@@ -2420,6 +2436,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -2458,10 +2483,6 @@
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -2583,6 +2604,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        },
         "scan": {
           "internalUrl": "http://scan-app.sv-da-1:5012",
           "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com"
@@ -2657,6 +2687,7 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -2692,10 +2723,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-da-1:5012",

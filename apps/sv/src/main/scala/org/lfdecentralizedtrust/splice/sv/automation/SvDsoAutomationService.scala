@@ -232,7 +232,6 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
-        config.topologyChangeDelayDuration,
       )
     )
 
@@ -364,6 +363,12 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         connection(SpliceLedgerConnectionPriority.Low),
+      )
+    )
+    registerTrigger(
+      new AmuletPriceMetricsTrigger(
+        triggerContext,
+        dsoStore,
       )
     )
 
@@ -515,5 +520,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
+      aTrigger[AmuletPriceMetricsTrigger],
     )
 }

@@ -100,10 +100,8 @@ function configureIstiod(
         },
         // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
         meshConfig: {
-          // Uncomment to turn on access logging across the entire cluster (we disabled it by default to reduce cost):
-          // accessLogFile: '/dev/stdout',
           // taken from https://github.com/istio/istio/issues/37682
-          accessLogFile: '',
+          accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
           accessLogEncoding: 'JSON',
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
           enablePrometheusMerge: false,
@@ -359,10 +357,16 @@ function configureGatewayService(
           ].concat(ingressPorts),
         },
         ...infraAffinityAndTolerations,
+        // The httpLoadBalancing addon needs to be enabled to use backend service-based network load balancers.
+        annotations: {
+          'cloud.google.com/l4-rbs': 'enabled',
+        },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
+      replaceOnChanges: ['values.annotations'],
+      deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
             const base: pulumi.Resource[] = [ingressNs, istiod];

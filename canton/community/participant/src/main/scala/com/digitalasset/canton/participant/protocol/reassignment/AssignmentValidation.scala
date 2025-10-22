@@ -5,25 +5,24 @@ package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.{EitherT, Validated}
 import cats.implicits.toFunctorOps
-import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.crypto.{SyncCryptoApi, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.conflictdetection.ActivenessResult
-import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationError.InvalidUnassignmentResult.DeliveredUnassignmentResultError
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationError.{
+  AssignmentCompleted,
   ContractDataMismatch,
-  InconsistentReassignmentCounter,
+  InconsistentReassignmentCounters,
   NonInitiatorSubmitsBeforeExclusivityTimeout,
-  ReassignmentDataCompleted,
   UnassignmentDataNotFound,
+  UnassignmentTimestampMismatch,
 }
+import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationResult.ReassigningParticipantValidationResult
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.validation.AuthenticationValidator
-import com.digitalasset.canton.participant.protocol.{ContractAuthenticator, ProcessingSteps}
+import com.digitalasset.canton.participant.protocol.{ProcessingSteps, reassignment}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.ReassignmentStore.{
   AssignmentStartingBeforeUnassignment,
@@ -32,112 +31,112 @@ import com.digitalasset.canton.participant.store.ReassignmentStore.{
 }
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.util.ContractValidator
+import com.digitalasset.canton.util.ReassignmentTag.Target
 
 import scala.concurrent.ExecutionContext
 
 private[reassignment] class AssignmentValidation(
-    synchronizerId: Target[SynchronizerId],
+    targetPSId: Target[PhysicalSynchronizerId],
     staticSynchronizerParameters: Target[StaticSynchronizerParameters],
     participantId: ParticipantId,
     reassignmentCoordination: ReassignmentCoordination,
-    contractAuthenticator: ContractAuthenticator,
+    contractValidator: ContractValidator,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends NamedLogging {
 
-  // TODO(#12926) Check what validations should be done for reassigning participants
-  // TODO(#12926) Check what validations can be done here + ensure coverage (here means for both reassigningParticipant and non-reassigningParticipant)
-  // TODO(#22119) Split this method in smaller chunks
   /** Validate the assignment request
     */
   def perform(
-      targetCrypto: Target[SynchronizerSnapshotSyncCryptoApi],
       unassignmentDataE: Either[ReassignmentStore.ReassignmentLookupError, UnassignmentData],
       activenessF: FutureUnlessShutdown[ActivenessResult],
   )(parsedRequest: ParsedReassignmentRequest[FullAssignmentTree])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, AssignmentValidationResult] = {
     val assignmentRequest: FullAssignmentTree = parsedRequest.fullViewTree
-    val assignmentRequestTs = parsedRequest.requestTimestamp
 
-    val reassignmentId = assignmentRequest.unassignmentResultEvent.reassignmentId
-    val targetSnapshot = targetCrypto.map(_.ipsSnapshot)
+    val reassignmentId = parsedRequest.reassignmentId
+    val sourcePSId = assignmentRequest.sourceSynchronizer
+    val targetSnapshot = Target(parsedRequest.snapshot).map(_.ipsSnapshot)
     val isReassigningParticipant = assignmentRequest.isReassigningParticipant(participantId)
 
     for {
-      validationResult <- EitherT.right(
-        performValidation(
-          targetCrypto,
-          activenessF,
-        )(parsedRequest)
+      commonValidationResult <- EitherT.right(
+        performCommonValidations(parsedRequest, activenessF)
       )
 
       reassigningParticipantValidationResult <- unassignmentDataE match {
         case _ if !isReassigningParticipant =>
           EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](
-            Seq.empty[ReassignmentValidationError]
+            ReassigningParticipantValidationResult(Nil)
           )
 
         case Right(unassignmentData) =>
-          validateAssignmentRequestForReassigningParticipant(
+          performValidationForReassigningParticipants(
+            parsedRequest,
             unassignmentData,
-            assignmentRequest,
-            assignmentRequestTs,
           )
 
         case Left(_: ReassignmentCompleted) =>
           EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](
-            Seq(ReassignmentDataCompleted(reassignmentId): ReassignmentValidationError)
+            ReassigningParticipantValidationResult(Seq(AssignmentCompleted(reassignmentId)))
           )
-        // this a special case where we are retrying to reprocess an assignment data. It's safe to consider that the reassignment data is missing
-        // because inserting AssignmentData is idempotent and detect modified values
+
+        // In phase 7, the assignmentData is written, and the time of completion is recorded a bit later in the conflict detector.
+        // Ideally, we would remove these two steps of writing data in the database. However, the serializable contract is not currently available
+        // in the conflict detector. One solution could be to enrich UnassignmentCommit and AssignmentCommit with the serializable contract,
+        // allowing everything to be written during the conflict detector phase, thereby removing the need for AssignmentStartingBeforeUnassignment.
+        // Alternatively, we could wait until the contract is removed from the store and then write the assignment data and the completion time in the conflict detector.
         case Left(_: AssignmentStartingBeforeUnassignment) =>
           EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](
-            Seq(UnassignmentDataNotFound(reassignmentId): ReassignmentValidationError)
+            ReassigningParticipantValidationResult(Seq(UnassignmentDataNotFound(reassignmentId)))
           )
+
         case Left(_: UnknownReassignmentId) =>
           EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](
-            Seq(
-              UnassignmentDataNotFound(reassignmentId): ReassignmentValidationError
-            )
+            ReassigningParticipantValidationResult(Seq(UnassignmentDataNotFound(reassignmentId)))
           )
       }
 
-      hostedStakeholders <- EitherT.right(
-        targetSnapshot.unwrap
-          .hostedOn(assignmentRequest.stakeholders.all, participantId)
-          .map(_.keySet)
+      hostedConfirmingReassigningParties <- EitherT.right(
+        if (isReassigningParticipant)
+          targetSnapshot.unwrap.canConfirm(
+            participantId,
+            parsedRequest.fullViewTree.confirmingParties,
+          )
+        else
+          FutureUnlessShutdown.pure(Set.empty[LfPartyId])
       )
 
     } yield AssignmentValidationResult(
       rootHash = assignmentRequest.rootHash,
-      contract = assignmentRequest.contract,
-      reassignmentCounter = assignmentRequest.reassignmentCounter,
+      contracts = assignmentRequest.contracts,
       submitterMetadata = assignmentRequest.submitterMetadata,
       reassignmentId = reassignmentId,
+      sourcePSId = sourcePSId,
       isReassigningParticipant = isReassigningParticipant,
-      hostedStakeholders = hostedStakeholders,
-      validationResult =
-        validationResult.addValidationErrors(reassigningParticipantValidationResult),
+      hostedConfirmingReassigningParties = hostedConfirmingReassigningParties,
+      commonValidationResult = commonValidationResult,
+      reassigningParticipantValidationResult = reassigningParticipantValidationResult,
     )
   }
 
-  private def performValidation(
-      targetCrypto: Target[SynchronizerSnapshotSyncCryptoApi],
+  def performCommonValidations(
+      parsedRequest: ParsedReassignmentRequest[FullAssignmentTree],
       activenessF: FutureUnlessShutdown[ActivenessResult],
-  )(parsedRequest: ParsedReassignmentRequest[FullAssignmentTree])(implicit
+  )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[AssignmentValidationResult.ValidationResult] = {
+  ): FutureUnlessShutdown[reassignment.AssignmentValidationResult.CommonValidationResult] = {
+    val topologySnapshot = Target(parsedRequest.snapshot.ipsSnapshot)
     val assignmentRequest: FullAssignmentTree = parsedRequest.fullViewTree
 
-    val reassignmentId = assignmentRequest.unassignmentResultEvent.reassignmentId
-    val targetSnapshot = targetCrypto.map(_.ipsSnapshot)
-
-    val stakeholdersCheckResultET =
-      new ReassignmentValidation(contractAuthenticator).checkMetadata(assignmentRequest)
+    val contractAuthenticationResultF =
+      ReassignmentValidation.authenticateContractAndStakeholders(
+        contractValidator,
+        assignmentRequest,
+      )
 
     for {
       activenessResult <- activenessF
@@ -145,168 +144,130 @@ private[reassignment] class AssignmentValidation(
       submitterCheckResult <-
         ReassignmentValidation
           .checkSubmitter(
-            ReassignmentRef(reassignmentId),
-            topologySnapshot = targetSnapshot,
+            assignmentRequest.reassignmentRef,
+            topologySnapshot = topologySnapshot,
             submitter = assignmentRequest.submitter,
             participantId = assignmentRequest.submitterMetadata.submittingParticipant,
             stakeholders = assignmentRequest.stakeholders.all,
           )
           .value
-          .map(_.swap.toSeq)
+          .map(_.swap.toOption)
 
-      authenticationErrorO <- AuthenticationValidator.verifyViewSignature(parsedRequest)
+      reassignmentIdResult = validateReassignmentId(parsedRequest.fullViewTree)
 
-    } yield AssignmentValidationResult.ValidationResult(
+      participantSignatureVerificationResult <- AuthenticationValidator.verifyViewSignature(
+        parsedRequest
+      )
+
+    } yield AssignmentValidationResult.CommonValidationResult(
       activenessResult = activenessResult,
-      authenticationErrorO = authenticationErrorO,
-      metadataResultET = stakeholdersCheckResultET,
-      validationErrors = submitterCheckResult,
+      participantSignatureVerificationResult = participantSignatureVerificationResult,
+      contractAuthenticationResultF = contractAuthenticationResultF,
+      submitterCheckResult = submitterCheckResult,
+      reassignmentIdResult = reassignmentIdResult,
     )
   }
 
-  private def validateAssignmentRequestForReassigningParticipant(
+  def performValidationForReassigningParticipants(
+      parsedRequest: ParsedReassignmentRequest[FullAssignmentTree],
       unassignmentData: UnassignmentData,
-      assignmentRequest: FullAssignmentTree,
-      assignmentRequestTs: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Seq[ReassignmentValidationError]] = {
-    val sourceSynchronizer = unassignmentData.unassignmentRequest.sourceSynchronizer
-    val unassignmentTs = unassignmentData.unassignmentTs
+  ): EitherT[
+    FutureUnlessShutdown,
+    ReassignmentProcessorError,
+    ReassigningParticipantValidationResult,
+  ] = {
+    val assignmentRequest = parsedRequest.fullViewTree
+    val assignmentRequestTs = parsedRequest.requestTimestamp
 
     for {
-      sourceStaticSynchronizerParam <- reassignmentCoordination
-        .getStaticSynchronizerParameter(sourceSynchronizer)
-      _ready <- {
-        logger.info(
-          s"Waiting for topology state at $unassignmentTs on unassignment synchronizer $sourceSynchronizer ..."
-        )
-        reassignmentCoordination
-          .awaitUnassignmentTimestamp(
-            sourceSynchronizer,
-            sourceStaticSynchronizerParam,
-            unassignmentTs,
-          )
-      }
+      // TODO(i26479): Check that reassignmentData.unassignmentRequest.targetTimestamp is in the past
+      exclusivityTimeoutError <- AssignmentValidation.checkExclusivityTimeout(
+        reassignmentCoordination,
+        targetPSId,
+        staticSynchronizerParameters,
+        unassignmentData,
+        assignmentRequestTs,
+        assignmentRequest.submitter,
+        parsedRequest.reassignmentId,
+      )
 
-      sourceCrypto <- reassignmentCoordination
-        .cryptoSnapshot(
-          sourceSynchronizer,
-          sourceStaticSynchronizerParam,
-          unassignmentTs,
-        )
-
-      targetTimeProof = unassignmentData.unassignmentRequest.targetTimeProof.timestamp
-
-      // TODO(i12926): Check that reassignmentData.unassignmentRequest.targetTimeProof.timestamp is in the past
-      cryptoSnapshotTargetTs <- reassignmentCoordination
-        .cryptoSnapshot(
-          unassignmentData.targetSynchronizer,
-          staticSynchronizerParameters,
-          targetTimeProof,
-        )
-        .map(_.map(_.ipsSnapshot))
-
-      exclusivityLimit <- ProcessingSteps
-        .getAssignmentExclusivity(
-          cryptoSnapshotTargetTs,
-          targetTimeProof,
-        )
-        .leftMap[ReassignmentProcessorError](ReassignmentParametersError(synchronizerId.unwrap, _))
-
-      // TODO(i12926): Validate the shipped unassignment result w.r.t. stakeholders
-
-      reassignmentDataResult <- EitherT.right(
-        validateUnassignmentData(
-          unassignmentData,
+      reassignmentDataResult <- EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](
+        validateAssignmentRequestAgainstUnassignmentData(
           assignmentRequest,
-          assignmentRequestTs,
-          exclusivityLimit,
-          sourceCrypto,
-          cryptoSnapshotTargetTs,
+          unassignmentData,
         )
       )
 
-    } yield reassignmentDataResult
+    } yield ReassigningParticipantValidationResult(
+      exclusivityTimeoutError.toList ++ reassignmentDataResult
+    )
   }
 
-  private def validateUnassignmentData(
-      unassignmentData: UnassignmentData,
-      assignmentRequest: FullAssignmentTree,
-      assignmentRequestTs: CantonTimestamp,
-      exclusivityLimit: Target[CantonTimestamp],
-      sourceTopology: Source[SyncCryptoApi],
-      targetTopologyTargetTs: Target[TopologySnapshot],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[ReassignmentValidationError]] = {
-    // TODO(i12926): Validate that the unassignment result received matches the unassignment result in reassignmentData
+  private def validateReassignmentId(
+      fullViewTree: FullAssignmentTree
+  ): Option[AssignmentValidationError.InconsistentReassignmentId] =
+    Option.unless(fullViewTree.isReassignmentIdValid) {
+      AssignmentValidationError.InconsistentReassignmentId(fullViewTree.reassignmentId)
+    }
 
-    val UnassignmentData(
-      reassignmentId,
-      unassignmentRequest,
-      unassignmentDecisionTime,
-      unassignmentResult,
-    ) = unassignmentData
+  private def validateAssignmentRequestAgainstUnassignmentData(
+      assignmentRequest: FullAssignmentTree,
+      unassignmentData: UnassignmentData,
+  ): Seq[ReassignmentValidationError] = {
+
+    val reassignmentId = unassignmentData.reassignmentId
 
     val reassigningParticipants = Validated.condNec(
-      unassignmentRequest.reassigningParticipants == assignmentRequest.reassigningParticipants,
+      unassignmentData.reassigningParticipants == assignmentRequest.reassigningParticipants,
       (),
       ReassignmentValidationError.ReassigningParticipantsMismatch(
         ReassignmentRef(reassignmentId),
-        expected = unassignmentData.unassignmentRequest.reassigningParticipants,
+        expected = unassignmentData.reassigningParticipants,
         declared = assignmentRequest.reassigningParticipants,
       ),
     )
 
     val contract = Validated.condNec(
-      unassignmentRequest.contract == assignmentRequest.contract,
+      unassignmentData.contractsBatch.contracts.toSeq == assignmentRequest.contracts.contracts.toSeq,
       (),
       ContractDataMismatch(reassignmentId),
     )
 
-    val exclusivityTimeout = Validated.condNec(
-      assignmentRequestTs >= exclusivityLimit.unwrap || unassignmentRequest.submitter == assignmentRequest.submitter,
-      (),
-      NonInitiatorSubmitsBeforeExclusivityTimeout(
-        reassignmentId,
-        assignmentRequest.submitter,
-        currentTimestamp = assignmentRequestTs,
-        timeout = exclusivityLimit,
-      ),
-    )
+    val reassignmentCounter = {
+      val declaredCounters = assignmentRequest.contracts.contractIdCounters
+      val expectedCounters = unassignmentData.contractsBatch.contractIdCounters
+      Validated.condNec(
+        declaredCounters == expectedCounters,
+        (),
+        InconsistentReassignmentCounters(
+          reassignmentId,
+          declaredCounters.diff(expectedCounters).toMap,
+          expectedCounters.diff(declaredCounters).toMap,
+        ),
+      )
+    }
 
-    val reassignmentCounter = Validated.condNec(
-      assignmentRequest.reassignmentCounter == unassignmentData.reassignmentCounter,
-      (),
-      InconsistentReassignmentCounter(
-        reassignmentId,
-        assignmentRequest.reassignmentCounter,
-        unassignmentData.reassignmentCounter,
-      ),
-    )
+    val unassignmentTs = {
+      val declaredUnassignmentTs = assignmentRequest.tree.commonData.tryUnwrap.unassignmentTs
+      val expectedUnassignmentTs = unassignmentData.unassignmentTs
+      Validated.condNec(
+        declaredUnassignmentTs == expectedUnassignmentTs,
+        (),
+        UnassignmentTimestampMismatch(
+          reassignmentId,
+          declaredUnassignmentTs,
+          expectedUnassignmentTs,
+        ),
+      )
+    }
 
-    val incompleteUnassignment = Validated.condNec(
-      unassignmentResult.nonEmpty,
-      (),
-      AssignmentValidationError.UnassignmentIncomplete(reassignmentId),
-    )
-
-    for {
-      deliveredUnassignmentResult <- DeliveredUnassignmentResultValidation(
-        reassignmentId = reassignmentId,
-        unassignmentRequest = unassignmentRequest,
-        unassignmentDecisionTime = unassignmentDecisionTime,
-        sourceTopology = sourceTopology,
-        targetTopologyTargetTs = targetTopologyTargetTs,
-      )(assignmentRequest.unassignmentResultEvent).validate.leftMap { err =>
-        DeliveredUnassignmentResultError(reassignmentId, err.error).reported()
-      }.value
-    } yield Seq(
+    Seq(
       reassigningParticipants,
       contract,
-      exclusivityTimeout,
       reassignmentCounter,
-      incompleteUnassignment,
-      deliveredUnassignmentResult.toValidatedNec,
+      unassignmentTs,
     ).sequence_.fold(_.toList, _ => Nil)
   }
 }
@@ -314,6 +275,62 @@ private[reassignment] class AssignmentValidation(
 private[reassignment] sealed trait AssignmentProcessorError extends ReassignmentProcessorError
 
 object AssignmentValidation {
+
+  /** Checks whether the submitter is either the initiator of the unassignment or the exclusivity
+    * timeout has elapsed.
+    */
+  def checkExclusivityTimeout(
+      reassignmentCoordination: ReassignmentCoordination,
+      targetPSId: Target[PhysicalSynchronizerId],
+      staticSynchronizerParameters: Target[StaticSynchronizerParameters],
+      unassignmentData: UnassignmentData,
+      requestTimestamp: CantonTimestamp,
+      submitter: LfPartyId,
+      reassignmentId: ReassignmentId,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Option[
+    ReassignmentValidationError
+  ]] = {
+    val targetTimestamp = unassignmentData.targetTimestamp
+    for {
+      // TODO(i26479): Check that reassignmentData.unassignmentRequest.targetTimestamp is in the past
+      cryptoSnapshotTargetTs <- reassignmentCoordination
+        .cryptoSnapshot(
+          /*
+          `targetPSId` can differ from `unassignmentData.targetPSId` if the target synchronizer is upgraded
+          between unassignment and assignment.
+           */
+          targetPSId,
+          staticSynchronizerParameters,
+          targetTimestamp,
+        )
+        .map(_.map(_.ipsSnapshot))
+
+      exclusivityLimit <- ProcessingSteps
+        .getAssignmentExclusivity(
+          cryptoSnapshotTargetTs,
+          targetTimestamp,
+        )
+        .leftMap[ReassignmentProcessorError](
+          ReassignmentParametersError(targetPSId.unwrap, _)
+        )
+
+      validationError = Option.when(
+        requestTimestamp < exclusivityLimit.unwrap && unassignmentData.submitterMetadata.submitter != submitter
+      )(
+        NonInitiatorSubmitsBeforeExclusivityTimeout(
+          reassignmentId,
+          unassignmentData.submitterMetadata.submitter,
+          currentTimestamp = requestTimestamp,
+          timeout = exclusivityLimit,
+        )
+      )
+
+    } yield validationError
+  }
+
   final case class NoReassignmentData(
       reassignmentId: ReassignmentId,
       lookupError: ReassignmentStore.ReassignmentLookupError,
@@ -330,8 +347,8 @@ object AssignmentValidation {
 
   final case class UnexpectedSynchronizer(
       reassignmentId: ReassignmentId,
-      targetSynchronizerId: SynchronizerId,
-      receivedOn: SynchronizerId,
+      targetSynchronizerId: PhysicalSynchronizerId,
+      receivedOn: PhysicalSynchronizerId,
   ) extends AssignmentProcessorError {
     override def message: String =
       s"Cannot assign `$reassignmentId`: expecting synchronizer `$targetSynchronizerId` but received on `$receivedOn`"

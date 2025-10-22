@@ -8,8 +8,8 @@ import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandl
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
@@ -103,7 +103,7 @@ class StoreBasedSynchronizerOutboxTest
       timeouts,
     )
     val target = new InMemoryTopologyStore(
-      TopologyStoreId.SynchronizerStore(DefaultTestIdentities.synchronizerId),
+      TopologyStoreId.SynchronizerStore(DefaultTestIdentities.physicalSynchronizerId),
       testedProtocolVersion,
       loggerFactory.append("store", "Synchronizer"),
       timeouts,
@@ -121,7 +121,7 @@ class StoreBasedSynchronizerOutboxTest
     )
     val client = new StoreBasedSynchronizerTopologyClient(
       clock,
-      synchronizerId,
+      defaultStaticSynchronizerParameters,
       store = target,
       packageDependenciesResolver = StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       timeouts = timeouts,
@@ -260,16 +260,14 @@ class StoreBasedSynchronizerOutboxTest
   ): FutureUnlessShutdown[StoreBasedSynchronizerOutbox] = {
     val synchronizerOutbox = new StoreBasedSynchronizerOutbox(
       synchronizer,
-      synchronizerId,
       participant1,
-      testedProtocolVersion,
       handle,
       client,
       source,
       target,
       timeouts,
       loggerFactory,
-      crypto,
+      SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters),
       topologyConfig,
       futureSupervisor = FutureSupervisor.Noop,
     )
@@ -448,7 +446,8 @@ class StoreBasedSynchronizerOutboxTest
       val (source, target, manager, handle, client) =
         mk(
           transactions.size,
-          rejections = Iterator.continually(Some(TopologyTransactionRejection.NotAuthorized)),
+          rejections =
+            Iterator.continually(Some(TopologyTransactionRejection.Authorization.NotAuthorized)),
         )
       for {
         _ <- outboxConnected(manager, handle, client, source, target)

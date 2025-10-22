@@ -9,7 +9,6 @@ import {
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
-  K8sResourceSchema,
   SvCometBftGovernanceKey,
   SvIdKey,
   ValidatorTopupConfig,
@@ -92,9 +91,6 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
 export const SvConfigSchema = z.object({
   sv: z
     .object({
-      participant: z.object({
-        resources: K8sResourceSchema,
-      }),
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
@@ -120,7 +116,6 @@ export const SvConfigSchema = z.object({
           skipInitialization: z.boolean().default(false),
           // This can be used on clusters like CILR where we usually would expect to skip initialization but the sv runbook gets reset periodically.
           forceSvRunbookInitialization: z.boolean().default(false),
-          topologyChangeDelay: z.string().optional(),
         })
         .optional(),
     })

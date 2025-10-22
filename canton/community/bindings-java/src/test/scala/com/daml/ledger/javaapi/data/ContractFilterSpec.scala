@@ -9,7 +9,6 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.util.{Collections, Optional}
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.{MapHasAsJava, SetHasAsJava}
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -40,7 +39,6 @@ class ContractFilterSpec extends AnyFlatSpec with Matchers {
     Optional.empty(),
   )
 
-  @nowarn("cat=deprecation")
   private def assertFilters(
       contractFilter: ContractFilter[_],
       expectedIncluded: Boolean,
@@ -75,16 +73,6 @@ class ContractFilterSpec extends AnyFlatSpec with Matchers {
     val expectedWildcardTransactionFormat = new TransactionFormat(
       expectedWildcardEventFormat,
       expectedShape,
-    )
-
-    contractFilter.transactionFilter(Optional.of(partiesSet)) shouldBe new TransactionFilter(
-      expectedPartyToFilters,
-      Optional.empty(),
-    )
-
-    contractFilter.transactionFilter(Optional.empty()) shouldBe new TransactionFilter(
-      Collections.emptyMap(),
-      Optional.of(expectedCumulativeFilter),
     )
 
     contractFilter.eventFormat(Optional.of(partiesSet)) shouldBe expectedEventFormatWithParties

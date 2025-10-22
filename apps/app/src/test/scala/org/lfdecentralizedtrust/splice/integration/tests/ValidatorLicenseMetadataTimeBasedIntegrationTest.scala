@@ -136,6 +136,9 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       sv1ScanBackend,
       aliceValidatorBackend,
     )
+
+    advanceTimeForRewardAutomationToRunForCurrentRound
+
     eventually() {
       val validatorLivenessActivityRecordRounds =
         sv1Backend.participantClient.ledger_api_extensions.acs
@@ -159,7 +162,7 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       actAndCheck(
         "Advance rounds so that issuing rounds 0 and 1 no longer exist",
         (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
         },
       )(
         "ValidatorLivenessActivityRecord contracts for round 0 and 1 should be expired",

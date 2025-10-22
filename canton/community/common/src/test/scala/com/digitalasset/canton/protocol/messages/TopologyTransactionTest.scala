@@ -32,7 +32,7 @@ class TopologyTransactionTest
   private val uid = DefaultTestIdentities.uid
   private val uid2 = UniqueIdentifier.tryFromProtoPrimitive("da1::default1")
   private val sequencerId = DefaultTestIdentities.daSequencerId
-  private val synchronizerId = DefaultTestIdentities.synchronizerId
+  private val synchronizerId = DefaultTestIdentities.physicalSynchronizerId
   private val crypto =
     TestingTopology(sequencerGroup =
       SequencerGroup(
@@ -180,8 +180,8 @@ class TopologyTransactionTest
     }
 
     "key to owner mappings" should {
-      val k1 = mk(OwnerToKeyMapping(sequencerId, NonEmpty(Seq, publicKey)))
-      val k2 = mk(OwnerToKeyMapping(sequencerId, NonEmpty(Seq, publicKey)))
+      val k1 = mk(OwnerToKeyMapping.tryCreate(sequencerId, NonEmpty(Seq, publicKey)))
+      val k2 = mk(OwnerToKeyMapping.tryCreate(sequencerId, NonEmpty(Seq, publicKey)))
       runTest(k1, k2)
     }
 

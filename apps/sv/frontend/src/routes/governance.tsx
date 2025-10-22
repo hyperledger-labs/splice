@@ -186,6 +186,8 @@ export const Governance: React.FC = () => {
         data={voteHistory}
         uniqueId="vote-history"
         showStatus
+        showVoteStats
+        showAcceptanceThreshold
       />
     </Box>
   );

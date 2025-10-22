@@ -113,13 +113,16 @@ You must:
 
 2. Configure your backends to use that OIDC provider.
 
+The validator supports non-authenticated deployments as well, but this is strongly discouraged for production deployments.
+If you wish to run without authentication, please refer to the notes in :ref:`helm-validator-no-auth`.
+
 .. _helm-validator-auth-requirements:
 
 OIDC Provider Requirements
 ++++++++++++++++++++++++++
 
 This section provides pointers for setting up an OIDC provider for use with your Validator node.
-Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.  
+Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.
 
 These docs focus on Auth0, and are being continuously tested and maintained. Other OIDC providers can be used, and are in active use by various community members, who have contributed some notes and examples in `Okta and Keycloak community authored examples </community/oidc-config-okta-keycloak.html>`.
 
@@ -305,6 +308,26 @@ To setup the wallet and CNS UI, create the following two secrets.
     kubectl create --namespace validator secret generic splice-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
+
+.. _helm-validator-no-auth:
+
+Running without Authentication
+++++++++++++++++++++++++++++++
+
+.. warning::
+
+  Running without authentication is highly insecure. Anyone with access to the wallet UI,
+  or to the validator in any other way, may log in to your wallet as a user of their choice,
+  or otherwise transact on-ledger on your behalf. For any production use, you should configure
+  proper authentication as described in the sections above.
+
+In order to run the validator without authentication, add ``disableAuth: true`` to both
+``splice-node/examples/sv-helm/validator-values.yaml`` and ``splice-node/examples/sv-helm/participant-values.yaml``.
+Note that you must disable auth in both places, otherwise the validator will not be able to connect to the participant.
+
+When running without authentication, the username of the validator administrator
+is `administrator`.
+
 
 .. _helm-validator-install:
 
@@ -759,3 +782,31 @@ values for ``splice-participant`` or ``splice-validator``:
       - name: my-extra-container
         image: busybox
         command: [ "sh", "-c", "echo 'example extra container'" ]
+
+.. _helm-validator-volume-ownership:
+
+Working around volume ownership issues
+--------------------------------------
+
+The containers in the ``splice-validator`` chart run as non-root users (specifically, user:group 1001:1001) for security reasons.
+The pod mounts volumes for use by the containers, and these volumes need to be owned by the user that the containers run as.
+The Helm chart uses an ``fsGroup`` `security context <https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>`_ to ensure that the mounted volumes are owned by the correct user.
+In certain environments, however, this does not work as expected and the mounted volumes are owned by root.
+If you encounter this issue, you can work around it by creating init containers that change the ownership of the mounted volumes to the correct user.
+
+For example, for the `/domain-upgrade-dump` volume (required for synchronizer upgrades),
+you can add the following to your ``validator-values.yaml`` file:
+
+.. code-block:: yaml
+
+    extraInitContainers:
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+
+
+A similar workaround will be required for mounting a usable `/participant-bootstrapping-dump`
+(required when recovering from identities backup).

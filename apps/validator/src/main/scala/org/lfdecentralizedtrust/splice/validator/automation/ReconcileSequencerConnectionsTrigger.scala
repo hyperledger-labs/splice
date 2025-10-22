@@ -13,11 +13,13 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -93,12 +95,16 @@ class ReconcileSequencerConnectionsTrigger(
                     SequencerConnections.tryMany(
                       nonEmptyConnections.forgetNE,
                       Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                      // TODO(#2110) Rethink this when we enable sequencer connection pools.
+                      sequencerLivenessMargin = NonNegativeInt.zero,
                       submissionRequestAmplification = SubmissionRequestAmplification(
                         Thresholds.sequencerSubmissionRequestAmplification(
                           nonEmptyConnections.size
                         ),
                         patience,
                       ),
+                      // TODO(#2666) Make the delays configurable.
+                      sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                     )
                 }
                 participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
@@ -146,16 +152,20 @@ class ReconcileSequencerConnectionsTrigger(
       connections: NonEmpty[Seq[SequencerConnection]],
   )(implicit tc: TraceContext) =
     sequencerConnections.connections.forgetNE
+      .map(ParticipantAdminConnection.dropSequencerId)
       .flatMap(c => sequencerConnectionEndpoint(c).toList)
-      .toSet != connections.forgetNE.flatMap(c => sequencerConnectionEndpoint(c).toList).toSet
+      .toSet != connections.forgetNE
+      .map(ParticipantAdminConnection.dropSequencerId)
+      .flatMap(c => sequencerConnectionEndpoint(c).toList)
+      .toSet
 
   private def sequencerConnectionEndpoint(
       connection: SequencerConnection
   )(implicit tc: TraceContext): Option[Endpoint] =
     connection match {
-      case GrpcSequencerConnection(endpoints, _, _, _) if endpoints.size == 1 =>
+      case GrpcSequencerConnection(endpoints, _, _, _, _) if endpoints.size == 1 =>
         Some(endpoints.head1)
-      case GrpcSequencerConnection(endpoints, _, _, _) =>
+      case GrpcSequencerConnection(endpoints, _, _, _, _) =>
         logger.warn(s"expected exactly 1 endpoint in a sequencer connection but got: $endpoints")
         None
     }

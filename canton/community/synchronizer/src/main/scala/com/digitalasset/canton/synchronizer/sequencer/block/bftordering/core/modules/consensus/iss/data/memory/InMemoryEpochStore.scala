@@ -5,6 +5,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.{
+  PekkoEnv,
+  PekkoFutureUnlessShutdown,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.{
   Block,
   Epoch,
@@ -36,10 +40,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PrePrepare,
   Prepare,
   ViewChange,
-}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.pekko.PekkoModuleSystem.{
-  PekkoEnv,
-  PekkoFutureUnlessShutdown,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.TryUtil
@@ -156,7 +156,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
       addSingleMessageToMap(prePreparesMap)(prePrepare)
     }
 
-  override def addPrepares(
+  override def addPreparesAtomically(
       prepares: Seq[SignedMessage[Prepare]]
   )(implicit traceContext: TraceContext): E#FutureUnlessShutdownT[Unit] =
     createFuture(addPreparesActionName) { () =>
@@ -192,7 +192,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
       }
     }
 
-  override def addOrderedBlock(
+  override def addOrderedBlockAtomically(
       prePrepare: SignedMessage[PrePrepare],
       commitMessages: Seq[SignedMessage[Commit]],
   )(implicit
@@ -201,10 +201,6 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
     val epochNumber = prePrepare.message.blockMetadata.epochNumber
     val blockNumber = prePrepare.message.blockMetadata.blockNumber
     createFuture(addOrderedBlockActionName(epochNumber, blockNumber)) { () =>
-      // we can drop the in progress messages for this block
-      preparesMap.remove(blockNumber).discard
-      prePreparesMap.remove(blockNumber).discard
-
       putIfAbsent(
         store = blocks,
         key = blockNumber,

@@ -6,6 +6,7 @@ package com.digitalasset.canton.platform.store.backend
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.platform.indexer.parallel.{PostPublishData, PublishSource}
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -27,7 +28,7 @@ private[backend] trait StorageBackendTestsCompletions
   import StorageBackendTestValues.*
 
   it should "correctly find completions by offset range" in {
-    TraceContext.withNewTraceContext { aTraceContext =>
+    TraceContext.withNewTraceContext("test") { aTraceContext =>
       val party = someParty
       val userId = someUserId
       val emptyTraceContext = SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
@@ -353,6 +354,7 @@ private[backend] trait StorageBackendTestsCompletions
     val publicationTime = Timestamp.now()
     val recordTime = Timestamp.now().addMicros(15)
     val submissionId = UUID.randomUUID().toString
+    val synchronizerId = SynchronizerId.tryFromString("x::synchronizer1")
     val dtos = Vector(
       dtoCompletion(
         offset(1)
@@ -363,7 +365,7 @@ private[backend] trait StorageBackendTestsCompletions
         commandId = commandId,
         userId = "userid1",
         submissionId = Some(submissionId),
-        synchronizerId = "x::synchronizer1",
+        synchronizerId = synchronizerId,
         messageUuid = Some(messageUuid.toString),
         publicationTime = publicationTime,
         isTransaction = true,
@@ -374,7 +376,7 @@ private[backend] trait StorageBackendTestsCompletions
         commandId = commandId,
         userId = "userid1",
         submissionId = Some(submissionId),
-        synchronizerId = "x::synchronizer1",
+        synchronizerId = synchronizerId,
         messageUuid = Some(messageUuid.toString),
         publicationTime = publicationTime,
         isTransaction = false,
@@ -385,7 +387,7 @@ private[backend] trait StorageBackendTestsCompletions
         commandId = commandId,
         userId = "userid1",
         submissionId = Some(submissionId),
-        synchronizerId = "x::synchronizer1",
+        synchronizerId = synchronizerId,
         recordTime = recordTime,
         messageUuid = None,
         updateId = None,

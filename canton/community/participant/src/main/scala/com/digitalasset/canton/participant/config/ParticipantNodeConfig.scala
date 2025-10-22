@@ -12,6 +12,7 @@ import com.digitalasset.canton.config.{ReplicationConfig, *}
 import com.digitalasset.canton.http.JsonApiConfig
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
+import com.digitalasset.canton.participant.admin.party.PartyReplicationTestInterceptor
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig.DefaultRateLimit
 import com.digitalasset.canton.participant.sync.CommandProgressTrackerConfig
 import com.digitalasset.canton.platform.apiserver.ApiServiceOwner
@@ -31,10 +32,11 @@ import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSou
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.store.PrunableByTimeParameters
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
-import io.netty.handler.ssl.SslContext
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 import monocle.macros.syntax.lens.*
 
 import java.nio.file.Path
+import scala.concurrent.duration.Duration
 
 /** Base for all participant configs - both local and remote */
 trait BaseParticipantConfig extends NodeConfig with Product with Serializable {
@@ -43,7 +45,6 @@ trait BaseParticipantConfig extends NodeConfig with Product with Serializable {
 
 final case class ParticipantProtocolConfig(
     minimumProtocolVersion: Option[ProtocolVersion],
-    override val sessionSigningKeys: SessionSigningKeysConfig,
     override val alphaVersionSupport: Boolean,
     override val betaVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
@@ -79,14 +80,14 @@ final case class ParticipantNodeConfig(
     override val init: ParticipantInitConfig = ParticipantInitConfig(),
     override val crypto: CryptoConfig = CryptoConfig(),
     ledgerApi: LedgerApiServerConfig = LedgerApiServerConfig(),
-    httpLedgerApi: Option[JsonApiConfig] = None,
+    httpLedgerApi: JsonApiConfig = JsonApiConfig(),
     override val adminApi: AdminServerConfig = AdminServerConfig(),
     override val storage: StorageConfig = StorageConfig.Memory(),
     testingTime: Option[TestingTimeServiceConfig] = None,
     override val parameters: ParticipantNodeParameterConfig = ParticipantNodeParameterConfig(),
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig(),
     replication: Option[ReplicationConfig] = None,
-    features: EnterpriseParticipantFeaturesConfig = EnterpriseParticipantFeaturesConfig.default,
+    features: ParticipantFeaturesConfig = ParticipantFeaturesConfig.default,
     override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig(),
     override val topology: TopologyConfig = TopologyConfig(),
     alphaDynamic: DeclarativeParticipantConfig = DeclarativeParticipantConfig(),
@@ -111,6 +112,8 @@ final case class ParticipantNodeConfig(
       .modify(ports.participantAdminApiPort.setDefaultPort)
       .focus(_.replication)
       .modify(ReplicationConfig.withDefaultO(storage, _, edition))
+      .focus(_.httpLedgerApi.server.internalPort)
+      .modify(ports.jsonLedgerApiPort.setDefaultPort)
 }
 
 object ParticipantNodeConfig {
@@ -119,24 +122,28 @@ object ParticipantNodeConfig {
     CantonConfigValidatorDerivation[ParticipantNodeConfig]
 }
 
-/** Enterprise features configuration
+/** Participant features configuration
   *
   * @param profileDir
   *   path to the directory used for Daml profiling
+  * @param snapshotDir
+  *   path to the directory used for saving transaction tree snapshots
   */
-final case class EnterpriseParticipantFeaturesConfig(
-    profileDir: Option[Path] = None
+final case class ParticipantFeaturesConfig(
+    profileDir: Option[Path] = None,
+    snapshotDir: Option[Path] = None,
 ) extends PredicatedCantonConfigValidation {
   override protected def allowThisInCommunity: Boolean =
-    this == EnterpriseParticipantFeaturesConfig.default
+    // DAMLe profiling is an enterprise-only supported feature
+    profileDir.isEmpty
 }
 
-object EnterpriseParticipantFeaturesConfig {
-  val default: EnterpriseParticipantFeaturesConfig = EnterpriseParticipantFeaturesConfig()
+object ParticipantFeaturesConfig {
+  val default: ParticipantFeaturesConfig = ParticipantFeaturesConfig()
 
-  implicit val enterpriseParticipantFeaturesConfigCantonConfigValidator
-      : CantonConfigValidator[EnterpriseParticipantFeaturesConfig] =
-    CantonConfigValidatorDerivation[EnterpriseParticipantFeaturesConfig]
+  implicit val participantFeaturesConfigCantonConfigValidator
+      : CantonConfigValidator[ParticipantFeaturesConfig] =
+    CantonConfigValidatorDerivation[ParticipantFeaturesConfig]
 }
 
 /** Configuration to connect the console to a participant running remotely.
@@ -174,8 +181,8 @@ object RemoteParticipantConfig {
   * @param authServices
   *   type of authentication services used by ledger-api server. If empty, we use a wildcard.
   *   Otherwise, the first service response that does not say "unauthenticated" will be used.
-  * @param adminToken
-  *   token that should grant admin access when presented by a client on the ledger api
+  * @param adminTokenConfig
+  *   configuration to grant admin access when presented by a client on the ledger api
   * @param jwtTimestampLeeway
   *   leeway parameters for JWTs
   * @param keepAliveServer
@@ -205,7 +212,7 @@ object RemoteParticipantConfig {
   *   enable command inspection service over the ledger api
   * @param identityProviderManagement
   *   configurations pertaining to the ledger api server's "identity provider management service"
-  * @param interactiveSubmissionServiceConfig
+  * @param interactiveSubmissionService
   *   config for interactive submission service over the ledger api
   */
 final case class LedgerApiServerConfig(
@@ -213,12 +220,13 @@ final case class LedgerApiServerConfig(
     internalPort: Option[Port] = None,
     tls: Option[TlsServerConfig] = None,
     authServices: Seq[AuthServiceConfig] = Seq.empty,
-    adminToken: Option[String] = None,
+    adminTokenConfig: AdminTokenConfig = AdminTokenConfig(),
     jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
     keepAliveServer: Option[LedgerApiKeepAliveServerConfig] = Some(
       LedgerApiKeepAliveServerConfig()
     ),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
+    maxInboundMetadataSize: NonNegativeInt = ServerConfig.defaultMaxInboundMetadataSize,
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
     postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
     databaseConnectionTimeout: config.NonNegativeFiniteDuration =
@@ -236,8 +244,13 @@ final case class LedgerApiServerConfig(
       InteractiveSubmissionServiceConfig.Default,
     topologyAwarePackageSelection: TopologyAwarePackageSelectionConfig =
       TopologyAwarePackageSelectionConfig.Default,
+    maxTokenLifetime: NonNegativeDuration = config.NonNegativeDuration(Duration.Inf),
+    jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
 ) extends ServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
+
+  // LAPI server does not use the canonical server builder, so doesn't support the stream limits using stream limit config
+  override val stream: Option[StreamLimitConfig] = None
 
   lazy val clientConfig: FullClientConfig =
     FullClientConfig(address, port, tls.map(_.clientConfig))
@@ -306,12 +319,6 @@ object TestingTimeServiceConfig {
   *
   * The following specialized participant node performance tuning parameters may be grouped once a
   * more final set of configs emerges.
-  * @param reassignmentTimeProofFreshnessProportion
-  *   Proportion of the target synchronizer exclusivity timeout that is used as a freshness bound
-  *   when requesting a time proof. Setting to 3 means we'll take a 1/3 of the target synchronizer
-  *   exclusivity timeout and potentially we reuse a recent timeout if one exists within that bound,
-  *   otherwise a new time proof will be requested. Setting to zero will disable reusing recent time
-  *   proofs and will instead always fetch a new proof.
   * @param minimumProtocolVersion
   *   The minimum protocol version that this participant will speak when connecting to a
   *   synchronizer
@@ -333,9 +340,18 @@ object TestingTimeServiceConfig {
   *   Disable the package upgrade verification on DAR upload
   * @param packageMetadataView
   *   Initialization parameters for the package metadata in-memory store.
-  * @param protocolFeatureFlags
-  *   Enable usage of protocol feature flags. See
-  *   [[com.digitalasset.canton.version.ParticipantProtocolFeatureFlags]]
+  * @param automaticallyPerformLogicalSynchronizerUpgrade
+  *   Whether the participant automatically performs a handshake with the upgraded synchronizer
+  *   after receiving enough sequencer connections, and whether the participants automatically
+  *   connects to the synchronizer after the upgrade time.
+  * @param activationFrequencyForWarnAboutConsistencyChecks
+  *   controls how often warning messages about
+  *   [[com.digitalasset.canton.config.CantonParameters.enableAdditionalConsistencyChecks]] being
+  *   enabled are logged, measured in the number of contract activations during a single connection
+  *   to a synchronizer. Used only for database storage.
+  * @param doNotAwaitOnCheckingIncomingCommitments
+  *   Enable fully asynchronous checking of incoming commitments. This may result in some incoming
+  *   commitments not being checked in case of crashes or HA failovers.
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -343,15 +359,14 @@ final case class ParticipantNodeParameterConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
-    reassignmentTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
-      ParticipantProtocolVersion(ProtocolVersion.v33)
+      ParticipantProtocolVersion(ProtocolVersion.v34)
     ),
     initialProtocolVersion: ParticipantProtocolVersion = ParticipantProtocolVersion(
       ProtocolVersion.latest
     ),
-    sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
-    alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    alphaVersionSupport: Boolean = true,
     betaVersionSupport: Boolean = false,
     dontWarnOnDeprecatedPV: Boolean = false,
     warnIfOverloadedFor: Option[config.NonNegativeFiniteDuration] = Some(
@@ -362,20 +377,23 @@ final case class ParticipantNodeParameterConfig(
     journalGarbageCollectionDelay: config.NonNegativeFiniteDuration =
       config.NonNegativeFiniteDuration.ofSeconds(0),
     disableUpgradeValidation: Boolean = false,
+    enableStrictDarValidation: Boolean = false,
     watchdog: Option[WatchdogConfig] = None,
     packageMetadataView: PackageMetadataViewConfig = PackageMetadataViewConfig(),
     commandProgressTracker: CommandProgressTrackerConfig = CommandProgressTrackerConfig(),
     unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig] = None,
-    protocolFeatureFlags: Boolean = true,
+    // TODO(#25344): check whether this should be removed
+    automaticallyPerformLogicalSynchronizerUpgrade: Boolean = true,
+    activationFrequencyForWarnAboutConsistencyChecks: Long = 1000,
+    reassignmentsConfig: ReassignmentsConfig = ReassignmentsConfig(),
+    doNotAwaitOnCheckingIncomingCommitments: Boolean = false,
 ) extends LocalNodeParametersConfig
     with UniformCantonConfigValidation
 
 object ParticipantNodeParameterConfig {
   implicit val participantNodeParameterConfigCantonConfigValidator
-      : CantonConfigValidator[ParticipantNodeParameterConfig] = {
-    import CantonConfigValidatorInstances.*
+      : CantonConfigValidator[ParticipantNodeParameterConfig] =
     CantonConfigValidatorDerivation[ParticipantNodeParameterConfig]
-  }
 }
 
 /** Parameters for the participant node's stores
@@ -483,15 +501,23 @@ object ContractLoaderConfig {
 }
 
 /** Parameters for the Online Party Replication (OPR) preview feature (unsafe for production)
-  *
-  * @param pauseSynchronizerIndexingDuringPartyReplication
-  *   whether to pause synchronizer indexing during party replication
   */
 final case class UnsafeOnlinePartyReplicationConfig(
-    pauseSynchronizerIndexingDuringPartyReplication: Boolean = false
+    testInterceptor: Option[UnsafeOnlinePartyReplicationConfig.TestInterceptor] = None
 ) extends UniformCantonConfigValidation
 object UnsafeOnlinePartyReplicationConfig {
+
+  /** The PartyReplicator supports adding a test interceptor for manipulating behavior during tests.
+    * This is used for delaying and/or dropping messages to verify the behavior in abnormal
+    * scenarios in a deterministic way. It is not expected to be used at runtime in any capacity and
+    * is not possible to set through pureconfig.
+    */
+  type TestInterceptor = () => PartyReplicationTestInterceptor
+
   implicit val unsafeOnlinePartyReplicationConfigCantonConfigValidator
-      : CantonConfigValidator[UnsafeOnlinePartyReplicationConfig] =
+      : CantonConfigValidator[UnsafeOnlinePartyReplicationConfig] = {
+    implicit val testingInterceptorCantonConfigValidator: CantonConfigValidator[TestInterceptor] =
+      CantonConfigValidator.validateAll
     CantonConfigValidatorDerivation[UnsafeOnlinePartyReplicationConfig]
+  }
 }

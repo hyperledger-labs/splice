@@ -8,9 +8,10 @@ set -euo pipefail
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 function usage() {
-  echo "Usage: $0 -[h] [-w]"
+  echo "Usage: $0 -[h] [-w] [-E]"
   echo "  -h: Show this help message"
   echo "  -w: Wait for the SV node to be ready"
+  echo "  -E: Use this flag to bind the Nginx proxy to 0.0.0.0 (external access) instead of 127.0.0.1 (default)."
 }
 
 # issue a user friendly red error
@@ -29,7 +30,9 @@ function _info(){
 }
 
 wait=0
-while getopts "hw" opt; do
+HOST_BIND_IP="127.0.0.1"
+
+while getopts "hwE" opt; do
   case ${opt} in
     h)
       usage
@@ -37,6 +40,9 @@ while getopts "hw" opt; do
       ;;
     w)
       wait=1
+      ;;
+    E)
+      HOST_BIND_IP="0.0.0.0"
       ;;
     ?)
       usage
@@ -60,4 +66,7 @@ extra_args=()
 if [ $wait -eq 1 ]; then
   extra_args+=("--wait" "--wait-timeout" "600")
 fi
+
+export HOST_BIND_IP
+
 docker compose -f "${script_dir}/compose.yaml" up -d "${extra_args[@]}"

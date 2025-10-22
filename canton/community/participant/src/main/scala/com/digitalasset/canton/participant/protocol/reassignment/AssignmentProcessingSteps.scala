@@ -21,7 +21,6 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
 }
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidation.*
-import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationError.UnassignmentIncomplete
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.{
   ViewHashAndRecipients,
@@ -31,13 +30,9 @@ import com.digitalasset.canton.participant.protocol.submission.{
   EncryptedViewMessageFactory,
   SeedGenerator,
 }
-import com.digitalasset.canton.participant.protocol.{
-  ContractAuthenticator,
-  EngineController,
-  ProcessingSteps,
-}
+import com.digitalasset.canton.participant.protocol.{EngineController, ProcessingSteps}
 import com.digitalasset.canton.participant.store.*
-import com.digitalasset.canton.participant.sync.{SyncEphemeralState, SyncEphemeralStateLookup}
+import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
@@ -47,28 +42,23 @@ import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.util.ReassignmentTag.Target
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.util.{ContractValidator, EitherTUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{
-  LfPartyId,
-  ReassignmentCounter,
-  RequestCounter,
-  SequencerCounter,
-  checked,
-}
+import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
 private[reassignment] class AssignmentProcessingSteps(
-    val synchronizerId: Target[SynchronizerId],
+    val synchronizerId: Target[PhysicalSynchronizerId],
     val participantId: ParticipantId,
     reassignmentCoordination: ReassignmentCoordination,
+    targetCrypto: SynchronizerCryptoClient,
     seedGenerator: SeedGenerator,
-    override protected val contractAuthenticator: ContractAuthenticator,
+    override protected val contractValidator: ContractValidator,
     staticSynchronizerParameters: Target[StaticSynchronizerParameters],
-    targetProtocolVersion: Target[ProtocolVersion],
+    val protocolVersion: Target[ProtocolVersion],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends ReassignmentProcessingSteps[
@@ -88,10 +78,13 @@ private[reassignment] class AssignmentProcessingSteps(
 
   override def explicitMediatorGroup(param: SubmissionParam): Option[MediatorGroupIndex] = None
 
-  override type SubmissionResultArgs = PendingReassignmentSubmission
-
   override type RequestType = ProcessingSteps.RequestType.Assignment
   override val requestType = ProcessingSteps.RequestType.Assignment
+
+  override def reassignmentId(
+      fullViewTree: FullAssignmentTree,
+      requestTimestamp: CantonTimestamp,
+  ): ReassignmentId = fullViewTree.reassignmentId
 
   override def pendingSubmissions(state: SyncEphemeralState): PendingSubmissions =
     state.pendingAssignmentSubmissions
@@ -101,7 +94,7 @@ private[reassignment] class AssignmentProcessingSteps(
     staticSynchronizerParameters,
     participantId,
     reassignmentCoordination,
-    contractAuthenticator,
+    contractValidator,
     loggerFactory,
   )
 
@@ -111,11 +104,15 @@ private[reassignment] class AssignmentProcessingSteps(
   override def createSubmission(
       submissionParam: SubmissionParam,
       mediator: MediatorGroupRecipient,
-      ephemeralState: SyncEphemeralStateLookup,
+      ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Submission] = {
+  ): EitherT[
+    FutureUnlessShutdown,
+    ReassignmentProcessorError,
+    (Submission, PendingSubmissionData),
+  ] = {
 
     val SubmissionParam(
       submitterMetadata,
@@ -147,19 +144,19 @@ private[reassignment] class AssignmentProcessingSteps(
         .lookup(reassignmentId)
         .leftMap(err => NoReassignmentData(reassignmentId, err))
 
-      unassignmentResult <- EitherT.fromEither[FutureUnlessShutdown](
-        unassignmentData.unassignmentResult.toRight(
-          UnassignmentIncomplete(reassignmentId).toSubmissionValidationError
-        )
-      )
+      sourceSynchronizer = unassignmentData.sourcePSId
 
-      targetSynchronizer = unassignmentData.targetSynchronizer
-      _ = if (targetSynchronizer != synchronizerId)
+      /*
+       Because an upgrade of the target synchronizer can happen between unassignment
+       and assignment, the comparison needs to be logical.
+       */
+      _ = if (unassignmentData.targetPSId.map(_.logical) != synchronizerId.map(_.logical))
         throw new IllegalStateException(
-          s"Assignment $reassignmentId: Reassignment data for ${unassignmentData.targetSynchronizer} found on wrong synchronizer $synchronizerId"
+          s"Assignment $reassignmentId: Reassignment data for ${unassignmentData.targetPSId
+              .map(_.logical)} found on wrong synchronizer ${synchronizerId.map(_.logical)}"
         )
 
-      stakeholders = unassignmentData.unassignmentRequest.stakeholders
+      stakeholders = unassignmentData.stakeholders
       _ <- ReassignmentValidation
         .checkSubmitter(
           ReassignmentRef(reassignmentId),
@@ -177,15 +174,16 @@ private[reassignment] class AssignmentProcessingSteps(
         makeFullAssignmentTree(
           pureCrypto,
           seed,
+          reassignmentId,
           submitterMetadata,
-          unassignmentData.contract,
-          unassignmentData.reassignmentCounter,
-          targetSynchronizer,
+          unassignmentData.contractsBatch,
+          sourceSynchronizer,
+          synchronizerId,
           mediator,
-          unassignmentResult,
           assignmentUuid,
-          targetProtocolVersion,
-          unassignmentData.unassignmentRequest.reassigningParticipants,
+          protocolVersion,
+          unassignmentData.reassigningParticipants,
+          unassignmentData.unassignmentTs,
         )
       )
 
@@ -198,10 +196,11 @@ private[reassignment] class AssignmentProcessingSteps(
         staticSynchronizerParameters.map(_.protocolVersion),
       )
       recipientsSet <- activeParticipantsOfParty(stakeholders.all.toSeq)
+      contractIds = unassignmentData.contractsBatch.contractIds.toSeq
       recipients <- EitherT.fromEither[FutureUnlessShutdown](
         Recipients
           .ofSet(recipientsSet)
-          .toRight(NoStakeholders.logAndCreate(unassignmentData.contract.contractId, logger))
+          .toRight(NoStakeholders.logAndCreate(contractIds, logger))
       )
       viewsToKeyMap <- EncryptedViewMessageFactory
         .generateKeysFromRecipients(
@@ -214,7 +213,7 @@ private[reassignment] class AssignmentProcessingSteps(
           ephemeralState.sessionKeyStoreLookup.convertStore,
         )
         .leftMap[ReassignmentProcessorError](
-          EncryptionError(unassignmentData.contract.contractId, _)
+          EncryptionError(contractIds, _)
         )
       ViewKeyData(_, viewKey, viewKeyMap) = viewsToKeyMap(fullTree.viewHash)
       viewMessage <- EncryptedViewMessageFactory
@@ -222,23 +221,21 @@ private[reassignment] class AssignmentProcessingSteps(
           fullTree,
           (viewKey, viewKeyMap),
           recentSnapshot,
-          targetProtocolVersion.unwrap,
+          protocolVersion.unwrap,
         )
         .leftMap[ReassignmentProcessorError](
-          EncryptionError(unassignmentData.contract.contractId, _)
+          EncryptionError(contractIds, _)
         )
-    } yield {
-      val rootHashMessage =
+      rootHashMessage =
         RootHashMessage(
           rootHash,
           synchronizerId.unwrap,
-          targetProtocolVersion.unwrap,
           ViewType.AssignmentViewType,
           recentSnapshot.ipsSnapshot.timestamp,
           EmptyRootHashMessagePayload,
         )
       // Each member gets a message sent to itself and to the mediator
-      val rootHashRecipients =
+      rootHashRecipients =
         Recipients.recipientGroups(
           checked(
             NonEmptyUtil.fromUnsafe(
@@ -248,32 +245,30 @@ private[reassignment] class AssignmentProcessingSteps(
             )
           )
         )
-      val messages = Seq[(ProtocolMessage, Recipients)](
+      messages = Seq[(ProtocolMessage, Recipients)](
         mediatorMessage -> Recipients.cc(mediator),
         viewMessage -> recipients,
         rootHashMessage -> rootHashRecipients,
       )
-      ReassignmentsSubmission(Batch.of(targetProtocolVersion.unwrap, messages*), rootHash)
-    }
-  }
-
-  override def updatePendingSubmissions(
-      pendingSubmissionMap: PendingSubmissions,
-      submissionParam: SubmissionParam,
-      submissionId: PendingSubmissionId,
-  ): EitherT[Future, ReassignmentProcessorError, SubmissionResultArgs] =
-    performPendingSubmissionMapUpdate(
-      pendingSubmissionMap,
-      ReassignmentRef(submissionParam.reassignmentId),
-      submissionParam.submitterLf,
-      submissionId,
+      pendingSubmission <-
+        performPendingSubmissionMapUpdate(
+          pendingSubmissions(ephemeralState),
+          ReassignmentRef(submissionParam.reassignmentId),
+          submissionParam.submitterLf,
+          rootHash,
+          _ => reassignmentId,
+        )
+    } yield (
+      ReassignmentsSubmission(Batch.of(protocolVersion.unwrap, messages*), rootHash),
+      Some(pendingSubmission),
     )
+  }
 
   override def createSubmissionResult(
       deliver: Deliver[Envelope[_]],
-      pendingSubmission: SubmissionResultArgs,
+      pendingSubmission: PendingSubmissionData,
   ): SubmissionResult =
-    SubmissionResult(pendingSubmission.reassignmentCompletion.future)
+    SubmissionResult(pendingSubmission.value.reassignmentCompletion.future)
 
   override protected def decryptTree(
       snapshot: SynchronizerSnapshotSyncCryptoApi,
@@ -289,14 +284,13 @@ private[reassignment] class AssignmentProcessingSteps(
   ] =
     EncryptedViewMessage
       .decryptFor(
-        staticSynchronizerParameters.unwrap,
         snapshot,
         sessionKeyStore,
         envelope.protocolMessage,
         participantId,
       ) { bytes =>
         FullAssignmentTree
-          .fromByteString(snapshot.pureCrypto, targetProtocolVersion)(bytes)
+          .fromByteString(snapshot.pureCrypto, protocolVersion)(bytes)
           .leftMap(e => DefaultDeserializationError(e.toString))
       }
       .map(fullTree =>
@@ -311,32 +305,39 @@ private[reassignment] class AssignmentProcessingSteps(
   )(implicit
       traceContext: TraceContext
   ): Either[ReassignmentProcessorError, ActivenessSet] =
-    // TODO(i12926): Send a rejection if malformedPayloads is non-empty
-    if (parsedRequest.fullViewTree.targetSynchronizer == synchronizerId) {
-      val contractId = parsedRequest.fullViewTree.contract.contractId
+    if (Target(parsedRequest.fullViewTree.synchronizerId) == synchronizerId) {
+      val contractIds = parsedRequest.fullViewTree.contracts.contractIds.toSet
       val contractCheck = ActivenessCheck.tryCreate(
         checkFresh = Set.empty,
-        checkFree = Set(contractId),
+        checkFree = contractIds,
         checkActive = Set.empty,
-        lock = Set(contractId),
+        lock = contractIds,
+        lockMaybeUnknown = Set.empty,
         needPriorState = Set.empty,
       )
       val activenessSet = ActivenessSet(
         contracts = contractCheck,
         reassignmentIds =
           if (parsedRequest.fullViewTree.isReassigningParticipant(participantId))
-            Set(parsedRequest.fullViewTree.unassignmentResultEvent.reassignmentId)
+            Set(parsedRequest.reassignmentId)
           else Set.empty,
       )
       Right(activenessSet)
     } else
       Left(
         UnexpectedSynchronizer(
-          parsedRequest.fullViewTree.unassignmentResultEvent.reassignmentId,
+          parsedRequest.reassignmentId,
           targetSynchronizerId = parsedRequest.fullViewTree.synchronizerId,
           receivedOn = synchronizerId.unwrap,
         )
       )
+
+  // assigned contracts should always be "known" as assignments include the contracts
+  protected override def contractsMaybeUnknown(
+      fullView: FullView,
+      snapshot: SynchronizerSnapshotSyncCryptoApi,
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+    FutureUnlessShutdown.pure(false)
 
   override def constructPendingDataAndResponse(
       parsedRequest: ParsedRequestType,
@@ -351,55 +352,64 @@ private[reassignment] class AssignmentProcessingSteps(
     ReassignmentProcessorError,
     StorePendingDataAndSendResponseAndCreateTimeout,
   ] = {
-    val reassignmentId = parsedRequest.fullViewTree.unassignmentResultEvent.reassignmentId
+    val reassignmentId = parsedRequest.reassignmentId
+    val sourceSynchronizer = parsedRequest.fullViewTree.sourceSynchronizer
     val isReassigningParticipant =
       parsedRequest.fullViewTree.isReassigningParticipant(participantId)
 
     for {
       reassignmentDataE <- EitherT.right[ReassignmentProcessorError](
         reassignmentCoordination
-          .waitForStartedUnassignmentToCompletePhase7(reassignmentId)
+          .waitForStartedUnassignmentToCompletePhase7(reassignmentId, sourceSynchronizer)
           .flatMap(_ => reassignmentLookup.lookup(reassignmentId).value)
       )
 
       assignmentValidationResult <- assignmentValidation
         .perform(
-          Target(parsedRequest.snapshot),
           reassignmentDataE,
           activenessResultFuture,
         )(parsedRequest)
 
     } yield {
-      val responseF = if (isReassigningParticipant) {
-        if (!assignmentValidationResult.validationResult.isUnassignmentDataNotFoundOrIncomplete)
+      val confirmationResponseF =
+        if (
+          assignmentValidationResult.reassigningParticipantValidationResult.isUnassignmentDataNotFound && isReassigningParticipant
+        ) {
+          logger.info(
+            s"Sending an abstain verdict for ${assignmentValidationResult.hostedConfirmingReassigningParties} because unassignment data is not found in the reassignment store"
+          )
+          val confirmationResponses = createAbstainResponse(
+            parsedRequest.requestId,
+            assignmentValidationResult.rootHash,
+            s"Unassignment data not found when processing assignment $reassignmentId.",
+            assignmentValidationResult.hostedConfirmingReassigningParties,
+          )
+
+          FutureUnlessShutdown.pure(confirmationResponses)
+        } else {
           createConfirmationResponses(
             parsedRequest.requestId,
-            parsedRequest.snapshot.ipsSnapshot,
-            targetProtocolVersion.unwrap,
-            parsedRequest.fullViewTree.confirmingParties,
+            parsedRequest.malformedPayloads,
+            protocolVersion.unwrap,
             assignmentValidationResult,
-          ).map(_.map((_, Recipients.cc(parsedRequest.mediator))))
-        else {
-          logger.info(
-            "Not sending a confirmation response because unassignment data is not found in the reassignment store"
           )
-          FutureUnlessShutdown.pure(None)
         }
-      } else // TODO(i24532): Not sending a confirmation response is a workaround to make possible to process the assignment before unassignment
-        FutureUnlessShutdown.pure(None)
 
-      // We consider that we rejected if we fail to process or if at least one of the responses is not "approve"
+      val responseF = confirmationResponseF.map(_.map((_, Recipients.cc(parsedRequest.mediator))))
+
+      // We consider that we rejected if we fail to process or if at least one of the responses is a "reject"
       val locallyRejectedF = responseF.map(
         _.exists { case (confirmation, _) =>
-          confirmation.responses.exists(response => !response.localVerdict.isApprove)
+          confirmation.responses.exists(_.localVerdict.isReject)
         }
       )
 
-      val engineAbortStatusF = assignmentValidationResult.metadataResultET.value.map {
-        case Left(ReassignmentValidationError.ReinterpretationAborted(_, reason)) =>
-          EngineAbortStatus.aborted(reason)
-        case _ => EngineAbortStatus.notAborted
-      }
+      val engineAbortStatusF =
+        assignmentValidationResult.commonValidationResult.contractAuthenticationResultF.value.map {
+          case Left(ReassignmentValidationError.ReinterpretationAborted(_, reason)) =>
+            EngineAbortStatus.aborted(reason)
+          case _ => EngineAbortStatus.notAborted
+        }
 
       // construct pending data and response
       val entry = PendingAssignment(
@@ -419,15 +429,15 @@ private[reassignment] class AssignmentProcessingSteps(
         EitherT.right(responseF),
         RejectionArgs(
           entry,
-          LocalRejectError.TimeRejects.LocalTimeout
-            .Reject()
-            .toLocalReject(targetProtocolVersion.unwrap),
+          ErrorDetails.fromLocalError(
+            LocalRejectError.TimeRejects.LocalTimeout.Reject()
+          ),
         ),
       )
     }
   }
 
-  override def getCommitSetAndContractsToBeStoredAndEvent(
+  override def getCommitSetAndContractsToBeStoredAndEventFactory(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
       verdict: Verdict,
       pendingRequestData: PendingAssignment,
@@ -453,52 +463,85 @@ private[reassignment] class AssignmentProcessingSteps(
     ) = pendingRequestData
 
     def rejected(
-        reason: TransactionRejection
-    ): Either[ReassignmentProcessorError, CommitAndStoreContractsAndPublishEvent] =
-      for {
-        eventO <- createRejectionEvent(RejectionArgs(pendingRequestData, reason))
-      } yield CommitAndStoreContractsAndPublishEvent(None, Seq.empty, eventO)
+        errorDetails: ErrorDetails
+    ): EitherT[
+      FutureUnlessShutdown,
+      ReassignmentProcessorError,
+      CommitAndStoreContractsAndPublishEvent,
+    ] = {
+      val commit = for {
+        eventO <- createRejectionEvent(RejectionArgs(pendingRequestData, errorDetails))
+      } yield CommitAndStoreContractsAndPublishEvent(
+        None,
+        Seq.empty,
+        eventO.map(event => _ => _ => event),
+      )
+      EitherT.fromEither[FutureUnlessShutdown](commit)
+    }
+
+    def mergeRejectionReasons(
+        validationError: Option[LocalRejectError],
+        errorDetails: ErrorDetails,
+    ): ErrorDetails =
+      // we reject with the phase 7 rejection, as it is the best information we have
+      validationError
+        .map(e => ErrorDetails(e.reason(), e.isMalformed))
+        .getOrElse(errorDetails)
 
     for {
-      isSuccessful <- EitherT.right(assignmentValidationResult.isSuccessfulF)
-      commitAndStoreContract <- verdict match {
-        // TODO(i22887): Right now we fail at phase 7 if any validation has failed
-        //  except reassignmentDataNotFound which is a race condition usually.
-        //  We should fail only for some specific errors e.g ModelConformance check.
-        // TODO(i22993): Adding this exception is a workaround, we should remove it once we have decided how to deal
-        //  with completing assignment before unassignment.
-        case _: Verdict.Approve
-            if !isSuccessful && !assignmentValidationResult.validationResult.isUnassignmentDataNotFoundOrIncomplete =>
-          throw new RuntimeException(
-            s"Assignment validation failed for $requestId because: ${assignmentValidationResult.validationResult}"
-          )
+      rejectionFromPhase3 <- EitherT.right(checkPhase7Validations(assignmentValidationResult))
 
-        case _: Verdict.Approve =>
+      // Additional validation requested during security audit as DIA-003-013.
+      // Activeness of the mediator already gets checked in Phase 3,
+      // this additional validation covers the case that the mediator gets deactivated between Phase 3 and Phase 7.
+      resultTs = event.event.content.timestamp
+      topologySnapshotAtTs <- EitherT(
+        targetCrypto.ips.awaitSnapshot(resultTs).map(snapshot => Either.right(Target(snapshot)))
+      )
+
+      mediatorCheckResultO <- EitherT.right(
+        ReassignmentValidation
+          .ensureMediatorActive(
+            topologySnapshotAtTs,
+            mediator = pendingRequestData.mediator,
+            reassignmentId = assignmentValidationResult.reassignmentId,
+          )
+          .value
+          .map(
+            _.swap.toOption.map(error =>
+              LocalRejectError.MalformedRejects.MalformedRequest
+                .Reject(s"${error.message}. Rolling back.")
+            )
+          )
+      )
+
+      rejectionO = mediatorCheckResultO.orElse(rejectionFromPhase3)
+
+      commitAndStoreContract <- (verdict, rejectionO) match {
+        case (_: Verdict.Approve, Some(rejection)) =>
+          rejected(ErrorDetails.fromLocalError(rejection))
+        case (_: Verdict.Approve, _) =>
           val commitSet = assignmentValidationResult.commitSet
           val commitSetO = Some(FutureUnlessShutdown.pure(commitSet))
-          val contractsToBeStored = Seq(assignmentValidationResult.contract)
+          val contractsToBeStored = assignmentValidationResult.contracts.contracts.map(_.contract)
 
           for {
-            // By inserting assignment data, it allows us to process the assignment before the unassignment.
-            // TODO(i22993): workaround for issue 22993.
             _ <-
               if (
-                assignmentValidationResult.validationResult.isUnassignmentDataNotFoundOrIncomplete
+                assignmentValidationResult.reassigningParticipantValidationResult.isUnassignmentDataNotFound
                 && assignmentValidationResult.isReassigningParticipant
               ) {
                 reassignmentCoordination.addAssignmentData(
                   assignmentValidationResult.reassignmentId,
-                  contract = assignmentValidationResult.contract,
-                  target = synchronizerId,
+                  contracts = assignmentValidationResult.contracts,
+                  source = assignmentValidationResult.sourcePSId.map(_.logical),
+                  target = synchronizerId.map(_.logical),
                 )
-              } else EitherTUtil.unitUS
-            update <- EitherT.fromEither[FutureUnlessShutdown](
-              assignmentValidationResult.createReassignmentAccepted(
-                synchronizerId,
-                participantId,
-                targetProtocolVersion,
-                requestId.unwrap,
-              )
+              } else EitherTUtil.unitUS[ReassignmentProcessorError]
+            update = assignmentValidationResult.createReassignmentAccepted(
+              synchronizerId.map(_.logical),
+              participantId,
+              requestId.unwrap,
             )
           } yield CommitAndStoreContractsAndPublishEvent(
             commitSetO,
@@ -506,14 +549,16 @@ private[reassignment] class AssignmentProcessingSteps(
             Some(update),
           )
 
-        case reasons: Verdict.ParticipantReject =>
-          EitherT.fromEither[FutureUnlessShutdown](rejected(reasons.keyEvent))
+        case (reasons: Verdict.ParticipantReject, rejectionO) =>
+          val mergedError = mergeRejectionReasons(rejectionO, reasons.keyErrorDetails)
+          rejected(mergedError)
 
-        case rejection: Verdict.MediatorReject =>
-          EitherT.fromEither[FutureUnlessShutdown](rejected(rejection))
+        case (rejection: Verdict.MediatorReject, rejectionO) =>
+          val mergedError =
+            mergeRejectionReasons(rejectionO, rejection.errorDetails)
+          rejected(mergedError)
       }
     } yield commitAndStoreContract
-
   }
 
   override def handleTimeout(parsedRequest: ParsedReassignmentRequest[FullView])(implicit
@@ -522,10 +567,11 @@ private[reassignment] class AssignmentProcessingSteps(
 
   override def localRejectFromActivenessCheck(
       requestId: RequestId,
-      activenessResult: ActivenessResult,
       validationResult: ReassignmentValidationResult,
-  ): Option[LocalRejectError] =
-    if (activenessResult.inactiveReassignments.nonEmpty)
+  ): Option[LocalRejectError] = {
+    val activenessResult = validationResult.commonValidationResult.activenessResult
+    if (validationResult.activenessResultIsSuccessful) None
+    else if (activenessResult.inactiveReassignments.contains(validationResult.reassignmentId))
       Some(
         LocalRejectError.AssignmentRejects.AlreadyCompleted
           .Reject("")
@@ -540,11 +586,11 @@ private[reassignment] class AssignmentProcessingSteps(
         LocalRejectError.ConsistencyRejections.LockedContracts
           .Reject(activenessResult.contracts.alreadyLocked.toSeq.map(_.coid))
       )
-    else if (activenessResult.isSuccessful) None
     else
       throw new RuntimeException(
         s"Assignment $requestId: Unexpected activeness result $activenessResult"
       )
+  }
 }
 
 object AssignmentProcessingSteps {
@@ -581,40 +627,41 @@ object AssignmentProcessingSteps {
   private[reassignment] def makeFullAssignmentTree(
       pureCrypto: CryptoPureApi,
       seed: SaltSeed,
+      reassignmentId: ReassignmentId,
       submitterMetadata: ReassignmentSubmitterMetadata,
-      contract: SerializableContract,
-      reassignmentCounter: ReassignmentCounter,
-      targetSynchronizer: Target[SynchronizerId],
+      contracts: ContractsReassignmentBatch,
+      sourceSynchronizer: Source[PhysicalSynchronizerId],
+      targetSynchronizer: Target[PhysicalSynchronizerId],
       targetMediator: MediatorGroupRecipient,
-      unassignmentResult: DeliveredUnassignmentResult,
       assignmentUuid: UUID,
       targetProtocolVersion: Target[ProtocolVersion],
       reassigningParticipants: Set[ParticipantId],
+      unassignmentTs: CantonTimestamp,
   ): Either[ReassignmentProcessorError, FullAssignmentTree] = {
     val commonDataSalt = Salt.tryDeriveSalt(seed, 0, pureCrypto)
     val viewSalt = Salt.tryDeriveSalt(seed, 1, pureCrypto)
-    val stakeholders = Stakeholders(contract.metadata)
+    val stakeholders = contracts.stakeholders
 
     val commonData = AssignmentCommonData
       .create(pureCrypto)(
         commonDataSalt,
+        sourceSynchronizer,
         targetSynchronizer,
         targetMediator,
         stakeholders = stakeholders,
         uuid = assignmentUuid,
         submitterMetadata,
-        targetProtocolVersion,
         reassigningParticipants,
+        unassignmentTs,
       )
 
     for {
       view <- AssignmentView
         .create(pureCrypto)(
           viewSalt,
-          contract,
-          unassignmentResult,
+          reassignmentId,
+          contracts,
           targetProtocolVersion,
-          reassignmentCounter,
         )
         .leftMap(reason => InvalidReassignmentView(reason))
       tree = AssignmentViewTree(commonData, view, targetProtocolVersion, pureCrypto)

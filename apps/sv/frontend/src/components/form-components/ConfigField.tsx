@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { Link as RouterLink } from 'react-router-dom';
 import { Box, Divider, TextField as MuiTextField, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -117,19 +118,27 @@ interface PendingConfigDisplayProps {
 }
 
 export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pendingFieldInfo }) => {
-  const atThreshold = pendingFieldInfo.effectiveDate === 'Threshold';
+  const { fieldName, pendingValue, proposalCid, effectiveDate } = pendingFieldInfo;
+  const effectiveText =
+    effectiveDate === 'Threshold' ? 'at Threshold' : dayjs(effectiveDate).fromNow();
+
   return (
     <Typography
       variant="caption"
       color="text.secondary"
       sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
-      data-testid={`config-pending-value-${pendingFieldInfo.fieldName}`}
+      data-testid={`config-pending-value-${fieldName}`}
     >
-      Pending Configuration: <strong>{pendingFieldInfo.pendingValue}</strong> <br />
-      This pending configuration will go into effect{' '}
-      <strong>
-        {atThreshold ? 'at Threshold' : dayjs(pendingFieldInfo.effectiveDate).fromNow()}
-      </strong>
+      Pending Configuration: <strong>{pendingValue}</strong> <br />
+      This{' '}
+      <RouterLink
+        to={`/governance-beta/proposals/${proposalCid}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        pending configuration
+      </RouterLink>{' '}
+      will go into effect <strong>{effectiveText}</strong>
     </Typography>
   );
 };

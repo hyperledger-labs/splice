@@ -8,18 +8,13 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransaction,
-  TimeQuery,
-  TopologyStoreId,
-}
-import com.digitalasset.canton.topology.transaction.{
-  OwnerToKeyMapping,
-  TopologyChangeOp,
-  TopologyMapping,
-}
+import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, TimeQuery}
+import com.digitalasset.canton.topology.transaction.{TopologyChangeOp, TopologyMapping}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
+import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
@@ -343,7 +338,7 @@ class NodeInitializer(
       authorizedStoreSnapshot: ByteString
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
     for {
-      _ <- connection.importTopologySnapshot(authorizedStoreSnapshot, AuthorizedStore)
+      _ <- connection.importTopologySnapshot(authorizedStoreSnapshot, Authorized)
       _ = logger.info(s"AuthorizedStore snapshot is imported")
     } yield ()
 
@@ -356,7 +351,7 @@ class NodeInitializer(
     val member = nodeIdentity(id)
     for {
       nsTxHistory <- connection.listAllTransactions(
-        store = TopologyStoreId.SynchronizerStore(synchronizerId),
+        store = TopologyStoreId.Synchronizer(synchronizerId),
         timeQuery = TimeQuery.Range(None, None),
         includeMappings = Set(OwnerToKeyMapping.code),
         filterNamespace = Some(member.namespace),
@@ -381,7 +376,7 @@ class NodeInitializer(
     val allOtkSignatures = ownerToKeyMappings
       .map(_.transaction)
       .flatMap(_.signatures)
-      .map(_.signedBy)
+      .map(_.signature)
       .distinct
     val currentKeys = ownerToKeyMappings
       .map(_.transaction)

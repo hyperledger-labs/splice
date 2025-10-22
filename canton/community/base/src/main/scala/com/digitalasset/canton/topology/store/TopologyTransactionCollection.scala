@@ -124,7 +124,7 @@ object StoredTopologyTransactions
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(adminV30.TopologyTransactions)(fromProtoV30),
       _.toProtoV30,
     )
@@ -137,8 +137,8 @@ object StoredTopologyTransactions
       .traverse(StoredTopologyTransaction.fromProtoV30)
       .map(StoredTopologyTransactions(_))
 
-  def empty: GenericStoredTopologyTransactions =
-    StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](Seq())
+  def empty[Op <: TopologyChangeOp]: StoredTopologyTransactions[Op, TopologyMapping] =
+    StoredTopologyTransactions[Op, TopologyMapping](Seq.empty)
 
   override def name: String = "topology transactions"
 }

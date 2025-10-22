@@ -14,10 +14,7 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.util.{EntitySyntax, PartiesAllocator}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -91,7 +88,7 @@ trait MediatorOnboardingTest
     val alice = AliceName.toPartyId(participant1)
 
     // create an Iou contract, for which we later exercise the Cal choice
-    participant3.ledger_api.javaapi.commands.submit_flat(
+    participant3.ledger_api.javaapi.commands.submit(
       Seq(participant3.id.adminParty),
       new Iou(
         participant3.id.adminParty.toProtoPrimitive,
@@ -246,5 +243,5 @@ trait MediatorOnboardingTest
 
 class MediatorOnboardingTestPostgres extends MediatorOnboardingTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

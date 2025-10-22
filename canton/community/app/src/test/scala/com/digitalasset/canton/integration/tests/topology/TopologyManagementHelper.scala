@@ -6,10 +6,12 @@ package com.digitalasset.canton.integration.tests.topology
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.{InstanceReference, LocalInstanceReference}
+import com.digitalasset.canton.crypto.KeyPurpose.Signing
 import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings
-import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
+
+import scala.concurrent.ExecutionContext
 
 trait TopologyManagementHelper { this: BaseTest =>
 
@@ -38,7 +40,7 @@ trait TopologyManagementHelper { this: BaseTest =>
   def manuallyInitNode(
       node: LocalInstanceReference,
       kmsKeysO: Option[TopologyKmsKeys] = None,
-  ): Unit = {
+  )(implicit ec: ExecutionContext): Unit = {
 
     val (namespaceKey, sequencerAuthKey, signingKey, encryptionKey) = if (kmsKeysO.isDefined) {
       val kmsKeys = kmsKeysO.valueOrFail("no kms key ids defined")
@@ -51,6 +53,21 @@ trait TopologyManagementHelper { this: BaseTest =>
         .valueOrFail(s"node [${node.name}] expects a signing key id")
       val encryptionKmsKeyId = kmsKeys.encryptionKeyId
         .valueOrFail(s"node [${node.name}] expects an encryption key id")
+
+      // To refer in docs
+      val intermediateNsKmsKeyId = namespaceKmsKeyId
+      // user-manual-entry-begin: ManualRegisterKmsIntermediateNamespaceKey
+      val intermediateKey = node.keys.secret
+        .register_kms_signing_key(
+          intermediateNsKmsKeyId,
+          SigningKeyUsage.NamespaceOnly,
+          name = s"${node.name}-${SigningKeyUsage.Namespace.identifier}",
+        )
+      // user-manual-entry-begin: ManualRegisterKmsNamespaceKey
+      node.crypto.cryptoPrivateStore
+        .existsPrivateKey(intermediateKey.id, Signing)
+        .valueOrFail("intermediate key not registered")
+        .futureValueUS
 
       // user-manual-entry-begin: ManualRegisterKmsKeys
 
@@ -140,10 +157,8 @@ trait TopologyManagementHelper { this: BaseTest =>
 
     // Assign the new keys to this node.
     node.topology.owner_to_key_mappings.propose(
-      OwnerToKeyMapping(
-        node.id.member,
-        NonEmpty(Seq, sequencerAuthKey, signingKey, encryptionKey),
-      ),
+      member = node.id.member,
+      keys = NonEmpty(Seq, sequencerAuthKey, signingKey, encryptionKey),
       signedBy = Seq(namespaceKey.fingerprint, sequencerAuthKey.fingerprint, signingKey.fingerprint),
     )
 

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.synchronizer.sequencing.integrations.state
 
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.TestHash
@@ -11,6 +12,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
+import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.{BaseTest, ProtocolVersionChecksAsyncWordSpec}
@@ -48,10 +50,13 @@ trait SequencerStateManagerStoreTest
       Await.result(actorSystem.terminate(), 10.seconds)
     }
 
-  def sequencerStateManagerStore(mk: () => SequencerStateManagerStore): Unit = {
+  def sequencerStateManagerStore(
+      mk: () => (SequencerStateManagerStore, SequencerStore)
+  ): Unit = {
     val alice = ParticipantId(UniqueIdentifier.tryCreate("participant", "alice"))
     val bob = ParticipantId(UniqueIdentifier.tryCreate("participant", "bob"))
     val carlos = ParticipantId(UniqueIdentifier.tryCreate("participant", "carlos"))
+    val allMembers = Seq(alice, bob, carlos)
 
     def ts(epochSeconds: Int): CantonTimestamp =
       CantonTimestamp.Epoch.plusSeconds(epochSeconds.toLong)
@@ -63,11 +68,14 @@ trait SequencerStateManagerStoreTest
 
     "read at timestamp" should {
       "hydrate a correct empty state when there have been no updates" in {
-        val store = mk()
+        val (store, sequencerStore) = mk()
         (for {
+          _ <- allMembers.parTraverse(member =>
+            sequencerStore.registerMember(member, CantonTimestamp.now())
+          )
           lowerBoundAndInFlightAggregations <- store.readInFlightAggregations(
             CantonTimestamp.Epoch,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
         } yield {
           val inFlightAggregations = lowerBoundAndInFlightAggregations
@@ -75,8 +83,9 @@ trait SequencerStateManagerStoreTest
         }).failOnShutdown
       }
 
-      "reconstruct the aggregation state" in withNewTraceContext { implicit traceContext =>
-        val store = mk()
+      "reconstruct the aggregation state" in withNewTraceContext("test") { implicit traceContext =>
+        val (store, sequencerStore) = mk()
+
         val aggregationId1 = AggregationId(TestHash.digest(1))
         val aggregationId2 = AggregationId(TestHash.digest(2))
         val aggregationId3 = AggregationId(TestHash.digest(3))
@@ -104,7 +113,6 @@ trait SequencerStateManagerStoreTest
 
         val inFlightAggregation1 = InFlightAggregation(
           rule = rule,
-          firstSequencingTimestamp = t2,
           maxSequencingTimestamp = t4,
           alice -> AggregationBySender(
             t2,
@@ -114,12 +122,10 @@ trait SequencerStateManagerStoreTest
         )
         val inFlightAggregation2 = InFlightAggregation(
           rule = rule,
-          firstSequencingTimestamp = t2,
           maxSequencingTimestamp = t3,
         )
         val inFlightAggregation3 = InFlightAggregation(
           rule = rule,
-          firstSequencingTimestamp = t2,
           maxSequencingTimestamp = t4,
           alice -> AggregationBySender(
             t4.immediatePredecessor,
@@ -128,6 +134,9 @@ trait SequencerStateManagerStoreTest
         )
 
         (for {
+          _ <- allMembers.parTraverse(member =>
+            sequencerStore.registerMember(member, CantonTimestamp.now())
+          )
           _ <- store.addInFlightAggregationUpdates(
             Map(
               aggregationId1 -> inFlightAggregation1.asUpdate,
@@ -137,23 +146,23 @@ trait SequencerStateManagerStoreTest
           )
           head2pred <- store.readInFlightAggregations(
             t2.immediatePredecessor,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
           head2 <- store.readInFlightAggregations(
             t2,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
           head3 <- store.readInFlightAggregations(
             t3,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
           head4pred <- store.readInFlightAggregations(
             t4.immediatePredecessor,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
           head4 <- store.readInFlightAggregations(
             t4,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
         } yield {
           // All aggregations by sender have later timestamps and the in-flight aggregations are therefore considered inexistent
@@ -180,7 +189,8 @@ trait SequencerStateManagerStoreTest
 
     "aggregation expiry" should {
       "delete all aggregation whose max sequencing time has elapsed" in {
-        val store = mk()
+        val (store, sequencerStore) = mk()
+
         val aggregationId1 = AggregationId(TestHash.digest(1))
         val aggregationId2 = AggregationId(TestHash.digest(2))
         val rule = AggregationRule(
@@ -207,7 +217,6 @@ trait SequencerStateManagerStoreTest
 
         val inFlightAggregation1 = InFlightAggregation(
           rule = rule,
-          firstSequencingTimestamp = t2,
           maxSequencingTimestamp = t3,
           alice -> AggregationBySender(
             t1,
@@ -217,12 +226,14 @@ trait SequencerStateManagerStoreTest
         )
         val inFlightAggregation2 = InFlightAggregation(
           rule = rule,
-          firstSequencingTimestamp = t2.immediatePredecessor,
           maxSequencingTimestamp = t3.immediateSuccessor,
           aggregatedSenders = alice -> AggregationBySender(t2, Seq.fill(3)(Seq.empty)),
         )
 
         (for {
+          _ <- allMembers.parTraverse(member =>
+            sequencerStore.registerMember(member, CantonTimestamp.now())
+          )
           _ <- store.addInFlightAggregationUpdates(
             Map(
               aggregationId1 -> inFlightAggregation1.asUpdate,
@@ -232,21 +243,36 @@ trait SequencerStateManagerStoreTest
           _ <- store.pruneExpiredInFlightAggregations(t2)
           head2 <- store.readInFlightAggregations(
             t2,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
+          )
+          head2WithBound1 <- store.readInFlightAggregations(
+            t2,
+            maxSequencingTimeUpperBound = t3,
+          )
+          head2WithBound2 <- store.readInFlightAggregations(
+            t2,
+            maxSequencingTimeUpperBound = t3.immediateSuccessor,
           )
           _ <- store.pruneExpiredInFlightAggregations(t3)
           head3 <- store.readInFlightAggregations(
             t3,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
           // We're using here the ability to read actually inconsistent data (for crash recovery)
           // for an already expired block to check that the expiry actually deletes the data.
           head2expired <- store.readInFlightAggregations(
             t2,
-            maxSequencingTimeBound = CantonTimestamp.MaxValue,
+            maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
           )
         } yield {
           head2 shouldBe Map(
+            aggregationId1 -> inFlightAggregation1,
+            aggregationId2 -> inFlightAggregation2,
+          )
+          head2WithBound1 shouldBe Map(
+            aggregationId1 -> inFlightAggregation1
+          )
+          head2WithBound2 shouldBe Map(
             aggregationId1 -> inFlightAggregation1,
             aggregationId2 -> inFlightAggregation2,
           )

@@ -11,8 +11,8 @@ import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.crypto.{Crypto, SyncCryptoApi, SyncCryptoClient}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.crypto.{SyncCryptoApi, SyncCryptoClient, SynchronizerCrypto}
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
 import com.digitalasset.canton.metrics.SequencerClientMetrics
@@ -53,7 +53,9 @@ trait SequencerClientFactory {
       sendTrackerStore: SendTrackerStore,
       requestSigner: RequestSigner,
       sequencerConnections: SequencerConnections,
-      expectedSequencers: NonEmpty[Map[SequencerAlias, SequencerId]],
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
+      expectedSequencersO: Option[NonEmpty[Map[SequencerAlias, SequencerId]]],
+      connectionPool: SequencerConnectionXPool,
   )(implicit
       executionContext: ExecutionContextExecutor,
       executionSequencerFactory: ExecutionSequencerFactory,
@@ -67,9 +69,9 @@ trait SequencerClientFactory {
 
 object SequencerClientFactory {
   def apply(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
-      crypto: Crypto,
+      crypto: SynchronizerCrypto,
       config: SequencerClientConfig,
       traceContextPropagation: TracingConfig.Propagation,
       testingConfig: TestingConfigInternal,
@@ -95,7 +97,9 @@ object SequencerClientFactory {
           sendTrackerStore: SendTrackerStore,
           requestSigner: RequestSigner,
           sequencerConnections: SequencerConnections,
-          expectedSequencers: NonEmpty[Map[SequencerAlias, SequencerId]],
+          synchronizerPredecessor: Option[SynchronizerPredecessor],
+          expectedSequencersO: Option[NonEmpty[Map[SequencerAlias, SequencerId]]],
+          connectionPool: SequencerConnectionXPool,
       )(implicit
           executionContext: ExecutionContextExecutor,
           executionSequencerFactory: ExecutionSequencerFactory,
@@ -114,25 +118,99 @@ object SequencerClientFactory {
         }
         val sequencerSynchronizerParamsLookup =
           SynchronizerParametersLookup.forSequencerSynchronizerParameters(
-            synchronizerParameters,
             config.overrideMaxRequestSize,
             topologyClient,
             loggerFactory,
           )
 
-        val sequencerTransportsMap = makeTransport(
-          sequencerConnections,
-          member,
-          requestSigner,
+        val sequencerTransportsMapO = Option.when(!config.useNewConnectionPool)(
+          makeTransport(
+            sequencerConnections,
+            member,
+            requestSigner,
+          )
         )
+
+        def getTrafficStateWithTransports(
+            ts: CantonTimestamp
+        ): EitherT[FutureUnlessShutdown, String, Option[TrafficState]] =
+          BftSender
+            .makeRequest(
+              s"Retrieving traffic state from synchronizer for $member at $ts",
+              futureSupervisor,
+              logger,
+              sequencerTransportsMapO.getOrElse(
+                throw new IllegalStateException(
+                  "sequencerTransportsMap undefined while using transports"
+                )
+              ),
+              sequencerConnections.sequencerTrustThreshold,
+            )(
+              _.getTrafficStateForMember(
+                // Request the traffic state at the timestamp immediately following the last sequenced event timestamp
+                // That's because we will not re-process that event, but if it was a traffic purchase, the sequencer
+                // would return a state with the previous extra traffic value, because traffic purchases only become
+                // valid _after_ they've been sequenced. This ensures the participant doesn't miss a traffic purchase
+                // if it gets disconnected just after reading one.
+                GetTrafficStateForMemberRequest(
+                  member,
+                  ts.immediateSuccessor,
+                  synchronizerParameters.protocolVersion,
+                )
+              ).map(_.trafficState)
+            )(identity)
+            .leftMap { err =>
+              s"Failed to retrieve traffic state from synchronizer for $member: $err"
+            }
+
+        def getTrafficStateWithConnectionPool(
+            ts: CantonTimestamp
+        ): EitherT[FutureUnlessShutdown, String, Option[TrafficState]] =
+          for {
+            connections <- EitherT.fromEither[FutureUnlessShutdown](
+              NonEmpty
+                .from(connectionPool.getOneConnectionPerSequencer("get-traffic-state"))
+                .toRight(
+                  s"No connection available to retrieve traffic state from synchronizer for $member"
+                )
+            )
+            result <- BftSender
+              .makeRequest(
+                s"Retrieving traffic state from synchronizer for $member at $ts",
+                futureSupervisor,
+                logger,
+                operators = connections,
+                threshold = sequencerConnections.sequencerTrustThreshold,
+              )(
+                performRequest = _.getTrafficStateForMember(
+                  // Request the traffic state at the timestamp immediately following the last sequenced event timestamp
+                  // That's because we will not re-process that event, but if it was a traffic purchase, the sequencer
+                  // would return a state with the previous extra traffic value, because traffic purchases only become
+                  // valid _after_ they've been sequenced. This ensures the participant doesn't miss a traffic purchase
+                  // if it gets disconnected just after reading one.
+                  GetTrafficStateForMemberRequest(
+                    member,
+                    ts.immediateSuccessor,
+                    synchronizerParameters.protocolVersion,
+                  ),
+                  timeout = processingTimeout.network.duration,
+                ).map(_.trafficState)
+              )(identity)
+              .leftMap { err =>
+                s"Failed to retrieve traffic state from synchronizer for $member: $err"
+              }
+
+          } yield result
 
         for {
           sequencerTransports <- EitherT.fromEither[FutureUnlessShutdown](
             SequencerTransports.from(
-              sequencerTransportsMap,
-              expectedSequencers,
+              sequencerTransportsMapO,
+              expectedSequencersO,
               sequencerConnections.sequencerTrustThreshold,
+              sequencerConnections.sequencerLivenessMargin,
               sequencerConnections.submissionRequestAmplification,
+              sequencerConnections.sequencerConnectionPoolDelays,
             )
           )
           // Reinitialize the sequencer counter allocator to ensure that passive->active replica transitions
@@ -149,7 +227,12 @@ object SequencerClientFactory {
               .value
               .map(_.map(_.timestamp))
           )
-          getTrafficStateFromSynchronizerFn = { (ts: CantonTimestamp) =>
+
+          getTrafficStateFromSynchronizerFn =
+            if (config.useNewConnectionPool) getTrafficStateWithConnectionPool _
+            else getTrafficStateWithTransports _
+
+          getTrafficStateFromSynchronizerWithRetryFn = { (ts: CantonTimestamp) =>
             EitherT(
               retry
                 .Backoff(
@@ -164,39 +247,16 @@ object SequencerClientFactory {
                   retryLogLevel = Some(Level.INFO),
                 )
                 .unlessShutdown(
-                  BftSender
-                    .makeRequest(
-                      s"Retrieving traffic state from synchronizer for $member at $ts",
-                      futureSupervisor,
-                      logger,
-                      sequencerTransportsMap.forgetNE,
-                      sequencerConnections.sequencerTrustThreshold,
-                    )(
-                      _.getTrafficStateForMember(
-                        // Request the traffic state at the timestamp immediately following the last sequenced event timestamp
-                        // That's because we will not re-process that event, but if it was a traffic purchase, the sequencer
-                        // would return a state with the previous extra traffic value, because traffic purchases only become
-                        // valid _after_ they've been sequenced. This ensures the participant doesn't miss a traffic purchase
-                        // if it gets disconnected just after reading one.
-                        GetTrafficStateForMemberRequest(
-                          member,
-                          ts.immediateSuccessor,
-                          synchronizerParameters.protocolVersion,
-                        )
-                      ).map(_.trafficState)
-                    )(identity)
-                    .leftMap { err =>
-                      s"Failed to retrieve traffic state from synchronizer for $member: $err"
-                    }
-                    .value,
+                  getTrafficStateFromSynchronizerFn(ts).value,
                   AllExceptionRetryPolicy,
                 )
             )
           }
+
           // Make a BFT call to all the transports to retrieve the current traffic state from the synchronizer
           // and initialize the trafficStateController with it
           trafficStateO <- latestSequencedTimestampO
-            .traverse(getTrafficStateFromSynchronizerFn(_))
+            .traverse(getTrafficStateFromSynchronizerWithRetryFn)
             .map(_.flatten)
 
           // fetch the initial set of pending sends to initialize the client with.
@@ -210,7 +270,7 @@ object SequencerClientFactory {
             synchronizerParameters.protocolVersion,
             new EventCostCalculator(loggerFactory),
             metrics.trafficConsumption,
-            synchronizerId,
+            psid,
           )
           sendTracker = new SendTracker(
             initialPendingSends,
@@ -226,13 +286,12 @@ object SequencerClientFactory {
                 traceContext: TraceContext
             ): SequencedEventValidator =
               if (config.skipSequencedEventValidation) {
-                SequencedEventValidator.noValidation(synchronizerId)(
+                SequencedEventValidator.noValidation(psid)(
                   NamedLoggingContext(loggerFactory, traceContext)
                 )
               } else {
                 new SequencedEventValidatorImpl(
-                  synchronizerId,
-                  synchronizerParameters.protocolVersion,
+                  psid,
                   syncCryptoApi,
                   loggerFactory,
                   processingTimeout,
@@ -240,12 +299,13 @@ object SequencerClientFactory {
               }
           }
         } yield new RichSequencerClientImpl(
-          synchronizerId,
+          psid,
+          synchronizerPredecessor,
           member,
           sequencerTransports,
+          connectionPool,
           config,
           testingConfig,
-          synchronizerParameters.protocolVersion,
           sequencerSynchronizerParamsLookup,
           processingTimeout,
           validatorFactory,
@@ -269,7 +329,7 @@ object SequencerClientFactory {
           connection: SequencerConnection,
           member: Member,
           requestSigner: RequestSigner,
-          allowReplay: Boolean = true,
+          allowReplay: Boolean,
       )(implicit
           executionContext: ExecutionContextExecutor,
           executionSequencerFactory: ExecutionSequencerFactory,
@@ -361,7 +421,7 @@ object SequencerClientFactory {
           endpoint -> createChannel(subConnection)
         }.toMap
         new GrpcSequencerClientAuth(
-          synchronizerId,
+          psid,
           member,
           crypto,
           channelPerEndpoint,

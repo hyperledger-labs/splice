@@ -26,14 +26,14 @@ set:
     nameServiceName: Mock Name Service
     nameServiceNameAcronym: MNS
 tests:
-  - it: "has only the pg-init and chown-domain-upgrade-dump init containers by default"
+  - it: "has only the pg-init"
     documentSelector:
       path: kind
       value: Deployment
     asserts:
       - lengthEqual:
           path: spec.template.spec.initContainers
-          count: 2
+          count: 1
       - isSubset:
           path: spec.template.spec.initContainers[0]
           content:
@@ -45,11 +45,6 @@ tests:
                   secretKeyRef:
                     key: postgresPassword
                     name: postgres-secrets
-      - isSubset:
-          path: spec.template.spec.initContainers[1]
-          content:
-            name: chown-domain-upgrade-dump
-            image: busybox:1.37.0
 
   - it: "has no init containers when enablePgInitContainer=false, svValidator=true and extraInitContainers is not defined"
     set:
@@ -94,15 +89,6 @@ tests:
               env:
                 - name: TOMATO_ENV_VAR
                   value: tomato-value
-            - name: chown-domain-upgrade-dump
-              image: busybox:1.37.0
-              command:
-                - sh
-                - -c
-                - chown -R 1001:1001 /domain-upgrade-dump
-              volumeMounts:
-                - mountPath: /domain-upgrade-dump
-                  name: domain-upgrade-dump-volume
 
   - it: "has both the extraInitContainers and pg-init container when enablePgInitContainer=true and no migration PVC init when migration.attachPvc=false"
     set:

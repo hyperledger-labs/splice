@@ -16,6 +16,14 @@ object PostgresResetStorageBackend extends ResetStorageBackend {
       delete from lapi_parameters cascade;
       delete from lapi_ledger_end_synchronizer_index cascade;
       delete from lapi_command_completions cascade;
+      delete from lapi_events_activate_contract cascade;
+      delete from lapi_filter_activate_stakeholder cascade;
+      delete from lapi_filter_activate_witness cascade;
+      delete from lapi_events_deactivate_contract cascade;
+      delete from lapi_filter_deactivate_stakeholder cascade;
+      delete from lapi_filter_deactivate_witness cascade;
+      delete from lapi_events_various_witnessed cascade;
+      delete from lapi_filter_various_witness cascade;
       delete from lapi_events_create cascade;
       delete from lapi_events_consuming_exercise cascade;
       delete from lapi_events_non_consuming_exercise cascade;
@@ -32,8 +40,8 @@ object PostgresResetStorageBackend extends ResetStorageBackend {
       delete from lapi_pe_consuming_id_filter_non_stakeholder_informee cascade;
       delete from lapi_pe_non_consuming_id_filter_informee cascade;
       delete from lapi_pe_assign_id_filter_stakeholder cascade;
-      delete from lapi_pe_unassign_id_filter_stakeholder cascade;
-      delete from lapi_transaction_meta cascade;
+      delete from lapi_pe_reassignment_id_filter_stakeholder cascade;
+      delete from lapi_update_meta cascade;
       delete from lapi_users cascade;
       delete from lapi_user_annotations cascade;
       delete from lapi_user_rights cascade;

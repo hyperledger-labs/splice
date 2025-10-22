@@ -3,23 +3,24 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
+import cats.implicits.catsSyntaxOptionId
 import cats.data.OptionT
-import cats.implicits.{
-  catsSyntaxOptionId,
-  catsSyntaxTuple2Semigroupal,
-  catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
-}
+import cats.syntax.apply.*
 import cats.syntax.foldable.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import cats.syntax.traverse.*
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnectionPoolDelays,
+  SequencerConnections,
+}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -69,7 +70,12 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  SynchronizerMigrationUtil,
+  PackageVetting,
+  TemplateJsonDecoder,
+}
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -136,7 +142,11 @@ class JoiningNodeInitializer(
         SequencerConnections.tryMany(
           Seq(GrpcSequencerConnection.tryCreate(url)),
           PositiveInt.one,
+          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification,
+          // TODO(#2666) Make the delays configurable.
+          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
         ),
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
         // This is changed to false after SV onboarding completes.
@@ -175,7 +185,7 @@ class JoiningNodeInitializer(
       migrationInfo =
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId,
-          acsRecordTime = None, // This SV doesn't know about any migrations
+          migrationTimeInfo = None, // This SV doesn't know about any migrations
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
@@ -352,6 +362,7 @@ class JoiningNodeInitializer(
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
       skipTrafficReconciliationTriggers: Boolean = false,
+      unpauseSynchronizer: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
@@ -364,6 +375,12 @@ class JoiningNodeInitializer(
       logger,
     )
     for {
+      // Do this at the very start as scan depends on it to start up.
+      _ <- SetupUtil.ensureDsoPartyMetadataAnnotation(
+        svSvAutomationService.connection(SpliceLedgerConnectionPriority.Low),
+        config,
+        dsoPartyId,
+      )
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "dso_rules_visible",
@@ -373,6 +390,15 @@ class JoiningNodeInitializer(
       )
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
+      _ <-
+        // Unpause the synchronizer after the post onboarding triggers are started
+        // that start the BFT peer reconciliation
+        if (unpauseSynchronizer)
+          SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+            participantAdminConnection,
+            decentralizedSynchronizer,
+          )
+        else Future.unit
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
       // submission rights.
@@ -380,11 +406,6 @@ class JoiningNodeInitializer(
         waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
         waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator,
-        SetupUtil.ensureDsoPartyMetadataAnnotation(
-          svSvAutomationService.connection(SpliceLedgerConnectionPriority.Low),
-          config,
-          dsoPartyId,
-        ),
       ).tupled
       _ <-
         if (!config.skipSynchronizerInitialization) {
@@ -411,7 +432,7 @@ class JoiningNodeInitializer(
                 config.scan,
               )
               // Finally, fully onboard the sequencer and mediator
-              _ <-
+              physicalSynchronizerId <-
                 localSynchronizerNode.onboardLocalSequencerIfRequired(
                   svConnection.map(_._2)
                 )
@@ -419,7 +440,7 @@ class JoiningNodeInitializer(
               _ = if (!skipTrafficReconciliationTriggers)
                 dsoAutomationService.registerTrafficReconciliationTriggers()
               _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
-                decentralizedSynchronizer
+                physicalSynchronizerId
               )
               _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
               _ <- waitForSvToObtainUnlimitedTraffic(
@@ -478,14 +499,14 @@ class JoiningNodeInitializer(
       "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
       for {
         decentralizedSynchronizerId <- participantAdminConnection
-          .getSynchronizerIdWithoutConnecting(
+          .getPhysicalSynchronizerIdWithoutConnecting(
             config.domains.global.alias
           )
         participantId <- participantAdminConnection.getParticipantId()
         // Check if the participant hosts the DSO party. If so,
         // the dsoParty is hosted on the participant we can proceed to all domains reconnect
         dsoPartyToParticipantMapping <- participantAdminConnection.listPartyToParticipant(
-          store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+          store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
           filterParty = dsoParty.filterString,
           filterParticipant = participantId.filterString,
           topologyTransactionType = TopologyTransactionType.AuthorizedState,
@@ -494,7 +515,7 @@ class JoiningNodeInitializer(
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         activeDsoPartyToParticipantProposals <- participantAdminConnection
           .listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+            store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
             filterParty = dsoParty.filterString,
             filterParticipant = participantId.filterString,
             topologyTransactionType = TopologyTransactionType.AllProposals,
@@ -512,7 +533,7 @@ class JoiningNodeInitializer(
         logger.info(
           s"Participant hosts dsoParty: ${dsoPartyToParticipantMapping.nonEmpty} and has proposals to host dsoParty ${activeDsoPartyToParticipantProposals.nonEmpty}"
         )
-        decentralizedSynchronizerId
+        decentralizedSynchronizerId.logical
       },
       logger,
     )
@@ -539,7 +560,7 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission)) =>
+          case Some(HostingParticipant(_, permission, _)) =>
             if (permission == ParticipantPermission.Submission)
               dsoPartyHosting
             else

@@ -529,7 +529,7 @@ class AppUpgradeIntegrationTest
         store = Some(Authorized),
       )
       .flatMap(_.item.packages)
-      .filter(_.validFrom.forall(_.isBefore(CantonTimestamp.now())))
+      .filter(_.validFromInclusive.forall(_.isBefore(CantonTimestamp.now())))
   }
 }
 

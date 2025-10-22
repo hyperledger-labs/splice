@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.platform.apiserver.execution
 
-import com.digitalasset.canton.protocol.SerializableContract
+import com.digitalasset.canton.protocol.LfHash
 import com.digitalasset.daml.lf.transaction.FatContractInstance
 
 object ContractAuthenticators {
-  type AuthenticateSerializableContract = SerializableContract => Either[String, Unit]
-  type AuthenticateFatContractInstance = FatContractInstance => Either[String, Unit]
+  // TODO(#27344) - Remove this type in preference of a trait
+  type ContractAuthenticatorFn = (FatContractInstance, LfHash) => Either[String, Unit]
 }

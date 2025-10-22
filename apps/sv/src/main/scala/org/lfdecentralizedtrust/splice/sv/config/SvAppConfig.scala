@@ -321,10 +321,19 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    // We want to be able to override this for simtime tests
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
+    // What batch size to target for converting app activity markers
+    delegatelessAutomationFeaturedAppActivityMarkerBatchSize: Int = 100,
+    // how long to wait before forcing a conversion even though the batch size is not full
+    delegatelessAutomationFeaturedAppActivityMarkerMaxAge: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(30),
+    // at what number of markers should the app switch into catchup mode where
+    // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
+    delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you

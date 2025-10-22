@@ -20,6 +20,7 @@ import { useAppForm } from '../../hooks/form';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
 import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigFromChanges';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   buildPendingConfigFields,
   configFormDataToConfigChanges,
@@ -174,8 +175,6 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const changes = configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges, false);
   const changedFields = changes.filter(c => c.currentValue !== c.newValue);
 
-  const hasChangedFields = changedFields.length > 0;
-
   const baseConfig = dsoConfig;
   const newConfig = buildDsoRulesConfigFromChanges(changes);
   const dsoAction: DsoRules_ActionRequiringConfirmation = {
@@ -229,7 +228,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
             {field => (
               <field.DateField
                 title="Threshold Deadline"
-                description="This is the last day voters can vote on this proposal"
+                description={THRESHOLD_DEADLINE_SUBTITLE}
                 id="set-dso-config-rules-expiry-date"
               />
             )}
@@ -293,7 +292,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       )}
 
       <JsonDiffAccordion>
-        {dsoConfigToCompareWith[1] && hasChangedFields ? (
+        {dsoConfigToCompareWith[1] ? (
           <PrettyJsonDiff
             changes={{
               newConfig: dsoAction.value.newConfig,
@@ -301,9 +300,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               actualConfig: dsoConfigToCompareWith[1],
             }}
           />
-        ) : (
-          <Typography>No changes</Typography>
-        )}
+        ) : null}
       </JsonDiffAccordion>
 
       <form.AppForm>

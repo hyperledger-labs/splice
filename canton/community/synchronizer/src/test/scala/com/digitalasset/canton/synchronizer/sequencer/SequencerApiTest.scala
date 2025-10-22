@@ -57,7 +57,7 @@ abstract class SequencerApiTest
 
     lazy val sequencer: CantonSequencer = {
       val sequencer = SequencerApiTest.this.createSequencer(
-        topologyFactory.forOwnerAndSynchronizer(owner = sequencerId, synchronizerId)
+        topologyFactory.forOwnerAndSynchronizer(owner = sequencerId, psid)
       )
       registerAllTopologyMembers(topologyFactory.topologySnapshot(), sequencer)
       sequencer
@@ -122,12 +122,12 @@ abstract class SequencerApiTest
     }
   }
 
-  var clock: Clock = _
-  var driverClock: Clock = _
+  protected var clock: Clock = _
+  protected var driverClock: Clock = _
 
-  def createClock(): Clock = new SimClock(loggerFactory = loggerFactory)
+  protected def createClock(): Clock = new SimClock(loggerFactory = loggerFactory)
 
-  def simClockOrFail(clock: Clock): SimClock =
+  protected def simClockOrFail(clock: Clock): SimClock =
     clock match {
       case simClock: SimClock => simClock
       case _ =>
@@ -135,11 +135,12 @@ abstract class SequencerApiTest
           "This test case is only compatible with SimClock for `clock` and `driverClock` fields"
         )
     }
-  def synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId
-  def mediatorId: MediatorId = DefaultTestIdentities.mediatorId
-  def sequencerId: SequencerId = DefaultTestIdentities.sequencerId
 
-  def createSequencer(crypto: SynchronizerCryptoClient)(implicit
+  protected def psid: PhysicalSynchronizerId = DefaultTestIdentities.physicalSynchronizerId
+  protected def mediatorId: MediatorId = DefaultTestIdentities.mediatorId
+  protected def sequencerId: SequencerId = DefaultTestIdentities.sequencerId
+
+  protected def createSequencer(crypto: SynchronizerCryptoClient)(implicit
       materializer: Materializer
   ): CantonSequencer
 
@@ -218,7 +219,8 @@ abstract class SequencerApiTest
                 )) or
                 include("Started gathering segment status") or
                 include("Broadcasting epoch status") or
-                include("Scheduling pruning in 1 hour"))
+                include("Scheduling pruning in 1 hour") or
+                include("Got a retransmission request from"))
             },
           )
         } yield {
@@ -497,9 +499,9 @@ abstract class SequencerApiTest
         val messageId1 = MessageId.tryCreate(s"request1")
         val messageId2 = MessageId.tryCreate(s"request2")
         val messageId3 = MessageId.tryCreate(s"request3")
-        val p11Crypto = topologyFactory.forOwnerAndSynchronizer(p11, synchronizerId)
-        val p12Crypto = topologyFactory.forOwnerAndSynchronizer(p12, synchronizerId)
-        val p13Crypto = topologyFactory.forOwnerAndSynchronizer(p13, synchronizerId)
+        val p11Crypto = topologyFactory.forOwnerAndSynchronizer(p11, psid)
+        val p12Crypto = topologyFactory.forOwnerAndSynchronizer(p12, psid)
+        val p13Crypto = topologyFactory.forOwnerAndSynchronizer(p13, psid)
 
         def mkRequest(
             sender: Member,
@@ -619,8 +621,8 @@ abstract class SequencerApiTest
         val messageId1 = MessageId.tryCreate(s"request1")
         val messageId2 = MessageId.tryCreate(s"request2")
         val messageId3 = MessageId.tryCreate(s"request3")
-        val p14Crypto = topologyFactory.forOwnerAndSynchronizer(p14, synchronizerId)
-        val p15Crypto = topologyFactory.forOwnerAndSynchronizer(p15, synchronizerId)
+        val p14Crypto = topologyFactory.forOwnerAndSynchronizer(p14, psid)
+        val p15Crypto = topologyFactory.forOwnerAndSynchronizer(p15, psid)
 
         def mkRequest(
             sender: Member,
@@ -959,7 +961,7 @@ abstract class SequencerApiTest
             .sendAsyncSigned(sign(request))
             .leftOrFail("Send successful, expected error")
           subscribeError <- sequencer
-            .readV2(sender, timestampInclusive = None)
+            .read(sender, timestampInclusive = None)
             .leftOrFail("Read successful, expected error")
         } yield {
           sendError.code.id shouldBe SequencerErrors.SubmissionRequestRefused.id
@@ -995,7 +997,7 @@ trait SequencerApiTestUtils
       .parTraverseFilter { member =>
         for {
           source <- valueOrFail(
-            sequencer.readV2(member, startTimestamp)
+            sequencer.read(member, startTimestamp)
           )(
             s"Read for $member"
           )

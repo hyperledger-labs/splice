@@ -39,10 +39,8 @@ class UpdateHistoryIntegrationTest
           _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .withTrafficTopupsDisabled
 
@@ -145,7 +143,7 @@ class UpdateHistoryIntegrationTest
               aliceUserParty,
               Set(update.contractId.contractId),
             ) shouldBe Map(
-            update.contractId.contractId -> synchronizerId
+            update.contractId.contractId -> synchronizerId.logical
           )
         },
     )

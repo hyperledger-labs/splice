@@ -87,8 +87,7 @@ final case class BlockEphemeralState(
 }
 
 object BlockEphemeralState {
-  val empty: BlockEphemeralState =
-    BlockEphemeralState(BlockInfo.initial, Map.empty)
+  val empty: BlockEphemeralState = BlockEphemeralState(BlockInfo.initial, Map.empty)
 
   def fromSequencerInitialState(
       initialState: SequencerInitialState

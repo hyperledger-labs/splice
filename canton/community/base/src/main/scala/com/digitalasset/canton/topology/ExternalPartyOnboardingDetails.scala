@@ -231,8 +231,8 @@ object ExternalPartyOnboardingDetails {
             SingleTransactionSignature(transaction.hash, _)
           ) ++ multiTransactionSignatures)
             // Prefer single transaction signatures over multi transaction ones
-            // as they're smaller
-            .groupMapReduce(_.signedBy)(identity)((first, _) => first)
+            // as they're smaller (they don't need the list of signed hashes)
+            .groupMapReduce(_.authorizingLongTermKey)(identity)((first, _) => first)
             .values
             .toSeq
         )
@@ -240,7 +240,7 @@ object ExternalPartyOnboardingDetails {
         // Special case for root namespaces: they require signatures only from the namespace key
         case namespaceDelegation: NamespaceDelegation =>
           deduplicatedSignatures
-            .map(_.filter(_.signedBy == namespaceDelegation.namespace.fingerprint))
+            .map(_.filter(_.authorizingLongTermKey == namespaceDelegation.namespace.fingerprint))
             .flatMap(NonEmpty.from)
         case _ => deduplicatedSignatures
       }
@@ -291,7 +291,7 @@ object ExternalPartyOnboardingDetails {
       p2pNamespace: Namespace,
   ): Either[String, Option[PartyNamespace]] =
     for {
-      // Look first for a decentralized namespace, can only be one at most one
+      // Look first for a decentralized namespace, can only be at most one
       signedDecentralizedTxO <- validateMaximumOneMapping[DecentralizedNamespaceDefinition](
         signedTransactions
       )
@@ -381,7 +381,7 @@ object ExternalPartyOnboardingDetails {
             .mkString(", ")}",
       )
       _ <- hostingParticipants.toList match {
-        case HostingParticipant(hosting, permission) :: Nil =>
+        case HostingParticipant(hosting, permission, _onboarding) :: Nil =>
           Either.cond(
             hosting == participantId && permission == ParticipantPermission.Confirmation,
             (),

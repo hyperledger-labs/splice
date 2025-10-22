@@ -8,8 +8,8 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Ref.HexString
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -217,6 +217,11 @@ trait AcsJdbcTypes {
 
   protected implicit val qualifiedNameGetResult: GetResult[QualifiedName] =
     GetResult.GetString.andThen { s => QualifiedName.assertFromString(s) }
+
+  protected implicit val packageQualifiedNameGetResult: GetResult[PackageQualifiedName] =
+    implicitly[GetResult[(QualifiedName, String)]].andThen { case (qualifiedName, packageName) =>
+      PackageQualifiedName(packageName, qualifiedName)
+    }
 
   protected implicit lazy val qualifiedNameJdbcType: JdbcType[QualifiedName] =
     MappedColumnType.base[QualifiedName, String](

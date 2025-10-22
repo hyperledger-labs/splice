@@ -3,16 +3,11 @@
 
 package com.digitalasset.canton.participant.synchronizer
 
-import com.digitalasset.base.error.{
-  ErrorCategory,
-  ErrorCategoryRetry,
-  ErrorCode,
-  ErrorGroup,
-  Explanation,
-  Resolution,
-}
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, ErrorGroup, Explanation, Resolution}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader.SequencerInfoLoaderError
+import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.SynchronizerPredecessor
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -24,22 +19,29 @@ import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.client.RichSequencerClient
 import com.digitalasset.canton.sequencing.client.channel.SequencerChannelClient
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
-import com.digitalasset.canton.topology.{SynchronizerId, TopologyManagerError}
+import com.digitalasset.canton.topology.{
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  TopologyManagerError,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import org.slf4j.event.Level
-
-import scala.concurrent.duration.DurationInt
 
 /** A registry of synchronizers. */
 trait SynchronizerRegistry extends AutoCloseable {
 
-  /** Returns a synchronizer handle that is used to setup a connection to a new synchronizer
+  /** Returns a synchronizer handle that is used to setup a connection to a new synchronizer, and
+    * the synchronizer connection config that was updated with missing sequencer ids of sequencers
+    * for which the connection attempt was successful.
     */
   def connect(
-      config: SynchronizerConnectionConfig
+      config: SynchronizerConnectionConfig,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Either[SynchronizerRegistryError, SynchronizerHandle]]
+  ): FutureUnlessShutdown[
+    Either[SynchronizerRegistryError, (SynchronizerHandle, SynchronizerConnectionConfig)]
+  ]
 
 }
 
@@ -71,11 +73,9 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
         SynchronizerRegistryError.ConfigurationErrors.MisconfiguredStaticSynchronizerParameters
           .Error(cause)
       case SequencerInfoLoaderError.FailedToConnectToSequencers(cause) =>
-        SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
-          .Error(cause, isRetryable = true)
+        SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers.Error(cause)
       case SequencerInfoLoaderError.InconsistentConnectivity(cause) =>
-        SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
-          .Error(cause, isRetryable = false)
+        SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers.Error(cause)
     }
 
   object ConnectionErrors extends ErrorGroup() {
@@ -89,15 +89,9 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
           id = "FAILED_TO_CONNECT_TO_SEQUENCERS",
           ErrorCategory.InvalidGivenCurrentSystemStateOther,
         ) {
-      final case class Error(reason: String, isRetryable: Boolean)(implicit
-          val loggingContext: ErrorLoggingContext
-      ) extends CantonError.Impl(cause = "The participant failed to connect to the sequencers")
-          with SynchronizerRegistryError {
-        override def retryable: Option[ErrorCategoryRetry] = Option.when(isRetryable)(
-          ErrorCategoryRetry(duration = 1.seconds)
-        )
-
-      }
+      final case class Error(reason: String)(implicit val loggingContext: ErrorLoggingContext)
+          extends CantonError.Impl(cause = "The participant failed to connect to the sequencers")
+          with SynchronizerRegistryError
     }
 
     @Explanation(
@@ -288,8 +282,8 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
           id = "SYNCHRONIZER_ID_MISMATCH",
           ErrorCategory.InvalidGivenCurrentSystemStateOther,
         ) {
-      final case class Error(expected: SynchronizerId, observed: SynchronizerId)(implicit
-          val loggingContext: ErrorLoggingContext
+      final case class Error(expected: PhysicalSynchronizerId, observed: PhysicalSynchronizerId)(
+          implicit val loggingContext: ErrorLoggingContext
       ) extends CantonError.Impl(
             cause =
               "The synchronizer reports a different synchronizer id than the participant is expecting"
@@ -398,7 +392,7 @@ trait SynchronizerHandle extends AutoCloseable {
 
   def staticParameters: StaticSynchronizerParameters
 
-  def synchronizerId: SynchronizerId
+  def psid: PhysicalSynchronizerId
 
   def synchronizerAlias: SynchronizerAlias
 
@@ -407,5 +401,7 @@ trait SynchronizerHandle extends AutoCloseable {
   def syncPersistentState: SyncPersistentState
 
   def topologyFactory: TopologyComponentFactory
+
+  def syncCrypto: SynchronizerCryptoClient
 
 }

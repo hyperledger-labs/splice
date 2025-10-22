@@ -5,17 +5,19 @@ package com.digitalasset.canton.networking.grpc
 
 import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.TlsServerConfig.logTlsProtocolsAndCipherSuites
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.networking.grpc.ratelimiting.StreamCounterCheck
 import com.digitalasset.canton.tracing.TracingConfig
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.*
-import io.grpc.netty.{GrpcSslContexts, NettyServerBuilder}
+import io.grpc.netty.shaded.io.grpc.netty.{GrpcSslContexts, NettyServerBuilder}
+import io.grpc.netty.shaded.io.netty.handler.ssl.{SslContext, SslContextBuilder}
 import io.grpc.util.MutableHandlerRegistry
-import io.netty.handler.ssl.{SslContext, SslContextBuilder}
 
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, TimeUnit}
@@ -33,6 +35,7 @@ trait CantonServerBuilder {
   def build: Server
 
   def maxInboundMessageSize(bytes: NonNegativeInt): CantonServerBuilder
+
 }
 
 trait CantonMutableHandlerRegistry extends AutoCloseable {
@@ -49,6 +52,10 @@ trait CantonMutableHandlerRegistry extends AutoCloseable {
   def removeService(service: ServerServiceDefinition): CantonMutableHandlerRegistry
 
   def removeServiceU(service: ServerServiceDefinition): Unit = removeService(service).discard
+
+  @VisibleForTesting
+  def streamCounterCheck: Option[StreamCounterCheck]
+
 }
 
 object CantonServerBuilder {
@@ -92,6 +99,10 @@ object CantonServerBuilder {
               .removeService(registry.getServices.get(registry.getServices.size() - 1))
               .discard[Boolean]
           }
+
+        override def streamCounterCheck: Option[StreamCounterCheck] =
+          interceptors.streamCounterCheck
+
       }
 
     override def addService(service: BindableService, withLogging: Boolean): CantonServerBuilder = {
@@ -142,13 +153,14 @@ object CantonServerBuilder {
     */
   def forConfig(
       config: ServerConfig,
-      adminToken: Option[CantonAdminToken],
+      adminTokenDispenser: Option[CantonAdminTokenDispenser],
       executor: Executor,
       loggerFactory: NamedLoggerFactory,
       apiLoggingConfig: ApiLoggingConfig,
       tracing: TracingConfig,
       grpcMetrics: GrpcServerMetrics,
       telemetry: Telemetry,
+      additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
   ): CantonServerBuilder = {
     val builder =
       NettyServerBuilder
@@ -171,9 +183,13 @@ object CantonServerBuilder {
         loggerFactory,
         grpcMetrics,
         config.authServices,
-        adminToken,
+        adminTokenDispenser,
         config.jwtTimestampLeeway,
+        config.adminTokenConfig,
+        config.jwksCacheConfig,
         telemetry,
+        additionalInterceptors,
+        config.stream,
       ),
     )
   }

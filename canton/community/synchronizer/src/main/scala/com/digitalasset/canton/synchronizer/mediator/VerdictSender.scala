@@ -68,21 +68,21 @@ private[mediator] object VerdictSender {
       sequencerSend: SequencerClientSend,
       crypto: SynchronizerCryptoClient,
       mediatorId: MediatorId,
-      protocolVersion: ProtocolVersion,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): VerdictSender =
-    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, protocolVersion, loggerFactory)
+    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, loggerFactory)
 }
 
 private[mediator] class DefaultVerdictSender(
     sequencerSend: SequencerClientSend,
     crypto: SynchronizerCryptoClient,
     mediatorId: MediatorId,
-    protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends VerdictSender
     with NamedLogging {
+  private val protocolVersion = sequencerSend.protocolVersion
+
   override def sendResult(
       requestId: RequestId,
       request: MediatorConfirmationRequest,
@@ -197,12 +197,11 @@ private[mediator] class DefaultVerdictSender(
         )
       envelopes <- {
         val result = ConfirmationResultMessage.create(
-          crypto.synchronizerId,
+          crypto.psid,
           request.viewType,
           requestId,
           request.rootHash,
           verdict,
-          protocolVersion,
         )
         val recipientSeq = informeesMap.keys.toSeq.map(MemberRecipient.apply)
         val recipients =
@@ -216,7 +215,7 @@ private[mediator] class DefaultVerdictSender(
             )
 
         SignedProtocolMessage
-          .signAndCreate(result, snapshot, protocolVersion)
+          .signAndCreate(result, snapshot)
           .map(signedResult => List(OpenEnvelope(signedResult, recipients)(protocolVersion)))
       }
 
@@ -320,18 +319,17 @@ private[mediator] class DefaultVerdictSender(
         envs <- recipientsByViewTypeAndRootHash.toSeq
           .parTraverse { case ((viewType, rootHash), flatRecipients) =>
             val rejection = ConfirmationResultMessage.create(
-              crypto.synchronizerId,
+              crypto.psid,
               viewType,
               requestId,
               rootHash,
               rejectionReason,
-              protocolVersion,
             )
 
             val recipients = Recipients.recipientGroups(flatRecipients.map(r => NonEmpty(Set, r)))
 
             SignedProtocolMessage
-              .trySignAndCreate(rejection, snapshot, protocolVersion)
+              .trySignAndCreate(rejection, snapshot)
               .map(_ -> recipients)
           }
         batches = envs.map(Batch.of(protocolVersion, _))

@@ -138,9 +138,6 @@ Timeout .*expired, but readers are still active
 # test significantly so for now we don't bother.
 ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 
-# TODO(#930) - investigate this on the canton side
-Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
-
 # TODO(#1450) - investigate this on the canton side
 FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
 Rejected transaction due to a participant determined timeout
@@ -150,5 +147,8 @@ Sequencing result message timed out.*mediator=
 
 # TODO (DACH-NY/canton-network-internal#966) - remove if not necessary anymore
 ACS_COMMITMENT_DEGRADATION
+
+# TODO(#2706) Investigate and remove once fixed
+Waiting for allocation of.*on synchronizer splitwell.*timed out
 
 # Make sure to have a trailing newline

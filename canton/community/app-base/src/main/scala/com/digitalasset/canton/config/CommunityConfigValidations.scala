@@ -4,6 +4,7 @@
 package com.digitalasset.canton.config
 
 import cats.data.Validated
+import cats.instances.list.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -12,6 +13,8 @@ import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.crypto.CryptoSchemes
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.config.ParticipantNodeConfig
+import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
 import com.digitalasset.canton.version.ProtocolVersion
@@ -70,11 +73,14 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
   private[config] def genericValidations[C <: CantonConfig]
       : List[C => Validated[NonEmpty[Seq[String]], Unit]] =
     List(
-      developmentProtocolSafetyCheck,
+      alphaProtocolVersionRequiresNonStandard,
+      dbSequencerRequiresNonStandard,
+      snapshotDirRequiresNonStandard,
       warnIfUnsafeMinProtocolVersion,
       adminTokenSafetyCheckParticipants,
-      adminTokensMatchOnParticipants,
+      adminTokenConfigsMatchOnParticipants,
       eitherUserListsOrPrivilegedTokensOnParticipants,
+      validateSelectedSchemes,
       sessionSigningKeysOnlyWithKms,
       distinctScopesAndAudiencesOnAuthServices,
       engineAdditionalConsistencyChecksParticipants,
@@ -190,10 +196,9 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
       (),
       NonEmpty(Seq, "At least one node must be defined in the configuration"),
     )
-
   }
 
-  private def developmentProtocolSafetyCheck(
+  private def alphaProtocolVersionRequiresNonStandard(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
 
@@ -201,12 +206,55 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
       val nonStandardConfig = config.parameters.nonStandardConfig
       val alphaVersionSupport = nodeConfig.parameters.alphaVersionSupport
       Option.when(!nonStandardConfig && alphaVersionSupport)(
-        s"Enabling alpha-version-support for ${nodeConfig.nodeTypeName} ${name.unwrap} requires you to explicitly set canton.parameters.non-standard-config = yes"
+        alphaProtocolVersionRequiresNonStandardError(
+          nodeType = nodeConfig.nodeTypeName,
+          nodeName = name.unwrap,
+        )
       )
     }
 
     toValidated(errors)
   }
+
+  def alphaProtocolVersionRequiresNonStandardError(nodeType: String, nodeName: String) =
+    s"Enabling alpha-version-support for $nodeType $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
+
+  def snapshotDirRequiresNonStandard(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+
+    val errors = config.allNodes.toSeq.mapFilter {
+      case (name, nodeConfig: ParticipantNodeConfig) =>
+        val nonStandardConfig = config.parameters.nonStandardConfig
+        val snapshotSupportEnabled = nodeConfig.features.snapshotDir.nonEmpty
+        Option.when(!nonStandardConfig && snapshotSupportEnabled)(
+          s"Setting snapshot-dir for ${nodeConfig.nodeTypeName} ${name.unwrap} requires you to explicitly set canton.parameters.non-standard-config = yes"
+        )
+
+      case _ =>
+        None
+    }
+
+    toValidated(errors)
+  }
+
+  private def dbSequencerRequiresNonStandard(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = if (!config.parameters.nonStandardConfig) {
+      config.sequencers.toSeq.mapFilter { case (name, config) =>
+        config.sequencer match {
+          case _: SequencerConfig.Database => Some(dbSequencerRequiresNonStandardError(name.unwrap))
+          case _ => None
+        }
+      }
+    } else Nil
+
+    toValidated(errors)
+  }
+
+  def dbSequencerRequiresNonStandardError(nodeName: String): String =
+    s"Using DB sequencer config for sequencer $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
 
   private def warnIfUnsafeMinProtocolVersion(
       config: CantonConfig
@@ -228,24 +276,25 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val errors = config.participants.toSeq.mapFilter { case (name, participantConfig) =>
       Option.when(
-        !config.parameters.nonStandardConfig && participantConfig.ledgerApi.adminToken.nonEmpty
+        !config.parameters.nonStandardConfig && (participantConfig.ledgerApi.adminTokenConfig != AdminTokenConfig())
       )(
-        s"Setting ledger-api.admin-token for participant ${name.unwrap} requires you to explicitly set canton.parameters.non-standard-config = yes"
+        s"Setting ledger-api.admin-token-config.fixed-admin-token or ledger-api.admin-token-config.admin-token-duration " +
+          s"for participant ${name.unwrap} requires you to explicitly set canton.parameters.non-standard-config = yes"
       )
     }
     toValidated(errors)
   }
 
-  private def adminTokensMatchOnParticipants(
+  private def adminTokenConfigsMatchOnParticipants(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val errors = config.participants.toSeq.mapFilter { case (name, participantConfig) =>
       Option.when(
-        participantConfig.ledgerApi.adminToken.exists(la =>
-          participantConfig.adminApi.adminToken.exists(_ != la)
+        participantConfig.ledgerApi.adminTokenConfig.fixedAdminToken.exists(la =>
+          participantConfig.adminApi.adminTokenConfig.fixedAdminToken.exists(_ != la)
         )
       )(
-        s"if both ledger-api.admin-token and admin-api.admin-token provided, they must match for participant ${name.unwrap}"
+        s"if both ledger-api.admin-token-config.fixed-admin-token and admin-api.admin-token-config.fixed-admin-token provided, they must match for participant ${name.unwrap}"
       )
     }
     toValidated(errors)
@@ -264,42 +313,161 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
     toValidated(errors)
   }
 
+  private def validateSelectedSchemes(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors: Seq[String] = config.allNodes.toSeq.flatMap { case (nodeName, nodeConfig) =>
+      val cryptoConfig = nodeConfig.crypto
+
+      val supportedSigningAlgoSpecs = cryptoConfig.signing.algorithms.allowed
+      val supportedSigningKeySpecs = cryptoConfig.signing.keys.allowed
+      val supportedEncryptionAlgoSpecs = cryptoConfig.encryption.algorithms.allowed
+      val supportedEncryptionKeySpecs = cryptoConfig.encryption.keys.allowed
+
+      def prefixErrors(validated: Seq[String]): Seq[String] =
+        validated.map(err => s"Node $nodeName: $err")
+
+      val signingAlgoCheck: Seq[String] =
+        cryptoConfig.signing.algorithms.default.zip(supportedSigningAlgoSpecs) match {
+          case Some((default, allowed)) if !allowed.contains(default) =>
+            Seq(
+              s"The selected signing algorithm specification, $default, is not supported. Supported " +
+                s"algorithms: $allowed."
+            )
+          case _ => Nil
+        }
+
+      val signingKeyCheck: Seq[String] =
+        cryptoConfig.signing.keys.default.zip(supportedSigningKeySpecs) match {
+          case Some((default, allowed)) if !allowed.contains(default) =>
+            Seq(
+              s"The selected signing key specification, $default, is not supported. Supported " +
+                s"keys: $allowed."
+            )
+          case _ => Nil
+        }
+
+      val signingKeySpecRelationCheck: Seq[String] =
+        supportedSigningKeySpecs match {
+          case Some(specs) =>
+            val allowedSpecs =
+              supportedSigningAlgoSpecs.toList.flatten.flatMap(_.supportedSigningKeySpecs).toSet
+            if (allowedSpecs.nonEmpty && !specs.subsetOf(allowedSpecs))
+              Seq(
+                s"The allowed signing key specifications ($specs) are not all supported by the allowed " +
+                  s"signing algorithms. Supported keys for those algorithms are: $allowedSpecs."
+              )
+            else Nil
+          case None => Nil
+        }
+
+      val signingAlgoSpecRelationCheck: Seq[String] =
+        supportedSigningKeySpecs match {
+          case Some(specs) =>
+            supportedSigningAlgoSpecs.toList.flatten.foldLeft(List.empty[String]) {
+              case (state, algoSpec) =>
+                if (algoSpec.supportedSigningKeySpecs.intersect(specs).isEmpty)
+                  state :+ s"The signing algorithm specification $algoSpec does not include any key " +
+                    s"specification supported by this node. Supported key specifications: $specs."
+                else state
+            }
+          case None => Nil
+        }
+
+      val encryptionAlgoCheck: Seq[String] =
+        cryptoConfig.encryption.algorithms.default.zip(supportedEncryptionAlgoSpecs) match {
+          case Some((default, allowed)) if !allowed.contains(default) =>
+            Seq(
+              s"The selected encryption algorithm specification, $default, is not supported. Supported " +
+                s"algorithms: $allowed."
+            )
+          case _ => Nil
+        }
+
+      val encryptionKeyCheck: Seq[String] =
+        cryptoConfig.encryption.keys.default.zip(supportedEncryptionKeySpecs) match {
+          case Some((default, allowed)) if !allowed.contains(default) =>
+            Seq(
+              s"The selected encryption key specification, $default, is not supported. Supported " +
+                s"keys: $allowed."
+            )
+          case _ => Nil
+        }
+
+      val encryptionKeySpecRelationCheck: Seq[String] =
+        supportedEncryptionKeySpecs match {
+          case Some(specs) =>
+            val allowedSpecs =
+              supportedEncryptionAlgoSpecs.toList.flatten
+                .flatMap(_.supportedEncryptionKeySpecs)
+                .toSet
+            if (allowedSpecs.nonEmpty && !specs.subsetOf(allowedSpecs))
+              Seq(
+                s"The allowed encryption key specifications ($specs) are not all supported by the " +
+                  s"allowed encryption algorithms. Supported keys for those algorithms are: $allowedSpecs."
+              )
+            else Nil
+          case None => Nil
+        }
+
+      val encryptionAlgoSpecRelationCheck: Seq[String] =
+        supportedEncryptionKeySpecs match {
+          case Some(specs) =>
+            supportedEncryptionAlgoSpecs.toList.flatten.foldLeft(List.empty[String]) {
+              case (state, algoSpec) =>
+                if (algoSpec.supportedEncryptionKeySpecs.intersect(specs).isEmpty)
+                  state :+ s"The encryption algorithm specification $algoSpec does not include any key " +
+                    s"specification supported by this node. Supported key specifications: $specs."
+                else state
+            }
+          case None => Nil
+        }
+
+      // only one supported scheme for symmetric, hash, and pbkdf; no need to check them.
+
+      val allChecksForNode =
+        signingAlgoCheck ++ signingKeyCheck ++ signingKeySpecRelationCheck ++ signingAlgoSpecRelationCheck ++
+          encryptionAlgoCheck ++ encryptionKeyCheck ++ encryptionKeySpecRelationCheck ++ encryptionAlgoSpecRelationCheck
+
+      prefixErrors(allChecksForNode)
+    }
+    toValidated(errors)
+  }
+
   private def sessionSigningKeysOnlyWithKms(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
-    val errors = config.allNodes.toSeq.mapFilter { case (name, nodeConfig) =>
+    val errors = config.allNodes.toSeq.mapFilter { case (_, nodeConfig) =>
       val cryptoConfig = nodeConfig.crypto
-      val sessionSigningKeysConfig = nodeConfig.parameters.sessionSigningKeys
+      cryptoConfig.kms match {
+        case Some(kmsConfig) =>
+          val sessionSigningKeysConfig = kmsConfig.sessionSigningKeys
+          cryptoConfig.provider match {
+            case CryptoProvider.Kms =>
+              val schemesE = CryptoSchemes.fromConfig(cryptoConfig)
+              val supportedAlgoSpecs =
+                schemesE.map(_.signingAlgoSpecs.allowed.forgetNE).getOrElse(Set.empty)
+              val supportedKeySpecs =
+                schemesE.map(_.signingKeySpecs.allowed.forgetNE).getOrElse(Set.empty)
 
-      cryptoConfig.provider match {
-        case CryptoProvider.Jce if !sessionSigningKeysConfig.enabled => None
-        case CryptoProvider.Jce =>
-          Some(
-            s"Session signing keys should not be enabled with the JCE crypto provider on node ${name.unwrap}"
-          )
-        case CryptoProvider.Kms if !sessionSigningKeysConfig.enabled => None
-        case CryptoProvider.Kms =>
-          val schemesE = CryptoSchemes.fromConfig(cryptoConfig)
-          val supportedAlgoSpecs =
-            schemesE.map(_.signingAlgoSpecs.allowed.forgetNE).getOrElse(Set.empty)
-          val supportedKeySpecs =
-            schemesE.map(_.signingKeySpecs.allowed.forgetNE).getOrElse(Set.empty)
-
-          // the signing algorithm spec configured for session keys is not supported
-          if (!supportedAlgoSpecs.contains(sessionSigningKeysConfig.signingAlgorithmSpec))
-            Some(
-              s"The selected signing algorithm specification, ${sessionSigningKeysConfig.signingAlgorithmSpec}, " +
-                s"for session signing keys is not supported. Supported algorithms " +
-                s"are: ${cryptoConfig.signing.algorithms.allowed}."
-            )
-          // the signing key spec configured for session keys is not supported
-          else if (!supportedKeySpecs.contains(sessionSigningKeysConfig.signingKeySpec))
-            Some(
-              s"The selected signing key specification, ${sessionSigningKeysConfig.signingKeySpec}, " +
-                s"for session signing keys is not supported. Supported algorithms " +
-                s"are: ${cryptoConfig.signing.keys.allowed}."
-            )
-          else None
+              // the signing algorithm spec configured for session keys is not supported
+              if (!supportedAlgoSpecs.contains(sessionSigningKeysConfig.signingAlgorithmSpec))
+                Some(
+                  s"The selected signing algorithm specification, ${sessionSigningKeysConfig.signingAlgorithmSpec}, " +
+                    s"for session signing keys is not supported. Supported algorithms " +
+                    s"are: ${cryptoConfig.signing.algorithms.allowed}."
+                )
+              // the signing key spec configured for session keys is not supported
+              else if (!supportedKeySpecs.contains(sessionSigningKeysConfig.signingKeySpec))
+                Some(
+                  s"The selected signing key specification, ${sessionSigningKeysConfig.signingKeySpec}, " +
+                    s"for session signing keys is not supported. Supported keys " +
+                    s"are: ${cryptoConfig.signing.keys.allowed}."
+                )
+              else None
+            case _ => None
+          }
+        case None => None
       }
     }
 

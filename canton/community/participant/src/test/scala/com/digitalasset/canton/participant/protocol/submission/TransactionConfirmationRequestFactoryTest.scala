@@ -22,16 +22,20 @@ import com.digitalasset.canton.participant.protocol.submission.TransactionConfir
   TransactionTreeFactoryError,
 }
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
+  ContractInstanceOfId,
   ContractLookupError,
-  SerializableContractOfId,
   TransactionTreeConversionError,
 }
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
-import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
+import com.digitalasset.canton.protocol.WellFormedTransaction.{
+  WithAbsoluteSuffixes,
+  WithoutSuffixes,
+}
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.sequencing.protocol.{
+  MaxRequestSizeToDeserialize,
   MediatorGroupRecipient,
   MemberRecipient,
   OpenEnvelope,
@@ -47,6 +51,7 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ResourceUtil
 import monocle.macros.syntax.lens.*
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -67,7 +72,8 @@ class TransactionConfirmationRequestFactoryTest
   private val observerParticipant2: ParticipantId = ParticipantId("observerParticipant2")
 
   // General dummy parameters
-  private val synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId
+  private val physicalSynchronizerId: PhysicalSynchronizerId =
+    DefaultTestIdentities.physicalSynchronizerId
   private val mediator: MediatorGroupRecipient = MediatorGroupRecipient(MediatorGroupIndex.zero)
   private val ledgerTime: CantonTimestamp = CantonTimestamp.Epoch
   private val workflowId: Option[WorkflowId] = Some(
@@ -86,11 +92,11 @@ class TransactionConfirmationRequestFactoryTest
     val map = partyToParticipant.fmap(parties => parties.map(_ -> permission).toMap)
     TestingTopology()
       .withReversedTopology(map)
-      .withSynchronizers(synchronizerId)
+      .withSynchronizers(physicalSynchronizerId)
       .withKeyPurposes(keyPurposes)
       .withFreshKeys(freshKeys)
       .build(loggerFactory)
-      .forOwnerAndSynchronizer(submittingParticipant, synchronizerId)
+      .forOwnerAndSynchronizer(submittingParticipant, physicalSynchronizerId)
       .currentSnapshotApproximation
   }
 
@@ -108,7 +114,7 @@ class TransactionConfirmationRequestFactoryTest
   // asymmetric encryption ciphertexts.
   private def newCryptoSnapshot: SynchronizerSnapshotSyncCryptoApi = {
     val cryptoSnapshot = createCryptoSnapshot(defaultTopology)
-    cryptoSnapshot.crypto.pureCrypto match {
+    cryptoSnapshot.crypto.pureCrypto.pureCrypto match {
       case crypto: SymbolicPureCrypto => crypto.setRandomnessFlag(true)
       case _ => ()
     }
@@ -124,12 +130,19 @@ class TransactionConfirmationRequestFactoryTest
       override def generateUuid(): UUID = transactionUuid
     }
 
+  // Input factory
+  private val transactionFactory: ExampleTransactionFactory =
+    new ExampleTransactionFactory()(ledgerTime = ledgerTime)
+
   // Device under test
   private def confirmationRequestFactory(
       transactionTreeFactoryResult: Either[TransactionTreeConversionError, GenTransactionTree]
   ): TransactionConfirmationRequestFactory = {
 
     val transactionTreeFactory: TransactionTreeFactory = new TransactionTreeFactory {
+      override def cantonContractIdVersion: CantonContractIdVersion =
+        transactionFactory.cantonContractIdVersion
+
       override def createTransactionTree(
           transaction: WellFormedTransaction[WithoutSuffixes],
           submitterInfo: SubmitterInfo,
@@ -138,7 +151,7 @@ class TransactionConfirmationRequestFactoryTest
           transactionSeed: SaltSeed,
           transactionUuid: UUID,
           _topologySnapshot: TopologySnapshot,
-          _contractOfId: SerializableContractOfId,
+          _contractOfId: ContractInstanceOfId,
           _keyResolver: LfKeyResolver,
           _maxSequencingTime: CantonTimestamp,
           validatePackageVettings: Boolean,
@@ -172,13 +185,14 @@ class TransactionConfirmationRequestFactoryTest
           salts: Iterable[Salt],
           transactionUuid: UUID,
           topologySnapshot: TopologySnapshot,
-          contractOfId: SerializableContractOfId,
+          contractOfId: ContractInstanceOfId,
           _rbContext: RollbackContext,
           _keyResolver: LfKeyResolver,
+          _absolutizer: ContractIdAbsolutizer,
       )(implicit traceContext: TraceContext): EitherT[
         FutureUnlessShutdown,
         TransactionTreeConversionError,
-        (TransactionView, WellFormedTransaction[WithSuffixes]),
+        (TransactionView, WellFormedTransaction[WithAbsoluteSuffixes]),
       ] = ???
 
       override def saltsFromView(view: TransactionView): Iterable[Salt] = ???
@@ -197,14 +211,10 @@ class TransactionConfirmationRequestFactoryTest
     )(executorService)
   }
 
-  private val contractInstanceOfId: SerializableContractOfId = { (id: LfContractId) =>
+  private val contractInstanceOfId: ContractInstanceOfId = { (id: LfContractId) =>
     EitherT.leftT(ContractLookupError(id, "Error in test: argument should not be used"))
   }
   // This isn't used because the transaction tree factory is mocked
-
-  // Input factory
-  private val transactionFactory: ExampleTransactionFactory =
-    new ExampleTransactionFactory()(ledgerTime = ledgerTime)
 
   // Since the ConfirmationRequestFactory signs the envelopes in parallel,
   // we cannot predict the counter that SymbolicCrypto uses to randomize the signatures.
@@ -319,7 +329,12 @@ class TransactionConfirmationRequestFactoryTest
             cryptoPureApi,
             sessionKey,
             TransactionViewType,
-          )(ltvt)
+          )(
+            ltvt,
+            MaxRequestSizeToDeserialize.Limit(
+              DynamicSynchronizerParameters.defaultMaxRequestSize.value
+            ),
+          )
           .valueOr(err => fail(s"fail to encrypt view tree: $err"))
 
         val encryptedViewMessage: EncryptedViewMessage[TransactionViewType] = {
@@ -333,7 +348,7 @@ class TransactionConfirmationRequestFactoryTest
             tree.viewHash,
             randomnessMapNE,
             encryptedView,
-            transactionFactory.synchronizerId,
+            transactionFactory.psid,
             SymmetricKeyScheme.Aes128Gcm,
             testedProtocolVersion,
           )
@@ -403,27 +418,33 @@ class TransactionConfirmationRequestFactoryTest
 
           val factory = confirmationRequestFactory(Right(example.transactionTree))
 
-          factory
-            .createConfirmationRequest(
-              example.wellFormedUnsuffixedTransaction,
-              submitterInfo,
-              workflowId,
-              example.keyResolver,
-              mediator,
-              newCryptoSnapshot,
-              new SessionKeyStoreWithInMemoryCache(
-                CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-              ),
-              contractInstanceOfId,
-              maxSequencingTime,
-              testedProtocolVersion,
+          ResourceUtil.withResourceM(
+            new SessionKeyStoreWithInMemoryCache(
+              CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+              timeouts,
+              loggerFactory,
             )
-            .value
-            .failOnShutdown
-            .map { res =>
-              val expected = expectedConfirmationRequest(example, newCryptoSnapshot)
-              stripSignatureAndOrderMap(res.value) shouldBe stripSignatureAndOrderMap(expected)
-            }(executorService) // parallel executorService to avoid a deadlock
+          ) { sessionKeyStore =>
+            factory
+              .createConfirmationRequest(
+                example.wellFormedUnsuffixedTransaction,
+                submitterInfo,
+                workflowId,
+                example.keyResolver,
+                mediator,
+                newCryptoSnapshot,
+                sessionKeyStore,
+                contractInstanceOfId,
+                maxSequencingTime,
+                testedProtocolVersion,
+              )
+              .value
+              .failOnShutdown
+              .map { res =>
+                val expected = expectedConfirmationRequest(example, newCryptoSnapshot)
+                stripSignatureAndOrderMap(res.value) shouldBe stripSignatureAndOrderMap(expected)
+              }(executorService) // parallel executorService to avoid a deadlock
+          }
         }
       }
 
@@ -457,14 +478,10 @@ class TransactionConfirmationRequestFactoryTest
 
       s"use different session key after key is revoked between two requests" in {
         val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
-        // we use the same store for two requests to simulate what would happen in a real scenario
-        val store =
-          new SessionKeyStoreWithInMemoryCache(
-            CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-          )
 
         def getSessionKeyFromConfirmationRequest(
-            cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi
+            cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+            sessionKeyStore: SessionKeyStoreWithInMemoryCache,
         ) =
           factory
             .createConfirmationRequest(
@@ -474,26 +491,44 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               cryptoSnapshot,
-              store,
+              sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
               testedProtocolVersion,
             )
             .failOnShutdown
             .map(_ =>
-              store
+              sessionKeyStore
                 .getSessionKeyInfoIfPresent(defaultRecipientGroup)
                 .valueOrFail("session key not found")
             )
 
-        for {
-          firstSessionKeyInfo <- getSessionKeyFromConfirmationRequest(newCryptoSnapshot)
-          secondSessionKeyInfo <- getSessionKeyFromConfirmationRequest(newCryptoSnapshot)
-          anotherCryptoSnapshot = createCryptoSnapshot(defaultTopology, freshKeys = true)
-          thirdSessionKeyInfo <- getSessionKeyFromConfirmationRequest(anotherCryptoSnapshot)
-        } yield {
-          firstSessionKeyInfo shouldBe secondSessionKeyInfo
-          secondSessionKeyInfo should not be thirdSessionKeyInfo
+        ResourceUtil.withResourceM(
+          // we use the same store for two requests to simulate what would happen in a real scenario
+          new SessionKeyStoreWithInMemoryCache(
+            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            timeouts,
+            loggerFactory,
+          )
+        ) { sessionKeyStore =>
+          for {
+            firstSessionKeyInfo <- getSessionKeyFromConfirmationRequest(
+              newCryptoSnapshot,
+              sessionKeyStore,
+            )
+            secondSessionKeyInfo <- getSessionKeyFromConfirmationRequest(
+              newCryptoSnapshot,
+              sessionKeyStore,
+            )
+            anotherCryptoSnapshot = createCryptoSnapshot(defaultTopology, freshKeys = true)
+            thirdSessionKeyInfo <- getSessionKeyFromConfirmationRequest(
+              anotherCryptoSnapshot,
+              sessionKeyStore,
+            )
+          } yield {
+            firstSessionKeyInfo shouldBe secondSessionKeyInfo
+            secondSessionKeyInfo should not be thirdSessionKeyInfo
+          }
         }
       }
     }
@@ -505,32 +540,38 @@ class TransactionConfirmationRequestFactoryTest
       "be rejected" in {
         val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
 
-        factory
-          .createConfirmationRequest(
-            singleFetch.wellFormedUnsuffixedTransaction,
-            submitterInfo,
-            workflowId,
-            singleFetch.keyResolver,
-            mediator,
-            emptyCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(
-              CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-            ),
-            contractInstanceOfId,
-            maxSequencingTime,
-            testedProtocolVersion,
+        ResourceUtil.withResourceM(
+          new SessionKeyStoreWithInMemoryCache(
+            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            timeouts,
+            loggerFactory,
           )
-          .failOnShutdown
-          .value
-          .map(
-            _ should equal(
-              Left(
-                ParticipantAuthorizationError(
-                  s"$submittingParticipant does not host $submitter or is not active."
+        ) { sessionKeyStore =>
+          factory
+            .createConfirmationRequest(
+              singleFetch.wellFormedUnsuffixedTransaction,
+              submitterInfo,
+              workflowId,
+              singleFetch.keyResolver,
+              mediator,
+              emptyCryptoSnapshot,
+              sessionKeyStore,
+              contractInstanceOfId,
+              maxSequencingTime,
+              testedProtocolVersion,
+            )
+            .failOnShutdown
+            .value
+            .map(
+              _ should equal(
+                Left(
+                  ParticipantAuthorizationError(
+                    s"$submittingParticipant does not host $submitter or is not active."
+                  )
                 )
               )
             )
-          )
+        }
       }
     }
 
@@ -542,32 +583,38 @@ class TransactionConfirmationRequestFactoryTest
       "be rejected" in {
         val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
 
-        factory
-          .createConfirmationRequest(
-            singleFetch.wellFormedUnsuffixedTransaction,
-            submitterInfo,
-            workflowId,
-            singleFetch.keyResolver,
-            mediator,
-            confirmationOnlyCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(
-              CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-            ),
-            contractInstanceOfId,
-            maxSequencingTime,
-            testedProtocolVersion,
+        ResourceUtil.withResourceM(
+          new SessionKeyStoreWithInMemoryCache(
+            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            timeouts,
+            loggerFactory,
           )
-          .failOnShutdown
-          .value
-          .map(
-            _ should equal(
-              Left(
-                ParticipantAuthorizationError(
-                  s"$submittingParticipant is not authorized to submit transactions for $submitter."
+        ) { sessionKeyStore =>
+          factory
+            .createConfirmationRequest(
+              singleFetch.wellFormedUnsuffixedTransaction,
+              submitterInfo,
+              workflowId,
+              singleFetch.keyResolver,
+              mediator,
+              confirmationOnlyCryptoSnapshot,
+              sessionKeyStore,
+              contractInstanceOfId,
+              maxSequencingTime,
+              testedProtocolVersion,
+            )
+            .failOnShutdown
+            .value
+            .map(
+              _ should equal(
+                Left(
+                  ParticipantAuthorizationError(
+                    s"$submittingParticipant is not authorized to submit transactions for $submitter."
+                  )
                 )
               )
             )
-          )
+        }
       }
     }
 
@@ -576,24 +623,30 @@ class TransactionConfirmationRequestFactoryTest
         val error = ContractLookupError(ExampleTransactionFactory.suffixedId(-1, -1), "foo")
         val factory = confirmationRequestFactory(Left(error))
 
-        factory
-          .createConfirmationRequest(
-            singleFetch.wellFormedUnsuffixedTransaction,
-            submitterInfo,
-            workflowId,
-            singleFetch.keyResolver,
-            mediator,
-            newCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(
-              CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-            ),
-            contractInstanceOfId,
-            maxSequencingTime,
-            testedProtocolVersion,
+        ResourceUtil.withResourceM(
+          new SessionKeyStoreWithInMemoryCache(
+            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            timeouts,
+            loggerFactory,
           )
-          .failOnShutdown
-          .value
-          .map(_ should equal(Left(TransactionTreeFactoryError(error))))
+        ) { sessionKeyStore =>
+          factory
+            .createConfirmationRequest(
+              singleFetch.wellFormedUnsuffixedTransaction,
+              submitterInfo,
+              workflowId,
+              singleFetch.keyResolver,
+              mediator,
+              newCryptoSnapshot,
+              sessionKeyStore,
+              contractInstanceOfId,
+              maxSequencingTime,
+              testedProtocolVersion,
+            )
+            .failOnShutdown
+            .value
+            .map(_ should equal(Left(TransactionTreeFactoryError(error))))
+        }
       }
     }
 
@@ -607,32 +660,38 @@ class TransactionConfirmationRequestFactoryTest
       "be rejected" in {
         val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
 
-        factory
-          .createConfirmationRequest(
-            singleFetch.wellFormedUnsuffixedTransaction,
-            submitterInfo,
-            workflowId,
-            singleFetch.keyResolver,
-            mediator,
-            submitterOnlyCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(
-              CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-            ),
-            contractInstanceOfId,
-            maxSequencingTime,
-            testedProtocolVersion,
+        ResourceUtil.withResourceM(
+          new SessionKeyStoreWithInMemoryCache(
+            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            timeouts,
+            loggerFactory,
           )
-          .failOnShutdown
-          .value
-          .map(
-            _ should equal(
-              Left(
-                TransactionConfirmationRequestFactory.RecipientsCreationError(
-                  s"Found no active participants for informees: ${List(observer)}"
+        ) { sessionKeyStore =>
+          factory
+            .createConfirmationRequest(
+              singleFetch.wellFormedUnsuffixedTransaction,
+              submitterInfo,
+              workflowId,
+              singleFetch.keyResolver,
+              mediator,
+              submitterOnlyCryptoSnapshot,
+              sessionKeyStore,
+              contractInstanceOfId,
+              maxSequencingTime,
+              testedProtocolVersion,
+            )
+            .failOnShutdown
+            .value
+            .map(
+              _ should equal(
+                Left(
+                  TransactionConfirmationRequestFactory.RecipientsCreationError(
+                    s"Found no active participants for informees: ${List(observer)}"
+                  )
                 )
               )
             )
-          )
+        }
       }
     }
 
@@ -644,42 +703,47 @@ class TransactionConfirmationRequestFactoryTest
               createCryptoSnapshot(defaultTopology, keyPurposes = availableKeys)
             val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
 
-            loggerFactory.assertLoggedWarningsAndErrorsSeq(
-              factory
-                .createConfirmationRequest(
-                  singleFetch.wellFormedUnsuffixedTransaction,
-                  submitterInfo,
-                  workflowId,
-                  singleFetch.keyResolver,
-                  mediator,
-                  noKeyCryptoSnapshot,
-                  new SessionKeyStoreWithInMemoryCache(
-                    CachingConfigs.defaultSessionEncryptionKeyCacheConfig
-                  ),
-                  contractInstanceOfId,
-                  maxSequencingTime,
-                  testedProtocolVersion,
-                )
-                .value
-                .failOnShutdown
-                .map {
-                  case Left(ParticipantAuthorizationError(message)) =>
-                    message shouldBe s"$submittingParticipant does not host $submitter or is not active."
-                  case otherwise =>
-                    fail(
-                      s"should have failed with a participant authorization error, but returned result: $otherwise"
-                    )
-                },
-              LogEntry.assertLogSeq(
-                Seq.empty,
-                mayContain = Seq(
-                  _.warningMessage should include(
-                    "has a synchronizer trust certificate, but no keys on synchronizer"
+            ResourceUtil.withResourceM(
+              new SessionKeyStoreWithInMemoryCache(
+                CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+                timeouts,
+                loggerFactory,
+              )
+            ) { sessionKeyStore =>
+              loggerFactory.assertLoggedWarningsAndErrorsSeq(
+                factory
+                  .createConfirmationRequest(
+                    singleFetch.wellFormedUnsuffixedTransaction,
+                    submitterInfo,
+                    workflowId,
+                    singleFetch.keyResolver,
+                    mediator,
+                    noKeyCryptoSnapshot,
+                    sessionKeyStore,
+                    contractInstanceOfId,
+                    maxSequencingTime,
+                    testedProtocolVersion,
                   )
+                  .value
+                  .failOnShutdown
+                  .map {
+                    case Left(ParticipantAuthorizationError(message)) =>
+                      message shouldBe s"$submittingParticipant does not host $submitter or is not active."
+                    case otherwise =>
+                      fail(
+                        s"should have failed with a participant authorization error, but returned result: $otherwise"
+                      )
+                  },
+                LogEntry.assertLogSeq(
+                  Seq.empty,
+                  mayContain = Seq(
+                    _.warningMessage should include(
+                      "has a synchronizer trust certificate, but no keys on synchronizer"
+                    )
+                  ),
                 ),
-              ),
-            )
-
+              )
+            }
           }
         }
 

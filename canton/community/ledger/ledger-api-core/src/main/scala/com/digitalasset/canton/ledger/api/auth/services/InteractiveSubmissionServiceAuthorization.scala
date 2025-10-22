@@ -5,6 +5,10 @@ package com.digitalasset.canton.ledger.api.auth.services
 
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc.InteractiveSubmissionService
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
+  ExecuteSubmissionAndWaitForTransactionRequest,
+  ExecuteSubmissionAndWaitForTransactionResponse,
+  ExecuteSubmissionAndWaitRequest,
+  ExecuteSubmissionAndWaitResponse,
   ExecuteSubmissionRequest,
   ExecuteSubmissionResponse,
   GetPreferredPackageVersionRequest,
@@ -68,6 +72,24 @@ final class InteractiveSubmissionServiceAuthorization(
 
   override def bindService(): ServerServiceDefinition =
     InteractiveSubmissionServiceGrpc.bindService(this, executionContext)
+
+  override def executeSubmissionAndWait(
+      request: ExecuteSubmissionAndWaitRequest
+  ): Future[ExecuteSubmissionAndWaitResponse] =
+    authorizer.rpc(service.executeSubmissionAndWait)(
+      getExecuteSubmissionClaims(
+        request,
+        preparedTransactionForExecuteSubmissionAndWaitL,
+        userIdForExecuteSubmissionAndWaitL,
+      )*
+    )(request)
+
+  override def executeSubmissionAndWaitForTransaction(
+      request: ExecuteSubmissionAndWaitForTransactionRequest
+  ): Future[ExecuteSubmissionAndWaitForTransactionResponse] =
+    authorizer.rpc(service.executeSubmissionAndWaitForTransaction)(
+      getExecuteSubmissionAndWaitForTransactionClaims(request)*
+    )(request)
 }
 
 object InteractiveSubmissionServiceAuthorization {
@@ -101,6 +123,18 @@ object InteractiveSubmissionServiceAuthorization {
     )
   }
 
+  def getExecuteSubmissionAndWaitForTransactionClaims(
+      request: ExecuteSubmissionAndWaitForTransactionRequest
+  ): List[RequiredClaim[ExecuteSubmissionAndWaitForTransactionRequest]] =
+    (getExecuteSubmissionClaims(
+      request,
+      preparedTransactionForExecuteSubmissionAndWaitForTransactionL,
+      userIdForExecuteSubmissionAndWaitForTransactionL,
+    ) ::: request.transactionFormat.toList
+      .flatMap(
+        RequiredClaims.transactionFormatClaims[ExecuteSubmissionAndWaitForTransactionRequest]
+      )).distinct
+
   val userIdForPrepareSubmissionL: Lens[PrepareSubmissionRequest, String] =
     Lens.unit[PrepareSubmissionRequest].userId
   val preparedTransactionForExecuteSubmissionL
@@ -108,4 +142,15 @@ object InteractiveSubmissionServiceAuthorization {
     Lens.unit[ExecuteSubmissionRequest].optionalPreparedTransaction
   val userIdForExecuteSubmissionL: Lens[ExecuteSubmissionRequest, String] =
     Lens.unit[ExecuteSubmissionRequest].userId
+  val preparedTransactionForExecuteSubmissionAndWaitL
+      : Lens[ExecuteSubmissionAndWaitRequest, Option[PreparedTransaction]] =
+    Lens.unit[ExecuteSubmissionAndWaitRequest].optionalPreparedTransaction
+  val userIdForExecuteSubmissionAndWaitL: Lens[ExecuteSubmissionAndWaitRequest, String] =
+    Lens.unit[ExecuteSubmissionAndWaitRequest].userId
+  val preparedTransactionForExecuteSubmissionAndWaitForTransactionL
+      : Lens[ExecuteSubmissionAndWaitForTransactionRequest, Option[PreparedTransaction]] =
+    Lens.unit[ExecuteSubmissionAndWaitForTransactionRequest].optionalPreparedTransaction
+  val userIdForExecuteSubmissionAndWaitForTransactionL
+      : Lens[ExecuteSubmissionAndWaitForTransactionRequest, String] =
+    Lens.unit[ExecuteSubmissionAndWaitForTransactionRequest].userId
 }

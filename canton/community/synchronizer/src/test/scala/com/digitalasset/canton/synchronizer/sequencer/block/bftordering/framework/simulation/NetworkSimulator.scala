@@ -4,10 +4,8 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
 
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.{
-  P2PEndpoint,
-  PlainTextP2PEndpoint,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.PlainTextP2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.P2PConnectionEventListener
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -133,7 +131,6 @@ class NetworkSimulator(
       from: BftNodeId,
       to: BftNodeId,
       msg: Any,
-      traceContext: TraceContext,
   ): Unit = {
 
     if (canUseFaults && settings.packetLoss.flipCoin(random)) {
@@ -152,7 +149,7 @@ class NetworkSimulator(
       val delay = settings.oneWayDelay
         .generateRandomDuration(random)
       agenda.addOne(
-        ReceiveNetworkMessage(to, msg, traceContext),
+        ReceiveNetworkMessage(to, msg),
         delay,
       )
     }
@@ -161,12 +158,19 @@ class NetworkSimulator(
   def scheduleEstablishConnection(
       from: BftNodeId,
       to: BftNodeId,
-      endpoint: PlainTextP2PEndpoint,
-      continuation: (P2PEndpoint.Id, BftNodeId) => Unit,
+      maybeP2PEndpoint: Option[PlainTextP2PEndpoint],
+      p2pConnectionEventListener: P2PConnectionEventListener,
+      traceContext: TraceContext,
   ): Unit = {
     val delay = settings.establishConnectionDelay.generateRandomDuration(random)
     agenda.addOne(
-      EstablishConnection(from, to, endpoint, continuation),
+      EstablishConnection(
+        from,
+        to,
+        maybeP2PEndpoint,
+        p2pConnectionEventListener,
+        traceContext,
+      ),
       delay,
     )
   }

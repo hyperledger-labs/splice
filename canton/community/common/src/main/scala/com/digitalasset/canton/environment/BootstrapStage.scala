@@ -4,7 +4,6 @@
 package com.digitalasset.canton.environment
 
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -23,7 +22,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.retry.{NoExceptionRetryPolicy, Success}
-import com.digitalasset.canton.util.{EitherTUtil, SimpleExecutionQueue, retry}
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, SimpleExecutionQueue, retry}
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.DurationInt
@@ -54,7 +53,7 @@ final class RunningNode[T <: CantonNode](
   def description: String = "Node up and running"
   override def getNode: Option[T] = Some(node)
 
-  override def getAdminToken: Option[String] = Some(node.adminToken.secret)
+  override def getAdminToken: Option[String] = Some(node.adminTokenDispenser.getCurrentToken.secret)
 
   override def start()(implicit
       traceContext: TraceContext
@@ -98,11 +97,11 @@ abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLe
         case Some(previous) => EitherT.rightT(Some(previous))
         case None =>
           EitherT(
-            performUnlessClosingUSF(description)(
+            synchronizeWithClosing(description)(
               (for {
                 result <- attempt()
                   .leftMap { err =>
-                    logger.error(s"Startup of $description failed with $err")
+                    logger.error(s"Attempting to run $description failed with $err")
                     bootstrap.abortThisNodeOnStartupFailure()
                     err
                   }
@@ -195,7 +194,7 @@ abstract class BootstrapStageWithStorage[
       // retry here as long as we don't get a result or we get a serious failure
       // so we retry here if the result is Right(None)
       val success = Success[Either[String, Option[StageResult]]](_ != Right(None))
-      EitherTUtil.doNotAwait(
+      EitherTUtil.doNotAwaitUS(
         EitherT(
           retry
             .Backoff(
@@ -213,17 +212,18 @@ abstract class BootstrapStageWithStorage[
               executionContext,
               traceContext,
             )
-        ).flatMap {
+        ).tapOnShutdown {
+          logger.debug(s"Initialization of $description aborted due to shutdown")
+        }.flatMap {
           case Some(result) =>
             logger.info(
               s"Initialization stage $description completed in the background, proceeding."
             )
-            performUnlessClosingEitherU(description)(result.start().onShutdown(Either.unit))
-          case None => // was aborted due to shutdown, so we just pass
-            EitherT.rightT[FutureUnlessShutdown, String](())
-        }.onShutdown {
-          logger.debug(s"Initialization of $description aborted due to shutdown")
-          Either.unit
+            synchronizeWithClosing(description)(result.start())
+          case None =>
+            ErrorUtil.invalidState(
+              s"Retry loop for initialization stage $description terminated with unsuccessful None"
+            )
         },
         s"Background startup failed at $description",
       )
@@ -260,7 +260,7 @@ abstract class BootstrapStageWithStorage[
         EitherT.pure[FutureUnlessShutdown, String][Option[StageResult]](None)
       } else {
         EitherT
-          .right[String](performUnlessClosingUSF("check-already-init")(stageCompleted))
+          .right[String](synchronizeWithClosing("check-already-init")(stageCompleted))
           .flatMap[String, Option[StageResult]] {
             case Some(result) =>
               logger.info(
@@ -293,7 +293,7 @@ abstract class BootstrapStageWithStorage[
         } else
           {
             for {
-              current <- performUnlessClosingEitherUSF(s"check-already-init-$description")(
+              current <- synchronizeWithClosing(s"check-already-init-$description")(
                 EitherT.right[String](stageCompleted)
               )
               _ <- EitherT.cond[FutureUnlessShutdown](
@@ -302,11 +302,11 @@ abstract class BootstrapStageWithStorage[
                 s"Node is already initialised with $current",
               )
               _ <- EitherT.cond[FutureUnlessShutdown](storage.isActive, (), "Node is passive")
-              item <- performUnlessClosingEitherUSF(s"complete-grab-result-$description")(
+              item <- synchronizeWithClosing(s"complete-grab-result-$description")(
                 storeAndPassResult
               ): EitherT[FutureUnlessShutdown, String, M]
               stage <-
-                performUnlessClosingEitherUSF(s"store-stage-$description") {
+                synchronizeWithClosing(s"store-stage-$description") {
                   buildNextStage(item).map { stage =>
                     stageResult.set(Some(stage))
                     stage
@@ -328,7 +328,7 @@ abstract class BootstrapStageWithStorage[
   final protected override def attempt()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Option[StageResult]] =
-    performUnlessClosingEitherUSF(description) {
+    synchronizeWithClosing(description) {
       for {
         result <- EitherT.right(stageCompleted)
         stageO <- result match {

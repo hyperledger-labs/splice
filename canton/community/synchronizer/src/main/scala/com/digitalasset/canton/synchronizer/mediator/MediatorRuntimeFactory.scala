@@ -37,7 +37,6 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.ServerServiceDefinition
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -71,7 +70,7 @@ final class MediatorRuntime(
 
   val timeService: ServerServiceDefinition = SynchronizerTimeServiceGrpc.bindService(
     GrpcSynchronizerTimeService
-      .forSynchronizerEntity(mediator.synchronizerId, mediator.timeTracker, loggerFactory),
+      .forSynchronizerEntity(mediator.psid, mediator.timeTracker, loggerFactory),
     ec,
   )
   val administrationService: ServerServiceDefinition =
@@ -113,7 +112,6 @@ final class MediatorRuntime(
 object MediatorRuntimeFactory {
   def create(
       mediatorId: MediatorId,
-      synchronizerId: SynchronizerId,
       storage: Storage,
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       sequencedEventStore: SequencedEventStore,
@@ -125,7 +123,6 @@ object MediatorRuntimeFactory {
       synchronizerOutboxFactory: SynchronizerOutboxFactory,
       timeTracker: SynchronizerTimeTracker,
       nodeParameters: CantonNodeParameters,
-      protocolVersion: ProtocolVersion,
       clock: Clock,
       metrics: MediatorMetrics,
       config: MediatorConfig,
@@ -140,7 +137,7 @@ object MediatorRuntimeFactory {
     val finalizedResponseStore = FinalizedResponseStore(
       storage,
       syncCrypto.pureCrypto,
-      protocolVersion,
+      sequencerClient.protocolVersion,
       nodeParameters.cachingConfigs.finalizedMediatorConfirmationRequests,
       nodeParameters.processingTimeouts,
       loggerFactory,
@@ -159,13 +156,12 @@ object MediatorRuntimeFactory {
         deduplicationStore,
         clock,
         metrics,
-        protocolVersion,
+        sequencerClient.protocolVersion,
         nodeParameters.processingTimeouts,
         loggerFactory,
       )
 
     val synchronizerOutbox = synchronizerOutboxFactory.create(
-      protocolVersion,
       topologyClient,
       sequencerClient,
       timeTracker,
@@ -174,7 +170,6 @@ object MediatorRuntimeFactory {
     )
 
     val mediator = new Mediator(
-      synchronizerId,
       mediatorId,
       sequencerClient,
       topologyClient,
@@ -187,7 +182,6 @@ object MediatorRuntimeFactory {
       sequencerCounterTrackerStore,
       sequencedEventStore,
       nodeParameters,
-      protocolVersion,
       clock,
       metrics,
       loggerFactory,
