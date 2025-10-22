@@ -24,6 +24,7 @@ import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseRefer
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
+import com.digitalasset.canton.participant.sync.SyncServiceInjectionError
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
@@ -197,12 +198,11 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
           // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
           // so for now we go for an ad-hoc logic here.
           val shouldRetry = decodedCantonError.exists { err =>
-            // Ideally we'd `case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true`
-            // but unfortunately `error.decodedCantonError` appears to wrap it in a `GenericErrorCode`, so the match doesn't work.
-            // We also cannot pattern match on GenericErrorCode because it's a private class.
-            if (
-              err.code.id == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.id && err.code.category == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.category
-            ) {
+            val forceRetry = err.code match {
+              case SyncServiceInjectionError.NotConnectedToAnySynchronizer => true
+              case SyncServiceInjectionError.NotConnectedToSynchronizer => true
+            }
+            if (forceRetry) {
               true
             } else {
               err.isRetryable
