@@ -559,6 +559,27 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
+  if (infraConfig.prometheus.installPrometheusPushgateway) {
+    new k8s.helm.v3.Release('prometheus-pushgateway', {
+      name: 'prometheus-pushgateway',
+      chart: 'prometheus-pushgateway',
+      version: '3.4.1',
+      namespace: namespaceName,
+      repositoryOpts: {
+        repo: 'https://prometheus-community.github.io/helm-charts',
+      },
+      values: {
+        serviceMonitor: {
+          enabled: true,
+          namespace: namespaceName,
+          additionalLabels: { release: 'prometheus-grafana-monitoring' },
+        },
+        ...infraAffinityAndTolerations,
+      },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
+    });
+  }
+
   return prometheusStack;
 }
 

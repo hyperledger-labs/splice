@@ -17,6 +17,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
 
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
@@ -71,7 +72,7 @@ class FeaturedAppActivityMarkerIntegrationTest
 
     val markerMultiplier = 10
 
-    actAndCheck(
+    actAndCheck(timeUntilSuccess = 40.seconds)(
       "Create activity markers", {
         for (i <- 1 to markerMultiplier) {
           // Added the 'eventually' here and below because sometimes the command submissions fail due to synchronizers not being

@@ -94,6 +94,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -128,6 +129,9 @@ class HttpScanHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
+
+  private implicit val offsetDateTimeCodecInstance: Codec[CantonTimestamp, OffsetDateTime] =
+    Codec.OffsetDateTime.instance
 
   def getDsoPartyId(
       response: v0.ScanResource.GetDsoPartyIdResponse.type
@@ -1346,6 +1350,16 @@ class HttpScanHandler(
     }
   }
 
+  private def getRecordTimeAtOrBefore(migrationId: Long, before: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Option[CantonTimestamp]] =
+    OptionT(
+      snapshotStore
+        .lookupSnapshotAtOrBefore(migrationId, before)
+    ).map {
+      _.snapshotRecordTime
+    }.value
+
   override def getDateOfMostRecentSnapshotBefore(
       respond: ScanResource.GetDateOfMostRecentSnapshotBeforeResponse.type
   )(before: OffsetDateTime, migrationId: Long)(
@@ -1354,13 +1368,13 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getDateOfMostRecentSnapshotBefore") { _ => _ =>
       snapshotStore
-        .lookupSnapshotBefore(migrationId, CantonTimestamp.assertFromInstant(before.toInstant))
+        .lookupSnapshotAtOrBefore(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(before))
         .map {
           case Some(snapshot) =>
             ScanResource.GetDateOfMostRecentSnapshotBeforeResponseOK(
               definitions
                 .AcsSnapshotTimestampResponse(
-                  snapshot.snapshotRecordTime.toInstant.atOffset(ZoneOffset.UTC)
+                  Codec.encode(snapshot.snapshotRecordTime)
                 )
             )
           case None =>
@@ -1417,7 +1431,7 @@ class HttpScanHandler(
                 .update
                 .recordTime
             )
-          lastSnapshot <- snapshotStore.lookupSnapshotBefore(
+          lastSnapshot <- snapshotStore.lookupSnapshotAtOrBefore(
             snapshotStore.currentMigrationId,
             snapshotTime,
           )
@@ -1442,7 +1456,7 @@ class HttpScanHandler(
             }
         } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
           definitions.ForceAcsSnapshotResponse(
-            snapshotTime.toInstant.atOffset(ZoneOffset.UTC),
+            Codec.encode(snapshotTime),
             snapshotStore.currentMigrationId,
           )
         )
@@ -1455,44 +1469,69 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAcsSnapshotAt") { _ => _ =>
-      body match {
-        case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
-          snapshotStore
-            .queryAcsSnapshot(
-              migrationId,
-              CantonTimestamp.assertFromInstant(recordTime.toInstant),
-              after,
-              PageLimit.tryCreate(pageSize),
-              partyIds
-                .getOrElse(Seq.empty)
-                .map(PartyId.tryFromProtoPrimitive),
-              templates
-                .getOrElse(Seq.empty)
-                .map(_.split(":") match {
-                  case Array(packageName, moduleName, entityName) =>
-                    PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
-                  case _ =>
-                    throw HttpErrorHandler.badRequest(
-                      s"Malformed template_id, expected 'package_name:module_name:entity_name'"
-                    )
-                }),
-            )
-            .map { result =>
-              ScanResource.GetAcsSnapshotAtResponseOK(
-                definitions.AcsResponse(
-                  recordTime,
-                  migrationId,
-                  result.createdEventsInPage
-                    .map(event =>
-                      CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
-                        event.eventId,
-                        event.event,
-                      )
-                    ),
-                  result.afterToken,
+      val AcsRequest(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        after,
+        pageSize,
+        partyIds,
+        templates,
+      ) = body
+
+      def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
+        .queryAcsSnapshot(
+          migrationId,
+          recordTimeTs,
+          after,
+          PageLimit.tryCreate(pageSize),
+          partyIds
+            .getOrElse(Seq.empty)
+            .map(PartyId.tryFromProtoPrimitive),
+          templates
+            .getOrElse(Seq.empty)
+            .map(_.split(":") match {
+              case Array(packageName, moduleName, entityName) =>
+                PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
+              case _ =>
+                throw HttpErrorHandler.badRequest(
+                  s"Malformed template_id, expected 'package_name:module_name:entity_name'"
                 )
-              )
-            }
+            }),
+        )
+
+      def toResponse(result: QueryAcsSnapshotResult) = {
+        ScanResource.GetAcsSnapshotAtResponseOK(
+          definitions.AcsResponse(
+            Codec.encode(result.snapshotRecordTime),
+            migrationId,
+            result.createdEventsInPage
+              .map(event =>
+                CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
+                  event.eventId,
+                  event.event,
+                )
+              ),
+            result.afterToken,
+          )
+        )
+      }
+
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+
+      recordTimeMatch.getOrElse(AcsRequest.RecordTimeMatch.Exact) match {
+        case AcsRequest.RecordTimeMatch.members.Exact =>
+          exactQuery(recordTimeTs).map(toResponse)
+        case AcsRequest.RecordTimeMatch.members.AtOrBefore =>
+          val snapshotQueryResult = for {
+            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+          } yield snapshotQueryResult
+          snapshotQueryResult.fold[ScanResource.GetAcsSnapshotAtResponse](
+            ScanResource.GetAcsSnapshotAtResponseNotFound(
+              ErrorResponse(s"No snapshots found before $recordTime")
+            )
+          )(toResponse)
       }
     }
   }
@@ -1502,32 +1541,55 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetHoldingsStateAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getHoldingsStateAt") { _ => _ =>
-      body match {
-        case HoldingsStateRequest(migrationId, recordTime, after, pageSize, ownerPartyIds) =>
-          snapshotStore
-            .getHoldingsState(
-              migrationId,
-              CantonTimestamp.assertFromInstant(recordTime.toInstant),
-              after,
-              PageLimit.tryCreate(pageSize),
-              nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
-            )
-            .map { result =>
-              ScanResource.GetHoldingsStateAtResponseOK(
-                definitions.AcsResponse(
-                  recordTime,
-                  migrationId,
-                  result.createdEventsInPage
-                    .map(event =>
-                      CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
-                        event.eventId,
-                        event.event,
-                      )
-                    ),
-                  result.afterToken,
+      val HoldingsStateRequest(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        after,
+        pageSize,
+        ownerPartyIds,
+      ) = body
+
+      def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
+        .getHoldingsState(
+          migrationId,
+          recordTimeTs,
+          after,
+          PageLimit.tryCreate(pageSize),
+          nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
+        )
+
+      def toResponse(result: QueryAcsSnapshotResult) =
+        ScanResource.GetHoldingsStateAtResponseOK(
+          definitions.AcsResponse(
+            Codec.encode(result.snapshotRecordTime),
+            migrationId,
+            result.createdEventsInPage
+              .map(event =>
+                CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
+                  event.eventId,
+                  event.event,
                 )
-              )
-            }
+              ),
+            result.afterToken,
+          )
+        )
+
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+
+      recordTimeMatch.getOrElse(HoldingsStateRequest.RecordTimeMatch.Exact) match {
+        case HoldingsStateRequest.RecordTimeMatch.members.Exact =>
+          exactQuery(recordTimeTs).map(toResponse)
+        case HoldingsStateRequest.RecordTimeMatch.members.AtOrBefore =>
+          val snapshotQueryResult = for {
+            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+          } yield snapshotQueryResult
+          snapshotQueryResult.fold[ScanResource.GetHoldingsStateAtResponse](
+            ScanResource.GetHoldingsStateAtResponseNotFound(
+              ErrorResponse(s"No snapshots found before $recordTime")
+            )
+          )(toResponse)
       }
     }
   }
@@ -1537,52 +1599,76 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetHoldingsSummaryAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getHoldingsSummaryAt") { _ => _ =>
-      body match {
-        case HoldingsSummaryRequest(migrationId, recordTime, partyIds, asOfRound) =>
-          for {
-            round <- asOfRound match {
-              case Some(round) => Future.successful(round)
-              case None =>
-                // gives the earliest mining round, as listContracts orders by event_number ASC
-                store.multiDomainAcsStore
-                  .listContracts(OpenMiningRound.COMPANION, PageLimit.tryCreate(1))
-                  .map(
-                    _.headOption.getOrElse(
-                      throw Status.FAILED_PRECONDITION
-                        .withDescription("No open mining rounds found.")
-                        .asRuntimeException()
-                    )
-                  )
-                  .map(_.contract.payload.round.number.toLong)
-            }
-            result <- snapshotStore
-              .getHoldingsSummary(
-                migrationId,
-                CantonTimestamp.assertFromInstant(recordTime.toInstant),
-                nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
-                round,
-              )
-          } yield ScanResource.GetHoldingsSummaryAtResponse.OK(
-            definitions.HoldingsSummaryResponse(
-              result.recordTime.toInstant.atOffset(ZoneOffset.UTC),
-              result.migrationId,
-              result.asOfRound,
-              result.summaries.map { case (partyId, holdings) =>
-                definitions.HoldingsSummary(
-                  partyId = Codec.encode(partyId),
-                  totalUnlockedCoin = Codec.encode(holdings.totalUnlockedCoin),
-                  totalLockedCoin = Codec.encode(holdings.totalLockedCoin),
-                  totalCoinHoldings = Codec.encode(holdings.totalCoinHoldings),
-                  accumulatedHoldingFeesUnlocked =
-                    Codec.encode(holdings.accumulatedHoldingFeesUnlocked),
-                  accumulatedHoldingFeesLocked =
-                    Codec.encode(holdings.accumulatedHoldingFeesLocked),
-                  accumulatedHoldingFeesTotal = Codec.encode(holdings.accumulatedHoldingFeesTotal),
-                  totalAvailableCoin = Codec.encode(holdings.totalAvailableCoin),
+      val HoldingsSummaryRequest(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        partyIds,
+        asOfRound,
+      ) = body
+
+      def exactQuery(recordTimeTs: CantonTimestamp) = for {
+        round <- asOfRound match {
+          case Some(round) => Future.successful(round)
+          case None =>
+            // gives the earliest mining round, as listContracts orders by event_number ASC
+            store.multiDomainAcsStore
+              .listContracts(OpenMiningRound.COMPANION, PageLimit.tryCreate(1))
+              .map(
+                _.headOption.getOrElse(
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription("No open mining rounds found.")
+                    .asRuntimeException()
                 )
-              }.toVector,
-            )
+              )
+              .map(_.contract.payload.round.number.toLong)
+        }
+        result <- snapshotStore
+          .getHoldingsSummary(
+            migrationId,
+            recordTimeTs,
+            nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
+            round,
           )
+      } yield result
+
+      def toResponse(result: AcsSnapshotStore.HoldingsSummaryResult) =
+        ScanResource.GetHoldingsSummaryAtResponse.OK(
+          definitions.HoldingsSummaryResponse(
+            Codec.encode(result.recordTime),
+            result.migrationId,
+            result.asOfRound,
+            result.summaries.map { case (partyId, holdings) =>
+              definitions.HoldingsSummary(
+                partyId = Codec.encode(partyId),
+                totalUnlockedCoin = Codec.encode(holdings.totalUnlockedCoin),
+                totalLockedCoin = Codec.encode(holdings.totalLockedCoin),
+                totalCoinHoldings = Codec.encode(holdings.totalCoinHoldings),
+                accumulatedHoldingFeesUnlocked =
+                  Codec.encode(holdings.accumulatedHoldingFeesUnlocked),
+                accumulatedHoldingFeesLocked = Codec.encode(holdings.accumulatedHoldingFeesLocked),
+                accumulatedHoldingFeesTotal = Codec.encode(holdings.accumulatedHoldingFeesTotal),
+                totalAvailableCoin = Codec.encode(holdings.totalAvailableCoin),
+              )
+            }.toVector,
+          )
+        )
+
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+
+      recordTimeMatch.getOrElse(HoldingsSummaryRequest.RecordTimeMatch.Exact) match {
+        case HoldingsSummaryRequest.RecordTimeMatch.members.Exact =>
+          exactQuery(recordTimeTs).map(toResponse)
+        case HoldingsSummaryRequest.RecordTimeMatch.members.AtOrBefore =>
+          val snapshotQueryResult = for {
+            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+          } yield snapshotQueryResult
+          snapshotQueryResult.fold[ScanResource.GetHoldingsSummaryAtResponse](
+            ScanResource.GetHoldingsSummaryAtResponseNotFound(
+              ErrorResponse(s"No snapshots found before $recordTime")
+            )
+          )(toResponse)
       }
     }
   }

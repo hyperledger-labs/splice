@@ -640,7 +640,7 @@ class AcsSnapshotTriggerTest
 
     def noPreviousSnapshot(migrationId: Long = currentMigrationId): Unit = {
       when(
-        store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
+        store.lookupSnapshotAtOrBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
           any[TraceContext]
         )
       )
@@ -655,7 +655,7 @@ class AcsSnapshotTriggerTest
     ): AcsSnapshot = {
       val lastSnapshot = AcsSnapshot(time, migrationId, historyId, 0, 100, None, None)
       when(
-        store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
+        store.lookupSnapshotAtOrBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
           any[TraceContext]
         )
       )

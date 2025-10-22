@@ -50,7 +50,7 @@ class AcsSnapshotStore(
 
   private def historyId = updateHistory.historyId
 
-  def lookupSnapshotBefore(
+  def lookupSnapshotAtOrBefore(
       migrationId: Long,
       before: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
