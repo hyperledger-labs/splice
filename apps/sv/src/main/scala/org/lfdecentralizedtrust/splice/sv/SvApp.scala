@@ -650,6 +650,7 @@ class SvApp(
         timeouts,
         httpClient,
         templateDecoder,
+        httpRateLimiter,
       )
     }
   }
@@ -792,6 +793,7 @@ object SvApp {
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
       decoder: TemplateJsonDecoder,
+      httpRateLimiter: HttpRateLimiter,
   ) extends FlagCloseableAsync
       with HasHealth {
     override def isHealthy: Boolean =
@@ -815,6 +817,7 @@ object SvApp {
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
         SyncCloseable("admin handler", svAdminHandler.close()),
         SyncCloseable("storage", storage.close()),
+        SyncCloseable("http rate limiter", httpRateLimiter.close()),
       )
   }
 
