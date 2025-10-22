@@ -199,6 +199,9 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
           // so for now we go for an ad-hoc logic here.
           val shouldRetry = decodedCantonError.exists { err =>
             val forceRetry = err.code match {
+              // Normally "not connected to synchronizer" errors are not retriable because they require operator intervention.
+              // In canton network, synchronizer connections are managed by the sv app automation
+              // and transient disconnects are normal.
               case SyncServiceInjectionError.NotConnectedToAnySynchronizer => true
               case SyncServiceInjectionError.NotConnectedToSynchronizer => true
             }
