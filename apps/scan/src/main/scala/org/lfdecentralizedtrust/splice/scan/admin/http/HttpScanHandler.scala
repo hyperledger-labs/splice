@@ -1355,7 +1355,7 @@ class HttpScanHandler(
   ): Future[Option[CantonTimestamp]] =
     OptionT(
       snapshotStore
-        .lookupSnapshotBefore(migrationId, before)
+        .lookupSnapshotAtOrBefore(migrationId, before)
     ).map {
       _.snapshotRecordTime
     }.value
@@ -1368,7 +1368,7 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getDateOfMostRecentSnapshotBefore") { _ => _ =>
       snapshotStore
-        .lookupSnapshotBefore(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(before))
+        .lookupSnapshotAtOrBefore(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(before))
         .map {
           case Some(snapshot) =>
             ScanResource.GetDateOfMostRecentSnapshotBeforeResponseOK(
@@ -1431,7 +1431,7 @@ class HttpScanHandler(
                 .update
                 .recordTime
             )
-          lastSnapshot <- snapshotStore.lookupSnapshotBefore(
+          lastSnapshot <- snapshotStore.lookupSnapshotAtOrBefore(
             snapshotStore.currentMigrationId,
             snapshotTime,
           )
