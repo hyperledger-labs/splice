@@ -53,6 +53,7 @@ export function approvedSvIdentities(): ApprovedSvIdentity[] {
 
   // We override public keys to the locally configured one,
   // to support using real approved-sv-id-values files on CI clusters that don't have access to the real keys.
+  // TODO(DACH-NY/canton-network-internal#2358) Consider not doing this on dev/test/main.
   const configuredPublicKeys = fromConfig.reduce(
     (acc, identity) => ({ ...acc, [identity.name]: identity.publicKey }),
     {} as Record<string, string | pulumi.Output<string>>
