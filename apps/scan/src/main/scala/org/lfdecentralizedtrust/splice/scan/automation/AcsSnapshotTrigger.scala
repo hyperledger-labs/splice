@@ -92,7 +92,7 @@ class AcsSnapshotTrigger(
       now: CantonTimestamp
   )(implicit tc: TraceContext): OptionT[Future, AcsSnapshotTrigger.Task] = {
     OptionT(for {
-      lastSnapshot <- store.lookupSnapshotBefore(currentMigrationId, CantonTimestamp.MaxValue)
+      lastSnapshot <- store.lookupSnapshotAtOrBefore(currentMigrationId, CantonTimestamp.MaxValue)
       possibleTask <- lastSnapshot match {
         case None =>
           firstSnapshotForMigrationIdTask(currentMigrationId)
@@ -188,7 +188,7 @@ class AcsSnapshotTrigger(
         .plus(Duration.ofHours(snapshotPeriodHours.toLong))
         .isBefore(maxTime)
       latestSnapshot <- store
-        .lookupSnapshotBefore(migrationIdToBackfill, CantonTimestamp.MaxValue)
+        .lookupSnapshotAtOrBefore(migrationIdToBackfill, CantonTimestamp.MaxValue)
       task <- latestSnapshot match {
         // Avoid creating the last snapshot for past migration ids, which will be contain a portion of empty history.
         // This is important because, if the migration id gets restored after HDM fast enough,
@@ -244,7 +244,7 @@ class AcsSnapshotTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     store
-      .lookupSnapshotBefore(currentMigrationId, task.snapshotRecordTime)
+      .lookupSnapshotAtOrBefore(currentMigrationId, task.snapshotRecordTime)
       .map(_.exists(_.snapshotRecordTime == task.snapshotRecordTime))
   }
 
