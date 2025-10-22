@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import {
-  ApprovedSvIdentity,
   Auth0Client,
   BackupConfig,
   BackupLocation,
@@ -74,7 +73,6 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
     peers: StaticCometBftConfigWithNodeName[];
   };
   onboarding: SvOnboarding;
-  approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
   periodicBackupConfig?: BackupConfig;

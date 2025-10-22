@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as nodePath from 'path';
 import { PathLike } from 'fs';
@@ -63,12 +62,6 @@ export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING',
 export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
-
-export type ApprovedSvIdentity = {
-  name: string;
-  publicKey: string | pulumi.Output<string>;
-  rewardWeightBps: number;
-};
 
 const enableSequencerPruning = config.envFlag('ENABLE_SEQUENCER_PRUNING', false);
 export const sequencerPruningConfig = enableSequencerPruning
@@ -202,7 +195,7 @@ function getClusterDirectory(): string {
 
 export const clusterDirectory = getClusterDirectory();
 
-function getPathToPrivateConfigFile(fileName: string): string | undefined {
+export function getPathToPrivateConfigFile(fileName: string): string | undefined {
   const path = PRIVATE_CONFIGS_PATH;
 
   if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
@@ -216,7 +209,7 @@ function getPathToPrivateConfigFile(fileName: string): string | undefined {
   return `${path}/configs/${clusterDirectory}/${fileName}`;
 }
 
-function getPathToPublicConfigFile(fileName: string): string | undefined {
+export function getPathToPublicConfigFile(fileName: string): string | undefined {
   const path = PUBLIC_CONFIGS_PATH;
 
   if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
@@ -242,15 +235,6 @@ export function externalIpRangesFile(): string | undefined {
   }
 
   return getPathToPrivateConfigFile('allowed-ip-ranges.json');
-}
-
-export function approvedSvIdentitiesFile(): string | undefined {
-  return getPathToPublicConfigFile('approved-sv-id-values.yaml');
-}
-
-export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  const file = approvedSvIdentitiesFile();
-  return file ? loadYamlFromFile(file).approvedSvIdentities : [];
 }
 
 // Typically used for overriding chart values.
