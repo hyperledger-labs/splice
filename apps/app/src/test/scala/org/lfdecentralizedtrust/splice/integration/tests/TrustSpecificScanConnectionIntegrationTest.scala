@@ -65,7 +65,6 @@ class TrustSpecificScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
 
-        // Assert that connections were successfully made to the trusted SVs
         messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made.")) should be(
           true
         )
@@ -76,12 +75,10 @@ class TrustSpecificScanConnectionIntegrationTest
           true
         )
 
-        // Assert that no connection attempt was made to the untrusted SV
         messages.exists(_.contains(s"Connection to trusted sv ${getSvName(4)} made.")) should be(
           false
         )
 
-        // Assert that the connection threshold was met
         messages.exists(_.contains("created threshold number of scan connections.")) should be(true)
       },
     )
@@ -113,32 +110,26 @@ class TrustSpecificScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
 
-        // Assert successful connections to the available trusted SVs
         messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made")) should be(
           true
-        ) // "Digital-Asset-2", "Digital-Asset-Eng-2", "Digital-Asset-Eng-3"
+        )
         messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made")) should be(
           true
         )
-
-        // Assert connection failure for the unavailable trusted sv2
         messages.exists(_.contains(s"Could not make connection to sv ${getSvName(2)}")) should be(
           true
         )
 
-        // Assert that the connection threshold (2) was met
         messages.exists(_.contains(s"created threshold number of scan connections.")) should be(
           true
         )
 
-        // Assert that no connection attempt was made to the untrusted SV
         messages.exists(_.contains(s"Connection to trusted sv ${getSvName(4)} made.")) should be(
           false
         )
       },
     )
 
-    // Verify the validator is operational after startup
     eventuallySucceeds() {
       aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     }
@@ -188,6 +179,10 @@ class TrustSpecificScanConnectionIntegrationTest
         )
       },
     )
+
+    eventuallySucceeds() {
+      aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    }
   }
 
 //  "fails to initialize when below threshold" in { implicit env =>
@@ -206,7 +201,6 @@ class TrustSpecificScanConnectionIntegrationTest
 //    sv3ScanBackend.stop()
 //
 //
-//    // The validator startup should fail with a specific gRPC exception
 //    val exception = intercept[java.lang.RuntimeException] {
 //      aliceValidatorBackend.startSync()
 //    }
@@ -221,16 +215,8 @@ class TrustSpecificScanConnectionIntegrationTest
 //    val statusRuntimeException =
 //      findStatusRuntimeException(exception).valueOrFail("Could not find StatusRuntimeException in cause chain")
 //
-//    // Assert that the exception's description contains the expected failure message
 //    val description = statusRuntimeException.getStatus.getDescription
 //    description should include("Failed to connect to required number of trusted scans.")
-//    description should include("Required: 2, Connected: 1")
-//    description should include("Scan apps failed or missing from network:")
-//
-//    // Assert that the description correctly lists the trusted SVs it failed to connect to
-//    description should include(s"${getSvName(2)}")
-//    description should include(s"${getSvName(3)}")
-//    description should not include(s"${getSvName(4)}")
 //  }
 
 }
