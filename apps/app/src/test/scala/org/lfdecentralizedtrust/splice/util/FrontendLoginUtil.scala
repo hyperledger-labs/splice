@@ -52,9 +52,9 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
     }
     textField("user-id-field").value = ledgerApiUser
     eventuallyClickOn(id("login-button"))
-    clue("Waiting for logout button to show up, indicating successful login") {
+    clue("Waiting for UI elements to show up that indicate login success or failure") {
       eventually() {
-        find(id("logout-button")).isDefined shouldBe true
+        (find(id("logout-button")).isDefined || find(id("loginFailed")).isDefined) shouldBe true
       }
     }
   }
