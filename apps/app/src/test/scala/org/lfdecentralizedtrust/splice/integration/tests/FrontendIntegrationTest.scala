@@ -23,7 +23,6 @@ import org.openqa.selenium.{
   WebDriverException,
   WebElement,
 }
-import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
 import org.openqa.selenium.support.ui.{ExpectedCondition, ExpectedConditions, WebDriverWait}
 import org.scalatest.{Assertion, ParallelTestExecution}
@@ -156,7 +155,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   val frontendNames: Seq[String] = Seq()
 
-  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor with WebStorage
+  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
 
   val aliceWalletUIPort = 3000
   val bobWalletUIPort = 3001
@@ -315,9 +314,11 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           // You cannot reset session storage of about:blank so
           // we exclude this.
           if (currentUrl != "about:blank") {
-            webDriver.getSessionStorage().clear()
+            webDriver.executeScript("window.sessionStorage.clear()")
             eventually() {
-              webDriver.getSessionStorage().keySet.asScala shouldBe empty
+              inside(webDriver.executeScript("return window.sessionStorage.length === 0")) {
+                case true => ()
+              }
             }
           }
         }
@@ -504,11 +505,30 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     clue("Logging local and session storage") {
       // Note: only logging keys, as values might contain sensitive information
       Try {
-        val localStorageKeys = webDriver.getLocalStorage.keySet.asScala
+        val localStorageKeys = webStorageApiStorageKeys(local = true)
         logger.debug(s"localStorage:\n${localStorageKeys.mkString("\n")}")
-        val sessionStorageKeys = webDriver.getSessionStorage.keySet.asScala
+
+        val sessionStorageKeys = webStorageApiStorageKeys(local = false)
         logger.debug(s"sessionStorage:\n${sessionStorageKeys.mkString("\n")}")
       }.fold(e => logger.debug(s"Failed to log storage: $e"), _ => ())
+    }
+  }
+
+  private[this] def webStorageApiStorageKeys(
+      local: Boolean
+  )(implicit webDriver: WebDriverType): Seq[String] = {
+    // a Storage is not an ordinary Object; use the Storage API
+    val script =
+      s"""const s = window.${if (local) "local" else "session"}Storage;
+         |const keys = [];
+         |for (let i = 0; i < s.length; i++) {
+         |  keys.push(s.key(i));
+         |}
+         |return keys;
+         |""".stripMargin
+    inside(webDriver.executeScript(script)) {
+      case keys: java.util.List[_] if keys.asScala.forall(_.isInstanceOf[String]) =>
+        keys.asScala.map { case s: String => s }.toSeq
     }
   }
 
@@ -604,11 +624,13 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           // Note: again, you can only access the local storage of the current page.
           clue("Clearing local storage") {
             val auth0LocalState =
-              webDriver.getLocalStorage.keySet.asScala.filter(_.startsWith("oidc."))
+              webStorageApiStorageKeys(local = true).filter(_.startsWith("oidc."))
             logger.debug(
               s"Deleting the following keys from localStorage: $auth0LocalState"
             )
-            auth0LocalState.foreach(webDriver.getSessionStorage.removeItem)
+            webDriver.executeScript(
+              s"${new Json().toJson(auth0LocalState)}.forEach(key => window.localStorage.removeItem(key))"
+            )
           }
           // Finally, navigate away from the current page to clear any JavaScript state
           go to "about:blank"
