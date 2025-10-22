@@ -595,8 +595,10 @@ class SvFrontendIntegrationTest
         val newWeight = "1234"
         val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
         testCreateAndVoteDsoRulesAction("SRARC_UpdateSvRewardWeight") { webDriver =>
-          val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-          dropDownMember.selectByValue(sv3PartyId)
+          eventuallySucceeds() {
+            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+            dropDownMember.selectByValue(sv3PartyId)
+          }
 
           val weightInput = webDriver.findElement(By.id("reward-weight"))
 

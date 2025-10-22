@@ -71,9 +71,14 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
   }
 
   def requestGroupMembership(invite: String)(implicit webDriver: WebDriverType) = {
-    val field = textField(id("group-invite-field"))
+    val field = eventually() {
+      textField(id("group-invite-field"))
+    }
     field.value = invite
-    click on id("request-membership-link")
+    val link = eventually() {
+      find(id("request-membership-link")).valueOrFail("Request membership link not found")
+    }
+    click on link
   }
 
   def getGroupContractIds()(implicit driver: WebDriverType): Set[String] =
