@@ -55,7 +55,7 @@ class AcsSnapshotStoreTest
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
-          result <- store.lookupSnapshotBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
+          result <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
         } yield result should be(None)
       }
 
@@ -69,7 +69,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
           )
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-          result <- store.lookupSnapshotBefore(migrationId = 1L, CantonTimestamp.MaxValue)
+          result <- store.lookupSnapshotAtOrBefore(migrationId = 1L, CantonTimestamp.MaxValue)
         } yield result should be(None)
       }
 
@@ -85,7 +85,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
           )
           _ <- originalStore.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-          result <- activeStore.lookupSnapshotBefore(
+          result <- activeStore.lookupSnapshotAtOrBefore(
             migrationId = activeStore.currentMigrationId,
             CantonTimestamp.MaxValue,
           )
@@ -106,7 +106,7 @@ class AcsSnapshotStoreTest
               snapshot <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
             } yield snapshot
           }
-          result <- store.lookupSnapshotBefore(DefaultMigrationId, timestamp4)
+          result <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp4)
         } yield result.map(_.snapshotRecordTime) should be(Some(timestamp3))
       }
 
@@ -210,7 +210,7 @@ class AcsSnapshotStoreTest
             omr2,
             timestamp2.minusSeconds(1L),
           )
-          lastSnapshot <- store.lookupSnapshotBefore(DefaultMigrationId, timestamp2)
+          lastSnapshot <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
           _ <- store.insertNewSnapshot(lastSnapshot, DefaultMigrationId, timestamp2)
           result <- queryAll(store, timestamp2)
         } yield result.createdEventsInPage.map(_.event.getContractId) should be(
@@ -820,11 +820,14 @@ class AcsSnapshotStoreTest
           migrationsWithCorruptSnapshots2 <- store2.updateHistory.migrationsWithCorruptSnapshots()
           _ = migrationsWithCorruptSnapshots2 shouldBe Set(secondMigration)
 
-          corruptSnapshot <- store2.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
+          corruptSnapshot <- store2.lookupSnapshotAtOrBefore(
+            secondMigration,
+            CantonTimestamp.MaxValue,
+          )
           _ = corruptSnapshot.value.snapshotRecordTime shouldBe timestamp2
 
           _ <- store2.deleteSnapshot(corruptSnapshot.value)
-          corruptSnapshotAfterDelete <- store2.lookupSnapshotBefore(
+          corruptSnapshotAfterDelete <- store2.lookupSnapshotAtOrBefore(
             secondMigration,
             CantonTimestamp.MaxValue,
           )
@@ -895,7 +898,7 @@ class AcsSnapshotStoreTest
             DefaultMigrationId,
             snapshotTimestamp,
           )
-          snapshotOpt <- store.lookupSnapshotBefore(domainMigrationId, snapshotTimestamp)
+          snapshotOpt <- store.lookupSnapshotAtOrBefore(domainMigrationId, snapshotTimestamp)
         } yield {
           val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
           snapshot.unlockedAmuletBalance should be(
@@ -971,7 +974,7 @@ class AcsSnapshotStoreTest
                   DefaultMigrationId,
                   snapshotTimestamp,
                 )
-                snapshotOpt <- store.lookupSnapshotBefore(domainMigrationId, snapshotTimestamp)
+                snapshotOpt <- store.lookupSnapshotAtOrBefore(domainMigrationId, snapshotTimestamp)
               } yield {
                 val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
                 snapshot.unlockedAmuletBalance should be(
@@ -995,7 +998,7 @@ class AcsSnapshotStoreTest
             DefaultMigrationId,
             CantonTimestamp.now(), // surely way after the Epoch
           )
-          snapshotOpt <- store.lookupSnapshotBefore(domainMigrationId, CantonTimestamp.now())
+          snapshotOpt <- store.lookupSnapshotAtOrBefore(domainMigrationId, CantonTimestamp.now())
         } yield {
           val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
           snapshot.unlockedAmuletBalance should be(
