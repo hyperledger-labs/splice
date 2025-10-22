@@ -598,7 +598,7 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
-        case BftScanClientConfig.TrustSpecific(seedUrls, _, _, _) =>
+        case BftScanClientConfig.TrustSpecific(seedUrls, _, _, _, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))

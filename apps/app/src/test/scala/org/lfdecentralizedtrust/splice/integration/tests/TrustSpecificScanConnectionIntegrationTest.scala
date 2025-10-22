@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.slf4j.event.Level
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class TrustSpecificScanConnectionIntegrationTest
     extends IntegrationTest
@@ -31,8 +32,9 @@ class TrustSpecificScanConnectionIntegrationTest
             val trustSpecificConfig = BftScanClientConfig.TrustSpecific(
               seedUrls = NonEmptyList.one(Uri("http://127.0.0.1:5012")),
               trustedSvs =
-                NonEmptyList.of("Digital-Asset-2", "Digital-Asset-Eng-2", "Digital-Asset-Eng-3"),
+                NonEmptyList.of(s"${getSvName(1)}", s"${getSvName(2)}", s"${getSvName(3)}"),
               threshold = Some(2),
+              scansRefreshInterval = NonNegativeFiniteDuration.ofSeconds(5),
             )
             c.copy(scanClient = trustSpecificConfig)
           case (_, c) => c
@@ -64,13 +66,13 @@ class TrustSpecificScanConnectionIntegrationTest
         val messages = logs.map(_.message)
 
         // Assert that connections were successfully made to the trusted SVs
-        messages.exists(_.contains("Connection to trusted sv Digital-Asset-2 made.")) should be(
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made.")) should be(
           true
         )
-        messages.exists(_.contains("Connection to trusted sv Digital-Asset-Eng-2 made.")) should be(
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(2)} made.")) should be(
           true
         )
-        messages.exists(_.contains("Connection to trusted sv Digital-Asset-Eng-3 made.")) should be(
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made.")) should be(
           true
         )
 
@@ -89,4 +91,146 @@ class TrustSpecificScanConnectionIntegrationTest
     }
 
   }
+
+  "starts successfully even with one trusted SV down" in { implicit env =>
+    startAllSync(
+      sv1ScanBackend,
+      sv1Backend,
+      sv2ScanBackend,
+      sv2Backend,
+      sv3ScanBackend,
+      sv3Backend,
+      sv4ScanBackend,
+      sv4Backend,
+    )
+
+    sv2ScanBackend.stop()
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        aliceValidatorBackend.startSync()
+      },
+      logs => {
+        val messages = logs.map(_.message)
+
+        // Assert successful connections to the available trusted SVs
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made")) should be(
+          true
+        ) // "Digital-Asset-2", "Digital-Asset-Eng-2", "Digital-Asset-Eng-3"
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made")) should be(
+          true
+        )
+
+        // Assert connection failure for the unavailable trusted sv2
+        messages.exists(_.contains(s"Could not make connection to sv ${getSvName(2)}")) should be(
+          true
+        )
+
+        // Assert that the connection threshold (2) was met
+        messages.exists(_.contains(s"created threshold number of scan connections.")) should be(
+          true
+        )
+
+        // Assert that no connection attempt was made to the untrusted SV
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(4)} made.")) should be(
+          false
+        )
+      },
+    )
+
+    // Verify the validator is operational after startup
+    eventuallySucceeds() {
+      aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    }
+  }
+
+  "reconnects to a recovered SV after the refresh interval" in { implicit env =>
+    startAllSync(
+      sv1ScanBackend,
+      sv1Backend,
+      sv2Backend, // sv2's main backend is running
+      sv2ScanBackend,
+      sv3ScanBackend,
+      sv3Backend,
+      sv4ScanBackend,
+      sv4Backend,
+    )
+
+    sv2ScanBackend.stop()
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        aliceValidatorBackend.startSync()
+      },
+      logs => {
+        val messages = logs.map(_.message)
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made.")) should be(
+          true
+        )
+        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made.")) should be(
+          true
+        )
+        messages.exists(_.contains(s"Could not make connection to sv ${getSvName(2)}")) should be(
+          true
+        )
+        messages.exists(_.contains("created threshold number of scan connections.")) should be(true)
+      },
+    )
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      { sv2ScanBackend.startSync() },
+      logs => {
+        val messages = logs.map(_.message)
+        messages.exists(
+          _.contains("Refresh complete. Active connections: 3 / 3")
+        ) should be(
+          true
+        )
+      },
+    )
+  }
+
+//  "fails to initialize when below threshold" in { implicit env =>
+//    startAllSync(
+//      sv1ScanBackend,
+//      sv1Backend,
+//      sv2ScanBackend,
+//      sv2Backend,
+//      sv3ScanBackend,
+//      sv3Backend,
+//      sv4ScanBackend,
+//      sv4Backend,
+//    )
+//
+//    sv2ScanBackend.stop()
+//    sv3ScanBackend.stop()
+//
+//
+//    // The validator startup should fail with a specific gRPC exception
+//    val exception = intercept[java.lang.RuntimeException] {
+//      aliceValidatorBackend.startSync()
+//    }
+//
+//    def findStatusRuntimeException(t: Throwable): Option[io.grpc.StatusRuntimeException] =
+//      t match {
+//        case sre: io.grpc.StatusRuntimeException => Some(sre)
+//        case null => None
+//        case _ => findStatusRuntimeException(t.getCause)
+//      }
+//
+//    val statusRuntimeException =
+//      findStatusRuntimeException(exception).valueOrFail("Could not find StatusRuntimeException in cause chain")
+//
+//    // Assert that the exception's description contains the expected failure message
+//    val description = statusRuntimeException.getStatus.getDescription
+//    description should include("Failed to connect to required number of trusted scans.")
+//    description should include("Required: 2, Connected: 1")
+//    description should include("Scan apps failed or missing from network:")
+//
+//    // Assert that the description correctly lists the trusted SVs it failed to connect to
+//    description should include(s"${getSvName(2)}")
+//    description should include(s"${getSvName(3)}")
+//    description should not include(s"${getSvName(4)}")
+//  }
+
 }
