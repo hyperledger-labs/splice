@@ -1423,7 +1423,7 @@ object BftScanConnection {
               loggerFactory,
             )
           )
-      case config @ BftScanClientConfig.TrustSpecific(_, _, _, _) =>
+      case config @ BftScanClientConfig.TrustSpecific(_, _, _, _, _) =>
         for {
           // empty ScanList instance. no connections made yet.
           scanList <- Future.successful(
@@ -1435,6 +1435,7 @@ object BftScanConnection {
               loggerFactory,
               builder,
               config.amuletRulesCacheTimeToLive,
+              config.scansRefreshInterval,
             )
           )
           _ <- scanList.initialize(
@@ -1616,6 +1617,8 @@ object BftScanConnection {
         trustedSvs: NonEmptyList[String], // should be at least 1
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
+        scansRefreshInterval: NonNegativeFiniteDuration =
+          ScanAppClientConfig.DefaultScansRefreshInterval,
     ) extends BftScanClientConfig {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSpecific =
         copy(amuletRulesCacheTimeToLive = ttl)
