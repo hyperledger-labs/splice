@@ -203,6 +203,7 @@
             "name": "splice-node-deployment"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "deployment-sa",
         "stack": "organization/deployment/deployment.mock",

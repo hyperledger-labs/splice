@@ -169,6 +169,7 @@
             "name": "splice-node-active"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "canton-network-sa",
         "stack": "organization/canton-network/canton-network.mock",
@@ -503,6 +504,7 @@
             "name": "splice-node-active"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "infra-sa",
         "stack": "organization/infra/infra.mock",
@@ -787,6 +789,7 @@
             "name": "splice-node-active"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "multi-validator-sa",
         "stack": "organization/multi-validator/multi-validator.mock",
@@ -1521,6 +1524,7 @@
             "name": "splice-node-active"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "splitwell-sa",
         "stack": "organization/splitwell/splitwell.mock",
@@ -1805,6 +1809,7 @@
             "name": "splice-node-migration-1"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-1.mock",
@@ -2089,6 +2094,7 @@
             "name": "splice-node-migration-2"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-2.mock",
@@ -2385,6 +2391,7 @@
             "name": "splice-node-migration-3"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-3.mock",
@@ -2681,6 +2688,7 @@
             "name": "splice-node-migration-4"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-4.mock",
@@ -2965,6 +2973,7 @@
             "name": "splice-node-migration-1"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-da-1-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-da-1-migration-1.mock",
@@ -3249,6 +3258,7 @@
             "name": "splice-node-migration-2"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-da-1-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-da-1-migration-2.mock",
@@ -3545,6 +3555,7 @@
             "name": "splice-node-migration-3"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-da-1-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-da-1-migration-3.mock",
@@ -3841,6 +3852,7 @@
             "name": "splice-node-migration-4"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-da-1-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-da-1-migration-4.mock",
@@ -4127,6 +4139,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-1.mock",
@@ -4413,6 +4426,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-2.mock",
@@ -4711,6 +4725,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-3.mock",
@@ -5009,6 +5024,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-4.mock",
@@ -5295,6 +5311,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-runbook-sa",
         "stack": "organization/sv-runbook/sv-runbook.mock",
@@ -5587,6 +5604,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "validator-runbook-sa",
         "stack": "organization/validator-runbook/validator-runbook.mock",
@@ -5871,6 +5889,7 @@
             "name": "splice-node-active"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "validator1-sa",
         "stack": "organization/validator1/validator1.mock",
@@ -6163,6 +6182,7 @@
         },
         "refresh": true,
         "resyncFrequencySeconds": 300,
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "validators.extra-validator-sa",
         "stack": "organization/validator-runbook/validators.extra-validator.mock",
