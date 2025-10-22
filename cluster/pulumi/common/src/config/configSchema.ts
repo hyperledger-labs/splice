@@ -36,6 +36,8 @@ const SingleResourceSchema = z
   })
   .optional();
 
+export type K8sResourceSchema = z.infer<typeof K8sResourceSchema>;
+
 export const K8sResourceSchema = z
   .object({
     limits: SingleResourceSchema,
