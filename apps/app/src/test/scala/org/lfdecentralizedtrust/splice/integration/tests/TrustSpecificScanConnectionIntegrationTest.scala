@@ -28,7 +28,8 @@ class TrustSpecificScanConnectionIntegrationTest
           case (name, c) if name == "aliceValidator" =>
             val trustSpecificConfig = BftScanClientConfig.TrustSpecific(
               seedUrls = NonEmptyList.one(Uri("http://127.0.0.1:5012")),
-              trustedSvs = NonEmptyList.of("Digital-Asset-2", "Digital-Asset-Eng-2", "Digital-Asset-Eng-3"),
+              trustedSvs =
+                NonEmptyList.of("Digital-Asset-2", "Digital-Asset-Eng-2", "Digital-Asset-Eng-3"),
               threshold = Some(2),
             )
             c.copy(scanClient = trustSpecificConfig)
