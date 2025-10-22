@@ -991,6 +991,12 @@ object BftScanConnection {
       val trustedSvsSet = sv_names.toList.toSet
       val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
       val logger = loggerFactory.getTracedLogger(getClass)
+      logger.info(
+        s"Attempting to connect to trusted SVs. Trusted list: ${trustedSvsSet.mkString(", ")}"
+      )
+      logger.info(s"Discovered the following scans from the network: ${allScans
+          .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
+          .mkString("; ")}")
       MonadUtil
         .sequentialTraverse(targetScans) { scan =>
           builder(scan.publicUrl, amuletRulesCacheTimeToLive)
