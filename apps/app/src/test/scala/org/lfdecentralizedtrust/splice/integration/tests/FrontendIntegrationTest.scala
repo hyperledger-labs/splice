@@ -251,9 +251,9 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
     registerWebDriver(name, webDriver)
 
-    biDi.addListener[LogEntry](
+    biDi.addListener(
       Log.entryAdded(),
-      logEntry => {
+      (logEntry: LogEntry) =>
         logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
           val msg = consoleLogEntry.getText
           val ctx = traceContextFromConsoleMessage(msg)
@@ -263,11 +263,10 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
             case LogLevel.WARNING => logger.warn(msg)(ctx)
             case LogLevel.ERROR => logger.error(msg)(ctx)
           }
-        }
-      },
+        },
     );
     val JSON = new Json()
-    biDi.addListener[NavigationInfo](
+    biDi.addListener(
       new Event[NavigationInfo](
         "browsingContext.domContentLoaded",
         params => {
@@ -276,7 +275,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           NavigationInfo.fromJson(input)
         },
       ),
-      navigationInfo => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
+      (navigationInfo: NavigationInfo) =>
+        logger.debug(s"dom content loaded for ${navigationInfo.url}"),
     );
   }
 
