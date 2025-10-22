@@ -41,6 +41,7 @@ import {
   validatorOnboardingSecretName,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
+  approvedSvIdentities,
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
@@ -498,7 +499,7 @@ function installSvApp(
       },
     })),
     isDevNet: config.isDevNet,
-    approvedSvIdentities: config.approvedSvIdentities,
+    approvedSvIdentities: approvedSvIdentities(),
     persistence: persistenceConfig(postgres, svDbName),
     identitiesExport: config.identitiesBackupLocation,
     participantIdentitiesDumpImport: config.bootstrappingDumpConfig
