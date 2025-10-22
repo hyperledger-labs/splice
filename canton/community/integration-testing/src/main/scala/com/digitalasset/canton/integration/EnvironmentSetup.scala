@@ -9,8 +9,10 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
   CommandService,
   CommandSubmissionService,
 }
-import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.admin.api.client.commands.{
+  GrpcAdminCommand,
+  ParticipantAdminCommands,
+}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
   CantonEdition,
@@ -23,14 +25,14 @@ import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupExce
 import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
-import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
+import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
 import java.util.concurrent.TimeUnit
-import scala.util.control.{NoStackTrace, NonFatal}
 import scala.util.Try
+import scala.util.control.{NoStackTrace, NonFatal}
 
 /** Provides an ability to create a canton environment when needed for test. Include
   * [[IsolatedEnvironments]] or [[SharedEnvironment]] to determine when this happens. Uses
