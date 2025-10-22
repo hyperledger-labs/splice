@@ -208,7 +208,6 @@ export function createStackCR(
           useLocalStackOnly: true,
           // retry if the stack is locked by another operation
           retryOnUpdateConflict: true,
-          retryMaxBackoffDurationSeconds: 600,
           updateTemplate: {
             spec: {
               parallel: configForStack(name).parallelism || 64,
