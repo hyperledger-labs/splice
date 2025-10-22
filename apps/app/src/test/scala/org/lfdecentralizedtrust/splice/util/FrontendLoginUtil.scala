@@ -52,6 +52,11 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
     }
     textField("user-id-field").value = ledgerApiUser
     eventuallyClickOn(id("login-button"))
+    clue("Waiting for logout button to show up, indicating successful login") {
+      eventually() {
+        find(id("logout-button")).isDefined shouldBe true
+      }
+    }
   }
 
   protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
