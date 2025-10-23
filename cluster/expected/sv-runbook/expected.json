@@ -824,7 +824,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -849,8 +849,13 @@
           },
           {
             "name": "Digital-Asset-1",
-            "publicKey": "THIS_IS_THE_WRONG_KEY",
+            "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {

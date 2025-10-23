@@ -60,7 +60,7 @@ class DeleteCorruptAcsSnapshotTrigger(
   ): Future[TaskOutcome] = task match {
     case DeleteCorruptAcsSnapshotTrigger.Task(migrationId) =>
       for {
-        lastSnapshotO <- store.lookupSnapshotBefore(migrationId, CantonTimestamp.MaxValue)
+        lastSnapshotO <- store.lookupSnapshotAtOrBefore(migrationId, CantonTimestamp.MaxValue)
         lastSnapshot = lastSnapshotO.getOrElse(
           throw new RuntimeException("Task should never become stale")
         )

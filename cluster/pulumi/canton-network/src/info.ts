@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as fs from 'fs';
 import {
-  approvedSvIdentitiesFile,
   clusterNetwork,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
   externalIpRangesFile,
   installSpliceHelmChart,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { getChainIdSuffix } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  approvedSvIdentitiesFile,
+  getChainIdSuffix,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { Resource } from '@pulumi/pulumi';
 import { createHash } from 'crypto';

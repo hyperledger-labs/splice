@@ -34,7 +34,6 @@ import {
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   activeVersion,
-  approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
   DEFAULT_AUDIENCE,
@@ -53,6 +52,7 @@ import {
   CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
+  approvedSvIdentities,
   CantonBftSynchronizerNode,
   configForSv,
   getChainIdSuffix,
@@ -297,7 +297,6 @@ async function installSvAndValidator(
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
-    // TODO(tech-debt): it's a bit confusing: we *only* approve from approved-sv-identities files here (so no "local" SV overrides)
     approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),

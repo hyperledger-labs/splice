@@ -35,7 +35,10 @@ class WalletFrontendTimeBasedIntegrationTest
 
         // After a short delay, the UI should realize that the user is not onboarded,
         // and switch to the onboarding page.
-        click on "onboard-button"
+        val onboardButton = eventually() {
+          find(id("onboard-button")).valueOrFail("Onboard button not found")
+        }
+        click on onboardButton
         // The onboard button should immediately be disabled, to prevent further clicking.
         try {
           find(id("onboard-button")) match {
