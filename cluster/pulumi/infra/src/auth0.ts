@@ -137,14 +137,18 @@ function newM2MApp(
       }
     );
 
-    if (ledgerApiAudValue !== 'https://canton.network.global') {
+    // TODO(DACH-NY/canton-network-internal#2206): Of course on MainNet we use a different default audience...
+    const legacyLedgerApiAud = isMainNet
+      ? 'https://ledger_api.main.digitalasset.com'
+      : 'https://canton.network.global';
+    if (ledgerApiAudValue !== legacyLedgerApiAud) {
       // TODO(DACH-NY/canton-network-internal#2206): For now, we also grant all apps access to the old default ledger API
       // audience, to un-break it until we clean up the audiences we use.
       new auth0.ClientGrant(
         `${resourceName}LegacyGrant`,
         {
           clientId: ret.id,
-          audience: 'https://canton.network.global',
+          audience: legacyLedgerApiAud,
           scopes: ['daml_ledger_api'],
         },
         {
