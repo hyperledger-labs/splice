@@ -144,20 +144,10 @@ function newM2MApp(
         `${resourceName}LegacyGrant`,
         {
           clientId: ret.id,
-          audience: 'https://canton.network.global',
-          scopes: ['daml_ledger_api'],
-        },
-        {
-          provider: auth0DomainProvider,
-        }
-      );
-    } else if (isMainNet) {
-      // TODO(DACH-NY/canton-network-internal#2206): But of course on MainNet we use a different default audience so all is a huge mess now
-      new auth0.ClientGrant(
-        `${resourceName}LegacyGrant`,
-        {
-          clientId: ret.id,
-          audience: 'https://ledger_api.main.digitalasset.com',
+          // TODO(DACH-NY/canton-network-internal#2206): Of course on MainNet we use a different default audience...
+          audience: isMainNet
+            ? 'https://ledger_api.main.digitalasset.com'
+            : 'https://canton.network.global',
           scopes: ['daml_ledger_api'],
         },
         {
