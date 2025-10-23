@@ -151,9 +151,7 @@ object SequencerAdminCommands {
 
     override protected def createRequest()
         : Either[String, proto.InitializeSequencerFromOnboardingStateRequest] =
-      Right(
-        proto.InitializeSequencerFromOnboardingStateRequest(onboardingState)
-      )
+      Right(proto.InitializeSequencerFromOnboardingStateRequest(onboardingState = onboardingState))
 
     override protected def handleResponse(
         response: proto.InitializeSequencerFromOnboardingStateResponse
@@ -229,7 +227,7 @@ object SequencerAdminCommands {
         (topologySnapshot: Array[Byte]) =>
           proto.InitializeSequencerFromGenesisStateRequest(
             topologySnapshot = ByteString.copyFrom(topologySnapshot),
-            Some(synchronizerParameters.toProtoV30),
+            synchronizerParameters = Some(synchronizerParameters.toProtoV30),
           ),
         request.topologySnapshot,
       )
@@ -239,7 +237,7 @@ object SequencerAdminCommands {
       Right(
         proto.InitializeSequencerFromGenesisStateRequest(
           topologySnapshot = topologySnapshot,
-          Some(synchronizerParameters.toProtoV30),
+          synchronizerParameters = Some(synchronizerParameters.toProtoV30),
         )
       )
 
@@ -247,6 +245,53 @@ object SequencerAdminCommands {
         response: proto.InitializeSequencerFromGenesisStateResponse
     ): Either[String, InitializeSequencerResponse] =
       Right(InitializeSequencerResponse(response.replicated))
+
+    override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+  }
+
+  final case class InitializeFromSynchronizerPredecessor(
+      topologySnapshot: ByteString,
+      synchronizerParameters: com.digitalasset.canton.protocol.StaticSynchronizerParameters,
+  ) extends GrpcAdminCommand[
+        proto.InitializeSequencerFromPredecessorRequest,
+        proto.InitializeSequencerFromPredecessorResponse,
+        Unit,
+      ] {
+    override type Svc =
+      proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub
+
+    override def createService(
+        channel: ManagedChannel
+    ): proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub =
+      proto.SequencerInitializationServiceGrpc.stub(channel)
+
+    override protected def submitRequest(
+        service: proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
+        request: proto.InitializeSequencerFromPredecessorRequest,
+    ): Future[proto.InitializeSequencerFromPredecessorResponse] =
+      GrpcStreamingUtils.streamToServer(
+        service.initializeSequencerFromPredecessor,
+        (topologySnapshot: Array[Byte]) =>
+          proto.InitializeSequencerFromPredecessorRequest(
+            topologySnapshot = ByteString.copyFrom(topologySnapshot),
+            synchronizerParameters = Some(synchronizerParameters.toProtoV30),
+          ),
+        request.topologySnapshot,
+      )
+
+    override protected def createRequest()
+        : Either[String, proto.InitializeSequencerFromPredecessorRequest] =
+      Right(
+        proto.InitializeSequencerFromPredecessorRequest(
+          topologySnapshot = topologySnapshot,
+          synchronizerParameters = Some(synchronizerParameters.toProtoV30),
+        )
+      )
+
+    override protected def handleResponse(
+        response: proto.InitializeSequencerFromPredecessorResponse
+    ): Either[String, Unit] =
+      Right(())
 
     override def timeoutType: TimeoutType = DefaultUnboundedTimeout
   }
@@ -466,26 +511,26 @@ object SequencerAdminCommands {
 
   }
 
-  final case class LocatePruningTimestampCommand(index: PositiveInt)
+  final case class FindPruningTimestampCommand(index: PositiveInt)
       extends BaseSequencerPruningAdministrationCommand[
-        pruningProto.LocatePruningTimestampRequest,
-        pruningProto.LocatePruningTimestampResponse,
+        pruningProto.FindPruningTimestampRequest,
+        pruningProto.FindPruningTimestampResponse,
         Option[CantonTimestamp],
       ] {
     override protected def createRequest()
-        : Either[String, pruningProto.LocatePruningTimestampRequest] =
+        : Either[String, pruningProto.FindPruningTimestampRequest] =
       Right(
-        pruningProto.LocatePruningTimestampRequest(index.value)
+        pruningProto.FindPruningTimestampRequest(index.value)
       )
 
     override protected def submitRequest(
         service: proto.SequencerPruningAdministrationServiceGrpc.SequencerPruningAdministrationServiceStub,
-        request: pruningProto.LocatePruningTimestampRequest,
-    ): Future[pruningProto.LocatePruningTimestampResponse] =
-      service.locatePruningTimestamp(request)
+        request: pruningProto.FindPruningTimestampRequest,
+    ): Future[pruningProto.FindPruningTimestampResponse] =
+      service.findPruningTimestamp(request)
 
     override protected def handleResponse(
-        response: pruningProto.LocatePruningTimestampResponse
+        response: pruningProto.FindPruningTimestampResponse
     ): Either[String, Option[CantonTimestamp]] =
       response.timestamp.fold(Right(None): Either[String, Option[CantonTimestamp]])(
         CantonTimestamp.fromProtoTimestamp(_).bimap(_.message, Some(_))

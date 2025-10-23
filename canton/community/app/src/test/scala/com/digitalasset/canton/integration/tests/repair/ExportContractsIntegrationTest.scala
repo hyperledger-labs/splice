@@ -4,30 +4,20 @@
 package com.digitalasset.canton.integration.tests.repair
 
 import better.files.*
-import com.daml.ledger.api.v2.state_service.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION
-import com.daml.ledger.api.v2.topology_transaction.{ParticipantAuthorizationAdded, TopologyEvent}
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.util.{EntitySyntax, PartyToParticipantDeclarative}
+import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.participant.admin.data.RepairContract
-import com.digitalasset.canton.participant.admin.party.PartyManagementServiceError
+import com.digitalasset.canton.participant.admin.repair.RepairServiceError
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.transaction.ParticipantPermission as PP
 import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
-import com.google.protobuf.ByteString
-
-import java.time.Instant
 
 final class ExportContractsIntegrationTest
     extends CommunityIntegrationTest
@@ -39,6 +29,7 @@ final class ExportContractsIntegrationTest
       .withSetup { implicit env =>
         import env.*
 
+        // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
         // Adding the "owner" party to P3 can expectedly trigger the ACS_MISMATCH_NO_SHARED_CONTRACTS
         // commitment warning because the test exports, but does not import contracts.
         // Set `reconciliationInterval` to ten years to avoid associated test flakes.
@@ -54,13 +45,8 @@ final class ExportContractsIntegrationTest
 
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
   )
-
-  def tryLoadFrom(acsSnapshot: File): List[RepairContract] =
-    RepairContract
-      .loadAcsSnapshot(ByteString.copyFrom(acsSnapshot.byteArray))
-      .fold(errorMessage => throw new RuntimeException(errorMessage), identity)
 
   "Exporting an ACS" should {
 
@@ -81,14 +67,14 @@ final class ExportContractsIntegrationTest
         )
 
         File.usingTemporaryFile() { file =>
-          participant1.parties.export_acs(
+          participant1.repair.export_acs(
             parties = Set(uninformed),
             exportFilePath = file.toString,
             synchronizerId = Some(daId),
             ledgerOffset = uninformedOffset,
           )
 
-          tryLoadFrom(file) should be(empty)
+          repair.acs.read_from_file(file.canonicalPath) shouldBe empty
         }
       }
     }
@@ -108,7 +94,7 @@ final class ExportContractsIntegrationTest
 
           File.usingTemporaryFile() { file =>
             loggerFactory.assertThrowsAndLogs[CommandFailure](
-              participant1.parties
+              participant1.repair
                 .export_acs(
                   parties = Set(payer),
                   exportFilePath = file.toString,
@@ -117,7 +103,7 @@ final class ExportContractsIntegrationTest
                   ), // `participant1` is only connected to `da`,
                   ledgerOffset = payerOffset,
                 ),
-              _.errorMessage should include(PartyManagementServiceError.InvalidArgument.id),
+              _.errorMessage should include(RepairServiceError.InvalidArgument.id),
             )
             file.exists shouldBe false // file should be deleted if error
           }
@@ -146,114 +132,29 @@ final class ExportContractsIntegrationTest
             val ledgerEndP2 = participant2.ledger_api.state.end()
 
             // exporting contracts from the participant where they are not hosted
-            participant1.parties
+            participant1.repair
               .export_acs(
                 parties = Set(bob),
                 exportFilePath = dumpForAlice.canonicalPath,
                 ledgerOffset = NonNegativeLong.tryCreate(ledgerEndP1),
               )
-            participant2.parties
+            participant2.repair
               .export_acs(
                 parties = Set(alice),
                 exportFilePath = dumpForBob.canonicalPath,
                 ledgerOffset = NonNegativeLong.tryCreate(ledgerEndP2),
               )
 
-            val forAlice = tryLoadFrom(dumpForAlice)
-            val forBob = tryLoadFrom(dumpForBob)
+            val forAlice = repair.acs
+              .read_from_file(dumpForAlice.canonicalPath)
+              .map(_.getCreatedEvent.contractId)
+            val forBob =
+              repair.acs.read_from_file(dumpForBob.canonicalPath).map(_.getCreatedEvent.contractId)
 
             forAlice should have length 2
-
             forAlice should contain theSameElementsAs forBob
           }
       }
     }
-
-    "export ACS at the effective time of a party onboarding topology transaction" in {
-      implicit env =>
-        import env.*
-        WithEnabledParties(participant1 -> Seq("payer"), participant2 -> Seq("owner")) {
-          case Seq(payer, owner) =>
-            IouSyntax.createIou(participant1)(payer, owner)
-
-            val ledgerOffsetBeforePartyOnboarding = participant2.ledger_api.state.end()
-
-            PartyToParticipantDeclarative.forParty(Set(participant2, participant3), daId)(
-              participant2,
-              owner,
-              PositiveInt.one,
-              Set(
-                (participant2, PP.Submission),
-                (participant3, PP.Submission),
-              ),
-            )
-
-            participant2.ledger_api.updates
-              .topology_transactions(
-                completeAfter = PositiveInt.one,
-                partyIds = Seq(owner),
-                beginOffsetExclusive = ledgerOffsetBeforePartyOnboarding,
-                synchronizerFilter = Some(daId),
-              )
-              .loneElement
-              .topologyTransaction
-              .events
-              .loneElement
-              .event shouldBe TopologyEvent.Event.ParticipantAuthorizationAdded(
-              ParticipantAuthorizationAdded(
-                partyId = owner.toProtoPrimitive,
-                participantId = participant3.uid.toProtoPrimitive,
-                participantPermission = PARTICIPANT_PERMISSION_SUBMISSION,
-              )
-            )
-
-            val onboardingTx = participant2.topology.party_to_participant_mappings
-              .list(
-                synchronizerId = daId,
-                filterParty = owner.filterString,
-                filterParticipant = participant3.filterString,
-              )
-              .loneElement
-              .context
-
-            File.usingTemporaryFile() { file =>
-              participant2.parties.export_acs_at_timestamp(
-                parties = Set(owner),
-                synchronizerId = daId,
-                topologyTransactionEffectiveTime = onboardingTx.validFrom,
-                exportFilePath = file.toString,
-              )
-              val acs = tryLoadFrom(file)
-
-              acs should have length 1
-            }
-        }
-    }
-
-    "fail to export ACS at a timestamp which does not correspond to a topology transaction (effective time)" in {
-      implicit env =>
-        import env.*
-        WithEnabledParties(participant1 -> Seq("payer"), participant2 -> Seq("owner")) {
-          case Seq(payer, owner) =>
-            IouSyntax.createIou(participant1)(payer, owner)
-
-            File.usingTemporaryFile() { file =>
-              loggerFactory.assertThrowsAndLogs[CommandFailure](
-                participant1.parties
-                  .export_acs_at_timestamp(
-                    parties = Set(payer),
-                    exportFilePath = file.toString,
-                    synchronizerId = daId,
-                    topologyTransactionEffectiveTime = Instant.now(),
-                  ),
-                _.errorMessage should include(
-                  PartyManagementServiceError.InvalidAcsSnapshotTimestamp.id
-                ),
-              )
-              file.exists shouldBe false // file should be deleted if error
-            }
-        }
-    }
   }
-
 }

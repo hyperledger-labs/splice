@@ -4,10 +4,13 @@
 package com.digitalasset.canton.ledger.api.services
 
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
+  ExecuteSubmissionAndWaitForTransactionResponse,
+  ExecuteSubmissionAndWaitResponse,
   ExecuteSubmissionResponse,
   PrepareSubmissionResponse,
   PreparedTransaction,
 }
+import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
 import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
@@ -19,7 +22,7 @@ import com.digitalasset.canton.ledger.api.validation.GetPreferredPackagesRequest
 import com.digitalasset.canton.ledger.api.{Commands, PackageReference}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.version.HashingSchemeVersion
 import com.digitalasset.daml.lf.data.Ref.{SubmissionId, UserId}
 
@@ -51,11 +54,22 @@ trait InteractiveSubmissionService {
       loggingContext: LoggingContextWithTrace
   ): FutureUnlessShutdown[ExecuteSubmissionResponse]
 
+  def executeAndWait(request: ExecuteRequest)(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[ExecuteSubmissionAndWaitResponse]
+
+  def executeAndWaitForTransaction(
+      request: ExecuteRequest,
+      transactionFormat: Option[TransactionFormat],
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[ExecuteSubmissionAndWaitForTransactionResponse]
+
   def getPreferredPackages(
       packageVettingRequirements: PackageVettingRequirements,
       synchronizerId: Option[SynchronizerId],
       vettingValidAt: Option[CantonTimestamp],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], SynchronizerId)]]
+  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], PhysicalSynchronizerId)]]
 }

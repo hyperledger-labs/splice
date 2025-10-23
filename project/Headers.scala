@@ -92,6 +92,7 @@ object Headers {
         ((Compile / baseDirectory).value ** "*.py") ---
           ((Compile / baseDirectory).value ** "configs" ** "*") ---
           ((Compile / baseDirectory).value ** "configs-private" ** "*") ---
+          ((Compile / baseDirectory).value ** "community" ** "*") ---
           ((Compile / baseDirectory).value ** "node_modules" ** "*")
       ).get
 

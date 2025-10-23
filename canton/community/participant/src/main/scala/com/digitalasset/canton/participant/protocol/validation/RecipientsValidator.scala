@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.protocol.validation
 import cats.data.OptionT
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.data.{ViewPosition, ViewTree}
@@ -21,7 +22,8 @@ import com.digitalasset.canton.sequencing.protocol.{MemberRecipient, Recipient, 
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, IterableUtil}
+import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.collection.IterableUtil
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
@@ -154,7 +156,7 @@ class RecipientsValidator[I](
     }
   }
 
-  def retainInputsWithValidRecipientsInternal(
+  private def retainInputsWithValidRecipientsInternal(
       requestId: RequestId,
       inputs: Seq[I],
       snapshot: PartyTopologySnapshotClient,
@@ -358,7 +360,7 @@ class RecipientsValidator[I](
       context: Context,
       mainRecipients: Recipients,
       mainViewPosition: List[MerklePathElement],
-      recipientsPathViewToRoot: Seq[Set[Recipient]],
+      recipientsPathViewToRoot: NonEmpty[Seq[NonEmpty[Set[Recipient]]]],
       errorBuilder: mutable.Builder[Error, Seq[Error]],
   )(implicit traceContext: TraceContext): Option[BadViewPosition] = {
     val Context(requestId, informeeParticipantsOfPositionAndParty) =

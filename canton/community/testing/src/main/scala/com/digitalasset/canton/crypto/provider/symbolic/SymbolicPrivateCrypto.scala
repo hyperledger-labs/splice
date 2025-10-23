@@ -29,6 +29,8 @@ class SymbolicPrivateCrypto(
 ) extends CryptoPrivateStoreApi
     with NamedLogging {
 
+  override private[crypto] def getInitialHealthState: ComponentHealthState = this.initialHealthState
+
   private val keyCounter = new AtomicInteger
 
   private val randomKeys = new AtomicBoolean(false)
@@ -37,9 +39,17 @@ class SymbolicPrivateCrypto(
   override protected val encryptionOps: EncryptionOps = pureCrypto
 
   // NOTE: These schemes are not really used by Symbolic crypto
-  override val defaultSigningAlgorithmSpec: SigningAlgorithmSpec = SigningAlgorithmSpec.Ed25519
-  override val defaultSigningKeySpec: SigningKeySpec = SigningKeySpec.EcCurve25519
-  override val defaultEncryptionKeySpec: EncryptionKeySpec = EncryptionKeySpec.EcP256
+  override val signingAlgorithmSpecs: CryptoScheme[SigningAlgorithmSpec] =
+    CryptoScheme(SigningAlgorithmSpec.Ed25519, NonEmpty.mk(Set, SigningAlgorithmSpec.Ed25519))
+  override val signingKeySpecs: CryptoScheme[SigningKeySpec] =
+    CryptoScheme(SigningKeySpec.EcCurve25519, NonEmpty.mk(Set, SigningKeySpec.EcCurve25519))
+  override val encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec] =
+    CryptoScheme(
+      EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc,
+      NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc),
+    )
+  override val encryptionKeySpecs: CryptoScheme[EncryptionKeySpec] =
+    CryptoScheme(EncryptionKeySpec.EcP256, NonEmpty.mk(Set, EncryptionKeySpec.EcP256))
 
   @VisibleForTesting
   def setRandomKeysFlag(newValue: Boolean): Unit =
@@ -63,30 +73,32 @@ class SymbolicPrivateCrypto(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningKeyPair] =
     genKeyPair((pubKey, privKey) =>
-      SigningKeyPair.create(
-        CryptoKeyFormat.Symbolic,
-        pubKey,
-        CryptoKeyFormat.Symbolic,
-        privKey,
-        keySpec,
-        usage,
-      )
+      SigningKeyPair
+        .create(
+          CryptoKeyFormat.Symbolic,
+          pubKey,
+          CryptoKeyFormat.Symbolic,
+          privKey,
+          keySpec,
+          usage,
+        )
+        .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.KeyCreationError.apply)
     ).toEitherT[FutureUnlessShutdown]
 
   override protected[crypto] def generateEncryptionKeypair(keySpec: EncryptionKeySpec)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, EncryptionKeyGenerationError, EncryptionKeyPair] =
-    EitherT.rightT(
-      genKeyPair((pubKey, privKey) =>
-        EncryptionKeyPair.create(
+    genKeyPair((pubKey, privKey) =>
+      EncryptionKeyPair
+        .create(
           CryptoKeyFormat.Symbolic,
           pubKey,
           CryptoKeyFormat.Symbolic,
           privKey,
           keySpec,
         )
-      )
-    )
+        .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.KeyCreationError.apply)
+    ).toEitherT[FutureUnlessShutdown]
 
   override def name: String = "symbolic-private-crypto"
 

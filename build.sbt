@@ -33,7 +33,7 @@ lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extens
 lazy val `canton-wartremover-annotations` = BuildCommon.`canton-wartremover-annotations`
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
-lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
+lazy val `canton-util-observability` = BuildCommon.`canton-util-observability`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
 lazy val `canton-scalatest-addon` = BuildCommon.`canton-scalatest-addon`
@@ -1668,6 +1668,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("io", "grpc", _*) => MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
+    // Don't really care about the notice file so just take any.
+    case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }

@@ -110,7 +110,7 @@ class ResourceTemplateDecoder(
 
   private def decode[TCid <: ContractId[T], T](
       decoder: ValueDecoder[T],
-      entityName: Ref.TypeConName,
+      entityName: Ref.TypeConId,
       json: Json,
   ): T = {
     val sprayJson = JsonUtil.circeJsonToSprayJsValue(json)

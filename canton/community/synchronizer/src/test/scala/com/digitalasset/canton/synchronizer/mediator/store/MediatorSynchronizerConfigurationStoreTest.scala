@@ -11,10 +11,9 @@ import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
-import com.digitalasset.canton.topology.DefaultTestIdentities
+import com.digitalasset.canton.topology.{DefaultTestIdentities, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, SequencerAlias}
-import monocle.macros.syntax.lens.*
 import org.scalatest.wordspec.{AsyncWordSpec, AsyncWordSpecLike}
 
 trait MediatorSynchronizerConfigurationStoreTest {
@@ -27,7 +26,7 @@ trait MediatorSynchronizerConfigurationStoreTest {
       val store = mkStore
 
       for {
-        config <- store.fetchConfiguration
+        config <- store.fetchConfiguration()
         isTopologyInitialized <- store.isTopologyInitialized()
       } yield {
         config shouldBe None
@@ -42,16 +41,17 @@ trait MediatorSynchronizerConfigurationStoreTest {
         transportSecurity = true,
         None,
         SequencerAlias.Default,
+        None,
       )
       val originalConfig = MediatorSynchronizerConfiguration(
-        DefaultTestIdentities.synchronizerId,
+        DefaultTestIdentities.physicalSynchronizerId,
         defaultStaticSynchronizerParameters,
         SequencerConnections.single(connection),
       )
 
       for {
         _ <- store.saveConfiguration(originalConfig)
-        persistedConfig <- store.fetchConfiguration.map(_.value)
+        persistedConfig <- store.fetchConfiguration().map(_.value)
         // storing the configuration doesn't change the topology initialization status
         isTopologyInitialized <- store.isTopologyInitialized()
       } yield {
@@ -63,7 +63,7 @@ trait MediatorSynchronizerConfigurationStoreTest {
     "supports updating the config" in {
       val store = mkStore
       val defaultParams = defaultStaticSynchronizerParameters
-      val connection = GrpcSequencerConnection(
+      def connection(sequencerId: Option[SequencerId] = None) = GrpcSequencerConnection(
         NonEmpty(
           Seq,
           Endpoint("sequencer", Port.tryCreate(200)),
@@ -72,17 +72,19 @@ trait MediatorSynchronizerConfigurationStoreTest {
         transportSecurity = true,
         None,
         SequencerAlias.Default,
+        sequencerId,
       )
       val originalConfig = MediatorSynchronizerConfiguration(
-        DefaultTestIdentities.synchronizerId,
+        DefaultTestIdentities.physicalSynchronizerId,
         defaultParams,
-        SequencerConnections.single(connection),
+        SequencerConnections.single(connection()),
       )
 
-      val updatedConfig = originalConfig
-        .focus(_.synchronizerParameters)
-        .replace(
-          BaseTest.defaultStaticSynchronizerParameters
+      val updatedConfig =
+        MediatorSynchronizerConfiguration(
+          DefaultTestIdentities.physicalSynchronizerId,
+          BaseTest.defaultStaticSynchronizerParameters,
+          SequencerConnections.single(connection(Some(DefaultTestIdentities.sequencerId))),
         )
 
       for {
@@ -91,7 +93,7 @@ trait MediatorSynchronizerConfigurationStoreTest {
         _ = isTopologyInitialized1 shouldBe false
 
         _ <- store.saveConfiguration(originalConfig)
-        persistedConfig1 <- store.fetchConfiguration.map(_.value)
+        persistedConfig1 <- store.fetchConfiguration().map(_.value)
         _ = persistedConfig1 shouldBe originalConfig
 
         // storing the config doesn't change the topology initialization state
@@ -103,7 +105,7 @@ trait MediatorSynchronizerConfigurationStoreTest {
         _ = isTopologyInitialized3 shouldBe true
 
         _ <- store.saveConfiguration(updatedConfig)
-        persistedConfig2 <- store.fetchConfiguration.map(_.value)
+        persistedConfig2 <- store.fetchConfiguration().map(_.value)
         _ = persistedConfig2 shouldBe updatedConfig
 
         // updating the config doesn't change the topology initialization state

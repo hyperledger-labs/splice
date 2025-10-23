@@ -16,7 +16,7 @@ import com.digitalasset.canton.integration.{
   TestEnvironment,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
-import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
@@ -168,15 +168,27 @@ case class EnvironmentDefinition(
       preSetup = implicit env => {
         this.preSetup(env)
         participants(env).foreach { p =>
-          logger.info(s"Removing all vetted packages for ${p.name}")(TraceContext.empty)
-          p.topology.vetted_packages.propose(
-            p.id,
-            Seq.empty,
-            force = ForceFlags(
-              ForceFlag.AllowUnvetPackage,
-              ForceFlag.AllowUnvetPackageWithActiveContracts,
-            ),
-          )
+          p.synchronizers.list_connected().foreach { connected =>
+            val currentVettedPackages = p.topology.vetted_packages.list(
+              store = Some(TopologyStoreId.Synchronizer(connected.synchronizerId)),
+              filterParticipant = p.id.filterString,
+            )
+            currentVettedPackages match {
+              case Seq(mapping) if mapping.item.packages.length > 1 =>
+                logger.info(
+                  s"Removing all vetted packages for ${p.name} on ${connected.synchronizerId}"
+                )(TraceContext.empty)
+                p.topology.vetted_packages.propose(
+                  p.id,
+                  Seq.empty,
+                  store = TopologyStoreId.Synchronizer(connected.synchronizerId),
+                )
+              case _ =>
+                logger.info(s"No vetted packages for ${p.name} on ${connected.synchronizerId}")(
+                  TraceContext.empty
+                )
+            }
+          }
         }
         participants(env).foreach { p =>
           logger.info(s"Ensuring vetting topology is effective for ${p.name}")(TraceContext.empty)
@@ -273,6 +285,15 @@ case class EnvironmentDefinition(
 
   def withBftSequencers: EnvironmentDefinition =
     addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
+
+  def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
+    addConfigTransforms((_, conf) =>
+      ConfigTransforms.updateAllSvAppConfigs_(config =>
+        config.copy(
+          delegatelessAutomationFeaturedAppActivityMarkerMaxAge = NonNegativeFiniteDuration.Zero
+        )
+      )(conf)
+    )
 
   def withAmuletPrice(price: BigDecimal): EnvironmentDefinition =
     addConfigTransforms((_, conf) => ConfigTransforms.setAmuletPrice(price)(conf))
@@ -400,15 +421,7 @@ case class EnvironmentDefinition(
           )
         )
     )
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(10_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(10_000)(conf),
-      )
-      // we bump remote app ports separately in order to not confuse
-      // the PreflightIntegrationTest which also uses bumpCantonPortsBy
-      .addConfigTransformsToFront((_, conf) =>
-        ConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(10_000)(conf))
       .withTrafficTopupsDisabled
       .addConfigTransform((_, conf) =>
         ConfigTransforms
@@ -453,6 +466,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withInitializedNodes()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
@@ -461,6 +475,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withInitializedNodes()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =

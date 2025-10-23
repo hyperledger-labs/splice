@@ -24,6 +24,7 @@ import com.digitalasset.canton.serialization.{
 }
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
+  IgnoreInSerializationTestExhaustivenessCheck,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
@@ -205,11 +206,13 @@ object MerkleTreeTest {
   type VersionedAbstractLeaf = AbstractLeaf[_ <: VersionedMerkleTree[_]]
   val hashOps = new SymbolicPureCrypto
 
-  object AbstractLeaf extends VersioningCompanion[VersionedAbstractLeaf] {
+  object AbstractLeaf
+      extends VersioningCompanion[VersionedAbstractLeaf]
+      with IgnoreInSerializationTestExhaustivenessCheck {
     override def name: String = "AbstractLeaf"
     override def versioningTable: VersioningTable = VersioningTable(
       ProtoVersion(30) -> VersionedProtoCodec.raw(
-        ProtocolVersion.v33,
+        ProtocolVersion.v34,
         (_, _, bytes) => fromProto(30)(bytes),
         _.getCryptographicEvidence,
       )

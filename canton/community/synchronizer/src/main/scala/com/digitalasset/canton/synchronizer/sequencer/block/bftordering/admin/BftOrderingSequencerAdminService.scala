@@ -8,7 +8,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencer.admin.v30.*
 import com.digitalasset.canton.sequencer.admin.v30.SequencerBftAdministrationServiceGrpc.SequencerBftAdministrationService
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleRef
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -127,5 +127,14 @@ final class BftOrderingSequencerAdminService(
         nodes.toSeq.sorted,
       )
     }
+  }
+
+  override def setPerformanceMetricsEnabled(
+      request: SetPerformanceMetricsEnabledRequest
+  ): Future[SetPerformanceMetricsEnabledResponse] = {
+    issConsensusAdminRef.asyncSend(
+      Consensus.Admin.SetPerformanceMetricsEnabled(request.enabled)
+    )
+    Future.successful(SetPerformanceMetricsEnabledResponse())
   }
 }

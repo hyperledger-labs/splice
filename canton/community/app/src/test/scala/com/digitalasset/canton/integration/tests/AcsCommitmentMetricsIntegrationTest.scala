@@ -8,19 +8,16 @@ import com.daml.metrics.MetricsFilterConfig
 import com.daml.metrics.api.MetricQualification
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Inspection.SlowCounterParticipantSynchronizerConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeProportion}
+import com.digitalasset.canton.config.{CommitmentSendDelay, DbConfig}
 import com.digitalasset.canton.console.{
   LocalParticipantReference,
   LocalSequencerReference,
   ParticipantReference,
 }
 import com.digitalasset.canton.examples.java.iou.Iou
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -82,7 +79,11 @@ trait AcsCommitmentMetricsIntegrationTest
           )
       )
       .updateTestingConfig(
-        _.focus(_.maxCommitmentSendDelayMillis).replace(Some(NonNegativeInt.zero))
+        _.focus(_.commitmentSendDelay).replace(
+          Some(
+            CommitmentSendDelay(Some(NonNegativeProportion.zero), Some(NonNegativeProportion.zero))
+          )
+        )
       )
       .withSetup { implicit env =>
         import env.*
@@ -103,11 +104,6 @@ trait AcsCommitmentMetricsIntegrationTest
           )
         }
 
-        // Allocate parties
-        alice = participant1.parties.enable(aliceName)
-        bob = participant2.parties.enable(bobName)
-        charlie = participant3.parties.enable(charlieName)
-
         metricsSynchronizerAlias = daName.unquoted
 
         participants.all.foreach { participant =>
@@ -122,6 +118,14 @@ trait AcsCommitmentMetricsIntegrationTest
             synchronizerAlias = acmeName,
           )
         }
+
+        // Allocate parties
+        alice = participant1.parties.enable(aliceName, synchronizer = daName)
+        participant1.parties.enable(aliceName, synchronizer = acmeName)
+        bob = participant2.parties.enable(bobName, synchronizer = daName)
+        participant2.parties.enable(bobName, synchronizer = acmeName)
+        charlie = participant3.parties.enable(charlieName, synchronizer = daName)
+        participant3.parties.enable(charlieName, synchronizer = acmeName)
       }
 
   private def connect(
@@ -131,7 +135,10 @@ trait AcsCommitmentMetricsIntegrationTest
   ): Unit = {
     // Connect and disconnect so that we can modify the synchronizer connection config afterwards
     participant.synchronizers.connect_local(localSequencerReference, alias = synchronizerAlias)
-    participant.dars.upload(CantonExamplesPath)
+    participant.dars.upload(
+      CantonExamplesPath,
+      synchronizerId = Some(participant.synchronizers.id_of(synchronizerAlias)),
+    )
   }
 
   private def deployAndCheckContractOnParticipants(
@@ -208,23 +215,37 @@ trait AcsCommitmentMetricsIntegrationTest
     afterUpdate shouldBe Seq(slowConfig)
 
     logger.info("we extend the config and validate it has an updated value")
-    participant1.commitments.add_participant_to_individual_metrics(Seq(participant3.id), Seq(daId))
+    // for readability purpose in the user manual, wew rename daId to synchronizerId
+    val synchronizerId = daId
+    // user-manual-entry-begin: IndividualMonitoringAdd
+    participant1.commitments.add_participant_to_individual_metrics(
+      Seq(participant3.id),
+      Seq(synchronizerId),
+    )
+    // user-manual-entry-end: IndividualMonitoringAdd
     val afterAddition = participant1.commitments.get_config_for_slow_counter_participants(Seq(daId))
-    afterAddition.foreach(_.participantsMetrics shouldBe Seq(participant3.id))
+    afterAddition.foreach(_.individuallyMonitored shouldBe Seq(participant3.id))
 
     logger.info("we remove the extension and validate it is as before")
+    // synchronizer is da, renamed for user man
+    // user-manual-entry-begin: IndividualMonitoringRemove
     participant1.commitments.remove_participant_from_individual_metrics(
       Seq(participant3.id),
-      Seq(daId),
+      Seq(synchronizerId),
     )
+    // user-manual-entry-end: IndividualMonitoringRemove
     val afterRemoval = participant1.commitments.get_config_for_slow_counter_participants(Seq(daId))
     afterRemoval shouldBe Seq(slowConfig)
 
     logger.info("we remove the config and validate that it is empty")
-    participant1.commitments.remove_config_for_slow_counter_participants(
+
+    // user-manual-entry-begin: DistinguishedParticipantRemoveMetric
+    participant1.commitments.remove_config_distinguished_slow_counter_participants(
       Seq(participant2.id),
-      Seq(daId),
+      Seq(synchronizer1Id),
     )
+    // user-manual-entry-end: DistinguishedParticipantRemoveMetric
+
     val afterClear = participant1.commitments.get_config_for_slow_counter_participants(Seq(daId))
     afterClear shouldBe Seq.empty
   }
@@ -239,14 +260,18 @@ trait AcsCommitmentMetricsIntegrationTest
       10,
       Seq(participant2.id),
     )
+    participant1.commitments.set_config_for_slow_counter_participants(Seq(initialConfig))
 
+    // user-manual-entry-begin: SetMonitoringConfig
     val update1Config = new SlowCounterParticipantSynchronizerConfig(
-      Seq(daId, acmeId),
-      Seq(participant3.id),
-      15,
-      15,
-      Seq.empty,
+      synchronizerIds = Seq(synchronizer1Id, synchronizer2Id),
+      distinguishedParticipants = Seq(participant3.id),
+      thresholdDistinguished = 15,
+      thresholdDefault = 15,
+      individuallyMonitored = Seq.empty,
     )
+    participant1.commitments.set_config_for_slow_counter_participants(Seq(update1Config))
+    // user-manual-entry-end: SetMonitoringConfig
 
     val update2Config = new SlowCounterParticipantSynchronizerConfig(
       Seq(daId, acmeId),
@@ -255,9 +280,6 @@ trait AcsCommitmentMetricsIntegrationTest
       20,
       Seq(participant3.id),
     )
-
-    participant1.commitments.set_config_for_slow_counter_participants(Seq(initialConfig))
-    participant1.commitments.set_config_for_slow_counter_participants(Seq(update1Config))
     participant1.commitments.set_config_for_slow_counter_participants(Seq(update2Config))
 
     val resultConfigs = participant1.commitments.get_config_for_slow_counter_participants(Seq.empty)
@@ -283,7 +305,7 @@ trait AcsCommitmentMetricsIntegrationTest
       finalSynchronizer2Config,
     )
 
-    participant1.commitments.remove_config_for_slow_counter_participants(
+    participant1.commitments.remove_config_distinguished_slow_counter_participants(
       Seq.empty,
       Seq(daId, acmeId),
     )
@@ -321,10 +343,14 @@ trait AcsCommitmentMetricsIntegrationTest
     initialBothConfig.foreach(_.distinguishedParticipants shouldBe Seq(participant3.id))
 
     logger.info("we add participant4 on synchronizer2")
+
+    // user-manual-entry-begin: DistinguishedParticipantAddMetric
     participant1.commitments.add_config_distinguished_slow_counter_participants(
       Seq(participant4Id),
-      Seq(acmeId),
+      Seq(synchronizer2Id),
     )
+    // user-manual-entry-end: DistinguishedParticipantAddMetric
+
     val afterAdditionSynchronizer2Config =
       participant1.commitments.get_config_for_slow_counter_participants(Seq(acmeId))
     val afterAdditionSynchronizerConfig =
@@ -346,9 +372,9 @@ trait AcsCommitmentMetricsIntegrationTest
       "asking for both synchronizers should return one for synchronizer2 with both participants and one for synchronizer1 with participant3"
     )
     afterAdditionBothConfig.foreach {
-      case config if config.synchronizerIds.contains(acmeId) =>
+      case config if config.synchronizerIds.contains(acmeId.logical) =>
         config.distinguishedParticipants shouldBe Seq(participant3.id, participant4Id)
-      case config if config.synchronizerIds.contains(daId) =>
+      case config if config.synchronizerIds.contains(daId.logical) =>
         config.distinguishedParticipants shouldBe Seq(participant3.id)
       case _ => fail()
     }
@@ -379,16 +405,19 @@ trait AcsCommitmentMetricsIntegrationTest
       "asking for both synchronizers should return a set containing (participant3,participant4) & (participant3,participant5)"
     )
     afterSecondAdditionBothConfig.foreach {
-      case config if config.synchronizerIds.contains(acmeId) =>
+      case config if config.synchronizerIds.contains(acmeId.logical) =>
         config.distinguishedParticipants shouldBe Seq(participant3.id, participant4Id)
-      case config if config.synchronizerIds.contains(daId) =>
+      case config if config.synchronizerIds.contains(daId.logical) =>
         config.distinguishedParticipants shouldBe Seq(participant3.id, participant5Id)
       case _ => fail()
     }
 
     logger.info("we validate that calling remove config with empty values removes everything")
     val preClean = participant1.commitments.get_config_for_slow_counter_participants(Seq.empty)
-    participant1.commitments.remove_config_for_slow_counter_participants(Seq.empty, Seq.empty)
+    participant1.commitments.remove_config_distinguished_slow_counter_participants(
+      Seq.empty,
+      Seq.empty,
+    )
     val postClean = participant1.commitments.get_config_for_slow_counter_participants(Seq.empty)
     preClean should not be postClean
     preClean should contain(
@@ -447,7 +476,10 @@ trait AcsCommitmentMetricsIntegrationTest
       val postConfig = participant1.commitments.get_config_for_slow_counter_participants(Seq.empty)
       preConfig shouldBe postConfig
 
-      participant1.commitments.remove_config_for_slow_counter_participants(Seq.empty, Seq.empty)
+      participant1.commitments.remove_config_distinguished_slow_counter_participants(
+        Seq.empty,
+        Seq.empty,
+      )
   }
 
   "Can get max long value when we have never received a counter commitment" in { implicit env =>
@@ -741,7 +773,7 @@ trait AcsCommitmentMetricsIntegrationTest
 
 class AcsCommitmentMetricsIntegrationTestDefault extends AcsCommitmentMetricsIntegrationTest {
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))
@@ -754,7 +786,7 @@ class AcsCommitmentMetricsIntegrationTestDefault extends AcsCommitmentMetricsInt
 class AcsCommitmentMetricsIntegrationTestPostgres extends AcsCommitmentMetricsIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))

@@ -65,7 +65,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       auth0Users += (name -> user)
     }
 
-    TraceContext.withNewTraceContext(implicit traceContext => {
+    TraceContext.withNewTraceContext("beforeEach")(implicit traceContext => {
       try {
         addUser("alice")
         addUser("bob")
@@ -510,21 +510,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     go to url
     waitForQuery(id("user-id-field"))
     loginOnceConfirmedToBeAtUrl(username)
-    eventually() {
-      (find(id("onboard-button")).isDefined || find(id("logout-button")).isDefined) shouldBe true
-    }
-    if (find(id("onboard-button")).isDefined) {
-      actAndCheck()(
-        "Onboard wallet user", {
-          click on "onboard-button"
-        },
-      )(
-        "Party ID is displayed after onboarding finishes",
-        _ => {
-          findAll(className("party-id")) should have size 1
-        },
-      )
-    }
+    onboardUserAfterLogin()
     copyPartyId()
   }
 
@@ -532,14 +518,26 @@ abstract class ValidatorPreflightIntegrationTestBase
       user: Auth0User,
       url: String,
   )(implicit webDriver: WebDriverType): String = {
-
     clue(s"Logging in to wallet UI at: ${url}") {
       auth0Login(
         user,
         url,
         () => find(id("onboard-button")) should not be empty,
       )
+    }
+    onboardUserAfterLogin()
+    copyPartyId()
+  }
 
+  private def onboardUserAfterLogin()(implicit webDriver: WebDriverType) = {
+    // After login, the UI fetches the user onboarding status from the validator.
+    // If the user is already onboarded, the party ID is displayed
+    // If the user is not onboarded, the onboard button is displayed
+    eventually() {
+      (find(id("onboard-button")).isDefined || find(className("party-id")).isDefined) shouldBe true
+    }
+
+    if (find(id("onboard-button")).isDefined) {
       // TODO(DACH-NY/canton-network-internal#485): This is a workaround to bypass slowness of wallet user onboarding
       actAndCheck(timeUntilSuccess = 2.minute)(
         "Onboard wallet user", {
@@ -551,8 +549,9 @@ abstract class ValidatorPreflightIntegrationTestBase
           findAll(className("party-id")) should have size 1
         },
       )
-
-      copyPartyId()
+    } else {
+      logger.debug("User is already onboarded")
+      findAll(className("party-id")) should have size 1
     }
   }
 

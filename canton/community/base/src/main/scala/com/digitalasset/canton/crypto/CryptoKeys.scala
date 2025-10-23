@@ -5,6 +5,7 @@ package com.digitalasset.canton.crypto
 
 import cats.Order
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedStringWrapper,
@@ -27,6 +28,8 @@ import com.digitalasset.canton.version.{
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.circe.Encoder
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import slick.jdbc.{GetResult, SetParameter}
 
@@ -148,7 +151,7 @@ object CryptoKeyPair extends HasVersionedMessageCompanion[CryptoKeyPair[PublicKe
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.CryptoKeyPair)(fromProtoCryptoKeyPairV30),
       _.toProtoCryptoKeyPairV30,
     )
@@ -195,7 +198,6 @@ trait PublicKey extends CryptoKeyPairKey {
   protected def dataForFingerprintO: Option[ByteString]
 
   override lazy val id: Fingerprint =
-    // TODO(i15649): Consider the key format and fingerprint scheme before computing
     Fingerprint.create(dataForFingerprintO.getOrElse(key))
 
   def purpose: KeyPurpose
@@ -222,9 +224,9 @@ trait PublicKey extends CryptoKeyPairKey {
 object PublicKey {
 
   /** Return the latest key from a sequence of keys */
-  def getLatestKey[A <: PublicKey](availableKeys: Seq[A]): Option[A] =
+  def getLatestKey[A <: PublicKey](availableKeys: NonEmpty[Seq[A]]): A =
     // use lastOption to retrieve latest key (newer keys are at the end) */
-    availableKeys.lastOption
+    availableKeys.last1
 
   def fromProtoPublicKeyV30(publicKeyP: v30.PublicKey): ParsingResult[PublicKey] =
     publicKeyP.key match {
@@ -279,7 +281,7 @@ object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName]
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.PublicKeyWithName)(fromProto30),
       _.toProtoV30,
     )
@@ -360,7 +362,7 @@ object CryptoKeyFormat {
   }
 
   // Parses a DER-encoded X.509 SubjectPublicKeyInfo structure and extracts the public key bytes.
-  def extractPublicKeyFromX509Spki(
+  private[crypto] def extractPublicKeyFromX509Spki(
       publicKey: ByteString
   ): Either[KeyParseAndValidateError, Array[Byte]] =
     Either
@@ -380,6 +382,29 @@ object CryptoKeyFormat {
     override def toProtoEnum: v30.CryptoKeyFormat =
       v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_DER_PKCS8_PRIVATE_KEY_INFO
   }
+
+  /** Parses a DER-encoding of PKCS #8 PrivateKeyInfo structure and extracts the private key bytes.
+    */
+  private[crypto] def extractPrivateKeyFromPkcs8Pki(
+      privateKey: ByteString
+  ): Either[KeyParseAndValidateError, Array[Byte]] =
+    Either
+      .catchOnly[IllegalArgumentException] {
+        val pki = PrivateKeyInfo.getInstance(privateKey.toByteArray)
+        val asn1Obj = pki.parsePrivateKey().toASN1Primitive
+
+        asn1Obj match {
+          case octetString: ASN1OctetString =>
+            octetString.getOctets
+          case _ =>
+            throw new IllegalArgumentException(
+              s"Unexpected ASN.1 type: ${asn1Obj.getClass.getSimpleName}"
+            )
+        }
+      }
+      .leftMap(err =>
+        KeyParseAndValidateError(s"Failed to parse private key from PKCS8 Private Key Info: $err")
+      )
 
   /** For public keys: ASN.1 + DER-encoding of X.509 SubjectPublicKeyInfo structure:
     * [[https://datatracker.ietf.org/doc/html/rfc5280#section-4.1 RFC 5280]]

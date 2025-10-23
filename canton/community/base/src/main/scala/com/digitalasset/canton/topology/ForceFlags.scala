@@ -37,8 +37,6 @@ object ForceFlag {
   case object PreparationTimeRecordTimeToleranceIncrease
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_PREPARATION_TIME_RECORD_TIME_TOLERANCE_INCREASE)
 
-  case object AllowUnvetPackage extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE)
-
   case object AllowUnvetPackageWithActiveContracts
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE_WITH_ACTIVE_CONTRACTS)
 
@@ -63,6 +61,12 @@ object ForceFlag {
   case object AllowUnvalidatedSigningKeys
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVALIDATED_SIGNING_KEYS)
 
+  case object AllowVetIncompatibleUpgrades
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_VET_INCOMPATIBLE_UPGRADES)
+
+  case object AllowOutOfBoundsValue
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_OUT_OF_BOUNDS_VALUE)
+
   /** This should only be used internally in situations where
     *   - the caller knows what they are doing
     *   - it's not necessarily clear which specific flags to use, but there also isn't really any
@@ -75,7 +79,6 @@ object ForceFlag {
     Seq[ForceFlag](
       AlienMember,
       LedgerTimeRecordTimeToleranceIncrease,
-      AllowUnvetPackage,
       AllowUnknownPackage,
       AllowUnvettedDependencies,
       DisablePartyWithActiveContracts,
@@ -84,6 +87,8 @@ object ForceFlag {
       PreparationTimeRecordTimeToleranceIncrease,
       AllowInsufficientParticipantPermissionForSignatoryParty,
       AllowInsufficientSignatoryAssigningParticipantsForParty,
+      AllowVetIncompatibleUpgrades,
+      AllowOutOfBoundsValue,
     )
       .map(ff => ff.toProtoV30 -> ff)
       .toMap

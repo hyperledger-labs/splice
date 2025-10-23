@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.scan.automation
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
@@ -346,6 +346,31 @@ class AcsSnapshotTriggerTest
             trigger.isDoneBackfillingAcsSnapshots should be(false)
           }
 
+          "return no task if the previous migration id is backfilled but didn't last long enough" in new AcsSnapshotTriggerTestScope(
+            true,
+            currentMigrationId = 1L,
+          ) {
+            // no snapshot needed for the current migration id
+            historyBackfilled(currentMigrationId, complete = true)
+            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
+
+            // therefore we attempt to backfill the previous migration id,
+            // which is backfilled
+            val previousMigrationId = currentMigrationId - 1
+            historyBackfilled(previousMigrationId, complete = true)
+            // last update happened shortly after the end
+            recordTimeRange(
+              previousMigrationId,
+              // didn't last enough
+              min = CantonTimestamp.MinValue.plusSeconds(3600L - 1),
+              max = CantonTimestamp.MinValue.plusSeconds(3600L + 600),
+            )
+            noPreviousSnapshot(previousMigrationId)
+
+            trigger.retrieveTasks().futureValue should be(Seq.empty)
+            trigger.isDoneBackfillingAcsSnapshots should be(true)
+          }
+
           "return the first task to backfill the previous migration id" in new AcsSnapshotTriggerTestScope(
             true
           ) {
@@ -554,13 +579,13 @@ class AcsSnapshotTriggerTest
     val dummyDomain = SynchronizerId.tryFromString("dummy::domain")
     def treeUpdate(recordTime: CantonTimestamp): TreeUpdate = {
       TransactionTreeUpdate(
-        new TransactionTree(
+        new Transaction(
           "updateId",
           "commandId",
           "workflowId",
           recordTime.toInstant,
+          java.util.Collections.emptyList(),
           0L,
-          java.util.Map.of(),
           dummyDomain.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           recordTime.toInstant,
@@ -615,7 +640,7 @@ class AcsSnapshotTriggerTest
 
     def noPreviousSnapshot(migrationId: Long = currentMigrationId): Unit = {
       when(
-        store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
+        store.lookupSnapshotAtOrBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
           any[TraceContext]
         )
       )
@@ -630,7 +655,7 @@ class AcsSnapshotTriggerTest
     ): AcsSnapshot = {
       val lastSnapshot = AcsSnapshot(time, migrationId, historyId, 0, 100, None, None)
       when(
-        store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
+        store.lookupSnapshotAtOrBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
           any[TraceContext]
         )
       )
@@ -707,11 +732,15 @@ class AcsSnapshotTriggerTest
         )
     }
 
-    def recordTimeRange(migrationId: Long, max: CantonTimestamp): Unit = {
+    def recordTimeRange(
+        migrationId: Long,
+        max: CantonTimestamp,
+        min: CantonTimestamp = CantonTimestamp.MinValue,
+    ): Unit = {
       when(updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext]))
         .thenReturn(
           Future.successful(
-            Map(dummyDomain -> DomainRecordTimeRange(CantonTimestamp.MinValue, max))
+            Map(dummyDomain -> DomainRecordTimeRange(min, max))
           )
         )
     }

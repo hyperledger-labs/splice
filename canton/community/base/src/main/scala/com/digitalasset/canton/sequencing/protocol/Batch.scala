@@ -54,6 +54,8 @@ final case class Batch[+Env <: Envelope[?]] private (envelopes: List[Env])(
       case AllMembersOfSynchronizer => AllMembersOfSynchronizer
     }
 
+  lazy val isBroadcast: Boolean = allRecipients.contains(AllMembersOfSynchronizer)
+
   private[protocol] def toProtoV30: v30.CompressedBatch = {
     val batch = v30.Batch(envelopes = envelopes.map(_.closeEnvelope.toProtoV30))
     val compressed = ByteStringUtil.compressGzip(checkedToByteString(batch))
@@ -86,10 +88,10 @@ object Batch extends VersioningCompanion2[Batch[Envelope[?]], Batch[ClosedEnvelo
 
   override val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(
-      ProtocolVersion.v33
+      ProtocolVersion.v34
     )(v30.CompressedBatch)(
       supportedProtoVersion(_)(
-        // TODO(i10428) Prevent zip bombing when decompressing the request
+        // TODO(i26169) Prevent zip bombing when decompressing the request
         Batch.fromProtoV30(_, maxRequestSize = MaxRequestSizeToDeserialize.NoLimit)
       ),
       _.toProtoV30,

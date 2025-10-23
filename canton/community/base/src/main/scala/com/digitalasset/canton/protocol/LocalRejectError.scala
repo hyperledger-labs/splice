@@ -15,10 +15,7 @@ import com.digitalasset.base.error.{
   Resolution,
 }
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.LocalRejectionGroup
-import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.messages.{LocalReject, TransactionRejection}
+import com.digitalasset.canton.protocol.messages.LocalReject
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.rpc.status.Status
 import org.slf4j.event.Level
@@ -43,62 +40,11 @@ abstract class MalformedErrorCode(id: String)(implicit
   implicit override val code: MalformedErrorCode = this
 }
 
-sealed trait LocalRejectError
-    extends TransactionError
-    with TransactionRejection
-    with PrettyPrinting
-    with Product
-    with Serializable {
-
-  override def reason(): Status = rpcStatusWithoutLoggingContext()
-
-  override def logRejection(extra: Map[String, String] = Map())(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): Unit =
-    errorLoggingContext.logError(this, extra)
+sealed trait LocalRejectError extends LocalError {
 
   def toLocalReject(protocolVersion: ProtocolVersion): LocalReject =
     LocalReject.create(reason(), isMalformed = false, protocolVersion)
 
-  /** The first part of the cause. Typically, the same for all instances of the particular type.
-    */
-  // The leading underscore will exclude the field from the error context, so that it doesn't get logged twice.
-  def _causePrefix: String
-
-  /** The second part of the cause. Typically a class parameter.
-    */
-  def _details: String = ""
-
-  override def cause: String = _causePrefix + _details
-
-  override def code: ErrorCode
-
-  /** Make sure to define this, if _resources is non-empty.
-    */
-  def _resourcesType: Option[ErrorResource] = None
-
-  /** The affected resources. It is used as follows:
-    *   - It will be logged as part of the context information.
-    *   - It is included into the resulting LocalReject.
-    *   - The LocalReject is sent via the sequencer to the mediator. Therefore: do not include any
-    *     confidential data!
-    *   - The LocalReject is also output through the ledger API.
-    */
-  def _resources: Seq[String] = Seq()
-
-  override def resources: Seq[(ErrorResource, String)] =
-    _resourcesType.fold(Seq.empty[(ErrorResource, String)])(rt => _resources.map(rs => (rt, rs)))
-
-  override def context: Map[String, String] =
-    _resourcesType.map(_.asString -> _resources.show).toList.toMap ++ super.context
-
-  override protected def pretty: Pretty[LocalRejectError] =
-    prettyOfClass(
-      param("code", _.code.id.unquoted),
-      param("cause", _.cause.doubleQuoted),
-      param("resources", _._resources.map(_.singleQuoted)),
-      paramIfDefined("throwable", _.throwableO),
-    )
 }
 
 /** Base class for LocalReject errors, if the rejection does not (necessarily) occur due to
@@ -111,7 +57,9 @@ sealed abstract class LocalRejectErrorImpl(
     override val _resourcesType: Option[ErrorResource] = None,
     override val _resources: Seq[String] = Seq.empty,
 )(implicit override val code: LocalRejectErrorCode)
-    extends LocalRejectError
+    extends LocalRejectError {
+  override def isMalformed: Boolean = false
+}
 
 /** Base class for LocalReject errors, if the rejection occurs due to malicious behavior.
   */
@@ -128,6 +76,7 @@ sealed abstract class Malformed(
   override def toLocalReject(protocolVersion: ProtocolVersion): LocalReject =
     LocalReject.create(rpcStatusWithoutLoggingContext(), isMalformed = true, protocolVersion)
 
+  override def isMalformed: Boolean = true
 }
 
 object LocalRejectError extends LocalRejectionGroup {
@@ -223,7 +172,6 @@ object LocalRejectError extends LocalRejectionGroup {
           id = "LOCAL_VERDICT_TIMEOUT",
           ErrorCategory.ContentionOnSharedResources,
         ) {
-      override def logLevel: Level = Level.WARN
       final case class Reject()
           extends LocalRejectErrorImpl(
             _causePrefix = "Rejected transaction due to a participant determined timeout "
@@ -340,9 +288,24 @@ object LocalRejectError extends LocalRejectionGroup {
           id = "REASSIGNMENT_VALIDATION_FAILED",
           ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
-
       final case class Reject(override val _details: String)
           extends LocalRejectErrorImpl(_causePrefix = "Validation check failed. ")
+    }
+
+    @Explanation(
+      """Validation checks failed for reassignment id."""
+    )
+    @Resolution(
+      "This indicates a malicious or faulty behaviour."
+    )
+    object InconsistentReassignmentId
+        extends LocalRejectErrorCode(
+          id = "INCONSISTENT_REASSIGNMENT_ID",
+          ErrorCategory.UnredactedSecurityAlert,
+        ) {
+      override def logLevel: Level = Level.ERROR
+      final case class Reject(override val _details: String)
+          extends LocalRejectErrorImpl(_causePrefix = s"Reassignment ID check failed. ")
     }
 
   }

@@ -4,29 +4,23 @@
 package com.digitalasset.canton.openapi
 
 import com.daml.ledger.api.v2 as lapi
-import com.digitalasset.canton.http.json.v2.JsSchema.{
-  JsInterfaceView,
-  JsReassignmentEvent,
-  JsTopologyEvent,
-}
+import com.digitalasset.canton.http.json.v2.JsSchema.{JsInterfaceView, JsReassignmentEvent}
 import org.scalacheck.{Arbitrary, Gen}
 import scalapb.{GeneratedEnum, GeneratedEnumCompanion}
 
 object CantonGenerators {
-  import StdGenerators.*
+  import com.digitalasset.canton.http.json.StdGenerators.*
   def enumArbitrary[T <: GeneratedEnum](companion: GeneratedEnumCompanion[T]): Arbitrary[T] = {
     val gen: Gen[T] = Gen.oneOf(companion.values)
     Arbitrary(gen)
   }
 
   // We define custom generators for the enums here, so that UNRECOGNIZED values are not generated
-  implicit val arbSignatureFormat
-      : Arbitrary[lapi.interactive.interactive_submission_service.SignatureFormat] =
-    enumArbitrary(lapi.interactive.interactive_submission_service.SignatureFormat.enumCompanion)
-  implicit val arbSigningAlgorithmSpec
-      : Arbitrary[lapi.interactive.interactive_submission_service.SigningAlgorithmSpec] =
+  implicit val arbSignatureFormat: Arbitrary[lapi.crypto.SignatureFormat] =
+    enumArbitrary(lapi.crypto.SignatureFormat.enumCompanion)
+  implicit val arbSigningAlgorithmSpec: Arbitrary[lapi.crypto.SigningAlgorithmSpec] =
     enumArbitrary(
-      lapi.interactive.interactive_submission_service.SigningAlgorithmSpec.enumCompanion
+      lapi.crypto.SigningAlgorithmSpec.enumCompanion
     )
   implicit val arbHashingSchemeVersion
       : Arbitrary[lapi.interactive.interactive_submission_service.HashingSchemeVersion] =
@@ -45,14 +39,22 @@ object CantonGenerators {
     enumArbitrary(
       lapi.package_service.PackageStatus.enumCompanion
     )
-//TransactionShape
 
   // limit size of random sequences
   import magnolify.scalacheck.auto.*
   implicit val arbReassignmentEventSeq: Arbitrary[Seq[JsReassignmentEvent.JsReassignmentEvent]] =
     smallSeqArbitrary
-  implicit val arbTopologyEventSeq: Arbitrary[Seq[JsTopologyEvent.TopologyEvent]] =
-    smallSeqArbitrary
+  implicit val arbOptIdentifier: Arbitrary[Option[com.daml.ledger.api.v2.value.Identifier]] =
+    arbSomeOnly[com.daml.ledger.api.v2.value.Identifier]
+  // we do not provide unknownFields, as they are not used in the JSON API
+  implicit val arbJsStatus: Arbitrary[com.google.rpc.status.Status] =
+    Arbitrary {
+      for {
+        code <- Gen.chooseNum(0, Int.MaxValue)
+        message <- Gen.alphaStr
+        details <- arbProtoAnySeq.arbitrary
+      } yield com.google.rpc.status.Status(code, message, details)
+    }
   implicit val arbInterfaceViewSeq: Arbitrary[Seq[JsInterfaceView]] =
     smallSeqArbitrary
 
@@ -60,6 +62,4 @@ object CantonGenerators {
   def arbSomeOnly[T](implicit arb: Arbitrary[T]): Arbitrary[Option[T]] =
     Arbitrary(arb.arbitrary.map(Some(_)))
 
-  implicit val arbOptIdentifier: Arbitrary[Option[com.daml.ledger.api.v2.value.Identifier]] =
-    arbSomeOnly[com.daml.ledger.api.v2.value.Identifier]
 }

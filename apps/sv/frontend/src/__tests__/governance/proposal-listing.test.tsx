@@ -249,9 +249,9 @@ describe('Vote history', () => {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2024-09-25 11:00',
       voteTakesEffect: '2024-09-26 11:00',
-      yourVote: 'no-vote',
+      yourVote: 'accepted',
       status: 'Implemented',
-      voteStats: { accepted: 0, rejected: 0, 'no-vote': 0 },
+      voteStats: { accepted: 9, rejected: 2, 'no-vote': 0 },
       acceptanceThreshold: BigInt(11),
     } as ProposalListingData;
 
@@ -262,6 +262,8 @@ describe('Vote history', () => {
           data={[data]}
           uniqueId={uniqueId}
           showStatus
+          showVoteStats
+          showAcceptanceThreshold
         />
       </MemoryRouter>
     );
@@ -272,17 +274,20 @@ describe('Vote history', () => {
     const action = screen.getByTestId(`${uniqueId}-row-action-name`);
     expect(action.textContent).toBe(data.actionName);
 
-    const votingCloses = screen.queryByTestId(`${uniqueId}-row-voting-threshold-deadline`);
-    expect(votingCloses).toBeNull();
-
     const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
     expect(voteTakesEffect.textContent).toBe(data.voteTakesEffect);
 
     const status = screen.getByTestId(`${uniqueId}-row-status`);
     expect(status.textContent).toBe(data.status);
 
+    const voteStats = screen.getByTestId(`${uniqueId}-row-vote-stats`);
+    expect(voteStats.textContent).toBe('9 Accepted / 2 Rejected');
+
+    const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
+    expect(acceptanceThreshold.textContent).toBe('11');
+
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
-    expect(yourVote.textContent).toMatch(/No Vote/);
+    expect(yourVote.textContent).toMatch(/Accepted/);
 
     const viewDetails = screen.getByTestId(`${uniqueId}-row-view-details`);
     expect(viewDetails).toBeDefined();

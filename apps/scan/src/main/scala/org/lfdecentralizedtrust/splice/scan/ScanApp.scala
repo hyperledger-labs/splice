@@ -393,6 +393,7 @@ class ScanApp(
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
         timeouts,
         bftSequencersWithAdminConnections.map(_._1),
+        Seq(httpRateLimiter),
       )
     }
   }
@@ -415,6 +416,7 @@ object ScanApp {
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       bftSequencersAdminConnections: Seq[SequencerAdminConnection],
+      cleanups: Seq[AutoCloseable],
   ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean =
@@ -422,6 +424,7 @@ object ScanApp {
 
     override def close(): Unit = {
       LifeCycle.close(bftSequencersAdminConnections*)(logger)
+      LifeCycle.close(cleanups*)(logger)
       LifeCycle.close(
         automation,
         verdictAutomation,

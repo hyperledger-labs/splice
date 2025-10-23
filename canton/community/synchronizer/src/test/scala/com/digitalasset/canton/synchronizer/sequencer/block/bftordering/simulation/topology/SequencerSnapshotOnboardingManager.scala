@@ -4,10 +4,11 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology
 
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftOrderingModuleSystemInitializer.BftOrderingStores
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.TopologyActivationTime
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleRef
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -25,14 +26,17 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.{
   AddEndpoint,
   Command,
+  CrashNode,
   EventOriginator,
   InjectedSend,
   ModuleAddress,
   PrepareOnboarding,
-  SimulationSettings,
   StartMachine,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.bftordering.BftOrderingVerifier
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.bftordering.{
+  BftOrderingVerifier,
+  TopologySettings,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.data.StorageHelpers
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology.SequencerSnapshotOnboardingManager.{
   BftOnboardingData,
@@ -43,6 +47,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.collection.mutable
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.DurationConverters.ScalaDurationOps
+import scala.util.Random
 
 class SequencerSnapshotOnboardingManager(
     newlyOnboardingNodesToTimes: Map[BftNodeId, TopologyActivationTime],
@@ -50,10 +55,10 @@ class SequencerSnapshotOnboardingManager(
     nodeToEndpoint: Map[BftNodeId, P2PEndpoint],
     stores: Map[BftNodeId, BftOrderingStores[SimulationEnv]],
     model: BftOrderingVerifier,
-    simulationSettings: SimulationSettings,
-) extends OnboardingManager[BftOnboardingData] {
-
-  implicit private val traceContext: TraceContext = TraceContext.empty
+    topologySettings: TopologySettings,
+    random: Random,
+) extends OnboardingManager[BftOnboardingData]
+    with TestEssentials {
 
   private var onboardedNodes = initialNodes
 
@@ -94,17 +99,24 @@ class SequencerSnapshotOnboardingManager(
   }
 
   override def commandsToSchedule(timestamp: CantonTimestamp): Seq[(Command, FiniteDuration)] = {
-    val commandsToStartNodes: Seq[(Command, FiniteDuration)] = nodesToStart.map { sequencerId =>
+    val commandsToStartNodes: Seq[(Command, FiniteDuration)] = nodesToStart.flatMap { sequencerId =>
       val myEndpoint = nodeToEndpoint(sequencerId)
 
-      StartMachine(myEndpoint) -> DefaultEpsilonForSchedulingCommand
+      Seq[(Command, FiniteDuration)](StartMachine(myEndpoint) -> DefaultEpsilonForSchedulingCommand)
+      ++
+      topologySettings.crashAfterOnboardDistribution.map(dist =>
+        CrashNode(sequencerId) -> DefaultEpsilonForSchedulingCommand.plus(
+          dist.generateRandomDuration(random)
+        )
+      )
     }
+
     nodesToStart = Seq.empty
 
     val commandsToRetryNodes: Seq[(Command, FiniteDuration)] = nodesToRetry.map { sequencerId =>
       PrepareOnboarding(
         sequencerId
-      ) -> simulationSettings.retryBecomingOnlineInterval
+      ) -> topologySettings.retryBecomingOnlineInterval
     }
     nodesToRetry = Seq.empty
 
@@ -134,20 +146,21 @@ class SequencerSnapshotOnboardingManager(
       newlyOnboardedNodesToOnboardingTimes: Map[BftNodeId, TopologyActivationTime],
       newNodesToEndpoint: Map[BftNodeId, P2PEndpoint],
       newModel: BftOrderingVerifier,
-      simulationSettings: SimulationSettings,
+      topologySettings: TopologySettings,
   ): SequencerSnapshotOnboardingManager = new SequencerSnapshotOnboardingManager(
     newlyOnboardedNodesToOnboardingTimes,
     onboardedNodes,
     newNodesToEndpoint,
     stores,
     newModel,
-    simulationSettings,
+    topologySettings,
+    random,
   )
 
   override def initCommands: Seq[(Command, CantonTimestamp)] = newlyOnboardingNodesToTimes.map {
     case (node, timestamp) =>
       PrepareOnboarding(node) -> timestamp.value.add(
-        simulationSettings.becomingOnlineAfterOnboardingDelay.toJava
+        topologySettings.becomingOnlineAfterOnboardingDelay.toJava
       )
   }.toSeq
 
@@ -169,14 +182,17 @@ class SequencerSnapshotOnboardingManager(
         Output.SequencerSnapshotMessage.GetAdditionalInfo(
           sequencerActivationTime.value,
           new ModuleRef[SequencerNode.SnapshotMessage] {
-            override def asyncSendTraced(msg: SequencerNode.SnapshotMessage)(implicit
+            override def asyncSend(msg: SequencerNode.SnapshotMessage)(implicit
                 traceContext: TraceContext,
                 metricsContext: MetricsContext,
             ): Unit =
               msg match {
                 case SnapshotMessage.AdditionalInfo(info) =>
                   val snapshot = SequencerSnapshotAdditionalInfo
-                    .fromProto(info.toByteString) // silly to convert to ByteString
+                    .fromProto(
+                      testedProtocolVersion,
+                      info.toByteString,
+                    ) // silly to convert to ByteString
                     .getOrElse(sys.error(s"Can't parse sequencerSnapshot $info"))
 
                   if (snapshot.nodeActiveAt.contains(node)) {

@@ -8,7 +8,6 @@ import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, Interf
 import com.daml.ledger.javaapi.data.{
   CreatedEvent as JavaCreatedEvent,
   Transaction as JavaTransaction,
-  TransactionTree as JavaTransactionTree,
 }
 
 import scala.jdk.CollectionConverters.*
@@ -44,21 +43,4 @@ object JavaDecodeUtil {
       a <- decodeCreated(companion)(JavaCreatedEvent.fromProto(created)).toList
     } yield a
   }
-
-  def treeToCreated(transaction: JavaTransactionTree): Seq[JavaCreatedEvent] =
-    for {
-      event <- transaction.getEventsById.values.asScala.toSeq
-      created <- event match {
-        case created: JavaCreatedEvent => Seq(created)
-        case _ => Seq.empty
-      }
-    } yield created
-
-  def decodeAllCreatedTree[TC](
-      companion: ContractCompanion[TC, ?, ?]
-  )(transaction: JavaTransactionTree): Seq[TC] =
-    for {
-      created <- treeToCreated(transaction)
-      a <- decodeCreated(companion)(created).toList
-    } yield a
 }

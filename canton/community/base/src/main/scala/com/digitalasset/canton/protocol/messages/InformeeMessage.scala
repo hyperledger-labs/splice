@@ -16,8 +16,9 @@ import com.digitalasset.canton.protocol.{RootHash, v30}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.{
+  HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
@@ -42,7 +43,8 @@ case class InformeeMessage(
     // By default, we use ProtoBuf for serialization.
     // Serializable classes that have a corresponding Protobuf message should inherit from this trait to inherit common code and naming conventions.
     // If the corresponding Protobuf message of a class has multiple versions (e.g. `InformeeMessage`),
-    with UnsignedProtocolMessage {
+    with UnsignedProtocolMessage
+    with HasProtocolVersionedWrapper[InformeeMessage] {
 
   override val representativeProtocolVersion: RepresentativeProtocolVersion[InformeeMessage.type] =
     InformeeMessage.protocolVersionRepresentativeFor(protocolVersion)
@@ -57,7 +59,7 @@ case class InformeeMessage(
 
   override def requestUuid: UUID = fullInformeeTree.transactionUuid
 
-  override def synchronizerId: SynchronizerId = fullInformeeTree.synchronizerId
+  override def synchronizerId: PhysicalSynchronizerId = fullInformeeTree.synchronizerId
 
   override def mediator: MediatorGroupRecipient = fullInformeeTree.mediator
 
@@ -90,7 +92,7 @@ object InformeeMessage
     extends VersioningCompanionContext[InformeeMessage, (HashOps, ProtocolVersion)] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.InformeeMessage)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.InformeeMessage)(
       supportedProtoVersion(_)((hashOps, proto) => fromProtoV30(hashOps)(proto)),
       _.toProtoV30,
     )

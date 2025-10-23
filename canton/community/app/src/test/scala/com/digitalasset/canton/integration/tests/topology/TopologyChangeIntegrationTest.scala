@@ -223,7 +223,7 @@ class TopologyChangeIntegrationTest extends CommunityIntegrationTest with Shared
         participant1.parties.list("indirect").headOption.valueOrFail("must be there").party
       val syncId = participant1.synchronizers
         .list_connected()
-        .map(_.synchronizerId)
+        .map(_.physicalSynchronizerId)
         .headOption
         .valueOrFail("it's there")
 

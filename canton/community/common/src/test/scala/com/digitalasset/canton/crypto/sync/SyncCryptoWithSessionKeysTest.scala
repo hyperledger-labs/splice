@@ -4,7 +4,7 @@
 package com.digitalasset.canton.crypto.sync
 
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.SessionSigningKeysConfig
+import com.digitalasset.canton.config.{PositiveFiniteDuration, SessionSigningKeysConfig}
 import com.digitalasset.canton.crypto.signer.SyncCryptoSignerWithSessionKeys
 import com.digitalasset.canton.crypto.{
   Signature,
@@ -12,9 +12,11 @@ import com.digitalasset.canton.crypto.{
   SignatureDelegationValidityPeriod,
   SynchronizerCryptoClient,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.DefaultTestIdentities.participant1
 import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.util.ResourceUtil
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration.FiniteDuration
@@ -34,11 +36,13 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
   private def sessionKeysVerificationCache(p: SynchronizerCryptoClient) =
     p.syncCryptoVerifier.sessionKeysVerificationCache.asMap().map { case (id, (sD, _)) => (id, sD) }
 
-  private def cleanUpSessionKeysCache(p: SynchronizerCryptoClient): Unit =
+  private def cleanUpSessionKeysCache(p: SynchronizerCryptoClient): Unit = {
     p.syncCryptoSigner
       .asInstanceOf[SyncCryptoSignerWithSessionKeys]
       .sessionKeysSigningCache
       .invalidateAll()
+    p.syncCryptoSigner.asInstanceOf[SyncCryptoSignerWithSessionKeys].pendingRequests.clear()
+  }
 
   private def cleanUpSessionKeysVerificationCache(p: SynchronizerCryptoClient): Unit =
     p.syncCryptoVerifier.sessionKeysVerificationCache
@@ -64,8 +68,8 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
       topologySnapshot: TopologySnapshot,
       signature: Signature,
       p: SynchronizerCryptoClient = p1,
-      periodLength: PositiveSeconds =
-        PositiveSeconds.tryOfSeconds(validityDuration.underlying.toSeconds),
+      validityPeriodLength: PositiveFiniteDuration =
+        PositiveFiniteDuration.ofSeconds(validityDuration.underlying.toSeconds),
   ): SignatureDelegation = {
 
     val cache = sessionKeysCache(p)
@@ -78,7 +82,9 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
     topologySnapshot
       .signingKeys(p.member, defaultUsage)
       .futureValueUS
-      .map(_.id) should contain(sessionKeyAndDelegation.signatureDelegation.signature.signedBy)
+      .map(_.id) should contain(
+      sessionKeyAndDelegation.signatureDelegation.signature.authorizingLongTermKey
+    )
 
     val sessionKeyId = sessionKeyAndDelegation.signatureDelegation.sessionKey.id
     val validityPeriod = sessionKeyAndDelegation.signatureDelegation.validityPeriod
@@ -87,13 +93,23 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
     signature.signedBy shouldBe sessionKeyId
 
     // Verify it has the correct validity period
+    val margin = cutOffDuration(p).asJava.dividedBy(2)
     validityPeriod shouldBe
       SignatureDelegationValidityPeriod(
-        topologySnapshot.timestamp,
-        periodLength,
+        topologySnapshot.timestamp.minus(margin),
+        validityPeriodLength,
       )
 
     sessionKeyAndDelegation.signatureDelegation
+  }
+
+  private def cleanCache(p: SynchronizerCryptoClient) = {
+    // make sure we start from a clean state
+    cleanUpSessionKeysCache(p)
+    cleanUpSessionKeysVerificationCache(p)
+
+    sessionKeysCache(p) shouldBe empty
+    sessionKeysVerificationCache(p) shouldBe empty
   }
 
   "A SyncCrypto with session keys" must {
@@ -102,13 +118,7 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
 
     "use correct sync crypto signer with session keys" in {
       syncCryptoSignerP1 shouldBe a[SyncCryptoSignerWithSessionKeys]
-
-      // make sure we start from a clean state
-      cleanUpSessionKeysCache(p1)
-      cleanUpSessionKeysVerificationCache(p1)
-
-      sessionKeysCache(p1) shouldBe empty
-      sessionKeysVerificationCache(p1) shouldBe empty
+      cleanCache(p1)
     }
 
     "correctly produce a signature delegation when signing a single message" in {
@@ -145,32 +155,34 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
     }
 
     "sign and verify message with different synchronizers uses different session keys" in {
-      val p1OtherSynchronizer =
+      ResourceUtil.withResource(
         testingTopology.forOwnerAndSynchronizer(
           owner = participant1,
           synchronizerId = otherSynchronizerId,
         )
-      val syncCryptoSignerP1Other = p1OtherSynchronizer.syncCryptoSigner
+      ) { p1OtherSynchronizer =>
+        val syncCryptoSignerP1Other = p1OtherSynchronizer.syncCryptoSigner
 
-      val signature = syncCryptoSignerP1Other
-        .sign(
-          testSnapshot,
-          hash,
-          defaultUsage,
-        )
-        .valueOrFail("sign failed")
-        .futureValueUS
+        val signature = syncCryptoSignerP1Other
+          .sign(
+            testSnapshot,
+            hash,
+            defaultUsage,
+          )
+          .valueOrFail("sign failed")
+          .futureValueUS
 
-      val signatureDelegationOther =
-        checkSignatureDelegation(testSnapshot, signature, p1OtherSynchronizer)
+        val signatureDelegationOther =
+          checkSignatureDelegation(testSnapshot, signature, p1OtherSynchronizer)
 
-      sessionKeysCache(p1OtherSynchronizer).loneElement
+        sessionKeysCache(p1OtherSynchronizer).loneElement
 
-      // it's different from the signature delegation for the other synchronizer
-      val (_, signatureDelegation) = sessionKeysCache(p1).loneElement
-      signatureDelegationOther.validityPeriod shouldBe signatureDelegation.signatureDelegation.validityPeriod
-      signatureDelegationOther.sessionKey should not be signatureDelegation.signatureDelegation.sessionKey
-      signatureDelegationOther.signature should not be signatureDelegation.signatureDelegation.signature
+        // it's different from the signature delegation for the other synchronizer
+        val (_, signatureDelegation) = sessionKeysCache(p1).loneElement
+        signatureDelegationOther.validityPeriod shouldBe signatureDelegation.signatureDelegation.validityPeriod
+        signatureDelegationOther.sessionKey should not be signatureDelegation.signatureDelegation.sessionKey
+        signatureDelegationOther.signature should not be signatureDelegation.signatureDelegation.signature
+      }
     }
 
     "use a new session signing key when the cut-off period has elapsed" in {
@@ -179,7 +191,7 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
       // select a timestamp that is after the cut-off period
       val cutOffTimestamp =
         currentSessionKey.signatureDelegation.validityPeriod
-          .computeCutOffTimestamp(cutOffDuration(p1))
+          .computeCutOffTimestamp(cutOffDuration(p1).asJava)
 
       val afterCutOffSnapshot =
         testingTopology.topologySnapshot(timestampOfSnapshot = cutOffTimestamp)
@@ -262,6 +274,73 @@ class SyncCryptoWithSessionKeysTest extends AnyWordSpec with SyncCryptoTest {
       eventually() {
         sessionKeysCache(p1).toSeq shouldBe empty
       }
+    }
+
+    "with decreasing timestamps we still use one session signing key" in {
+
+      cleanCache(p1)
+      testingTopology.getTopology().freshKeys.set(false)
+
+      /* This covers a test scenario where we receive a decreasing timestamp order of signing requests
+          and verifies that since the validity period of a key is set as ts-cutOff/2 to ts+x+cutOff/2 we
+          can still use the same session key created for the first request.
+       */
+
+      val signatureDelegation3 = syncCryptoSignerP1
+        .sign(
+          testingTopology.topologySnapshot(timestampOfSnapshot = CantonTimestamp.ofEpochSecond(3)),
+          hash,
+          defaultUsage,
+        )
+        .valueOrFail("sign failed")
+        .futureValueUS
+        .signatureDelegation
+        .valueOrFail("no signature delegation")
+
+      val signatureDelegation2 = syncCryptoSignerP1
+        .sign(
+          testingTopology.topologySnapshot(timestampOfSnapshot = CantonTimestamp.ofEpochSecond(2)),
+          hash,
+          defaultUsage,
+        )
+        .valueOrFail("sign failed")
+        .futureValueUS
+        .signatureDelegation
+        .valueOrFail("no signature delegation")
+
+      val signatureDelegation1 = syncCryptoSignerP1
+        .sign(
+          testingTopology.topologySnapshot(timestampOfSnapshot = CantonTimestamp.ofEpochSecond(1)),
+          hash,
+          defaultUsage,
+        )
+        .valueOrFail("sign failed")
+        .futureValueUS
+        .signatureDelegation
+        .valueOrFail("no signature delegation")
+
+      signatureDelegation1 should equal(signatureDelegation2)
+      signatureDelegation2 should equal(signatureDelegation3)
+
+      // enough time has elapsed and the session key is no longer valid
+
+      val signatureDelegationNew = syncCryptoSignerP1
+        .sign(
+          testingTopology.topologySnapshot(timestampOfSnapshot =
+            CantonTimestamp.Epoch
+              .addMicros(validityDuration.unwrap.toMicros)
+              .add(cutOffDuration(p1).asJava)
+          ),
+          hash,
+          defaultUsage,
+        )
+        .valueOrFail("sign failed")
+        .futureValueUS
+        .signatureDelegation
+        .valueOrFail("no signature delegation")
+
+      signatureDelegationNew should not equal signatureDelegation1
+
     }
 
   }

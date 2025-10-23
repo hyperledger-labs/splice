@@ -32,7 +32,6 @@ import {
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   activeVersion,
-  approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
   DecentralizedSynchronizerUpgradeConfig,
@@ -50,6 +49,8 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
+  approvedSvIdentities,
+  CantonBftSynchronizerNode,
   configForSv,
   installSvLoopback,
   svsConfig,
@@ -119,7 +120,7 @@ export async function installNode(
     ? svCometBftGovernanceKeyFromSecret(svAppConfig.externalGovernanceKeyGcpSecret)
     : undefined;
 
-  const { sv, validator } = await installSvAndValidator(
+  await installSvAndValidator(
     {
       xns,
       decentralizedSynchronizerMigrationConfig,
@@ -173,7 +174,7 @@ export async function installNode(
       },
     },
     activeVersion,
-    { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
+    { dependsOn: ingressImagePullDeps }
   );
 }
 
@@ -240,14 +241,6 @@ async function installSvAndValidator(
 
   const bftSequencerConnection =
     !svConfig.participant || svConfig.participant.bftSequencerConnection;
-  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
-    ? [
-        {
-          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-        },
-      ]
-    : [];
   const disableBftSequencerConnectionEnvVars = bftSequencerConnection
     ? []
     : [
@@ -256,9 +249,9 @@ async function installSvAndValidator(
           value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
         },
       ];
-  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || [])
-    .concat(topologyChangeDelayEnvVars)
-    .concat(disableBftSequencerConnectionEnvVars);
+  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || []).concat(
+    disableBftSequencerConnectionEnvVars
+  );
 
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
@@ -280,12 +273,12 @@ async function installSvAndValidator(
         },
       ]
     : [];
+  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
-    // TODO(tech-debt): it's a bit confusing: we *only* approve from approved-sv-identities files here (so no "local" SV overrides)
     approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),
@@ -293,13 +286,26 @@ async function installSvAndValidator(
       skipInitialization:
         svsConfig?.synchronizer?.skipInitialization &&
         !svsConfig?.synchronizer.forceSvRunbookInitialization,
+      ...(useCantonBft
+        ? {
+            enableBftSequencer: true,
+          }
+        : {}),
     },
-    cometBFT: {
-      ...(valuesFromYamlFile.cometBFT || {}),
-      externalGovernanceKey: cometBftGovernanceKey
-        ? true
-        : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
-    },
+    ...(useCantonBft
+      ? {
+          cometBFT: {
+            enabled: false,
+          },
+        }
+      : {
+          cometBFT: {
+            ...(valuesFromYamlFile.cometBFT || {}),
+            externalGovernanceKey: cometBftGovernanceKey
+              ? true
+              : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
+          },
+        }),
     migration: {
       ...valuesFromYamlFile.migration,
       migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
@@ -319,6 +325,7 @@ async function installSvAndValidator(
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
+    resources: svConfig.svApp?.resources,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -369,6 +376,9 @@ async function installSvAndValidator(
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
+  const externalSequencerP2pAddress = (
+    canton.decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
+  ).externalSequencerP2pAddress;
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
@@ -376,6 +386,18 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
+    ...(useCantonBft
+      ? {
+          bftSequencers: [
+            {
+              p2pUrl: externalSequencerP2pAddress,
+              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              sequencerAddress: canton.decentralizedSynchronizer.namespaceInternalSequencerAddress,
+            },
+          ],
+        }
+      : {}),
+    resources: svConfig.scanApp?.resources,
   };
 
   const scanValuesWithFixedTokens = {
@@ -393,8 +415,7 @@ async function installSvAndValidator(
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
         .concat(svAppSecrets)
-        .concat([appsPg])
-        .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : []),
+        .concat([appsPg]),
     }
   );
 
@@ -423,6 +444,7 @@ async function installSvAndValidator(
     ),
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
+    resources: svConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

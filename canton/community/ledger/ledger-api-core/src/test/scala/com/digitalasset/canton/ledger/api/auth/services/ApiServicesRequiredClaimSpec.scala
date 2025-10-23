@@ -10,10 +10,10 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRequest
 import com.daml.ledger.api.v2.command_service.SubmitAndWaitForTransactionRequest
 import com.daml.ledger.api.v2.commands.Commands
-import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdRequest
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.Metadata.SubmitterInfo
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
+  ExecuteSubmissionAndWaitForTransactionRequest,
   ExecuteSubmissionRequest,
   Metadata,
   PrepareSubmissionRequest,
@@ -26,7 +26,6 @@ import com.daml.ledger.api.v2.transaction_filter.{
   Filters,
   ParticipantAuthorizationTopologyFormat,
   TopologyFormat,
-  TransactionFilter,
   TransactionFormat,
   UpdateFormat,
 }
@@ -35,6 +34,7 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.auth.RequiredClaim
 import com.digitalasset.canton.ledger.api.auth.RequiredClaims
 import com.digitalasset.canton.ledger.api.auth.services.ApiServicesRequiredClaimSpec.{
+  executeSubmissionAndWaitForTransactionRequest,
   executeSubmissionRequest,
   prepareSubmissionRequest,
   submitAndWaitForTransactionRequest,
@@ -45,9 +45,7 @@ import org.scalatest.matchers.should.Matchers
 import scalapb.lenses.Lens
 
 import java.util.UUID
-import scala.annotation.nowarn
 
-@nowarn("cat=deprecation")
 class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matchers {
 
   behavior of "CommandCompletionServiceAuthorization.completionStreamClaims"
@@ -125,8 +123,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
   it should "compute the correct claims in the happy path" in {
     StateServiceAuthorization.getActiveContractsClaims(
       GetActiveContractsRequest(
-        filter = None,
-        verbose = true,
         activeAtOffset = 15,
         eventFormat = Some(
           EventFormat(
@@ -151,8 +147,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
   it should "compute the correct claims if no filtersForAnyParty" in {
     StateServiceAuthorization.getActiveContractsClaims(
       GetActiveContractsRequest(
-        filter = None,
-        verbose = true,
         activeAtOffset = 15,
         eventFormat = Some(
           EventFormat(
@@ -176,8 +170,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
   it should "compute the correct claims if no filtersByParty" in {
     StateServiceAuthorization.getActiveContractsClaims(
       GetActiveContractsRequest(
-        filter = None,
-        verbose = true,
         activeAtOffset = 15,
         eventFormat = Some(
           EventFormat(
@@ -193,144 +185,8 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
   it should "compute the correct claims if no eventFormat" in {
     StateServiceAuthorization.getActiveContractsClaims(
       GetActiveContractsRequest(
-        filter = None,
-        verbose = true,
         activeAtOffset = 15,
         eventFormat = None,
-      )
-    ) shouldBe Nil
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if both legacy and new usage" in {
-    StateServiceAuthorization.getActiveContractsClaims(
-      GetActiveContractsRequest(
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map(
-              "1" -> Filters(Nil),
-              "2" -> Filters(Nil),
-              "3" -> Filters(Nil),
-            ),
-            filtersForAnyParty = Some(Filters(Nil)),
-          )
-        ),
-        verbose = true,
-        activeAtOffset = 15,
-        eventFormat = Some(
-          EventFormat(
-            filtersByParty = Map(
-              "a" -> Filters(Nil),
-              "b" -> Filters(Nil),
-              "c" -> Filters(Nil),
-            ),
-            filtersForAnyParty = Some(Filters(Nil)),
-            verbose = true,
-          )
-        ),
-      )
-    ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
-      RequiredClaim.ReadAs("a"),
-      RequiredClaim.ReadAs("b"),
-      RequiredClaim.ReadAs("c"),
-      RequiredClaim.ReadAsAnyParty(),
-      RequiredClaim.ReadAs("1"),
-      RequiredClaim.ReadAs("2"),
-      RequiredClaim.ReadAs("3"),
-      RequiredClaim.ReadAsAnyParty(),
-    )
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if both legacy and new usage, if one of the any party filters missing" in {
-    StateServiceAuthorization.getActiveContractsClaims(
-      GetActiveContractsRequest(
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map(
-              "1" -> Filters(Nil),
-              "2" -> Filters(Nil),
-              "3" -> Filters(Nil),
-            ),
-            filtersForAnyParty = None,
-          )
-        ),
-        verbose = true,
-        activeAtOffset = 15,
-        eventFormat = Some(
-          EventFormat(
-            filtersByParty = Map(
-              "a" -> Filters(Nil),
-              "b" -> Filters(Nil),
-              "c" -> Filters(Nil),
-            ),
-            filtersForAnyParty = Some(Filters(Nil)),
-            verbose = true,
-          )
-        ),
-      )
-    ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
-      RequiredClaim.ReadAs("a"),
-      RequiredClaim.ReadAs("b"),
-      RequiredClaim.ReadAs("c"),
-      RequiredClaim.ReadAsAnyParty(),
-      RequiredClaim.ReadAs("1"),
-      RequiredClaim.ReadAs("2"),
-      RequiredClaim.ReadAs("3"),
-    )
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if both legacy and new usage, if only one any party filters, and one by party filters" in {
-    StateServiceAuthorization.getActiveContractsClaims(
-      GetActiveContractsRequest(
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map(
-              "1" -> Filters(Nil),
-              "2" -> Filters(Nil),
-              "3" -> Filters(Nil),
-            ),
-            filtersForAnyParty = None,
-          )
-        ),
-        verbose = true,
-        activeAtOffset = 15,
-        eventFormat = Some(
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(Filters(Nil)),
-            verbose = true,
-          )
-        ),
-      )
-    ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
-      RequiredClaim.ReadAsAnyParty(),
-      RequiredClaim.ReadAs("1"),
-      RequiredClaim.ReadAs("2"),
-      RequiredClaim.ReadAs("3"),
-    )
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if both legacy and new usage, if all empty" in {
-    StateServiceAuthorization.getActiveContractsClaims(
-      GetActiveContractsRequest(
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = None,
-          )
-        ),
-        verbose = true,
-        activeAtOffset = 15,
-        eventFormat = Some(
-          EventFormat(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = None,
-            verbose = true,
-          )
-        ),
       )
     ) shouldBe Nil
   }
@@ -363,6 +219,25 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       RequiredClaim.ExecuteAs("2"),
       RequiredClaim.MatchUserId(
         InteractiveSubmissionServiceAuthorization.userIdForExecuteSubmissionL
+      ),
+    )
+  }
+
+  behavior of "InteractiveSubmissionServiceAuthorization.executeSubmissionAndWaitForTransaction"
+
+  it should "compute the correct claims in the happy path" in {
+    InteractiveSubmissionServiceAuthorization.getExecuteSubmissionAndWaitForTransactionClaims(
+      executeSubmissionAndWaitForTransactionRequest
+    ) should contain theSameElementsAs RequiredClaims[
+      ExecuteSubmissionAndWaitForTransactionRequest
+    ](
+      RequiredClaim.ExecuteAs("1"),
+      RequiredClaim.ExecuteAs("2"),
+      RequiredClaim.ReadAs("i"),
+      RequiredClaim.ReadAs("ii"),
+      RequiredClaim.ReadAsAnyParty(),
+      RequiredClaim.MatchUserId(
+        InteractiveSubmissionServiceAuthorization.userIdForExecuteSubmissionAndWaitForTransactionL
       ),
     )
   }
@@ -474,8 +349,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = Some(
@@ -525,8 +398,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = Some(
@@ -582,8 +453,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = Some(
@@ -617,8 +486,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = Some(
@@ -642,8 +509,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = false,
         updateFormat = None,
       )
     ) shouldBe Nil
@@ -654,8 +519,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = None,
@@ -677,8 +540,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = Some(
@@ -708,8 +569,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeReassignments = Some(
@@ -734,8 +593,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetUpdatesRequest(
         beginExclusive = 10,
         endInclusive = Some(15),
-        filter = None,
-        verbose = true,
         updateFormat = Some(
           UpdateFormat(
             includeTransactions = None,
@@ -745,79 +602,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
             ),
           )
         ),
-      )
-    ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
-      RequiredClaim.ReadAsAnyParty()
-    )
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if legacy, happy path" in {
-    UpdateServiceAuthorization.getUpdatesClaims(
-      GetUpdatesRequest(
-        beginExclusive = 10,
-        endInclusive = Some(15),
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map(
-              "1" -> Filters(Nil),
-              "2" -> Filters(Nil),
-              "3" -> Filters(Nil),
-            ),
-            filtersForAnyParty = Some(Filters(Nil)),
-          )
-        ),
-        verbose = true,
-        updateFormat = None,
-      )
-    ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
-      RequiredClaim.ReadAs("1"),
-      RequiredClaim.ReadAs("2"),
-      RequiredClaim.ReadAs("3"),
-      RequiredClaim.ReadAsAnyParty(),
-    )
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if legacy, if the any party filters are missing" in {
-    UpdateServiceAuthorization.getUpdatesClaims(
-      GetUpdatesRequest(
-        beginExclusive = 10,
-        endInclusive = Some(15),
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map(
-              "1" -> Filters(Nil),
-              "2" -> Filters(Nil),
-              "3" -> Filters(Nil),
-            ),
-            filtersForAnyParty = None,
-          )
-        ),
-        verbose = true,
-        updateFormat = None,
-      )
-    ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
-      RequiredClaim.ReadAs("1"),
-      RequiredClaim.ReadAs("2"),
-      RequiredClaim.ReadAs("3"),
-    )
-  }
-
-  // TODO(i23504) Remove
-  it should "compute the aggregated claims if legacy, if only any party filters exist" in {
-    UpdateServiceAuthorization.getUpdatesClaims(
-      GetUpdatesRequest(
-        beginExclusive = 10,
-        endInclusive = Some(15),
-        filter = Some(
-          TransactionFilter(
-            filtersByParty = Map.empty,
-            filtersForAnyParty = Some(Filters(Nil)),
-          )
-        ),
-        verbose = true,
-        updateFormat = None,
       )
     ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
       RequiredClaim.ReadAsAnyParty()
@@ -835,37 +619,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
     ) should contain theSameElementsAs RequiredClaims[String](
       RequiredClaim.MatchUserIdForUserManagement(userIdL),
       RequiredClaim.MatchIdentityProviderId(identityProviderIdL),
-    )
-  }
-
-  behavior of "EventQueryServiceAuthorization.getEventsByContractIdClaims"
-
-  it should "compute the correct claims in the happy path" in {
-    val result = EventQueryServiceAuthorization.getEventsByContractIdClaims(
-      GetEventsByContractIdRequest(
-        contractId = "",
-        requestingParties = Seq("a", "b", "c"),
-        eventFormat = Some(
-          EventFormat(
-            filtersByParty = Map(
-              "A" -> Filters(Nil),
-              "B" -> Filters(Nil),
-              "C" -> Filters(Nil),
-            ),
-            filtersForAnyParty = Some(Filters(Nil)),
-            verbose = true,
-          )
-        ),
-      )
-    )
-    result should contain theSameElementsAs RequiredClaims[GetEventsByContractIdRequest](
-      RequiredClaim.ReadAs("a"),
-      RequiredClaim.ReadAs("b"),
-      RequiredClaim.ReadAs("c"),
-      RequiredClaim.ReadAs("A"),
-      RequiredClaim.ReadAs("B"),
-      RequiredClaim.ReadAs("C"),
-      RequiredClaim.ReadAsAnyParty(),
     )
   }
 
@@ -930,7 +683,7 @@ object ApiServicesRequiredClaimSpec {
       packageIdSelectionPreference = Seq.empty,
       verboseHashing = true,
       prefetchContractKeys = Seq.empty,
-      maxRecordTime = None,
+      maxRecordTime = Option.empty,
     )
 
   val preparedTransaction = PreparedTransaction(
@@ -951,7 +704,7 @@ object ApiServicesRequiredClaimSpec {
         minLedgerEffectiveTime = None,
         maxLedgerEffectiveTime = None,
         globalKeyMapping = Seq.empty,
-        maxRecordTime = None,
+        maxRecordTime = Option.empty,
       )
     ),
   )
@@ -967,5 +720,20 @@ object ApiServicesRequiredClaimSpec {
       userId = "userId",
       hashingSchemeVersion = HASHING_SCHEME_VERSION_V2,
       minLedgerTime = None,
+    )
+
+  val executeSubmissionAndWaitForTransactionRequest =
+    ExecuteSubmissionAndWaitForTransactionRequest(
+      preparedTransaction = Some(preparedTransaction),
+      partySignatures = None,
+      deduplicationPeriod =
+        ExecuteSubmissionAndWaitForTransactionRequest.DeduplicationPeriod.DeduplicationDuration(
+          ProtoConverter.DurationConverter.toProtoPrimitive(java.time.Duration.ofSeconds(1))
+        ),
+      submissionId = "submissionId",
+      userId = "userId",
+      hashingSchemeVersion = HASHING_SCHEME_VERSION_V2,
+      minLedgerTime = None,
+      transactionFormat = Some(transactionFormat),
     )
 }

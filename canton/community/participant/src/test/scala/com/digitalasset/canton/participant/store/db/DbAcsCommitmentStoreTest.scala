@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.store.db
 
+import cats.Eval
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.store.{
@@ -10,6 +11,7 @@ import com.digitalasset.canton.participant.store.{
   CommitmentQueueTest,
   IncrementalCommitmentStoreTest,
 }
+import com.digitalasset.canton.platform.store.interning.MockStringInterning
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.IndexedSynchronizer
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
@@ -18,6 +20,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.ExecutionContext
 
 trait DbAcsCommitmentStoreTest extends AcsCommitmentStoreTest { this: DbTest =>
+
+  val mockStringInterning = new MockStringInterning
 
   override def cleanDb(
       storage: DbStorage
@@ -41,15 +45,17 @@ trait DbAcsCommitmentStoreTest extends AcsCommitmentStoreTest { this: DbTest =>
         storage,
         IndexedSynchronizer.tryCreate(synchronizerId, 1),
         new DbAcsCommitmentConfigStore(storage, timeouts, loggerFactory),
-        testedProtocolVersion,
         timeouts,
         loggerFactory,
+        Eval.now(mockStringInterning),
       )(ec)
     )
   }
 }
 
 trait DbIncrementalCommitmentStoreTest extends IncrementalCommitmentStoreTest { this: DbTest =>
+  val mockStringInterning = new MockStringInterning
+
   override def cleanDb(
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
@@ -68,9 +74,9 @@ trait DbIncrementalCommitmentStoreTest extends IncrementalCommitmentStoreTest { 
       new DbIncrementalCommitmentStore(
         storage,
         IndexedSynchronizer.tryCreate(synchronizerId, 1),
-        testedProtocolVersion,
         timeouts,
         loggerFactory,
+        Eval.now(mockStringInterning),
       )(ec)
     )
   }
@@ -94,7 +100,6 @@ trait DbCommitmentQueueTest extends CommitmentQueueTest { this: DbTest =>
       new DbCommitmentQueue(
         storage,
         IndexedSynchronizer.tryCreate(synchronizerId, 1),
-        testedProtocolVersion,
         timeouts,
         loggerFactory,
       )(ec)

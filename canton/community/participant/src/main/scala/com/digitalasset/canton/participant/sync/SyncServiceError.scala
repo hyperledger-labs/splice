@@ -27,11 +27,11 @@ import com.digitalasset.canton.error.{
 import com.digitalasset.canton.ledger.participant.state.SubmissionResult
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError
-import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{LedgerSubmissionId, SynchronizerAlias}
+import com.digitalasset.canton.{LedgerSubmissionId, LfPartyId, SynchronizerAlias}
 import com.google.rpc.status.Status
 import io.grpc.Status.Code
 import org.slf4j.event.Level
@@ -125,19 +125,75 @@ object SyncServiceError extends SyncServiceErrorGroup {
   }
 
   @Explanation(
-    "This error results on an attempt to register a new synchronizer under an alias already in use."
+    "This error results if the service cannot infer the active synchronizer for the alias."
   )
-  object SyncServiceAlreadyAdded
+  @Resolution(
+    "Please confirm the synchronizer alias is correct, or configure the synchronizer before (re)connecting."
+  )
+  object SyncServiceAliasResolution
       extends ErrorCode(
-        "SYNC_SERVICE_ALREADY_ADDED",
-        ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
+        "SYNC_SERVICE_ALIAS_RESOLUTION",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
       ) {
-    final case class Error(synchronizerAlias: SynchronizerAlias)(implicit
+    final case class Error(synchronizerAlias: SynchronizerAlias, error: String)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = "The synchronizer with the given alias has already been added."
+          cause =
+            s"Unable to find single active synchronizer connection for ${synchronizerAlias.unwrap}: $error"
         )
         with SyncServiceError
+  }
+
+  @Explanation(
+    "This error results if the service cannot register the physical synchronizer id for the given alias."
+  )
+  @Resolution(
+    "Please confirm the synchronizer alias and id are correct."
+  )
+  object SyncServicePhysicalIdRegistration
+      extends ErrorCode(
+        "SYNC_SERVICE_PHYSICAL_ID_REGISTRATION",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+      ) {
+    final case class Error(
+        synchronizerAlias: SynchronizerAlias,
+        physicalSynchronizerId: PhysicalSynchronizerId,
+        error: String,
+    )(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"Unable to register id $physicalSynchronizerId for alias ${synchronizerAlias.unwrap}: $error"
+        )
+        with SyncServiceError
+  }
+
+  @Explanation(
+    "This error results on an attempt to register a new synchronizer."
+  )
+  object SynchronizerRegistration
+      extends ErrorCode(
+        "SYNCHRONIZER_REGISTRATION",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
+      ) {
+    final case class Error(synchronizerAlias: SynchronizerAlias, error: String)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"The synchronizer with alias $synchronizerAlias cannot be registered: $error"
+        )
+        with SyncServiceError
+
+    final case class SuccessorInitializationError(
+        synchronizerId: PhysicalSynchronizerId,
+        error: String,
+    )(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"The synchronizer with physical synchronizer id $synchronizerId cannot be registered: $error"
+        )
+        with SyncServiceError
+
   }
 
   @Explanation("This error results if a admin command is submitted to the passive replica.")
@@ -245,13 +301,10 @@ object SyncServiceError extends SyncServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
 
-    final case class Error(
-        synchronizerAlias: SynchronizerAlias,
-        status: SynchronizerConnectionConfigStore.Status,
-    )(implicit
+    final case class Error(synchronizerAlias: SynchronizerAlias)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"$synchronizerAlias has status $status and can therefore not be connected to."
+          cause = s"$synchronizerAlias is not active and can therefore not be connected to."
         )
         with SyncServiceError
   }
@@ -382,6 +435,18 @@ object SyncServiceError extends SyncServiceErrorGroup {
             "Failed to await for participant becoming active due to missing synchronizer objects"
         )
         with SyncServiceError
+
+    final case class PhysicalSynchronizerIdNotConfigured(
+        synchronizerAlias: SynchronizerAlias,
+        where: String,
+    )(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"The physical synchronizer id for the synchronizer configuration for $synchronizerAlias was unexpectedly not configured."
+        )
+        with SyncServiceError
+
     final case class CleanHeadAwaitFailed(
         synchronizerAlias: SynchronizerAlias,
         ts: CantonTimestamp,
@@ -440,6 +505,25 @@ object SyncServiceError extends SyncServiceErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = show"Cannot allocate a party without being connected to a synchronizer"
+        )
+  }
+  @Explanation(
+    """The participant is connected to more than one synchronizer and can therefore not automatically
+       detect on which synchronizer the party should be allocated."""
+  )
+  @Resolution(
+    "Explicitly specify the synchronizer on which to allocate the party or disconnect from all but one synchronizer."
+  )
+  object PartyAllocationCannotDetermineSynchronizer
+      extends ErrorCode(
+        "PARTY_ALLOCATION_CANNOT_DETERMINE_SYNCHRONIZER",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(partyId: LfPartyId)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            show"Cannot determine the synchronizer on which to allocate party $partyId, because the participant is connected to multiple synchronizers and no synchronizer was specified."
         )
   }
 

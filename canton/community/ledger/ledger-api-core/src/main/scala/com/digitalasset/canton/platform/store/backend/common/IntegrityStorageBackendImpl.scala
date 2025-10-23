@@ -3,14 +3,16 @@
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import anorm.SqlParser.{array, int, long, str}
+import anorm.SqlParser.{byteArray, int, long, str}
 import anorm.{RowParser, ~}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.platform.store.backend.IntegrityStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.`SimpleSql ops`
+import com.digitalasset.canton.protocol.UpdateId
 import com.digitalasset.canton.topology.SynchronizerId
+import com.google.common.annotations.VisibleForTesting
 
 import java.sql.Connection
 
@@ -107,7 +109,8 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
         EventSequentialIdsRow(min.getOrElse(0L), max.getOrElse(0L), count)
       }
 
-  override def onlyForTestingVerifyIntegrity(
+  @VisibleForTesting
+  override def verifyIntegrity(
       failForEmptyDB: Boolean = true
   )(connection: Connection): Unit = try {
     val duplicateSeqIds = SqlDuplicateEventSequentialIds
@@ -179,15 +182,15 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
     // Verify no duplicate update id
     SQL"""
           SELECT meta1.update_id as uId, meta1.event_offset as offset1, meta2.event_offset as offset2
-          FROM lapi_transaction_meta as meta1, lapi_transaction_meta as meta2
+          FROM lapi_update_meta as meta1, lapi_update_meta as meta2
           WHERE meta1.update_id = meta2.update_id and
                 meta1.event_offset != meta2.event_offset
           FETCH NEXT 1 ROWS ONLY
       """
-      .asSingleOpt(str("uId") ~ offset("offset1") ~ offset("offset2"))(connection)
+      .asSingleOpt(updateId("uId") ~ offset("offset1") ~ offset("offset2"))(connection)
       .foreach { case uId ~ offset1 ~ offset2 =>
         throw new RuntimeException(
-          s"occurrence of duplicate update ID [$uId] found for offsets $offset1, $offset2"
+          s"occurrence of duplicate update ID [${uId.toHexString}] found for offsets $offset1, $offset2"
         )
       }
 
@@ -209,7 +212,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
     // Verify publication time cannot go backwards
     val offsetPublicationTimes =
       SQL"""
-           SELECT event_offset as _offset, publication_time FROM lapi_transaction_meta
+           SELECT event_offset as _offset, publication_time FROM lapi_update_meta
            UNION ALL
            SELECT completion_offset as _offset, publication_time FROM lapi_command_completions
            """
@@ -249,10 +252,10 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
       """
       .asVectorOf(
         offset("completion_offset") ~
-          str("user_id") ~
-          array[Int]("submitters") ~
+          int("user_id") ~
+          byteArray("submitters") ~
           str("command_id") ~
-          str("update_id").? ~
+          updateId("update_id").? ~
           str("submission_id").? ~
           str("message_uuid").? ~
           long("record_time") ~
@@ -260,7 +263,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
             case offset ~ userId ~ submitters ~ commandId ~ updateId ~ submissionId ~ messageUuid ~ recordTimeLong ~ synchronizerId =>
               CompletionEntry(
                 userId,
-                submitters.toList,
+                IntArrayDBSerialization.decodeFromByteArray(submitters).toList,
                 commandId,
                 updateId,
                 submissionId,
@@ -300,6 +303,24 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
         )
       )
 
+    // Verify no duplicate completion entry
+    val internalContractIds = SQL"""
+          SELECT
+            internal_contract_id
+          FROM par_contracts
+      """
+      .asVectorOf(long("internal_contract_id"))(connection)
+    val firstTenDuplicatedInternalIds = internalContractIds
+      .groupMap(identity)(identity)
+      .iterator
+      .filter(_._2.sizeIs > 1)
+      .take(10)
+      .map(_._1)
+      .toSeq
+    if (firstTenDuplicatedInternalIds.nonEmpty)
+      throw new RuntimeException(
+        s"duplicate internal_contract_id-s found in table par_contracts (first 10 shown) $firstTenDuplicatedInternalIds"
+      )
   } catch {
     case t: Throwable if !failForEmptyDB =>
       val failure = t.getMessage
@@ -316,7 +337,8 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
       }
   }
 
-  override def onlyForTestingNumberOfAcceptedTransactionsFor(
+  @VisibleForTesting
+  override def numberOfAcceptedTransactionsFor(
       synchronizerId: SynchronizerId
   )(connection: Connection): Int =
     SQL"""SELECT internal_id
@@ -326,7 +348,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
       .asSingleOpt(int("internal_id"))(connection)
       .map(internedSynchronizerId => SQL"""
         SELECT COUNT(*) as count
-        FROM lapi_transaction_meta
+        FROM lapi_update_meta
         WHERE synchronizer_id = $internedSynchronizerId
        """.asSingle(int("count"))(connection))
       .getOrElse(0)
@@ -334,8 +356,11 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
   /** ONLY FOR TESTING This is causing wiping of all LAPI event data. This should not be used during
     * working indexer.
     */
-  override def onlyForTestingMoveLedgerEndBackToScratch()(connection: Connection): Unit = {
-    SQL"DELETE FROM lapi_parameters".executeUpdate()(connection).discard
+  @VisibleForTesting
+  override def moveLedgerEndBackToScratch()(connection: Connection): Unit = {
+    SQL"UPDATE lapi_parameters SET ledger_end = 1, ledger_end_sequential_id = 0"
+      .executeUpdate()(connection)
+      .discard
     SQL"DELETE FROM lapi_post_processing_end".executeUpdate()(connection).discard
     SQL"DELETE FROM lapi_ledger_end_synchronizer_index".executeUpdate()(connection).discard
     SQL"DELETE FROM par_command_deduplication".executeUpdate()(connection).discard
@@ -343,10 +368,10 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
   }
 
   private final case class CompletionEntry(
-      userId: String,
+      userId: Int,
       submitters: List[Int],
       commandId: String,
-      updateId: Option[String],
+      updateId: Option[UpdateId],
       submissionId: Option[String],
       messageUuid: Option[String],
       recordTimeLong: Long,

@@ -36,8 +36,6 @@ object NodeLoggingUtil {
       logger.setLevel(Level.valueOf(level))
   }
 
-  val originalRootLoggerLevel: Level = rootLogger.getLevel
-
   def getLogger(loggerName: String): Logger = {
     import org.slf4j.LoggerFactory
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

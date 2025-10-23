@@ -14,7 +14,7 @@ trait MultiDomainTestUtil extends TestCommon {
       onDomain: SynchronizerAlias
   )(cids: ContractId[?]*)(implicit env: SpliceTestConsoleEnvironment, pos: source.Position) = {
     val cidStrings = cids.map(c => c.contractId)
-    val synchronizerId = splitwellBackend.participantClient.synchronizers.id_of(onDomain)
+    val synchronizerId = splitwellBackend.participantClient.synchronizers.id_of(onDomain).logical
     val domains =
       splitwellBackend.participantClient.ledger_api_extensions.acs.lookup_contract_domain(
         splitwellBackend.getProviderPartyId(),

@@ -4,16 +4,22 @@
 package com.digitalasset.canton.admin.api.client.data.crypto
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 
 final case class RequiredEncryptionSpecs(
     algorithms: NonEmpty[Set[EncryptionAlgorithmSpec]],
     keys: NonEmpty[Set[EncryptionKeySpec]],
-)
+) extends PrettyPrinting {
+  override val pretty: Pretty[this.type] = prettyOfClass(
+    param("algorithms", _.algorithms),
+    param("keys", _.keys),
+  )
+}
 
 /** Key schemes for asymmetric/hybrid encryption. */
-sealed trait EncryptionKeySpec extends Product with Serializable {
+sealed trait EncryptionKeySpec extends Product with Serializable with PrettyPrinting {
   def name: String
-  override def toString: String = name
+  override val pretty: Pretty[this.type] = prettyOfString(_.name)
 }
 
 object EncryptionKeySpec {
@@ -27,16 +33,12 @@ object EncryptionKeySpec {
 }
 
 /** Algorithm schemes for asymmetric/hybrid encryption. */
-sealed trait EncryptionAlgorithmSpec extends Product with Serializable {
+sealed trait EncryptionAlgorithmSpec extends Product with Serializable with PrettyPrinting {
   def name: String
-  override def toString: String = name
+  override val pretty: Pretty[this.type] = prettyOfString(_.name)
 }
 
 object EncryptionAlgorithmSpec {
-  case object EciesHkdfHmacSha256Aes128Gcm extends EncryptionAlgorithmSpec {
-    override val name: String = "ECIES_HMAC256_AES128-GCM"
-  }
-
   case object EciesHkdfHmacSha256Aes128Cbc extends EncryptionAlgorithmSpec {
     override val name: String = "ECIES_HMAC256_AES128-CBC"
   }
@@ -47,9 +49,9 @@ object EncryptionAlgorithmSpec {
 }
 
 /** Key/algorithm schemes for symmetric encryption. */
-sealed trait SymmetricKeyScheme extends Product with Serializable {
+sealed trait SymmetricKeyScheme extends Product with Serializable with PrettyPrinting {
   def name: String
-  override def toString: String = name
+  override val pretty: Pretty[this.type] = prettyOfString(_.name)
 
   def keySizeInBytes: Int
 }

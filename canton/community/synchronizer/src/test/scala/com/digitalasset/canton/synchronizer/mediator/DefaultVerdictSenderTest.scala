@@ -35,6 +35,7 @@ import com.digitalasset.canton.topology.{
   MediatorGroup,
   MediatorId,
   ParticipantId,
+  PhysicalSynchronizerId,
   SynchronizerId,
   TestingIdentityFactory,
   TestingTopology,
@@ -164,19 +165,19 @@ class DefaultVerdictSenderTest
     }
   }
 
-  case class TestHelper(
+  private case class TestHelper(
       mediatorId: MediatorId,
       transactionMediatorGroup: MediatorGroupRecipient,
   ) {
 
-    val synchronizerId: SynchronizerId = SynchronizerId(
+    val psid: PhysicalSynchronizerId = SynchronizerId(
       UniqueIdentifier.tryFromProtoPrimitive("synchronizer::test")
-    )
+    ).toPhysical
     val testTopologyTimestamp = CantonTimestamp.Epoch
 
     val factory =
       new ExampleTransactionFactory()(
-        synchronizerId = synchronizerId,
+        psid = psid,
         mediatorGroup = transactionMediatorGroup,
       )
     val mediatorRecipient: MediatorGroupRecipient = factory.mediatorGroup
@@ -185,8 +186,7 @@ class DefaultVerdictSenderTest
       InformeeMessage(fullInformeeTree, Signature.noSignature)(testedProtocolVersion)
     val rootHashMessage = RootHashMessage(
       fullInformeeTree.transactionId.toRootHash,
-      synchronizerId,
-      testedProtocolVersion,
+      psid,
       ViewType.TransactionViewType,
       testTopologyTimestamp,
       SerializedRootHashMessagePayload.empty,
@@ -208,9 +208,9 @@ class DefaultVerdictSenderTest
     val initialSynchronizerParameters = TestSynchronizerParameters.defaultDynamic
 
     val synchronizerSyncCryptoApi: SynchronizerCryptoClient =
-      if (testedProtocolVersion >= ProtocolVersion.v33) {
+      if (testedProtocolVersion >= ProtocolVersion.v34) {
         val topology = TestingTopology.from(
-          Set(synchronizerId),
+          Set(psid),
           Map(
             submitter -> Map(participant -> ParticipantPermission.Confirmation),
             signatory ->
@@ -227,10 +227,10 @@ class DefaultVerdictSenderTest
           dynamicSynchronizerParameters = initialSynchronizerParameters,
         )
 
-        identityFactory.forOwnerAndSynchronizer(mediatorId, synchronizerId)
+        identityFactory.forOwnerAndSynchronizer(mediatorId, psid)
       } else {
         val topology = TestingTopology.from(
-          Set(synchronizerId),
+          Set(psid),
           Map(
             submitter -> Map(participant -> ParticipantPermission.Confirmation),
             signatory ->
@@ -254,7 +254,7 @@ class DefaultVerdictSenderTest
           dynamicSynchronizerParameters = initialSynchronizerParameters,
         )
 
-        identityFactory.forOwnerAndSynchronizer(mediatorId, synchronizerId)
+        identityFactory.forOwnerAndSynchronizer(mediatorId, psid)
       }
 
     private val sequencerClientSend: TestSequencerClientSend = new TestSequencerClientSend
@@ -268,7 +268,6 @@ class DefaultVerdictSenderTest
       sequencerClientSend,
       synchronizerSyncCryptoApi,
       mediatorId,
-      testedProtocolVersion,
       loggerFactory,
     )
 

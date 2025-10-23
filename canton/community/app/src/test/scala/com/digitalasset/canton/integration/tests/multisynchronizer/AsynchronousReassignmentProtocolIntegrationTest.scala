@@ -7,12 +7,11 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalSequencerReference
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{EntitySyntax, PartiesAllocator}
@@ -32,7 +31,6 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 }
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{BaseTest, SynchronizerAlias, config}
 
 import java.util.concurrent.atomic.AtomicLong
@@ -57,7 +55,7 @@ final class AsynchronousReassignmentProtocolIntegrationTest
 
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2")).map(_.map(InstanceName.tryCreate))
@@ -75,7 +73,8 @@ final class AsynchronousReassignmentProtocolIntegrationTest
         import env.*
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
         participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
-        participants.all.dars.upload(BaseTest.CantonExamplesPath)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = daId)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = acmeId)
 
         // Disable automatic assignment so that we really control it
         def disableAutomaticAssignment(
@@ -93,7 +92,7 @@ final class AsynchronousReassignmentProtocolIntegrationTest
         val alice = "alice"
         val bob = "bob"
         // Enable alice on other participants, on all synchronizers
-        new PartiesAllocator(participants.all.toSet)(
+        PartiesAllocator(participants.all.toSet)(
           Seq(alice -> participant1, bob -> participant1),
           Map(
             alice -> Map(
@@ -105,12 +104,9 @@ final class AsynchronousReassignmentProtocolIntegrationTest
               acmeId -> (PositiveInt.one, Set((participant1, Submission))),
             ),
           ),
-        ).run()
-
-        programmableSequencers.put(
-          daName,
-          getProgrammableSequencer(sequencer1.name),
         )
+
+        programmableSequencers.put(daName, getProgrammableSequencer(sequencer1.name))
         programmableSequencers.put(acmeName, getProgrammableSequencer(sequencer2.name))
       }
 
@@ -154,19 +150,11 @@ final class AsynchronousReassignmentProtocolIntegrationTest
 
       val entries =
         reassignmentIds.map(id => reassignmentStore.findReassignmentEntry(id).futureValueUS.value)
-
-      val (entryBob, entryAlice) = entries match {
-        case Seq(e1, e2) if e1.unassignmentRequest.exists(_.submitter == bobId.toLf) => (e1, e2)
-        case Seq(e1, e2) if e2.unassignmentRequest.exists(_.submitter == bobId.toLf) => (e2, e1)
-        case _ =>
-          fail(
-            s"Expected two in-flight entries in the reassignment store but found ${entries.size}"
-          )
-      }
-
       // make sure that Bob's unassignment completed before Alice's one
-      entryBob.unassignmentResult should not be empty
-      entryAlice.unassignmentResult shouldBe empty
+      entries.loneElement.unassignmentData.map(_.submitterMetadata.submitter) should contain(
+        bobId.toLf
+      )
+
     }
     until.trySuccess(())
 
@@ -194,11 +182,11 @@ final class AsynchronousReassignmentProtocolIntegrationTest
         daId,
         acmeId,
       )
-      .unassignId
+      .reassignmentId
 
     val unassign2 = participant1.ledger_api.commands
       .submit_unassign(bobId, Seq(LfContractId.assertFromString(iou2.id.contractId)), daId, acmeId)
-      .unassignId
+      .reassignmentId
 
     val until: Promise[Unit] = Promise[Unit]()
     programmableSequencers(acmeName).setPolicy_("delay confirmation response from alice")(
@@ -221,10 +209,8 @@ final class AsynchronousReassignmentProtocolIntegrationTest
         acmeId,
       )
 
-    val aliceReassignmentId =
-      ReassignmentId(Source(daId), CantonTimestamp.assertFromLong(unassign1.toLong))
-    val bobReassignmentId =
-      ReassignmentId(Source(daId), CantonTimestamp.assertFromLong(unassign2.toLong))
+    val aliceReassignmentId = ReassignmentId.tryCreate(unassign1)
+    val bobReassignmentId = ReassignmentId.tryCreate(unassign2)
 
     val reassignmentStore = participant1.underlying.value.sync.syncPersistentStateManager
       .get(acmeId)

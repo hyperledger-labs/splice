@@ -100,11 +100,11 @@ final class CommitmentsService(
       ),
     )
     val synchronizers = connectedSynchronizersLookup.snapshot.values.filter(synchronizer =>
-      paramSynchronizerIds.isEmpty || paramSynchronizerIds.contains(synchronizer.synchronizerId)
+      paramSynchronizerIds.isEmpty || paramSynchronizerIds.contains(synchronizer.psid.logical)
     )
 
     val resultPerSynchronizer = synchronizers.map { synchronizer =>
-      val synchronizerId = synchronizer.synchronizerId
+      val synchronizerId = synchronizer.psid.logical
       val statusPerSynchronizer =
         for {
           synchronizerIndex <- EitherT
@@ -118,21 +118,21 @@ final class CommitmentsService(
 
           _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
             synchronizer.acsCommitmentProcessor.reinitializeCommitments(reinitRecordTime),
-            s"Reinitialization is already scheduled or in progress for ${synchronizer.synchronizerId}.",
+            s"Reinitialization is already scheduled or in progress for ${synchronizer.psid}.",
           )
 
           persistentState <- EitherT.fromEither[FutureUnlessShutdown](
-            syncPersistentStateLookup.getAll
-              .get(synchronizerId)
+            syncPersistentStateLookup
+              .get(synchronizer.psid)
               .toRight(
-                s"Could not find persistent state for ${synchronizer.synchronizerId}"
+                s"Could not find persistent state for ${synchronizer.psid}"
               )
           )
           _ <- EitherT.fromEither[FutureUnlessShutdown](
             Either.cond(
               !persistentState.isMemory,
               (),
-              s"${synchronizer.synchronizerId} is in memory which is not supported by commitment reinitialization. Use db persistence.",
+              s"${synchronizer.psid} is in memory which is not supported by commitment reinitialization. Use db persistence.",
             )
           )
           res <- EitherT(

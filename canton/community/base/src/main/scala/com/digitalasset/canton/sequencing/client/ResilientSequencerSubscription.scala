@@ -25,7 +25,7 @@ import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionErro
 import com.digitalasset.canton.sequencing.client.SubscriptionCloseReason.HandlerException
 import com.digitalasset.canton.sequencing.client.transports.SequencerClientTransport
 import com.digitalasset.canton.sequencing.handlers.{EventTimestampCapture, HasReceivedEvent}
-import com.digitalasset.canton.sequencing.protocol.SubscriptionRequestV2
+import com.digitalasset.canton.sequencing.protocol.SubscriptionRequest
 import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
@@ -86,7 +86,7 @@ class ResilientSequencerSubscription[HandlerError](
   private def setupNewSubscription(
       delayOnRestart: FiniteDuration = retryDelayRule.initialDelay
   )(implicit traceContext: TraceContext): Unit =
-    performUnlessClosing(functionFullName) {
+    synchronizeWithClosingSync(functionFullName) {
       def started(
           hasReceivedEvent: HasReceivedEvent,
           newSubscription: SequencerSubscription[HandlerError],
@@ -175,7 +175,7 @@ class ResilientSequencerSubscription[HandlerError](
     } else if (isFailed) {
       logger.info(logMessage)
     } else if (!isClosing) {
-      TraceContext.withNewTraceContext { tx =>
+      TraceContext.withNewTraceContext("restart_subscription") { tx =>
         this.failureOccurred(
           LostSequencerSubscription.Warn(sequencerId)(this.errorLoggingContext(tx))
         )
@@ -293,8 +293,8 @@ class ResilientSequencerSubscription[HandlerError](
     val _ = closeReasonPromise.tryComplete(reason)
   }
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = withNewTraceContext {
-    implicit traceContext =>
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    withNewTraceContext("close_sequencer_subscription") { implicit traceContext =>
       Seq(
         SyncCloseable(
           "underlying-subscription",
@@ -306,7 +306,7 @@ class ResilientSequencerSubscription[HandlerError](
           closeReasonPromise.tryComplete(Success(SubscriptionCloseReason.Closed)).discard[Boolean],
         ),
       )
-  }
+    }
 }
 
 object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
@@ -352,7 +352,7 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
       )(implicit
           traceContext: TraceContext
       ): UnlessShutdown[(SequencerSubscription[E], SubscriptionErrorRetryPolicy)] = {
-        val request = SubscriptionRequestV2(member, startingTimestamp, protocolVersion)
+        val request = SubscriptionRequest(member, startingTimestamp, protocolVersion)
         getTransport
           .map { transport =>
             val subscription =

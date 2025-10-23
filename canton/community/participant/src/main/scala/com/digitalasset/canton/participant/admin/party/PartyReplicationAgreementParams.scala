@@ -4,11 +4,11 @@
 package com.digitalasset.canton.participant.admin.party
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.participant.admin.workflows.java.canton.internal as M
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 
 final case class PartyReplicationAgreementParams private (
     requestId: Hash,
@@ -17,7 +17,8 @@ final case class PartyReplicationAgreementParams private (
     sourceParticipantId: ParticipantId,
     targetParticipantId: ParticipantId,
     sequencerId: SequencerId,
-    serialO: Option[PositiveInt],
+    serial: PositiveInt,
+    participantPermission: ParticipantPermission,
 )
 
 object PartyReplicationAgreementParams {
@@ -57,12 +58,13 @@ object PartyReplicationAgreementParams {
           .fromProtoPrimitive(synchronizer, "synchronizer")
           // The following error is impossible to trigger as the ledger-api does not emit invalid synchronizer ids
           .leftMap(err => s"Invalid synchronizerId $err")
-      serialIntO <- Either.cond(
+      serialInt <- Either.cond(
         c.topologySerial.toInt.toLong == c.topologySerial,
-        Option.when(c.topologySerial.toInt != 0)(c.topologySerial.toInt),
+        c.topologySerial.toInt,
         s"Non-integer serial ${c.topologySerial}",
       )
-      serial <- serialIntO.traverse(PositiveInt.create).leftMap(_.message)
+      serial <- PositiveInt.create(serialInt).leftMap(_.message)
+      participantPermission = PartyParticipantPermission.fromDaml(c.participantPermission)
     } yield PartyReplicationAgreementParams(
       requestId,
       partyId,
@@ -71,6 +73,7 @@ object PartyReplicationAgreementParams {
       targetParticipantId,
       sequencerId,
       serial,
+      participantPermission,
     )
 
   def fromProposal(
@@ -86,5 +89,20 @@ object PartyReplicationAgreementParams {
       proposal.targetParticipantId,
       sequencerId,
       proposal.serial,
+      proposal.participantPermission,
+    )
+
+  def fromAgreedReplicationStatus(
+      agreedStatus: PartyReplicationStatus.AgreedReplicationStatus
+  ): PartyReplicationAgreementParams =
+    PartyReplicationAgreementParams(
+      agreedStatus.params.requestId,
+      agreedStatus.params.partyId,
+      agreedStatus.params.synchronizerId,
+      agreedStatus.params.sourceParticipantId,
+      agreedStatus.params.targetParticipantId,
+      agreedStatus.sequencerId,
+      agreedStatus.params.serial,
+      agreedStatus.params.participantPermission,
     )
 }

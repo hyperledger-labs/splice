@@ -12,9 +12,9 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.console.{ParticipantReference, SequencerReference}
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -169,6 +169,6 @@ trait TimeAdvancingTopologySubscriberIntegrationTest
 class TimeAdvancingTopologySubscriberReferenceIntegrationTestPostgres
     extends TimeAdvancingTopologySubscriberIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

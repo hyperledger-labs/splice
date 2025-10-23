@@ -5,14 +5,12 @@ package com.digitalasset.canton.participant.admin.data
 
 import cats.implicits.*
 import com.daml.ledger.api.v2.state_service.ActiveContract as LapiActiveContract
-import com.digitalasset.canton.data.{CantonTimestamp, Counter}
+import com.digitalasset.canton.data.Counter
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
-import com.digitalasset.canton.{LfVersioned, ReassignmentCounter}
-import com.digitalasset.daml.lf.transaction
-import com.digitalasset.daml.lf.transaction.TransactionCoder
+import com.digitalasset.canton.{LfPackageId, ReassignmentCounter}
+import com.digitalasset.daml.lf.transaction.{CreationTime, TransactionCoder}
 import com.google.protobuf.ByteString
 
 import java.io.ByteArrayInputStream
@@ -21,13 +19,14 @@ import java.io.ByteArrayInputStream
   */
 final case class RepairContract(
     synchronizerId: SynchronizerId,
-    contract: SerializableContract,
+    contract: LfFatContractInst,
     reassignmentCounter: ReassignmentCounter,
+    representativePackageId: LfPackageId,
 ) {
   def contractId: LfContractId = contract.contractId
 
-  def withSerializableContract(
-      contract: SerializableContract
+  def withContractInstance(
+      contract: LfFatContractInst
   ): RepairContract = copy(contract = contract)
 }
 
@@ -71,48 +70,17 @@ object RepairContract {
           s"Unable to decode contract event payload: ${decodeError.errorMessage}"
         )
 
-      contractInstance = LfContractInst(
-        fattyContract.packageName,
-        fattyContract.templateId,
-        transaction.Versioned(fattyContract.version, fattyContract.createArg),
-      )
+      // TODO(#25385): Assume populated representativePackageId starting with 3.4
+      representativePackageId <- Option(event.representativePackageId)
+        .filter(_.nonEmpty)
+        .traverse(LfPackageId.fromString)
+        .leftMap(err => s"Unable to parse representative package id: $err")
+        .map(_.getOrElse(fattyContract.templateId.packageId))
 
-      maybeKeyWithMaintainersVersioned: Option[LfVersioned[LfGlobalKeyWithMaintainers]] =
-        fattyContract.contractKeyWithMaintainers.map { value =>
-          transaction.Versioned(
-            fattyContract.version,
-            LfGlobalKeyWithMaintainers(value.globalKey, value.maintainers),
-          )
-        }
-
-      rawContractInstance <- SerializableRawContractInstance
-        .create(contractInstance)
-        .leftMap(encodeError => s"Unable to encode contract instance: ${encodeError.errorMessage}")
-
-      contractMetadata <- ContractMetadata.create(
-        signatories = fattyContract.signatories,
-        stakeholders = fattyContract.stakeholders,
-        maybeKeyWithMaintainersVersioned,
-      )
-
-      ledgerCreateTime = LedgerCreateTime(CantonTimestamp(fattyContract.createdAt))
-
-      driverContractMetadata <-
-        DriverContractMetadata
-          .fromTrustedByteString(fattyContract.cantonData.toByteString)
-          .leftMap(deserializationError =>
-            s"Unable to deserialize driver contract metadata: ${deserializationError.message}"
-          )
-
-      contractSalt = driverContractMetadata.salt
-
-      serializableContract = new SerializableContract(
-        fattyContract.contractId,
-        rawContractInstance,
-        contractMetadata,
-        ledgerCreateTime,
-        contractSalt,
-      )
+      fatContractInstance <- fattyContract.traverseCreateAt {
+        case absolute: CreationTime.CreatedAt => Right(absolute)
+        case _ => Left("Unable to determine create time.")
+      }
 
       synchronizerId <- SynchronizerId
         .fromString(contract.synchronizerId)
@@ -120,9 +88,10 @@ object RepairContract {
           s"Unable to deserialize synchronized id from ${contract.synchronizerId}: $deserializationError"
         )
     } yield RepairContract(
-      synchronizerId,
-      serializableContract,
-      Counter(contract.reassignmentCounter),
+      synchronizerId = synchronizerId,
+      contract = fatContractInstance,
+      reassignmentCounter = Counter(contract.reassignmentCounter),
+      representativePackageId = representativePackageId,
     )
 
 }

@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.migration.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -39,6 +39,7 @@ class DomainMigrationDumpGenerator(
   private val darExporter = new DarExporter(participantConnection)
   private val participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
 
+  // This is the safe option used for migrations
   def generateDomainDump(
       migrationId: Long,
       domain: SynchronizerId,
@@ -67,6 +68,7 @@ class DomainMigrationDumpGenerator(
         acsTimestamp = acsTimestamp,
         dars = dars,
         createdAt = createdAt,
+        synchronizerWasPaused = true,
       )
       logger.info(
         show"Finished generating $result"
@@ -75,6 +77,7 @@ class DomainMigrationDumpGenerator(
     }
   }
 
+  // This is the safe option used for DR
   def getDomainDataSnapshot(
       timestamp: Instant,
       domain: SynchronizerId,
@@ -88,7 +91,7 @@ class DomainMigrationDumpGenerator(
       participantId <- participantConnection.getId()
       parties <- participantConnection
         .listPartyToParticipant(
-          store = TopologyStoreId.SynchronizerStore(domain).some,
+          store = TopologyStoreId.Synchronizer(domain).some,
           filterParticipant = participantId.toProtoPrimitive,
         )
         .map(_.map(_.mapping.partyId))
@@ -111,6 +114,7 @@ class DomainMigrationDumpGenerator(
         acsTimestamp = timestamp,
         dars = dars,
         createdAt = Instant.now(),
+        synchronizerWasPaused = false,
       )
     }
   }

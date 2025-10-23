@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
-public final class CreatedEvent implements Event, TreeEvent {
+public final class CreatedEvent implements Event {
 
   private final @NonNull List<@NonNull String> witnessParties;
 
@@ -46,6 +46,10 @@ public final class CreatedEvent implements Event, TreeEvent {
   // from/toProto.
   public final @NonNull Instant createdAt;
 
+  private final @NonNull Boolean acsDelta;
+
+  private final @NonNull String representativePackageId;
+
   public CreatedEvent(
       @NonNull List<@NonNull String> witnessParties,
       @NonNull Long offset,
@@ -60,7 +64,9 @@ public final class CreatedEvent implements Event, TreeEvent {
       @NonNull Optional<Value> contractKey,
       @NonNull Collection<@NonNull String> signatories,
       @NonNull Collection<@NonNull String> observers,
-      @NonNull Instant createdAt) {
+      @NonNull Instant createdAt,
+      @NonNull Boolean acsDelta,
+      @NonNull String representativePackageId) {
     this.witnessParties = List.copyOf(witnessParties);
     this.offset = offset;
     this.nodeId = nodeId;
@@ -75,6 +81,8 @@ public final class CreatedEvent implements Event, TreeEvent {
     this.signatories = Set.copyOf(signatories);
     this.observers = Set.copyOf(observers);
     this.createdAt = createdAt;
+    this.acsDelta = acsDelta;
+    this.representativePackageId = representativePackageId;
   }
 
   @NonNull
@@ -158,6 +166,15 @@ public final class CreatedEvent implements Event, TreeEvent {
     return createdAt;
   }
 
+  public boolean isAcsDelta() {
+    return acsDelta;
+  }
+
+  @NonNull
+  public String getRepresentativePackageId() {
+    return representativePackageId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -176,7 +193,9 @@ public final class CreatedEvent implements Event, TreeEvent {
         && Objects.equals(contractKey, that.contractKey)
         && Objects.equals(signatories, that.signatories)
         && Objects.equals(observers, that.observers)
-        && Objects.equals(createdAt, that.createdAt);
+        && Objects.equals(createdAt, that.createdAt)
+        && Objects.equals(acsDelta, that.acsDelta)
+        && Objects.equals(representativePackageId, that.representativePackageId);
   }
 
   @Override
@@ -195,7 +214,9 @@ public final class CreatedEvent implements Event, TreeEvent {
         contractKey,
         signatories,
         observers,
-        createdAt);
+        createdAt,
+        acsDelta,
+        representativePackageId);
   }
 
   @Override
@@ -230,6 +251,10 @@ public final class CreatedEvent implements Event, TreeEvent {
         + observers
         + ", createdAt="
         + createdAt
+        + ", acsDelta="
+        + acsDelta
+        + ", representativePackageId="
+        + representativePackageId
         + '}';
   }
 
@@ -258,7 +283,9 @@ public final class CreatedEvent implements Event, TreeEvent {
                 com.google.protobuf.Timestamp.newBuilder()
                     .setSeconds(this.createdAt.getEpochSecond())
                     .setNanos(this.createdAt.getNano())
-                    .build());
+                    .build())
+            .setAcsDelta(this.isAcsDelta())
+            .setRepresentativePackageId(this.getRepresentativePackageId());
     contractKey.ifPresent(a -> builder.setContractKey(a.toProto()));
     return builder.build();
   }
@@ -277,7 +304,6 @@ public final class CreatedEvent implements Event, TreeEvent {
                     .build());
   }
 
-  @SuppressWarnings("deprecation")
   public static CreatedEvent fromProto(EventOuterClass.CreatedEvent createdEvent) {
     var splitInterfaceViews =
         createdEvent.getInterfaceViewsList().stream()
@@ -307,6 +333,8 @@ public final class CreatedEvent implements Event, TreeEvent {
         createdEvent.getSignatoriesList(),
         createdEvent.getObserversList(),
         Instant.ofEpochSecond(
-            createdEvent.getCreatedAt().getSeconds(), createdEvent.getCreatedAt().getNanos()));
+            createdEvent.getCreatedAt().getSeconds(), createdEvent.getCreatedAt().getNanos()),
+        createdEvent.getAcsDelta(),
+        createdEvent.getRepresentativePackageId());
   }
 }

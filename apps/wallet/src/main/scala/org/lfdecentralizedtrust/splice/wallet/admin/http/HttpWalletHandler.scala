@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.environment.{
   CommandPriority,
   PackageVersionSupport,
+  RetryFor,
   RetryProvider,
   SpliceLedgerConnection,
 }
@@ -745,7 +746,8 @@ class HttpWalletHandler(
               _ = logger.debug(
                 s"Created TransferPreapprovalProposal with contract ID $proposalCid. Now waiting for automation to create the TransferPreapproval."
               )
-              preapproval <- retryProvider.retryForClientCalls(
+              preapproval <- retryProvider.retry(
+                RetryFor.InitializingClientCalls,
                 "getTransferPreapproval",
                 "wait for validator automation to create TransferPreapproval",
                 store.getTransferPreapproval(store.key.endUserParty),

@@ -80,7 +80,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",
@@ -354,7 +354,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",
@@ -548,7 +548,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",
@@ -724,7 +724,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",
@@ -900,7 +900,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",
@@ -1076,7 +1076,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",
@@ -1136,7 +1136,7 @@
                   "admin": "dso::normalized",
                   "id": "Amulet"
                 },
-                "contractId": "0",
+                "contractId": "1",
                 "owner": "alice::normalized",
                 "meta": {
                   "values": {
@@ -1257,7 +1257,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "expire-lock": {
                         "tag": "AV_Bool",
@@ -1406,7 +1406,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "expire-lock": {
                         "tag": "AV_Bool",
@@ -1549,7 +1549,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "expire-lock": {
                         "tag": "AV_Bool",
@@ -1693,7 +1693,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "expire-lock": {
                         "tag": "AV_Bool",
@@ -1811,7 +1811,7 @@
                     "values": {
                       "amulet-rules": {
                         "tag": "AV_ContractId",
-                        "value": "1"
+                        "value": "0"
                       },
                       "open-round": {
                         "tag": "AV_ContractId",

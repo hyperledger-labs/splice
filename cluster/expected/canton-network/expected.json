@@ -1574,6 +1574,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -1612,10 +1621,6 @@
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -1638,7 +1643,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -1665,6 +1670,11 @@
             "name": "Digital-Asset-1",
             "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -1763,6 +1773,15 @@
           "schema": "sv_sv_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
@@ -1874,10 +1893,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
@@ -2421,6 +2441,15 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -2459,10 +2488,6 @@
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -2485,7 +2510,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -2512,6 +2537,11 @@
             "name": "Digital-Asset-1",
             "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -2583,6 +2613,15 @@
           "schema": "sv_sv_da_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-da-1:5012",
@@ -2694,10 +2733,11 @@
         },
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "2Gi"
           },
           "requests": {
-            "memory": "2Gi"
+            "cpu": "1",
+            "memory": "1Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-da-1:5012",

@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
@@ -54,7 +54,8 @@ abstract class SequencerBftPeerReconciler(
           scanSequencer.id == sequencerId && scanSequencer.migrationId == migrationId
         )
       }
-      currentPeers <- sequencerAdminConnection.listCurrentPeerEndpoints()
+      // TODO(#1929) Reconsider whether we can really ignore incoming connections.
+      currentPeers <- sequencerAdminConnection.listCurrentOutgoingPeerEndpoints()
 
       peersToAdd = dsoSequencersWithScanInfo
         .collect { case (id, Some(config)) =>

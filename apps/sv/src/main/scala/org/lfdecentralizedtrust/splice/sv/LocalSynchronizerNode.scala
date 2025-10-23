@@ -16,13 +16,18 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnection,
   SubmissionRequestAmplification,
 }
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code.{
   NamespaceDelegation,
   OwnerToKeyMapping,
 }
-import com.digitalasset.canton.topology.{ForceFlag, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ForceFlag,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
@@ -99,7 +104,7 @@ final class LocalSynchronizerNode(
     for {
       txs <- participantAdminConnection.getIdentityTransactions(
         uid,
-        TopologyStoreId.SynchronizerStore(synchronizerId),
+        TopologyStoreId.Synchronizer(synchronizerId),
       )
       _ <-
         if (containsIdentityTransactions(uid, txs)) {
@@ -108,7 +113,7 @@ final class LocalSynchronizerNode(
         } else
           for {
             _ <- participantAdminConnection.addTopologyTransactions(
-              TopologyStoreId.SynchronizerStore(synchronizerId),
+              TopologyStoreId.Synchronizer(synchronizerId),
               identityTransactions,
               ForceFlag.AlienMember,
             )
@@ -126,7 +131,7 @@ final class LocalSynchronizerNode(
       "identity_transaction",
       show"the identity transactions for $uid are visible",
       participantAdminConnection
-        .getIdentityTransactions(uid, TopologyStoreId.SynchronizerStore(synchronizerId))
+        .getIdentityTransactions(uid, TopologyStoreId.Synchronizer(synchronizerId))
         .map { txs =>
           if (!containsIdentityTransactions(uid, txs)) {
             throw Status.NOT_FOUND
@@ -153,7 +158,7 @@ final class LocalSynchronizerNode(
   /** Onboard the mediator operated by this SV to the domain if it is not already initialized.
     */
   def initializeLocalMediatorIfRequired(
-      synchronizerId: SynchronizerId
+      synchronizerId: PhysicalSynchronizerId
   )(implicit traceContext: TraceContext): Future[Unit] = {
     onMediatorNotInitialized {
       logger.info("Onboarding mediator")
@@ -197,7 +202,7 @@ final class LocalSynchronizerNode(
       mediatorId <- mediatorAdminConnection.getMediatorId
       identity <- mediatorAdminConnection.getIdentityTransactions(
         mediatorId.uid,
-        TopologyStoreId.AuthorizedStore,
+        TopologyStoreId.Authorized,
       )
       _ <- addIdentityTransactions(
         "mediator",
@@ -211,7 +216,7 @@ final class LocalSynchronizerNode(
   /** Onboard the mediator operated by this SV to the domain if it is not already initialized.
     */
   private def initializeLocalMediator(
-      synchronizerId: SynchronizerId
+      synchronizerId: PhysicalSynchronizerId
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
@@ -241,7 +246,7 @@ final class LocalSynchronizerNode(
         "local sequencer observes mediator as onboarded",
         // Otherwise we might fail with `PERMISSION_DENIED` during initialization
         sequencerAdminConnection
-          .getMediatorSynchronizerState(synchronizerId, AuthorizedState)
+          .getMediatorSynchronizerState(synchronizerId.logical, AuthorizedState)
           .map { state =>
             if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
@@ -301,8 +306,9 @@ final class LocalSynchronizerNode(
         RetryFor.WaitingOnInitDependency,
         "mediator_onboarded",
         "mediator observes itself as onboarded",
-        mediatorAdminConnection.getMediatorSynchronizerState(synchronizerId, AuthorizedState).map {
-          state =>
+        mediatorAdminConnection
+          .getMediatorSynchronizerState(synchronizerId.logical, AuthorizedState)
+          .map { state =>
             if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
@@ -310,7 +316,7 @@ final class LocalSynchronizerNode(
                 )
                 .asRuntimeException()
             }
-        },
+          },
         logger,
       )
     } yield ()
@@ -353,7 +359,7 @@ final class LocalSynchronizerNode(
       sequencerId <- sequencerAdminConnection.getSequencerId
       identity <- sequencerAdminConnection.getIdentityTransactions(
         sequencerId.uid,
-        TopologyStoreId.AuthorizedStore,
+        TopologyStoreId.Authorized,
       )
       _ <- addIdentityTransactions(
         "sequencer",
@@ -368,7 +374,7 @@ final class LocalSynchronizerNode(
     */
   def onboardLocalSequencerIfRequired(
       svConnection: => Future[SvConnection]
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[PhysicalSynchronizerId] =
     retryProvider
       .getValueWithRetries(
         RetryFor.WaitingOnInitDependency,
@@ -381,14 +387,14 @@ final class LocalSynchronizerNode(
         case Left(NodeStatus.NotInitialized(_, _)) =>
           logger.info("Onboarding sequencer")
           svConnection.flatMap(onboardLocalSequencer(_))
-        case Right(NodeStatus.Success(_)) =>
+        case Right(NodeStatus.Success(s)) =>
           logger.info("Sequencer is already onboarded")
-          Future.unit
+          Future.successful(s.synchronizerId)
       }
 
   private def onboardLocalSequencer(
       svConnection: SvConnection
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[PhysicalSynchronizerId] = {
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
@@ -416,18 +422,25 @@ final class LocalSynchronizerNode(
       _ = logger.info(
         s"Initializing sequencer $sequencerId"
       )
-      _ <- retryProvider.retry(
+      synchronizerId <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "initializer_sequencer",
         "Initializing sequencer",
         sequencerAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_, _) =>
-            sequencerAdminConnection.initializeFromOnboardingState(
-              onboardingState
-            )
-          case NodeStatus.Success(_) =>
+            for {
+              _ <- sequencerAdminConnection.initializeFromOnboardingState(
+                onboardingState
+              )
+              status <- sequencerAdminConnection.getStatus
+            } yield status.successOption.fold(
+              throw Status.INTERNAL
+                .withDescription("Sequencer did not report as initialized after we initialized it")
+                .asRuntimeException
+            )(_.synchronizerId)
+          case NodeStatus.Success(status) =>
             logger.info("Sequencer is already initialized")
-            Future.unit
+            Future.successful(status.synchronizerId)
           case NodeStatus.Failure(err) =>
             Future.failed(
               Status.UNAVAILABLE
@@ -437,7 +450,7 @@ final class LocalSynchronizerNode(
         },
         logger,
       )
-    } yield ()
+    } yield synchronizerId
   }
 
   def ensureMediatorSequencerRequestAmplification()(implicit
@@ -504,5 +517,6 @@ object LocalSynchronizerNode {
       transportSecurity = config.tlsConfig.isDefined,
       customTrustCertificates = None,
       alias,
+      sequencerId = None,
     )
 }

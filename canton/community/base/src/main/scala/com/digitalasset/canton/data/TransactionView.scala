@@ -11,7 +11,10 @@ import com.digitalasset.canton.data.ActionDescription.{
   FetchActionDescription,
 }
 import com.digitalasset.canton.data.TransactionView.{
+  AllSubviewState,
   InvalidView,
+  TransactionViewTreeOps,
+  TransactionViewTreeOpsWithPosition,
   WithPath,
   validateViewCommonData,
   validateViewParticipantData,
@@ -21,7 +24,8 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.util.{ErrorUtil, MapsUtil, NamedLoggingLazyVal}
+import com.digitalasset.canton.util.collection.MapsUtil
+import com.digitalasset.canton.util.{ErrorUtil, NamedLoggingLazyVal, RoseTree}
 import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfVersioned, ProtoDeserializationError}
 import com.google.common.annotations.VisibleForTesting
@@ -94,9 +98,15 @@ final case class TransactionView private (
 
   val viewHash: ViewHash = ViewHash.fromRootHash(rootHash)
 
+  lazy val allSubviews: RoseTree[TransactionView] =
+    RoseTree.foldLeft(TransactionViewTreeOps, this)(init = AllSubviewState.init)(finish = _.finish)(
+      update = _.update(_)
+    )
+
   /** Traverses all unblinded subviews `v1, v2, v3, ...` in pre-order and yields `f(...f(f(z, v1),
     * v2)..., vn)`
     */
+  // TODO(#23971) remove this function as it's used only in tests
   def foldLeft[A](z: A)(f: (A, TransactionView) => A): A =
     subviews.unblindedElements
       .to(LazyList)
@@ -105,26 +115,23 @@ final case class TransactionView private (
   /** Yields all (direct and indirect) subviews of this view in pre-order. The first element is this
     * view.
     */
-  lazy val flatten: Seq[TransactionView] =
-    foldLeft(Seq.newBuilder[TransactionView])((acc, v) => acc += v).result()
+  lazy val flatten: Seq[TransactionView] = allSubviews.preorder.toSeq
 
   lazy val tryFlattenToParticipantViews: Seq[ParticipantTransactionView] =
     flatten.map(ParticipantTransactionView.tryCreate)
 
+  def allSubviewsWithPositionTree(
+      rootPos: ViewPosition
+  ): RoseTree[(TransactionView, ViewPosition)] =
+    RoseTree.foldLeft(TransactionViewTreeOpsWithPosition, this -> rootPos)(
+      init = AllSubviewState.init
+    )(finish = _.finish)(update = _.update(_))
+
   /** Yields all (direct and indirect) subviews of this view in pre-order, along with the subview
     * position under the root view position `rootPos`. The first element is this view.
     */
-  def allSubviewsWithPosition(rootPos: ViewPosition): Seq[(TransactionView, ViewPosition)] = {
-    def helper(
-        view: TransactionView,
-        viewPos: ViewPosition,
-    ): Seq[(TransactionView, ViewPosition)] =
-      (view, viewPos) +: view.subviews.unblindedElementsWithIndex.flatMap {
-        case (view, viewIndex) => helper(view, viewIndex +: viewPos)
-      }
-
-    helper(this, rootPos)
-  }
+  def allSubviewsWithPosition(rootPos: ViewPosition): Seq[(TransactionView, ViewPosition)] =
+    allSubviewsWithPositionTree(rootPos).preorder.toSeq
 
   override protected def pretty: Pretty[TransactionView] = prettyOfClass(
     param("root hash", _.rootHash),
@@ -153,8 +160,9 @@ final case class TransactionView private (
     copy(viewCommonData, viewParticipantData, subviews).tryValidated()
 
   /** If the view with the given hash appears either as this view or one of its unblinded
-    * descendants, replace it by the given view. TODO(i12900): not stack safe unless we have limits
-    * on the depths of views.
+    * descendants, replace it by the given view.
+    *
+    * TODO(i26565): not stack safe unless we have limits on the depths of views.
     */
   def replace(h: ViewHash, v: TransactionView): TransactionView =
     if (viewHash == h) v
@@ -323,7 +331,6 @@ final case class TransactionView private (
       }
     } yield this
   }
-
 }
 
 object TransactionView
@@ -333,7 +340,7 @@ object TransactionView
     ] {
   override def name: String = "TransactionView"
   override def versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewNode)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewNode)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
     )
@@ -503,4 +510,33 @@ object TransactionView
 
   /** Indicates an attempt to create an invalid view. */
   final case class InvalidView(message: String) extends RuntimeException(message)
+
+  case object TransactionViewTreeOps extends RoseTree.TreeOps[TransactionView] {
+    override def children(view: TransactionView): Iterator[TransactionView] =
+      view.subviews.unblindedElements.iterator
+  }
+
+  case object TransactionViewTreeOpsWithPosition
+      extends RoseTree.TreeOps[(TransactionView, ViewPosition)] {
+    override def children(
+        viewAndPos: (TransactionView, ViewPosition)
+    ): Iterator[(TransactionView, ViewPosition)] = {
+      val (view, position) = viewAndPos
+      view.subviews.unblindedElementsWithIndex.iterator.map { case (v, idx) =>
+        (v, idx +: position)
+      }
+    }
+  }
+
+  private final case class AllSubviewState[A](
+      visitedSiblingsReversed: List[RoseTree[A]],
+      current: A,
+  ) {
+    def update(next: RoseTree[A]): AllSubviewState[A] =
+      copy(visitedSiblingsReversed = next +: visitedSiblingsReversed)
+    def finish: RoseTree[A] = RoseTree(current, visitedSiblingsReversed.reverse*)
+  }
+  private object AllSubviewState {
+    def init[A](current: A): AllSubviewState[A] = AllSubviewState(List.empty, current)
+  }
 }

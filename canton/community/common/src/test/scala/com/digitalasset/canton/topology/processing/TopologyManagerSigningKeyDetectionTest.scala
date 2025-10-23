@@ -31,13 +31,13 @@ class TopologyManagerSigningKeyDetectionTest
     def mk() =
       new TopologyManagerSigningKeyDetection(
         new InMemoryTopologyStore(
-          SynchronizerStore(Factory.synchronizerId1),
+          SynchronizerStore(Factory.physicalSynchronizerId1),
           testedProtocolVersion,
           loggerFactory,
           timeouts,
         ),
-        Factory.cryptoApi.crypto.pureCrypto,
-        Factory.cryptoApi.crypto.cryptoPrivateStore,
+        Factory.syncCryptoClient.crypto.pureCrypto,
+        Factory.syncCryptoClient.crypto.cryptoPrivateStore,
         loggerFactory,
       )
 
@@ -130,14 +130,14 @@ class TopologyManagerSigningKeyDetectionTest
       val otk = TopologyTransaction(
         Replace,
         PositiveInt.one,
-        OwnerToKeyMapping(
+        OwnerToKeyMapping.tryCreate(
           ParticipantId("decentralized-participant", dns1.mapping.namespace),
           NonEmpty(Seq, EncryptionKeys.key1, SigningKeys.key4),
         ),
         testedProtocolVersion,
       )
 
-      cryptoApi.crypto.cryptoPrivateStore
+      syncCryptoClient.crypto.cryptoPrivateStore
         .removePrivateKey(SigningKeys.key8.fingerprint)
         .futureValueUS
 

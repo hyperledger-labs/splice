@@ -89,9 +89,11 @@ export const InfraConfigSchema = z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
       retentionSize: z.string(),
+      installPrometheusPushgateway: z.boolean().default(false),
     }),
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
+      enableClusterAccessLogging: z.boolean().default(false),
     }),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),

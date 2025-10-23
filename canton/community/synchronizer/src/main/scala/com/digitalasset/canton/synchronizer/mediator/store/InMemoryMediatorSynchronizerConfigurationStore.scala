@@ -15,7 +15,7 @@ class InMemoryMediatorSynchronizerConfigurationStore
 
   private val isTopologyInitialized_ : AtomicBoolean = new AtomicBoolean(false)
 
-  override def fetchConfiguration(implicit
+  override def fetchConfiguration()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[MediatorSynchronizerConfiguration]] =
     FutureUnlessShutdown.pure(currentConfiguration.get())

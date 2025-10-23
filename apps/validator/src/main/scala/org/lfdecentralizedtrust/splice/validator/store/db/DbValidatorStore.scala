@@ -27,12 +27,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   DbAppStore,
 }
 import org.lfdecentralizedtrust.splice.store.{LimitHelpers, PageLimit}
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  ContractWithState,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -66,7 +61,7 @@ class DbValidatorStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbValidatorStore",
         party = key.validatorParty,
         participant = participantId,
@@ -114,9 +109,8 @@ class DbValidatorStore(
           ValidatorTables.acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = sql"""template_id_qualified_name = ${QualifiedName(
-              walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
-            )} and user_party = $endUserParty""",
+          walletCodegen.WalletAppInstall.COMPANION,
+          where = sql"""user_party = $endUserParty""",
           orderLimit = sql"limit 1",
         ).headOption,
         "lookupInstallByParty",
@@ -135,9 +129,8 @@ class DbValidatorStore(
           ValidatorTables.acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = sql"""template_id_qualified_name = ${QualifiedName(
-              walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
-            )} and user_name = ${lengthLimited(endUserName)}""",
+          walletCodegen.WalletAppInstall.COMPANION,
+          where = sql"""user_name = ${lengthLimited(endUserName)}""",
           orderLimit = sql"limit 1",
         ).headOption,
         "lookupInstallByName",
@@ -156,9 +149,8 @@ class DbValidatorStore(
           ValidatorTables.acsTableName,
           acsStoreId,
           domainMigrationId,
-          where = sql"""template_id_qualified_name = ${QualifiedName(
-              amuletCodegen.FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
-            )} and provider_party = ${walletKey.validatorParty}""",
+          amuletCodegen.FeaturedAppRight.COMPANION,
+          where = sql"""provider_party = ${walletKey.validatorParty}""",
           orderLimit = sql"limit 1",
         ).headOption,
         "lookupValidatorFeaturedAppRight",
@@ -180,11 +172,8 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            sql"""
-            template_id_qualified_name = ${QualifiedName(
-                walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              and user_name = ${lengthLimited(endUserName)}
+            walletCodegen.WalletAppInstall.COMPANION,
+            sql"""user_name = ${lengthLimited(endUserName)}
             """,
             sql"limit 1",
           ).headOption,
@@ -211,10 +200,9 @@ class DbValidatorStore(
                 ValidatorTables.acsTableName,
                 acsStoreId,
                 domainMigrationId,
-                sql"""
-                   template_id_qualified_name = ${QualifiedName(
-                    TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
-                  )} and contract_expires_at < ${now.plus(renewalDuration.asJava)}
+                TransferPreapproval.COMPANION,
+                additionalWhere =
+                  sql"""and contract_expires_at < ${now.plus(renewalDuration.asJava)}
               """,
               ),
               "listExpiringTransferPreapprovals",
@@ -238,12 +226,8 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                ExternalPartySetupProposal.COMPANION.TEMPLATE_ID
-              )}
-                and user_party = $partyId
-            """,
+            ExternalPartySetupProposal.COMPANION,
+            where = sql"""user_party = $partyId""",
             orderLimit = sql"""
                 limit 1
             """,
@@ -272,15 +256,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                TransferPreapproval.COMPANION.TEMPLATE_ID
-              )}
-                and user_party = $partyId
-            """,
-            orderLimit = sql"""
-                limit 1
-            """,
+            TransferPreapproval.COMPANION,
+            where = sql"""user_party = $partyId""",
+            orderLimit = sql"""limit 1""",
           ).headOption,
           "lookupTransferPreapprovalReceiver",
         )
@@ -307,13 +285,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            sql"""
-            template_id_qualified_name = ${QualifiedName(
-                validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              and validator_party = ${key.validatorParty}
-            """,
-            sql"limit 1",
+            validatorLicenseCodegen.ValidatorLicense.COMPANION,
+            where = sql"""validator_party = ${key.validatorParty}""",
+            orderLimit = sql"limit 1",
           ).headOption,
           "lookupValidatorLicenseWithOffset",
         )
@@ -342,13 +316,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            sql"""
-            template_id_qualified_name = ${QualifiedName(
-                amuletCodegen.ValidatorRight.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              and user_party = $party
-            """,
-            sql"limit 1",
+            amuletCodegen.ValidatorRight.COMPANION,
+            where = sql"""user_party = $party""",
+            orderLimit = sql"limit 1",
           ).headOption,
           "lookupValidatorRightByPartyWithOffset",
         )
@@ -374,13 +344,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            sql"""
-            template_id_qualified_name = ${QualifiedName(
-                topupCodegen.ValidatorTopUpState.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              and traffic_domain_id = $synchronizerId
-            """,
-            sql"limit 1",
+            topupCodegen.ValidatorTopUpState.COMPANION,
+            where = sql"""traffic_domain_id = $synchronizerId""",
+            orderLimit = sql"limit 1",
           ).headOption,
           "lookupValidatorTopUpStateWithOffset",
         )

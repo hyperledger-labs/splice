@@ -481,6 +481,15 @@
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -719,10 +728,6 @@
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           },
           {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
-          },
-          {
             "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
             "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
           }
@@ -747,7 +752,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -772,8 +777,13 @@
           },
           {
             "name": "Digital-Asset-1",
-            "publicKey": "THIS_IS_THE_WRONG_KEY",
+            "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -828,6 +838,15 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
@@ -1139,6 +1158,15 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scanAddress": "http://scan-app.sv:5012",
         "spliceInstanceNames": {

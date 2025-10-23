@@ -32,24 +32,33 @@ import com.daml.nonempty.NonEmpty
 import com.daml.platform.v1.page_tokens.ListPartiesPageTokenPayload
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.auth.AuthorizationChecksErrors
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.v30.{SigningKeyScheme, SigningKeyUsage}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey, v30}
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.FieldValidator.*
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.requirePresence
 import com.digitalasset.canton.ledger.api.validation.{CryptoValidator, ValidationErrors}
-import com.digitalasset.canton.ledger.api.{IdentityProviderId, ObjectMeta, PartyDetails}
+import com.digitalasset.canton.ledger.api.{
+  IdentityProviderId,
+  ObjectMeta,
+  PartyDetails,
+  User,
+  UserRight,
+}
 import com.digitalasset.canton.ledger.error.CommonErrors
 import com.digitalasset.canton.ledger.error.groups.{
   PartyManagementServiceErrors,
   RequestValidationErrors,
 }
+import com.digitalasset.canton.ledger.localstore.api.UserManagementStore.UserInfo
 import com.digitalasset.canton.ledger.localstore.api.{
+  ObjectMetaUpdate,
   PartyDetailsUpdate,
   PartyRecord,
   PartyRecordStore,
   PartyRecordUpdate,
+  UserManagementStore,
 }
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel.Observation
@@ -66,6 +75,11 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   withEnrichedLoggingContext,
 }
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiPartyManagementService.*
+import com.digitalasset.canton.platform.apiserver.services.admin.AuthenticatedUserContextResolver.AuthenticatedUserContext
+import com.digitalasset.canton.platform.apiserver.services.admin.{
+  PartyAllocation,
+  PendingPartyAllocations,
+}
 import com.digitalasset.canton.platform.apiserver.services.logging
 import com.digitalasset.canton.platform.apiserver.services.tracking.StreamTracker
 import com.digitalasset.canton.platform.apiserver.update
@@ -93,8 +107,10 @@ import scala.util.{Failure, Try}
 
 private[apiserver] final class ApiPartyManagementService private (
     partyManagementService: IndexPartyManagementService,
+    userManagementStore: UserManagementStore,
     identityProviderExists: IdentityProviderExists,
     maxPartiesPageSize: PositiveInt,
+    maxSelfAllocatedParties: NonNegativeInt,
     partyRecordStore: PartyRecordStore,
     syncService: state.PartySyncService,
     managementServiceTimeout: FiniteDuration,
@@ -107,7 +123,10 @@ private[apiserver] final class ApiPartyManagementService private (
     tracer: Tracer,
 ) extends PartyManagementService
     with GrpcApiService
-    with NamedLogging {
+    with NamedLogging
+    with AuthenticatedUserContextResolver {
+
+  private val pendingPartyAllocations = new PendingPartyAllocations()
 
   private implicit val loggingContext: LoggingContext =
     createLoggingContext(loggerFactory)(identity)
@@ -224,7 +243,10 @@ private[apiserver] final class ApiPartyManagementService private (
         key: PartyAllocation.TrackerKey
     )(implicit errorLogger: ErrorLoggingContext): StatusRuntimeException =
       CommonErrors.RequestAlreadyInFlight
-        .Reject(requestId = key.submissionId)
+        .Reject(
+          requestId = key.submissionId,
+          details = s"Party ${key.party} is in the process of being allocated on this node.",
+        )
         .asGrpcError
   }
 
@@ -242,6 +264,9 @@ private[apiserver] final class ApiPartyManagementService private (
       )
       implicit val errorLoggingContext: ErrorLoggingContext =
         ErrorLoggingContext(logger, loggingContext.toPropertiesMap, loggingContext.traceContext)
+      // Retrieving the authenticated user context from the thread-local context
+      val authenticatedUserContextF: Future[AuthenticatedUserContext] =
+        resolveAuthenticatedUserContext
       import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
       withValidation {
@@ -268,52 +293,120 @@ private[apiserver] final class ApiPartyManagementService private (
             request.identityProviderId,
             "identity_provider_id",
           )
-        } yield (partyIdHintO, annotations, identityProviderId)
-      } { case (partyIdHintO, annotations, identityProviderId) =>
+          synchronizerIdO <- optionalSynchronizerId(request.synchronizerId, "synchronizer_id")
+          userId <- optionalUserId(request.userId, "user_id")
+
+        } yield (partyIdHintO, annotations, identityProviderId, synchronizerIdO, userId)
+      } { case (partyIdHintO, annotations, identityProviderId, synchronizerIdO, userId) =>
         val partyName = partyIdHintO.getOrElse(generatePartyName)
         val trackerKey = submissionIdGenerator(partyName, AuthorizationLevel.Submission)
-        withEnrichedLoggingContext(telemetry)(logging.submissionId(trackerKey.submissionId)) {
+        withEnrichedLoggingContext(logging.submissionId(trackerKey.submissionId)) {
           implicit loggingContext =>
-            for {
-              _ <- identityProviderExistsOrError(identityProviderId)
-              allocated <- partyAllocationTracker
-                .track(
-                  trackerKey,
-                  NonNegativeFiniteDuration(managementServiceTimeout),
-                ) { _ =>
-                  for {
-                    result <- syncService.allocateParty(
-                      partyName,
-                      trackerKey.submissionId,
-                      externalPartyOnboardingDetails = None,
-                    )
-                    _ <- checkSubmissionResult(result)
-                  } yield ()
-                }
-                .transform(alreadyExistsError(trackerKey.submissionId, loggingContext))
-              _ <- verifyPartyIsNonExistentOrInIdp(
-                identityProviderId,
-                allocated.partyDetails.party,
-              )
-              partyRecord <- partyRecordStore
-                .createPartyRecord(
-                  PartyRecord(
-                    party = allocated.partyDetails.party,
-                    metadata = ObjectMeta(resourceVersionO = None, annotations = annotations),
-                    identityProviderId = identityProviderId,
-                  )
+            pendingPartyAllocations.withUser(userId) { outstandingCalls =>
+              for {
+                _ <- identityProviderExistsOrError(identityProviderId)
+                userInfo <- getUserIfUserSpecified(userId, identityProviderId)
+                _ <- checkUserLimitsIfUserSpecified(
+                  userInfo.map(_.rights),
+                  outstandingCalls,
+                  authenticatedUserContextF,
                 )
-                .flatMap(handlePartyRecordStoreResult("creating a party record")(_))
-            } yield {
-              val details = toProtoPartyDetails(
-                partyDetails = allocated.partyDetails,
-                metadataO = Some(partyRecord.metadata),
-                identityProviderId = Some(identityProviderId),
-              )
-              AllocatePartyResponse(Some(details))
+                allocated <- partyAllocationTracker
+                  .track(
+                    trackerKey,
+                    NonNegativeFiniteDuration(managementServiceTimeout),
+                  ) { _ =>
+                    for {
+                      result <- syncService.allocateParty(
+                        partyName,
+                        trackerKey.submissionId,
+                        synchronizerIdO,
+                        externalPartyOnboardingDetails = None,
+                      )
+                      _ <- checkSubmissionResult(result)
+                    } yield ()
+                  }
+                  .transform(alreadyExistsError(trackerKey.submissionId, loggingContext))
+                _ <- verifyPartyIsNonExistentOrInIdp(
+                  identityProviderId,
+                  allocated.partyDetails.party,
+                )
+                existingPartyRecord <- partyRecordStore.getPartyRecordO(
+                  allocated.partyDetails.party
+                )
+                partyRecord <- updateOrCreatePartyRecord(
+                  existingPartyRecord,
+                  allocated.partyDetails.party,
+                  identityProviderId,
+                  annotations,
+                )
+                _ <- updateUserInfoIfUserSpecified(
+                  allocated.partyDetails.party,
+                  userInfo.map(_.user),
+                )
+              } yield {
+                val details = toProtoPartyDetails(
+                  partyDetails = allocated.partyDetails,
+                  metadataO = Some(partyRecord.metadata),
+                  identityProviderId = Some(identityProviderId),
+                )
+                AllocatePartyResponse(Some(details))
+              }
             }
         }
       }
+    }
+
+  private def updateUserInfoIfUserSpecified(
+      party: Ref.Party,
+      user: Option[User],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] =
+    user.fold(Future.successful(())) { u =>
+      userManagementStore
+        .grantRights(
+          u.id,
+          Set(UserRight.CanActAs(party)),
+          u.identityProviderId,
+        )
+        .map(_.left.map {
+          case UserManagementStore.UserNotFound(id) =>
+            UserManagementStore.UserDeletedWhileUpdating(id)
+          case other => other
+        })
+        .flatMap(Utils.handleResult("granting user rights for a new party"))
+        .map(_ => ())
+    }
+
+  private def updateOrCreatePartyRecord(
+      existingPartyRecord: PartyRecordStore.Result[Option[PartyRecord]],
+      party: Ref.Party,
+      identityProviderId: IdentityProviderId,
+      annotations: Map[String, String],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[PartyRecord] =
+    if (existingPartyRecord.exists(_.nonEmpty)) {
+      partyRecordStore
+        .updatePartyRecord(
+          PartyRecordUpdate(
+            party = party,
+            identityProviderId = identityProviderId,
+            metadataUpdate = ObjectMetaUpdate(
+              resourceVersionO = None,
+              annotationsUpdateO = Some(annotations),
+            ),
+          ),
+          ledgerPartyIsLocal = true,
+        )
+        .flatMap(handlePartyRecordStoreResult("updating a party record")(_))
+    } else {
+      partyRecordStore
+        .createPartyRecord(
+          PartyRecord(
+            party = party,
+            metadata = ObjectMeta(resourceVersionO = None, annotations = annotations),
+            identityProviderId = identityProviderId,
+          )
+        )
+        .flatMap(handlePartyRecordStoreResult("creating a party record")(_))
     }
 
   private def checkSubmissionResult(r: state.SubmissionResult) = r match {
@@ -620,6 +713,41 @@ private[apiserver] final class ApiPartyManagementService private (
         Future.successful(t)
     }
 
+  private def getUserIfUserSpecified(
+      userId: Option[Ref.UserId],
+      identityProviderId: IdentityProviderId,
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Option[UserInfo]] =
+    userId.fold[Future[Option[UserInfo]]](Future.successful(None))(
+      userManagementStore
+        .getUserInfo(_, identityProviderId)
+        .flatMap(result => Utils.handleResult("checking user's existence")(result).map(Some(_)))
+    )
+
+  private def checkUserLimitsIfUserSpecified(
+      userRights: Option[Set[UserRight]],
+      outstandingCalls: Int,
+      authenticatedUserContextF: Future[AuthenticatedUserContext],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] =
+    userRights match {
+      case None => Future.successful(())
+      case Some(rights) =>
+        for {
+          authenticatedUserContext <- authenticatedUserContextF
+          resultingRightsCount = rights.flatMap(_.getParty).size + outstandingCalls
+          _ <-
+            if (
+              authenticatedUserContext.isRegularUser && resultingRightsCount > maxSelfAllocatedParties.unwrap
+            )
+              Future.failed(
+                AuthorizationChecksErrors.PermissionDenied
+                  .Reject(s"User quota of party allocations exhausted")
+                  .asGrpcError
+              )
+            else
+              Future.successful(())
+        } yield ()
+    }
+
   private def identityProviderExistsOrError(
       id: IdentityProviderId
   )(implicit
@@ -694,10 +822,18 @@ private[apiserver] final class ApiPartyManagementService private (
 
     withValidation {
       for {
-        synchronizerId <- requireSynchronizerId(request.synchronizer, "synchronizer_id")
+        synchronizerId <- requireSynchronizerId(request.synchronizer, "synchronizer")
+          .orElse(
+            // Take a physical synchronizer ID too
+            requirePhysicalSynchronizerId(request.synchronizer, "synchronizer").map(_.logical)
+          )
         protocolVersion <- syncService
           .protocolVersionForSynchronizerId(synchronizerId)
-          .toRight(ValidationErrors.invalidArgument("No valid synchronizer found."))
+          .toRight(
+            ValidationErrors.invalidArgument(
+              s"This node is not connected to the requested synchronizer $synchronizerId."
+            )
+          )
         transactionsWithSignatures <- request.onboardingTransactions.toList.traverse(
           parseSignedTransaction(protocolVersion, _)
         )
@@ -718,10 +854,10 @@ private[apiserver] final class ApiPartyManagementService private (
           .create(signedTransactionsNE, parsedMultiSignatures, protocolVersion, cantonParticipantId)
           .leftMap(ValidationErrors.invalidArgument(_))
         partyName <- requireParty(externalPartyDetails.partyHint)
-      } yield (partyName, externalPartyDetails)
-    } { case (partyName, externalPartyOnboardingDetails) =>
+      } yield (partyName, synchronizerId, externalPartyDetails)
+    } { case (partyName, synchronizerId, externalPartyOnboardingDetails) =>
       val hostingParticipantsString = externalPartyOnboardingDetails.hostingParticipants
-        .map { case HostingParticipant(participantId, permission) =>
+        .map { case HostingParticipant(participantId, permission, _onboarding) =>
           s"$participantId -> $permission"
         }
         .mkString("[", ", ", "]")
@@ -747,6 +883,7 @@ private[apiserver] final class ApiPartyManagementService private (
             result <- syncService.allocateParty(
               partyName,
               trackerKey.submissionId,
+              Some(synchronizerId),
               Some(externalPartyOnboardingDetails),
             )
             _ <- checkSubmissionResult(result)
@@ -765,7 +902,9 @@ private[apiserver] final class ApiPartyManagementService private (
             } else {
               allocateFn
                 .map(_ => externalPartyOnboardingDetails.partyId.toProtoPrimitive)
-                .failOnShutdownTo(CommonErrors.ServerIsShuttingDown.Reject().asGrpcError)
+                .failOnShutdownTo(
+                  CommonErrors.ServiceNotRunning.Reject("PartyManagementService").asGrpcError
+                )
             }
           partyIdF
             .map(AllocateExternalPartyResponse.apply)
@@ -785,15 +924,15 @@ private[apiserver] final class ApiPartyManagementService private (
       partyHint,
       publicKeyO,
       localParticipantObservationOnly,
-      otherConfirmingParticipantIds,
+      otherConfirmingParticipantUids,
       confirmationThreshold,
-      observingParticipantIds,
+      observingParticipantUids,
     ) = request
 
     val participantId = syncService.participantId
 
     val availableConfirmers =
-      (if (localParticipantObservationOnly) 0 else 1) + otherConfirmingParticipantIds.size
+      (if (localParticipantObservationOnly) 0 else 1) + otherConfirmingParticipantUids.size
 
     val response = for {
       publicKeyP <- ProtoConverter.required("public_key", publicKeyO).leftMap(_.message)
@@ -830,20 +969,34 @@ private[apiserver] final class ApiPartyManagementService private (
       _ <- UniqueIdentifier.verifyValidString(partyHint).leftMap(x => "party_hint: " + x)
       uid <- UniqueIdentifier.create(partyHint, namespace)
       _ <- Either.cond(confirmationThreshold >= 0, (), "Negative confirmation threshold observed")
-      confirmingPids <- otherConfirmingParticipantIds.toList
+      confirmingPids <- otherConfirmingParticipantUids.toList
         .traverse(UniqueIdentifier.fromProtoPrimitive_)
         .leftMap(_.message)
-      observingPids <- observingParticipantIds.toList
+      observingPids <- observingParticipantUids.toList
         .traverse(UniqueIdentifier.fromProtoPrimitive_)
         .leftMap(_.message)
-      allParticipantIds =
-        (confirmingPids ++ observingPids).map(ParticipantId(_)) :+ participantId
+      _ <- Either.cond(
+        !confirmingPids.contains(participantId.uid),
+        (),
+        s"This participant node ($participantId) is also listed in 'otherConfirmingParticipantUids'." +
+          s" By sending the request to this node, it is de facto a hosting node and must not be listed in 'otherConfirmingParticipantUids'.",
+      )
+      _ <- Either.cond(
+        !observingPids.contains(participantId.uid),
+        (),
+        s"This participant node ($participantId) is also listed in 'observingParticipantUids'." +
+          s" By sending the request to this node, it is de facto a hosting node and must not be listed in 'observingParticipantUids'.",
+      )
+      allParticipantIds = (confirmingPids ++ observingPids)
       _ <- Either.cond(
         allParticipantIds.distinct.sizeIs == allParticipantIds.size,
         (), {
-          val duplicate =
+          val duplicates =
             allParticipantIds.groupBy(identity).collect { case (x, ys) if ys.sizeIs > 1 => x }
-          s"Duplicate participant ids $duplicate. They need to be unique and only in one category."
+          s"The following participant IDs are referenced multiple times in the request: ${duplicates
+              .mkString(", ")}." +
+            s" Please ensure all IDs are referenced only once" +
+            s" across 'otherConfirmingParticipantUids' and 'observingParticipantUids' fields."
         },
       )
       _ <- Either.cond(
@@ -951,8 +1104,10 @@ private[apiserver] object ApiPartyManagementService {
 
   def createApiService(
       partyManagementServiceBackend: IndexPartyManagementService,
+      userManagementStore: UserManagementStore,
       identityProviderExists: IdentityProviderExists,
       maxPartiesPageSize: PositiveInt,
+      maxSelfAllocatedParties: NonNegativeInt,
       partyRecordStore: PartyRecordStore,
       writeBackend: state.PartySyncService,
       managementServiceTimeout: FiniteDuration,
@@ -966,8 +1121,10 @@ private[apiserver] object ApiPartyManagementService {
   ): PartyManagementServiceGrpc.PartyManagementService & GrpcApiService =
     new ApiPartyManagementService(
       partyManagementServiceBackend,
+      userManagementStore,
       identityProviderExists,
       maxPartiesPageSize,
+      maxSelfAllocatedParties,
       partyRecordStore,
       writeBackend,
       managementServiceTimeout,
@@ -1035,20 +1192,11 @@ private[apiserver] object ApiPartyManagementService {
           partyIdHint: String,
           authorizationLevel: AuthorizationLevel,
       ): PartyAllocation.TrackerKey =
-        PartyAllocation.TrackerKey.of(
+        PartyAllocation.TrackerKey(
           partyIdHint,
           participantId,
           AuthorizationEvent.Added(authorizationLevel),
         )
     }
-
-    def fixedForTests(const: String) = new CreateSubmissionId() {
-      override def apply(
-          partyIdHint: String,
-          authorizationLevel: AuthorizationLevel,
-      ): PartyAllocation.TrackerKey =
-        PartyAllocation.TrackerKey.forTests(Ref.SubmissionId.assertFromString(const))
-    }
-
   }
 }

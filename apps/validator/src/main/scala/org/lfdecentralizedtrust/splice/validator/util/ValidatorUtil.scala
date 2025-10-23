@@ -30,6 +30,7 @@ import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerC
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 private[validator] object ValidatorUtil {
 
@@ -237,6 +238,7 @@ private[validator] object ValidatorUtil {
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     val store = storeWithIngestion.store
+    val connection = storeWithIngestion.connection(SpliceLedgerConnectionPriority.Low)
     store.lookupInstallByName(endUserName).flatMap {
       case None =>
         // Note: it's OK to skip off-boarding in this case, as on-boarding always creates an install contract first,
@@ -312,8 +314,20 @@ private[validator] object ValidatorUtil {
             // these commands could fail with PERMISSION_DENIED errors (#4425).
             Seq(Status.Code.PERMISSION_DENIED),
           )
+
+          // we delete the user only if it exists
+          _ <- connection
+            .getUser(endUserName)
+            .flatMap { _ =>
+              connection.deleteUser(endUserName)
+            }
+            .recover { case NonFatal(ex) =>
+              logger
+                .debug(s"Skipping user deletion for '$endUserName' due to a non-fatal error.", ex)
+              ()
+            }
         } yield {
-          logger.debug(s"User $endUserParty offboarded")
+          logger.info(s"User $endUserName offboarded")
           ()
         }
     }

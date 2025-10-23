@@ -139,7 +139,7 @@ class SimpleExecutionQueue(
     next.chain(
       oldHead,
       // Only run the task when the queue is not shut down
-      performUnlessClosingF(s"queued task: $description")(
+      synchronizeWithClosingF(s"queued task: $description")(
         // Turn the action FutureUnlessShutdown[A] into Future[Try[UnlessShutdown[A]]].
         // This allows us to distinguish between the failure/shutdown of the queue or the task.
         execution
@@ -169,6 +169,12 @@ class SimpleExecutionQueue(
 
   private val queueHead: AtomicReference[TaskCell] =
     new AtomicReference[TaskCell](TaskCell.sentinel(queueName = name, directExecutionContext))
+
+  /** Check if any task is queued skipping the sentinel */
+  def isEmpty: Boolean = queueHead.get().predecessor.isEmpty
+
+  /** Check if at most one task is queued */
+  def isAtMostOneTaskScheduled: Boolean = queueHead.get().predecessor.flatMap(_.predecessor).isEmpty
 
   /** slow and in-efficient queue size, to be used for inspection */
   def queueSize: Int = {
@@ -449,7 +455,7 @@ object SimpleExecutionQueue {
 
     def shutdown(): Unit = {
       errorLoggingContext.warn(s"Forcibly completing $description with AbortedDueToShutdown")
-      completionPromise.shutdown()
+      completionPromise.shutdown_()
     }
   }
 
@@ -471,7 +477,7 @@ object SimpleExecutionQueue {
         errorLoggingContext
       )
       cell.predecessorCell.set(None)
-      cell.completionPromise.outcome(Success(UnlessShutdown.Outcome(())))
+      cell.completionPromise.outcome_(Success(UnlessShutdown.Outcome(())))
       cell
     }
   }

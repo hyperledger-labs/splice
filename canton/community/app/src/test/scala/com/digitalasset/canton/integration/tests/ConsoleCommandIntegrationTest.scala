@@ -13,7 +13,7 @@ import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.UseCommunityReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.OptionValues
@@ -66,7 +66,7 @@ trait ConsoleCommandIntegrationTest
     "succeed when party name has length at most 185" in { implicit env =>
       // see commands in `UniqueIdentifier` for why this will fail with party names of length >185
       import env.*
-      participant1.ledger_api.parties.allocate("a" * 185)
+      participant1.ledger_api.parties.allocate("a" * 185, synchronizerId = daId.logical)
     }
   }
 
@@ -207,7 +207,7 @@ trait ConsoleCommandIntegrationTest
         amount: Amount,
     ): EventOuterClass.CreatedEvent =
       participant.ledger_api.javaapi.commands
-        .submit_flat(
+        .submit(
           actAs = Seq(actAs),
           commands = new Iou(
             payer.toProtoPrimitive,
@@ -259,7 +259,7 @@ trait ConsoleCommandIntegrationTest
 }
 
 class ConsoleCommandIntegrationTestDefault extends ConsoleCommandIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }
 
 //class ConsoleCommandIntegrationTestPostgres extends ConsoleCommandIntegrationTest {
