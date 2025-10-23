@@ -151,6 +151,19 @@ function newM2MApp(
           provider: auth0DomainProvider,
         }
       );
+    } else if (isMainNet) {
+      // TODO(DACH-NY/canton-network-internal#2206): But of course on MainNet we use a different default audience so all is a huge mess now
+      new auth0.ClientGrant(
+        `${resourceName}LegacyGrant`,
+        {
+          clientId: ret.id,
+          audience: 'https://ledger_api.main.digitalasset.com',
+          scopes: ['daml_ledger_api'],
+        },
+        {
+          provider: auth0DomainProvider,
+        }
+      );
     }
 
     if (ledgerApiAudValue !== appAudValue) {
