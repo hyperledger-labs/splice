@@ -33,7 +33,7 @@ synchronizerMigration:
     version: 0.4.22
     releaseReference:
       repoUrl: https://github.com/DACH-NY/canton-network-internal
-      gitReference: 9478747579634f7a8f27353f3e6f0f12995e747a
+      gitReference: 9b8f1f337a975ab61073cf12f025f395824c919f
       pulumiBaseDir: "splice/cluster/pulumi"
       pulumiStacksDir: "cluster/stacks/scratchnets"
       deploymentDir: "cluster/deployment"
