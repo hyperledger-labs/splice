@@ -5,16 +5,18 @@ runtimeDetails:
 
 deploymentDetails:  # optional, exposes static configuration under path /
   network: TARGET_CLUSTER  # One of "main", "test" or "dev"
+  sv:
+    version: "SV_VERSION"
   configDigest:
     allowedIpRanges:
       type: "md5"
-      value: MD5_HASH_OF_ALLOWED_IP_RANGES
+      value: "MD5_HASH_OF_ALLOWED_IP_RANGES"
     approvedSvIdentities:
       type: "md5"
-      value: MD5_HASH_OF_APPROVED_SV_IDENTITIES
+      value: "MD5_HASH_OF_APPROVED_SV_IDENTITIES"
   synchronizer:
     active:
-      chainIdSuffix: CHAIN_ID_SUFFIX
+      chainIdSuffix: "CHAIN_ID_SUFFIX"
       migrationId: MIGRATION_ID
     #staging:  # Configure this when staging synchronizer is enabled
     #  chainIdSuffix: CHAIN_ID_SUFFIX
