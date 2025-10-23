@@ -133,7 +133,7 @@ class ScanEventStore(
     }
     val updateF = memUpdateRt match {
       case some @ Some(_) => Future.successful(some)
-      case None => verdictStore.maxUpdateRecordTime(updateHistory.historyId, currentMigrationId)
+      case None => verdictStore.maxUpdateRecordTime(currentMigrationId)
     }
     for {
       v <- verdictF
