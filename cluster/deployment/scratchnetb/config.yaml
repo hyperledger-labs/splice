@@ -33,7 +33,7 @@ synchronizerMigration:
     version: 0.4.22
     releaseReference:
       repoUrl: https://github.com/hyperledger-labs/splice
-      gitReference: 9b8f1f337a975ab61073cf12f025f395824c919f
+      gitReference: refs/heads/martinflorian-da/temp-branch-for-operator@sha1:eee27a84f0d988f1636f169468d167051877aa94
       pulumiBaseDir: "cluster/pulumi"
       pulumiStacksDir: "cluster/stacks/scratchnets"
       deploymentDir: "cluster/deployment"
