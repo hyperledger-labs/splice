@@ -22,7 +22,6 @@ import org.openqa.selenium.{
   WebDriver,
   WebDriverException,
   WebElement,
-  Keys,
 }
 import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
