@@ -195,7 +195,7 @@ repository into small ones in the future.
 * Install the Scala plugin in IntelliJ if you don't have it yet.
 * Clone the repository first, if you haven't yet, and setup `direnv`
   (otherwise the environment variables referenced below are not defined).
-* Run `jps` to make sure that there are no `sbt` instances running
+* Kill all existing `sbt` sessions. Use `jps` to find their process IDs.
 * Run `sbt` from the **repository root** in a new terminal and leave it running. This will start and SBT server that
   IntelliJ will later connect to. Running it in the repository root makes sure that it has the right environment.
 * Start IntelliJ from the **repository root directory** so that it has access to all the environment variables
@@ -206,7 +206,7 @@ repository into small ones in the future.
 * If IntelliJ complains that no JDK is configured determine its path by running `echo $JAVA_HOME` in the repository root
   and add it to IntelliJ using the "Add JDK from disk" action (can be found using Ctrl-Shift-A or Command-Shift-A).
 * After IntelliJ imports the project the setup should be complete. You can use the SBT shell started in previous steps
-  for issuing build commands from the CLI.
+  for issuing build commands and in particular start test runs from the CLI.
 
 ## VSCode Setup
 
