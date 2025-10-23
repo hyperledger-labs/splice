@@ -11,7 +11,7 @@ export default {
     // https://stackoverflow.com/questions/79592526/testing-error-after-upgrading-mui-x-data-grid-to-v8-1-0-unknown-file-extensio
     server: {
       deps: {
-        inline: ['@mui/x-data-grid'],
+        inline: ['@mui/x-data-grid', '@mui/x-date-pickers'],
       },
     },
   },

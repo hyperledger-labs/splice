@@ -29,17 +29,6 @@ export default defineConfig(({ mode }) => {
     test: {
       globalSetup: path.resolve(__dirname, 'vitest.global-setup.ts'),
       setupFiles: ['./src/__tests__/setup/setup.ts'],
-      server: {
-        deps: {
-          inline: ['@mui/x-date-picker'],
-        },
-      },
-      alias: {
-        '@mui/system/RtlProvider': path.resolve(
-          __dirname,
-          '../../node_modules/@mui/system/RtlProvider/index.js'
-        ),
-      },
       reporters: [
         'default',
         ['junit', { outputFile: './../target/test-reports/TEST-sv.xml' }], // Logs to a file
