@@ -23,10 +23,12 @@ type ResourcesSpec = {
   requests?: {
     cpu?: string;
     memory?: string;
+    'ephemeral-storage'?: string;
   };
   limits?: {
     cpu?: string;
     memory?: string;
+    'ephemeral-storage'?: string;
   };
 };
 
@@ -69,6 +71,7 @@ const runnerSpecs = [
       requests: {
         cpu: '4',
         memory: '18Gi',
+        'ephemeral-storage': '42Gi',
       },
       limits: {
         cpu: '4',
