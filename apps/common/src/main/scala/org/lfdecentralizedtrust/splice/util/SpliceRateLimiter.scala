@@ -22,6 +22,15 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit m
     )
   )
 
+  val gauge: MetricHandle.Gauge[Double] = otelFactory.gauge(
+    MetricInfo(
+      SpliceMetrics.MetricsPrefix :+ "rate_limiting_max_limit_per_second",
+      "Max allowed rate per second",
+      Saturation,
+    ),
+    0,
+  )
+
 }
 
 case class SpliceRateLimitConfig(
@@ -38,6 +47,9 @@ class SpliceRateLimiter(
 
   // noinspection UnstableApiUsage
   private val rateLimiter = RateLimiter.create(config.ratePerSecond)
+  metrics.gauge.updateValue(config.ratePerSecond)(
+    MetricsContext("limiter" -> name)
+  )
 
   def markRun(): Boolean = {
     if (config.enabled && Instant.now().isAfter(enforceAfter)) {

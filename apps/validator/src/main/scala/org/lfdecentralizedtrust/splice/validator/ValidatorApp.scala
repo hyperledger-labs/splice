@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.migration.{
   DomainDataRestorer,
   DomainMigrationInfo,
+  MigrationTimeInfo,
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
@@ -438,26 +439,27 @@ class ValidatorApp(
         }
     } yield initialSynchronizerTime
 
-  private def readRestoreDump = config.restoreFromMigrationDump.map { path =>
-    if (config.svValidator)
-      throw Status.INVALID_ARGUMENT
-        .withDescription("SV Validator should not be configured with a dump file")
-        .asRuntimeException()
-
-    val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
-      case Failure(exception) =>
+  private def readRestoreDump: Option[DomainMigrationDump] = config.restoreFromMigrationDump.map {
+    path =>
+      if (config.svValidator)
         throw Status.INVALID_ARGUMENT
-          .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+          .withDescription("SV Validator should not be configured with a dump file")
           .asRuntimeException()
-      case Success(value) => value
-    }
-    if (migrationDump.migrationId != config.domainMigrationId)
-      throw Status.INVALID_ARGUMENT
-        .withDescription(
-          s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
-        )
-        .asRuntimeException()
-    migrationDump
+
+      val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
+        case Failure(exception) =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+            .asRuntimeException()
+        case Success(value) => value
+      }
+      if (migrationDump.migrationId != config.domainMigrationId)
+        throw Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
+          )
+          .asRuntimeException()
+      migrationDump
   }
 
   private def getAcsSnapshotFromSingleScan(
@@ -737,13 +739,17 @@ class ValidatorApp(
             )
           }
         } else {
-          val acsTimestamp =
-            readRestoreDump.map(dump => CantonTimestamp.assertFromInstant(dump.acsTimestamp))
+          val dump = readRestoreDump
           Future.successful(
             // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
             DomainMigrationInfo(
               config.domainMigrationId,
-              acsTimestamp,
+              dump.map(d =>
+                MigrationTimeInfo(
+                  CantonTimestamp.assertFromInstant(d.acsTimestamp),
+                  d.synchronizerWasPaused,
+                )
+              ),
             )
           )
         }

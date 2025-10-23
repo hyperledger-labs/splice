@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummytwointerfaces.DummyTwoInterfaces
+import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -104,6 +105,7 @@ abstract class MultiDomainAcsStoreTest[
         GenericAcsRowData,
         GenericInterfaceRowData,
       ] = defaultContractFilter,
+      migrationTimeInfo: Option[MigrationTimeInfo] = None,
   ): Store
 
   protected type Store = S

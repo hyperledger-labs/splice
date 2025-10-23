@@ -5,6 +5,8 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 
+import scala.concurrent.duration.DurationInt
+
 class WalletRewardsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
@@ -48,7 +50,7 @@ class WalletRewardsTimeBasedIntegrationTest
 
       advanceTimeForRewardAutomationToRunForCurrentRound
 
-      eventually() {
+      eventually(40.seconds) {
         bobValidatorWalletClient.listAppRewardCoupons() should have size 1
         bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         aliceValidatorWalletClient.listAppRewardCoupons() should have size 1

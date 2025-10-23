@@ -115,7 +115,10 @@ canton.participants.participant_$index = {
         }
     }
 
-    topology.broadcast-batch-size = 1
+    topology {
+      broadcast-batch-size = 1
+      validate-initial-topology-snapshot = false
+    }
 }
 EOF
 

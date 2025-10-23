@@ -19,7 +19,7 @@ trait MiningRoundsStore extends AppStore {
   /** Lookup the triple of open mining rounds that should always be present
     * after bootstrapping.
     */
-  final def lookupOpenMiningRoundTriple()(implicit
+  def lookupOpenMiningRoundTriple()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[MiningRoundsStore.OpenMiningRoundTriple]] =

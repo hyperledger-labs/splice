@@ -58,7 +58,7 @@ class GrpcAdminCommandRunner(
   private val retryPolicyV =
     new AtomicReference[GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean](_ => _ => false)
 
-  def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean = _ => _ => false
+  def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean = retryPolicyV.get()
 
   def setRetryPolicy(policy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean): Unit =
     retryPolicyV.set(policy)

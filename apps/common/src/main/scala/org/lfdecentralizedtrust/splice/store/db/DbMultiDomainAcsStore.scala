@@ -1875,14 +1875,46 @@ final class DbMultiDomainAcsStore[TXE](
   )(implicit tc: TraceContext): Future[Unit] = {
     txLogTableNameOpt.fold(Future.unit) { _ =>
       val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
-      domainMigrationInfo.acsRecordTime match {
-        case Some(acsRecordTime) =>
-          deleteRolledBackTxLogEntries(txLogStoreId, previousMigrationId, acsRecordTime)
+      domainMigrationInfo.migrationTimeInfo match {
+        case Some(info) =>
+          if (info.synchronizerWasPaused) {
+            verifyNoRolledBackData(txLogStoreId, previousMigrationId, info.acsRecordTime)
+          } else {
+            deleteRolledBackTxLogEntries(txLogStoreId, previousMigrationId, info.acsRecordTime)
+          }
         case _ =>
           logger.debug("No previous domain migration, not checking or deleting txlog entries")
           Future.unit
       }
     }
+  }
+
+  private[this] def verifyNoRolledBackData(
+      txLogStoreId: TxLogStoreId, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext) = {
+    val action =
+      sql"""
+            select count(*) from #$txLogTableName
+            where store_id = $txLogStoreId and migration_id = $migrationId and record_time > $recordTime
+          """
+        .as[Long]
+        .head
+        .map(rows =>
+          if (rows > 0) {
+            throw new IllegalStateException(
+              s"Found $rows rows for $txLogStoreDescriptor where migration_id = $migrationId and record_time > $recordTime, " +
+                "but the configuration says the domain was paused during the migration. " +
+                "Check the domain migration configuration and the content of the txlog database."
+            )
+          } else {
+            logger.debug(
+              s"No txlog entries found for $txLogStoreDescriptor where migration_id = $migrationId and record_time > $recordTime"
+            )
+          }
+        )
+    storage.query(action, "verifyNoRolledBackData")
   }
 
   private[this] def deleteRolledBackTxLogEntries(
