@@ -544,6 +544,10 @@ function installK8sRunnerScaleSet(
                     mountPath: '/home/runner/_work',
                   },
                   {
+                    name: 'nix',
+                    mountPath: '/nix',
+                  },
+                  {
                     name: 'workflow-pod-config',
                     mountPath: '/pod.yaml',
                     readOnly: true,
@@ -580,6 +584,23 @@ function installK8sRunnerScaleSet(
                       resources: {
                         requests: {
                           storage: '32Gi',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                name: 'nix',
+                ephemeral: {
+                  volumeClaimTemplate: {
+                    spec: {
+                      accessModes: ['ReadWriteOnce'],
+                      // only hyperdisks are supported on c4 nodes
+                      storageClassName: 'hyperdisk-balanced-rwo',
+                      resources: {
+                        requests: {
+                          storage: '48Gi',
                         },
                       },
                     },
