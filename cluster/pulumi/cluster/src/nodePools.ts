@@ -26,12 +26,14 @@ export function installNodePools(): void {
       labels: {
         cn_apps: 'true',
       },
+      diskSizeGb: 500,
     },
     initialNodeCount: 0,
     autoscaling: {
       minNodeCount: gkeClusterConfig.nodePools.apps.minNodes,
       maxNodeCount: gkeClusterConfig.nodePools.apps.maxNodes,
     },
+
   });
 
   new gcp.container.NodePool('cn-infra-node-pool', {
