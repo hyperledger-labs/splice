@@ -21,6 +21,7 @@ import com.digitalasset.canton.config.{
   TestingConfigInternal,
 }
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
+import com.digitalasset.canton.error.TransactionRoutingError
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
 import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
@@ -206,6 +207,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
               // and transient disconnects are normal.
               case SyncServiceInjectionError.NotConnectedToAnySynchronizer => true
               case SyncServiceInjectionError.NotConnectedToSynchronizer => true
+              case TransactionRoutingError.TopologyErrors.UnknownInformees => true
               case _ => false
             }
             if (forceRetry) {
