@@ -38,7 +38,7 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        NIX_BINARY_VERSION=2.32.1
+        NIX_BINARY_VERSION=2.13.3
         echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
         cat nix/canton-sources.json
         git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
@@ -91,9 +91,8 @@ runs:
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
-          # TODO (#2663): fix & uncomment these two lines
-          # rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
-          # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+          rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
+          sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
         else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
@@ -194,8 +193,7 @@ runs:
 
           #requires to preserve read only during clone
           sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
-          # TODO (#2663): fix & uncomment this line
-          # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
+          sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
         fi
