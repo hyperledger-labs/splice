@@ -54,7 +54,6 @@ import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetAmuletRulesConfig from './actions/SetAmuletRulesConfig';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
 import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
-import './VoteRequest.css';
 
 dayjs.extend(utc);
 
@@ -297,6 +296,7 @@ export const CreateVoteRequest: React.FC = () => {
                   maxDateTime={effectivity}
                   readOnly={false}
                   onChange={d => handleExpirationDateChange(d)}
+                  className="datetime-picker-vote-request-expiration-root"
                   slotProps={{
                     textField: {
                       id: 'datetime-picker-vote-request-expiration',
@@ -349,6 +349,7 @@ export const CreateVoteRequest: React.FC = () => {
                     format="YYYY-MM-DD HH:mm"
                     readOnly={false}
                     onChange={d => handleEffectivityDateChange(d)}
+                    className="datetime-picker-vote-request-effectivity-root"
                     slotProps={{
                       textField: {
                         id: 'datetime-picker-vote-request-effectivity',

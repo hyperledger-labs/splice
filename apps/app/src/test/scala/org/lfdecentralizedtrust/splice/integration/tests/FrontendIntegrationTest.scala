@@ -688,13 +688,16 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       webDriver: WebDriverType
   ): Assertion = {
     clue(s"$party selects the date $dateTime via $pickerId") {
-      val dateTimePicker = webDriver.findElement(By.id(pickerId))
+      val dateTimePickerRoot = webDriver.findElement(By.className(s"$pickerId-root"));
+      val dateTimePicker =
+        dateTimePickerRoot.findElement(By.className("MuiPickersSectionList-root"))
+
       eventually() {
+        clue("datepicker is cleared") {
+          dateTimePicker.clear()
+        }
         clue("datepicker is clicked") {
           dateTimePicker.click()
-        }
-        clue("datepicker content is selected") {
-          dateTimePicker.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
         }
         // Typing in the "filler" characters can mess up the input badly
         // Note: this breaks on Feb 29th because the date library validates that the day
