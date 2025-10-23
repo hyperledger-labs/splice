@@ -191,25 +191,22 @@ repository into small ones in the future.
 
 ## IntelliJ Setup
 
-* The following instructions work for recent IntelliJ installs (tested on "IntelliJ IDEA 2024.3 (Community Edition)").
+* The following instructions work for recent IntelliJ installs (tested on "IntelliJ IDEA 2025.2.3 (Community Edition)").
 * Install the Scala plugin in IntelliJ if you don't have it yet.
 * Clone the repository first, if you haven't yet, and setup `direnv`
   (otherwise the environment variables referenced below are not defined).
-* **Important**: start IntelliJ from the repo directory so that it has access to all the environment variables
+* Kill all existing `sbt` sessions. Use `jps` to find their process IDs.
+* Run `sbt` from the **repository root** in a new terminal and leave it running. This will start and SBT server that
+  IntelliJ will later connect to. Running it in the repository root makes sure that it has the right environment.
+* Start IntelliJ from the **repository root directory** so that it has access to all the environment variables
   and the `nix` packages defined using `direnv` .
   On macos, this can be done via the `open` command, for example: `open -a "IntelliJ IDEA CE"`.
 * Open the repository via "File -> Open".
-* IntelliJ should prompt you whether you want to import the `sbt` project. Answer yes. The import will fail
-  though as the JDK and sbt launcher are not yet setup.
-* Determine the path for the JDK by running `echo $JAVA_HOME` in the repo root and add it to IntelliJ using
-  the "Add JDK from disk" action (can be found using Ctrl-Shift-A).
-* Determine the path of the sbt launcher using `echo $SBT_LAUNCH_PATH` and add it
-  using the "&launcher (sbt launch.jar)" config (can be found using Ctrl-Shift-A).
-  See sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html) for more info.
-* Your sbt settings should in the end roughly look like the ones in this [screenshot](https://i.imgur.com/B3yWCZ9.png)
-
-You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
-same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
+* IntelliJ should prompt you whether you want to import the project through SBT or BSP. Choose BSP.
+* If IntelliJ complains that no JDK is configured determine its path by running `echo $JAVA_HOME` in the repository root
+  and add it to IntelliJ using the "Add JDK from disk" action (can be found using Ctrl-Shift-A or Command-Shift-A).
+* After IntelliJ imports the project the setup should be complete. You can use the SBT shell started in previous steps
+  for issuing build commands and in particular start test runs from the CLI.
 
 ## VSCode Setup
 

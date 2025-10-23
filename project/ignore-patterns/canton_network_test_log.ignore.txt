@@ -54,7 +54,7 @@ Trying to re-register template.*
 
 # TODO(#979) Ignore errors related to global domain disconnection and reconnection after sequencers connections changed for now.
 # Revisit later to see if we can remove these.
-.*NOT_FOUND/UNKNOWN_INFORMEES.*The participant is not connected to any domain where the given informees are known.
+.*NOT_FOUND/UNKNOWN_INFORMEES.*The participant is not connected to any .* where the given informees are known.
 .*NOT_FOUND/SUBMISSION_DOMAIN_NOT_READY.*Trying to submit to a disconnected or not configured domain.
 
 # TODO(#975): investigate and remove once fixed

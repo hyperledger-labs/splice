@@ -1037,7 +1037,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.18"
+          "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
         },
         "secretRef": {
           "name": "github"
@@ -1090,7 +1090,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.18"
+          "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
         },
         "secretRef": {
           "name": "github"
