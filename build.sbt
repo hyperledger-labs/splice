@@ -103,6 +103,8 @@ lazy val root: Project = (project in file("."))
     `splice-wallet-test-daml`,
     `splice-util-featured-app-proxies-daml`,
     `splice-util-featured-app-proxies-test-daml`,
+    `FOO-util-delegation-daml`,
+    `FOO-util-delegation-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -794,6 +796,17 @@ lazy val `splice-util-featured-app-proxies-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `FOO-util-delegation-daml` =
+  project
+    .in(file("daml/FOO-util-delegation"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `splice-util-featured-app-proxies-test-daml` =
   project
     .in(file("daml/splice-util-featured-app-proxies-test"))
@@ -803,6 +816,19 @@ lazy val `splice-util-featured-app-proxies-test-daml` =
       Compile / damlDependencies :=
         (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `FOO-util-delegation-test-daml` =
+  project
+    .in(file("daml/FOO-util-delegation-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`FOO-util-delegation-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
     .dependsOn(`canton-bindings-java`)
