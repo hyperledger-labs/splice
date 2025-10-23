@@ -42,9 +42,6 @@ export const generateToken = async (
       'Web Crypto API is not available. Ensure you are running in a secure context (HTTPS or localhost) and using a modern browser that supports the Web Crypto API.'
     );
   }
-  // set expiry date 10 days in the future
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + 10);
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -58,7 +55,7 @@ export const generateToken = async (
     .setIssuedAt()
     .setAudience(audience)
     .setSubject(userId)
-    .setExpirationTime(expiryDate.valueOf())
+    .setExpirationTime('30d')
     .sign(key);
 };
 
