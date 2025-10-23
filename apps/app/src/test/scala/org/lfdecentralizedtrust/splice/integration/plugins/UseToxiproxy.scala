@@ -243,8 +243,8 @@ case class UseToxiproxy(
   def disableConnectionViaProxy(connection: String): Unit = {
     proxies.get(connection) match {
       case Some(p) =>
-        logger.info(s"Disabled $connection")
         p.disable()
+        logger.info(s"Disabled $connection")
       case _ => fail(s"No proxy named ${connection}")
     }
   }
