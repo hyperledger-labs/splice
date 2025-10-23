@@ -98,8 +98,7 @@ object MetricsConfig {
         if (config.cpu) Cpu.registerObservers(openTelemetry).discard
         if (config.memoryPools) MemoryPools.registerObservers(openTelemetry).discard
         if (config.threads) Threads.registerObservers(openTelemetry).discard
-        if (config.gc)
-          GarbageCollector.registerObservers(openTelemetry, /*captureGcCause =*/ false).discard
+        if (config.gc) GarbageCollector.registerObservers(openTelemetry).discard
       }
   }
 
