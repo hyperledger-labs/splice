@@ -43,7 +43,7 @@ synchronizerMigration:
 operatorDeployment:
   reference:
     repoUrl: https://github.com/hyperledger-labs/splice
-    gitReference: refs/head/martinflorian-da/temp-branch-for-operator
+    gitReference: refs/heads/martinflorian-da/temp-branch-for-operator
     pulumiBaseDir: "cluster/pulumi"
     pulumiStacksDir: "cluster/stacks/scratchnets"
     deploymentDir: "cluster/deployment"
