@@ -771,7 +771,29 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
               monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
             ),
-            'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+            'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
+              'sv-status-report_alerts.yaml',
+              [
+                {
+                  reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '5m',
+                  teamLabel: 'canton-network',
+                  subtitle: 'DA SVs',
+                },
+                {
+                  reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '15m',
+                  teamLabel: 'support',
+                  subtitle: 'DA SVs',
+                },
+                {
+                  reportPublisherFormula: '=!"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '15m',
+                  teamLabel: 'support',
+                  subtitle: 'External SVs',
+                },
+              ]
+            ),
             ...(enableMiningRoundAlert
               ? {
                   'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
@@ -861,6 +883,38 @@ function readGrafanaAlertingFile(file: string) {
   return shouldIgnoreNoDataOrDataSourceError
     ? fileContent.replace(/(execErrState|noDataState): .+/g, '$1: OK')
     : fileContent;
+}
+
+interface AlertRulesConfig {
+  reportPublisherFormula: string; // =~"svA,svB" or !~"svA,svB"
+  notificationDelay: string; // 5m or 15m
+  teamLabel: string; // "canton-network" or "support"
+  subtitle: string;
+}
+
+function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRulesConfig[]) {
+  const fileContent = fs.readFileSync(
+    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    'utf-8'
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const content: any = yaml.load(fileContent);
+  const genericAlertRule = yaml.dump(content['groups'][0]['rules'][0]);
+
+  content['groups'][0]['rules'] = rules.map(rule =>
+    genericAlertRule
+      .replace('$REPORT_PUBLISHER_FORMULA', rule.reportPublisherFormula)
+      .replace('$NOTIFICATION_DELAY', rule.notificationDelay)
+      .replace('$TEAM_LABEL', rule.teamLabel)
+      .replace('$SUB_TITLE', rule.subtitle)
+  );
+  const newFileContent = yaml.dump(content);
+
+  // Ignore no data or data source error if the cluster is reset periodically
+  return shouldIgnoreNoDataOrDataSourceError
+    ? newFileContent.replace(/(execErrState|noDataState): .+/g, '$1: OK')
+    : newFileContent;
 }
 
 function readAlertingManagerFile(file: string) {

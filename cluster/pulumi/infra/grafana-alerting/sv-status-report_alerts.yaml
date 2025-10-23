@@ -6,7 +6,7 @@ groups:
     interval: 1m
     rules:
       - uid: adlmhpz5iv4sgc
-        title: Report Creation Time Lag
+        title: Report Creation Time Lag ($SUB_TITLE)
         condition: No recent report
         data:
           - refId: Report time lag
@@ -19,7 +19,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~".*", report_publisher=~".*", canton_version=~".*"}) / 1000000
+              expr: time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~".*", report_publisher$REPORT_PUBLISHER_FORMULA, canton_version=~".*"}) / 1000000
               instant: false
               interval: ""
               intervalMs: 30000
@@ -89,7 +89,7 @@ groups:
         panelId: 18
         noDataState: $NODATA
         execErrState: Alerting
-        for: 5m
+        for: $NOTIFICATION_DELAY
         annotations:
           __dashboardUid__: cdlm6c7fn7vuod
           __panelId__: "18"
@@ -98,5 +98,5 @@ groups:
           runbook_url: ""
           summary: Status report creation time lag too high
         labels:
-          "team": "support"
+          "team": $TEAM_LABEL
         isPaused: false
