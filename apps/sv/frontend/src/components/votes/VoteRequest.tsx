@@ -54,6 +54,7 @@ import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetAmuletRulesConfig from './actions/SetAmuletRulesConfig';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
 import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
+import './VoteRequest.css';
 
 dayjs.extend(utc);
 
