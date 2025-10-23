@@ -995,10 +995,13 @@ object BftScanConnection {
         .sequentialTraverse(scans) { scan =>
           logger.info(s"Attempting to connect to Scan: $scan.")
           connectionBuilder(scan.publicUrl)
-            .transformWith { result =>
-              // logging
-              result.failed.foreach { err =>
-                // TODO(#815): abstract this pattern into the RetryProvider
+            .transformWith {
+              case Success(conn) =>
+                logger.info(
+                  s"Successfully connected to scan of ${scan.svName} (${scan.publicUrl})."
+                )
+                Future.successful(Right(scan.publicUrl -> (conn, scan.svName)))
+              case Failure(err) =>
                 if (retryProvider.isClosing)
                   logger.info(
                     s"Suppressed warning, as we're shutting down: Failed to connect to scan of ${scan.svName} (${scan.publicUrl}).",
@@ -1009,12 +1012,7 @@ object BftScanConnection {
                     s"Failed to connect to scan of ${scan.svName} (${scan.publicUrl}).",
                     err,
                   )
-              }
-              // actual result
-              Future.successful(
-                result.toEither
-                  .bimap(scan.publicUrl -> (_, scan.svName), scan.publicUrl -> (_, scan.svName))
-              )
+                Future.successful(Left(scan.publicUrl -> (err, scan.svName)))
             }
         }
         .map(_.partitionEither(identity))

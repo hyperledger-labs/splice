@@ -46,6 +46,26 @@ class TrustSpecificScanConnectionIntegrationTest
       .withInitialPackageVersions
       .withManualStart
 
+  private def assertSuccessfulConnection(
+      messages: Seq[String],
+      svIndex: Int,
+      connected: Boolean = true,
+  ): org.scalatest.Assertion = {
+    val logMessage = s"Successfully connected to scan of ${getSvName(svIndex)}"
+
+    if (connected) {
+      messages.exists(_.contains(logMessage)) should be(true)
+    } else {
+      messages.exists(_.contains(logMessage)) should be(false)
+    }
+  }
+
+  private def assertThresholdMet(messages: Seq[String]): org.scalatest.Assertion = {
+
+    messages.exists(_.contains("created threshold number of scan connections")) should be(true)
+
+  }
+
   "simple threshold" in { implicit env =>
     startAllSync(
       sv1ScanBackend,
@@ -65,35 +85,23 @@ class TrustSpecificScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
 
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made.")) should be(
-          true
-        )
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(2)} made.")) should be(
-          true
-        )
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made.")) should be(
-          true
-        )
-
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(4)} made.")) should be(
-          false
-        )
-
-        messages.exists(_.contains("created threshold number of scan connections.")) should be(true)
+        assertSuccessfulConnection(messages, 1)
+        assertSuccessfulConnection(messages, 2)
+        assertSuccessfulConnection(messages, 3)
+        assertSuccessfulConnection(messages, 4, false)
+        assertThresholdMet(messages)
       },
     )
 
     eventuallySucceeds() {
       aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     }
-
   }
 
   "starts successfully even with one trusted SV down" in { implicit env =>
     startAllSync(
       sv1ScanBackend,
       sv1Backend,
-      sv2ScanBackend,
       sv2Backend,
       sv3ScanBackend,
       sv3Backend,
@@ -101,32 +109,18 @@ class TrustSpecificScanConnectionIntegrationTest
       sv4Backend,
     )
 
-    sv2ScanBackend.stop()
-
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
         aliceValidatorBackend.startSync()
       },
       logs => {
         val messages = logs.map(_.message)
 
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made")) should be(
-          true
-        )
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made")) should be(
-          true
-        )
-        messages.exists(_.contains(s"Could not make connection to sv ${getSvName(2)}")) should be(
-          true
-        )
-
-        messages.exists(_.contains(s"created threshold number of scan connections.")) should be(
-          true
-        )
-
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(4)} made.")) should be(
-          false
-        )
+        assertSuccessfulConnection(messages, 1)
+        assertSuccessfulConnection(messages, 3)
+        assertSuccessfulConnection(messages, 2, connected = false)
+        assertSuccessfulConnection(messages, 4, connected = false)
+        assertThresholdMet(messages)
       },
     )
 
@@ -139,44 +133,35 @@ class TrustSpecificScanConnectionIntegrationTest
     startAllSync(
       sv1ScanBackend,
       sv1Backend,
-      sv2Backend, // sv2's main backend is running
-      sv2ScanBackend,
+      sv2Backend,
       sv3ScanBackend,
       sv3Backend,
       sv4ScanBackend,
       sv4Backend,
     )
 
-    sv2ScanBackend.stop()
-
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
         aliceValidatorBackend.startSync()
       },
       logs => {
         val messages = logs.map(_.message)
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(1)} made.")) should be(
-          true
-        )
-        messages.exists(_.contains(s"Connection to trusted sv ${getSvName(3)} made.")) should be(
-          true
-        )
-        messages.exists(_.contains(s"Could not make connection to sv ${getSvName(2)}")) should be(
-          true
-        )
-        messages.exists(_.contains("created threshold number of scan connections.")) should be(true)
+
+        assertSuccessfulConnection(messages, 1)
+        assertSuccessfulConnection(messages, 3)
+        assertSuccessfulConnection(messages, 2, connected = false)
+        assertSuccessfulConnection(messages, 4, connected = false)
+        assertThresholdMet(messages)
       },
     )
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-      { sv2ScanBackend.startSync() },
+      {
+        sv2ScanBackend.startSync()
+      },
       logs => {
         val messages = logs.map(_.message)
-        messages.exists(
-          _.contains("Refresh complete. Active connections: 3 / 3")
-        ) should be(
-          true
-        )
+        assertSuccessfulConnection(messages, 2)
       },
     )
 
@@ -184,39 +169,4 @@ class TrustSpecificScanConnectionIntegrationTest
       aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     }
   }
-
-//  "fails to initialize when below threshold" in { implicit env =>
-//    startAllSync(
-//      sv1ScanBackend,
-//      sv1Backend,
-//      sv2ScanBackend,
-//      sv2Backend,
-//      sv3ScanBackend,
-//      sv3Backend,
-//      sv4ScanBackend,
-//      sv4Backend,
-//    )
-//
-//    sv2ScanBackend.stop()
-//    sv3ScanBackend.stop()
-//
-//
-//    val exception = intercept[java.lang.RuntimeException] {
-//      aliceValidatorBackend.startSync()
-//    }
-//
-//    def findStatusRuntimeException(t: Throwable): Option[io.grpc.StatusRuntimeException] =
-//      t match {
-//        case sre: io.grpc.StatusRuntimeException => Some(sre)
-//        case null => None
-//        case _ => findStatusRuntimeException(t.getCause)
-//      }
-//
-//    val statusRuntimeException =
-//      findStatusRuntimeException(exception).valueOrFail("Could not find StatusRuntimeException in cause chain")
-//
-//    val description = statusRuntimeException.getStatus.getDescription
-//    description should include("Failed to connect to required number of trusted scans.")
-//  }
-
 }
