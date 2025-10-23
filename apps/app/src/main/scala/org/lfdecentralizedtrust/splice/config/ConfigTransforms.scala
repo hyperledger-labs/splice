@@ -811,7 +811,11 @@ object ConfigTransforms {
       user: String,
       c: LedgerApiClientConfig,
   ): LedgerApiClientConfig = {
-    val userToken = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
+    val userToken = AuthUtil.LedgerApi.testToken(
+      user = user,
+      secret = secret,
+      expiration = NonNegativeFiniteDuration.ofDays(30),
+    )
     c.copy(
       authConfig = AuthTokenSourceConfig.Static(
         userToken,
