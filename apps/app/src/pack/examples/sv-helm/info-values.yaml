@@ -5,8 +5,6 @@ runtimeDetails:
 
 deploymentDetails:  # optional, exposes static configuration under path /
   network: TARGET_CLUSTER  # One of "main", "test" or "dev"
-  sv:
-    version: "SV_VERSION"
   configDigest:
     allowedIpRanges:
       type: "md5"
