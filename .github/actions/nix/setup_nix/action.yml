@@ -38,7 +38,7 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        NIX_BINARY_VERSION=2.32.0
+        NIX_BINARY_VERSION=2.32.1
         echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
         cat nix/canton-sources.json
         git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
