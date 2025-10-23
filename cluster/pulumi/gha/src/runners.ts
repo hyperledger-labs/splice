@@ -544,10 +544,6 @@ function installK8sRunnerScaleSet(
                     mountPath: '/home/runner/_work',
                   },
                   {
-                    name: 'nix',
-                    mountPath: '/nix',
-                  },
-                  {
                     name: 'cache',
                     mountPath: '/cache',
                   },
@@ -595,23 +591,6 @@ function installK8sRunnerScaleSet(
                 },
               },
               {
-                name: 'nix',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '48Gi',
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              {
                 name: 'cache',
                 ephemeral: {
                   volumeClaimTemplate: {
@@ -621,7 +600,7 @@ function installK8sRunnerScaleSet(
                       storageClassName: 'hyperdisk-balanced-rwo',
                       resources: {
                         requests: {
-                          storage: '48Gi',
+                          storage: '128Gi',
                         },
                       },
                     },
