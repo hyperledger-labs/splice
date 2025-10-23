@@ -32,21 +32,21 @@ synchronizerMigration:
     id: 0
     version: 0.4.22
     releaseReference:
-      repoUrl: https://github.com/DACH-NY/canton-network-internal
+      repoUrl: https://github.com/hyperledger-labs/splice
       gitReference: 9b8f1f337a975ab61073cf12f025f395824c919f
-      pulumiBaseDir: "splice/cluster/pulumi"
+      pulumiBaseDir: "cluster/pulumi"
       pulumiStacksDir: "cluster/stacks/scratchnets"
       deploymentDir: "cluster/deployment"
-      spliceRoot: "splice"
+      spliceRoot: "."
       privateConfigsDir: "cluster/configs/configs-private"
       publicConfigsDir: "cluster/configs/configs"
 operatorDeployment:
   reference:
-    repoUrl: https://github.com/DACH-NY/canton-network-internal
+    repoUrl: https://github.com/hyperledger-labs/splice
     gitReference: refs/head/martinflorian-da/temp-branch-for-operator
-    pulumiBaseDir: "splice/cluster/pulumi"
+    pulumiBaseDir: "cluster/pulumi"
     pulumiStacksDir: "cluster/stacks/scratchnets"
     deploymentDir: "cluster/deployment"
-    spliceRoot: "splice"
+    spliceRoot: "."
     privateConfigsDir: "cluster/configs/configs-private"
     publicConfigsDir: "cluster/configs/configs"
