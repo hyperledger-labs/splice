@@ -513,3 +513,31 @@ export function configureScanBigQuery(
   installScheduledTasks(dashboardsDataset, [functionsDataset, dataset]);
   return;
 }
+
+
+
+/** Notes:
+ *
+ * OVERRIDE_VERSION=0.4.21 cncluster psql sv-1 scan-app
+ *
+ * ALTER PUBLICATION update_history_datastream_pub SET TABLE update_history_creates, update_history_exercises, scan_verdict_store;
+ *
+ * SELECT
+    p.pubname AS publication_name,
+    c.relname AS published_table
+FROM
+    pg_publication p
+JOIN
+    pg_publication_rel pr ON p.oid = pr.prpubid
+JOIN
+    pg_class c ON pr.prrelid = c.oid
+ORDER BY
+    p.pubname, c.relname;
+ *
+
+    In BQ:
+    ALTER TABLE `da-cn-scratchnet.devnet_da2_scan.scan_sv_1_scan_verdict_store`
+      SET OPTIONS (max_staleness = INTERVAL 0 MINUTE);
+
+    (might want to set dataFreshness to 0s when on a scratchnet)
+ */
