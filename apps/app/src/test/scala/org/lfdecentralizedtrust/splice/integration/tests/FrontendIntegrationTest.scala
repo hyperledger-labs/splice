@@ -686,19 +686,27 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ): Assertion = {
-    clue(s"$party selects the date $dateTime") {
+    clue(s"$party selects the date $dateTime via $pickerId") {
       val dateTimePicker = webDriver.findElement(By.id(pickerId))
       eventually() {
-        dateTimePicker.clear()
-        dateTimePicker.click()
+        clue("datepicker is cleared") {
+          dateTimePicker.clear()
+        }
+        clue("datepicker is clicked") {
+          dateTimePicker.click()
+        }
         // Typing in the "filler" characters can mess up the input badly
         // Note: this breaks on Feb 29th because the date library validates that the day
         // of the month is valid for the year you enter and because the year is entered
         // one digit at a time that fails and it resets it to Feb 28th. Luckily,
         // this does not happen very often …
-        dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
+        clue("datepicker is filled") {
+          dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
+        }
         eventually()(
-          dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
+          clue("datepicker is checked") {
+            dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
+          }
         )
       }
     }
