@@ -3,17 +3,7 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ArrowForward, ContentCopy } from '@mui/icons-material';
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Chip,
-  GridLegacy,
-  IconButton,
-  Typography,
-} from '@mui/material';
+import { Alert, Badge, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 export interface ActionRequiredData {
@@ -97,8 +87,8 @@ const ActionCard = (props: ActionCardProps) => {
           justifyContent: 'space-between',
         }}
       >
-        <GridLegacy container spacing={1}>
-          <GridLegacy xs={3}>
+        <Grid container spacing={1}>
+          <Grid size={{ xs: 3 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 ACTION
@@ -107,8 +97,8 @@ const ActionCard = (props: ActionCardProps) => {
                 {action}
               </Typography>
             </Box>
-          </GridLegacy>
-          <GridLegacy xs={2}>
+          </Grid>
+          <Grid size={{ xs: 2 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 CREATED AT
@@ -121,8 +111,8 @@ const ActionCard = (props: ActionCardProps) => {
                 {createdAt}
               </Typography>
             </Box>
-          </GridLegacy>
-          <GridLegacy xs={2}>
+          </Grid>
+          <Grid size={{ xs: 2 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 THRESHOLD DEADLINE
@@ -135,8 +125,8 @@ const ActionCard = (props: ActionCardProps) => {
                 {votingEnds}
               </Typography>
             </Box>
-          </GridLegacy>
-          <GridLegacy xs={2}>
+          </Grid>
+          <Grid size={{ xs: 2 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 REQUESTER
@@ -155,8 +145,8 @@ const ActionCard = (props: ActionCardProps) => {
                 {isYou && <Chip label="You" size="small" data-testid="action-required-you" />}
               </Box>
             </Box>
-          </GridLegacy>
-        </GridLegacy>
+          </Grid>
+        </Grid>
 
         <Button
           component={RouterLink}

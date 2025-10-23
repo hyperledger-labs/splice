@@ -4,7 +4,7 @@ import { useGetRoundOfLatestData } from '@lfdecentralizedtrust/splice-common-fro
 import React, { useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
-import { GridLegacy, Tab, Tabs, Typography, Box } from '@mui/material';
+import { Tab, Tabs, Typography, Box, Grid } from '@mui/material';
 
 import Layout from '../components/Layout';
 import NetworkInfo from '../components/NetworkInfo';
@@ -45,38 +45,31 @@ const Root: React.FC = () => {
 
   return (
     <Layout>
-      <GridLegacy
-        container
-        margin={4}
-        pr={4}
-        spacing={4}
-        justifyContent="center"
-        sx={{ width: 'auto' }}
-      >
-        <GridLegacy item xs={8}>
+      <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>
+        <Grid size={{ xs: 8 }}>
           <Typography variant="h5">
             Explore, search and find answers to current network configuration details.
           </Typography>
-        </GridLegacy>
+        </Grid>
 
-        <GridLegacy item xs={4}>
+        <Grid size={{ xs: 4 }}>
           <div id="as-of-round">
             <Typography variant="body2" data-testid="round-of-latest-data-text">
               The content on this page is computed as of round:{' '}
               <span data-testid="round-of-latest-data-value">{round}</span>
             </Typography>
           </div>
-        </GridLegacy>
+        </Grid>
 
-        <GridLegacy item xs={12} lg={6} data-testid="circulating-supply-container">
+        <Grid size={{ xs: 12, lg: 6 }} data-testid="circulating-supply-container">
           <TotalAmuletBalance />
-        </GridLegacy>
+        </Grid>
 
-        <GridLegacy item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <TotalRewards />
-        </GridLegacy>
+        </Grid>
 
-        <GridLegacy item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Box mb={0}>
             <Tabs value={selected}>
               {navLinks.map(navLink => {
@@ -93,15 +86,15 @@ const Root: React.FC = () => {
             </Tabs>
           </Box>
           <Outlet />
-        </GridLegacy>
+        </Grid>
 
         {/** spacer element to separate NetworkInfo from tables on large screen widths */}
-        <GridLegacy item xs={0} lg={1} />
+        <Grid size={{ xs: 0, lg: 1 }} />
 
-        <GridLegacy item xs={12} lg={5}>
+        <Grid size={{ xs: 12, lg: 5 }}>
           <NetworkInfo />
-        </GridLegacy>
-      </GridLegacy>
+        </Grid>
+      </Grid>
     </Layout>
   );
 };
