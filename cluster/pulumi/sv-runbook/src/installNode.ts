@@ -47,12 +47,12 @@ import {
   networkWideConfig,
   getAdditionalJvmOptions,
   externalIpRangesFile,
-  approvedSvIdentitiesFile,
   clusterNetwork,
   CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   approvedSvIdentities,
+  approvedSvIdentitiesFile,
   CantonBftSynchronizerNode,
   configForSv,
   getChainIdSuffix,
@@ -550,28 +550,36 @@ function installInfoEndpoint(
     return path !== undefined ? fs.readFileSync(path, 'utf-8') : '';
   }
 
-  const infoValues = {
-    ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/info-values.yaml`, {
+  const defaultValues = loadYamlFromFile(
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/info-values.yaml`,
+    {
       TARGET_CLUSTER: clusterNetwork,
-      SV_VERSION: CnChartVersion.stringify(decentralizedSynchronizerMigrationConfig.active.version),
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
-      MD5_HASH_OF_ALLOWED_IP_RANGES: createHash('md5')
+      MD5_HASH_OF_ALLOWED_IP_RANGES: `"${createHash('md5')
         .update(readFileOrEmptyString(externalIpRangesFile()))
-        .digest('hex'),
-      MD5_HASH_OF_APPROVED_SV_IDENTITIES: createHash('md5')
+        .digest('hex')}"`,
+      MD5_HASH_OF_APPROVED_SV_IDENTITIES: `"${createHash('md5')
         .update(readFileOrEmptyString(approvedSvIdentitiesFile()))
-        .digest('hex'),
-      CHAIN_ID_SUFFIX: getChainIdSuffix(),
-    }),
-    // TODO: I'm not sure which properties should be templated in the example info-values.yaml
-    //       in contrast to setting them here.
+        .digest('hex')}"`,
+      CHAIN_ID_SUFFIX: `"${getChainIdSuffix()}"`,
+    }
+  );
+
+  const values = {
+    ...defaultValues,
+    deploymentDetails: {
+      ...defaultValues.deploymentDetails,
+      sv: {
+        version: CnChartVersion.stringify(decentralizedSynchronizerMigrationConfig.active.version),
+      },
+    },
     istioVirtualService: {
       host: `info.${xns.logicalName}.${CLUSTER_HOSTNAME}`,
       gateway: 'cluster-ingress/cn-http-gateway',
     },
   };
 
-  installSpliceRunbookHelmChart(xns, 'info', 'splice-info', infoValues, activeVersion, {
+  installSpliceRunbookHelmChart(xns, 'info', 'splice-info', values, activeVersion, {
     dependsOn: [scan],
   });
 }
