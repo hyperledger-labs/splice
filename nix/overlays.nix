@@ -12,46 +12,6 @@
   python3 = super.python3.override {
     packageOverrides = pySelf : pySuper : rec {
       sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };
-      # gsutil requires an older version of pyopenssl dependency
-      pyopenssl = pySuper.pyopenssl.overridePythonAttrs (old: rec {
-        version = "24.2.1";
-        src = super.fetchFromGitHub {
-          owner = "pyca";
-          repo = "pyopenssl";
-          tag = version;
-          hash = "sha256-/TQnDWdycN4hQ7ZGvBhMJEZVafmL+0wy9eJ8hC6rfio=";
-        };
-        # we remove the docs output because it fails to build and we don't need it
-        outputs = [
-          "out"
-          "dev"
-        ];
-        # tweaked to remove the sphinx hook to build docs
-        nativeBuildInputs = [
-          super.openssl
-        ];
-      });
-      # downgraded to work with pyopenssl
-      cryptography = (pySuper.cryptography.override {}).overridePythonAttrs (old: rec {
-        pname = "cryptography";
-        version = "43.0.1";
-        src = pySuper.fetchPypi {
-          inherit pname version;
-          hash = "sha256-ID6Sp1cW2M+0kdxHx54X0NkgfM/8vLNfWY++RjrjRE0=";
-        };
-
-        cargoRoot = "src/rust";
-
-        cargoDeps = super.rustPlatform.fetchCargoTarball {
-          inherit src;
-          sourceRoot = "${pname}-${version}/${cargoRoot}";
-          name = "${pname}-${version}";
-          hash = "sha256-wiAHM0ucR1X7GunZX8V0Jk2Hsi+dVdGgDKqcYjSdD7Q=";
-        };
-      });
-      # downgraded together with cryptography. We can't just override it
-      # as it's not exposed in pythonpackages so we need to copy vectors.nix
-      cryptography-vectors = super.callPackage ./vectors.nix { buildPythonPackage = pySuper.buildPythonPackage; cryptography = pySelf.cryptography; flit-core = pySuper.flit-core; };
     };
   };
   pre-commit = super.pre-commit.overrideAttrs (old: {
