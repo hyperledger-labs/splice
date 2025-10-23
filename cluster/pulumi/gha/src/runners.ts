@@ -71,7 +71,7 @@ const runnerSpecs = [
       requests: {
         cpu: '4',
         memory: '18Gi',
-        'ephemeral-storage': '42Gi',
+        'ephemeral-storage': '80Gi',
       },
       limits: {
         cpu: '4',
