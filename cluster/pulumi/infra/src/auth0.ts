@@ -137,7 +137,7 @@ function newM2MApp(
       }
     );
 
-    if (ledgerApiAudValue !== 'https://canton.network.global') {
+    if (!isMainNet && ledgerApiAudValue !== 'https://canton.network.global') {
       // TODO(DACH-NY/canton-network-internal#2206): For now, we also grant all apps access to the old default ledger API
       // audience, to un-break it until we clean up the audiences we use.
       new auth0.ClientGrant(

@@ -361,3 +361,8 @@ CREATE INDEX dso_acs_store_sid_mid_pn_tid_mtm_mtd ON dso_acs_store (store_id, mi
                                                                     template_id_qualified_name, member_traffic_member,
                                                                     member_traffic_domain) WHERE (member_traffic_member IS NOT NULL);
 
+DROP INDEX dso_acs_contract_id_hash_idx;
+CREATE INDEX dso_acs_contract_id_hash_idx on dso_acs_store (store_id, migration_id, stable_int32_hash(contract_id))
+  where
+    package_name = 'splice-amulet' and
+    template_id_qualified_name = 'Splice.Amulet:FeaturedAppActivityMarker';

@@ -97,6 +97,7 @@ class DsoDelegateBasedAutomationService(
       new FeaturedAppActivityMarkerTrigger(
         triggerContext,
         svTaskContext,
+        config,
       )
     )
 
