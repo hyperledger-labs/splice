@@ -127,6 +127,13 @@ class ScanEventHistoryIntegrationTest
 
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
+    eventually() {
+      // Check that mediator connection really doesn't work anymore.
+      sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
+    }
+
+    // after this point, scan should be unable to ingest any verdicts
+
     val _ = onboardAliceAndBob()
 
     // There may be some data already in scan's DB even with disabled proxy
