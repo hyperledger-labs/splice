@@ -41,7 +41,7 @@ object CantonDependencies {
 
   lazy val pureconfig_version = "0.14.0"
 
-  lazy val circe_version = "0.14.2"
+  lazy val circe_version = "0.14.10"
 
   lazy val scalatest_version = "3.2.19"
   lazy val scalacheck_version = "1.15.4"
@@ -196,7 +196,8 @@ object CantonDependencies {
 
   lazy val circe_core = "io.circe" %% "circe-core" % circe_version
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
-  lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
+  lazy val circe_generic_extras =
+    "io.circe" %% "circe-generic-extras" % "0.14.4" // https://github.com/circe/circe-generic-extras?tab=readme-ov-file#versioning
 
   lazy val guava = "com.google.guava" % "guava" % "33.3.0-jre"
   lazy val tink = "com.google.crypto.tink" % "tink" % "1.12.0" excludeAll (
@@ -235,7 +236,7 @@ object CantonDependencies {
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
   lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
 
-  lazy val sttp_version = "3.8.16"
+  lazy val sttp_version = "3.11.0"
   lazy val sttp = "com.softwaremill.sttp.client3" %% "core" % sttp_version
   lazy val sttp_okhttp = "com.softwaremill.sttp.client3" %% "okhttp-backend" % sttp_version
   lazy val sttp_circe = "com.softwaremill.sttp.client3" %% "circe" % sttp_version
