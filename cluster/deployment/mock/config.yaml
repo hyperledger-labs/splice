@@ -25,7 +25,7 @@ synchronizerMigration:
     - id: 1
       version: 0.3.18
       releaseReference:
-        gitReference: "refs/heads/release-line-0.3.18"
+        gitReference: "981227e62011e386cca3cdb5f00b472cf05a12c4"
         repoUrl: https://github.com/hyperledger-labs/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
