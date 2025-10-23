@@ -20,29 +20,29 @@ REQUIRED_ARGS=(
   "tables-to-replicate-length"
   "db-name"
   "schema-name"
-  "tables-to-replicate-list"
-  "tables-to-replicate-joined"
   "postgres-user-name"
   "publication-name"
   "replication-slot-name"
   "replicator-user-name"
   "postgres-instance-name"
   "scan-app-database-name"
+  "tables-to-wait-for-record-time-list"
+  "tables-to-wait-for-record-time-length"
 )
 PRIVATE_NETWORK_PROJECT=""
 COMPUTE_REGION=""
 SERVICE_ACCOUNT_EMAIL=""
-TABLES_TO_REPLICATE_LENGTH=""
 DB_NAME=""
 SCHEMA_NAME=""
-TABLES_TO_REPLICATE_LIST=""
-TABLES_TO_REPLICATE_JOINED=""
 POSTGRES_USER_NAME=""
 PUBLICATION_NAME=""
 REPLICATION_SLOT_NAME=""
 REPLICATOR_USER_NAME=""
 POSTGRES_INSTANCE_NAME=""
 SCAN_APP_DATABASE_NAME=""
+TABLES_TO_REPLICATE_JOINED=""
+TABLES_TO_WAIT_FOR_RECORD_TIME_LIST=""
+TABLES_TO_WAIT_FOR_RECORD_TIME_LENGTH=""
 
 # Track which arguments have been provided
 declare -A PROVIDED_ARGS
@@ -77,17 +77,11 @@ while [ "$#" -gt 0 ]; do
     service-account-email)
       SERVICE_ACCOUNT_EMAIL="$param_value"
       ;;
-    tables-to-replicate-length)
-      TABLES_TO_REPLICATE_LENGTH="$param_value"
-      ;;
     db-name)
       DB_NAME="$param_value"
       ;;
     schema-name)
       SCHEMA_NAME="$param_value"
-      ;;
-    tables-to-replicate-list)
-      TABLES_TO_REPLICATE_LIST="$param_value"
       ;;
     tables-to-replicate-joined)
       TABLES_TO_REPLICATE_JOINED="$param_value"
@@ -109,6 +103,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     scan-app-database-name)
       SCAN_APP_DATABASE_NAME="$param_value"
+      ;;
+    tables-to-wait-for-record-time-list)
+      TABLES_TO_WAIT_FOR_RECORD_TIME_LIST="$param_value"
+      ;;
+    tables-to-wait-for-record-time-length)
+      TABLES_TO_WAIT_FOR_RECORD_TIME_LENGTH="$param_value"
       ;;
     *)
       echo "Unknown parameter: --$param_name" >&2
@@ -158,7 +158,7 @@ trap cleanup EXIT
 
 # create temporary bucket
 echo "Creating temporary bucket $TMP_BUCKET"
-gcloud storage buckets create --pap enforced --project "$PRIVATE_NETWORK_PROJECT" \
+gcloud storage buckets create --pap --project "$PRIVATE_NETWORK_PROJECT" \
     -l "$COMPUTE_REGION" "gs://$TMP_BUCKET"
 
 # grant DB service account access to the bucket
@@ -179,11 +179,11 @@ case "$SUBCOMMAND" in
         WHILE NOT migration_complete AND attempt < max_attempts LOOP
           -- Check if all tables exist AND have the record_time column
           -- this is added by V037__denormalize_update_history.sql
-          SELECT COUNT(*) = $TABLES_TO_REPLICATE_LENGTH INTO migration_complete
+          SELECT COUNT(*) = $TABLES_TO_WAIT_FOR_RECORD_TIME_LENGTH INTO migration_complete
             FROM information_schema.columns
             WHERE table_catalog = '$DB_NAME'
               AND table_schema = '$SCHEMA_NAME'
-              AND table_name IN ($TABLES_TO_REPLICATE_LIST)
+              AND table_name IN ($TABLES_TO_WAIT_FOR_RECORD_TIME_LIST)
               AND column_name = 'record_time';
 
           IF NOT migration_complete THEN
@@ -203,7 +203,10 @@ case "$SUBCOMMAND" in
       DO \$\$
       BEGIN
         -- TODO (#453) drop slot, pub if table list doesn't match
-        IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '$PUBLICATION_NAME') THEN
+        IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '$PUBLICATION_NAME') THEN
+          ALTER PUBLICATION $PUBLICATION_NAME
+            SET TABLE $TABLES_TO_REPLICATE_JOINED;
+        ELSE
           CREATE PUBLICATION $PUBLICATION_NAME
             FOR TABLE $TABLES_TO_REPLICATE_JOINED;
         END IF;
