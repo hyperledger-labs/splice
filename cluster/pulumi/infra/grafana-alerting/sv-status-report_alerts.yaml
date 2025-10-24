@@ -89,7 +89,7 @@ groups:
         panelId: 18
         noDataState: $NODATA
         execErrState: Alerting
-        for: 5m
+        for: 15m
         annotations:
           __dashboardUid__: cdlm6c7fn7vuod
           __panelId__: "18"
