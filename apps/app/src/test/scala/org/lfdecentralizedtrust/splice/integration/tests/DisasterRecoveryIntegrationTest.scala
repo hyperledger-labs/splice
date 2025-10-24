@@ -654,7 +654,7 @@ class DisasterRecoveryIntegrationTest
       dump.participantUsers,
       createdAt = dump.createdAt,
     )
-    fullDumpFile.write(fullDump.asJson.spaces2)
+    fullDumpFile.write(fullDump.toHttp(outputDirectory = None).asJson.spaces2)
   }
 
   private def clearOrCreate(f: File) = {

@@ -1330,7 +1330,7 @@ class HttpScanHandler(
         // that users backup their own ACS.
         // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshotNonChunked(
           Set(partyId),
           timestamp = recordTime.map(_.toInstant),
         )

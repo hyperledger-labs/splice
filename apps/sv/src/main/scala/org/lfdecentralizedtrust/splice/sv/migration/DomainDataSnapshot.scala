@@ -8,29 +8,57 @@ import org.lfdecentralizedtrust.splice.migration.{Dar, ParticipantUsersData}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.google.protobuf.ByteString
 
+import java.io.*
 import java.time.Instant
 import java.util.Base64
+import scala.collection.mutable.ListBuffer
+import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 // TODO(DACH-NY/canton-network-node#11100) Split domain data snapshots for validators and SVs to avoid
 // the optional mess.
 final case class DomainDataSnapshot(
-    genesisState: Option[ByteString],
-    acsSnapshot: ByteString,
+    genesisState: Option[Seq[ByteString]],
+    acsSnapshot: Seq[ByteString],
     acsTimestamp: Instant,
     dars: Seq[Dar],
     // true if we exported for a proper migration, false for DR.
     synchronizerWasPaused: Boolean,
 ) extends PrettyPrinting {
-  def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
-    genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
-    Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
-    acsTimestamp.toString,
-    dars.map { dar =>
-      val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
-      http.Dar(dar.mainPackageId, content)
-    }.toVector,
-    synchronizerWasPaused = Some(synchronizerWasPaused),
-  )
+  // if output directory is specified we use the new format, otherwise the old one.
+  // Only the DR endpoint should use the old one.
+  def toHttp(outputDirectory: Option[String]): http.DomainDataSnapshot = {
+    def encodeField(name: String, content: Seq[ByteString]): String = {
+      outputDirectory match {
+        case None =>
+          Base64.getEncoder.encodeToString(ByteString.copyFrom(content.asJava).toByteArray)
+        case Some(dir) =>
+          val file = s"$dir/${acsTimestamp}-$name"
+          Using.resource(
+            new DataOutputStream(
+              new BufferedOutputStream(
+                new FileOutputStream(file)
+              )
+            )
+          ) { dos =>
+            DomainDataSnapshot.writeChunks(dos, content)
+          }
+          file
+      }
+    }
+
+    http.DomainDataSnapshot(
+      genesisState.map(s => encodeField("genesis-state", s)),
+      encodeField("acs-snapshot", acsSnapshot),
+      acsTimestamp.toString,
+      dars.map { dar =>
+        val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
+        http.Dar(dar.mainPackageId, content)
+      }.toVector,
+      synchronizerWasPaused = Some(synchronizerWasPaused),
+      separatePayloadFiles = outputDirectory.isDefined,
+    )
+  }
 
   override def pretty: Pretty[DomainDataSnapshot.this.type] =
     Pretty.prettyNode(
@@ -64,8 +92,6 @@ object DomainDataSnapshot {
   def fromHttp(
       src: http.DomainDataSnapshot
   ): Either[String, DomainDataSnapshot] = {
-    val genesisState = src.genesisState.map(s => ByteString.copyFrom(base64Decoder.decode(s)))
-    val acsSnapshot = ByteString.copyFrom(base64Decoder.decode(src.acsSnapshot))
     val dars =
       src.dars.map { dar =>
         val decoded = base64Decoder.decode(dar.content)
@@ -74,12 +100,53 @@ object DomainDataSnapshot {
     val acsTimestamp = Instant.parse(src.acsTimestamp)
     Right(
       DomainDataSnapshot(
-        genesisState,
-        acsSnapshot,
+        src.genesisState.map(readBytes(src.separatePayloadFiles, _)),
+        readBytes(src.separatePayloadFiles, src.acsSnapshot),
         acsTimestamp,
         dars,
         src.synchronizerWasPaused.getOrElse(false),
       )
     )
+  }
+
+  def readBytes(separateFiles: Boolean, content: String): Seq[ByteString] = {
+    if (separateFiles) {
+      Using.resource(
+        new DataInputStream(
+          new BufferedInputStream(
+            new FileInputStream(content)
+          )
+        )
+      )(readAllChunks)
+    } else {
+      Seq(ByteString.copyFrom(base64Decoder.decode(content)))
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+  private def readAllChunks(
+      dis: DataInputStream
+  ): Seq[ByteString] = {
+    val acc = ListBuffer.empty[ByteString]
+    var eof = false
+    while (!eof) {
+      try {
+        val length = dis.readInt()
+        val chunk = new Array[Byte](length)
+        dis.readFully(chunk)
+        acc.addOne(ByteString.copyFrom(chunk))
+      } catch {
+        case _: EOFException =>
+          eof = true
+      }
+    }
+    acc.toSeq
+  }
+
+  private def writeChunks(dos: DataOutputStream, chunks: Seq[ByteString]): Unit = {
+    chunks.foreach { chunk =>
+      dos.writeInt(chunk.size)
+      dos.write(chunk.toByteArray)
+    }
   }
 }

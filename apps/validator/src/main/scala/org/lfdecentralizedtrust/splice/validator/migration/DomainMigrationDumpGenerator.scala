@@ -24,6 +24,7 @@ import io.grpc.Status
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class DomainMigrationDumpGenerator(
     ledgerConnection: SpliceLedgerConnection,
@@ -64,7 +65,8 @@ class DomainMigrationDumpGenerator(
         migrationId = migrationId,
         participant = nodeIdentities,
         participantUsers = participantUsersData,
-        acsSnapshot = acsSnapshot,
+        // FIXME
+        acsSnapshot = com.google.protobuf.ByteString.copyFrom(acsSnapshot.asJava),
         acsTimestamp = acsTimestamp,
         dars = dars,
         createdAt = createdAt,
@@ -110,7 +112,8 @@ class DomainMigrationDumpGenerator(
         migrationId = migrationId,
         participant = nodeIdentities,
         participantUsers = participantUsersData,
-        acsSnapshot = acsSnapshot,
+        // FIXME
+        acsSnapshot = com.google.protobuf.ByteString.copyFrom(acsSnapshot.asJava),
         acsTimestamp = timestamp,
         dars = dars,
         createdAt = Instant.now(),

@@ -1059,6 +1059,7 @@ components:
         - acs_snapshot
         - acs_timestamp
         - dars
+        - separate_payload_files
       properties:
         genesis_state:
           description: |
@@ -1076,6 +1077,10 @@ components:
             $ref: "#/components/schemas/Dar"
         synchronizer_was_paused:
           type: boolean
+        separate_payload_files:
+          type: boolean
+          description: |
+            If set to true, genesis_state, acs_snapshot and dars are filenames
 
     Dar:
       type: object
