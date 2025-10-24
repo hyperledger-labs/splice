@@ -46,7 +46,7 @@ const tablesToReplicate = [
   'scan_verdict_store',
   'scan_verdict_transaction_view_store',
 ];
-const tablesToWaitForRecordTime = ['update_history_creates', 'update_history_exercises'];
+const flywayMigrationToWaitFor = 'V047__verdict_history_id.sql';
 
 function cloudsdkComputeRegion() {
   return config.requireEnv('CLOUDSDK_COMPUTE_REGION');
@@ -459,7 +459,6 @@ function createPublicationAndReplicationSlots(
       --private-network-project="${gcp.organizations.getProjectOutput({}).apply(proj => proj.name)}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
-      --db-name="${dbName}" \\
       --schema-name="${schemaName}" \\
       --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \\
       --postgres-user-name="${postgres.user.name}" \\
@@ -468,8 +467,7 @@ function createPublicationAndReplicationSlots(
       --replicator-user-name="${replicatorUserName}" \\
       --postgres-instance-name="${postgres.databaseInstance.name}" \\
       --scan-app-database-name="${scanAppDatabaseName(postgres)}" \\
-      --tables-to-wait-for-record-time-length="${tablesToWaitForRecordTime.length}" \\
-      --tables-to-wait-for-record-time-list="${tablesToWaitForRecordTime.map(n => `'${n}'`).join(', ')}" \\
+      --flyway-migration-to-wait-for="${flywayMigrationToWaitFor}" \\
       `;
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,

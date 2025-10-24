@@ -18,7 +18,6 @@ REQUIRED_ARGS=(
   "compute-region"
   "service-account-email"
   "tables-to-replicate-joined"
-  "db-name"
   "schema-name"
   "postgres-user-name"
   "publication-name"
@@ -26,13 +25,11 @@ REQUIRED_ARGS=(
   "replicator-user-name"
   "postgres-instance-name"
   "scan-app-database-name"
-  "tables-to-wait-for-record-time-list"
-  "tables-to-wait-for-record-time-length"
+  "flyway-migration-to-wait-for"
 )
 PRIVATE_NETWORK_PROJECT=""
 COMPUTE_REGION=""
 SERVICE_ACCOUNT_EMAIL=""
-DB_NAME=""
 SCHEMA_NAME=""
 POSTGRES_USER_NAME=""
 PUBLICATION_NAME=""
@@ -41,8 +38,7 @@ REPLICATOR_USER_NAME=""
 POSTGRES_INSTANCE_NAME=""
 SCAN_APP_DATABASE_NAME=""
 TABLES_TO_REPLICATE_JOINED=""
-TABLES_TO_WAIT_FOR_RECORD_TIME_LIST=""
-TABLES_TO_WAIT_FOR_RECORD_TIME_LENGTH=""
+FLYWAY_MIGRATION_TO_WAIT_FOR=""
 
 # Track which arguments have been provided
 declare -A PROVIDED_ARGS
@@ -77,9 +73,6 @@ while [ "$#" -gt 0 ]; do
     service-account-email)
       SERVICE_ACCOUNT_EMAIL="$param_value"
       ;;
-    db-name)
-      DB_NAME="$param_value"
-      ;;
     schema-name)
       SCHEMA_NAME="$param_value"
       ;;
@@ -104,11 +97,8 @@ while [ "$#" -gt 0 ]; do
     scan-app-database-name)
       SCAN_APP_DATABASE_NAME="$param_value"
       ;;
-    tables-to-wait-for-record-time-list)
-      TABLES_TO_WAIT_FOR_RECORD_TIME_LIST="$param_value"
-      ;;
-    tables-to-wait-for-record-time-length)
-      TABLES_TO_WAIT_FOR_RECORD_TIME_LENGTH="$param_value"
+    flyway-migration-to-wait-for)
+      FLYWAY_MIGRATION_TO_WAIT_FOR="$param_value"
       ;;
     *)
       echo "Unknown parameter: --$param_name" >&2
@@ -170,6 +160,7 @@ gcloud storage buckets add-iam-policy-binding "gs://$TMP_BUCKET" \
 case "$SUBCOMMAND" in
   create-pub-rep-slot)
     cat > "$TMP_SQL_FILE" <<EOT
+      SET search_path TO $SCHEMA_NAME;
       DO \$\$
       DECLARE
         migration_complete BOOLEAN := FALSE;
@@ -177,27 +168,30 @@ case "$SUBCOMMAND" in
         attempt INT := 0;
       BEGIN
         WHILE NOT migration_complete AND attempt < max_attempts LOOP
-          -- Check if all tables exist AND have the record_time column
-          -- this is added by V037__denormalize_update_history.sql
-          SELECT COUNT(*) = $TABLES_TO_WAIT_FOR_RECORD_TIME_LENGTH INTO migration_complete
-            FROM information_schema.columns
-            WHERE table_catalog = '$DB_NAME'
-              AND table_schema = '$SCHEMA_NAME'
-              AND table_name IN ($TABLES_TO_WAIT_FOR_RECORD_TIME_LIST)
-              AND column_name = 'record_time';
+
+          -- Wait for the required Flyway migration to be successfully applied
+          BEGIN
+            SELECT success INTO migration_complete
+              FROM flyway_schema_history
+              WHERE script = '$FLYWAY_MIGRATION_TO_WAIT_FOR';
+          EXCEPTION
+            WHEN SQLSTATE '42P01' THEN
+              -- Flyway migrations table does not exist yet
+              RAISE NOTICE 'Flyway schema history table does not exist yet.';
+              migration_complete := FALSE;
+          END;
 
           IF NOT migration_complete THEN
-            RAISE NOTICE 'Waiting for update_history tables (attempt %/%), sleeping 10s...', attempt + 1, max_attempts;
+            RAISE NOTICE 'Waiting for flyway migration (attempt %/%), sleeping 10s...', attempt + 1, max_attempts;
             PERFORM pg_sleep(10);
             attempt := attempt + 1;
           END IF;
         END LOOP;
 
         IF NOT migration_complete THEN
-          RAISE EXCEPTION 'Timed out waiting for update_history tables to be created';
+          RAISE EXCEPTION 'Timed out waiting for flyway migrations to reach version $FLYWAY_MIGRATION_TO_WAIT_FOR after % attempts', max_attempts;
         END IF;
       END \$\$;
-      SET search_path TO $SCHEMA_NAME;
       -- from https://cloud.google.com/datastream/docs/configure-cloudsql-psql
       ALTER USER $POSTGRES_USER_NAME WITH REPLICATION; -- needed to create the replication slot
       DO \$\$
