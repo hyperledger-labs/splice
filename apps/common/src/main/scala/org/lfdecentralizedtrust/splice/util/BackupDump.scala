@@ -4,12 +4,13 @@
 package org.lfdecentralizedtrust.splice.util
 
 import better.files.File
-import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Decoder
+import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 
 import java.io.FileNotFoundException
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Path, Paths}
 import scala.util.Try
 
@@ -40,7 +41,7 @@ object BackupDump {
     import better.files.File
     val file = File(path)
     file.parent.createDirectories()
-    file.write(content)
+    file.write(content)(File.OpenOptions.default, StandardCharsets.UTF_8)
     file
   }
 
@@ -54,7 +55,7 @@ object BackupDump {
     if (!dumpFile.exists) {
       throw new FileNotFoundException(s"Failed to find dump file at $path")
     } else {
-      val jsonString: String = dumpFile.contentAsString
+      val jsonString: String = dumpFile.contentAsString(StandardCharsets.UTF_8)
       io.circe.parser.decode[T](jsonString) match {
         case Left(error) =>
           throw new IllegalArgumentException(
