@@ -6,7 +6,7 @@ groups:
     interval: 1m
     rules:
       - uid: $RULE_UID
-        title: Report Creation Time Lag lol ($SUB_TITLE)
+        title: Report Creation Time Lag ($SUB_TITLE)
         condition: No recent report
         data:
           - refId: Report time lag

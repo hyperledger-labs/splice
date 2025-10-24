@@ -778,21 +778,21 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
                   notificationDelay: '5m',
                   teamLabel: 'canton-network',
-                  subtitle: 'DA SVs',
+                  subtitle: 'internal SVs 5m',
                   uid: 'adlmhpz5iv4sgc',
                 },
                 {
                   reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
                   notificationDelay: '15m',
                   teamLabel: 'support',
-                  subtitle: 'DA SVs',
+                  subtitle: 'internal SVs 15m',
                   uid: 'bdlmhpz5iv4sgc',
                 },
                 {
-                  reportPublisherFormula: '=!"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  reportPublisherFormula: '!~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
                   notificationDelay: '15m',
-                  teamLabel: 'support',
-                  subtitle: 'External SVs',
+                  teamLabel: 'da',
+                  subtitle: 'external SVs 15m',
                   uid: 'cdlmhpz5iv4sgc',
                 },
               ]
@@ -896,24 +896,47 @@ interface AlertRulesConfig {
   uid: string;
 }
 
+interface GrafanaRule {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface GrafanaRuleGroup {
+  name: string;
+  rules: GrafanaRule[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface GrafanaRuleFile {
+  groups: GrafanaRuleGroup[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+// reads grafana alerting template rule from file, fill it with alert rules custom configurations and append to rules
 function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRulesConfig[]) {
   const fileContent = fs.readFileSync(
     `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
     'utf-8'
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content: any = yaml.load(fileContent);
-  const genericAlertRule = yaml.dump(content['groups'][0]['rules'][0]);
+  const content: GrafanaRuleFile = yaml.load(fileContent) as GrafanaRuleFile;
+  if (!content?.groups?.[0]?.rules?.[0]) {
+    throw new Error(`Invalid or empty rule template, Expected 'groups[0].rules[0]' to exist.`);
+  }
 
-  content['groups'][0]['rules'] = rules.map(rule =>
-    genericAlertRule
+  const genericAlertRule = yaml.dump(content.groups[0].rules[0]);
+
+  content.groups[0].rules = rules.map(rule => {
+    const newRuleString = genericAlertRule
       .replace('$REPORT_PUBLISHER_FORMULA', rule.reportPublisherFormula)
       .replace('$NOTIFICATION_DELAY', rule.notificationDelay)
       .replace('$TEAM_LABEL', rule.teamLabel)
       .replace('$SUB_TITLE', rule.subtitle)
-      .replace('$RULE_UID', rule.uid)
-  );
+      .replace('$RULE_UID', rule.uid);
+    return yaml.load(newRuleString) as GrafanaRule;
+  });
   const newFileContent = yaml.dump(content);
 
   // Ignore no data or data source error if the cluster is reset periodically
