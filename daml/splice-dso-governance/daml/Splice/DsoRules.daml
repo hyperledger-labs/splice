@@ -9,9 +9,9 @@ import DA.Action (void, unless)
 import DA.Assert
 import DA.Either (partitionEithers)
 import DA.Exception
-import DA.Foldable (forA_, all)
+import DA.Foldable (forA_, all, minimum)
 import DA.List as List hiding (all)
-import DA.Optional (isNone, fromSome, fromOptional, isSome)
+import DA.Optional (isNone, fromSome, fromOptional, isSome, catOptionals)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -986,6 +986,9 @@ template DsoRules with
           kind = Some OperatorLicense
         return DsoRules_OnboardValidatorResult with ..
 
+    -- Grant ValidatorLicense to a party that is not an validator node operator
+    ---------------------------------------------------------------------------
+
     nonconsuming choice DsoRules_GrantValidatorLicense : DsoRules_GrantValidatorLicenseResult
       with
         sponsor : Party
@@ -993,7 +996,6 @@ template DsoRules with
       controller sponsor
       do
         require "Sponsor is an SV" (sponsor `Map.member` svs)
-        -- create license for a validator that is not an operator
         now <- getTime
         validatorLicense <- create ValidatorLicense with
           dso
@@ -1007,7 +1009,10 @@ template DsoRules with
         return DsoRules_GrantValidatorLicenseResult with ..
 
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
-      -- ^ Note: removes the old duplicated licenses and creates a new one with the highest lastReceivedFor round
+      -- ^ Note: removes the old duplicated licenses and creates a new one with merged fields:
+      -- - lastReceivedFor: max value among all licenses
+      -- - weight: min value among all licenses
+      -- - kind: Some OperatorLicense if any license has None or Some OperatorLicense
       -- There should never be duplicates going forward.
       with
         validatorLicenseCids : [ContractId ValidatorLicense]
@@ -1017,13 +1022,30 @@ template DsoRules with
          require "Number of validatorLicense contracts to merge is >= 2" (length validatorLicenseCids >= 2)
          validatorLicenses <- forA validatorLicenseCids $ fetchAndArchive (ForDso this.dso)
          require "All validatorLicenses map to the same validator" ( length (dedup (map (.validator) validatorLicenses)) == 1)
-         -- We don't attempt to merge the fields in the validator licence since there is no good
-         -- way to do so and none of the fields other than lastReceivedFor round are crucial and for that
-         -- taking the max is the correct merge.
-         cid <- create $ maximumOn (\license ->
+
+         -- Merge the licenses:
+         -- 1. Use the max lastReceivedFor for faucetState (take the license with max lastReceivedFor as base)
+         -- 2. Use the min weight (treating None as 1.0)
+         -- 3. Use Some OperatorLicense for kind if any license has None or Some OperatorLicense
+         let baseLicense = maximumOn (\license ->
                      case license.faucetState of
                          None    -> Round 0
                          Some r  -> r.lastReceivedFor) validatorLicenses
+
+         -- Calculate merged weight: use minimum weight among all licenses, or None if all are None
+         let weights = catOptionals $ map (.weight) validatorLicenses
+         let mergedWeight = if null weights then None else Some (minimum weights)
+
+         -- Calculate merged kind: use OperatorLicense if any license has None or Some OperatorLicense
+         let hasOperatorLicense license =
+               isNone license.kind || license.kind == Some OperatorLicense
+         let mergedKind = if any hasOperatorLicense validatorLicenses
+                          then Some OperatorLicense
+                          else Some NonOperatorLicense
+
+         cid <- create baseLicense with
+           weight = mergedWeight
+           kind = mergedKind
          pure $ DsoRules_MergeValidatorLicenseResult cid
 
     -- SV onboarding
