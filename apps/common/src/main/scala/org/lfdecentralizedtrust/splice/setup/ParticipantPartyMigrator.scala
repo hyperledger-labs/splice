@@ -349,7 +349,6 @@ class ParticipantPartyMigrator(
       _ <- MonadUtil.sequentialTraverse(partyIds) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
-          // FIXME
           _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot))
         } yield ()
       }
