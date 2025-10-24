@@ -150,21 +150,22 @@ GCS_URI="gs://$TMP_BUCKET/$(basename "$TMP_SQL_FILE")"
 # things to clean up
 cleanup() {
   echo 'Cleaning up temporary GCS object and bucket'
-  gsutil rm "$GCS_URI" || true
-  gsutil rb "gs://$TMP_BUCKET" || true
+  gcloud storage  rm "$GCS_URI" || true
+  gcloud storage buckets delete "gs://$TMP_BUCKET" || true
   rm "$TMP_SQL_FILE" || true
 }
 trap cleanup EXIT
 
 # create temporary bucket
 echo "Creating temporary bucket $TMP_BUCKET"
-gsutil mb --pap enforced -p "$PRIVATE_NETWORK_PROJECT" \
+gcloud storage buckets create --pap --project "$PRIVATE_NETWORK_PROJECT" \
     -l "$COMPUTE_REGION" "gs://$TMP_BUCKET"
 
 # grant DB service account access to the bucket
 echo "Granting CloudSQL DB access to $TMP_BUCKET"
-gsutil iam ch "serviceAccount:$SERVICE_ACCOUNT_EMAIL:roles/storage.objectAdmin" \
-    "gs://$TMP_BUCKET"
+gcloud storage buckets add-iam-policy-binding "gs://$TMP_BUCKET" \
+  --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
+  --role="roles/storage.objectAdmin"
 
 case "$SUBCOMMAND" in
   create-pub-rep-slot)
@@ -246,7 +247,7 @@ EOT
 esac
 
 echo 'Uploading SQL to temporary bucket'
-gsutil cp "$TMP_SQL_FILE" "$GCS_URI"
+gcloud storage cp "$TMP_SQL_FILE" "$GCS_URI"
 
 echo 'Importing into CloudSQL'
 gcloud sql import sql "$POSTGRES_INSTANCE_NAME" "$GCS_URI" \
