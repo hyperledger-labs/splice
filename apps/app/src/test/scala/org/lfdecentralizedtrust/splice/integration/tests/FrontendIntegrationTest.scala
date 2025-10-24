@@ -22,6 +22,7 @@ import org.openqa.selenium.{
   WebDriver,
   WebDriverException,
   WebElement,
+  Keys,
 }
 import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
@@ -692,11 +693,11 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         dateTimePickerRoot.findElement(By.className("MuiPickersSectionList-root"))
 
       eventually() {
-        clue("datepicker is cleared") {
-          dateTimePicker.clear()
-        }
         clue("datepicker is clicked") {
           dateTimePicker.click()
+        }
+        clue("datepicker content is selected") {
+          dateTimePicker.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
         }
         // Typing in the "filler" characters can mess up the input badly
         // Note: this breaks on Feb 29th because the date library validates that the day
