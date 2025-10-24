@@ -888,10 +888,16 @@ function readGrafanaAlertingFile(file: string) {
     : fileContent;
 }
 
+type ReportMatchOperator = '=~' | '!~';
+type ReportPublisherList = 'Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node';
+type ReportPublisherFormula = `${ReportMatchOperator}"${ReportPublisherList}"`;
+type NotificationDelay = '5m' | '15m';
+type TeamLabel = 'canton-network' | 'support' | 'da';
+
 interface AlertRulesConfig {
-  reportPublisherFormula: string; // =~"svA,svB" or !~"svA,svB"
-  notificationDelay: string; // 5m or 15m
-  teamLabel: string; // "canton-network" or "support"
+  reportPublisherFormula: ReportPublisherFormula;
+  notificationDelay: NotificationDelay;
+  teamLabel: TeamLabel;
   subtitle: string;
   uid: string;
 }
