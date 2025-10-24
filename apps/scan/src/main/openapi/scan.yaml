@@ -3700,6 +3700,18 @@ components:
             `firstCollected` if the validator has collected in only one round
           type: integer
           format: int64
+        weight:
+          description: |
+            Weight of the activity records produced by this license. Determined
+            through SV votes. If not set, weight is 1.0
+          type: number
+          format: double
+        kind:
+          description: |
+            Type of license: OperatorLicense or NonOperatorLicense. If not set,
+            kind is OperatorLicense
+          type: string
+          enum: [OperatorLicense, NonOperatorLicense]
     GetBackfillingStatusResponse:
       type: object
       required: [ "complete" ]
