@@ -86,6 +86,54 @@ describe('SV user can', () => {
     );
   });
 
+  test('grant validator license with party address validation', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    const partyAddressInput = screen.getByTestId('grant-license-party-address');
+    const getButton = () => screen.getByTestId('grant-validator-license');
+
+    const testPartyAddress = async (value: string, shouldBeValid: boolean) => {
+      await user.clear(partyAddressInput);
+      await user.type(partyAddressInput, value);
+      if (shouldBeValid) {
+        expect(getButton()).not.toBeDisabled();
+      } else {
+        expect(getButton()).toBeDisabled();
+      }
+    };
+
+    // Valid format - exactly 68 hex characters
+    await testPartyAddress('validator::' + 'a'.repeat(68), true);
+    await testPartyAddress('validator_name-1::' + 'a'.repeat(68), true);
+
+    await testPartyAddress(
+      'alice-validator-1::122033d05365666e7ac8bf589e038be2b965e186609025341222dc8c5f2c23a66c08',
+      true
+    );
+
+    // Invalid
+    await testPartyAddress('wrong-input', false);
+
+    // Length mismatch
+    await testPartyAddress('validator::' + 'a'.repeat(67), false);
+    await testPartyAddress('validator::' + 'a'.repeat(69), false);
+
+    await testPartyAddress('validator::' + 'a'.repeat(67) + ' ', false);
+
+    // no prefix
+    await testPartyAddress('::' + 'a'.repeat(68), false);
+
+    // special character in prefix
+    await testPartyAddress('validator@name::' + 'a'.repeat(68), false);
+
+    // space in prefix
+    await testPartyAddress('validator name::' + 'a'.repeat(68), false);
+  });
+
   test('validator onboarding info has correct format', () => {
     const validatorOnboardingInfo = onboardingInfo(
       {
@@ -348,6 +396,43 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     // secrets
     expect(await screen.queryByText('encoded_secret')).toBeDefined();
     expect(await screen.queryByText('candidate_secret')).toBeNull();
+  });
+
+  test('validator licenses table includes weight and license kind columns', async () => {
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Licenses')).toBeDefined();
+
+    // Verify the table has the Weight and Operator columns
+    expect(screen.getByText('Weight')).toBeDefined();
+    expect(screen.getByText('Operator')).toBeDefined();
+
+    // Verify the table loads data successfully
+    const table = document.querySelector('.validator-licenses-table');
+    expect(table).toBeDefined();
+
+    // Verify weight values are displayed for each license
+    // mock data sets the weights based on index % 4:
+    // - null (indices 0, 4, 8) = 3 licenses
+    // - '1.5' (indices 1, 5, 9) = 3 licenses
+    // - '2.0' (indices 2, 6) = 2 licenses
+    // - '0.0' (indices 3, 7) = 2 licenses
+    const weightsOnePointFive = screen.getAllByText('1.5');
+    expect(weightsOnePointFive.length).toBe(3);
+
+    const weightsTwoPointZero = screen.getAllByText('2.0');
+    expect(weightsTwoPointZero.length).toBe(2);
+
+    const weightsZeroPointZero = screen.getAllByText('0.0');
+    expect(weightsZeroPointZero.length).toBe(2);
+
+    // Verify Operator checkmark is displayed for licenses with kind != 'NonOperatorLicense'
+    // mock data sets the kind based on index % 3:
+    // - null (indices 0, 3, 6, 9) = 4 licenses
+    // - 'OperatorLicense' (indices 1, 4, 7) = 3 licenses
+    // - 'NonOperatorLicense' (indices 2, 5, 8) = 3 licenses
+    const checkIcons = document.querySelectorAll('[data-testid="CheckIcon"]');
+    expect(checkIcons.length).toBe(7);
   });
 });
 

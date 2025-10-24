@@ -76,6 +76,7 @@ export interface SvAdminClient {
   ) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: (limit: number, after?: number) => Promise<ListValidatorLicensesResponse>;
+  grantValidatorLicense: (partyId: string) => Promise<void>;
   listAmuletPriceVotes: () => Promise<ListAmuletPriceVotesResponse>;
   updateDesiredAmuletPrice: (amuletPrice: BigNumber) => Promise<void>;
   listOpenMiningRounds: () => Promise<ListOpenMiningRoundsResponse>;
@@ -188,6 +189,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         after?: number
       ): Promise<ListValidatorLicensesResponse> => {
         return await svAdminClient.listValidatorLicenses(after, limit);
+      },
+      grantValidatorLicense: async (party_id: string): Promise<void> => {
+        return await svAdminClient.grantValidatorLicense({ party_id });
       },
       listAmuletPriceVotes: async (): Promise<ListAmuletPriceVotesResponse> => {
         return await svAdminClient.listAmuletPriceVotes();

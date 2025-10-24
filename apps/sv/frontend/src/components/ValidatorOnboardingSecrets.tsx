@@ -1,18 +1,21 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
+  ConfirmationDialog,
   DateDisplay,
   DisableConditionally,
   Loading,
   SvClientProvider,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useCallback } from 'react';
 
 import {
+  Box,
   Button,
   IconButton,
+  Paper,
   Stack,
   Table,
   TableContainer,
@@ -34,20 +37,52 @@ import {
   getUTCWithOffset,
 } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
-const VALID_PARTY_ID_REGEX = /^[^-]+-[^-]+-\d+$/;
+const VALID_PARTY_HINT_REGEX = /^[^-]+-[^-]+-\d+$/;
+const VALID_PARTY_ID_REGEX = /^[A-Za-z0-9_-]{1,185}::[A-Fa-f0-9]{68}$/;
+const MAX_PARTY_ID_LENGTH = 255;
+
+const isValidPartyId = (partyId: string): boolean =>
+  VALID_PARTY_ID_REGEX.test(partyId) && partyId.length <= MAX_PARTY_ID_LENGTH;
 
 const ValidatorOnboardingSecrets: React.FC = () => {
   const ONBOARDING_SECRET_EXPIRY_IN_SECOND = 172800; // We allow validator to be onboarded in 48 hours
-  const { prepareValidatorOnboarding } = useSvAdminClient();
+  const { prepareValidatorOnboarding, grantValidatorLicense } = useSvAdminClient();
   const validatorOnboardingsQuery = useValidatorOnboardings();
+  const queryClient = useQueryClient();
 
   const [partyHint, setPartyHint] = useState('');
+  const [partyAddress, setPartyAddress] = useState('');
+  const [grantLicenseDialogOpen, setGrantLicenseDialogOpen] = useState(false);
 
   const prepareOnboardingMutation = useMutation({
     mutationFn: (partyHint: string) => {
       return prepareValidatorOnboarding(ONBOARDING_SECRET_EXPIRY_IN_SECOND, partyHint);
     },
   });
+
+  const grantLicenseMutation = useMutation({
+    mutationFn: (partyId: string) => {
+      return grantValidatorLicense(partyId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listValidatorLicenses'] });
+    },
+  });
+
+  const handleGrantLicenseConfirm = () => {
+    grantLicenseMutation.mutateAsync(partyAddress).then(() => {
+      setPartyAddress('');
+      setGrantLicenseDialogOpen(false);
+    });
+  };
+
+  const handleGrantLicenseClose = () => {
+    setGrantLicenseDialogOpen(false);
+  };
+
+  const copyPartyAddress = useCallback(() => {
+    navigator.clipboard.writeText(partyAddress);
+  }, [partyAddress]);
 
   if (validatorOnboardingsQuery.isPending) {
     return <Loading />;
@@ -78,7 +113,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
       <Stack direction="column" mb={4} spacing={1}>
         <Typography variant="h6">Party Hint</Typography>
         <TextField
-          error={partyHint === '' || !VALID_PARTY_ID_REGEX.test(partyHint)}
+          error={partyHint === '' || !VALID_PARTY_HINT_REGEX.test(partyHint)}
           autoComplete="off"
           id="create-party-hint"
           placeholder="<organization>-<function>-<enumerator>"
@@ -93,7 +128,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           { disabled: prepareOnboardingMutation.isPending, reason: 'Loading...' },
           { disabled: partyHint === '', reason: 'No Party Hint' },
           {
-            disabled: !VALID_PARTY_ID_REGEX.test(partyHint),
+            disabled: !VALID_PARTY_HINT_REGEX.test(partyHint),
             reason: 'Party Hint is invalid',
             severity: 'warning',
           },
@@ -112,6 +147,93 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           Create a validator onboarding secret
         </Button>
       </DisableConditionally>
+
+      {grantLicenseMutation.isError && (
+        <Typography variant="body1" color="error">
+          Error:{' '}
+          {grantLicenseMutation.error instanceof Error
+            ? grantLicenseMutation.error.message
+            : 'Something went wrong while granting validator license'}
+        </Typography>
+      )}
+
+      <Stack direction="column" mb={4} spacing={1}>
+        <Typography variant="h6">Grant Validator License</Typography>
+        <TextField
+          error={partyAddress !== '' && !isValidPartyId(partyAddress)}
+          autoComplete="off"
+          id="grant-license-party-address"
+          placeholder="<name>::<identifier>"
+          inputProps={{ 'data-testid': 'grant-license-party-address' }}
+          onChange={e => setPartyAddress(e.target.value)}
+          value={partyAddress}
+        />
+      </Stack>
+
+      <DisableConditionally
+        conditions={[
+          { disabled: grantLicenseMutation.isPending, reason: 'Loading...' },
+          { disabled: partyAddress === '', reason: 'No Party Address' },
+          {
+            disabled: !isValidPartyId(partyAddress),
+            reason: 'Party Address is invalid',
+            severity: 'warning',
+          },
+        ]}
+      >
+        <Button
+          id="grant-validator-license"
+          data-testid="grant-validator-license"
+          variant="pill"
+          fullWidth
+          size="large"
+          onClick={() => setGrantLicenseDialogOpen(true)}
+        >
+          Grant Validator License
+        </Button>
+      </DisableConditionally>
+
+      <ConfirmationDialog
+        showDialog={grantLicenseDialogOpen}
+        onClose={handleGrantLicenseClose}
+        onAccept={handleGrantLicenseConfirm}
+        title="Confirm Grant Validator License"
+        attributePrefix="grant-license"
+      >
+        <Stack spacing={2}>
+          <Typography variant="body1">
+            Are you sure you want to grant a validator license to the following party?
+          </Typography>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+              Party Address:
+            </Typography>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                fontFamily: 'monospace',
+                fontSize: '0.875rem',
+                wordBreak: 'break-all',
+              }}
+            >
+              <Box sx={{ flex: 1 }}>{partyAddress}</Box>
+              <IconButton
+                onClick={copyPartyAddress}
+                size="small"
+                sx={{ flexShrink: 0 }}
+                title="Copy to clipboard"
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Paper>
+          </Box>
+        </Stack>
+      </ConfirmationDialog>
+
       <TableContainer>
         <Table
           sx={{
