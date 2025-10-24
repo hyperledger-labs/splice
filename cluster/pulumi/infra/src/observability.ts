@@ -776,7 +776,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
               [
                 {
                   reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
-                  notificationDelay: '15m',
+                  notificationDelay: '5m',
                   teamLabel: 'canton-network',
                   subtitle: 'internal SVs 5m',
                   uid: 'adlmhpz5iv4sgc',
@@ -893,13 +893,14 @@ type ReportPublisherList = 'Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node';
 type ReportPublisherFormula = `${ReportMatchOperator}"${ReportPublisherList}"`;
 type NotificationDelay = '5m' | '15m';
 type TeamLabel = 'canton-network' | 'support' | 'da';
+type RulesUID = 'adlmhpz5iv4sgc' | 'bdlmhpz5iv4sgc' | 'cdlmhpz5iv4sgc';
 
 interface AlertRulesConfig {
   reportPublisherFormula: ReportPublisherFormula;
   notificationDelay: NotificationDelay;
   teamLabel: TeamLabel;
   subtitle: string;
-  uid: string;
+  uid: RulesUID;
 }
 
 interface GrafanaRule {
