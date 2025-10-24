@@ -25,10 +25,6 @@ async function main() {
       participant: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
       validator: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
     },
-
-    appToClientAudience: {
-      validator: 'https://ledger_api.example.com',
-    },
     auth0Domain: 'auth0Domain',
     auth0MgtClientId: 'auth0MgtClientId',
     auth0MgtClientSecret: 'auth0MgtClientSecret',

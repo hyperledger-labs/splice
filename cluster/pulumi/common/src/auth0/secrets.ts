@@ -38,7 +38,7 @@ async function auth0Secret(
 ): Promise<{ [key: string]: string }> {
   const cfg = auth0Client.getCfg();
   const clientSecrets = lookupClientSecrets(allSecrets, cfg.appToClientId, clientName);
-  const audience: string = cfg.appToClientAudience[clientName] || DEFAULT_AUDIENCE;
+  const audience: string = cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE;
 
   const clientId = clientSecrets.client_id;
   const clientSecret = clientSecrets.client_secret;
