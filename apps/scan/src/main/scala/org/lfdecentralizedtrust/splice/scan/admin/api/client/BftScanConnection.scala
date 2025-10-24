@@ -867,7 +867,6 @@ object BftScanConnection {
   }
 
   sealed trait Bft extends ScanList {
-    // members to be implemented by subclasses
     protected val initialScanConnections: Seq[SingleScanConnection]
     protected val initialFailedConnections: Map[Uri, Throwable]
     protected val connectionBuilder: Uri => Future[SingleScanConnection]
@@ -877,7 +876,6 @@ object BftScanConnection {
     val loggerFactory: NamedLoggerFactory
     implicit protected val ec: ExecutionContext
 
-    // abstract methods for strategy-specific logic
     protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan]
     protected def validateState(state: BftState): Unit
 
@@ -930,7 +928,6 @@ object BftScanConnection {
         logger.info(s"Updated scan list to $newState")
 
         val connections = newState.scanConnections
-
         validateState(newState)
         connections
       }
@@ -1029,7 +1026,6 @@ object BftScanConnection {
       }
     }
 
-    // Provide a concrete helper for subclasses to call
     protected def currentConnectionsState: ScanConnections =
       currentScanConnectionsRef.get().scanConnections
 
@@ -1056,7 +1052,7 @@ object BftScanConnection {
 
     override protected def validateState(state: BftState): Unit = {
       val defaultCallConfig = BftCallConfig.default(state.scanConnections)
-      // Fail early if there are not enough Scans for the default config
+
       if (!defaultCallConfig.enoughAvailableScans) {
         throw io.grpc.Status.FAILED_PRECONDITION
           .withDescription(
@@ -1072,7 +1068,7 @@ object BftScanConnection {
     }
   }
 
-  class SpecificBft(
+  class BftCustom(
       val trustedSvs: NonEmptyList[String],
       val threshold: Option[Int],
       override val initialScanConnections: Seq[SingleScanConnection],
@@ -1089,10 +1085,6 @@ object BftScanConnection {
 
     override protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan] = {
       val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
-
-      logger.info(
-        s"Attempting to connect to trusted SVs. Trusted list: ${trustedSvsSet.mkString(", ")}"
-      )
 
       logger.info(s"Discovered the following trusted scans from the network: ${targetScans
           .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
@@ -1111,7 +1103,7 @@ object BftScanConnection {
         throw Status.UNAVAILABLE
           .withDescription(
             s"Failed to connect to required number of trusted scans. " +
-              s"Required: $requiredCount, Connected: $successfulCount. Scan apps failed or missing from network: $failedNames."
+              s"Required: $requiredCount, Connected: $successfulNames. Scan apps failed or missing from network: $failedNames."
           )
           .asRuntimeException()
       } else {
@@ -1200,17 +1192,43 @@ object BftScanConnection {
           loggerFactory,
         )
 
-      case ts @ BftScanClientConfig.TrustSpecific(_, _, _, _, _) =>
+      case ts @ BftScanClientConfig.BftCustom(_, _, _, _, _) =>
         for {
-          initialConnections <- ts.seedUrls.traverse(uri =>
-            builder(uri, ts.amuletRulesCacheTimeToLive).transformWith {
+          bootstrapConn <- ts.seedUrls
+            .traverse(uri => builder(uri, ts.amuletRulesCacheTimeToLive).transform(Success(_)))
+            .map(_.collectFirst { case Success(conn) => conn })
+            .flatMap {
+              case Some(conn) => Future.successful(conn)
+              case None =>
+                Future.failed(
+                  Status.UNAVAILABLE
+                    .withDescription(s"Failed to connect to any seed URLs: ${ts.seedUrls.toList}")
+                    .asRuntimeException()
+                )
+            }
+
+          allScans <- {
+            val tempConnection = new BftScanConnection(
+              spliceLedgerClient,
+              ts.amuletRulesCacheTimeToLive,
+              new TrustSingle(bootstrapConn, retryProvider, loggerFactory),
+              clock,
+              retryProvider,
+              loggerFactory,
+            )
+            Bft.getScansInDsoRules(tempConnection)
+          }
+
+          trustedScans = allScans.filter(scan => ts.trustedSvs.toList.contains(scan.svName))
+          initialConnections <- MonadUtil.sequentialTraverse(trustedScans)(scan =>
+            builder(scan.publicUrl, ts.amuletRulesCacheTimeToLive).transformWith {
               case Success(conn) => Future.successful(Right(conn))
-              case Failure(err) => Future.successful(Left(uri -> err))
+              case Failure(err) => Future.successful(Left(scan.publicUrl -> err))
             }
           )
           (failed, connections) = initialConnections.toList.partitionEither(identity)
 
-          scanList = new SpecificBft(
+          scanList = new BftCustom(
             ts.trustedSvs,
             ts.threshold,
             connections,
@@ -1221,6 +1239,7 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
           )
+
           bftConnection = new BftScanConnection(
             spliceLedgerClient,
             ts.amuletRulesCacheTimeToLive,
@@ -1229,6 +1248,7 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
           )
+
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,
             "refresh_initial_scan_list",
@@ -1408,7 +1428,7 @@ object BftScanConnection {
         copy(amuletRulesCacheTimeToLive = ttl)
     }
 
-    case class TrustSpecific(
+    case class BftCustom(
         seedUrls: NonEmptyList[Uri], // by default only one seed_url is provided
         threshold: Option[Int] = None, // default to len(seedUrls)/3+1
         trustedSvs: NonEmptyList[String], // should be at least 1
@@ -1417,7 +1437,7 @@ object BftScanConnection {
         scansRefreshInterval: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultScansRefreshInterval,
     ) extends BftScanClientConfig {
-      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSpecific =
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftCustom =
         copy(amuletRulesCacheTimeToLive = ttl)
     }
 
