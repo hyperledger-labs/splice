@@ -158,7 +158,7 @@ trap cleanup EXIT
 
 # create temporary bucket
 echo "Creating temporary bucket $TMP_BUCKET"
-gcloud storage buckets create --pap enforced --project "$PRIVATE_NETWORK_PROJECT" \
+gcloud storage buckets create --pap --project "$PRIVATE_NETWORK_PROJECT" \
     -l "$COMPUTE_REGION" "gs://$TMP_BUCKET"
 
 # grant DB service account access to the bucket
