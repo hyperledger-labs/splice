@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
+import * as fs from 'fs';
 import {
   Auth0Client,
   BackupConfig,
@@ -45,11 +46,16 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getAdditionalJvmOptions,
+  externalIpRangesFile,
+  clusterNetwork,
+  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   approvedSvIdentities,
+  approvedSvIdentitiesFile,
   CantonBftSynchronizerNode,
   configForSv,
+  getChainIdSuffix,
   installSvLoopback,
   svsConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -58,6 +64,7 @@ import {
   CloudPostgres,
   SplicePostgres,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { createHash } from 'node:crypto';
 
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
@@ -423,7 +430,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  installSpliceRunbookHelmChart(
+  const scan = installSpliceRunbookHelmChart(
     xns,
     'scan',
     'splice-scan',
@@ -435,6 +442,8 @@ async function installSvAndValidator(
         .concat([svAppSecret, appsPg]),
     }
   );
+
+  installInfoEndpoint(xns, decentralizedSynchronizerMigrationConfig, scan);
 
   const validatorValues = {
     ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
@@ -530,4 +539,47 @@ async function installSvAndValidator(
   );
 
   return { sv, validator };
+}
+
+function installInfoEndpoint(
+  xns: ExactNamespace,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
+  scan: pulumi.Resource
+): void {
+  function readFileOrEmptyString(path: string | undefined): string {
+    return path !== undefined ? fs.readFileSync(path, 'utf-8') : '';
+  }
+
+  const defaultValues = loadYamlFromFile(
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/info-values.yaml`,
+    {
+      TARGET_CLUSTER: clusterNetwork,
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+      MD5_HASH_OF_ALLOWED_IP_RANGES: `"${createHash('md5')
+        .update(readFileOrEmptyString(externalIpRangesFile()))
+        .digest('hex')}"`,
+      MD5_HASH_OF_APPROVED_SV_IDENTITIES: `"${createHash('md5')
+        .update(readFileOrEmptyString(approvedSvIdentitiesFile()))
+        .digest('hex')}"`,
+      CHAIN_ID_SUFFIX: `"${getChainIdSuffix()}"`,
+    }
+  );
+
+  const values = {
+    ...defaultValues,
+    deploymentDetails: {
+      ...defaultValues.deploymentDetails,
+      sv: {
+        version: CnChartVersion.stringify(decentralizedSynchronizerMigrationConfig.active.version),
+      },
+    },
+    istioVirtualService: {
+      host: `info.${xns.logicalName}.${CLUSTER_HOSTNAME}`,
+      gateway: 'cluster-ingress/cn-http-gateway',
+    },
+  };
+
+  installSpliceRunbookHelmChart(xns, 'info', 'splice-info', values, activeVersion, {
+    dependsOn: [scan],
+  });
 }

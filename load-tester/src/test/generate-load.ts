@@ -58,10 +58,14 @@ export function setup(): ValidatorConf[] {
     } else if (validator.auth.kind === 'self-signed') {
       const secret = validator.auth.secret;
       const aud = validator.auth.audience;
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 10);
+      const exp = expiryDate.valueOf();
       const adminToken = encodeJwtHmac256(
         {
           sub: validator.auth.user,
           aud,
+          exp,
         },
         secret,
       );
@@ -73,6 +77,7 @@ export function setup(): ValidatorConf[] {
             {
               sub: `v-${validatorIndex}-user-${i}`,
               aud,
+              exp,
             },
             secret,
           ),

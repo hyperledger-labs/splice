@@ -314,13 +314,13 @@ object SpliceTests extends LazyLogging {
         newUser: String,
     ): AuthTokenSourceConfig = {
       conf match {
-        case AuthTokenSourceConfig.Static(_, adminToken) => {
+        case AuthTokenSourceConfig.Static(_, adminToken, expiration) => {
           val secret = "test" // used for all of our tests
-          val userToken = AuthUtil.LedgerApi.testToken(newUser, secret)
+          val userToken = AuthUtil.LedgerApi.testToken(newUser, secret, expiration)
           AuthTokenSourceConfig.Static(userToken, adminToken)
         }
-        case AuthTokenSourceConfig.SelfSigned(audience, _, secret, adminToken) => {
-          AuthTokenSourceConfig.SelfSigned(audience, newUser, secret, adminToken)
+        case AuthTokenSourceConfig.SelfSigned(audience, _, secret, adminToken, expiration) => {
+          AuthTokenSourceConfig.SelfSigned(audience, newUser, secret, adminToken, expiration)
         }
         case _ => conf
       }
