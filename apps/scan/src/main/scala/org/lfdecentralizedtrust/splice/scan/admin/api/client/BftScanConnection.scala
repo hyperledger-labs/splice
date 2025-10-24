@@ -1243,7 +1243,6 @@ object BftScanConnection {
                   retryProvider,
                   loggerFactory,
                 )
-                // Use .transform so one failure doesn't fail the whole discovery
                 Bft.getScansInDsoRules(tempConnection).transform(Success(_))
               }
             }
@@ -1448,8 +1447,7 @@ object BftScanConnection {
         connections,
         failed.toMap,
         uri => builder(uri, amuletRulesCacheTimeToLive),
-        _ =>
-          Bft.getPeerScansFromStore(store, svName), // The `getScans` function is specific to peers
+        _ => Bft.getPeerScansFromStore(store, svName),
         scansRefreshInterval,
         retryProvider,
         loggerFactory,
