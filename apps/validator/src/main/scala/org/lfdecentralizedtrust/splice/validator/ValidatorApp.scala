@@ -254,8 +254,7 @@ class ValidatorApp(
                       migrationDump.domainId,
                       sequencerConnections,
                       migrationDump.dars,
-                      // FIXME
-                      Seq(migrationDump.acsSnapshot),
+                      migrationDump.acsSnapshot,
                     )
                   }
                   _ <- appInitStep("Restoring participant users data") {

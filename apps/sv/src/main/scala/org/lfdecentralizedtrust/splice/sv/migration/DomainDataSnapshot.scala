@@ -4,16 +4,12 @@
 package org.lfdecentralizedtrust.splice.sv.migration
 
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
-import org.lfdecentralizedtrust.splice.migration.{Dar, ParticipantUsersData}
+import org.lfdecentralizedtrust.splice.migration.{Dar, DomainMigrationEncoding, ParticipantUsersData}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.google.protobuf.ByteString
 
-import java.io.*
 import java.time.Instant
 import java.util.Base64
-import scala.collection.mutable.ListBuffer
-import scala.jdk.CollectionConverters.*
-import scala.util.Using
 
 // TODO(DACH-NY/canton-network-node#11100) Split domain data snapshots for validators and SVs to avoid
 // the optional mess.
@@ -29,22 +25,7 @@ final case class DomainDataSnapshot(
   // Only the DR endpoint should use the old one.
   def toHttp(outputDirectory: Option[String]): http.DomainDataSnapshot = {
     def encodeField(name: String, content: Seq[ByteString]): String = {
-      outputDirectory match {
-        case None =>
-          Base64.getEncoder.encodeToString(ByteString.copyFrom(content.asJava).toByteArray)
-        case Some(dir) =>
-          val file = s"$dir/${acsTimestamp}-$name"
-          Using.resource(
-            new DataOutputStream(
-              new BufferedOutputStream(
-                new FileOutputStream(file)
-              )
-            )
-          ) { dos =>
-            DomainDataSnapshot.writeChunks(dos, content)
-          }
-          file
-      }
+      DomainMigrationEncoding.encode(outputDirectory, acsTimestamp, name, content)
     }
 
     http.DomainDataSnapshot(
@@ -100,8 +81,8 @@ object DomainDataSnapshot {
     val acsTimestamp = Instant.parse(src.acsTimestamp)
     Right(
       DomainDataSnapshot(
-        src.genesisState.map(readBytes(src.separatePayloadFiles, _)),
-        readBytes(src.separatePayloadFiles, src.acsSnapshot),
+        src.genesisState.map(DomainMigrationEncoding.decode(src.separatePayloadFiles, _)),
+        DomainMigrationEncoding.decode(src.separatePayloadFiles, src.acsSnapshot),
         acsTimestamp,
         dars,
         src.synchronizerWasPaused.getOrElse(false),
@@ -109,44 +90,4 @@ object DomainDataSnapshot {
     )
   }
 
-  def readBytes(separateFiles: Option[Boolean], content: String): Seq[ByteString] = {
-    if (separateFiles.getOrElse(false)) {
-      Using.resource(
-        new DataInputStream(
-          new BufferedInputStream(
-            new FileInputStream(content)
-          )
-        )
-      )(readAllChunks)
-    } else {
-      Seq(ByteString.copyFrom(base64Decoder.decode(content)))
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
-  private def readAllChunks(
-      dis: DataInputStream
-  ): Seq[ByteString] = {
-    val acc = ListBuffer.empty[ByteString]
-    var eof = false
-    while (!eof) {
-      try {
-        val length = dis.readInt()
-        val chunk = new Array[Byte](length)
-        dis.readFully(chunk)
-        acc.addOne(ByteString.copyFrom(chunk))
-      } catch {
-        case _: EOFException =>
-          eof = true
-      }
-    }
-    acc.toSeq
-  }
-
-  private def writeChunks(dos: DataOutputStream, chunks: Seq[ByteString]): Unit = {
-    chunks.foreach { chunk =>
-      dos.writeInt(chunk.size)
-      dos.write(chunk.toByteArray)
-    }
-  }
 }
