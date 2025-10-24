@@ -693,7 +693,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       val js = webDriver.asInstanceOf[JavascriptExecutor]
 
       eventually() {
-        js.executeScript("arguments[0].focus()", spanList)
+        js.executeScript("arguments[0].click()", spanList)
         // spanList.click()
 
         spanList.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
