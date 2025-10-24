@@ -17,7 +17,6 @@ export type Auth0Config = {
   appToClientId: ClientIdMap;
   namespaceToUiToClientId: NamespaceToClientIdMapMap;
   appToApiAudience: AudienceMap;
-  appToClientAudience: AudienceMap;
   auth0Domain: string;
   auth0MgtClientId: string;
   auth0MgtClientSecret: string;

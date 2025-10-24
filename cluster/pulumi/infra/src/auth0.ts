@@ -335,13 +335,6 @@ function svsOnlyAuth0(
           } as AudienceMap)
         : {},
 
-      appToClientAudience: apiAudiences
-        ? ({
-            sv: apiAudiences.ledger,
-            validator: apiAudiences.ledger,
-          } as AudienceMap)
-        : {},
-
       fixedTokenCacheName: fixedTokenCacheName,
 
       auth0Domain: auth0Domain,
@@ -559,11 +552,6 @@ function svRunbookAuth0(
           validator: validatorApiAudience,
         } as AudienceMap,
 
-        appToClientAudience: {
-          sv: ledgerApiAudience,
-          validator: ledgerApiAudience,
-        } as AudienceMap,
-
         fixedTokenCacheName: fixedTokenCacheName,
 
         auth0Domain: auth0Domain,
@@ -626,10 +614,6 @@ function validatorRunbookAuth0(
       appToApiAudience: {
         participant: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
         validator: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
-      } as AudienceMap,
-
-      appToClientAudience: {
-        validator: 'https://ledger_api.example.com',
       } as AudienceMap,
 
       fixedTokenCacheName: 'auth0-fixed-token-cache-validator-test',

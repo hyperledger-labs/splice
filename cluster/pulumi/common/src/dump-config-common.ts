@@ -81,7 +81,6 @@ export const cantonNetworkAuth0Config = {
     },
   },
   appToApiAudience: {},
-  appToClientAudience: {},
   auth0Domain: isMainNet
     ? 'canton-network-mainnet.us.auth0.com'
     : 'canton-network-dev.us.auth0.com',
@@ -107,10 +106,6 @@ export const svRunbookAuth0Config = {
     validator: 'https://validator.example.com/api', // The Validator App API in the sv-test tenant
   },
 
-  appToClientAudience: {
-    sv: 'https://ledger_api.example.com',
-    validator: 'https://ledger_api.example.com',
-  },
   auth0Domain: 'canton-network-sv-test.us.auth0.com',
   auth0MgtClientId: 'auth0MgtClientId',
   auth0MgtClientSecret: 'auth0MgtClientSecret',
