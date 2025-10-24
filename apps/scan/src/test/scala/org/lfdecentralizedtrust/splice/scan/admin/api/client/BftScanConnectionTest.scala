@@ -202,7 +202,7 @@ class BftScanConnectionTest
     new BftScanConnection(
       mock[SpliceLedgerClient],
       NonNegativeFiniteDuration.ofSeconds(1),
-      new BftScanConnection.BftAny(
+      new BftScanConnection.AllDsoScansBft(
         initialConnections,
         initialFailedConnections,
         connectionBuilder,
