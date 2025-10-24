@@ -150,7 +150,8 @@ const ValidatorOnboardingSecrets: React.FC = () => {
 
       {grantLicenseMutation.isError && (
         <Typography variant="body1" color="error">
-          Error: {grantLicenseMutation.error instanceof Error
+          Error:{' '}
+          {grantLicenseMutation.error instanceof Error
             ? grantLicenseMutation.error.message
             : 'Something went wrong while granting validator license'}
         </Typography>
