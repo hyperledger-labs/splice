@@ -687,24 +687,27 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       webDriver: WebDriverType
   ): Assertion = {
     clue(s"$party selects the date $dateTime via $pickerId") {
-      val input = webDriver.findElement(By.id(pickerId));
-
+      val root = webDriver.findElement(By.className(s"$pickerId-root"))
+      val input = root.findElement(By.id(pickerId))
       val js = webDriver.asInstanceOf[JavascriptExecutor]
-      js.executeScript(
-        """
-        arguments[0].value = arguments[1];
-        arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-        arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
-        """,
-        input,
-        dateTime,
-      )
 
-      eventually()(
-        input.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
-      )
+      eventually() {
+        val editableSpans = root.findElements(By.cssSelector("[contenteditable='true']"))
+        assert(!editableSpans.isEmpty, s"No editable spans found in $pickerId")
+
+        val firstEditable = editableSpans.get(0)
+        js.executeScript("arguments[0].focus()", firstEditable)
+        firstEditable.click()
+
+        firstEditable.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
+
+        eventually() {
+          input.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
+        }
+      }
     }
   }
+
 }
 
 object FrontendIntegrationTest {
