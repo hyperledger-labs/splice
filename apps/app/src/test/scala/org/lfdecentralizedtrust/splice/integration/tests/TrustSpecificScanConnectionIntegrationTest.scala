@@ -25,11 +25,11 @@ class TrustSpecificScanConnectionIntegrationTest
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
-      .fromResources(Seq("simple-topology.conf"), this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllValidatorConfigs {
           case (name, c) if name == "aliceValidator" =>
-            val trustSpecificConfig = BftScanClientConfig.TrustSpecific(
+            val trustSpecificConfig = BftScanClientConfig.BftCustom(
               seedUrls = NonEmptyList.one(Uri("http://127.0.0.1:5012")),
               trustedSvs =
                 NonEmptyList.of(s"${getSvName(1)}", s"${getSvName(2)}", s"${getSvName(3)}"),
@@ -40,10 +40,6 @@ class TrustSpecificScanConnectionIntegrationTest
           case (_, c) => c
         }(config)
       )
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
       .withManualStart
 
   private def assertSuccessfulConnection(
@@ -88,7 +84,7 @@ class TrustSpecificScanConnectionIntegrationTest
         assertSuccessfulConnection(messages, 1)
         assertSuccessfulConnection(messages, 2)
         assertSuccessfulConnection(messages, 3)
-        assertSuccessfulConnection(messages, 4, false)
+        assertSuccessfulConnection(messages, 4, connected = false)
         assertThresholdMet(messages)
       },
     )

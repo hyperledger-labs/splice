@@ -176,7 +176,7 @@ case class UseToxiproxy(
                       ),
                     )
                   case BftScanClientConfig
-                        .TrustSpecific(
+                        .BftCustom(
                           seedUrls,
                           _,
                           _,
