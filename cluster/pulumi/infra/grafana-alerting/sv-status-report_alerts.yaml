@@ -5,8 +5,8 @@ groups:
     folder: canton-network
     interval: 1m
     rules:
-      - uid: adlmhpz5iv4sgc
-        title: Report Creation Time Lag ($SUB_TITLE)
+      - uid: $RULE_UID
+        title: Report Creation Time Lag lol ($SUB_TITLE)
         condition: No recent report
         data:
           - refId: Report time lag

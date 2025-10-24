@@ -779,18 +779,21 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   notificationDelay: '5m',
                   teamLabel: 'canton-network',
                   subtitle: 'DA SVs',
+                  uid: 'adlmhpz5iv4sgc',
                 },
                 {
                   reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
                   notificationDelay: '15m',
                   teamLabel: 'support',
                   subtitle: 'DA SVs',
+                  uid: 'bdlmhpz5iv4sgc',
                 },
                 {
                   reportPublisherFormula: '=!"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
                   notificationDelay: '15m',
                   teamLabel: 'support',
                   subtitle: 'External SVs',
+                  uid: 'cdlmhpz5iv4sgc',
                 },
               ]
             ),
@@ -890,6 +893,7 @@ interface AlertRulesConfig {
   notificationDelay: string; // 5m or 15m
   teamLabel: string; // "canton-network" or "support"
   subtitle: string;
+  uid: string;
 }
 
 function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRulesConfig[]) {
@@ -908,6 +912,7 @@ function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRules
       .replace('$NOTIFICATION_DELAY', rule.notificationDelay)
       .replace('$TEAM_LABEL', rule.teamLabel)
       .replace('$SUB_TITLE', rule.subtitle)
+      .replace('$RULE_UID', rule.uid)
   );
   const newFileContent = yaml.dump(content);
 
