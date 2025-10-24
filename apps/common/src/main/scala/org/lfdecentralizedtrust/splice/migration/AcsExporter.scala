@@ -39,7 +39,7 @@ class AcsExporter(
       parties: PartyId*
   )(implicit
       tc: TraceContext
-  ): Future[ByteString] = {
+  ): Future[Seq[ByteString]] = {
     participantAdminConnection.downloadAcsSnapshot(
       parties = parties.toSet,
       filterSynchronizerId = Some(domain),
@@ -51,7 +51,7 @@ class AcsExporter(
   def safeExportParticipantPartiesAcsFromPausedDomain(domain: SynchronizerId)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
+  ): EitherT[Future, AcsExportFailure, (Seq[ByteString], Instant)] = {
     EitherT {
       for {
         participantId <- participantAdminConnection.getId()
@@ -70,7 +70,7 @@ class AcsExporter(
   private def safeExportAcsFromPausedDomain(domain: SynchronizerId, parties: PartyId*)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
+  ): EitherT[Future, AcsExportFailure, (Seq[ByteString], Instant)] = {
     for {
       paramsState <- domainStateTopology
         .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
@@ -83,7 +83,7 @@ class AcsExporter(
       _ <- EitherT.liftF[Future, AcsExportFailure, Unit](
         waitUntilSynchronizerTime(domain, paramsState.acsExportWaitTimestamp)
       )
-      snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
+      snapshot <- EitherT.liftF[Future, AcsExportFailure, Seq[ByteString]](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties.toSet,
           filterSynchronizerId = Some(domain),

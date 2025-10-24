@@ -182,7 +182,11 @@ class HttpValidatorAdminHandler(
           .map { response =>
             v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(
               definitions
-                .GetValidatorDomainDataSnapshotResponse(response.toHttp, response.migrationId)
+                // DR dumps don't separate output files
+                .GetValidatorDomainDataSnapshotResponse(
+                  response.toHttp(outputDirectory = None),
+                  response.migrationId,
+                )
             )
           }
       } yield res

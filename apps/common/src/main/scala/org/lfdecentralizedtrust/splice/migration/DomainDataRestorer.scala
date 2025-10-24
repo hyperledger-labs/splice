@@ -31,7 +31,7 @@ class DomainDataRestorer(
       synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
       dars: Seq[Dar],
-      acsSnapshot: ByteString,
+      acsSnapshot: Seq[ByteString],
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
@@ -89,7 +89,7 @@ class DomainDataRestorer(
       }
   }
 
-  private def importAcs(acs: ByteString)(implicit tc: TraceContext) = {
+  private def importAcs(acs: Seq[ByteString])(implicit tc: TraceContext) = {
     participantAdminConnection.uploadAcsSnapshot(
       acs
     )

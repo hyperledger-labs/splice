@@ -349,7 +349,7 @@ class ParticipantPartyMigrator(
       _ <- MonadUtil.sequentialTraverse(partyIds) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
-          _ <- participantAdminConnection.uploadAcsSnapshot(acsSnapshot)
+          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot))
         } yield ()
       }
       _ <- participantAdminConnection.reconnectAllDomains()

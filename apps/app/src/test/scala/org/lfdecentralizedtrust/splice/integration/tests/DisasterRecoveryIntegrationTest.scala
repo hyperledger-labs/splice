@@ -631,7 +631,7 @@ class DisasterRecoveryIntegrationTest
 
     val fullDumpFile = migrationDumpFilePath(validator.name)
     clearOrCreate(fullDumpFile)
-    fullDumpFile.write(dump.asJson.spaces2)
+    fullDumpFile.write(dump.toHttp(outputDirectory = None).asJson.spaces2)
   }
 
   private def writeMigrationDumpFile(
@@ -654,7 +654,7 @@ class DisasterRecoveryIntegrationTest
       dump.participantUsers,
       createdAt = dump.createdAt,
     )
-    fullDumpFile.write(fullDump.asJson.spaces2)
+    fullDumpFile.write(fullDump.toHttp(outputDirectory = None).asJson.spaces2)
   }
 
   private def clearOrCreate(f: File) = {
