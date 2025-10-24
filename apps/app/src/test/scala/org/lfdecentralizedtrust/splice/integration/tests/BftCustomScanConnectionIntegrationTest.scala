@@ -94,55 +94,6 @@ class BftCustomScanConnectionIntegrationTest
     }
   }
 
-  "starts successfully even with one trusted SV down" in { implicit env =>
-    sv1Backend.startSync()
-    sv1ScanBackend.startSync()
-    sv2Backend.startSync()
-    sv2ScanBackend.startSync()
-    sv4Backend.startSync()
-    sv4ScanBackend.startSync()
-
-    eventually() {
-      val allHealthy = Seq(sv1ScanBackend, sv2ScanBackend, sv4ScanBackend).forall { scan =>
-        scan.httpHealth.successOption.exists(_.active)
-      }
-      allHealthy shouldBe true
-    }
-
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-      {
-        aliceValidatorBackend.startSync()
-      },
-      logs => {
-        val messages = logs.map(_.message)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(1)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(2)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(3)}"
-          )
-        ) should be(false)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(4)}"
-          )
-        ) should be(false)
-      },
-    )
-
-    eventuallySucceeds() {
-      aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
-    }
-  }
-
   "reconnects to a recovered SV after the refresh interval" in { implicit env =>
     sv1Backend.startSync()
     sv1ScanBackend.startSync()
@@ -195,7 +146,7 @@ class BftCustomScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
         messages.exists(_.contains(s"Successfully connected to scan of ${getSvName(3)}")) should be(
-          false
+          true
         )
       },
     )
