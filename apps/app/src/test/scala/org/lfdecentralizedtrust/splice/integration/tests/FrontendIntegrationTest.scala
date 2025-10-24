@@ -692,15 +692,18 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       val dateTimePickerSectionList =
         dateTimePickerRoot.findElement(By.className("MuiPickersSectionList-root"))
 
-      val sections =
-        dateTimePickerSectionList.findElements(By.cssSelector("[contenteditable='true']")).asScala
       val parts = dateTime.split("[^0-9APM]").filter(_.nonEmpty)
 
-      sections.zip(parts).foreach { case (section, part) =>
+      for ((part, idx) <- parts.zipWithIndex) {
+        val freshSections = dateTimePickerSectionList
+          .findElements(By.cssSelector("[contenteditable='true']"))
+          .asScala
+
+        val section = freshSections(idx)
         section.click()
-        section.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
         section.sendKeys(part)
       }
+
       val dateTimePickerInputElement = dateTimePickerRoot.findElement(By.id(pickerId));
 
       eventually()(
