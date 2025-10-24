@@ -88,7 +88,7 @@ export async function installLedgerApiUserSecret(
   );
 }
 
-// TODO: for now we still export this for splitwell, reconsider
+// TODO(#2873): for now we still export this for splitwell, reconsider
 export async function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
@@ -113,7 +113,7 @@ export async function installAuth0Secret(
   );
 }
 
-// TODO: for now we still export this for splitwell, reconsider
+// TODO(#2873): for now we still export this for splitwell, reconsider
 export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
