@@ -1177,6 +1177,7 @@ object BftScanConnection {
   ): Future[BftScanConnection] = {
 
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
+    val logger = loggerFactory.getTracedLogger(getClass)
 
     config match {
       case BftScanClientConfig.TrustSingle(url, ttl) =>
@@ -1216,17 +1217,44 @@ object BftScanConnection {
               retryProvider,
               loggerFactory,
             )
-            Bft.getScansInDsoRules(tempConnection)
+            Bft.getScansInDsoRules(tempConnection).map { discoveredScans =>
+              val scanDetails = discoveredScans
+                .map(s => s"  - Name: ${s.svName}, URL: ${s.publicUrl}")
+                .mkString("\n")
+              logger.info(s"all available scans on booststrap after first DSO call $scanDetails")
+              discoveredScans
+            }
           }
 
           trustedScans = allScans.filter(scan => ts.trustedSvs.toList.contains(scan.svName))
+
+          trustedScanDetails = trustedScans
+            .map(s => s"  - Name: ${s.svName}, URL: ${s.publicUrl}")
+            .mkString("\n")
+          _ = logger.info(s"all available trusted scans on booststrap:\n$trustedScanDetails")
+
           initialConnections <- MonadUtil.sequentialTraverse(trustedScans)(scan =>
             builder(scan.publicUrl, ts.amuletRulesCacheTimeToLive).transformWith {
-              case Success(conn) => Future.successful(Right(conn))
+              case Success(conn) => {
+                logger.info(
+                  s"Successfully established initial connection to trusted scan: ${scan.svName}"
+                )
+                Future.successful(Right(conn))
+              }
               case Failure(err) => Future.successful(Left(scan.publicUrl -> err))
             }
           )
           (failed, connections) = initialConnections.toList.partitionEither(identity)
+
+          successfulConnectionDetails = connections
+            .map(c => s"  - ${c.config.adminApi.url}")
+            .mkString("\n")
+          failedConnectionDetails = failed
+            .map { case (uri, err) => s"  - $uri (${err.getMessage})" }
+            .mkString("\n")
+          _ = logger.info(
+            s"initial connection attempts complete. Successful (${connections.size}):\n$successfulConnectionDetails\nFailed (${failed.size}):\n$failedConnectionDetails"
+          )
 
           scanList = new BftCustom(
             ts.trustedSvs,
