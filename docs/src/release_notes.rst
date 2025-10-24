@@ -25,6 +25,7 @@ Release Notes
 
       - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
 
+
 0.4.19
 ------
 
