@@ -244,21 +244,6 @@ paths:
           description: "If set it assumes a DR and exports the snapshot at the given timestamp. If not set it expects the synchronizer to be paused and will export at the safe timestamp."
           schema:
             type: string
-        - name: party_id
-          in: query
-          schema:
-            type: string
-        - name: migration_id
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-        - name: force
-          in: query
-          required: false
-          schema:
-            type: boolean
       responses:
         "200":
           description: ok
