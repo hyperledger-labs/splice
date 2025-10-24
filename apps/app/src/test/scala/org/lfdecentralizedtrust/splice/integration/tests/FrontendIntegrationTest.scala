@@ -688,18 +688,15 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ): Assertion = {
     clue(s"$party selects the date $dateTime via $pickerId") {
       val root = webDriver.findElement(By.className(s"$pickerId-root"))
+      val spanList = root.findElement(By.className("MuiPickersSectionList-root"))
       val input = root.findElement(By.id(pickerId))
       val js = webDriver.asInstanceOf[JavascriptExecutor]
 
       eventually() {
-        val editableSpans = root.findElements(By.cssSelector("[contenteditable='true']"))
-        assert(!editableSpans.isEmpty, s"No editable spans found in $pickerId")
+        js.executeScript("arguments[0].focus()", spanList)
+        // spanList.click()
 
-        val firstEditable = editableSpans.get(0)
-        js.executeScript("arguments[0].focus()", firstEditable)
-        firstEditable.click()
-
-        firstEditable.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
+        spanList.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
 
         eventually() {
           input.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
