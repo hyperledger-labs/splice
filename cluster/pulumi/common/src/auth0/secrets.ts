@@ -118,7 +118,7 @@ export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
-  clientName?: string // TODO: remove this after applying once
+  clientName?: string // TODO(#2873): remove this after applying once
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
   const namespaceClientIds = auth0Client.getCfg().namespaceToUiToClientId[xns.logicalName];
@@ -135,7 +135,7 @@ export function installAuth0UiSecretWithClientId(
   xns: ExactNamespace,
   secretNameApp: string,
   clientId: string | Promise<string>,
-  clientName?: string // TODO: remove this, and the alias, after applying once
+  clientName?: string // TODO(#2873): remove this, and the alias, after applying once
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
     `splice-auth0-ui-secret-${xns.logicalName}-${secretNameApp}`,
@@ -191,8 +191,8 @@ export async function installValidatorSecrets(
 export async function installSvAppSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
-  auth0SvAppName: string, // FIXME: try to get rid of this
-  uiSecretClientName?: string // // TODO: remove this after applying once
+  auth0SvAppName: string, // TODO(#2873): try to get rid of this
+  uiSecretClientName?: string // TODO(#2873): remove this after applying once
 ): Promise<k8s.core.v1.Secret[]> {
   const clientId = getUiClientId(auth0Client, ns, 'sv');
 
