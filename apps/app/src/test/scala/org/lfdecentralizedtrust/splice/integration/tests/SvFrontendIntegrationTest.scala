@@ -162,6 +162,56 @@ class SvFrontendIntegrationTest
       }
     }
 
+    "can grant a validator license to an existing party" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can login and browse to the validator-onboarding tab", {
+            go to s"http://localhost:$sv1UIPort/validator-onboarding"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+          },
+        )(
+          "We see the grant validator license form",
+          _ => {
+            find(id("grant-license-party-address")) should not be empty
+            find(id("grant-validator-license")) should not be empty
+          },
+        )
+
+        val licenseRows = getLicensesTableRows
+        val newValidatorParty = allocateRandomSvParty("test-validator", Some(100))
+
+        actAndCheck(
+          "fill party address", {
+            inside(find(id("grant-license-party-address"))) { case Some(element) =>
+              element.underlying.sendKeys(newValidatorParty.toProtoPrimitive)
+            }
+          },
+        )(
+          "grant button becomes enabled",
+          _ => {
+            find(id("grant-validator-license")).value.isEnabled shouldBe true
+          },
+        )
+
+        actAndCheck(
+          "click the grant validator license button", {
+            click on "grant-validator-license"
+
+            click on "grant-license-confirmation-dialog-accept-button"
+          },
+        )(
+          "a new validator license row is added",
+          _ => {
+            checkValidatorLicenseRow(
+              licenseRows.size.toLong,
+              sv1Backend.getDsoInfo().svParty,
+              newValidatorParty,
+            )
+          },
+        )
+      }
+    }
+
     "can view median amulet price and update desired amulet price by each SV" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(

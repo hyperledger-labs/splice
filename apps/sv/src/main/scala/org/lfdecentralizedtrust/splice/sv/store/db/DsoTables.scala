@@ -55,6 +55,7 @@ object DsoTables extends AcsTables with NamedLogging {
       svName: Option[String] = None,
       walletParty: Option[PartyId] = None,
       conversionRateFeedPublisher: Option[PartyId] = None,
+      validatorLivenessWeight: Option[BigDecimal] = None,
   ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       DsoAcsStoreRowData.IndexColumns.amulet_round_of_expiry -> amuletRoundOfExpiry,
@@ -89,6 +90,7 @@ object DsoTables extends AcsTables with NamedLogging {
       DsoAcsStoreRowData.IndexColumns.sv_name -> svName.map(lengthLimited),
       DsoAcsStoreRowData.IndexColumns.wallet_party -> walletParty,
       DsoAcsStoreRowData.IndexColumns.conversion_rate_feed_publisher -> conversionRateFeedPublisher,
+      DsoAcsStoreRowData.IndexColumns.validator_liveness_weight -> validatorLivenessWeight,
     )
   }
   object DsoAcsStoreRowData {
@@ -130,6 +132,7 @@ object DsoTables extends AcsTables with NamedLogging {
       val sv_name = "sv_name"
       val wallet_party = "wallet_party"
       val conversion_rate_feed_publisher = "conversion_rate_feed_publisher"
+      val validator_liveness_weight = "validator_liveness_weight"
       val All = Seq(
         amulet_round_of_expiry,
         reward_round,
@@ -162,6 +165,7 @@ object DsoTables extends AcsTables with NamedLogging {
         sv_name,
         wallet_party,
         conversion_rate_feed_publisher,
+        validator_liveness_weight,
       )
     }
   }

@@ -381,6 +381,17 @@ class DbSvDsoStore(
     synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
 
+  override def sumValidatorLivenessActivityRecordsWeightsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+  )(implicit tc: TraceContext): Future[BigDecimal] =
+    selectFromRewardCouponsOnDomain[Option[BigDecimal]](
+      sql"select sum(coalesce(validator_liveness_weight, 1.0))",
+      PackageQualifiedName.fromJavaCodegenCompanion(ValidatorLivenessActivityRecord.COMPANION),
+      round,
+      synchronizerId,
+    ).map(_.headOption.flatten.getOrElse(BigDecimal(0)))
+
   private def listRewardCouponsOnDomain[C, TCId <: ContractId[?], T](
       companion: C,
       round: Long,

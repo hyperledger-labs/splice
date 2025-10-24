@@ -51,6 +51,42 @@ class HttpSvAdminHandler(
   protected val workflowId: String = this.getClass.getSimpleName
   private val dsoStore = dsoStoreWithIngestion.store
 
+  override def grantValidatorLicense(
+      respond: r0.GrantValidatorLicenseResponse.type
+  )(
+      body: definitions.GrantValidatorLicenseRequest
+  )(tuser: AdminUserRequest): Future[r0.GrantValidatorLicenseResponse] = {
+    implicit val AdminUserRequest(traceContext) = tuser
+    withSpan(s"$workflowId.grantValidatorLicense") { implicit traceContext => _ =>
+      Codec.decode(Codec.Party)(body.partyId) match {
+        case Left(error) =>
+          Future.failed(
+            HttpErrorHandler.badRequest(s"Invalid party ID '${body.partyId}': $error")
+          )
+        case Right(validatorParty) =>
+          for {
+            dsoRules <- dsoStore.getDsoRules()
+            svParty = dsoStore.key.svParty
+            dsoParty = dsoStore.key.dsoParty
+            cmd = dsoRules.exercise(
+              _.exerciseDsoRules_GrantValidatorLicense(
+                svParty.toProtoPrimitive,
+                validatorParty.toProtoPrimitive,
+              )
+            )
+            _ <- dsoStoreWithIngestion
+              .connection(SpliceLedgerConnectionPriority.Low)
+              .submit(Seq(svParty), Seq(dsoParty), cmd)
+              .withSynchronizerId(dsoRules.domain)
+              .noDedup
+              .yieldUnit()
+          } yield {
+            r0.GrantValidatorLicenseResponseOK
+          }
+      }
+    }
+  }
+
   override def pauseDecentralizedSynchronizer(
       respond: r0.PauseDecentralizedSynchronizerResponse.type
   )()(
