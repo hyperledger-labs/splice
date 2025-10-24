@@ -776,7 +776,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
               [
                 {
                   reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
-                  notificationDelay: '5m',
+                  notificationDelay: '15m',
                   teamLabel: 'canton-network',
                   subtitle: 'internal SVs 5m',
                   uid: 'adlmhpz5iv4sgc',
