@@ -1079,7 +1079,7 @@ components:
         separate_payload_files:
           type: boolean
           description: |
-            If set to true, genesis_state, acs_snapshot and dars are filenames
+            If set to true, genesis_state and acs_snapshot are filenames
 
     Dar:
       type: object
