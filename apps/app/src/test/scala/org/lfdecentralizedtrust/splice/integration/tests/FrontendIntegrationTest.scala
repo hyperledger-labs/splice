@@ -689,28 +689,21 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ): Assertion = {
     clue(s"$party selects the date $dateTime via $pickerId") {
       val dateTimePickerRoot = webDriver.findElement(By.className(s"$pickerId-root"));
-      val dateTimePicker =
+      val dateTimePickerSectionList =
         dateTimePickerRoot.findElement(By.className("MuiPickersSectionList-root"))
+      val dateTimePickerInputElement = dateTimePickerRoot.findElement(By.id(pickerId));
 
       eventually() {
-        clue("datepicker is clicked") {
-          dateTimePicker.click()
-        }
-        clue("datepicker content is selected") {
-          dateTimePicker.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
-        }
+        dateTimePickerSectionList.click()
+        dateTimePickerSectionList.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
         // Typing in the "filler" characters can mess up the input badly
         // Note: this breaks on Feb 29th because the date library validates that the day
         // of the month is valid for the year you enter and because the year is entered
         // one digit at a time that fails and it resets it to Feb 28th. Luckily,
         // this does not happen very often …
-        clue("datepicker is filled") {
-          dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
-        }
+        dateTimePickerSectionList.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
         eventually()(
-          clue("datepicker is checked") {
-            dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
-          }
+          dateTimePickerInputElement.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
         )
       }
     }
