@@ -689,23 +689,23 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ): Assertion = {
     clue(s"$party selects the date $dateTime via $pickerId") {
       val dateTimePickerRoot = webDriver.findElement(By.className(s"$pickerId-root"));
-      val dateTimePickerSectionList =
+      val dateTimePickerSectionsList =
         dateTimePickerRoot.findElement(By.className("MuiPickersSectionList-root"))
+
+      val sections =
+        dateTimePickerSectionList.findElements(By.cssSelector("[contenteditable='true']"))
+      val parts = dateTime.split("[^0-9APM]").filter(_.nonEmpty)
+
+      sections.zip(parts).foreach { case (section, part) =>
+        section.click()
+        section.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
+        section.sendKeys(part)
+      }
       val dateTimePickerInputElement = dateTimePickerRoot.findElement(By.id(pickerId));
 
-      eventually() {
-        dateTimePickerSectionList.click()
-        dateTimePickerSectionList.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE)
-        // Typing in the "filler" characters can mess up the input badly
-        // Note: this breaks on Feb 29th because the date library validates that the day
-        // of the month is valid for the year you enter and because the year is entered
-        // one digit at a time that fails and it resets it to Feb 28th. Luckily,
-        // this does not happen very often …
-        dateTimePickerSectionList.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
-        eventually()(
-          dateTimePickerInputElement.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
-        )
-      }
+      eventually()(
+        dateTimePickerInputElement.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
+      )
     }
   }
 }
