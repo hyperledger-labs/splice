@@ -233,6 +233,42 @@ paths:
                 "$ref": "#/components/schemas/GetSynchronizerNodeIdentitiesDumpResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/export-snapshot:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "exportDomainDataSnapshot"
+      parameters:
+        - name: timestamp
+          in: query
+          description: "If set it assumes a DR and exports the snapshot at the given timestamp. If not set it expects the synchronizer to be paused and will export at the safe timestamp."
+          schema:
+            type: string
+        - name: party_id
+          in: query
+          schema:
+            type: string
+        - name: migration_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainDataSnapshotResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/admin/domain/data-snapshot:
     get:
       tags: [ sv ]
@@ -1147,3 +1183,40 @@ components:
           $ref: "#/components/schemas/DomainDataSnapshot"
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
+    ExportDomainDataSnapshotResponse:
+      type: object
+      required:
+        - created_at
+        - migration_id
+        - data_snapshot
+        - participant_users
+      properties:
+        created_at:
+          description: |
+            equal to data_snapshot.acs_timestamp
+          type: string
+        migration_id:
+          type: integer
+          format: int64
+        data_snapshot:
+          $ref: "#/components/schemas/ExportDomainDataSnapshot"
+        participant_users:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
+    ExportDomainDataSnapshot:
+      type: object
+      required:
+        - acs_timestamp
+        - acs_snapshot_file_name
+        - dars_file_name
+        - genesis_state_file_name
+      properties:
+        acs_timestamp:
+          type: string
+        synchronizer_was_paused:
+          type: boolean
+        acs_snapshot_file_name:
+          type: string
+        dars_file_name:
+          type: string
+        genesis_state_file_name:
+          type: string
