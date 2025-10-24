@@ -689,7 +689,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ): Assertion = {
     clue(s"$party selects the date $dateTime via $pickerId") {
       val dateTimePickerRoot = webDriver.findElement(By.className(s"$pickerId-root"));
-      val dateTimePickerSectionsList =
+      val dateTimePickerSectionList =
         dateTimePickerRoot.findElement(By.className("MuiPickersSectionList-root"))
 
       val sections =
