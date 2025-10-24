@@ -12,7 +12,6 @@ import {
   config,
   daContactPoint,
   DecentralizedSynchronizerUpgradeConfig,
-  DEFAULT_AUDIENCE,
   activeVersion,
   exactNamespace,
   ExactNamespace,
