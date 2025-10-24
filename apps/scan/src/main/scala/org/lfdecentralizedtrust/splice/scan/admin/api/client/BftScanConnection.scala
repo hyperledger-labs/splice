@@ -927,7 +927,6 @@ object BftScanConnection {
 
       for {
         // if the previous state had too many failed scans, we cannot fetch the new list of scans.
-        // if the previous state had too many failed scans, we cannot fetch the new list of scans.
         // thus, we retry all failed connections first.
         (retriedScansFailedConnections, retriedScansSuccessfulConnections) <- attemptConnections(
           currentFailed.map { case (uri, (_, svName)) =>
