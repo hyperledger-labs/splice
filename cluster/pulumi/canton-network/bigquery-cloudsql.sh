@@ -17,7 +17,7 @@ REQUIRED_ARGS=(
   "private-network-project"
   "compute-region"
   "service-account-email"
-  "tables-to-replicate-length"
+  "tables-to-replicate-joined"
   "db-name"
   "schema-name"
   "postgres-user-name"
