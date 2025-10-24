@@ -39,6 +39,14 @@ class ScanMediatorVerdictIngestionMetrics(metricsFactory: LabeledMetricsFactory)
     )
   )(MetricsContext.Empty)
 
+  val restartErrors: Meter = metricsFactory.meter(
+    MetricInfo(
+      name = prefix :+ "restart_errors",
+      summary = "Count of ingestion restart errors",
+      qualification = Traffic,
+    )
+  )(MetricsContext.Empty)
+
   override def close(): Unit = {
     lastIngestedRecordTime.close()
   }
