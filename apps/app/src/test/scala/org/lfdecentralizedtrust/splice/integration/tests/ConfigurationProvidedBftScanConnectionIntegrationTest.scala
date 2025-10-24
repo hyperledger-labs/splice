@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 package org.lfdecentralizedtrust.splice.integration.tests
 
@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class BftCustomScanConnectionIntegrationTest
+class ConfigurationProvidedBftScanConnectionIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
     with SvTestUtil
@@ -42,6 +42,30 @@ class BftCustomScanConnectionIntegrationTest
       )
       .withManualStart
 
+  def connectionEstablished(svName: Int, message: Seq[String]) = {
+    message.exists(
+      _.contains(
+        s"Successfully established initial connection to trusted scan: ${getSvName(svName)}"
+      )
+    ) should be(true)
+  }
+
+  def connectionNotEstablished(svName: Int, message: Seq[String]) = {
+    message.exists(
+      _.contains(
+        s"Successfully established initial connection to trusted scan: ${getSvName(svName)}"
+      )
+    ) should be(false)
+  }
+
+  def refreshConnectionEstablished(svName: Int, message: Seq[String]) = {
+    message.exists(
+      _.contains(
+        s"Successfully connected to scan of ${getSvName(svName)}"
+      )
+    ) should be(true)
+  }
+
   "simple threshold normal case validator onboarding succeeds" in { implicit env =>
     sv1Backend.startSync()
     sv1ScanBackend.startSync()
@@ -66,26 +90,10 @@ class BftCustomScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(1)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(2)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(3)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(4)}"
-          )
-        ) should be(false)
+        connectionEstablished(1, messages)
+        connectionEstablished(2, messages)
+        connectionEstablished(3, messages)
+        connectionNotEstablished(4, messages)
       },
     )
 
@@ -115,26 +123,10 @@ class BftCustomScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(1)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(2)}"
-          )
-        ) should be(true)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(3)}"
-          )
-        ) should be(false)
-        messages.exists(
-          _.contains(
-            s"Successfully established initial connection to trusted scan: ${getSvName(4)}"
-          )
-        ) should be(false)
+        connectionEstablished(1, messages)
+        connectionEstablished(2, messages)
+        connectionNotEstablished(3, messages)
+        connectionNotEstablished(4, messages)
       },
     )
 
@@ -145,9 +137,7 @@ class BftCustomScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        messages.exists(_.contains(s"Successfully connected to scan of ${getSvName(3)}")) should be(
-          true
-        )
+        refreshConnectionEstablished(3, messages)
       },
     )
 
