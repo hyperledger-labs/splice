@@ -24,10 +24,6 @@ export function installInfo(
   scanUrl: string,
   scanDependency: Resource
 ): void {
-  function cnChartVerstionToString(version: CnChartVersion): string {
-    return version.type === 'remote' ? version.version : 'local';
-  }
-
   function md5(str: string): string {
     return createHash('md5').update(str).digest('hex');
   }
@@ -44,7 +40,7 @@ export function installInfo(
     deploymentDetails: {
       network: clusterNetwork,
       sv: {
-        version: cnChartVerstionToString(decentralizedSynchronizerMigrationConfig.active.version),
+        version: CnChartVersion.stringify(decentralizedSynchronizerMigrationConfig.active.version),
       },
       configDigest: {
         allowedIpRanges: {
@@ -60,13 +56,15 @@ export function installInfo(
         active: {
           chainIdSuffix: getChainIdSuffix(),
           migrationId: decentralizedSynchronizerMigrationConfig.active.id,
-          version: cnChartVerstionToString(decentralizedSynchronizerMigrationConfig.active.version),
+          version: CnChartVersion.stringify(
+            decentralizedSynchronizerMigrationConfig.active.version
+          ),
         },
         legacy: decentralizedSynchronizerMigrationConfig.legacy
           ? {
               chainIdSuffix: getChainIdSuffix(),
               migrationId: decentralizedSynchronizerMigrationConfig.legacy.id,
-              version: cnChartVerstionToString(
+              version: CnChartVersion.stringify(
                 decentralizedSynchronizerMigrationConfig.legacy.version
               ),
             }
@@ -75,7 +73,7 @@ export function installInfo(
           ? {
               chainIdSuffix: getChainIdSuffix(),
               migrationId: decentralizedSynchronizerMigrationConfig.upgrade.id,
-              version: cnChartVerstionToString(
+              version: CnChartVersion.stringify(
                 decentralizedSynchronizerMigrationConfig.upgrade.version
               ),
             }
