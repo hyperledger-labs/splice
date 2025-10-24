@@ -3679,6 +3679,8 @@ components:
           "numRoundsMissed",
           "firstCollectedInRound",
           "lastCollectedInRound",
+          "weight",
+          "kind",
         ]
       properties:
         validator:
@@ -3710,6 +3712,17 @@ components:
             `firstCollected` if the validator has collected in only one round
           type: integer
           format: int64
+        weight:
+          description: |
+            Weight of the activity records produced by this license. Determined
+            through SV votes.
+          type: number
+          format: double
+        kind:
+          description: |
+            Type of license: OperatorLicense or NonOperatorLicense. 
+          type: string
+          enum: [OperatorLicense, NonOperatorLicense]
     GetBackfillingStatusResponse:
       type: object
       required: [ "complete" ]

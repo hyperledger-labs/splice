@@ -286,6 +286,11 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
+  def sumValidatorLivenessActivityRecordsWeightsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+  )(implicit tc: TraceContext): Future[BigDecimal]
+
   def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
@@ -1175,6 +1180,7 @@ object SvDsoStore {
           contract,
           rewardRound = Some(contract.payload.round.number),
           rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+          validatorLivenessWeight = contract.payload.weight.toScala.map(BigDecimal(_)),
         )
       },
       mkFilter(splice.amulet.SvRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>

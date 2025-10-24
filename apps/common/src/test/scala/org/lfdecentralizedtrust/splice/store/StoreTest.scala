@@ -452,7 +452,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def validatorLivenessActivityRecord(validator: PartyId, round: Long = 1L) = {
+  protected def validatorLivenessActivityRecord(
+      validator: PartyId,
+      round: Long = 1L,
+      weight: Option[BigDecimal] = None,
+  ) = {
     contract(
       identifier =
         validatorLicenseCodegen.ValidatorLivenessActivityRecord.TEMPLATE_ID_WITH_PACKAGE_ID,
@@ -462,7 +466,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         dsoParty.toProtoPrimitive,
         validator.toProtoPrimitive,
         new Round(round),
-        Optional.empty(),
+        weight.fold(Optional.empty[java.math.BigDecimal]())(w =>
+          Optional.of(new java.math.BigDecimal(w.setScale(10).toString()))
+        ),
       ),
     )
   }

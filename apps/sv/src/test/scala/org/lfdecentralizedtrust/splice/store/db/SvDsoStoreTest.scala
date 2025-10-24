@@ -568,7 +568,21 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     "list & sum ValidatorLivenessActivityRecordsOnDomain" should {
 
       "list all the validator liveness activity records on the domain" in {
-        val inRound = (1 to 5).map(n => validatorLivenessActivityRecord(userParty(n), round = 3))
+        val inRound = Seq(
+          validatorLivenessActivityRecord(userParty(1), round = 3),
+          validatorLivenessActivityRecord(
+            userParty(2),
+            round = 3,
+            weight = Some(BigDecimal("0.5")),
+          ),
+          validatorLivenessActivityRecord(
+            userParty(3),
+            round = 3,
+            weight = Some(BigDecimal("2.0")),
+          ),
+          validatorLivenessActivityRecord(userParty(4), round = 3),
+          validatorLivenessActivityRecord(userParty(5), round = 3, weight = Some(BigDecimal("1.5"))),
+        )
         val outOfRound = (1 to 3).map(n => validatorLivenessActivityRecord(userParty(n), round = 2))
         val inRoundOtherDomain =
           (1 to 3).map(n => validatorLivenessActivityRecord(userParty(n), round = 3))
@@ -592,6 +606,49 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           result should contain theSameElementsAs inRound
           countResult should be(inRound.size.toLong)
+        }
+      }
+
+      "sum all the validator liveness activity record weights on the domain" in {
+        val withWeights = Seq(
+          validatorLivenessActivityRecord(
+            userParty(1),
+            round = 3,
+            weight = Some(BigDecimal("0.5")),
+          ),
+          validatorLivenessActivityRecord(
+            userParty(2),
+            round = 3,
+            weight = Some(BigDecimal("1.5")),
+          ),
+          validatorLivenessActivityRecord(userParty(3), round = 3, weight = Some(BigDecimal("2.5"))),
+        )
+        val withoutWeight = Seq(
+          validatorLivenessActivityRecord(userParty(4), round = 3, weight = None),
+          validatorLivenessActivityRecord(userParty(5), round = 3, weight = None),
+          validatorLivenessActivityRecord(userParty(6), round = 3, weight = None),
+        )
+        val otherRound = Seq(
+          validatorLivenessActivityRecord(userParty(5), round = 2, weight = Some(BigDecimal("5.0")))
+        )
+        val otherDomain = Seq(
+          validatorLivenessActivityRecord(userParty(6), round = 3, weight = Some(BigDecimal("4.0")))
+        )
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(withWeights ++ withoutWeight ++ otherRound)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- MonadUtil.sequentialTraverse(otherDomain)(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
+          )
+          sumResult <- store.sumValidatorLivenessActivityRecordsWeightsOnDomain(
+            round = 3,
+            dummyDomain,
+          )
+        } yield {
+          // Expected: 0.5 + 1.5 + 2.5 + 3 x 1.0 (default) = 7.5
+          sumResult should be(BigDecimal("7.5"))
         }
       }
 
