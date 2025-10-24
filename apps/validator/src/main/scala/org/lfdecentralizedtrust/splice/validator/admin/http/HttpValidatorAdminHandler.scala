@@ -183,7 +183,10 @@ class HttpValidatorAdminHandler(
             v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(
               definitions
                 // DR dumps don't separate output files
-                .GetValidatorDomainDataSnapshotResponse(response.toHttp(outputDirectory = None), response.migrationId)
+                .GetValidatorDomainDataSnapshotResponse(
+                  response.toHttp(outputDirectory = None),
+                  response.migrationId,
+                )
             )
           }
       } yield res

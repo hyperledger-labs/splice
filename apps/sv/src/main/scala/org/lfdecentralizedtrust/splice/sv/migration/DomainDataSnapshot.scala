@@ -4,7 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.migration
 
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
-import org.lfdecentralizedtrust.splice.migration.{Dar, DomainMigrationEncoding, ParticipantUsersData}
+import org.lfdecentralizedtrust.splice.migration.{
+  Dar,
+  DomainMigrationEncoding,
+  ParticipantUsersData,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.google.protobuf.ByteString
 

@@ -6,7 +6,11 @@ package org.lfdecentralizedtrust.splice.validator.migration
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import org.lfdecentralizedtrust.splice.migration.{Dar, DomainMigrationEncoding, ParticipantUsersData}
+import org.lfdecentralizedtrust.splice.migration.{
+  Dar,
+  DomainMigrationEncoding,
+  ParticipantUsersData,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.google.protobuf.ByteString
@@ -46,7 +50,8 @@ final case class DomainMigrationDump(
   def toHttp(outputDirectory: Option[String]): http.DomainMigrationDump = http.DomainMigrationDump(
     participant = participant.toHttp,
     participantUsers = participantUsers.toHttp,
-    acsSnapshot = DomainMigrationEncoding.encode(outputDirectory, acsTimestamp, "acs-snapshot", acsSnapshot),
+    acsSnapshot =
+      DomainMigrationEncoding.encode(outputDirectory, acsTimestamp, "acs-snapshot", acsSnapshot),
     acsTimestamp = acsTimestamp.toString,
     dars = dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
@@ -61,7 +66,8 @@ final case class DomainMigrationDump(
 }
 
 object DomainMigrationDump {
-  implicit val decoder: Decoder[DomainMigrationDump] = Decoder[http.DomainMigrationDump] emap fromHttp
+  implicit val decoder: Decoder[DomainMigrationDump] =
+    Decoder[http.DomainMigrationDump] emap fromHttp
   def codec(outputDirectory: Option[String]): Codec[DomainMigrationDump] =
     Codec.from(
       decoder,
@@ -77,7 +83,10 @@ object DomainMigrationDump {
     participantUsers = ParticipantUsersData.fromHttp(response.participantUsers)
     domainId <- SynchronizerId fromString response.domainId
     migrationId = response.migrationId
-    acsSnapshot = DomainMigrationEncoding.decode(response.separatePayloadFiles, response.acsSnapshot)
+    acsSnapshot = DomainMigrationEncoding.decode(
+      response.separatePayloadFiles,
+      response.acsSnapshot,
+    )
     dars = response.dars.map { dar =>
       val decoded = base64Decoder.decode(dar.content)
       Dar(dar.hash, ByteString.copyFrom(decoded))

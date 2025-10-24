@@ -9,12 +9,17 @@ import java.time.Instant
 import java.util.Base64
 import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.*
-  import scala.util.Using
+import scala.util.Using
 
 object DomainMigrationEncoding {
   private val base64Decoder = Base64.getDecoder()
 
-  def encode(outputDirectory: Option[String], acsTimestamp: Instant, name: String, content: Seq[ByteString]): String = {
+  def encode(
+      outputDirectory: Option[String],
+      acsTimestamp: Instant,
+      name: String,
+      content: Seq[ByteString],
+  ): String = {
     outputDirectory match {
       case None =>
         Base64.getEncoder.encodeToString(ByteString.copyFrom(content.asJava).toByteArray)
