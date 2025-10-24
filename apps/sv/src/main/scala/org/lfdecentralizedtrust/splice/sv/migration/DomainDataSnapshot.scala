@@ -56,7 +56,7 @@ final case class DomainDataSnapshot(
         http.Dar(dar.mainPackageId, content)
       }.toVector,
       synchronizerWasPaused = Some(synchronizerWasPaused),
-      separatePayloadFiles = outputDirectory.isDefined,
+      separatePayloadFiles = Some(outputDirectory.isDefined),
     )
   }
 
@@ -109,8 +109,8 @@ object DomainDataSnapshot {
     )
   }
 
-  def readBytes(separateFiles: Boolean, content: String): Seq[ByteString] = {
-    if (separateFiles) {
+  def readBytes(separateFiles: Option[Boolean], content: String): Seq[ByteString] = {
+    if (separateFiles.getOrElse(false)) {
       Using.resource(
         new DataInputStream(
           new BufferedInputStream(

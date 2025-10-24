@@ -1059,7 +1059,6 @@ components:
         - acs_snapshot
         - acs_timestamp
         - dars
-        - separate_payload_files
       properties:
         genesis_state:
           description: |
