@@ -57,7 +57,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import io.circe.syntax.EncoderOps
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -513,7 +512,9 @@ class HttpSvAdminHandler(
                     domainDataSnapshotGenerator,
                   )
                   .map { response =>
-                    v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
+                    // DR endpoint does not support separate output files so set outputDirectory = None
+                    v0.SvAdminResource.GetDomainMigrationDumpResponse
+                      .OK(response.toHttp(outputDirectory = None))
                   }
               case None =>
                 Future.failed(
@@ -555,7 +556,9 @@ class HttpSvAdminHandler(
           force.getOrElse(false),
         )
         .map { response =>
-          val responseHttp = response.toHttp
+          // No output directory for HTTP: Note that this means that it breaks on
+          // large outputs.
+          val responseHttp = response.toHttp(outputDirectory = None)
           SvAdminResource.GetDomainDataSnapshotResponse.OK(
             definitions
               .GetDomainDataSnapshotResponse(
@@ -648,9 +651,10 @@ class HttpSvAdminHandler(
                     domainDataSnapshotGenerator,
                   )
               } yield {
+                import io.circe.syntax.*
                 val path = BackupDump.writeToPath(
                   dumpPath,
-                  dump.asJson.noSpaces,
+                  dump.toHttp(outputDirectory = Some(dumpPath.getParent.toString)).asJson.noSpaces,
                 )
                 logger.info(s"Wrote domain migration dump at path $path")
                 SvAdminResource.TriggerDomainMigrationDumpResponseOK
