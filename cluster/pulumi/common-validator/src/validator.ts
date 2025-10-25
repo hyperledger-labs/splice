@@ -11,17 +11,16 @@ import {
   CnInput,
   config,
   daContactPoint,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
   getAdditionalJvmOptions,
-  installAuth0Secret,
-  installAuth0UISecret,
+  getValidatorAppApiAudience,
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  installValidatorSecrets,
   K8sResourceSchema,
   LogLevel,
   networkWideConfig,
@@ -73,7 +72,8 @@ type BasicValidatorConfig = {
   additionalEnvVars?: k8s.types.input.core.v1.EnvVar[];
   additionalJvmOptions?: string;
   participantAddress: Output<string> | string;
-  secrets?: ValidatorSecrets | ValidatorSecretsConfig; // should be undefined if auth is disabled
+  auth0Client: Auth0Client;
+  auth0ValidatorAppName: string;
   sweep?: SweepConfig;
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
   nodeIdentifier: string;
@@ -136,15 +136,9 @@ export async function installValidatorApp(
 
   const config = { ...baseConfig, backupConfig };
 
-  if (!baseConfig.disableAuth && !config.secrets) {
-    throw new Error('secrets or secretsConfig must be provided if auth is not disabled');
-  }
-  // will be undefined if auth is disabled
-  const validatorSecrets: ValidatorSecrets | undefined = baseConfig.disableAuth
-    ? undefined
-    : 'validatorSecret' in config.secrets!
-      ? config.secrets
-      : await installValidatorSecrets(config.secrets!);
+  const validatorSecrets: Secret[] = baseConfig.disableAuth
+    ? []
+    : await installValidatorSecrets(config.xns, config.auth0Client, config.auth0ValidatorAppName);
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     !config.svValidator && config.participantBootstrapDump
@@ -166,11 +160,7 @@ export async function installValidatorApp(
     .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat(
-      validatorSecrets
-        ? [validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns]
-        : []
-    )
+    .concat(validatorSecrets)
     .concat(config.extraDependsOn || []);
 
   const walletSweep = config.sweep && {
@@ -235,16 +225,12 @@ export async function installValidatorApp(
       additionalJvmOptions: getAdditionalJvmOptions(config.additionalJvmOptions),
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       enablePostgresMetrics: true,
-      auth: config.secrets
-        ? {
-            audience:
-              config.secrets?.auth0Client.getCfg().appToApiAudience['validator'] ||
-              DEFAULT_AUDIENCE,
-            jwksUrl: config.secrets
-              ? `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`
-              : undefined,
-          }
-        : undefined,
+      auth: config.disableAuth
+        ? undefined
+        : {
+            audience: getValidatorAppApiAudience(config.auth0Client.getCfg()),
+            jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
+          },
       walletSweep,
       autoAcceptTransfers,
       contactPoint: daContactPoint,
@@ -260,26 +246,4 @@ export async function installValidatorApp(
     chartVersion,
     { dependsOn }
   );
-}
-
-type ValidatorSecretsConfig = {
-  xns: ExactNamespace;
-  auth0Client: Auth0Client;
-  auth0AppName: string;
-};
-
-export async function installValidatorSecrets(
-  config: ValidatorSecretsConfig
-): Promise<ValidatorSecrets> {
-  return {
-    validatorSecret: await installAuth0Secret(
-      config.auth0Client,
-      config.xns,
-      'validator',
-      config.auth0AppName
-    ),
-    wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
-    auth0Client: config.auth0Client,
-  };
 }

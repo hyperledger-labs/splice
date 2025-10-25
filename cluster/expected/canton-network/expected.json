@@ -983,7 +983,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-1-sv-1",
+    "name": "splice-auth0-ui-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1049,7 +1049,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-ui-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

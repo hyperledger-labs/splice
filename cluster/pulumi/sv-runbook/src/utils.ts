@@ -1,15 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import {
-  config,
-  CLUSTER_HOSTNAME,
-  ExactNamespace,
-  Auth0Client,
-  installAuth0Secret,
-  AppAndUiSecrets,
-  uiSecret,
-} from '@lfdecentralizedtrust/splice-pulumi-common';
-import { svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { config, CLUSTER_HOSTNAME } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { retry } from '@lfdecentralizedtrust/splice-pulumi-common/src/retries';
 import fetch from 'node-fetch';
 
@@ -35,15 +26,4 @@ export async function getValidator1PartyId(): Promise<string> {
       return json.party_id;
     }
   });
-}
-
-export async function svAppSecrets(
-  ns: ExactNamespace,
-  auth0Client: Auth0Client,
-  clientId: string
-): Promise<AppAndUiSecrets> {
-  return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', svRunbookConfig.auth0SvAppName),
-    uiSecret: uiSecret(auth0Client, ns, 'sv', clientId),
-  };
 }
