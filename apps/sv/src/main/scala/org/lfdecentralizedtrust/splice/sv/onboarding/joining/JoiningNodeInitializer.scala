@@ -330,6 +330,15 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        localSynchronizerNode,
+        clock,
+        loggerFactory,
+        retryProvider,
+        decentralizedSynchronizerId,
+      )
       _ <- onboard(
         decentralizedSynchronizerId,
         dsoAutomation,
