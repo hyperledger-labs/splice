@@ -1123,6 +1123,7 @@ class SvFrontendIntegrationTest
     dropDownAction.selectByValue(actionName)
 
     if (actionName != "SRARC_OffboardSv") {
+      waitForQuery(id("action-change-dialog-proceed"))
       val proceedButton = webDriver.findElement(By.id("action-change-dialog-proceed"))
       proceedButton.click()
     }
