@@ -25,7 +25,17 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const istio = configureIstio(network.ingressNs, ingressIp, network.cometbftIngressIp.address);
+const cloudArmorBackendConfig = configureCloudArmorPolicy(
+  cloudArmorConfig,
+  network.ingressNs
+)?.backendConfig;
+
+const istio = configureIstio(
+  network.ingressNs,
+  ingressIp,
+  network.cometbftIngressIp.address,
+  cloudArmorBackendConfig
+);
 
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = istio.concat([network]);
@@ -43,8 +53,6 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
-
-configureCloudArmorPolicy(cloudArmorConfig);
 
 installExtraCustomResources();
 
