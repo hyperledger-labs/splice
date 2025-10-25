@@ -202,11 +202,15 @@ repository into small ones in the future.
   and the `nix` packages defined using `direnv` .
   On macos, this can be done via the `open` command, for example: `open -a "IntelliJ IDEA CE"`.
 * Open the repository via "File -> Open".
-* IntelliJ should prompt you whether you want to import the project through SBT or BSP. Choose BSP.
+* IntelliJ should prompt you whether you want to import the project through SBT or BSP. We prefer BSP, as it allows
+  using the `direnv` provided environment, as long as the `sbt` server is started from the repo root directory *before*
+  starting a build in IntelliJ.
+  This is particularly interesting when working on multiple codebases at the same time, provided you have enough RAM.
 * If IntelliJ complains that no JDK is configured determine its path by running `echo $JAVA_HOME` in the repository root
   and add it to IntelliJ using the "Add JDK from disk" action (can be found using Ctrl-Shift-A or Command-Shift-A).
-* After IntelliJ imports the project the setup should be complete. You can use the SBT shell started in previous steps
-  for issuing build commands and in particular start test runs from the CLI.
+* After IntelliJ imports the project the setup should be complete. You can use IntellIJ to build the full project
+  and navigate it. Test execution sadly does not yet work due to some classpath and working directory shenanignas.
+  Use the SBT shell started in previous steps to start test runs from the CLI; and where desired to issue build commands.
 
 ## VSCode Setup
 
