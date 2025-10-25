@@ -427,6 +427,9 @@ object SpliceConfig {
     implicit val scanClientConfigTrustSingleConfigReader
         : ConfigReader[BftScanClientConfig.TrustSingle] =
       deriveReader[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigBftCustomConfigReader
+        : ConfigReader[BftScanClientConfig.BftCustom] =
+      deriveReader[BftScanClientConfig.BftCustom]
     implicit val scanClientConfigSeedsConfigReader: ConfigReader[BftScanClientConfig.Bft] =
       deriveReader[BftScanClientConfig.Bft]
     implicit val scanClientConfigConfigReader: ConfigReader[BftScanClientConfig] =
@@ -847,6 +850,9 @@ object SpliceConfig {
     implicit val scanClientConfigTrustSingleConfigWriter
         : ConfigWriter[BftScanClientConfig.TrustSingle] =
       deriveWriter[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigBftCustomConfigWriter
+        : ConfigWriter[BftScanClientConfig.BftCustom] =
+      deriveWriter[BftScanClientConfig.BftCustom]
     implicit val scanClientConfigSeedsConfigWriter: ConfigWriter[BftScanClientConfig.Bft] =
       deriveWriter[BftScanClientConfig.Bft]
     implicit val scanClientConfigConfigWriter: ConfigWriter[BftScanClientConfig] =

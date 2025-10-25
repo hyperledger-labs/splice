@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   OpenMiningRound,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
-import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, Thresholds, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
@@ -785,13 +785,25 @@ object BftScanConnection {
 
   object BftCallConfig {
     def default(connections: ScanConnections): BftCallConfig = {
-      val f = connections.f
-      BftCallConfig(
-        connections = connections.open,
-        requestsToDo = 2 * f + 1,
-        targetSuccess = f + 1,
-      )
+      connections.totalInSubset match {
+        case Some(n) =>
+          // Use the static total number of trusted SVs (n) for the threshold
+          val threshold = connections.threshold.getOrElse(Thresholds.requiredNumScanThreshold(n))
+          BftCallConfig(
+            connections = connections.open,
+            requestsToDo = connections.open.size,
+            targetSuccess = threshold,
+          )
+        case None =>
+          val f = connections.f
+          BftCallConfig(
+            connections = connections.open,
+            requestsToDo = 2 * f + 1,
+            targetSuccess = f + 1,
+          )
+      }
     }
+
     def forAvailableData(
         connections: ScanConnections,
         dataAvailable: SingleScanConnection => Boolean,
@@ -816,7 +828,12 @@ object BftScanConnection {
     }
   }
 
-  case class ScanConnections(open: Seq[SingleScanConnection], failed: Int) {
+  case class ScanConnections(
+      open: Seq[SingleScanConnection],
+      failed: Int,
+      threshold: Option[Int] = Some(0),
+      totalInSubset: Option[Int] = None,
+  ) {
     val totalNumber: Int = open.size + failed
     val f: Int = (totalNumber - 1) / 3
   }
@@ -832,7 +849,8 @@ object BftScanConnection {
       val retryProvider: RetryProvider,
       val loggerFactory: NamedLoggerFactory,
   ) extends ScanList {
-    override def scanConnections: ScanConnections = ScanConnections(Seq(scanConnection), 0)
+    override def scanConnections: ScanConnections =
+      ScanConnections(Seq(scanConnection), 0)
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
       SyncCloseable("scan_connection", scanConnection.close())
@@ -848,16 +866,40 @@ object BftScanConnection {
       ScanConnections(openConnections.values.map(_._1).toSeq, failedConnections.size)
   }
 
-  class Bft(
-      initialScanConnections: Seq[SingleScanConnection],
-      initialFailedConnections: Map[Uri, Throwable],
-      connectionBuilder: Uri => Future[SingleScanConnection],
-      getScans: BftScanConnection => Future[Seq[DsoScan]],
-      val scansRefreshInterval: NonNegativeFiniteDuration,
-      val retryProvider: RetryProvider,
-      val loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext)
-      extends ScanList {
+  sealed trait Bft extends ScanList {
+    protected val initialScanConnections: Seq[SingleScanConnection]
+    protected val initialFailedConnections: Map[Uri, Throwable]
+    protected val connectionBuilder: Uri => Future[SingleScanConnection]
+    protected val getScans: BftScanConnection => Future[Seq[DsoScan]]
+    val scansRefreshInterval: NonNegativeFiniteDuration
+    val retryProvider: RetryProvider
+    val loggerFactory: NamedLoggerFactory
+    implicit protected val ec: ExecutionContext
+
+    protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan]
+    protected def getRequiredConnections(state: BftState): Int
+
+    protected def validateState(state: BftState)(implicit tc: TraceContext): Unit = {
+      val successfulCount = state.openConnections.size
+      val requiredCount = getRequiredConnections(state)
+
+      if (successfulCount < requiredCount) {
+        val successfulNames = state.openConnections.values.map(_._2).mkString(", ")
+        val failedNames = state.failedConnections.values.map(_._2).mkString(", ")
+
+        throw Status.UNAVAILABLE
+          .withDescription(
+            s"Failed to connect to the required number of scans. " +
+              s"Required: $requiredCount, Connected: $successfulCount. " +
+              s"Connected to: [$successfulNames]. Failed or missing: [$failedNames]."
+          )
+          .asRuntimeException()
+      } else {
+        logger.debug(
+          s"Successfully connected to $successfulCount scan(s), meeting the threshold of $requiredCount."
+        )
+      }
+    }
 
     private val currentScanConnectionsRef: AtomicReference[BftState] =
       new AtomicReference(
@@ -899,24 +941,17 @@ object BftScanConnection {
         _ = currentScanConnectionsRef.set(retriedCurrentState)
         // these will be BFT-read, failing if there's no consensus
         scansInDsoRules <- getScans(connection)
-        newState <- computeNewState(retriedCurrentState, scansInDsoRules)
+
+        filteredScans = filterScans(scansInDsoRules)
+
+        newState <- computeNewState(retriedCurrentState, filteredScans)
       } yield {
         currentScanConnectionsRef.set(newState)
         logger.info(s"Updated scan list to $newState")
 
         val connections = newState.scanConnections
-        val defaultCallConfig = BftCallConfig.default(connections)
-        // Most but not all calls will use the default config.
-        // Fail early if there are not enough Scans for the default config
-        if (!defaultCallConfig.enoughAvailableScans) {
-          throw io.grpc.Status.FAILED_PRECONDITION
-            .withDescription(
-              s"There are not enough Scans to satisfy f=${connections.f}. Will be retried. State: $newState"
-            )
-            .asRuntimeException()
-        } else {
-          connections
-        }
+        validateState(newState)
+        connections
       }
     }
 
@@ -975,14 +1010,18 @@ object BftScanConnection {
     )(implicit
         tc: TraceContext
     ): Future[(Seq[(Uri, (Throwable, SvName))], Seq[(Uri, (SingleScanConnection, SvName))])] = {
+      logger.info(s"Attempting to connect to scans: ${scans.map(_.svName)}")
       MonadUtil
         .sequentialTraverse(scans) { scan =>
-          logger.info(s"Attempting to connect to Scan: $scan.")
+          logger.debug(s"Attempting to connect to Scan: $scan.")
           connectionBuilder(scan.publicUrl)
-            .transformWith { result =>
-              // logging
-              result.failed.foreach { err =>
-                // TODO(#815): abstract this pattern into the RetryProvider
+            .transformWith {
+              case Success(conn) =>
+                logger.info(
+                  s"Successfully connected to scan of ${scan.svName} (${scan.publicUrl})."
+                )
+                Future.successful(Right(scan.publicUrl -> (conn, scan.svName)))
+              case Failure(err) =>
                 if (retryProvider.isClosing)
                   logger.info(
                     s"Suppressed warning, as we're shutting down: Failed to connect to scan of ${scan.svName} (${scan.publicUrl}).",
@@ -993,12 +1032,7 @@ object BftScanConnection {
                     s"Failed to connect to scan of ${scan.svName} (${scan.publicUrl}).",
                     err,
                   )
-              }
-              // actual result
-              Future.successful(
-                result.toEither
-                  .bimap(scan.publicUrl -> (_, scan.svName), scan.publicUrl -> (_, scan.svName))
-              )
+                Future.successful(Left(scan.publicUrl -> (err, scan.svName)))
             }
         }
         .map(_.partitionEither(identity))
@@ -1015,14 +1049,77 @@ object BftScanConnection {
       }
     }
 
-    override def scanConnections: ScanConnections = {
+    protected def currentConnectionsState: ScanConnections =
       currentScanConnectionsRef.get().scanConnections
-    }
+
+    def scanConnections: ScanConnections
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
       initialScanConnections.zipWithIndex.map { case (connection, i) =>
         SyncCloseable(s"scan_connection_$i", connection.close())
       }
+  }
+
+  class AllDsoScansBft(
+      override val initialScanConnections: Seq[SingleScanConnection],
+      override val initialFailedConnections: Map[Uri, Throwable],
+      override val connectionBuilder: Uri => Future[SingleScanConnection],
+      override val getScans: BftScanConnection => Future[Seq[DsoScan]],
+      override val scansRefreshInterval: NonNegativeFiniteDuration,
+      override val retryProvider: RetryProvider,
+      override val loggerFactory: NamedLoggerFactory,
+  )(implicit override val ec: ExecutionContext)
+      extends Bft {
+
+    override protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan] = allScans
+
+    override protected def getRequiredConnections(state: BftState): Int = {
+      val totalNumber = state.openConnections.size + state.failedConnections.size
+      val f = (totalNumber - 1) / 3
+      f + 1
+    }
+
+    override def scanConnections: ScanConnections = {
+      val connections = currentConnectionsState
+      connections.copy(totalInSubset = None, threshold = None)
+    }
+  }
+
+  class ConfigurationProvidedScansBft(
+      trustedSvs: NonEmptyList[String],
+      threshold: Option[Int],
+      override val initialScanConnections: Seq[SingleScanConnection],
+      override val initialFailedConnections: Map[Uri, Throwable],
+      override val connectionBuilder: Uri => Future[SingleScanConnection],
+      override val getScans: BftScanConnection => Future[Seq[DsoScan]],
+      override val scansRefreshInterval: NonNegativeFiniteDuration,
+      override val retryProvider: RetryProvider,
+      override val loggerFactory: NamedLoggerFactory,
+  )(implicit override val ec: ExecutionContext, tc: TraceContext)
+      extends Bft {
+
+    private val trustedSvsSet = trustedSvs.toList.toSet
+
+    override protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan] = {
+      val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
+
+      logger.debug(s"Discovered the following trusted scans from the network: ${targetScans
+          .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
+          .mkString("; ")}")
+      targetScans
+    }
+
+    override protected def getRequiredConnections(state: BftState): Int = {
+      threshold.getOrElse(Thresholds.requiredNumScanThreshold(trustedSvs.size))
+    }
+
+    override def scanConnections: ScanConnections = {
+      val connections = currentConnectionsState
+      connections.copy(
+        totalInSubset = Some(trustedSvs.size),
+        threshold = threshold,
+      )
+    }
   }
 
   object Bft {
@@ -1080,57 +1177,210 @@ object BftScanConnection {
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[BftScanConnection] = {
+
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
+    val logger = loggerFactory.getTracedLogger(getClass)
+
     config match {
-      case BftScanClientConfig.TrustSingle(url, amuletRulesCacheTimeToLive) =>
-        // If this fails to connect, fail and let it retry
-        val connectionF = builder(url, amuletRulesCacheTimeToLive)
-        connectionF
-          .map(conn =>
-            new BftScanConnection(
-              spliceLedgerClient,
-              amuletRulesCacheTimeToLive,
-              new TrustSingle(conn, retryProvider, loggerFactory),
-              clock,
-              retryProvider,
-              loggerFactory,
-            )
-          )
-      case BftScanClientConfig.Bft(seedUrls, scansRefreshInterval, amuletRulesCacheTimeToLive) =>
+      case BftScanClientConfig.TrustSingle(url, ttl) =>
         for {
-          bft <- seedUrls
-            .traverse(uri =>
-              builder(uri, amuletRulesCacheTimeToLive).transformWith {
-                case Success(conn) => Future.successful(Right(conn))
-                case Failure(err) => Future.successful(Left(uri -> err))
-              }
-            )
-            .map { cs =>
-              val (failed, connections) = cs.toList.partitionEither(identity)
-              new Bft(
-                connections,
-                failed.toMap,
-                uri => builder(uri, amuletRulesCacheTimeToLive),
-                Bft.getScansInDsoRules,
-                scansRefreshInterval,
-                retryProvider,
-                loggerFactory,
+          conn <- builder(url, ttl)
+          scanList = new TrustSingle(conn, retryProvider, loggerFactory)
+        } yield new BftScanConnection(
+          spliceLedgerClient,
+          ttl,
+          scanList,
+          clock,
+          retryProvider,
+          loggerFactory,
+        )
+
+      case ts @ BftScanClientConfig.BftCustom(_, _, _, _, _) =>
+        /*
+         * The initialization for `BftCustom` is more complex than for `AllDsoScansBft`.
+         *
+         * `AllDsoScansBft` can bootstrap with a single seed URL because its BFT threshold is
+         * dynamic (f+1). On the first `refresh`, if it only knows about one node, the threshold becomes 1,
+         * allowing it to make a non-BFT discovery call to find the rest of the network.
+         *
+         * This does not work for `BftCustom` because its threshold is static and determined by the
+         * configuration (either a specific number or calculated from the total number of trusted SVs),
+         * which is almost always greater than 1.
+         *
+         * Therefore, we cannot rely on a single seed URL to perform a BFT discovery call.
+         *
+         * Hence we use a multi-step bootstrap process:
+         * 1. Connect to all available seed URLs individually ("TrustSingle" mode for each).
+         * 2. Query each successfully connected seed node for its view of the full network topology.
+         * 3. Out of all the responses, find the one with the majority agreement (consensus).
+         * 4. Only then, proceed with the consensus topology to filter for the trusted SVs and
+         * establish the final BFT connection pool.
+         *
+         */
+
+        for {
+          initialSeedConnections <- ts.seedUrls.traverse(uri =>
+            builder(uri, ts.amuletRulesCacheTimeToLive).transform(Success(_))
+          )
+          successfulSeedConnections = initialSeedConnections.collect { case Success(conn) =>
+            conn
+          }.toList
+
+          allScansFromSeeds <- {
+            if (successfulSeedConnections.isEmpty) {
+              Future.failed(
+                Status.UNAVAILABLE
+                  .withDescription(s"Failed to connect to any seed URLs: ${ts.seedUrls.toList}")
+                  .asRuntimeException()
               )
+            } else {
+              Future.traverse(successfulSeedConnections) { conn =>
+                val tempConnection = new BftScanConnection(
+                  spliceLedgerClient,
+                  ts.amuletRulesCacheTimeToLive,
+                  new TrustSingle(conn, retryProvider, loggerFactory),
+                  clock,
+                  retryProvider,
+                  loggerFactory,
+                )
+                Bft.getScansInDsoRules(tempConnection).transform(Success(_))
+              }
             }
+          }
+
+          allScans <- {
+            val successfulResponses = allScansFromSeeds.collect { case Success(scans) => scans }
+            if (successfulResponses.isEmpty) {
+              Future.failed(
+                new IllegalStateException(
+                  "Failed to get scan list from any of the connected seed nodes."
+                )
+              )
+            } else {
+              val groupedResponses = successfulResponses.groupBy(identity)
+
+              val consensusEntryOpt = groupedResponses.maxByOption { case (_, group) => group.size }
+
+              consensusEntryOpt match {
+                case Some((consensusResponse, _)) =>
+                  logger.info(
+                    s"Reached consensus on scan list from seed nodes. Majority response: ${consensusResponse
+                        .map(_.svName)}"
+                  )
+                  Future.successful(consensusResponse)
+                case None =>
+                  Future.failed(
+                    new IllegalStateException(
+                      "Internal error: could not determine consensus from non-empty responses."
+                    )
+                  )
+              }
+            }
+          }
+
+          trustedScans = allScans.filter(scan => ts.trustedSvs.toList.contains(scan.svName))
+
+          trustedScanDetails = trustedScans
+            .map(s => s"  - Name: ${s.svName}, URL: ${s.publicUrl}")
+            .mkString("\n")
+          _ = logger.info(s"all available trusted scans on booststrap:\n$trustedScanDetails")
+
+          initialConnections <- MonadUtil.sequentialTraverse(trustedScans)(scan =>
+            builder(scan.publicUrl, ts.amuletRulesCacheTimeToLive).transformWith {
+              case Success(conn) => {
+                logger.info(
+                  s"Successfully established initial connection to trusted scan: ${scan.svName}"
+                )
+                Future.successful(Right(conn))
+              }
+              case Failure(err) => Future.successful(Left(scan.publicUrl -> err))
+            }
+          )
+          (failed, connections) = initialConnections.toList.partitionEither(identity)
+
+          successfulConnectionDetails = connections
+            .map(c => s"  - ${c.config.adminApi.url}")
+            .mkString("\n")
+          failedConnectionDetails = failed
+            .map { case (uri, err) => s"  - $uri (${err.getMessage})" }
+            .mkString("\n")
+          _ = logger.info(
+            s"initial connection attempts complete. Successful (${connections.size}):\n$successfulConnectionDetails\nFailed (${failed.size}):\n$failedConnectionDetails"
+          )
+
+          scanList = new ConfigurationProvidedScansBft(
+            ts.trustedSvs,
+            ts.threshold,
+            connections,
+            failed.toMap,
+            uri => builder(uri, ts.amuletRulesCacheTimeToLive),
+            Bft.getScansInDsoRules,
+            ts.scansRefreshInterval,
+            retryProvider,
+            loggerFactory,
+          )
+
           bftConnection = new BftScanConnection(
             spliceLedgerClient,
-            amuletRulesCacheTimeToLive,
-            bft,
+            ts.amuletRulesCacheTimeToLive,
+            scanList,
             clock,
             retryProvider,
             loggerFactory,
           )
-          // start with the latest scan list
+
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,
             "refresh_initial_scan_list",
             "Scan list is refreshed.",
-            bft
+            scanList
+              .refresh(bftConnection)
+              .recoverWith { case NonFatal(ex) =>
+                Future.failed(
+                  Status.UNAVAILABLE
+                    .withDescription("Failed to refresh scan list on init")
+                    .withCause(ex)
+                    .asException()
+                )
+              }
+              .map(_ => ()),
+            loggerFactory.getTracedLogger(classOf[BftScanConnection]),
+          )
+        } yield bftConnection
+
+      case bft @ BftScanClientConfig.Bft(_, _, _) =>
+        for {
+
+          initialConnections <- bft.seedUrls.traverse(uri =>
+            builder(uri, bft.amuletRulesCacheTimeToLive).transformWith {
+              case Success(conn) => Future.successful(Right(conn))
+              case Failure(err) => Future.successful(Left(uri -> err))
+            }
+          )
+          (failed, connections) = initialConnections.toList.partitionEither(identity)
+
+          scanList = new AllDsoScansBft(
+            connections,
+            failed.toMap,
+            uri => builder(uri, bft.amuletRulesCacheTimeToLive),
+            Bft.getScansInDsoRules,
+            bft.scansRefreshInterval,
+            retryProvider,
+            loggerFactory,
+          )
+          bftConnection = new BftScanConnection(
+            spliceLedgerClient,
+            bft.amuletRulesCacheTimeToLive,
+            scanList,
+            clock,
+            retryProvider,
+            loggerFactory,
+          )
+          _ <- retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            "refresh_initial_scan_list",
+            "Scan list is refreshed.",
+            scanList
               .refresh(bftConnection)
               .recoverWith { case NonFatal(ex) =>
                 Future.failed(
@@ -1184,29 +1434,28 @@ object BftScanConnection {
           },
         loggerFactory.getTracedLogger(classOf[BftScanConnection]),
       )
-      bft <- MonadUtil
+      initialConnections <- MonadUtil
         .sequentialTraverse(scans)(scan =>
           builder(scan.publicUrl, amuletRulesCacheTimeToLive).transformWith {
             case Success(conn) => Future.successful(Right(conn))
             case Failure(err) => Future.successful(Left(scan.publicUrl -> err))
           }
         )
-        .map { cs =>
-          val (failed, connections) = cs.toList.partitionEither(identity)
-          new Bft(
-            connections,
-            failed.toMap,
-            uri => builder(uri, amuletRulesCacheTimeToLive),
-            _ => Bft.getPeerScansFromStore(store, svName),
-            scansRefreshInterval,
-            retryProvider,
-            loggerFactory,
-          )
-        }
+      (failed, connections) = initialConnections.toList.partitionEither(identity)
+
+      scanList = new AllDsoScansBft(
+        connections,
+        failed.toMap,
+        uri => builder(uri, amuletRulesCacheTimeToLive),
+        _ => Bft.getPeerScansFromStore(store, svName),
+        scansRefreshInterval,
+        retryProvider,
+        loggerFactory,
+      )
       bftConnection = new BftScanConnection(
         spliceLedgerClient,
         amuletRulesCacheTimeToLive,
-        bft,
+        scanList,
         clock,
         retryProvider,
         loggerFactory,
@@ -1245,6 +1494,7 @@ object BftScanConnection {
         )
 
   sealed trait BftScanClientConfig {
+    def amuletRulesCacheTimeToLive: NonNegativeFiniteDuration
     def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftScanClientConfig
   }
   object BftScanClientConfig {
@@ -1256,6 +1506,20 @@ object BftScanConnection {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSingle =
         copy(amuletRulesCacheTimeToLive = ttl)
     }
+
+    case class BftCustom(
+        seedUrls: NonEmptyList[Uri], // by default only one seed_url is provided
+        threshold: Option[Int] = None, // default to len(seedUrls)/3+1
+        trustedSvs: NonEmptyList[String], // should be at least 1
+        amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
+          ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
+        scansRefreshInterval: NonNegativeFiniteDuration =
+          ScanAppClientConfig.DefaultScansRefreshInterval,
+    ) extends BftScanClientConfig {
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftCustom =
+        copy(amuletRulesCacheTimeToLive = ttl)
+    }
+
     case class Bft(
         seedUrls: NonEmptyList[Uri],
         scansRefreshInterval: NonNegativeFiniteDuration =
