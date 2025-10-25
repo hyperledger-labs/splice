@@ -35,6 +35,7 @@ import { ProposalSummary } from '../governance/ProposalSummary';
 import { FormLayout } from './FormLayout';
 import {
   validateEffectiveDate,
+  validateExpiration,
   validateExpiryEffectiveDate,
   validateNextScheduledSynchronizerUpgrade,
   validateSummary,
@@ -224,7 +225,13 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
             )}
           </form.AppField>
 
-          <form.AppField name="common.expiryDate">
+          <form.AppField
+            name="common.expiryDate"
+            validators={{
+              onChange: ({ value }) => validateExpiration(value),
+              onBlur: ({ value }) => validateExpiration(value),
+            }}
+          >
             {field => (
               <field.DateField
                 title="Threshold Deadline"

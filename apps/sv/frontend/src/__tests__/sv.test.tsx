@@ -138,7 +138,7 @@ Expiration
 
       // We wait for the date to be set to the default value from the ledger.
       await waitFor(() => expect(dateInput.getAttribute('value')).toBe(inOneWeek));
-      await user.type(dateInput, expirationDate);
+      fireEvent.change(dateInput, { target: { value: expirationDate } });
       expect(dateInput.getAttribute('value')).toBe(expirationDate);
 
       const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
