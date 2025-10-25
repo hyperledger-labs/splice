@@ -1119,14 +1119,14 @@ class SvFrontendIntegrationTest
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
     eventually() { find(id("display-actions")) should not be empty }
-    val existingElement = find(id("display-actions"))
-    logger.debug(s"Existing action: ${existingElement}")
-    logger.debug(s"Existing action: ${existingElement.value.attribute("value")}")
-    logger.debug(s"New action: ${actionName}")
     val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+    val existingAction: String = dropDownAction.getFirstSelectedOption().getAttribute("value")
     dropDownAction.selectByValue(actionName)
 
-    if (actionName != "SRARC_OffboardSv") {
+    if (actionName != "SRARC_OffboardSv" && existingAction != actionName) {
+      logger.debug(
+        s"Changed action from $existingAction to $actionName, waiting for confirmation dialog"
+      )
       waitForQuery(id("action-change-dialog-proceed"))
       val proceedButton = webDriver.findElement(By.id("action-change-dialog-proceed"))
       proceedButton.click()
