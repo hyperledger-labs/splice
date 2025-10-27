@@ -5,8 +5,10 @@ package org.lfdecentralizedtrust.splice.migration
 
 import com.google.protobuf.ByteString
 import java.io.*
+import java.nio.file.Paths
 import java.time.Instant
 import java.util.Base64
+import org.lfdecentralizedtrust.splice.util.BackupDump
 import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
@@ -25,14 +27,16 @@ object DomainMigrationEncoding {
         Base64.getEncoder.encodeToString(ByteString.copyFrom(content.asJava).toByteArray)
       case Some(dir) =>
         val file = s"$dir/${acsTimestamp}-$name"
-        Using.resource(
-          new DataOutputStream(
-            new BufferedOutputStream(
-              new FileOutputStream(file)
+        BackupDump.withParentDirectoryFor(Paths.get(file)) {
+          Using.resource(
+            new DataOutputStream(
+              new BufferedOutputStream(
+                new FileOutputStream(file)
+              )
             )
-          )
-        ) { dos =>
-          writeChunks(dos, content)
+          ) { dos =>
+            writeChunks(dos, content)
+          }
         }
         file
     }
