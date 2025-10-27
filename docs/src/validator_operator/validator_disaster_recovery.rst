@@ -372,7 +372,7 @@ Lastly, we can import the ACS:
 .. code::
 
      participant.synchronizers.disconnect_all()
-     participant.repair.import_acs_old("acs_snapshot")
+     participant.repair.import_acs("acs_snapshot")
      participant.synchronizers.reconnect_all()
 
 The party is now hosted on the node and can participat in

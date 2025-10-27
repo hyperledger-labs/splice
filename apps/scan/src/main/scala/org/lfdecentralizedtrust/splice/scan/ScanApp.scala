@@ -280,7 +280,7 @@ class ScanApp(
         config.spliceInstanceNames,
         participantAdminConnection,
         sequencerAdminConnection,
-        store,
+        automation,
         acsSnapshotStore,
         scanEventStore,
         dsoAnsResolver,

@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
+import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
@@ -256,6 +257,8 @@ class ValidatorApp(
                       sequencerConnections,
                       migrationDump.dars,
                       migrationDump.acsSnapshot,
+                      legacyAcsImport =
+                        migrationDump.acsFormat == http.DomainDataSnapshot.AcsFormat.AdminApi,
                     )
                   }
                   _ <- appInitStep("Restoring participant users data") {
