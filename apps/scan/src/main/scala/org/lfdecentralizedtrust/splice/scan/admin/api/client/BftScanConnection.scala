@@ -788,7 +788,8 @@ object BftScanConnection {
       connections.totalInSubset match {
         case Some(n) =>
           // Use the static total number of trusted SVs (n) for the threshold
-          val threshold = connections.threshold.getOrElse(Thresholds.requiredNumScanThreshold(n))
+          val threshold =
+            connections.threshold.getOrElse(Thresholds.requiredNumScanThreshold(n).value)
           BftCallConfig(
             connections = connections.open,
             requestsToDo = connections.open.size,
@@ -1110,7 +1111,7 @@ object BftScanConnection {
     }
 
     override protected def getRequiredConnections(state: BftState): Int = {
-      threshold.getOrElse(Thresholds.requiredNumScanThreshold(trustedSvs.size))
+      threshold.getOrElse(Thresholds.requiredNumScanThreshold(trustedSvs.size).value)
     }
 
     override def scanConnections: ScanConnections = {
