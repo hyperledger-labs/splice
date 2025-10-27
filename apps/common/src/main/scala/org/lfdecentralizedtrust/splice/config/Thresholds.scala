@@ -61,6 +61,6 @@ object Thresholds {
   }
 
   def requiredNumScanThreshold(svNum: Int) = {
-    (svNum / 3) + 1
+    FPlus1Threshold(svNum)
   }
 }
