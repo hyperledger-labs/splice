@@ -40,9 +40,20 @@ object BackupDump {
   def writeToPath(path: Path, content: String): File = {
     import better.files.File
     val file = File(path)
-    file.parent.createDirectories()
-    file.write(content)(File.OpenOptions.default, StandardCharsets.UTF_8)
+    withParentDirectoryFor(path) {
+      // even though the default is UTF-8 the String implementation of encoding is broken so we need to explicitly set
+      // StandardCharsets.UTF_8 and not Charset.defaultCharset()
+      // for more details check #2864
+      file.write(content)(File.OpenOptions.default, StandardCharsets.UTF_8)
+    }
     file
+  }
+
+  def withParentDirectoryFor(path: Path)(f: => Unit): Unit = {
+    import better.files.File
+    val file = File(path)
+    file.parent.createDirectories()
+    f
   }
 
   def fileExists(path: Path): Boolean = {
