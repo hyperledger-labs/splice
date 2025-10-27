@@ -1076,8 +1076,7 @@ object BftScanConnection {
 
     override protected def getRequiredConnections(state: BftState): Int = {
       val totalNumber = state.openConnections.size + state.failedConnections.size
-      val f = (totalNumber - 1) / 3
-      f + 1
+      Thresholds.requiredNumScanThreshold(totalNumber).value
     }
 
     override def scanConnections: ScanConnections = {
