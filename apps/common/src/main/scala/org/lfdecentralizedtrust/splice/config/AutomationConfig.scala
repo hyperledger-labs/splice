@@ -71,9 +71,6 @@ case class AutomationConfig(
       * TODO(DACH-NY/canton-network-node#11828) Remove this option
       */
     enableExpireValidatorFaucet: Boolean = false,
-    /** Only intended for testing. Disables the expiration of Amulet.
-      */
-    enableExpireAmulet: Boolean = false,
     /** Only intended for testing. Allows disabling governance automation.
       */
     enableDsoGovernance: Boolean = true,

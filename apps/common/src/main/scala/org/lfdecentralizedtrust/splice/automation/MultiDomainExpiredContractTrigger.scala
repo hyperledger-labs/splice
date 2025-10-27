@@ -18,7 +18,6 @@ import MultiDomainAcsStore.ContractState
   *
   * Use [[ScheduledTaskTrigger]] for more complex expiry choices.
   */
-// TODO(tech-debt): if we happen to find LOTS of instances that just expire the contract based on its expiry date, then we should consider introducing a Daml-level interface 'ExpiringContract' and handle all of them using single trigger.
 abstract class MultiDomainExpiredContractTrigger[
     C,
     TCid <: ContractId[_],
