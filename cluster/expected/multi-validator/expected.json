@@ -2626,7 +2626,7 @@
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3065,7 +3065,7 @@
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3504,7 +3504,7 @@
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3943,7 +3943,7 @@
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",
@@ -4382,7 +4382,7 @@
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/domain_migration_dump_INDEX.json\""
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",
