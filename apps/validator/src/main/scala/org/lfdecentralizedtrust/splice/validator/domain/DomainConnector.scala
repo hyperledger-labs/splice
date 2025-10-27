@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.domain
 
-import cats.implicits.{catsSyntaxApplicativeId}
+import cats.implicits.catsSyntaxApplicativeId
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
@@ -22,10 +22,11 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnections,
   SequencerConnectionPoolDelays,
+  SequencerConnections,
   SubmissionRequestAmplification,
 }
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
@@ -71,22 +72,24 @@ class DomainConnector(
     )
   }
 
-  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(time: CantonTimestamp)(
-      implicit tc: TraceContext
+  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()(implicit
+      tc: TraceContext,
+      clock: Clock,
   ): Future[Unit] = {
-    getDecentralizedSynchronizerSequencerConnections(time).flatMap(x =>
+    getDecentralizedSynchronizerSequencerConnections().flatMap(x =>
       MonadUtil.sequentialTraverse_(x.toList) { case (alias, connections) =>
         ensureDomainRegistered(alias, connections)
       }
     )
   }
 
-  def getDecentralizedSynchronizerSequencerConnections(time: CantonTimestamp)(implicit
-      tc: TraceContext
+  def getDecentralizedSynchronizerSequencerConnections()(implicit
+      tc: TraceContext,
+      clock: Clock,
   ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
-        waitForSequencerConnectionsFromScan(time)
+        waitForSequencerConnectionsFromScan()
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
@@ -124,8 +127,10 @@ class DomainConnector(
   }
 
   private def waitForSequencerConnectionsFromScan(
-      time: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Map[SynchronizerAlias, SequencerConnections]] = {
+  )(implicit
+      tc: TraceContext,
+      clock: Clock,
+  ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     retryProvider.getValueWithRetries(
       // Short retries since usually a failure here is just a misconfiguration error.
       // The only case where this can happen is during a domain migration and even then
@@ -134,8 +139,8 @@ class DomainConnector(
       RetryFor.ClientCalls,
       "scan_sequencer_connections",
       "non-empty sequencer connections from scan",
-      getSequencerConnectionsFromScan(time)
-        .map { connections =>
+      getSequencerConnectionsFromScan()
+        .map { case (connections, time) =>
           if (connections.isEmpty) {
             throw Status.NOT_FOUND
               .withDescription(
@@ -173,10 +178,15 @@ class DomainConnector(
   }
 
   def getSequencerConnectionsFromScan(
-      domainTime: CantonTimestamp
+      time: Option[CantonTimestamp] = None
   )(implicit
-      traceContext: TraceContext
-  ): Future[Map[SynchronizerAlias, Seq[GrpcSequencerConnection]]] = {
+      clock: Clock,
+      traceContext: TraceContext,
+  ): Future[(Map[SynchronizerAlias, Seq[GrpcSequencerConnection]], CantonTimestamp)] = {
+    val domainTime = time match {
+      case Some(time) => time
+      case None => clock.now
+    }
     for {
       domainSequencers <- scanConnection.listDsoSequencers()
       decentralizedSynchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
@@ -187,10 +197,13 @@ class DomainConnector(
           // so this is just an extra safeguard.
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
-      filteredSequencers.map { domainSequencer =>
-        config.domains.global.alias ->
-          extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
-      }.toMap
+      (
+        filteredSequencers.map { domainSequencer =>
+          config.domains.global.alias ->
+            extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
+        }.toMap,
+        domainTime,
+      )
     }
   }
 

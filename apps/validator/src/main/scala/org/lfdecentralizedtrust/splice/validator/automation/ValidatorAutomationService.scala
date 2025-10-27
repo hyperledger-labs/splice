@@ -226,6 +226,7 @@ class ValidatorAutomationService(
         domainConnector,
         sequencerSubmissionAmplificationPatience,
         initialSynchronizerTime,
+        clock,
       )
     )
 

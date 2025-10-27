@@ -25,6 +25,7 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status.Code
@@ -40,6 +41,7 @@ class ReconcileSequencerConnectionsTrigger(
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
     initialSynchronizerTimeO: Option[CantonTimestamp],
+    clock: Clock,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -79,7 +81,9 @@ class ReconcileSequencerConnectionsTrigger(
             case _ => domainTime
           }
           for {
-            sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(maxDomainTime)
+            (sequencerConnections, _) <- domainConnector.getSequencerConnectionsFromScan(
+              Some(maxDomainTime)
+            )(clock, traceContext)
             _ <- MonadUtil.sequentialTraverse_(sequencerConnections.toList) {
               case (alias, connections) =>
                 val sequencerConnectionConfig = NonEmpty.from(connections) match {

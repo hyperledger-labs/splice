@@ -232,7 +232,7 @@ class ValidatorApp(
               case Some(migrationDump) =>
                 for {
                   allSequencerConnections <- domainConnector
-                    .getDecentralizedSynchronizerSequencerConnections(now)
+                    .getDecentralizedSynchronizerSequencerConnections()(traceContext, clock)
                   sequencerConnections = allSequencerConnections.values.toSeq match {
                     case Seq() =>
                       sys.error("Expected at least one sequencer connection but got 0")
@@ -286,7 +286,10 @@ class ValidatorApp(
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
                     domainConnector
-                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(now)
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()(
+                        traceContext,
+                        clock,
+                      )
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
