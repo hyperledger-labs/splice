@@ -1308,6 +1308,8 @@ object BftScanConnection {
             s"initial connection attempts complete. Successful (${connections.size}):\n$successfulConnectionDetails\nFailed (${failed.size}):\n$failedConnectionDetails"
           )
 
+          // TODO(#2880): The connection initialization logic for ConfigurationProvidedScansBft and AllDsoScansBft significantly differs. Consider refactoring to reduce duplication.
+
           scanList = new ConfigurationProvidedScansBft(
             ts.trustedSvs,
             ts.threshold,
