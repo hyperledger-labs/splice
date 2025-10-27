@@ -118,12 +118,6 @@ multiValidator:
       limits:
         memory: '12Gi'
 sv:
-  participant:
-    resources:
-      requests:
-        memory: '12Gi'
-      limits:
-        memory: '18Gi'
   scan:
     externalRateLimits:
       globalLimits:
@@ -148,12 +142,22 @@ svs:
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true
+      resources:
+        requests:
+          memory: '12Gi'
+        limits:
+          memory: '18Gi'
     validatorApp:
       additionalEnvVars:
         # enable https://github.com/hyperledger-labs/splice/pull/2499
         - name: ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT
           value: |
             canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m
+      resources:
+        requests:
+          memory: '2Gi'
+        limits:
+          memory: '4Gi'
 validators:
   validator-runbook:
     namespace: validator
