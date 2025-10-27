@@ -51,14 +51,14 @@ export class MultiValidator extends MultiNodeDeployment {
           {
             name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_INIT_MIGRATION',
             value:
-              'canton.validator-apps.validator_backend_INDEX.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump_INDEX.json"',
+              'canton.validator-apps.validator_backend_INDEX.restore-from-migration-dump = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
           },
         ]
       : [
           {
             name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH',
             value:
-              'canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump_INDEX.json"',
+              'canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
           },
         ];
     super(
