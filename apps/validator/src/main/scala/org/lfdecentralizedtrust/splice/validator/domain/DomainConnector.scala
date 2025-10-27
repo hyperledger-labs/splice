@@ -72,24 +72,22 @@ class DomainConnector(
     )
   }
 
-  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()(implicit
-      tc: TraceContext,
-      clock: Clock,
+  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock: Clock)(implicit
+      tc: TraceContext
   ): Future[Unit] = {
-    getDecentralizedSynchronizerSequencerConnections().flatMap(x =>
+    getDecentralizedSynchronizerSequencerConnections(clock).flatMap(x =>
       MonadUtil.sequentialTraverse_(x.toList) { case (alias, connections) =>
         ensureDomainRegistered(alias, connections)
       }
     )
   }
 
-  def getDecentralizedSynchronizerSequencerConnections()(implicit
-      tc: TraceContext,
-      clock: Clock,
+  def getDecentralizedSynchronizerSequencerConnections(clock: Clock)(implicit
+      tc: TraceContext
   ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
-        waitForSequencerConnectionsFromScan()
+        waitForSequencerConnectionsFromScan(clock)
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
@@ -126,10 +124,8 @@ class DomainConnector(
     )
   }
 
-  private def waitForSequencerConnectionsFromScan(
-  )(implicit
-      tc: TraceContext,
-      clock: Clock,
+  private def waitForSequencerConnectionsFromScan(clock: Clock)(implicit
+      tc: TraceContext
   ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     retryProvider.getValueWithRetries(
       // Short retries since usually a failure here is just a misconfiguration error.
@@ -139,7 +135,7 @@ class DomainConnector(
       RetryFor.ClientCalls,
       "scan_sequencer_connections",
       "non-empty sequencer connections from scan",
-      getSequencerConnectionsFromScan()
+      getSequencerConnectionsFromScan(Right(clock))
         .map { case (connections, time) =>
           if (connections.isEmpty) {
             throw Status.NOT_FOUND
@@ -178,14 +174,13 @@ class DomainConnector(
   }
 
   def getSequencerConnectionsFromScan(
-      time: Option[CantonTimestamp] = None
+      timeOrClock: Either[CantonTimestamp, Clock]
   )(implicit
-      clock: Clock,
-      traceContext: TraceContext,
+      traceContext: TraceContext
   ): Future[(Map[SynchronizerAlias, Seq[GrpcSequencerConnection]], CantonTimestamp)] = {
-    val domainTime = time match {
-      case Some(time) => time
-      case None => clock.now
+    val domainTime = timeOrClock match {
+      case Left(time) => time
+      case Right(clock) => clock.now
     }
     for {
       domainSequencers <- scanConnection.listDsoSequencers()
