@@ -18,7 +18,7 @@
     doCheck = false;
   });
   geckodriver = (
-    super.callPackage ./geckodriver.nix { inherit (super.darwin.apple_sdk.frameworks) Security; }
+    super.callPackage ./geckodriver.nix {}
   ).overrideAttrs (oldAttrs: {
     cargoDeps = oldAttrs.cargoDeps.overrideAttrs (oldAttrs: {
       buildPhase = builtins.replaceStrings
@@ -28,15 +28,6 @@
     });
   });
   git-search-replace = super.callPackage ./git-search-replace.nix {};
-  gh = super.gh.overrideAttrs (old: rec {
-    version = "2.82.0";
-    src = super.fetchFromGitHub {
-      owner = "cli";
-      repo = "cli";
-      tag = "v${version}";
-      hash = "sha256-0PheldNAlexi/tXHhhrPLd3YBGmcM1G+guicI2z9RYU=";
-    };
-  });
   sphinx-lint = super.callPackage ./sphinx-lint.nix {};
   jsonnet = super.callPackage ./jsonnet.nix {};
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
