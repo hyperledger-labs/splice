@@ -272,12 +272,12 @@ class UpdateHistory(
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
         } yield {
-          state.updateAndGet(state =>
-            state.copy(
-              historyId = Some(newHistoryId),
-              initialized = state.initialized.success(()),
+          state.updateAndGet(
+            _.copy(
+              historyId = Some(newHistoryId)
             )
           )
+          state.get().initialized.trySuccess(())
           lastIngestedOffset match {
             case Some(offset) =>
               logger.info(s"${description()} resumed at offset $offset")
