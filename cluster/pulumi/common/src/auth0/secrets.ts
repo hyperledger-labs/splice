@@ -151,7 +151,9 @@ export function installAuth0UiSecretWithClientId(
     },
     {
       dependsOn: xns.ns,
-      aliases: clientName ? [`splice-auth0-ui-secret-${xns.logicalName}-${clientName}`] : [],
+      aliases: clientName
+        ? [{ name: `splice-auth0-ui-secret-${xns.logicalName}-${clientName}` }]
+        : [],
     }
   );
 }
