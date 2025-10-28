@@ -3,16 +3,15 @@
 import * as k8s from '@pulumi/kubernetes';
 
 import { ExactNamespace, fixedTokens } from '../utils';
-import { DEFAULT_AUDIENCE } from './audiences';
-import { requireAuth0ClientId } from './auth0';
-import { Auth0Client, Auth0ClientSecret, Auth0SecretMap, ClientIdMap } from './auth0types';
+import { Auth0Client, Auth0ClientSecret, Auth0SecretMap } from './auth0types';
 
 function lookupClientSecrets(
   allSecrets: Auth0SecretMap,
-  clientIdMap: ClientIdMap,
-  app: string
+  auth0Client: Auth0Client,
+  namespace: string,
+  app: 'sv' | 'validator' | 'splitwell'
 ): Auth0ClientSecret {
-  const appClientId = requireAuth0ClientId(clientIdMap, app);
+  const appClientId = getClientId(auth0Client, app, namespace);
 
   const clientSecret = allSecrets.get(appClientId);
 
@@ -31,16 +30,55 @@ function lookupClientSecrets(
   return clientSecret;
 }
 
-async function auth0Secret(
+function getClientId(
+  auth0Client: Auth0Client,
+  clientName: 'sv' | 'validator' | 'splitwell',
+  namespace: string
+): string {
+  const cfg = auth0Client.getCfg();
+  switch (clientName) {
+    case 'sv':
+      return cfg.namespacedConfigs.get(namespace)!.backendClientIds.svApp!;
+    case 'validator':
+      return cfg.namespacedConfigs.get(namespace)!.backendClientIds.validator;
+    case 'splitwell':
+      return cfg.namespacedConfigs.get(namespace)!.backendClientIds.splitwell!;
+  }
+}
+
+function getUiClientId(
+  auth0Client: Auth0Client,
+  uiName: 'wallet' | 'cns' | 'sv' | 'splitwell',
+  namespace: string
+): string {
+  const cfg = auth0Client.getCfg();
+  if (!cfg.namespacedConfigs.has(namespace)) {
+    throw new Error(`No Auth0 configuration for namespace ${namespace}`);
+  }
+  switch (uiName) {
+    case 'wallet':
+      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.wallet;
+    case 'cns':
+      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.cns;
+    case 'sv':
+      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.sv!;
+    case 'splitwell':
+      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.splitwell!;
+  }
+}
+
+async function ledgerApiSecretContent(
   auth0Client: Auth0Client,
   allSecrets: Auth0SecretMap,
-  clientName: string
+  clientName: 'sv' | 'validator' | 'splitwell',
+  namespace: string
 ): Promise<{ [key: string]: string }> {
   const cfg = auth0Client.getCfg();
-  const clientSecrets = lookupClientSecrets(allSecrets, cfg.appToClientId, clientName);
-  const audience: string = cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE;
+  const clientId = getClientId(auth0Client, clientName, namespace);
 
-  const clientId = clientSecrets.client_id;
+  const clientSecrets = lookupClientSecrets(allSecrets, auth0Client, namespace, clientName);
+  const audience = cfg.namespacedConfigs.get(namespace)!.audiences.ledgerApi;
+
   const clientSecret = clientSecrets.client_secret;
 
   if (fixedTokens()) {
@@ -65,10 +103,10 @@ export async function installLedgerApiUserSecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
-  clientName: string
+  clientName: 'sv' | 'validator' | 'splitwell'
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
-  const secret = await auth0Secret(auth0Client, secrets, clientName);
+  const secret = await ledgerApiSecretContent(auth0Client, secrets, clientName, xns.logicalName);
   const ledgerApiUserOnly = {
     'ledger-api-user': secret['ledger-api-user'],
   };
@@ -89,20 +127,19 @@ export async function installLedgerApiUserSecret(
 }
 
 // TODO(#2873): for now we still export this for splitwell, reconsider
-export async function installAuth0Secret(
+export async function installLedgerApiSecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
-  secretNameApp: string,
-  clientName: string
+  clientName: 'sv' | 'validator' | 'splitwell'
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
-  const secret = await auth0Secret(auth0Client, secrets, clientName);
+  const secret = await ledgerApiSecretContent(auth0Client, secrets, clientName, xns.logicalName);
 
   return new k8s.core.v1.Secret(
     `splice-auth0-secret-${xns.logicalName}-${clientName}`,
     {
       metadata: {
-        name: `splice-app-${secretNameApp}-ledger-api-auth`,
+        name: `splice-app-${clientName}-ledger-api-auth`,
         namespace: xns.ns.metadata.name,
       },
       stringData: secret,
@@ -117,20 +154,15 @@ export async function installAuth0Secret(
 export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
-  secretNameApp: string,
+  secretNameApp: 'wallet' | 'cns' | 'sv' | 'splitwell',
   clientName?: string // TODO(#2873): remove this after applying once
 ): Promise<k8s.core.v1.Secret> {
-  const secrets = await auth0Client.getSecrets();
-  const namespaceClientIds = auth0Client.getCfg().namespaceToUiToClientId[xns.logicalName];
-  if (!namespaceClientIds) {
-    throw new Error(`No Auth0 client IDs configured for namespace: ${xns.logicalName}`);
-  }
-  const id = lookupClientSecrets(secrets, namespaceClientIds, secretNameApp).client_id;
+  const clientId = getUiClientId(auth0Client, secretNameApp, xns.logicalName);
 
-  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, id, clientName);
+  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientId, clientName);
 }
 
-export function installAuth0UiSecretWithClientId(
+function installAuth0UiSecretWithClientId(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
@@ -156,33 +188,15 @@ export function installAuth0UiSecretWithClientId(
   );
 }
 
-function getNameSpaceAuth0Clients(auth0Client: Auth0Client, ns: ExactNamespace): ClientIdMap {
-  const auth0Config = auth0Client.getCfg();
-  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId[ns.logicalName];
-  if (!svNameSpaceAuth0Clients) {
-    throw new Error(`No ${ns.logicalName} namespace in auth0 config`);
-  }
-  return svNameSpaceAuth0Clients;
-}
-
-function getUiClientId(auth0Client: Auth0Client, ns: ExactNamespace, appName: string): string {
-  const clientId = getNameSpaceAuth0Clients(auth0Client, ns)[appName];
-  if (!clientId) {
-    throw new Error(`No ${appName} ui client id in auth0 config`);
-  }
-  return clientId;
-}
-
 export async function installValidatorSecrets(
   ns: ExactNamespace,
-  auth0Client: Auth0Client,
-  auth0ValidatorAppName?: string
+  auth0Client: Auth0Client
 ): Promise<k8s.core.v1.Secret[]> {
-  const walletUiClientId = getUiClientId(auth0Client, ns, 'wallet');
-  const cnsUiClientId = getUiClientId(auth0Client, ns, 'cns');
+  const walletUiClientId = getUiClientId(auth0Client, 'wallet', ns.logicalName);
+  const cnsUiClientId = getUiClientId(auth0Client, 'cns', ns.logicalName);
 
   return [
-    await installAuth0Secret(auth0Client, ns, 'validator', auth0ValidatorAppName || 'validator'),
+    await installLedgerApiSecret(auth0Client, ns, 'validator'),
     installAuth0UiSecretWithClientId(auth0Client, ns, 'wallet', walletUiClientId),
     installAuth0UiSecretWithClientId(auth0Client, ns, 'cns', cnsUiClientId),
   ];
@@ -190,14 +204,12 @@ export async function installValidatorSecrets(
 
 export async function installSvAppSecrets(
   ns: ExactNamespace,
-  auth0Client: Auth0Client,
-  auth0SvAppName: string, // TODO(#2873): try to get rid of this
-  uiSecretClientName?: string // TODO(#2873): remove this after applying once
+  auth0Client: Auth0Client
 ): Promise<k8s.core.v1.Secret[]> {
-  const clientId = getUiClientId(auth0Client, ns, 'sv');
+  const clientId = getUiClientId(auth0Client, 'sv', ns.logicalName);
 
   return [
-    await installAuth0Secret(auth0Client, ns, 'sv', auth0SvAppName),
-    installAuth0UiSecretWithClientId(auth0Client, ns, 'sv', clientId, uiSecretClientName),
+    await installLedgerApiSecret(auth0Client, ns, 'sv'),
+    installAuth0UiSecretWithClientId(auth0Client, ns, 'sv', clientId),
   ];
 }

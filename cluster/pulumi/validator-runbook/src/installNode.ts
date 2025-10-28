@@ -177,11 +177,6 @@ async function installValidator(
     },
   };
 
-  const validatorNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['validator'];
-  if (!validatorNameSpaceAuth0Clients) {
-    throw new Error('No validator namespace in auth0 config');
-  }
-
   const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const validatorValuesFromYamlFiles = {
@@ -254,7 +249,7 @@ async function installValidator(
     ...validatorValuesWithOnboardingOverride,
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
-      audience: getValidatorAppApiAudience(auth0Client.getCfg()),
+      audience: getValidatorAppApiAudience(auth0Client.getCfg(), xns.logicalName),
     },
   };
 
@@ -268,7 +263,8 @@ async function installValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = validatorNameSpaceAuth0Clients['cns'];
+  const cnsUiClientId = auth0Client.getCfg().namespacedConfigs.get(xns.logicalName)!.uiClientIds
+    .cns;
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }

@@ -14,7 +14,6 @@ import type {
   Auth0SecretMap,
   Auth0ClientAccessToken,
   Auth0ClientSecret,
-  ClientIdMap,
   Auth0Config,
   Auth0ClusterConfig,
 } from './auth0types';
@@ -245,16 +244,6 @@ export class Auth0Fetch implements Auth0Client {
       };
     }
   }
-}
-
-export function requireAuth0ClientId(clientIdMap: ClientIdMap, app: string): string {
-  const appClientId = clientIdMap[app];
-
-  if (!appClientId) {
-    throw new Error(`Unknown Auth0 client ID for app: ${app}, ${JSON.stringify(clientIdMap)}`);
-  }
-
-  return appClientId;
 }
 
 export function auth0UserNameEnvVar(

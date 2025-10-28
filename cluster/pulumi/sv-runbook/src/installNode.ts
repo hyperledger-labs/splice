@@ -238,7 +238,7 @@ async function installSvAndValidator(
   const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
 
-  const svAppSecrets = await installSvAppSecrets(xns, auth0Client, svRunbookConfig.auth0SvAppName);
+  const svAppSecrets = await installSvAppSecrets(xns, auth0Client);
 
   svKeySecret(xns, svKey);
 
@@ -340,7 +340,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, svValues),
     auth: {
       ...svValues.auth,
-      audience: getSvAppApiAudience(auth0Config),
+      audience: getSvAppApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -461,7 +461,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
-      audience: getValidatorAppApiAudience(auth0Config),
+      audience: getValidatorAppApiAudience(auth0Config, xns.logicalName),
     },
   };
 

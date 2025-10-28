@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
-import { Auth0Config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { Auth0Config, Auth0NamespaceConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
@@ -11,20 +11,23 @@ async function main() {
   // eslint-disable-next-line no-process-env
   process.env.SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME = 'validator-runbook';
   const installNode = await import('./src/installNode');
-  const auth0Cfg: Auth0Config = {
-    appToClientId: {
+  const namespaceAuth0Cfg: Auth0NamespaceConfig = {
+    audiences: {
+      ledgerApi: 'https://ledger_api.example.com',
+      validatorApi: 'https://validator.example.com/api',
+    },
+    backendClientIds: {
       validator: 'validator-client-id',
     },
-    namespaceToUiToClientId: {
-      validator: {
-        wallet: 'wallet-client-id',
-        cns: 'cns-client-id',
-      },
+    uiClientIds: {
+      wallet: 'wallet-client-id',
+      cns: 'cns-client-id',
     },
-    appToApiAudience: {
-      participant: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
-      validator: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
-    },
+  };
+  const namespacedConfigs = new Map<string, Auth0NamespaceConfig>();
+  namespacedConfigs.set('validator', namespaceAuth0Cfg);
+  const auth0Cfg: Auth0Config = {
+    namespacedConfigs: namespacedConfigs,
     auth0Domain: 'auth0Domain',
     auth0MgtClientId: 'auth0MgtClientId',
     auth0MgtClientSecret: 'auth0MgtClientSecret',

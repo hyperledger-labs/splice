@@ -4,14 +4,13 @@ import * as auth0 from '@pulumi/auth0';
 import * as pulumi from '@pulumi/pulumi';
 import {
   ansDomainPrefix,
-  AudienceMap,
   Auth0Config,
   Auth0ClusterConfig,
-  ClientIdMap,
   config,
   isMainNet,
-  NamespaceToClientIdMapMap,
   clusterProdLike,
+  Auth0NamespaceConfig,
+  DEFAULT_AUDIENCE,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   standardSvConfigs,
@@ -20,24 +19,28 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 function ledgerApiAudience(
-  svNamespaces: string,
+  svNamespace: string,
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): pulumi.Output<string> {
+  if (isMainNet) {
+    // TODO: get rid of this
+    return pulumi.output('https://ledger_api.main.digitalasset.com');
+  }
   if (clusterProdLike) {
     // On prod clusters, we create a ledger API per SV namespace
     const auth0Api = new auth0.ResourceServer(
-      `LedgerApi${svNamespaces.replace(/-/g, '')}`,
+      `LedgerApi${svNamespace.replace(/-/g, '')}`,
       {
-        name: `Ledger API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
-        identifier: `https://ledger_api.${svNamespaces}.${clusterBasename}.canton.network`,
+        name: `Ledger API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://ledger_api.${svNamespace}.${clusterBasename}.canton.network`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
       },
       { provider: auth0DomainProvider }
     );
 
     new auth0.ResourceServerScopes(
-      `LedgerApiScopes${svNamespaces.replace(/-/g, '')}`,
+      `LedgerApiScopes${svNamespace.replace(/-/g, '')}`,
       {
         resourceServerIdentifier: auth0Api.identifier,
         scopes: [
@@ -58,17 +61,21 @@ function ledgerApiAudience(
 }
 
 function svAppAudience(
-  svNamespaces: string,
+  svNamespace: string,
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): pulumi.Output<string> {
+  if (isMainNet) {
+    // TODO: get rid of this
+    return pulumi.output('https://sv.main.digitalasset.com');
+  }
   if (clusterProdLike) {
     // On prod clusters, we create a SV App API per SV namespace
     const auth0Api = new auth0.ResourceServer(
-      `SvAppApi${svNamespaces.replace(/-/g, '')}`,
+      `SvAppApi${svNamespace.replace(/-/g, '')}`,
       {
-        name: `SV App API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
-        identifier: `https://sv.${svNamespaces}.${clusterBasename}.canton.network/api`,
+        name: `SV App API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://sv.${svNamespace}.${clusterBasename}.canton.network/api`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
       },
       { provider: auth0DomainProvider }
@@ -82,17 +89,21 @@ function svAppAudience(
 }
 
 function validatorAppAudience(
-  svNamespaces: string,
+  svNamespace: string,
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): pulumi.Output<string> {
+  if (isMainNet) {
+    // TODO: get rid of this
+    return pulumi.output('https://validator.main.digitalasset.com');
+  }
   if (clusterProdLike) {
     // On prod clusters, we create a Validator App API per SV namespace
     const auth0Api = new auth0.ResourceServer(
-      `ValidatorAppApi${svNamespaces.replace(/-/g, '')}`,
+      `ValidatorAppApi${svNamespace.replace(/-/g, '')}`,
       {
-        name: `Validator App API for SV ${svNamespaces} on ${clusterBasename} (Pulumi managed)`,
-        identifier: `https://validator.${svNamespaces}.${clusterBasename}.canton.network/api`,
+        name: `Validator App API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://validator.${svNamespace}.${clusterBasename}.canton.network/api`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
       },
       { provider: auth0DomainProvider }
@@ -235,11 +246,70 @@ interface svAuth0Params {
   svBackend?: BackendAuth0Params;
   validatorBackend?: BackendAuth0Params;
 }
-interface ApiAudienceAuth0Params {
-  ledger: string;
-  sv: string;
-  validator: string;
+
+function auth0ForSvNamespace(
+  clusterBasename: string,
+  namespace: string,
+  provider: auth0.Provider,
+  ingressName: string,
+  dnsNames: string[]
+): pulumi.Output<Auth0NamespaceConfig> {
+  const ledgerApiAud = ledgerApiAudience(namespace, clusterBasename, provider);
+  const svAppAud = svAppAudience(namespace, clusterBasename, provider);
+  const validatorAud = validatorAppAudience(namespace, clusterBasename, provider);
+  const validatorApp = newM2MApp(
+    `${namespace.replace(/-/g, '')}ValidatorBackendApp`,
+    `${namespace.replace(/-/g, '').toUpperCase()} Validator Backend`,
+    `Used for the Validator backend for SV ${namespace} on ${clusterBasename}`,
+    clusterBasename,
+    ledgerApiAud,
+    validatorAud,
+    provider
+  );
+  const svApp = newM2MApp(
+    `${namespace.replace(/-/g, '')}SvBackendApp`,
+    `${namespace.replace(/-/g, '').toUpperCase()} SV Backend`,
+    `Used for the SV backend for SV ${namespace} on ${clusterBasename}`,
+    clusterBasename,
+    ledgerApiAud,
+    svAppAud,
+    provider
+  );
+  const uiApp = newUiApp(
+    `${namespace.replace(/-/g, '')}UiApp`,
+    `${namespace.replace(/-/g, '').toUpperCase()} UI`,
+    `Used for the Wallet, ANS and SV UIs for SV ${namespace}`,
+    ['wallet', ansDomainPrefix, 'sv'],
+    ingressName,
+    clusterBasename,
+    dnsNames,
+    provider
+  );
+
+  return pulumi
+    .all([ledgerApiAud, svAppAud, validatorAud, validatorApp.id, svApp.id, uiApp.id])
+    .apply(
+      ([ledgerApiAudValue, svAppAudValue, validatorAudValue, validatorAppId, svAppId, uiAppId]) => {
+        return {
+          audiences: {
+            ledgerApi: ledgerApiAudValue,
+            svAppApi: svAppAudValue,
+            validatorApi: validatorAudValue,
+          },
+          backendClientIds: {
+            validator: validatorAppId,
+            svApp: svAppId,
+          },
+          uiClientIds: {
+            sv: uiAppId,
+            wallet: uiAppId,
+            cns: uiAppId,
+          },
+        };
+      }
+    );
 }
+
 function svsOnlyAuth0(
   clusterBasename: string,
   dnsNames: string[],
@@ -247,96 +317,33 @@ function svsOnlyAuth0(
   svs: svAuth0Params[],
   auth0Domain: string,
   auth0MgtClientId: string,
-  fixedTokenCacheName: string,
-  // only "same audiences for all" supported for now
-  apiAudiences?: ApiAudienceAuth0Params
+  fixedTokenCacheName: string
 ): pulumi.Output<Auth0Config> {
-  const svUis = svs.map(sv =>
-    newUiApp(
-      `${sv.namespace.replace(/-/g, '')}UiApp`,
-      `${sv.namespace.replace(/-/g, '').toUpperCase()} UI`,
-      `Used for the Wallet, ANS and SV UIs for ${sv.description}`,
-      ['wallet', ansDomainPrefix, 'sv'],
+  const svAuth0CfgPromises = svs.map(sv => {
+    const auth0NamespaceConfig = auth0ForSvNamespace(
+      clusterBasename,
+      sv.namespace,
+      provider,
       sv.ingressName,
-      clusterBasename,
-      dnsNames,
-      provider
-    ).id.apply(appId => ({ ns: sv.namespace, id: appId }))
-  );
+      dnsNames
+    );
+    return auth0NamespaceConfig.apply(cfg => ({
+      namespace: sv.namespace,
+      cfg: cfg,
+    }));
+  });
 
-  const nsToUiToCLientIdOutput: pulumi.Output<NamespaceToClientIdMapMap> = pulumi
-    .all(svUis)
-    .apply(uis =>
-      uis.reduce(
-        (acc, ui) => ({
-          ...acc,
-          [ui.ns]: {
-            wallet: ui.id,
-            sv: ui.id,
-            cns: ui.id,
-          },
-        }),
-        {} as NamespaceToClientIdMapMap
-      )
-    );
+  const namespacedConfig = pulumi.all(svAuth0CfgPromises).apply(svCfgs => {
+    return svCfgs.reduce((acc, svCfg) => {
+      acc.set(svCfg.namespace, svCfg.cfg);
+      return acc;
+    }, new Map<string, Auth0NamespaceConfig>());
+  });
 
-  const appToClientId: ClientIdMap = svs.reduce((acc, sv) => {
-    // Create auth0 APIs if needed, and obtain the audiences
-    const ledgerApiAud = ledgerApiAudience(sv.namespace, clusterBasename, provider);
-    const svAppAud = svAppAudience(sv.namespace, clusterBasename, provider);
-    const validatorAppAud = validatorAppAudience(sv.namespace, clusterBasename, provider);
-    // Create M2M apps
-    const svApp = newM2MApp(
-      `${sv.namespace.replace(/-/g, '')}SvBackendApp`,
-      `${sv.namespace.replace(/-/g, '').toUpperCase()} SV Backend`,
-      `Used for the SV backend for ${sv.description} on ${clusterBasename}`,
-      clusterBasename,
-      ledgerApiAud,
-      svAppAud,
-      provider
-    );
-    const validatorApp = newM2MApp(
-      `${sv.namespace.replace(/-/g, '')}ValidatorBackendApp`,
-      `${sv.namespace.replace(/-/g, '').toUpperCase()} Validator Backend`,
-      `Used for the Validator backend for ${sv.description} on ${clusterBasename}`,
-      clusterBasename,
-      ledgerApiAud,
-      validatorAppAud,
-      provider
-    );
-    // Currently, for no good reason, we have sv-1 vs sv1_validator naming inconsistency.
-    // To make things worse, the sv-da-1 namespace is even more special and has sv-da-1 vs sv-da-1_validator.
-    // Then mainnet DA-2 is even worse, as we use "sv" and "validator"
-    // TODO(DACH-NY/canton-internal#2110): clean this up
-    const svAppName = isMainNet && sv.namespace == 'sv-1' ? 'sv' : sv.namespace;
-    const validatorAppName =
-      sv.namespace == 'sv-da-1'
-        ? 'sv-da-1_validator'
-        : isMainNet
-          ? 'validator'
-          : sv.namespace.replace('-', '') + '_validator';
+  return namespacedConfig.apply(namespacedConfig => {
     return {
-      ...acc,
-      ...{ [svAppName]: svApp.clientId, [validatorAppName]: validatorApp.clientId },
-    };
-  }, {});
-
-  return nsToUiToCLientIdOutput.apply(nsToUiToClientId => {
-    return {
-      appToClientId: appToClientId,
-
-      namespaceToUiToClientId: nsToUiToClientId,
-
-      appToApiAudience: apiAudiences
-        ? ({
-            participant: apiAudiences.ledger,
-            sv: apiAudiences.sv,
-            validator: apiAudiences.validator,
-          } as AudienceMap)
-        : {},
-
+      namespacedConfigs: namespacedConfig,
       fixedTokenCacheName: fixedTokenCacheName,
-
       auth0Domain: auth0Domain,
       auth0MgtClientId: auth0MgtClientId,
       // TODO(tech-debt) We don't seem to set this anywhere?
@@ -376,12 +383,7 @@ function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Outpu
     [sv1, ...extraSvs],
     auth0Domain,
     auth0MgtClientId,
-    'DO_NOT_USE',
-    {
-      ledger: 'https://ledger_api.main.digitalasset.com',
-      sv: 'https://sv.main.digitalasset.com',
-      validator: 'https://validator.main.digitalasset.com',
-    }
+    'DO_NOT_USE'
   );
 }
 
@@ -419,14 +421,6 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     'auth0-fixed-token-cache'
   );
 
-  // hardcoded client IDs
-  // TODO(tech-debt) consider folding into main config or into `config.yaml`
-  const extraAppToClientIds: ClientIdMap = {
-    validator1: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
-    splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
-    splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
-  };
-
   const validator1UiApp = newUiApp(
     'validator1UiApp',
     'Validator1 UI',
@@ -437,6 +431,28 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     dnsNames,
     provider
   );
+  const validator1Auth0Config: pulumi.Output<Auth0NamespaceConfig> = validator1UiApp.id.apply(
+    clientId => {
+      return {
+        audiences: {
+          ledgerApi: DEFAULT_AUDIENCE,
+          validatorApi: DEFAULT_AUDIENCE,
+        },
+        backendClientIds: {
+          // hardcoded client IDs
+          // TODO(tech-debt) consider folding into main config or into `config.yaml`
+          // TODO(DACH-NY/canton-network-internal#2206): consider creating these apps in pulumi instead
+          validator: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
+        },
+        uiClientIds: {
+          wallet: clientId,
+          cns: clientId,
+          splitwell: clientId,
+        },
+      };
+    }
+  );
+
   const splitwellUiApp = newUiApp(
     'SplitwellUiApp',
     'Splitwell UI',
@@ -447,31 +463,39 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     dnsNames,
     provider
   );
+  const splitwellAuth0Config: pulumi.Output<Auth0NamespaceConfig> = splitwellUiApp.id.apply(
+    clientId => {
+      return {
+        audiences: {
+          ledgerApi: DEFAULT_AUDIENCE,
+          validatorApi: DEFAULT_AUDIENCE,
+        },
+        backendClientIds: {
+          // hardcoded client IDs
+          // TODO(tech-debt) consider folding into main config or into `config.yaml`
+          // TODO(DACH-NY/canton-network-internal#2206): consider creating these apps in pulumi instead
+          validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
+          splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
+        },
+        uiClientIds: {
+          wallet: clientId,
+          cns: clientId,
+          splitwell: clientId,
+        },
+      };
+    }
+  );
 
-  return pulumi
-    .all([validator1UiApp.id, splitwellUiApp.id])
-    .apply(([validator1UiId, splitwellUiId]) =>
-      baseAuth0.apply(auth0Cfg => ({
-        ...auth0Cfg,
-        appToClientId: {
-          ...extraAppToClientIds,
-          ...auth0Cfg.appToClientId,
-        } as ClientIdMap,
-        namespaceToUiToClientId: {
-          ...auth0Cfg.namespaceToUiToClientId,
-          validator1: {
-            wallet: validator1UiId,
-            cns: validator1UiId,
-            splitwell: validator1UiId,
-          },
-          splitwell: {
-            wallet: splitwellUiId,
-            cns: splitwellUiId,
-            splitwell: splitwellUiId,
-          },
-        } as NamespaceToClientIdMapMap,
-      }))
-    );
+  return baseAuth0.apply(baseCfg => {
+    return pulumi
+      .all([validator1Auth0Config, splitwellAuth0Config])
+      .apply(([validator1Cfg, splitwellCfg]) => {
+        baseCfg.namespacedConfigs.set('validator1', validator1Cfg);
+        baseCfg.namespacedConfigs.set('splitwell', splitwellCfg);
+
+        return baseCfg;
+      });
+  });
 }
 
 function svRunbookAuth0(
@@ -531,29 +555,27 @@ function svRunbookAuth0(
   return pulumi
     .all([walletUiApp.id, ansUiApp.id, svUiApp.id])
     .apply(([walletUiAppId, ansUiAppId, svUiAppId]) => {
-      const nsToUiToClientId: NamespaceToClientIdMapMap = {};
-      nsToUiToClientId[namespace] = {
-        wallet: walletUiAppId,
-        sv: svUiAppId,
-        cns: ansUiAppId,
-      };
+      const namespacedConfig = new Map<string, Auth0NamespaceConfig>();
+      namespacedConfig.set(namespace, {
+        audiences: {
+          ledgerApi: ledgerApiAudience,
+          svAppApi: svApiAudience,
+          validatorApi: validatorApiAudience,
+        },
+        backendClientIds: {
+          validator: validatorBackendClientId,
+          svApp: svBackendClientId,
+        },
+        uiClientIds: {
+          sv: svUiAppId,
+          wallet: walletUiAppId,
+          cns: ansUiAppId,
+        },
+      });
 
       return {
-        appToClientId: {
-          sv: svBackendClientId,
-          validator: validatorBackendClientId,
-        } as ClientIdMap,
-
-        namespaceToUiToClientId: nsToUiToClientId,
-
-        appToApiAudience: {
-          participant: ledgerApiAudience,
-          sv: svApiAudience,
-          validator: validatorApiAudience,
-        } as AudienceMap,
-
+        namespacedConfigs: namespacedConfig,
         fixedTokenCacheName: fixedTokenCacheName,
-
         auth0Domain: auth0Domain,
         auth0MgtClientId: auth0MgtClientId,
         auth0MgtClientSecret: '',
@@ -599,27 +621,26 @@ function validatorRunbookAuth0(
   );
 
   return pulumi.all([walletUiApp.id, ansUiApp.id]).apply(([walletUiAppId, ansUiAppId]) => {
-    return {
-      appToClientId: {
+    const namespacedConfig = new Map<string, Auth0NamespaceConfig>();
+    namespacedConfig.set('validator', {
+      audiences: {
+        ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
+        validatorApi: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
+      },
+      backendClientIds: {
         validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
-      } as ClientIdMap,
+      },
+      uiClientIds: {
+        wallet: walletUiAppId,
+        cns: ansUiAppId,
+      },
+    });
 
-      namespaceToUiToClientId: {
-        validator: {
-          wallet: walletUiAppId,
-          cns: ansUiAppId,
-        },
-      } as NamespaceToClientIdMapMap,
-
-      appToApiAudience: {
-        participant: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
-        validator: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
-      } as AudienceMap,
-
+    return {
+      namespacedConfigs: namespacedConfig,
       fixedTokenCacheName: 'auth0-fixed-token-cache-validator-test',
-
-      auth0Domain: 'canton-network-validator-test.us.auth0.com',
-      auth0MgtClientId: config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID'),
+      auth0Domain: auth0Domain,
+      auth0MgtClientId: auth0MgtClientId,
       auth0MgtClientSecret: '',
     };
   });

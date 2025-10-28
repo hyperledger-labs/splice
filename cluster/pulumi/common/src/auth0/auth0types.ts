@@ -7,16 +7,33 @@ export interface Auth0ClientSecret {
 
 export type Auth0SecretMap = Map<string, Auth0ClientSecret>;
 
-export type ClientIdMap = Partial<Record<string, string>>;
+export type Auth0NamespaceAudiences = {
+  ledgerApi: string;
+  validatorApi: string;
+  svAppApi?: string; // Empty for validator-only namespaces
+};
 
-export type NamespaceToClientIdMapMap = Partial<Record<string, ClientIdMap>>;
+export type Auth0NamespaceBackendClientIds = {
+  validator: string;
+  svApp?: string; // Empty for validator-only namespaces
+  splitwell?: string;
+};
 
-export type AudienceMap = Partial<Record<string, string>>;
+export type Auth0NamespaceUiClientIds = {
+  wallet: string;
+  cns: string;
+  sv?: string; // Empty for validator-only namespaces
+  splitwell?: string;
+};
+
+export type Auth0NamespaceConfig = {
+  audiences: Auth0NamespaceAudiences;
+  backendClientIds: Auth0NamespaceBackendClientIds;
+  uiClientIds: Auth0NamespaceUiClientIds;
+};
 
 export type Auth0Config = {
-  appToClientId: ClientIdMap;
-  namespaceToUiToClientId: NamespaceToClientIdMapMap;
-  appToApiAudience: AudienceMap;
+  namespacedConfigs: Map<string, Auth0NamespaceConfig>;
   auth0Domain: string;
   auth0MgtClientId: string;
   auth0MgtClientSecret: string;
