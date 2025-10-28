@@ -46,9 +46,6 @@ import {
   installSvAppSecrets,
   getSvAppApiAudience,
   getValidatorAppApiAudience,
-  externalIpRangesFile,
-  clusterNetwork,
-  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
