@@ -115,6 +115,10 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_ValidatorLicense_ChangeWeight DsoRules_ValidatorLicense_ChangeWeight
+    -- ^ Voted action to change weights of validator licenses.
+  | SRARC_ValidatorLicense_Withdraw DsoRules_ValidatorLicense_Withdraw
+    -- ^ Voted action to withdraw validator licenses.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -144,6 +148,18 @@ data DsoSummary = DsoSummary with
     numSvs : Int
     requiredNumVotes : Int
       -- ^ The number of votes required for considering a confirmation, or a request for a vote
+  deriving (Eq, Show)
+
+-- | Helper data types for validator license operations
+data ValidatorWeightUpdate = ValidatorWeightUpdate with
+    validator : Party
+    weight : Decimal
+  deriving (Eq, Show)
+
+data ValidatorLicense_InstructionType
+  = VLI_ChangeWeight with
+      weight : Decimal
+  | VLI_Withdraw
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -297,6 +313,16 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
+
+data DsoRules_ValidatorLicense_ChangeWeightResult = DsoRules_ValidatorLicense_ChangeWeightResult with
+    instructionCids : [ContractId ValidatorLicense_Instruction]
+  deriving (Show, Eq)
+
+data DsoRules_ValidatorLicense_WithdrawResult = DsoRules_ValidatorLicense_WithdrawResult with
+    instructionCids : [ContractId ValidatorLicense_Instruction]
+  deriving (Show, Eq)
+
+data DsoRules_Execute_ValidatorLicense_InstructionResult = DsoRules_Execute_ValidatorLicense_InstructionResult
 
 
 -- Workflow templates
@@ -1529,6 +1555,51 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
+    nonconsuming choice DsoRules_ValidatorLicense_ChangeWeight : DsoRules_ValidatorLicense_ChangeWeightResult
+      with
+        updates : [ValidatorWeightUpdate]
+      controller dso
+      do instructionCids <- forA updates $ \update -> do
+           require ("Weight is non-negative for " <> show update.validator) (update.weight >= 0.0)
+           create ValidatorLicense_Instruction
+             with
+               dso
+               validator = update.validator
+               instructionType = VLI_ChangeWeight with weight = update.weight
+         return DsoRules_ValidatorLicense_ChangeWeightResult with ..
+
+    nonconsuming choice DsoRules_ValidatorLicense_Withdraw : DsoRules_ValidatorLicense_WithdrawResult
+      with
+        validators : [Party]
+      controller dso
+      do instructionCids <- forA validators $ \validator ->
+           create ValidatorLicense_Instruction
+             with
+               dso
+               validator
+               instructionType = VLI_Withdraw
+         return DsoRules_ValidatorLicense_WithdrawResult with ..
+
+    nonconsuming choice DsoRules_Execute_ValidatorLicense_Instruction : DsoRules_Execute_ValidatorLicense_InstructionResult
+      with
+        sv : Party
+        validatorLicenseCid : ContractId ValidatorLicense
+        instructionCid : ContractId ValidatorLicense_Instruction
+      controller sv
+      do _ <- getAndValidateSvParty this (Some sv)
+         license <- fetch validatorLicenseCid
+         instruction <- fetchAndArchive (ForDso dso) instructionCid
+         require ("Party on instruction " <> show instruction.validator <> " matches party on license " <> show license.validator) (license.validator == instruction.validator)
+         case instruction.instructionType of
+           VLI_ChangeWeight weight -> do
+             license <- fetchAndArchive (ForDso dso) validatorLicenseCid
+             _ <- create license with weight = Some weight
+             pure ()
+           VLI_Withdraw -> do
+             exercise validatorLicenseCid ValidatorLicense_Withdraw with reason = "revoked by governance decision"
+             pure ()
+         return DsoRules_Execute_ValidatorLicense_InstructionResult
+
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1588,6 +1659,8 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ValidatorLicense_ChangeWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ValidatorLicense_Withdraw choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -1779,6 +1852,26 @@ template UnallocatedUnclaimedActivityRecord
     signatory dso
     ensure amount > 0.0
 
+-- Vote indirections
+--------------------
+
+-- Vote requests fix the choice arguments. This doesn't work well for choices that need to act on
+-- contracts that get cycled frequently, e.g., ValidatorLicense. The contracts here act as an indirection to handle that:
+-- The vote is on a choice that creates one of these contracts. Automation then uses those contracts as authorization
+-- to exercise the actual action.
+
+template ValidatorLicense_Instruction
+  with
+    dso : Party
+    validator : Party
+    instructionType : ValidatorLicense_InstructionType
+    -- TODO: expiry
+  where
+    ensure case instructionType of
+      VLI_ChangeWeight weight -> weight >= 0.0
+      VLI_Withdraw -> True
+    signatory dso
+
 
 -- instances
 ------------
@@ -1800,6 +1893,9 @@ instance HasCheckedFetch UnallocatedUnclaimedActivityRecord ForDso where
 
 instance HasCheckedFetch Confirmation ForDso where
   contractGroupId Confirmation {..} = ForDso with dso
+
+instance HasCheckedFetch ValidatorLicense_Instruction ForDso where
+  contractGroupId ValidatorLicense_Instruction {..} = ForDso with dso
 
 instance Patchable DsoRulesConfig where
   patch new base current = DsoRulesConfig with
