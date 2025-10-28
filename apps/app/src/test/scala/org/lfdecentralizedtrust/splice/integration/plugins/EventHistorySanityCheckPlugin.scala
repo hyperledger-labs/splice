@@ -114,7 +114,8 @@ class EventHistorySanityCheckPlugin(
       val different = otherComparable
         .zip(founderComparable)
         .collect {
-          case (otherItem, founderItem) if founderItem != otherItem =>
+          case (otherItem, founderItem)
+              if makeComparable(founderItem) != makeComparable(otherItem) =>
             otherItem -> founderItem
         }
 
@@ -140,5 +141,11 @@ class EventHistorySanityCheckPlugin(
         }
     }
     updateCursor.orElse(item.verdict.map(v => (v.migrationId, v.recordTime)))
+  }
+
+  private def makeComparable(item: EventHistoryItem): EventHistoryItem = {
+    item.copy(verdict =
+      item.verdict.map(_.copy(finalizationTime = "this is not equal across scans/mediators"))
+    )
   }
 }
