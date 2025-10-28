@@ -31,7 +31,8 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
           case (name, c) if name == "aliceValidator" =>
             val bftCustomConfig = BftScanClientConfig.BftCustom(
               seedUrls = NonEmptyList.of(
-                Uri("http://127.0.0.1:5012")
+                Uri("http://127.0.0.1:5012"),
+                Uri("http://127.0.0.1.:5112"),
               ),
               trustedSvs =
                 NonEmptyList.of(s"${getSvName(1)}", s"${getSvName(2)}", s"${getSvName(3)}"),
@@ -69,8 +70,6 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
   }
 
   "simple threshold normal case validator onboarding succeeds" in { implicit env =>
-    // checks if aliceValidatorBackend can connect to sv1, sv2, sv3 and not sv4
-
     startAllSync(
       sv1Backend,
       sv1ScanBackend,
@@ -97,22 +96,31 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        connectionEstablished(1, messages) // sv1 connected
-        connectionEstablished(2, messages) // sv2 connected
-        connectionEstablished(3, messages) // sv3 connected
-        connectionNotEstablished(4, messages) // sv4 not connected
+        withClue("Validator should connect to sv1:") {
+          connectionEstablished(1, messages)
+        }
+        withClue("Validator should connect to sv2:") {
+          connectionEstablished(2, messages)
+        }
+        withClue("Validator should connect to sv3:") {
+          connectionEstablished(3, messages)
+        }
+        withClue("Validator should NOT connect to sv4:") {
+          connectionNotEstablished(4, messages)
+        }
       },
     )
 
-    eventuallySucceeds() {
-      // to make sure aliceValidatorBackend is working properly
-      aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    withClue("Alice's validator should be able to onboard a user after establishing connections.") {
+      eventuallySucceeds() {
+        aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+      }
     }
   }
 
   "reconnects to a recovered SV after the refresh interval" in { implicit env =>
     startAllSync(sv1Backend, sv1ScanBackend, sv2Backend, sv2ScanBackend, sv4Backend, sv4ScanBackend)
-    // check if aliceValidatorBackend can connect to sv1, sv2, and work, although sv3 is down
+
     eventually() {
       val allHealthy = Seq(sv1ScanBackend, sv2ScanBackend, sv4ScanBackend).forall { scan =>
         scan.httpHealth.successOption.exists(_.active)
@@ -122,33 +130,44 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
-        // start alice validator
         aliceValidatorBackend.startSync()
       },
       logs => {
         val messages = logs.map(_.message)
-        connectionEstablished(1, messages) // sv1 connected
-        connectionEstablished(2, messages) // sv2 connected
-        connectionNotEstablished(3, messages) // sv3 not connected
-        connectionNotEstablished(4, messages) // sv4 not connected
+        withClue("Validator should connect to sv1:") {
+          connectionEstablished(1, messages)
+        }
+        withClue("Validator should connect to sv2:") {
+          connectionEstablished(2, messages)
+        }
+        withClue("Validator should not connect to the offline sv3:") {
+          connectionNotEstablished(3, messages)
+        }
+        withClue("Validator should not connect to sv4") {
+          connectionNotEstablished(4, messages)
+        }
       },
     )
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
-        // now start sv3
         sv3Backend.startSync()
         sv3ScanBackend.startSync()
       },
       logs => {
         val messages = logs.map(_.message)
-        refreshConnectionEstablished(3, messages) // sv3 reconnected
+        withClue("Validator should detect and connect to the newly started sv3 after a refresh:") {
+          refreshConnectionEstablished(3, messages)
+        }
       },
     )
 
-    eventuallySucceeds() {
-      // to make sure aliceValidatorBackend is working properly
-      aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    withClue(
+      "The validator should successfully onboard a user after connecting to the recovered scan."
+    ) {
+      eventuallySucceeds() {
+        aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+      }
     }
   }
 }
