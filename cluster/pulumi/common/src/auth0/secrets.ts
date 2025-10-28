@@ -3,6 +3,7 @@
 import * as k8s from '@pulumi/kubernetes';
 
 import { ExactNamespace, fixedTokens } from '../utils';
+import { getNamespaceConfig } from './auth0';
 import { Auth0Client, Auth0ClientSecret, Auth0SecretMap } from './auth0types';
 
 function lookupClientSecrets(
@@ -38,11 +39,11 @@ function getClientId(
   const cfg = auth0Client.getCfg();
   switch (clientName) {
     case 'sv':
-      return cfg.namespacedConfigs.get(namespace)!.backendClientIds.svApp!;
+      return getNamespaceConfig(cfg, namespace).backendClientIds.svApp!;
     case 'validator':
-      return cfg.namespacedConfigs.get(namespace)!.backendClientIds.validator;
+      return getNamespaceConfig(cfg, namespace).backendClientIds.validator;
     case 'splitwell':
-      return cfg.namespacedConfigs.get(namespace)!.backendClientIds.splitwell!;
+      return getNamespaceConfig(cfg, namespace).backendClientIds.splitwell!;
   }
 }
 
@@ -52,18 +53,18 @@ function getUiClientId(
   namespace: string
 ): string {
   const cfg = auth0Client.getCfg();
-  if (!cfg.namespacedConfigs.has(namespace)) {
+  if (!cfg.namespacedConfigs[namespace]) {
     throw new Error(`No Auth0 configuration for namespace ${namespace}`);
   }
   switch (uiName) {
     case 'wallet':
-      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.wallet;
+      return getNamespaceConfig(cfg, namespace).uiClientIds.wallet;
     case 'cns':
-      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.cns;
+      return getNamespaceConfig(cfg, namespace).uiClientIds.cns;
     case 'sv':
-      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.sv!;
+      return getNamespaceConfig(cfg, namespace).uiClientIds.sv!;
     case 'splitwell':
-      return cfg.namespacedConfigs.get(namespace)!.uiClientIds.splitwell!;
+      return getNamespaceConfig(cfg, namespace).uiClientIds.splitwell!;
   }
 }
 
@@ -77,7 +78,7 @@ async function ledgerApiSecretContent(
   const clientId = getClientId(auth0Client, clientName, namespace);
 
   const clientSecrets = lookupClientSecrets(allSecrets, auth0Client, namespace, clientName);
-  const audience = cfg.namespacedConfigs.get(namespace)!.audiences.ledgerApi;
+  const audience = cfg.namespacedConfigs[namespace]!.audiences.ledgerApi;
 
   const clientSecret = clientSecrets.client_secret;
 

@@ -37,6 +37,7 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getValidatorAppApiAudience,
+  getNamespaceConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -263,8 +264,7 @@ async function installValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = auth0Client.getCfg().namespacedConfigs.get(xns.logicalName)!.uiClientIds
-    .cns;
+  const cnsUiClientId = getNamespaceConfig(auth0Client.getCfg(), xns.logicalName).uiClientIds.cns;
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }

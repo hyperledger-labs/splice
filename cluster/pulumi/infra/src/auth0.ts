@@ -11,6 +11,7 @@ import {
   clusterProdLike,
   Auth0NamespaceConfig,
   DEFAULT_AUDIENCE,
+  NamespacedAuth0Configs,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   standardSvConfigs,
@@ -334,10 +335,13 @@ function svsOnlyAuth0(
   });
 
   const namespacedConfig = pulumi.all(svAuth0CfgPromises).apply(svCfgs => {
-    return svCfgs.reduce((acc, svCfg) => {
-      acc.set(svCfg.namespace, svCfg.cfg);
-      return acc;
-    }, new Map<string, Auth0NamespaceConfig>());
+    return svCfgs.reduce(
+      (acc: Record<string, Auth0NamespaceConfig>, svCfg) => {
+        acc[svCfg.namespace] = svCfg.cfg;
+        return acc;
+      },
+      {} as Record<string, Auth0NamespaceConfig>
+    );
   });
 
   return namespacedConfig.apply(namespacedConfig => {
@@ -486,16 +490,14 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     }
   );
 
-  return baseAuth0.apply(baseCfg => {
-    return pulumi
-      .all([validator1Auth0Config, splitwellAuth0Config])
-      .apply(([validator1Cfg, splitwellCfg]) => {
-        baseCfg.namespacedConfigs.set('validator1', validator1Cfg);
-        baseCfg.namespacedConfigs.set('splitwell', splitwellCfg);
+  return pulumi
+    .all([baseAuth0, validator1Auth0Config, splitwellAuth0Config])
+    .apply(([baseCfg, validator1Cfg, splitwellCfg]) => {
+      baseCfg.namespacedConfigs['validator1'] = validator1Cfg;
+      baseCfg.namespacedConfigs['splitwell'] = splitwellCfg;
 
-        return baseCfg;
-      });
-  });
+      return baseCfg;
+    });
 }
 
 function svRunbookAuth0(
@@ -555,8 +557,8 @@ function svRunbookAuth0(
   return pulumi
     .all([walletUiApp.id, ansUiApp.id, svUiApp.id])
     .apply(([walletUiAppId, ansUiAppId, svUiAppId]) => {
-      const namespacedConfig = new Map<string, Auth0NamespaceConfig>();
-      namespacedConfig.set(namespace, {
+      const namespacedConfig: NamespacedAuth0Configs = {};
+      namespacedConfig[namespace] = {
         audiences: {
           ledgerApi: ledgerApiAudience,
           svAppApi: svApiAudience,
@@ -571,7 +573,7 @@ function svRunbookAuth0(
           wallet: walletUiAppId,
           cns: ansUiAppId,
         },
-      });
+      };
 
       return {
         namespacedConfigs: namespacedConfig,
@@ -621,20 +623,21 @@ function validatorRunbookAuth0(
   );
 
   return pulumi.all([walletUiApp.id, ansUiApp.id]).apply(([walletUiAppId, ansUiAppId]) => {
-    const namespacedConfig = new Map<string, Auth0NamespaceConfig>();
-    namespacedConfig.set('validator', {
-      audiences: {
-        ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
-        validatorApi: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
+    const namespacedConfig: NamespacedAuth0Configs = {
+      validator: {
+        audiences: {
+          ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
+          validatorApi: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
+        },
+        backendClientIds: {
+          validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
+        },
+        uiClientIds: {
+          wallet: walletUiAppId,
+          cns: ansUiAppId,
+        },
       },
-      backendClientIds: {
-        validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
-      },
-      uiClientIds: {
-        wallet: walletUiAppId,
-        cns: ansUiAppId,
-      },
-    });
+    };
 
     return {
       namespacedConfigs: namespacedConfig,
@@ -678,15 +681,17 @@ export function configureAuth0(
       'auth0-fixed-token-cache-sv-test'
     );
     const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename, dnsNames);
-    return pulumi
-      .all([spliceAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg])
-      .apply(([splice, sv, validator]) => {
-        const r: Auth0ClusterConfig = {
-          cantonNetwork: splice,
-          svRunbook: sv,
-          validatorRunbook: validator,
-        };
-        return r;
+
+    return spliceAuth0Cfg.apply(splice => {
+      return svRunbookAuth0Cfg.apply(sv => {
+        return validatorRunbookAuth0Cfg.apply(validator => {
+          return {
+            cantonNetwork: splice,
+            svRunbook: sv,
+            validatorRunbook: validator,
+          };
+        });
       });
+    });
   }
 }

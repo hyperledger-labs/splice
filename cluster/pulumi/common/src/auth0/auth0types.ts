@@ -32,8 +32,11 @@ export type Auth0NamespaceConfig = {
   uiClientIds: Auth0NamespaceUiClientIds;
 };
 
+// Map<> doesn't work as Pulumi outputs, so we use Record<> here. See https://github.com/pulumi/pulumi/issues/9787
+export type NamespacedAuth0Configs = Record<string, Auth0NamespaceConfig>;
+
 export type Auth0Config = {
-  namespacedConfigs: Map<string, Auth0NamespaceConfig>;
+  namespacedConfigs: NamespacedAuth0Configs;
   auth0Domain: string;
   auth0MgtClientId: string;
   auth0MgtClientSecret: string;

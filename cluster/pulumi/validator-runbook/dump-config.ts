@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
-import { Auth0Config, Auth0NamespaceConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  Auth0Config,
+  Auth0NamespaceConfig,
+  NamespacedAuth0Configs,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
@@ -24,8 +28,8 @@ async function main() {
       cns: 'cns-client-id',
     },
   };
-  const namespacedConfigs = new Map<string, Auth0NamespaceConfig>();
-  namespacedConfigs.set('validator', namespaceAuth0Cfg);
+  const namespacedConfigs: NamespacedAuth0Configs = {};
+  namespacedConfigs['validator'] = namespaceAuth0Cfg;
   const auth0Cfg: Auth0Config = {
     namespacedConfigs: namespacedConfigs,
     auth0Domain: 'auth0Domain',

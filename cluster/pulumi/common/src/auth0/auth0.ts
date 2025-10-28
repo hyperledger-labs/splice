@@ -16,6 +16,7 @@ import type {
   Auth0ClientSecret,
   Auth0Config,
   Auth0ClusterConfig,
+  Auth0NamespaceConfig,
 } from './auth0types';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
@@ -317,6 +318,17 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
         });
       }
   }
+}
+
+export function getNamespaceConfig(
+  auth0Config: Auth0Config,
+  namespace: string
+): Auth0NamespaceConfig {
+  const nsConfig = auth0Config.namespacedConfigs[namespace];
+  if (!nsConfig) {
+    throw new Error(`No Auth0 configuration for namespace ${namespace}`);
+  }
+  return nsConfig;
 }
 
 export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {

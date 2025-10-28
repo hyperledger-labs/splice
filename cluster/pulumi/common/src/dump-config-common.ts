@@ -11,6 +11,7 @@ import {
   Auth0ClusterConfig,
   Auth0Config,
   Auth0NamespaceConfig,
+  NamespacedAuth0Configs,
 } from './auth0/auth0types';
 import { isMainNet } from './config';
 
@@ -147,14 +148,14 @@ const splitwellAuth0Config: Auth0NamespaceConfig = {
   },
 };
 
-const namespacedConfigs = new Map<string, Auth0NamespaceConfig>();
-namespacedConfigs.set('sv-1', sv1Auth0Config);
-namespacedConfigs.set('sv-da-1', svDa1Auth0Config);
-namespacedConfigs.set('sv-2', sv2Auth0Config);
-namespacedConfigs.set('sv-3', sv3Auth0Config);
-namespacedConfigs.set('sv-4', sv4Auth0Config);
-namespacedConfigs.set('validator1', validator1Auth0Config);
-namespacedConfigs.set('splitwell', splitwellAuth0Config);
+const namespacedConfigs: NamespacedAuth0Configs = {};
+namespacedConfigs['sv-1'] = sv1Auth0Config;
+namespacedConfigs['sv-da-1'] = svDa1Auth0Config;
+namespacedConfigs['sv-2'] = sv2Auth0Config;
+namespacedConfigs['sv-3'] = sv3Auth0Config;
+namespacedConfigs['sv-4'] = sv4Auth0Config;
+namespacedConfigs['validator1'] = validator1Auth0Config;
+namespacedConfigs['splitwell'] = splitwellAuth0Config;
 
 export const cantonNetworkAuth0Config: Auth0Config = {
   namespacedConfigs: namespacedConfigs,
@@ -166,23 +167,24 @@ export const cantonNetworkAuth0Config: Auth0Config = {
   fixedTokenCacheName: 'fixedTokenCacheName',
 };
 
-const svRunbookNamespacedConfigs = new Map<string, Auth0NamespaceConfig>();
-svRunbookNamespacedConfigs.set('sv', {
-  audiences: {
-    ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the sv-test tenant
-    svAppApi: 'https://sv.example.com/api', // The SV App API in the sv-test tenant
-    validatorApi: 'https://validator.example.com/api', // The Validator App API in the sv-test tenant
+const svRunbookNamespacedConfigs: NamespacedAuth0Configs = {
+  sv: {
+    audiences: {
+      ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the sv-test tenant
+      svAppApi: 'https://sv.example.com/api', // The SV App API in the sv-test tenant
+      validatorApi: 'https://validator.example.com/api', // The Validator App API in the sv-test tenant
+    },
+    backendClientIds: {
+      svApp: 'sv-client-id',
+      validator: 'validator-client-id',
+    },
+    uiClientIds: {
+      wallet: 'wallet-client-id',
+      cns: 'cns-client-id',
+      sv: 'sv-client-id',
+    },
   },
-  backendClientIds: {
-    svApp: 'sv-client-id',
-    validator: 'validator-client-id',
-  },
-  uiClientIds: {
-    wallet: 'wallet-client-id',
-    cns: 'cns-client-id',
-    sv: 'sv-client-id',
-  },
-});
+};
 
 export const svRunbookAuth0Config = {
   namespacedConfigs: svRunbookNamespacedConfigs,
