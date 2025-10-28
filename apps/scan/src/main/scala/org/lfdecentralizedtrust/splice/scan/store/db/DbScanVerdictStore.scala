@@ -95,6 +95,8 @@ class DbScanVerdictStore(
 
   private def historyId = updateHistory.historyId
 
+  def waitUntilInitialized: Future[Unit] = updateHistory.waitUntilInitialized
+
   override protected def timeouts = new ProcessingTimeout
 
   private val lastIngestedRecordTimeRef =

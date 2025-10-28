@@ -8,7 +8,7 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
-import com.google.protobuf.ByteString;
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -40,7 +40,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{Storage, DbStorage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -58,10 +58,11 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequiremen
 import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import com.digitalasset.canton.discard.Implicits.*
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -118,6 +119,8 @@ class UpdateHistory(
       }
     }
   }
+
+  def waitUntilInitialized: Future[Unit] = state.get().initialized.future
 
   def historyId: Long =
     state
@@ -275,6 +278,7 @@ class UpdateHistory(
               historyId = Some(newHistoryId)
             )
           )
+          state.get().initialized.trySuccess(()).discard
           lastIngestedOffset match {
             case Some(offset) =>
               logger.info(s"${description()} resumed at offset $offset")
@@ -2343,6 +2347,7 @@ object UpdateHistory {
 
   case class State(
       historyId: Option[Long],
+      initialized: Promise[Unit],
       corruptSnapshotsDeleted: Boolean,
       lastIngestedRecordTime: Option[CantonTimestamp],
   ) {}
@@ -2350,6 +2355,7 @@ object UpdateHistory {
   object State {
     def empty(): State = State(
       historyId = None,
+      initialized = Promise[Unit](),
       corruptSnapshotsDeleted = false,
       lastIngestedRecordTime = None,
     )
