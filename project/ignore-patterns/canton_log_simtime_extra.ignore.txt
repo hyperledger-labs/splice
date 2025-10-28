@@ -3,7 +3,7 @@
 
 # This works around issues in simtime where in-flight requests
 # end up timing out when we concurrently advance time.
-The sequencer clock timestamp .* is already past the max sequencing time
+The estimated sequencing time .* is already past the max sequencing time
 # variant of the above for aggregate submissions
 Max sequencing time.*for submission.*is already past the sequencer clock timestamp
 Submission timed out at
