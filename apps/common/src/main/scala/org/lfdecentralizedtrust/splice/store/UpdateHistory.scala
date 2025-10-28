@@ -62,6 +62,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import com.digitalasset.canton.discard.Implicits.*
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -277,7 +278,7 @@ class UpdateHistory(
               historyId = Some(newHistoryId)
             )
           )
-          state.get().initialized.trySuccess(())
+          state.get().initialized.trySuccess(()).discard
           lastIngestedOffset match {
             case Some(offset) =>
               logger.info(s"${description()} resumed at offset $offset")
