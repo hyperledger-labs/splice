@@ -128,11 +128,6 @@ export class Auth0Fetch implements Auth0Client {
     const data = {} as Record<string, string>;
     await pulumi.log.debug('Saving Auth0 cache');
 
-    // if (!this.auth0Cache) {
-    //   await pulumi.log.debug('No auth0 cache loaded in Auth0Fetch');
-    //   return;
-    // }
-
     if (this.auth0Cache && !this.hasDiffsToSave) {
       await pulumi.log.debug('Auth0 cache was loaded, and no cache diffs to save');
       return;
