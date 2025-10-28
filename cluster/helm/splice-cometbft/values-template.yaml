@@ -74,10 +74,10 @@ db:
 
 resources:
   limits:
-    memory: 4Gi
+    memory: 6Gi
   requests:
     cpu: 2
-    memory: 2Gi
+    memory: 3Gi
 
 metrics:
   enable: false

@@ -15,11 +15,10 @@ cluster:
 defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data -Dpekko.http.server.idle-timeout=20m -Dpekko.http.client.idle-timeout=20m
 resources:
   limits:
-    cpu: 3
-    memory: 4Gi
+    memory: 6Gi
   requests:
-    cpu: 1
-    memory: 2Gi
+    cpu: 2
+    memory: 3Gi
 
 metrics:
   enable: false
