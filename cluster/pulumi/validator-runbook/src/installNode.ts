@@ -28,7 +28,6 @@ import {
   nonDevNetNonSvValidatorTopupConfig,
   nonSvValidatorTopupConfig,
   participantBootstrapDumpSecretName,
-  preApproveValidatorRunbook,
   SPLICE_ROOT,
   setupBootstrapping,
   spliceInstanceNames,
@@ -75,17 +74,13 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bootstrappingConfig,
     });
 
-  const onboardingSecret = preApproveValidatorRunbook
-    ? validatorConfig.onboardingSecret
-    : undefined;
-
   const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
   const validator = await installValidator({
     xns,
-    onboardingSecret,
+    onboardingSecret: validatorConfig.onboardingSecret,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
