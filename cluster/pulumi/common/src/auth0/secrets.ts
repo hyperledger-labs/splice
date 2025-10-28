@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 
+import { isMainNet } from '../config';
 import { ExactNamespace, fixedTokens } from '../utils';
 import { getNamespaceConfig } from './auth0';
 import { Auth0Client, Auth0ClientSecret, Auth0SecretMap } from './auth0types';
@@ -127,6 +128,55 @@ export async function installLedgerApiUserSecret(
   );
 }
 
+// TODO(#2873): remove this after applying once
+function legacyResourceName(
+  xns: ExactNamespace,
+  clientName: 'sv' | 'validator' | 'splitwell'
+): string {
+  // Currently, for no good reason, we have sv-1 vs sv1_validator naming inconsistency.
+  // To make things worse, the sv-da-1 namespace is even more special and has sv-da-1 vs sv-da-1_validator.
+  // Then mainnet DA-2 is even worse, as we use "sv" and "validator"
+
+  if (xns.logicalName == 'sv-da-1') {
+    if (clientName == 'sv') {
+      return `splice-auth0-secret-${xns.logicalName}-sv-da-1`;
+    }
+    if (clientName == 'validator') {
+      return `splice-auth0-secret-${xns.logicalName}-sv-da-1_validator`;
+    }
+  }
+  if (isMainNet && xns.logicalName == 'da-2') {
+    // These are actually identical to the "new" names, but returning them here nevertheless for completeness
+    if (clientName == 'sv') {
+      return `splice-auth0-secret-${xns.logicalName}-sv`;
+    }
+    if (clientName == 'validator') {
+      return `splice-auth0-secret-${xns.logicalName}-validator`;
+    }
+  }
+  if (xns.logicalName.startsWith('sv-')) {
+    if (clientName == 'sv') {
+      return `splice-auth0-secret-${xns.logicalName}-${xns.logicalName}`;
+    }
+    if (clientName == 'validator') {
+      return `splice-auth0-secret-${xns.logicalName}-${xns.logicalName.replace('-', '')}_validator`;
+    }
+  }
+  if (xns.logicalName == 'splitwell') {
+    if (clientName == 'validator') {
+      return `splice-auth0-secret-${xns.logicalName}-splitwell_validator`;
+    }
+    return '';
+  }
+  if (xns.logicalName == 'validator1') {
+    if (clientName == 'validator') {
+      return `splice-auth0-secret-validator1-validator1`;
+    }
+  }
+
+  return '';
+}
+
 // TODO(#2873): for now we still export this for splitwell, reconsider
 export async function installLedgerApiSecret(
   auth0Client: Auth0Client,
@@ -147,6 +197,8 @@ export async function installLedgerApiSecret(
     },
     {
       dependsOn: xns.ns,
+      // TODO(#2873): remove the alias after applying once
+      aliases: [{ name: legacyResourceName(xns, clientName) }],
     }
   );
 }
