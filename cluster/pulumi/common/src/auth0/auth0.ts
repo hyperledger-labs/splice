@@ -111,8 +111,16 @@ export class Auth0Fetch implements Auth0Client {
       this.auth0Cache = cacheMap;
       await pulumi.log.debug('Auth0 cache loaded...');
     } catch (e) {
+      await this.k8sApi.createNamespacedSecret('default', {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: this.cfg.fixedTokenCacheName,
+        },
+        data: {},
+      });
       this.auth0Cache = undefined;
-      await pulumi.log.debug('No Auth0 cache secret found.');
+      await pulumi.log.debug('No Auth0 cache secret found (created a new one)');
     }
   }
 
@@ -120,13 +128,13 @@ export class Auth0Fetch implements Auth0Client {
     const data = {} as Record<string, string>;
     await pulumi.log.debug('Saving Auth0 cache');
 
-    if (!this.auth0Cache) {
-      await pulumi.log.debug('No auth0 cache loaded in Auth0Fetch');
-      return;
-    }
+    // if (!this.auth0Cache) {
+    //   await pulumi.log.debug('No auth0 cache loaded in Auth0Fetch');
+    //   return;
+    // }
 
-    if (!this.hasDiffsToSave) {
-      await pulumi.log.debug('No auth0 cache diffs to save');
+    if (this.auth0Cache && !this.hasDiffsToSave) {
+      await pulumi.log.debug('Auth0 cache was loaded, and no cache diffs to save');
       return;
     }
 
