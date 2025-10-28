@@ -22,6 +22,7 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
     with HasActorSystem {
 
   override protected def runEventHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -169,5 +170,70 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
         aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
       }
     }
+  }
+
+  "validator crashes when the number of connected scans drops below the threshold" in {
+    implicit env =>
+      startAllSync(
+        sv1Backend,
+        sv1ScanBackend,
+        sv2Backend,
+        sv2ScanBackend,
+        sv3Backend,
+        sv3ScanBackend,
+        sv4Backend,
+        sv4ScanBackend,
+      )
+
+      eventually() {
+        val allHealthy =
+          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).forall { scan =>
+            scan.httpHealth.successOption.exists(_.active)
+          }
+        allHealthy shouldBe true
+      }
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+        {
+          aliceValidatorBackend.startSync()
+        },
+        logs => {
+          val messages = logs.map(_.message)
+          withClue("Validator should connect to sv1:") {
+            connectionEstablished(1, messages)
+          }
+          withClue("Validator should connect to sv2:") {
+            connectionEstablished(2, messages)
+          }
+          withClue("Validator should connect to sv3:") {
+            connectionEstablished(3, messages)
+          }
+          withClue("Validator should NOT connect to sv4:") {
+            connectionNotEstablished(4, messages)
+          }
+        },
+      )
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+        {
+          sv1ScanBackend.stop()
+          sv2ScanBackend.stop()
+        },
+        logs => {
+          val messages = logs.map(_.message)
+          withClue(
+            "Validator should fail to reach consensus when trusted scans drop below the threshold:"
+          ) {
+            messages.exists(
+              _.contains(
+                "Consensus not reached"
+              )
+            ) should be(true)
+          }
+        },
+      )
+
+      aliceValidatorBackend.stop()
+
   }
 }
