@@ -71,9 +71,11 @@ class ScanVerdictStoreIngestion(
       val base: Source[Seq[v30.Verdict], NotUsed] =
         Source
           .future(
-            store
-              .maxVerdictRecordTime(migrationId)
-              .map(_.getOrElse(CantonTimestamp.MinValue))
+            store.waitUntilInitialized.flatMap(_ =>
+              store
+                .maxVerdictRecordTime(migrationId)
+                .map(_.getOrElse(CantonTimestamp.MinValue))
+            )
           )
           .map { ts =>
             logger.info(s"Streaming verdicts starting from $ts")
