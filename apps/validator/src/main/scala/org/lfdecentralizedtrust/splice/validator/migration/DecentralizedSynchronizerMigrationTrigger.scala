@@ -32,7 +32,12 @@ final class DecentralizedSynchronizerMigrationTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends DomainMigrationTrigger[DomainMigrationDump] {
+) extends DomainMigrationTrigger[DomainMigrationDump]()(
+      ec,
+      mat,
+      tracer,
+      DomainMigrationDump.codec(Some(dumpPath.getParent.toString)),
+    ) {
 
   // Disabling domain time and domain paused sync, as it runs after the domain is paused
   override protected lazy val context =

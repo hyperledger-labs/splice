@@ -55,6 +55,7 @@ export const generateToken = async (
     .setIssuedAt()
     .setAudience(audience)
     .setSubject(userId)
+    .setExpirationTime('30d')
     .sign(key);
 };
 

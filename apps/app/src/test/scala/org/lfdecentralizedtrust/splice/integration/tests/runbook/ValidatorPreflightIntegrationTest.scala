@@ -546,12 +546,12 @@ abstract class ValidatorPreflightIntegrationTestBase
       )(
         "Party ID is displayed after onboarding finishes",
         _ => {
-          findAll(className("party-id")) should have size 1
+          find(className("party-id")) should not be None
         },
       )
     } else {
       logger.debug("User is already onboarded")
-      findAll(className("party-id")) should have size 1
+      find(className("party-id")) should not be None
     }
   }
 

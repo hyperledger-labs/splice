@@ -291,7 +291,7 @@ class DomainMigrationInitializer(
 
   private def initializeSynchronizerNode(
       nodeIdentities: SynchronizerNodeIdentities,
-      genesisState: ByteString,
+      genesisState: Seq[ByteString],
   ): Future[Unit] = {
     val synchronizerNodeInitiaizer = SynchronizerNodeInitializer(
       localSynchronizerNode,
@@ -340,7 +340,7 @@ class DomainMigrationInitializer(
   private def initializeSequencer(
       synchronizerNodeInitializer: SynchronizerNodeInitializer,
       identity: NodeIdentitiesDump,
-      genesisState: ByteString,
+      genesisState: Seq[ByteString],
   ): Future[PhysicalSynchronizerId] = {
     synchronizerNodeInitializer.synchronizerNode.sequencerAdminConnection.getStatus
       .flatMap { status =>

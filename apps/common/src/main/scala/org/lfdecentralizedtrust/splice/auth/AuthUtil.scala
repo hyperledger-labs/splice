@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.auth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 // See also: com.daml.ledger.api.auth.Main from the Daml SDK contains utils for generating ledger API access tokens
 object AuthUtil {
@@ -28,15 +29,23 @@ object AuthUtil {
       audience: String,
       user: String,
       secret: String,
+      expiration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
   ): String = {
-    testTokenSecret(audience, user, secret)
+    testTokenSecret(audience, user, secret, expiration)
   }
 
-  def testTokenSecret(audience: String, user: String, secret: String): String = {
+  def testTokenSecret(
+      audience: String,
+      user: String,
+      secret: String,
+      expiration: NonNegativeFiniteDuration,
+  ): String = {
     JWT
       .create()
       .withSubject(user)
       .withAudience(audience)
+      // Canton also uses Instant.now for the checks even in simtime so this is ok.
+      .withExpiresAt(java.time.Instant.now().plus(expiration.asJava))
       .sign(Algorithm.HMAC256(secret))
   }
 
@@ -52,12 +61,15 @@ object AuthUtil {
     def testToken(
         user: String,
         secret: String,
+        expiration: NonNegativeFiniteDuration,
     ): String = {
       JWT
         .create()
         .withSubject(user)
         .withClaim("scope", "daml_ledger_api")
         .withAudience(testAudience)
+        // Canton also uses Instant.now for the checks even in simtime so this is ok.
+        .withExpiresAt(java.time.Instant.now().plus(expiration.asJava))
         .sign(Algorithm.HMAC256(secret))
     }
   }

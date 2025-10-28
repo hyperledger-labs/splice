@@ -13,7 +13,7 @@ import {
   numInstances,
   numNodesPerInstance,
   loadTesterConfig,
-  parsedVersion,
+  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { Resource } from '@pulumi/pulumi';
@@ -87,7 +87,9 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           adaptiveScenario: loadTesterConfig.adaptiveScenario,
         }),
       },
-      loadTesterConfig.chartVersion ? parsedVersion(loadTesterConfig.chartVersion) : activeVersion,
+      loadTesterConfig.chartVersion
+        ? CnChartVersion.parse(loadTesterConfig.chartVersion)
+        : activeVersion,
       { dependsOn: imagePullDeps.concat(dependencies).concat(loopback) }
     );
   } else {

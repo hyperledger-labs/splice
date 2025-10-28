@@ -174,6 +174,78 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-info",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "info",
+      "namespace": "sv",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "deploymentDetails": {
+          "configDigest": {
+            "allowedIpRanges": {
+              "type": "md5",
+              "value": "90eedde4a8599204a45dcb972e212c8b"
+            },
+            "approvedSvIdentities": {
+              "type": "md5",
+              "value": "5871224b744b45122540483fddbd550f"
+            }
+          },
+          "network": "test",
+          "sv": {
+            "version": "0.3.20"
+          },
+          "synchronizer": {
+            "active": {
+              "chainIdSuffix": "4",
+              "migrationId": 3
+            }
+          }
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "istioVirtualService": {
+          "gateway": "cluster-ingress/cn-http-gateway",
+          "host": "info.sv.mock.global.canton.network.digitalasset.com"
+        },
+        "nginxImage": "nginx:latest",
+        "runtimeDetails": {
+          "scanUrl": "http://scan-app.sv:5012"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "info",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s-imgpull-cluster-ingress-default",
@@ -1161,11 +1233,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "4Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
+            "memory": "2Gi"
           }
         },
         "scanAddress": "http://scan-app.sv:5012",

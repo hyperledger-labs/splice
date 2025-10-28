@@ -101,6 +101,43 @@ object GrpcStreamingUtils {
     requestComplete.future
   }
 
+  def streamToServerChunked[Req, Resp](
+      load: StreamObserver[Resp] => StreamObserver[Req],
+      requests: Seq[Req],
+  ): Future[Resp] = {
+    val requestComplete = Promise[Resp]()
+    val ref = new AtomicReference[Option[Resp]](None)
+
+    val responseObserver = new StreamObserver[Resp] {
+      override def onNext(value: Resp): Unit =
+        ref.set(Some(value))
+
+      override def onError(t: Throwable): Unit = requestComplete.failure(t)
+
+      override def onCompleted(): Unit =
+        ref.get() match {
+          case Some(response) => requestComplete.success(response)
+          case None =>
+            requestComplete.failure(
+              io.grpc.Status.CANCELLED
+                .withDescription("Server completed the request before providing a response")
+                .asRuntimeException()
+            )
+        }
+
+    }
+    val requestObserver = load(responseObserver)
+
+    requests
+      .foreach { request =>
+        blocking {
+          requestObserver.onNext(request)
+        }
+      }
+    requestObserver.onCompleted()
+    requestComplete.future
+  }
+
   def streamToClient[T](
       responseF: OutputStream => Future[Unit],
       responseObserver: StreamObserver[T],

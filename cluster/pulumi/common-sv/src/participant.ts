@@ -5,10 +5,10 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Config,
   ChartValues,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
+  getLedgerApiAudience,
   getParticipantKmsHelmResources,
   InstalledHelmChart,
   installSpliceHelmChart,
@@ -66,7 +66,7 @@ export function installSvParticipant(
     },
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: getLedgerApiAudience(auth0Config),
       jwksUrl: `https://${auth0Config.auth0Domain}/.well-known/jwks.json`,
     },
     ...kmsValues,
