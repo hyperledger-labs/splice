@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   RetryProvider,
 }
-import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
+import org.lfdecentralizedtrust.splice.migration.AcsExporter.{AcsExportFailure, AcsExportForParties}
 import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -36,12 +36,15 @@ class AcsExporter(
       domain: SynchronizerId,
       timestamp: Instant,
       force: Boolean,
-      parties: PartyId*
+      parties: AcsExportForParties,
   )(implicit
       tc: TraceContext
   ): Future[Seq[ByteString]] = {
     participantAdminConnection.downloadAcsSnapshot(
-      parties = parties.toSet,
+      parties = parties match {
+        case AcsExportForParties.AllParticipantParties => Set.empty
+        case AcsExportForParties.OnlyForParties(parties) => parties
+      },
       filterSynchronizerId = Some(domain),
       timestamp = Some(timestamp),
       force = force,
@@ -133,6 +136,13 @@ class AcsExporter(
 }
 
 object AcsExporter {
+
+  sealed trait AcsExportForParties
+
+  object AcsExportForParties {
+    case object AllParticipantParties extends AcsExportForParties
+    case class OnlyForParties(parties: Set[PartyId]) extends AcsExportForParties
+  }
 
   sealed trait AcsExportFailure
 

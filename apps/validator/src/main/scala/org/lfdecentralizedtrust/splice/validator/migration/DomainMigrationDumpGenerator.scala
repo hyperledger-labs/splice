@@ -3,24 +3,23 @@
 
 package org.lfdecentralizedtrust.splice.validator.migration
 
-import cats.implicits.catsSyntaxOptionId
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
-  SpliceLedgerConnection,
   RetryProvider,
+  SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
+import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportForParties.AllParticipantParties
 import org.lfdecentralizedtrust.splice.migration.{
   AcsExporter,
   DarExporter,
   ParticipantUsersDataExporter,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -88,20 +87,13 @@ class DomainMigrationDumpGenerator(
       tc: TraceContext,
   ): Future[DomainMigrationDump] = {
     for {
-      participantId <- participantConnection.getId()
-      parties <- participantConnection
-        .listPartyToParticipant(
-          store = TopologyStoreId.SynchronizerStore(domain).some,
-          filterParticipant = participantId.toProtoPrimitive,
-        )
-        .map(_.map(_.mapping.partyId))
       nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump()
       participantUsersData <- participantUsersDataExporter.exportParticipantUsersData()
       acsSnapshot <- acsExporter.exportAcsAtTimestamp(
         domain,
         timestamp,
         force,
-        parties*
+        AllParticipantParties,
       )
       dars <- darExporter.exportAllDars()
     } yield {
