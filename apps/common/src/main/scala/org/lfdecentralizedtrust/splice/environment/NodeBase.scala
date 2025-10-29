@@ -7,36 +7,18 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import org.lfdecentralizedtrust.splice.SpliceMetrics
 import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
-import org.lfdecentralizedtrust.splice.auth.{
-  AuthToken,
-  AuthTokenManager,
-  AuthTokenSource,
-  AuthTokenSourceNone,
-}
+import org.lfdecentralizedtrust.splice.auth.{AuthToken, AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
 import org.lfdecentralizedtrust.splice.automation.AutomationService
-import org.lfdecentralizedtrust.splice.config.{
-  BaseParticipantClientConfig,
-  SharedSpliceAppParameters,
-}
+import org.lfdecentralizedtrust.splice.config.{BaseParticipantClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.util.{
-  HasHealth,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  HasCloseContext,
-  SyncCloseable,
-}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync, HasCloseContext, SyncCloseable}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider, W3CTraceContext}
@@ -47,13 +29,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
 import org.apache.pekko.http.scaladsl.{ClientTransport, ConnectionContext, Http}
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpHeader,
-  HttpRequest,
-  HttpResponse,
-}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpRequest, HttpResponse}
 import org.apache.pekko.http.scaladsl.server.Directive0
 import org.apache.pekko.http.scaladsl.settings.ClientConnectionSettings
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
@@ -121,141 +97,11 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   private val httpExt = Http()(ac)
 
-  private def traceContextFromHeaders(headers: immutable.Seq[HttpHeader]) = {
-    W3CTraceContext
-      .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
-      .map(_.toTraceContext)
-      .getOrElse(TraceContext.empty)
-  }
-
-  private def buildHttpClient(
-      outerRequestParameters: HttpClient.HttpRequestParameters
-  ): HttpClient =
-    new HttpClient {
-      override val requestParameters: HttpClient.HttpRequestParameters = outerRequestParameters
-
-      override def withOverrideParameters(
-          newParameters: HttpClient.HttpRequestParameters
-      ): HttpClient = buildHttpClient(outerRequestParameters)
-
-      override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
-        implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
-        import parameters.monitoringConfig.logging.api.*
-        val logPayload = messagePayloads
-        val pathLimited = request.uri.path.toString
-          .limit(maxMethodLength)
-        def msg(message: String): String =
-          s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
-
-        if (logPayload) {
-          request.entity match {
-            // Only logging strict messages which are already in memory, not attempting to log streams
-            case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-              logger.debug(
-                msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
-              )
-            case _ => logger.debug(msg(s"omitting logging of request entity data."))
-          }
-        }
-        logger
-          .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
-        val host = request.uri.authority.host.address()
-        val port = request.uri.effectivePort
-        logger.trace(
-          s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-        )
-        val connectionContext = request.uri.scheme match {
-          case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
-          case _ => ConnectionContext.noEncryption()
-        }
-
-        val settings = createClientConnectionSettings()
-        val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
-          Http()
-            .outgoingConnectionUsingContext(host, port, connectionContext, settings)
-
-        // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
-        // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
-        def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
-          Source
-            .single(request)
-            .via(connectionFlow)
-            .completionTimeout(requestParameters.requestTimeout.asFiniteApproximation)
-            .runWith(Sink.head)
-            .recoverWith { case NonFatal(e) =>
-              logger.debug(msg("HTTP request failed"), e)(traceContext)
-              Future.failed(e)
-            }
-        val start = System.currentTimeMillis()
-        dispatchRequest(request).map { response =>
-          val responseTraceCtx = traceContextFromHeaders(response.headers)
-          val end = System.currentTimeMillis()
-          logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
-          logger.debug(msg(s"Received response with status code: ${response.status}"))(
-            responseTraceCtx
-          )
-          if (logPayload) {
-            response.entity match {
-              // Only logging strict messages which are already in memory, not attempting to log streams
-              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-                logger.debug(
-                  msg(
-                    s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
-                  )
-                )(responseTraceCtx)
-              case _ =>
-                logger.debug(msg(s"omitting logging of response entity data."))(responseTraceCtx)
-            }
-          }
-          logger.trace(
-            msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
-          )(responseTraceCtx)
-          response
-        }
-      }
-    }
-
-  protected implicit val httpClient: HttpClient = buildHttpClient(
-    HttpClient.HttpRequestParameters(parameters.requestTimeout)
+  protected implicit val httpClient: HttpClient = NodeBase.buildHttpClient(
+    parameters.monitoringConfig.logging.api,
+    HttpClient.HttpRequestParameters(parameters.requestTimeout),
+    logger,
   )
-
-  private def createClientConnectionSettings() = {
-    case class ProxySettings(address: InetSocketAddress, creds: Option[BasicHttpCredentials] = None)
-    def host(scheme: String) = s"$scheme.proxyHost"
-    def port(scheme: String) = s"$scheme.proxyPort"
-    def user(scheme: String) = s"$scheme.proxyUser"
-    def password(scheme: String) = s"$scheme.proxyPassword"
-    def prop(property: String): Option[String] =
-      Option(System.getProperty(property)).map(_.trim)
-    def props(scheme: String) =
-      (prop(host(scheme)), prop(port(scheme)), prop(user(scheme)), prop(password(scheme)))
-    def proxySettings(scheme: String) = props(scheme) match {
-      case (Some(host), Some(port), Some(user), Some(password)) =>
-        Some(
-          ProxySettings(
-            InetSocketAddress.createUnresolved(host, port.toInt),
-            Some(BasicHttpCredentials(user, password)),
-          )
-        )
-      case (Some(host), Some(port), None, None) =>
-        Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
-      case _ => None
-    }
-
-    val proxySettingsO = proxySettings("http").orElse(proxySettings("https"))
-
-    proxySettingsO.fold(ClientConnectionSettings(ac)) { proxySettings =>
-      proxySettings.creds.fold(
-        ClientConnectionSettings(ac).withTransport(
-          ClientTransport.httpsProxy(proxySettings.address)
-        )
-      ) { creds =>
-        ClientConnectionSettings(ac).withTransport(
-          ClientTransport.httpsProxy(proxySettings.address, creds)
-        )
-      }
-    }
-  }
 
   def requestLogger(implicit traceContext: TraceContext): Directive0 =
     HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
@@ -514,5 +360,140 @@ object NodeBase {
         ).mkString(System.lineSeparator())
       )
 
+  }
+
+  def buildHttpClient(
+      apiLoggingConfig: ApiLoggingConfig,
+      outerRequestParameters: HttpClient.HttpRequestParameters,
+      logger: TracedLogger,
+  )(implicit
+      ac: ActorSystem,
+      ec: ExecutionContextExecutor,
+  ): HttpClient =
+    new HttpClient {
+      override val requestParameters: HttpClient.HttpRequestParameters = outerRequestParameters
+
+      override def withOverrideParameters(
+          newParameters: HttpClient.HttpRequestParameters
+      ): HttpClient = buildHttpClient(apiLoggingConfig, outerRequestParameters, logger)
+
+      override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
+        implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
+        import apiLoggingConfig.*
+        val logPayload = messagePayloads
+        val pathLimited = request.uri.path.toString
+          .limit(maxMethodLength)
+        def msg(message: String): String =
+          s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
+
+        if (logPayload) {
+          request.entity match {
+            // Only logging strict messages which are already in memory, not attempting to log streams
+            case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+              logger.debug(
+                msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
+              )
+            case _ => logger.debug(msg(s"omitting logging of request entity data."))
+          }
+        }
+        logger
+          .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
+        val host = request.uri.authority.host.address()
+        val port = request.uri.effectivePort
+        logger.trace(
+          s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
+        )
+        val connectionContext = request.uri.scheme match {
+          case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
+          case _ => ConnectionContext.noEncryption()
+        }
+
+        val settings = createClientConnectionSettings()
+        val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
+          Http()
+            .outgoingConnectionUsingContext(host, port, connectionContext, settings)
+
+        // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
+        // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
+        def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
+          Source
+            .single(request)
+            .via(connectionFlow)
+            .completionTimeout(requestParameters.requestTimeout.asFiniteApproximation)
+            .runWith(Sink.head)
+            .recoverWith { case NonFatal(e) =>
+              logger.debug(msg("HTTP request failed"), e)(traceContext)
+              Future.failed(e)
+            }
+        val start = System.currentTimeMillis()
+        dispatchRequest(request).map { response =>
+          val responseTraceCtx = traceContextFromHeaders(response.headers)
+          val end = System.currentTimeMillis()
+          logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
+          logger.debug(msg(s"Received response with status code: ${response.status}"))(
+            responseTraceCtx
+          )
+          if (logPayload) {
+            response.entity match {
+              // Only logging strict messages which are already in memory, not attempting to log streams
+              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+                logger.debug(
+                  msg(
+                    s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
+                  )
+                )(responseTraceCtx)
+              case _ =>
+                logger.debug(msg(s"omitting logging of response entity data."))(responseTraceCtx)
+            }
+          }
+          logger.trace(
+            msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
+          )(responseTraceCtx)
+          response
+        }
+      }
+    }
+  private def traceContextFromHeaders(headers: immutable.Seq[HttpHeader]) = {
+    W3CTraceContext
+      .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
+      .map(_.toTraceContext)
+      .getOrElse(TraceContext.empty)
+  }
+  private def createClientConnectionSettings()(implicit ac: ActorSystem) = {
+    case class ProxySettings(address: InetSocketAddress, creds: Option[BasicHttpCredentials] = None)
+    def host(scheme: String) = s"$scheme.proxyHost"
+    def port(scheme: String) = s"$scheme.proxyPort"
+    def user(scheme: String) = s"$scheme.proxyUser"
+    def password(scheme: String) = s"$scheme.proxyPassword"
+    def prop(property: String): Option[String] =
+      Option(System.getProperty(property)).map(_.trim)
+    def props(scheme: String) =
+      (prop(host(scheme)), prop(port(scheme)), prop(user(scheme)), prop(password(scheme)))
+    def proxySettings(scheme: String) = props(scheme) match {
+      case (Some(host), Some(port), Some(user), Some(password)) =>
+        Some(
+          ProxySettings(
+            InetSocketAddress.createUnresolved(host, port.toInt),
+            Some(BasicHttpCredentials(user, password)),
+          )
+        )
+      case (Some(host), Some(port), None, None) =>
+        Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
+      case _ => None
+    }
+
+    val proxySettingsO = proxySettings("http").orElse(proxySettings("https"))
+
+    proxySettingsO.fold(ClientConnectionSettings(ac)) { proxySettings =>
+      proxySettings.creds.fold(
+        ClientConnectionSettings(ac).withTransport(
+          ClientTransport.httpsProxy(proxySettings.address)
+        )
+      ) { creds =>
+        ClientConnectionSettings(ac).withTransport(
+          ClientTransport.httpsProxy(proxySettings.address, creds)
+        )
+      }
+    }
   }
 }
