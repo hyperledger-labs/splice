@@ -18,7 +18,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       eventuallyClickOn(id("tap-amount-field"))
       numberField("tap-amount-field").underlying.clear()
       numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
-      click on "tap-button"
+      eventuallyClickOn(id("tap-button"))
     }
 
     val txDatesBefore =
@@ -228,27 +228,27 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       driver: WebDriverType
   ) = {
     assert(transferAmount.scale <= 10, "Amulet amount must have at most 10 decimal places")
-    click on "navlink-transfer"
+    eventuallyClickOn(id("navlink-transfer"))
 
     if (shouldDisableTokenStandardSwitch) {
       click on "toggle-token-standard-transfer"
     }
 
-    click on "create-offer-receiver"
+    eventuallyClickOn(id("create-offer-receiver"))
     setAnsField(
       textField("create-offer-receiver"),
       receiver.toProtoPrimitive,
       receiver.toProtoPrimitive,
     )
 
-    click on "create-offer-amulet-amount"
+    eventuallyClickOn(id("create-offer-amulet-amount"))
     numberField("create-offer-amulet-amount").value = ""
     numberField("create-offer-amulet-amount").underlying.sendKeys(transferAmount.toString())
 
-    click on "create-offer-expiration-days"
+    eventuallyClickOn(id("create-offer-expiration-days"))
     singleSel("create-offer-expiration-days").value = expiryDays.toString
 
-    click on "create-offer-description"
+    eventuallyClickOn(id("create-offer-description"))
     textArea("create-offer-description").underlying.sendKeys(description)
 
     eventuallyClickOn(id("create-offer-submit-button"))
