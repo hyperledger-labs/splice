@@ -42,7 +42,7 @@ trait TimeTestUtil extends TestCommon {
         // get dropped by the sequencer due to exceeding max-sequencing-time.
         // While we do recover from such an issue, we recover from it once the participant
         // times out with LOCAL_VERDICT_TIMEOUT. That timeout is measured in wall clock
-        // so we will wait the full participantResponseTimeout (30s by default) which
+        // so we will wait the full confirmationResponseTimeout (30s by default) which
         // then results in `eventually`'s in tests never completing.
         //
         // The waiting implement below should ensure that existing background automation (e.g. amulet merging)
