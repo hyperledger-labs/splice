@@ -214,7 +214,9 @@ The initialization of the validator app will be interrupted on the first failed 
 If you still observe issues, in particular you observe
 ``ACS_COMMITMENT_MISMATCH`` warnings in your participant logs,
 something has likely gone wrong while importing the active contracts
-of at least one of the parties hosted on your node. To address this, you can usually:
+of at least one of the parties hosted on your node.
+Another common symptom (in case the validator party is affected) is that your your validator initialization fails with a ``Unknown secret`` error and your validator logs contain a ``ValidatorLicense not found`` message.
+To address a failed :term:`ACS` import, you can usually:
 
 1. First make sure all parties are hosted on the same node. The most
    common case is that either the parties are still on the old node
@@ -226,7 +228,7 @@ of at least one of the parties hosted on your node. To address this, you can usu
    .. code::
 
       val syncId = participant.synchronizers.list_connected().head.synchronizerId
-      participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
+      participant.topology.party_to_participant_mappings.list(syncId, filterParticipant = <namespace>)
 
    If all parties are on the same node, proceed to the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node by opening a console to the new node and running the following command
    (adjust the parameters as required for your parties):
@@ -236,7 +238,36 @@ of at least one of the parties hosted on your node. To address this, you can usu
       val participantId = participant.id // ID of the new participant
       participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((participantId, <participant-permission>)), store = syncId)
 
-2. If your parties are still on the original node that you took identities backup from, you can use your existing backup.
+2. If all parties are on the new node already, you can attempt to (re-)import the ACS for those parties manually.
+   The following steps concern your new validator node:
+
+   a. Stop your validator app.
+   b. Open a :ref:`participant console <console_access>` to that new validator and keep it open for the next steps.
+   c. From the Canton console, run:
+
+      .. code::
+
+         participant.synchronizers.disconnect_all()
+
+   d. For each ``PARTY_ID`` you want to migrate / re-import the ACS for:
+
+      Run from a regular shell (same working directory like the one you started your Canton console from):
+
+      .. parsed-literal::
+
+         curl -sSL --fail-with-body '|gsf_scan_url|/api/scan/v0/acs/YOUR_PARTY_ID' -H 'Content-Type: application/json' | jq -r .acs_snapshot | base64 -d > acs_snapshot
+
+      From the Canton console:
+
+      .. code::
+
+          participant.repair.import_acs_old("acs_snapshot")
+
+   e. From the Canton console, run ``participant.synchronizers.reconnect_all()``.
+   f. Start your validator app again.
+
+3. If the previous step failed or you chose not to attempt it, you can retry the migration procedure with a fresh participant.
+   If your parties are still on the original node that you took identities backup from, you can use your existing backup.
    If your parties have been migrated to the new node already, take a new identities dump from the new node.
    If the new node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id`` field to the participant ID of the new node.
    You can obtain the ``id`` in the correct format by, for example, running ``participant.id.toProtoPrimitive`` in a Canton console to the participant.
