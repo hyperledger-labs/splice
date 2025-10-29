@@ -3,9 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.console
 
-import com.digitalasset.canton.config.{
-  ConsoleCommandTimeout,
-  NonNegativeDuration}
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
