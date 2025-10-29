@@ -1264,9 +1264,9 @@ object BftScanConnection {
       case ts @ BftScanClientConfig.BftCustom(_, _, _, _, _) =>
 
         // We bootstrap with the set of provided seed-urls.
-        // Since not all trusted SV seeds are provided, they will not be used in the initial scan connection checking.
+        // Since not all trusted SV seeds are provided (most likely), they will not be used in the initial scan connection checking.
         // TODO: In the future, add a new threshold for how many trusted seed-urls should be there.
-        
+
         for {
           tempBftConnection <- bootstrapWithSeedNodes(
             ts.seedUrls,
