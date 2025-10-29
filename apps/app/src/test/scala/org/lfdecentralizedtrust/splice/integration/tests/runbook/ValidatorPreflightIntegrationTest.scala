@@ -142,7 +142,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   private def logout()(implicit webDriver: WebDriverType) = {
     clue("Logging out") {
-      click on "logout-button"
+      eventuallyClickOn(id("logout-button"))
       eventually() {
         (find(id("oidc-login-button")).isDefined || find(
           id("user-id-field")
@@ -200,7 +200,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         actAndCheck(2.minutes)(
           "Accept transfer offer", {
             click on acceptButton
-            click on "navlink-transactions"
+            eventuallyClickOn(id("navlink-transactions"))
           },
         )(
           "Transfer appears in transactions log",
@@ -299,7 +299,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         eventually() {
           findAll(className("add-user-link")).toSeq should not be (empty)
         }
-        actAndCheck("add user", click on className("add-user-link"))(
+        actAndCheck("add user", eventuallyClickOn(className("add-user-link")))(
           "user has been added and invite link disappears",
           _ => findAll(className("add-user-link")).toSeq shouldBe empty,
         )
@@ -541,7 +541,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       // TODO(DACH-NY/canton-network-internal#485): This is a workaround to bypass slowness of wallet user onboarding
       actAndCheck(timeUntilSuccess = 2.minute)(
         "Onboard wallet user", {
-          click on "onboard-button"
+          eventuallyClickOn(id("onboard-button"))
         },
       )(
         "Party ID is displayed after onboarding finishes",

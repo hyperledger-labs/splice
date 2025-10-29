@@ -145,7 +145,7 @@ class SvReOnboardPreflightIntegrationTest
       actAndCheck(timeUntilSuccess = 30.seconds)(
         "Accept transfer offer", {
           click on acceptButton
-          click on "navlink-transactions"
+          eventuallyClickOn(id("navlink-transactions"))
         },
       )(
         "Transfer appears in transactions log",
