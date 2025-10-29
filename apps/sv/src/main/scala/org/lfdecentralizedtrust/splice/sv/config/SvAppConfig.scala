@@ -352,6 +352,9 @@ case class SvAppBackendConfig(
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
+    // If true, we check that topology on mediator and sequencer is the same after
+    // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
+    validateTopologyAfterMigration: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

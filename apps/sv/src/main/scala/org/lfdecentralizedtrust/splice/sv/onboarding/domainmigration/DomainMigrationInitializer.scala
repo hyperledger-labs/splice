@@ -311,29 +311,37 @@ class DomainMigrationInitializer(
         synchronizerNodeInitiaizer,
         nodeIdentities.mediator,
       )
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        "mediator_up_to_date",
-        "mediator synced topology",
-        for {
-          sequencerTopology <- localSynchronizerNode.sequencerAdminConnection.listAllTransactions(
-            TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
-          )
-          mediatorTopology <- mediatorAdminConnection.listAllTransactions(
-            TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
-          )
-        } yield {
-          if (sequencerTopology.size != mediatorTopology.size) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"""Mediator topology is not synchronized.
-                   |Sequencer topology size [${sequencerTopology.size}], mediator topology size [${mediatorTopology.size}].""".stripMargin
+
+      _ <-
+        if (config.validateTopologyAfterMigration) {
+          retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            "mediator_up_to_date",
+            "mediator synced topology",
+            for {
+              sequencerTopology <- localSynchronizerNode.sequencerAdminConnection
+                .listAllTransactions(
+                  TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
+                )
+              mediatorTopology <- mediatorAdminConnection.listAllTransactions(
+                TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
               )
-              .asRuntimeException()
-          }
-        },
-        loggerFactory.getTracedLogger(getClass),
-      )
+            } yield {
+              if (sequencerTopology.size != mediatorTopology.size) {
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    s"""Mediator topology is not synchronized.
+                   |Sequencer topology size [${sequencerTopology.size}], mediator topology size [${mediatorTopology.size}].""".stripMargin
+                  )
+                  .asRuntimeException()
+              }
+            },
+            loggerFactory.getTracedLogger(getClass),
+          )
+        } else {
+          logger.info("Topology validation mediator and sequencer is disabled")
+          Future.unit
+        }
     } yield {}
   }
 
