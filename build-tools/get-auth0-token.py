@@ -132,6 +132,9 @@ class Auth0AppAndAudience:
       infra_outputs = self.get_pulumi_infra_outputs()
       domain = infra_outputs["auth0"][self.pulumi_stack]["auth0Domain"]
 
+    if domain.startswith("https://"):
+      domain = domain[8:]
+
     if domain == "canton-network-dev.us.auth0.com":
       self.auth0_domain = Auth0Domain(domain, require_env('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'), require_env('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'))
     elif domain == "canton-network-sv-test.us.auth0.com":
