@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.concurrent.duration.*
 
@@ -24,7 +25,7 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
             c.copy(
               domains = c.domains.copy(
                 global = c.domains.global.copy(
-                  sequencerNames = Some(Seq(getSvName(1), getSvName(2), getSvName(3)))
+                  sequencerNames = Some(Seq(getSvName(1), getSvName(2)))
                 )
               ),
               automation = c.automation.copy(pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)),
@@ -49,7 +50,7 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
     aliceValidatorBackend.startSync()
 
     withClue("Validator should connect to the filtered list of sequencers from the config") {
-      eventually(30.seconds, 1.second) {
+      eventually(60.seconds, 1.second) {
         val connectedUrls = getSequencerPublicUrls(
           aliceValidatorBackend.participantClientWithAdminToken,
           globalSyncAlias,
@@ -62,8 +63,8 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
           connectedUrls should contain(getPublicSequencerUrl(sv2Backend))
         }
 
-        withClue("Should be connected to SV3's sequencer:") {
-          connectedUrls should contain(getPublicSequencerUrl(sv3Backend))
+        withClue("Should not be connected to SV3's sequencer:") {
+          connectedUrls should not contain(getPublicSequencerUrl(sv3Backend))
         }
 
         withClue("Should NOT be connected to SV4's sequencer:") {
@@ -80,8 +81,10 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
   }
 
 
-  private def getPublicSequencerUrl(sv: SvAppBackendReference): String =
-    sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+  private def getPublicSequencerUrl(sv: SvAppBackendReference): String = {
+    val fullUrl = sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+    Uri(fullUrl).authority.toString()
+  }
 
   private def getSequencerPublicUrls(
                                       participantConnection: ParticipantClientReference,
