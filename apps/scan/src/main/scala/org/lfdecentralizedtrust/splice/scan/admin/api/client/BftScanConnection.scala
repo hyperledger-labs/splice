@@ -787,7 +787,6 @@ object BftScanConnection {
     def default(connections: ScanConnections): BftCallConfig = {
       connections.targetTotalNumber match {
         case Some(n) =>
-          // Use the static total number of trusted SVs (n) for the threshold
           val threshold =
             connections.threshold.getOrElse(Thresholds.requiredNumScanThreshold(n).value)
           BftCallConfig(
@@ -1102,10 +1101,17 @@ object BftScanConnection {
 
     override protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan] = {
       val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
+      val foundSvs = targetScans.map(_.svName).toSet
+      val missingSvs = trustedSvsSet -- foundSvs
 
-      logger.debug(s"Discovered the following trusted scans from the network: ${targetScans
-          .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
-          .mkString("; ")}")
+      logger.trace(s"Discovered the following trusted scans from the network: ${targetScans
+        .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
+        .mkString("; ")}")
+
+      if (missingSvs.nonEmpty) {
+        logger.debug(s"Configured trusted SVs not found in the DSO rules: ${missingSvs.mkString(", ")}")
+      }
+
       targetScans
     }
 
@@ -1256,6 +1262,11 @@ object BftScanConnection {
         )
 
       case ts @ BftScanClientConfig.BftCustom(_, _, _, _, _) =>
+
+        // We bootstrap with the set of provided seed-urls.
+        // Since not all trusted SV seeds are provided, they will not be used in the initial scan connection checking.
+        // TODO: In the future, add a new threshold for how many trusted seed-urls should be there.
+        
         for {
           tempBftConnection <- bootstrapWithSeedNodes(
             ts.seedUrls,
