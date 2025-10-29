@@ -125,7 +125,7 @@ class SvFrontendIntegrationTest
             }
 
             clue("click the create validator onboarding secret button") {
-              click on "create-validator-onboarding-secret"
+              eventuallyClickOn(id("create-validator-onboarding-secret"))
             }
           },
         )(
@@ -224,12 +224,12 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv1 operator can change the desired price", {
-            click on "edit-amulet-price-button"
-            click on "desired-amulet-price-field"
+            eventuallyClickOn(id("edit-amulet-price-button"))
+            eventuallyClickOn(id("desired-amulet-price-field"))
             numberField("desired-amulet-price-field").underlying.clear()
             numberField("desired-amulet-price-field").underlying.sendKeys("10.55")
 
-            click on "update-amulet-price-button"
+            eventuallyClickOn(id("update-amulet-price-button"))
           },
         )(
           "median fractional amulet price changed and amulet price updated on the row for sv2",
@@ -240,12 +240,12 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv1 operator can change the desired price", {
-            click on "edit-amulet-price-button"
-            click on "desired-amulet-price-field"
+            eventuallyClickOn(id("edit-amulet-price-button"))
+            eventuallyClickOn(id("desired-amulet-price-field"))
             numberField("desired-amulet-price-field").underlying.clear()
             numberField("desired-amulet-price-field").underlying.sendKeys("10")
 
-            click on "update-amulet-price-button"
+            eventuallyClickOn(id("update-amulet-price-button"))
           },
         )(
           "median amulet price changed and amulet price updated on the row for sv2",
@@ -367,7 +367,7 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
-              click on "tab-panel-in-progress"
+              eventuallyClickOn(id("tab-panel-in-progress"))
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
@@ -395,7 +395,7 @@ class SvFrontendIntegrationTest
             find(id("tab-badge-action-needed-count")).value.text shouldBe "1"
             find(id("nav-badge-votes-count")).value.text shouldBe "1"
 
-            click on "tab-panel-action-needed"
+            eventuallyClickOn(id("tab-panel-action-needed"))
 
             val tbody = find(id("sv-voting-action-needed-table-body"))
             inside(tbody) { case Some(tb) =>
@@ -463,16 +463,16 @@ class SvFrontendIntegrationTest
         val voteReasonUrl = "vote reason url"
         actAndCheck(
           "sv2 operator can cast vote", {
-            click on "cast-vote-button"
-            click on "reject-vote-button"
+            eventuallyClickOn(id("cast-vote-button"))
+            eventuallyClickOn(id("reject-vote-button"))
             inside(find(id("vote-reason-url"))) { case Some(element) =>
               element.underlying.sendKeys(voteReasonUrl)
             }
             inside(find(id("vote-reason-body"))) { case Some(element) =>
               element.underlying.sendKeys(voteReasonBody)
             }
-            click on "save-vote-button"
-            click on "vote-confirmation-dialog-accept-button"
+            eventuallyClickOn(id("save-vote-button"))
+            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
           },
         )(
           "sv2 can see the new vote request detail",
@@ -518,8 +518,8 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv2") { implicit webDriver =>
         actAndCheck(
           "sv2 operator can update its vote", {
-            click on "edit-vote-button"
-            click on "accept-vote-button"
+            eventuallyClickOn(id("edit-vote-button"))
+            eventuallyClickOn(id("accept-vote-button"))
             inside(find(id("vote-reason-url"))) { case Some(element) =>
               element.underlying.clear()
               element.underlying.sendKeys(updatedVoteReasonUrl)
@@ -528,8 +528,8 @@ class SvFrontendIntegrationTest
               element.underlying.clear()
               element.underlying.sendKeys(updatedVoteReasonBody)
             }
-            click on "save-vote-button"
-            click on "vote-confirmation-dialog-accept-button"
+            eventuallyClickOn(id("save-vote-button"))
+            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
           },
         )(
           "sv2 can see the new updated vote",
@@ -632,7 +632,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          click on "tab-panel-in-progress"
+          eventuallyClickOn(id("tab-panel-in-progress"))
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
           actAndCheck(
@@ -657,7 +657,7 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
-              click on "tab-panel-in-progress"
+              eventuallyClickOn(id("tab-panel-in-progress"))
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
@@ -713,7 +713,7 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
-              click on "tab-panel-in-progress"
+              eventuallyClickOn(id("tab-panel-in-progress"))
 
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress + 2
@@ -806,7 +806,7 @@ class SvFrontendIntegrationTest
           }
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
-            click on "tab-panel-in-progress"
+            eventuallyClickOn(id("tab-panel-in-progress"))
             val rows = getAllVoteRows("sv-voting-in-progress-table-body")
             rows.size shouldBe previousVoteRequestsInProgress + 1
             rows.head
@@ -825,7 +825,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          click on "tab-panel-in-progress"
+          eventuallyClickOn(id("tab-panel-in-progress"))
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
           clue("Pausing vote request expiration automation") {
@@ -885,7 +885,7 @@ class SvFrontendIntegrationTest
             eventually() {
               find(id("vote-request-modal-root")) shouldBe empty
             }
-            click on "tab-panel-rejected"
+            eventuallyClickOn(id("tab-panel-rejected"))
             eventually() {
               val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
               rows.size shouldBe 2
@@ -943,7 +943,7 @@ class SvFrontendIntegrationTest
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
             eventually() {
-              click on "tab-panel-in-progress"
+              eventuallyClickOn(id("tab-panel-in-progress"))
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress + 1
               rows.head
@@ -963,9 +963,9 @@ class SvFrontendIntegrationTest
             },
           )
 
-          click on "tab-panel-in-progress"
+          eventuallyClickOn(id("tab-panel-in-progress"))
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
-          click on "tab-panel-rejected"
+          eventuallyClickOn(id("tab-panel-rejected"))
           val previousVoteRequestsRejected = getVoteRequestsRejectedSize()
 
           clue("Pausing vote request expiration automation") {
@@ -1025,7 +1025,7 @@ class SvFrontendIntegrationTest
             eventually() {
               find(id("vote-request-modal-root")) shouldBe empty
             }
-            click on "tab-panel-rejected"
+            eventuallyClickOn(id("tab-panel-rejected"))
             eventually() {
               val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
               rows.size shouldBe previousVoteRequestsRejected + 2
@@ -1056,7 +1056,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          click on "tab-panel-in-progress"
+          eventuallyClickOn(id("tab-panel-in-progress"))
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
           actAndCheck(
@@ -1085,7 +1085,7 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
-              click on "tab-panel-in-progress"
+              eventuallyClickOn(id("tab-panel-in-progress"))
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
