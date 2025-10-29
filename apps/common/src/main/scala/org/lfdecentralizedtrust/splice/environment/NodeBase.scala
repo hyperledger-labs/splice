@@ -45,7 +45,8 @@ import com.digitalasset.canton.version.ReleaseVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
+import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
+import org.apache.pekko.http.scaladsl.{ClientTransport, ConnectionContext, Http}
 import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
@@ -54,8 +55,10 @@ import org.apache.pekko.http.scaladsl.model.{
   HttpResponse,
 }
 import org.apache.pekko.http.scaladsl.server.Directive0
+import org.apache.pekko.http.scaladsl.settings.ClientConnectionSettings
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 
+import java.net.InetSocketAddress
 import java.time
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
@@ -165,9 +168,11 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
           case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
           case _ => ConnectionContext.noEncryption()
         }
+
+        val settings = createClientConnectionSettings()
         val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
           Http()
-            .outgoingConnectionUsingContext(host, port, connectionContext)
+            .outgoingConnectionUsingContext(host, port, connectionContext, settings)
 
         // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
         // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
@@ -213,6 +218,44 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   protected implicit val httpClient: HttpClient = buildHttpClient(
     HttpClient.HttpRequestParameters(parameters.requestTimeout)
   )
+
+  private def createClientConnectionSettings() = {
+    case class ProxySettings(address: InetSocketAddress, creds: Option[BasicHttpCredentials] = None)
+    def host(scheme: String) = s"$scheme.proxyHost"
+    def port(scheme: String) = s"$scheme.proxyPort"
+    def user(scheme: String) = s"$scheme.proxyUser"
+    def password(scheme: String) = s"$scheme.proxyPassword"
+    def prop(property: String): Option[String] =
+      Option(System.getProperty(property)).map(_.trim)
+    def props(scheme: String) =
+      (prop(host(scheme)), prop(port(scheme)), prop(user(scheme)), prop(password(scheme)))
+    def proxySettings(scheme: String) = props(scheme) match {
+      case (Some(host), Some(port), Some(user), Some(password)) =>
+        Some(
+          ProxySettings(
+            InetSocketAddress.createUnresolved(host, port.toInt),
+            Some(BasicHttpCredentials(user, password)),
+          )
+        )
+      case (Some(host), Some(port), None, None) =>
+        Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
+      case _ => None
+    }
+
+    val proxySettingsO = proxySettings("http").orElse(proxySettings("https"))
+
+    proxySettingsO.fold(ClientConnectionSettings(ac)) { proxySettings =>
+      proxySettings.creds.fold(
+        ClientConnectionSettings(ac).withTransport(
+          ClientTransport.httpsProxy(proxySettings.address)
+        )
+      ) { creds =>
+        ClientConnectionSettings(ac).withTransport(
+          ClientTransport.httpsProxy(proxySettings.address, creds)
+        )
+      }
+    }
+  }
 
   def requestLogger(implicit traceContext: TraceContext): Directive0 =
     HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
