@@ -14,6 +14,7 @@ function write_participant_config() {
     local health_port=$(( base_port + 61 ))
     local ledger_port=$(( base_port + 1 ))
     local admin_port=$(( base_port + 2 ))
+    local http_ledger_port=$(( base_port + 3))
 
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
 
@@ -82,6 +83,11 @@ canton.participants.participant_$index = {
         # polling for domain connections which can add up quite a bit
         # once you're around ~100 users.
         rate-limit.max-api-services-queue-size = 80000
+    }
+
+    http-ledger-api {
+      address = 0.0.0.0
+      port = $http_ledger_port
     }
 
     parameters {
