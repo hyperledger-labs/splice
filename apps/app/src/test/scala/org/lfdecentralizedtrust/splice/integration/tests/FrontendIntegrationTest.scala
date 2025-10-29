@@ -683,6 +683,15 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     clickOn(query)
   }
 
+  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
+    clue(s"Waiting for $query to be clickable") {
+      waitForCondition(query) {
+        ExpectedConditions.elementToBeClickable(_)
+      }
+    }
+    find(query)
+  }
+
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ): Assertion = {
