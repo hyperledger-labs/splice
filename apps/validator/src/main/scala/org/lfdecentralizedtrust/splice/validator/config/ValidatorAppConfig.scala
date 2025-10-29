@@ -99,7 +99,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
       NonNegativeFiniteDuration.ofSeconds(1),
 
     /** An optional statically specified sequencerNames for a sequencer to use to connect.
-     * specifies the trusted set of sequencers the validator should connect to.
+     * specifies the trusted set of sequencers the participant should connect to.
      * If set, the url parameter should not be set.
      */
     sequencerNames: Option[Seq[String]] = None,
