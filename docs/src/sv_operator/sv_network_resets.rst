@@ -37,8 +37,10 @@ To complete the reset, go through the following steps:
 
        Featured app rights will be lost as part of the reset and need to be recreated manually after the reset.
 
-    e. Make a note of the current round in the Scan UI.
+    e. Make a note of the current round in the Scan UI **on MainNet**.
        The current round number affects the reward distribution.
+       We typically want TestNet to be one week (approximately 1008 rounds) ahead of MainNet,
+       whereas DevNet is always reset to round 0.
 
 2.  Decommission your old node
 
