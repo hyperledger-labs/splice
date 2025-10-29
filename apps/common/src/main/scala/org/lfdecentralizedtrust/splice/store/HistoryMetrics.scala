@@ -217,6 +217,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
   }
 
   override def close(): Unit = {
+    UpdateHistory.latestRecordTime.close()
     UpdateHistoryBackfilling.completed.close()
     UpdateHistoryBackfilling.latestRecordTime.close()
     TxLogBackfilling.completed.close()
