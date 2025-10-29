@@ -261,7 +261,7 @@ To address a failed :term:`ACS` import, you can usually:
 
       .. code::
 
-          participant.repair.import_acs_old("acs_snapshot")
+          participant.repair.import_acs("acs_snapshot")
 
    e. From the Canton console, run ``participant.synchronizers.reconnect_all()``.
    f. Start your validator app again.
