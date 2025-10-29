@@ -4,9 +4,11 @@ import {
   exactNamespace,
   numInstances,
   imagePullSecret,
+  DecentralizedSynchronizerUpgradeConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
+import { multiValidatorConfig } from './config';
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';
 import { installPostgres } from './postgres';
@@ -33,7 +35,12 @@ export async function installNode(): Promise<void> {
       `multi-participant-${i}`,
       {
         namespace: namespace.ns,
-        postgres: { ...postgresConf, db: `cantonnet_p` },
+        postgres: {
+          ...postgresConf,
+          db: multiValidatorConfig?.useStaticParticipantDatabase
+            ? `cantonnet_p`
+            : `participant_${DecentralizedSynchronizerUpgradeConfig.active.id}`,
+        },
       },
       { dependsOn: [postgres] }
     );

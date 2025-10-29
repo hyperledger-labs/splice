@@ -20,6 +20,7 @@ export const MultiValidatorConfigSchema = z.object({
       requiresOnboardingSecret: z.boolean().default(false),
       extraValidatorEnvVars: z.array(EnvironmentVariableSchema).default([]),
       extraParticipantEnvVars: z.array(EnvironmentVariableSchema).default([]),
+      useStaticParticipantDatabase: z.boolean().default(false),
       logLevel: LogLevelSchema.optional().default('INFO'),
       resources: z
         .object({
