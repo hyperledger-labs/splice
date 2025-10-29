@@ -14,10 +14,10 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import scala.concurrent.Future
 
 final object SynchronizerMigrationUtil {
-  // We only check mediatorReactionTimeout here as that is what matters for safety and it ensures that
-  // synchronizerIsUnpaused = !synchronizerIsUnpaused instead of checking that both are 0 or both are non-zero.
+  // We only check confirmationResponseTimeout here as that is what matters for safety and it ensures that
+  // synchronizerIsUnpaused = !synchronizerIsUnpaused instead of checking that all 3 are 0 or both are non-zero.
   def synchronizerIsPaused(params: TopologyResult[SynchronizerParametersState]): Boolean =
-    params.mapping.parameters.mediatorReactionTimeout == NonNegativeFiniteDuration.Zero
+    params.mapping.parameters.confirmationResponseTimeout == NonNegativeFiniteDuration.Zero
 
   def synchronizerIsUnpaused(params: TopologyResult[SynchronizerParametersState]): Boolean =
     !synchronizerIsPaused(params)
@@ -33,10 +33,11 @@ final object SynchronizerMigrationUtil {
         // instaed of timing out. It is only enforced on the
         // write path so there can still be transaction going through after we set it to zero
         // if the sequencer has not yet observed the topology change.
-        // mediator reaction timeout is enforced as part of the transaction protocol so there we really get a guarantee
+        // mediator reaction timeout and participant response timeout is enforced as part of the transaction protocol so there we really get a guarantee
         // that no transactions go through.
         confirmationRequestsMaxRate = NonNegativeInt.zero,
         mediatorReactionTimeout = NonNegativeFiniteDuration.Zero,
+        confirmationResponseTimeout = NonNegativeFiniteDuration.Zero,
       ),
     )
 
@@ -51,6 +52,8 @@ final object SynchronizerMigrationUtil {
         confirmationRequestsMaxRate =
           DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
         mediatorReactionTimeout = DynamicSynchronizerParameters.defaultMediatorReactionTimeout,
+        confirmationResponseTimeout =
+          DynamicSynchronizerParameters.defaultConfirmationResponseTimeout,
       ),
     )
 
