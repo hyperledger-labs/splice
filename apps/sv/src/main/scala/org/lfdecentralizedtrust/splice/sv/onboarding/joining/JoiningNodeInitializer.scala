@@ -373,7 +373,7 @@ class JoiningNodeInitializer(
         dsoPartyId,
       )
       _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
+        RetryFor.WaitingOnInitDependencyLong,
         "dso_rules_visible",
         show"the DsoRules and AmuletRules are visible",
         dsoStore.getDsoRules().map(_ => ()),
