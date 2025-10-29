@@ -83,6 +83,9 @@ canton.participants.participant_$index = {
         # polling for domain connections which can add up quite a bit
         # once you're around ~100 users.
         rate-limit.max-api-services-queue-size = 80000
+
+        # TODO(DACH-NY/canton-network-internal#2347) Revisit this, we need 30 days in fixed token mode.
+        max-token-lifetime = 30 days
     }
 
     http-ledger-api {
