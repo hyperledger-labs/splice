@@ -41,6 +41,9 @@ class Auth0Domain:
     self.mgmt_client_secret = mgmt_client_secret
 
 
+def is_legacy_infra(infra_outputs: dict) -> bool:
+  return "appToClientId" in infra_outputs["auth0"]["cantonNetwork"]
+
 class Auth0AppAndAudience:
   client_id: str
   pulumi_stack: str
@@ -57,106 +60,125 @@ class Auth0AppAndAudience:
       self.pulumi_infra_outputs = json.loads(infra_outputs_str)
     return self.pulumi_infra_outputs
 
+  def init_pulumi_stack(self, args: argparse.Namespace) -> str:
+    if args.namespace == "sv":
+      self.pulumi_stack = "svRunbook"
+    elif args.namespace == "validator":
+      self.pulumi_stack = "validatorRunbook"
+    else:
+      self.pulumi_stack = "cantonNetwork"
+
+    info(f"Pulumi stack: {self.pulumi_stack}")
+
+
   def init_client_id(self, args: argparse.Namespace):
     if args.client_id:
       self.client_id = args.client_id
     else:
       infra_outputs = self.get_pulumi_infra_outputs()
-      if args.namespace == "sv":
-        if args.app not in ["sv", "validator"]:
-          raise ValueError("Only sv and validator apps are supported in sv namespace")
-        self.client_id = infra_outputs["auth0"]["svRunbook"]["appToClientId"][args.app]
-      elif args.namespace == "validator":
-        if args.app != "validator":
-          raise ValueError("Only validator app is supported in validator namespace")
-        self.client_id = infra_outputs["auth0"]["validatorRunbook"]["appToClientId"][args.app]
-      elif args.namespace == "validator1":
-        if args.app != "validator":
-          raise ValueError("Only validator app is supported in validator1 namespace")
-        self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["validator1"]
-      elif args.namespace == "splitwell":
-        if args.app == "validator":
-          self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell_validator"]
-        elif args.app == "splitwell":
-          self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell"]
+
+      if is_legacy_infra(infra_outputs):
+        # Legacy infra data structures
+        # TODO(#2873): remove this once infra on all clusters has been migrated
+        if args.namespace == "sv":
+          if args.app not in ["sv", "validator"]:
+            raise ValueError("Only sv and validator apps are supported in sv namespace")
+          self.client_id = infra_outputs["auth0"]["svRunbook"]["appToClientId"][args.app]
+        elif args.namespace == "validator":
+          if args.app != "validator":
+            raise ValueError("Only validator app is supported in validator namespace")
+          self.client_id = infra_outputs["auth0"]["validatorRunbook"]["appToClientId"][args.app]
+        elif args.namespace == "validator1":
+          if args.app != "validator":
+            raise ValueError("Only validator app is supported in validator1 namespace")
+          self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["validator1"]
+        elif args.namespace == "splitwell":
+          if args.app == "validator":
+            self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell_validator"]
+          elif args.app == "splitwell":
+            self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell"]
+          else:
+            raise ValueError("Only splitwell and validator apps are supported in splitwell namespace")
+        elif args.namespace.startswith("sv-"):
+          if args.app == "sv":
+            self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"][args.namespace]
+          elif args.app == "validator":
+            self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"][f"{args.namespace.replace("-","")}_validator"]
+          else:
+            raise ValueError(f"Only sv and validator apps are supported in {args.namespace} namespace")
         else:
-          raise ValueError("Only splitwell and validator apps are supported in splitwell namespace")
-      elif args.namespace.startswith("sv-"):
-        if args.app == "sv":
-          self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"][args.namespace]
-        elif args.app == "validator":
-          self.client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"][f"{args.namespace.replace("-","")}_validator"]
-        else:
-          raise ValueError(f"Only sv and validator apps are supported in {args.namespace} namespace")
+          raise ValueError(f"Unknown namespace: {args.namespace}")
       else:
-        raise ValueError(f"Unknown namespace: {args.namespace}")
+        if args.app == "validator":
+          app = "validator"
+        elif args.app == "sv":
+          app = "svApp"
+        elif args.app == "splitwell":
+          app = "splitwell"
+        else:
+          raise ValueError(f"Unknown app: {args.app}")
+        if args.namespace not in infra_outputs["auth0"][self.pulumi_stack]["namespacedConfigs"]:
+          raise ValueError(f"Unknown namespace: {args.namespace}")
+        if app not in infra_outputs["auth0"][self.pulumi_stack]["namespacedConfigs"][args.namespace]["backendClientIds"]:
+          raise ValueError(f"Unknown app: {args.app}")
+        self.client_id = infra_outputs["auth0"][self.pulumi_stack]["namespacedConfigs"][args.namespace]["backendClientIds"][app]
+
 
     info(f"Client ID: {self.client_id}")
 
-  def init_auth0_domain_and_pulumi_stack(self, args: argparse.Namespace):
+  def init_auth0_domain(self, args: argparse.Namespace):
     domain = args.auth0_domain
     if not domain:
       infra_outputs = self.get_pulumi_infra_outputs()
-      cn_auth0_app_to_client_id = infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]
-      sv_auth0_app_to_client_id = infra_outputs["auth0"]["svRunbook"]["appToClientId"]
-      validator_auth0_app_to_client_id = infra_outputs["auth0"]["validatorRunbook"]["appToClientId"]
-      if self.client_id in cn_auth0_app_to_client_id.values():
-        domain = "canton-network-dev.us.auth0.com"
-      elif self.client_id in sv_auth0_app_to_client_id.values():
-        domain = "canton-network-sv-test.us.auth0.com"
-      elif self.client_id in validator_auth0_app_to_client_id.values():
-        domain = "canton-network-validator-test.us.auth0.com"
-      else:
-        raise AssertionError(f"Unknown client_id: {self.client_id}")
-    elif domain.startswith("https://"):
-      domain = domain[8:]
+      domain = infra_outputs["auth0"][self.pulumi_stack]["auth0Domain"]
 
     if domain == "canton-network-dev.us.auth0.com":
       self.auth0_domain = Auth0Domain(domain, require_env('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'), require_env('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'))
-      self.pulumi_stack = "cantonNetwork"
     elif domain == "canton-network-sv-test.us.auth0.com":
       self.auth0_domain = Auth0Domain(domain, require_env('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'), require_env('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET'))
-      self.pulumi_stack = "svRunbook"
     elif domain == "canton-network-validator-test.us.auth0.com":
       self.auth0_domain = Auth0Domain(domain, require_env('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID'), require_env('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET'))
-      self.pulumi_stack = "validatorRunbook"
     else:
       raise ValueError(f"Unknown auth0 domain: {domain}")
 
-    info(f"Pulumi stack: {self.pulumi_stack}, auth0 domain: {self.auth0_domain.domain}")
+    info(f"auth0 domain: {self.auth0_domain.domain}")
 
   def get_app(self, args: argparse.Namespace):
     if args.app:
       return args.app
     else:
       infra_outputs = self.get_pulumi_infra_outputs()
-      if self.pulumi_stack == "svRunbook":
-        self.namespace = "sv"
-        if self.client_id == infra_outputs["auth0"][self.pulumi_stack]["appToClientId"]["sv"]:
-          return "sv"
-        elif self.client_id == infra_outputs["auth0"][self.pulumi_stack]["appToClientId"]["validator"]:
-          return "validator"
-        else:
-          raise ValueError(f"Unknown client_id: {self.client_id}")
-      elif self.pulumi_stack == "validatorRunbook":
-        return "validator"
-      else:
-        if self.client_id == infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell"]:
-          return "splitwell"
-        elif self.client_id == infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell_validator"]:
-          return "validator"
-        elif self.client_id == infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["validator1"]:
-          return "validator"
-        elif self.client_id in infra_outputs["auth0"]["cantonNetwork"]["appToClientId"].values():
-          app_in_infra = [x for x in infra_outputs["auth0"]["cantonNetwork"]["appToClientId"].keys() if infra_outputs["auth0"]["cantonNetwork"]["appToClientId"][x] == self.client_id][0]
-          if re.match("^sv-[0-9]+", app_in_infra):
+      if is_legacy_infra(infra_outputs):
+        # Legacy infra data structures
+        # TODO(#2873): remove this once infra on all clusters has been migrated
+        if self.pulumi_stack == "svRunbook":
+          self.namespace = "sv"
+          if self.client_id == infra_outputs["auth0"][self.pulumi_stack]["appToClientId"]["sv"]:
             return "sv"
-          elif re.match("^sv[0-9]+_validator", app_in_infra):
+          elif self.client_id == infra_outputs["auth0"][self.pulumi_stack]["appToClientId"]["validator"]:
             return "validator"
           else:
             raise ValueError(f"Unknown client_id: {self.client_id}")
+        elif self.pulumi_stack == "validatorRunbook":
+          return "validator"
         else:
-          raise ValueError(f"Unknown client_id: {self.client_id}")
+          if self.client_id == infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell"]:
+            return "splitwell"
+          elif self.client_id == infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["splitwell_validator"]:
+            return "validator"
+          elif self.client_id == infra_outputs["auth0"]["cantonNetwork"]["appToClientId"]["validator1"]:
+            return "validator"
+          elif self.client_id in infra_outputs["auth0"]["cantonNetwork"]["appToClientId"].values():
+            app_in_infra = [x for x in infra_outputs["auth0"]["cantonNetwork"]["appToClientId"].keys() if infra_outputs["auth0"]["cantonNetwork"]["appToClientId"][x] == self.client_id][0]
+            if re.match("^sv-[0-9]+", app_in_infra):
+              return "sv"
+            elif re.match("^sv[0-9]+_validator", app_in_infra):
+              return "validator"
+            else:
+              raise ValueError(f"Unknown client_id: {self.client_id}")
+          else:
+            raise ValueError(f"Unknown client_id: {self.client_id}")
+
 
   def init_audience(self, args: argparse.Namespace):
     if args.audience:
@@ -164,18 +186,27 @@ class Auth0AppAndAudience:
     else:
       app = self.get_app(args)
       infra_outputs = self.get_pulumi_infra_outputs()
-      if app in infra_outputs["auth0"][self.pulumi_stack]["appToApiAudience"]:
-        self.audience = infra_outputs["auth0"][self.pulumi_stack]["appToApiAudience"][app]
+      if is_legacy_infra(infra_outputs):
+        # Legacy infra data structures
+        # TODO(#2873): remove this once infra on all clusters has been migrated
+        if app in infra_outputs["auth0"][self.pulumi_stack]["appToApiAudience"]:
+          self.audience = infra_outputs["auth0"][self.pulumi_stack]["appToApiAudience"][app]
+        else:
+          if app == "sv":
+            self.audience = require_env("OIDC_AUTHORITY_SV_AUDIENCE")
+          else:
+            self.audience = require_env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE")
       else:
         if app == "sv":
-          self.audience = require_env("OIDC_AUTHORITY_SV_AUDIENCE")
-        else:
-          self.audience = require_env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE")
+          self.audience = infra_outputs["auth0"][self.pulumi_stack]["namespacedConfigs"][args.namespace]["audiences"]["svAppApi"]
+        elif app == "validator":
+          self.audience = infra_outputs["auth0"][self.pulumi_stack]["namespacedConfigs"][args.namespace]["audiences"]["validatorApi"]
     info(f"Audience: {self.audience}")
 
   def __init__(self, args: argparse.Namespace):
+    self.init_pulumi_stack(args)
     self.init_client_id(args)
-    self.init_auth0_domain_and_pulumi_stack(args)
+    self.init_auth0_domain(args)
     self.init_audience(args)
 
 
