@@ -258,7 +258,7 @@ class ValidatorApp(
                       migrationDump.dars,
                       migrationDump.acsSnapshot,
                       legacyAcsImport =
-                        migrationDump.acsFormat == http.DomainDataSnapshot.AcsFormat.AdminApi,
+                        migrationDump.acsFormat == http.DomainMigrationDump.AcsFormat.AdminApi,
                     )
                   }
                   _ <- appInitStep("Restoring participant users data") {
