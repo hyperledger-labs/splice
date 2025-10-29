@@ -684,9 +684,9 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   }
 
   protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
-    clue(s"Waiting for $query to be clickable") {
+    clue(s"Waiting for $query to be found") {
       waitForCondition(query) {
-        ExpectedConditions.elementToBeClickable(_)
+        ExpectedConditions.visibilityOfElementLocated(_)
       }
     }
     find(query)
