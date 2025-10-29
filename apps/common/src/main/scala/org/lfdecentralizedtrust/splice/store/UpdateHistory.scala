@@ -114,10 +114,7 @@ class UpdateHistory(
 
   private def advanceLastIngestedRecordTime(ts: CantonTimestamp): Unit = {
     val newState = state.updateAndGet { s =>
-      s.lastIngestedRecordTime match {
-        case Some(curr) => s
-        case _ => s.copy(lastIngestedRecordTime = Some(ts))
-      }
+      s.copy(lastIngestedRecordTime = Some(ts))
     }
     (for {
       metrics <- oMetrics
