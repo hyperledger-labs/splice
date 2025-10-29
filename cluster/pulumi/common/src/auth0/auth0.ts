@@ -8,7 +8,7 @@ import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
 import { config, isMainNet } from '../config';
-import { CLUSTER_BASENAME } from '../utils';
+import { CLUSTER_BASENAME, fixedTokens } from '../utils';
 import type {
   Auth0Client,
   Auth0SecretMap,
@@ -93,6 +93,12 @@ export class Auth0Fetch implements Auth0Client {
   }
 
   public async loadAuth0Cache(): Promise<void> {
+    if (!fixedTokens()) {
+      await pulumi.log.debug('Fixed tokens not enabled, skipping Auth0 cache load');
+      this.auth0Cache = undefined;
+      return;
+    }
+
     await pulumi.log.debug('Loading Auth0 Cache');
     const cacheMap = {} as Auth0CacheMap;
 
@@ -108,28 +114,25 @@ export class Auth0Fetch implements Auth0Client {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
       }
 
-      this.auth0Cache = cacheMap;
       await pulumi.log.debug('Auth0 cache loaded...');
     } catch (e) {
-      await this.k8sApi.createNamespacedSecret('default', {
-        apiVersion: 'v1',
-        kind: 'Secret',
-        metadata: {
-          name: this.cfg.fixedTokenCacheName,
-        },
-        data: {},
-      });
-      this.auth0Cache = undefined;
-      await pulumi.log.debug('No Auth0 cache secret found (created a new one)');
+      await pulumi.log.warn('No Auth0 cache secret found');
     }
+
+    this.auth0Cache = cacheMap;
   }
 
   public async saveAuth0Cache(): Promise<void> {
     const data = {} as Record<string, string>;
     await pulumi.log.debug('Saving Auth0 cache');
 
-    if (this.auth0Cache && !this.hasDiffsToSave) {
-      await pulumi.log.debug('Auth0 cache was loaded, and no cache diffs to save');
+    if (!this.auth0Cache) {
+      await pulumi.log.debug('No auth0 cache to save');
+      return;
+    }
+
+    if (!this.hasDiffsToSave) {
+      await pulumi.log.debug('No auth0 cache diffs to save');
       return;
     }
 
