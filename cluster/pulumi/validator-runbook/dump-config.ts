@@ -45,6 +45,7 @@ async function main() {
     getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
       Promise.resolve('access_token'),
     getCfg: () => auth0Cfg,
+    reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
   });
 }
 
