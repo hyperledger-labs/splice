@@ -687,6 +687,13 @@ object SpliceConfig {
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
           _ <- Either.cond(
+            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+            ),
+          )
+          _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
             (),
             ConfigValidationFailed("Validator party hint must not be specified for SV validators"),
