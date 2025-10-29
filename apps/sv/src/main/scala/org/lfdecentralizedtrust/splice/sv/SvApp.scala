@@ -351,6 +351,7 @@ class SvApp(
                 retryProvider,
                 config.spliceInstanceNames,
                 loggerFactory,
+                config.parameters.enabledFeatures,
               )
               initializer.bootstrapDso()
             }
@@ -393,6 +394,7 @@ class SvApp(
               retryProvider,
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
+              config.parameters.enabledFeatures,
             ).migrateDomain()
           }
         case None =>
@@ -556,7 +558,12 @@ class SvApp(
               .sequencerAdminConnection
           ),
           dsoStore,
-          new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          new AcsExporter(
+            participantAdminConnection,
+            retryProvider,
+            config.parameters.enabledFeatures.enableNewAcsExport,
+            loggerFactory,
+          ),
           retryProvider,
           loggerFactory,
         ),

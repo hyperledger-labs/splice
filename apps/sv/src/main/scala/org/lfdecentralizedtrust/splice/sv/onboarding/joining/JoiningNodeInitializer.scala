@@ -252,6 +252,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 upgradesConfig,
                 packageVersionSupport,
+                config.parameters.enabledFeatures,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -845,6 +846,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNode,
                   upgradesConfig,
                   packageVersionSupport,
+                  config.parameters.enabledFeatures,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias
