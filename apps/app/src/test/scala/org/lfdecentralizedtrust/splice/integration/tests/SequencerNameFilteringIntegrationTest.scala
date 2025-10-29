@@ -49,27 +49,15 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
 
     aliceValidatorBackend.startSync()
 
+    val expectedUrls = Set(getPublicSequencerUrl(sv1Backend), getPublicSequencerUrl(sv2Backend))
+
     withClue("Validator should connect to the filtered list of sequencers from the config") {
       eventually(60.seconds, 1.second) {
         val connectedUrls = getSequencerPublicUrls(
           aliceValidatorBackend.participantClientWithAdminToken,
           globalSyncAlias,
         )
-
-        withClue("Should be connected to SV1's sequencer:") {
-          connectedUrls should contain(getPublicSequencerUrl(sv1Backend))
-        }
-        withClue("Should be connected to SV2's sequencer:") {
-          connectedUrls should contain(getPublicSequencerUrl(sv2Backend))
-        }
-
-        withClue("Should not be connected to SV3's sequencer:") {
-          connectedUrls should not contain(getPublicSequencerUrl(sv3Backend))
-        }
-
-        withClue("Should NOT be connected to SV4's sequencer:") {
-          connectedUrls should not contain (getPublicSequencerUrl(sv4Backend))
-        }
+        connectedUrls shouldBe expectedUrls
       }
     }
 
@@ -80,6 +68,46 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
     }
   }
 
+  "validator connects to available sequencers when a configured one is down" in { implicit env =>
+    startAllSync(
+      sv1Backend,
+      sv1ScanBackend,
+      sv3Backend,
+      sv3ScanBackend,
+      sv4Backend,
+      sv4ScanBackend,
+    )
+
+    aliceValidatorBackend.startSync()
+
+    withClue("Validator should connect only to the available sequencer from its configured list") {
+      eventually(60.seconds, 1.second) {
+        val connectedUrls = getSequencerPublicUrls(
+          aliceValidatorBackend.participantClientWithAdminToken,
+          globalSyncAlias,
+        )
+        connectedUrls shouldBe Set(getPublicSequencerUrl(sv1Backend))
+      }
+    }
+
+    startAllSync(sv2Backend, sv2ScanBackend)
+
+    withClue("Validator should dynamically connect to SV2 after it starts") {
+      eventually(60.seconds, 1.second) {
+        val connectedUrls = getSequencerPublicUrls(
+          aliceValidatorBackend.participantClientWithAdminToken,
+          globalSyncAlias,
+        )
+        connectedUrls shouldBe Set(getPublicSequencerUrl(sv1Backend), getPublicSequencerUrl(sv2Backend))
+      }
+    }
+
+    withClue("Alice's validator should remain functional") {
+      eventuallySucceeds() {
+        aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+      }
+    }
+  }
 
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String = {
     val fullUrl = sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
