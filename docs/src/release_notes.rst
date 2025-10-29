@@ -26,6 +26,10 @@ Upcoming
       Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
       or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
 
+  - Docs
+
+    - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+
 0.4.22
 ------
 
