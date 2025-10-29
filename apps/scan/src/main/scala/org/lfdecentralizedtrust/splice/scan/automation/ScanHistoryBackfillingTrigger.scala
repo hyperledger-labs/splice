@@ -279,7 +279,7 @@ class ScanHistoryBackfillingTrigger(
         historyMetrics.UpdateHistoryBackfilling.completed.updateValue(0)
         // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
         historyMetrics.UpdateHistoryBackfilling.latestRecordTime.updateValue(
-          workDone.lastBackfilledRecordTime.toMicros
+          workDone.lastBackfilledRecordTime
         )(MetricsContext.Empty)
         historyMetrics.UpdateHistoryBackfilling.updateCount.inc(
           workDone.backfilledUpdates

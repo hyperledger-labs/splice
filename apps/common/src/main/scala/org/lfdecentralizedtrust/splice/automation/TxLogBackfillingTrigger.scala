@@ -115,7 +115,7 @@ class TxLogBackfillingTrigger[TXE](
         historyMetrics.TxLogBackfilling.completed.updateValue(0)
         // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
         historyMetrics.TxLogBackfilling.latestRecordTime.updateValue(
-          workDone.lastBackfilledRecordTime.toMicros
+          workDone.lastBackfilledRecordTime
         )(MetricsContext.Empty)
         historyMetrics.TxLogBackfilling.updateCount.inc(
           workDone.backfilledUpdates

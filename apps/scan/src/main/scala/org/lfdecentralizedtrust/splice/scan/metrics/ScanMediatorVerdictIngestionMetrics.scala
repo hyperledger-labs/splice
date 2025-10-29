@@ -20,7 +20,7 @@ class ScanMediatorVerdictIngestionMetrics(metricsFactory: LabeledMetricsFactory)
       summary = "Latest ingested mediator verdict record_time",
       qualification = Traffic,
     ),
-    initial = 0L,
+    initial = CantonTimestamp.MinValue,
   )(MetricsContext.Empty)
 
   val verdictCount: Meter = metricsFactory.meter(

@@ -8,7 +8,6 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
-import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -64,6 +63,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.discard.Implicits.*
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -115,14 +115,14 @@ class UpdateHistory(
   private def advanceLastIngestedRecordTime(ts: CantonTimestamp): Unit = {
     val newState = state.updateAndGet { s =>
       s.lastIngestedRecordTime match {
-        case Some(curr) if ts < curr => s
+        case Some(curr) => s
         case _ => s.copy(lastIngestedRecordTime = Some(ts))
       }
     }
-    for {
+    (for {
       metrics <- oMetrics
       lastIngestedRecordTime <- newState.lastIngestedRecordTime
-    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)
+    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)).discard
   }
 
   def waitUntilInitialized: Future[Unit] = state.get().initialized.future
@@ -328,20 +328,22 @@ class UpdateHistory(
           traceContext: TraceContext
       ): Future[Unit] = {
         val offset: Long = updateOrCheckpoint.offset
-        val (recordTime, updateType) = updateOrCheckpoint match {
+        val recordTime = updateOrCheckpoint match {
           case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
-            Some(reassignment.recordTime) -> "ReassignmentUpdate"
+            Some(reassignment.recordTime)
           case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
-            Some(CantonTimestamp.assertFromInstant(tree.getRecordTime)) -> "TransactionTreeUpdate"
+            Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
           case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) =>
-            None -> "Checkpoint"
+            None
         }
 
         val timeIngestion = oMetrics
           .map(metrics =>
             (future: Future[Unit]) =>
               metrics.UpdateHistory.latency
-                .timeFuture[Unit](future)(MetricsContext("update_type" -> updateType))
+                .timeFuture[Unit](future)(
+                  metrics.metricsContextFromUpdate(updateOrCheckpoint, backfilling = false)
+                )
           )
           .getOrElse(identity[Future[Unit]])
 
@@ -2282,7 +2284,16 @@ class UpdateHistory(
         _ <-
           if (!itemExists) {
             DBIOAction
-              .sequence(items.map(item => ingestUpdate_(item.update, migrationId)))
+              .sequence(items.map { item =>
+                val dbio = ingestUpdate_(item.update, migrationId)
+                oMetrics
+                  .map(metrics =>
+                    SpliceMetrics.timeDBIO(dbio, metrics.UpdateHistory.latency)(
+                      metrics.metricsContextFromUpdate(item.update, backfilling = true)
+                    )
+                  )
+                  .getOrElse(dbio)
+              })
           } else {
             DBIOAction.successful(())
           }

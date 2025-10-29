@@ -8,6 +8,12 @@ import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricQualification.{Debug, Latency, Traffic}
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+  TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
 
 class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     metricsContext: MetricsContext
@@ -214,6 +220,31 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         )
       )(metricsContext)
 
+  }
+
+  def metricsContextFromUpdate(
+      treeUpdateOrOffsetCheckpoint: TreeUpdateOrOffsetCheckpoint,
+      backfilling: Boolean,
+  ): MetricsContext = {
+    treeUpdateOrOffsetCheckpoint match {
+      case TreeUpdateOrOffsetCheckpoint.Update(treeUpdate, _) =>
+        metricsContextFromUpdate(treeUpdate, backfilling)
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) =>
+        MetricsContext("update_type" -> "Checkpoint", "backfilling" -> backfilling.toString)
+    }
+  }
+
+  def metricsContextFromUpdate(
+      treeUpdate: TreeUpdate,
+      backfilling: Boolean,
+  ): MetricsContext = {
+    val updateType = treeUpdate match {
+      case ReassignmentUpdate(_) =>
+        "ReassignmentUpdate"
+      case TransactionTreeUpdate(_) =>
+        "TransactionTreeUpdate"
+    }
+    MetricsContext("update_type" -> updateType, "backfilling" -> backfilling.toString)
   }
 
   override def close(): Unit = {
