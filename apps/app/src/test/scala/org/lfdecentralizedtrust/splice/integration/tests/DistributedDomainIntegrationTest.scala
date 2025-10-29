@@ -162,7 +162,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
       parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
       parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
-      parameters.confirmationResponseTimeuot should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+      parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
     }
 
     bracket(
