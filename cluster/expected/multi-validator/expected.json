@@ -345,7 +345,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -537,7 +537,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -783,7 +783,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -975,7 +975,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1221,7 +1221,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1413,7 +1413,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1659,7 +1659,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1851,7 +1851,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -2097,7 +2097,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -2289,7 +2289,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
