@@ -223,7 +223,7 @@ class ScanApp(
       )(ec)
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
-          RetryFor.WaitingOnInitDependency,
+          RetryFor.WaitingOnInitDependencyLong,
           "wait_open_mining",
           "there is an OpenMiningRound contract",
           store.multiDomainAcsStore
