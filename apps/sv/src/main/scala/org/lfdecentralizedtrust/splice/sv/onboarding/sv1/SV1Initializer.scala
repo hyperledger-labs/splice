@@ -11,7 +11,11 @@ import cats.implicits.{
 import cats.syntax.functorFilter.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -114,6 +118,7 @@ class SV1Initializer(
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
+    enabledFeatures: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -319,6 +324,7 @@ class SV1Initializer(
         Some(localSynchronizerNode),
         upgradesConfig,
         packageVersionSupport,
+        enabledFeatures,
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
       withDsoStore = new WithDsoStore(
