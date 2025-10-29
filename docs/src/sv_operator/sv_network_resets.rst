@@ -37,18 +37,13 @@ To complete the reset, go through the following steps:
 
        Featured app rights will be lost as part of the reset and need to be recreated manually after the reset.
 
-    e. Make a note of the current round in the Scan UI **on MainNet**.
-       The current round number affects the reward distribution.
-       We typically want TestNet to be one week (approximately 1008 rounds) ahead of MainNet,
-       whereas DevNet is always reset to round 0.
-
-2.  Decommission your old node
+1.  Decommission your old node
 
     a. Uninstall all helm charts.
     b. Delete all PVCs, docker volumes and databases (including databases
        in Amazon AWS, GCP CloudSQL or similar).
 
-4.  Deploy your new node
+1.  Deploy your new node
 
     a. Set the migration id to 0 in helm chart values. The migration id appears in all helm charts,
        both as its own value, e.g.::
@@ -60,16 +55,17 @@ To complete the reset, go through the following steps:
 
            sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
 
-    b. Set ``initialAmuletPrice`` to your desired price in ``sv-values.yaml`` (see step 1.b).
-    c. Set ``chainIdSuffix`` to the new value in ``cometbft-values.yaml`` and ``info-values.yaml``.
+    b. Set ``skipInitialization`` to ``false`` in ``sv-values.yaml``.
+    c. Set ``initialAmuletPrice`` to your desired price in ``sv-values.yaml`` (see step 1.b).
+    d. Set ``chainIdSuffix`` to the new value in ``cometbft-values.yaml`` and ``info-values.yaml``.
        Usually this will just increase by 1 on a network reset but double check with
        the other SV operators on what has been agreed upon.
-    d. Founding node only: Set all helm chart values that affect network parameters,
+    e. Founding node only: Set all helm chart values that affect network parameters,
        such that the verification steps listed below pass.
-    e. Install all helm charts.
-    f. Wait until your SV node is sending status reports.
+    f. Install all helm charts.
+    g. Wait until your SV node is sending status reports.
 
-5.  Verify that network parameters were preserved
+1.  Verify that network parameters were preserved
 
     a. Confirm that the reset did not change the dso rules
        by repeating step 1.a and comparing the result:
@@ -98,14 +94,14 @@ To complete the reset, go through the following steps:
     b. Check your desired coin price in the SV UI, and verify that it matches
        the value from before the reset (see step 1.b.)
     c. Check the current round in the Scan UI, and verify that it matches the expected value.
-       This can either be roughly the same value as before the reset (see step 1.e.), or
-       a different value if the SV operators agreed on that, e.g., to match the minting curve
-       to a different network.
+       The round number affects the reward distribution.
+       We usually want TestNet to be one week (approximately 1008 rounds) ahead of MainNet,
+       whereas DevNet is usually reset to round 0.
 
-6.  Take a backup of your node identities as they change as part of the
+1.  Take a backup of your node identities as they change as part of the
     reset.
 
-7.  Other post-reset actions
+1.  Other post-reset actions
 
     a. Recreate votes that were ongoing at the time of the reset, see step 1.c.
     b. Re-issue onboarding secrets to validators you are sponsoring (TestNet only, on DevNet they can self-issue secrets).
