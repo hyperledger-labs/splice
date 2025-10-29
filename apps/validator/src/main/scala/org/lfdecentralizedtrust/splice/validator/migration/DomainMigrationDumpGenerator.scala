@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.EnabledFeaturesConfig
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryProvider,
@@ -29,12 +30,18 @@ class DomainMigrationDumpGenerator(
     participantConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
+    featureConfig: EnabledFeaturesConfig,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
   private val nodeIdentityStore =
     new NodeIdentitiesStore(participantConnection, None, loggerFactory)
-  private val acsExporter = new AcsExporter(participantConnection, retryProvider, loggerFactory)
+  private val acsExporter = new AcsExporter(
+    participantConnection,
+    retryProvider,
+    featureConfig.enableNewAcsExport,
+    loggerFactory,
+  )
   private val darExporter = new DarExporter(participantConnection)
   private val participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
 

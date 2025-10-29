@@ -866,6 +866,7 @@ class ValidatorApp(
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
+        config.parameters.enabledFeatures,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

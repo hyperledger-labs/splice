@@ -95,6 +95,7 @@ class HttpValidatorAdminHandler(
     participantAdminConnection,
     retryProvider,
     loggerFactory,
+    config.parameters.enabledFeatures,
   )
 
   private def requireWalletEnabled[T](handleRequest: UserWalletManager => T): T = {
