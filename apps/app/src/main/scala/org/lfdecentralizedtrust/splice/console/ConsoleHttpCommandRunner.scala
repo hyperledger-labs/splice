@@ -5,22 +5,18 @@ package org.lfdecentralizedtrust.splice.console
 
 import com.digitalasset.canton.config.{
   ConsoleCommandTimeout,
-  NonNegativeDuration,
-  ProcessingTimeout,
-}
+  NonNegativeDuration}
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
   StringErrorEitherToCommandResultExtensions,
 }
-import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
-import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import org.lfdecentralizedtrust.splice.admin.api.client.HttpCtlRunner
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpCommand, HttpCommandException}
@@ -37,24 +33,20 @@ import scala.util.control.NonFatal
   */
 class ConsoleHttpCommandRunner(
     environment: SpliceEnvironment,
-    timeouts: ProcessingTimeout,
     commandTimeouts: ConsoleCommandTimeout,
     requestTimeout: NonNegativeDuration,
 )(implicit tracer: Tracer, templateDecoder: TemplateJsonDecoder)
     extends NamedLogging
-    with AutoCloseable
     with Spanning {
 
   private implicit val executionContext: ExecutionContextExecutor =
     environment.executionContext
+  private implicit val actorSystem: ActorSystem = environment.actorSystem
   override val loggerFactory: NamedLoggerFactory = environment.loggerFactory
 
   private val httpRunner = new HttpCtlRunner(
     loggerFactory
   )
-  implicit val actorSystem: ActorSystem =
-    ActorSystem("ConsoleHttpCommandRunner", environment.config.pekkoConfig)
-  implicit val mat: Materializer = Materializer(actorSystem)
 
   def runCommand[Result](
       instanceName: String,
@@ -65,7 +57,7 @@ class ConsoleHttpCommandRunner(
     withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
       span.setAttribute("instance_name", instanceName)
       val commandDescription =
-        s"Running on ${instanceName} command ${command} against ${clientConfig}"
+        s"Running on $instanceName command $command against $clientConfig"
       logger.debug(commandDescription)(
         traceContext
       )
@@ -137,6 +129,4 @@ class ConsoleHttpCommandRunner(
       }
     }
 
-  override def close(): Unit =
-    LifeCycle.close(LifeCycle.toCloseableActorSystem(actorSystem, logger, timeouts))(logger)
 }
