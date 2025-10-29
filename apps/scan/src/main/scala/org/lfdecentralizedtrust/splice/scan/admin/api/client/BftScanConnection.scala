@@ -1105,11 +1105,13 @@ object BftScanConnection {
       val missingSvs = trustedSvsSet -- foundSvs
 
       logger.trace(s"Discovered the following trusted scans from the network: ${targetScans
-        .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
-        .mkString("; ")}")
+          .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
+          .mkString("; ")}")
 
       if (missingSvs.nonEmpty) {
-        logger.debug(s"Configured trusted SVs not found in the DSO rules: ${missingSvs.mkString(", ")}")
+        logger.debug(
+          s"Configured trusted SVs not found in the DSO rules: ${missingSvs.mkString(", ")}"
+        )
       }
 
       targetScans
@@ -1262,10 +1264,9 @@ object BftScanConnection {
         )
 
       case ts @ BftScanClientConfig.BftCustom(_, _, _, _, _) =>
-
         // We bootstrap with the set of provided seed-urls.
         // Since not all trusted SV seeds are provided (most likely), they will not be used in the initial scan connection checking.
-        // TODO: In the future, add a new threshold for how many trusted seed-urls should be there.
+        // In the future, add a new threshold for how many trusted seed-urls should be there.
 
         for {
           tempBftConnection <- bootstrapWithSeedNodes(
