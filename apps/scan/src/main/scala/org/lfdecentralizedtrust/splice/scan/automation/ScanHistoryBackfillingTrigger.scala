@@ -284,8 +284,11 @@ class ScanHistoryBackfillingTrigger(
         historyMetrics.UpdateHistoryBackfilling.updateCount.inc(
           workDone.backfilledUpdates
         )(MetricsContext.Empty)
-        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledEvents)(
-          MetricsContext.Empty
+        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledCreatedEvents)(
+          MetricsContext("event_type" -> "created")
+        )
+        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledExercisedEvents)(
+          MetricsContext("event_type" -> "exercised")
         )
         TaskSuccess("Backfilling step completed")
       case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>

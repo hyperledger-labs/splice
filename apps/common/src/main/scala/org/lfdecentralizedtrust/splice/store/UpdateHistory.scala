@@ -8,6 +8,7 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
+import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -357,9 +358,10 @@ class UpdateHistory(
                 logger.debug(
                   s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
                 )
-                ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
-                  updateOffset(offset)
-                )
+                for {
+                  ingestedEvents <- ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId)
+                  _ <- updateOffset(offset)
+                } yield ingestedEvents
               case Some(lastIngestedOffset) =>
                 if (offset <= lastIngestedOffset) {
                   updateOrCheckpoint match {
@@ -381,23 +383,34 @@ class UpdateHistory(
                         )
                       }
                   }
-                  DBIO.successful(())
+                  DBIO.successful(IngestedEvents(0, 0))
                 } else {
                   logger.debug(
                     s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
                   )
-                  ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
-                    updateOffset(offset)
-                  )
+                  for {
+                    ingestedEvents <- ingestUpdateOrCheckpoint_(
+                      updateOrCheckpoint,
+                      domainMigrationId,
+                    )
+                    _ <- updateOffset(offset)
+                  } yield ingestedEvents
                 }
             })
-            .map(_ => ())
             .transactionally
 
           storage
             .queryAndUpdate(action, "ingestUpdate")
-            .map { _ =>
+            .map { ingestedEvents =>
               recordTime.foreach(advanceLastIngestedRecordTime)
+              oMetrics.foreach { metrics =>
+                metrics.UpdateHistory.eventCount.inc(ingestedEvents.numCreatedEvents)(
+                  MetricsContext("event_type" -> "created")
+                )
+                metrics.UpdateHistory.eventCount.inc(ingestedEvents.numExercisedEvents)(
+                  MetricsContext("event_type" -> "exercised")
+                )
+              }
             }
         }
       }
@@ -413,21 +426,21 @@ class UpdateHistory(
   private def ingestUpdateOrCheckpoint_(
       updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+  ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
     updateOrCheckpoint match {
       case TreeUpdateOrOffsetCheckpoint.Update(update, _) =>
         ingestUpdate_(update, migrationId)
-      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => DBIO.unit
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => DBIO.successful(IngestedEvents(0, 0))
     }
   }
 
   private def ingestUpdate_(
       update: TreeUpdate,
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+  ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
     update match {
       case ReassignmentUpdate(reassignment) =>
-        ingestReassignment(reassignment, migrationId)
+        ingestReassignment(reassignment, migrationId).map(_ => IngestedEvents(0, 0))
       case TransactionTreeUpdate(tree) =>
         ingestTransactionTree(tree, migrationId)
     }
@@ -530,29 +543,31 @@ class UpdateHistory(
   private def ingestTransactionTree(
       tree: Transaction,
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+  ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
     oMetrics.foreach(_.UpdateHistory.transactionsTrees.mark())
-    insertTransactionUpdateRow(tree, migrationId).flatMap(updateRowId => {
-      // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
-      // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
-      DBIOAction.seq[Effect.Write](
-        tree.getEventsById.values().asScala.toSeq.map {
-          case created: CreatedEvent =>
-            insertCreateEventRow(tree.getUpdateId, created, tree, migrationId, updateRowId)
-          case exercised: ExercisedEvent =>
-            insertExerciseEventRow(
-              tree.getUpdateId,
-              exercised,
-              tree,
-              migrationId,
-              updateRowId,
-              tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
-            )
-          case e =>
-            throw new RuntimeException(s"Unsupported event type: $e")
-        }*
-      )
-    })
+    insertTransactionUpdateRow(tree, migrationId)
+      .flatMap(updateRowId => {
+        // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
+        // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
+        DBIOAction.seq[Effect.Write](
+          tree.getEventsById.values().asScala.toSeq.map {
+            case created: CreatedEvent =>
+              insertCreateEventRow(tree.getUpdateId, created, tree, migrationId, updateRowId)
+            case exercised: ExercisedEvent =>
+              insertExerciseEventRow(
+                tree.getUpdateId,
+                exercised,
+                tree,
+                migrationId,
+                updateRowId,
+                tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
+              )
+            case e =>
+              throw new RuntimeException(s"Unsupported event type: $e")
+          }*
+        )
+      })
+      .map(_ => IngestedEvents.eventCount(Seq(tree)))
   }
 
   private def insertTransactionUpdateRow(
@@ -2190,13 +2205,17 @@ class UpdateHistory(
     )(implicit
         tc: TraceContext
     ): Future[DestinationHistory.InsertResult] = {
-      insertItems(migrationId, items).map(insertedItems =>
+      insertItems(migrationId, items).map { insertedItems =>
+        val ingestedEvents = IngestedEvents.eventCount(insertedItems.map(_.update).collect {
+          case TransactionTreeUpdate(tree) => tree
+        })
         DestinationHistory.InsertResult(
           backfilledUpdates = insertedItems.size.toLong,
-          backfilledEvents = eventCount(insertedItems),
+          backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
+          backfilledCreatedEvents = ingestedEvents.numCreatedEvents,
           lastBackfilledRecordTime = insertedItems.last.update.recordTime,
         )
-      )
+      }
     }
 
     override def insertImportUpdates(
@@ -2212,14 +2231,6 @@ class UpdateHistory(
         )
       )
     }
-
-    private def eventCount(updates: NonEmptyList[UpdateHistoryResponse]): Long =
-      updates
-        .map(_.update)
-        .collect { case TransactionTreeUpdate(tree) =>
-          tree.getEventsById.size().toLong
-        }
-        .sum
 
     private def insertItems(
         migrationId: Long,

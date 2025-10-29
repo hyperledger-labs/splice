@@ -200,6 +200,15 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       )
     )(metricsContext)
 
+    val eventCount: Counter =
+      metricsFactory.counter(
+        MetricInfo(
+          name = updateHistoryPrefix :+ "event-count",
+          summary = "The number of events that have been ingested",
+          Traffic,
+        )
+      )(metricsContext)
+
     lazy val latestRecordTime: Gauge[CantonTimestamp] =
       SpliceMetrics.cantonTimestampGauge(
         metricsFactory,

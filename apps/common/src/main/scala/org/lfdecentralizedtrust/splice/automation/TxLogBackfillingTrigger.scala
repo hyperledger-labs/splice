@@ -120,8 +120,11 @@ class TxLogBackfillingTrigger[TXE](
         historyMetrics.TxLogBackfilling.updateCount.inc(
           workDone.backfilledUpdates
         )(MetricsContext.Empty)
-        historyMetrics.TxLogBackfilling.eventCount.inc(workDone.backfilledEvents)(
-          MetricsContext.Empty
+        historyMetrics.TxLogBackfilling.eventCount.inc(workDone.backfilledCreatedEvents)(
+          MetricsContext("event_type" -> "created")
+        )
+        historyMetrics.TxLogBackfilling.eventCount.inc(workDone.backfilledExercisedEvents)(
+          MetricsContext("event_type" -> "exercised")
         )
         TaskSuccess("Backfilling step completed")
       case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
