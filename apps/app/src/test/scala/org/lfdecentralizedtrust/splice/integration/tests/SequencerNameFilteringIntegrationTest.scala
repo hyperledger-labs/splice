@@ -12,7 +12,10 @@ import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.concurrent.duration.*
 
-class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
+class SequencerNameFilteringIntegrationTest
+    extends IntegrationTest
+    with SvTestUtil
+    with WalletTestUtil {
 
   private val globalSyncAlias = SynchronizerAlias.tryCreate("global")
 
@@ -28,44 +31,46 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
                   sequencerNames = Some(Seq(getSvName(1), getSvName(2)))
                 )
               ),
-              automation = c.automation.copy(pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)),
+              automation =
+                c.automation.copy(pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)),
             )
           case (_, c) => c
         }(config)
       )
       .withManualStart
 
-  "validator with 'sequencerNames' config connects only to specified sequencers" in { implicit env =>
-    startAllSync(
-      sv1Backend,
-      sv1ScanBackend,
-      sv2Backend,
-      sv2ScanBackend,
-      sv3Backend,
-      sv3ScanBackend,
-      sv4Backend,
-      sv4ScanBackend,
-    )
+  "validator with 'sequencerNames' config connects only to specified sequencers" in {
+    implicit env =>
+      startAllSync(
+        sv1Backend,
+        sv1ScanBackend,
+        sv2Backend,
+        sv2ScanBackend,
+        sv3Backend,
+        sv3ScanBackend,
+        sv4Backend,
+        sv4ScanBackend,
+      )
 
-    aliceValidatorBackend.startSync()
+      aliceValidatorBackend.startSync()
 
-    val expectedUrls = Set(getPublicSequencerUrl(sv1Backend), getPublicSequencerUrl(sv2Backend))
+      val expectedUrls = Set(getPublicSequencerUrl(sv1Backend), getPublicSequencerUrl(sv2Backend))
 
-    withClue("Validator should connect to the filtered list of sequencers from the config") {
-      eventually(60.seconds, 1.second) {
-        val connectedUrls = getSequencerPublicUrls(
-          aliceValidatorBackend.participantClientWithAdminToken,
-          globalSyncAlias,
-        )
-        connectedUrls shouldBe expectedUrls
+      withClue("Validator should connect to the filtered list of sequencers from the config") {
+        eventually(60.seconds, 1.second) {
+          val connectedUrls = getSequencerPublicUrls(
+            aliceValidatorBackend.participantClientWithAdminToken,
+            globalSyncAlias,
+          )
+          connectedUrls shouldBe expectedUrls
+        }
       }
-    }
 
-    withClue("Alice's validator should be functional and able to onboard a user") {
-      eventuallySucceeds() {
-        aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+      withClue("Alice's validator should be functional and able to onboard a user") {
+        eventuallySucceeds() {
+          aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+        }
       }
-    }
   }
 
   "validator connects to available sequencers when a configured one is down" in { implicit env =>
@@ -98,7 +103,10 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
           aliceValidatorBackend.participantClientWithAdminToken,
           globalSyncAlias,
         )
-        connectedUrls shouldBe Set(getPublicSequencerUrl(sv1Backend), getPublicSequencerUrl(sv2Backend))
+        connectedUrls shouldBe Set(
+          getPublicSequencerUrl(sv1Backend),
+          getPublicSequencerUrl(sv2Backend),
+        )
       }
     }
 
@@ -115,9 +123,9 @@ class SequencerNameFilteringIntegrationTest extends IntegrationTest with SvTestU
   }
 
   private def getSequencerPublicUrls(
-                                      participantConnection: ParticipantClientReference,
-                                      synchronizerAlias: SynchronizerAlias,
-                                    ): Set[String] = {
+      participantConnection: ParticipantClientReference,
+      synchronizerAlias: SynchronizerAlias,
+  ): Set[String] = {
     val sequencerConnections = participantConnection.synchronizers
       .config(synchronizerAlias)
       .value
