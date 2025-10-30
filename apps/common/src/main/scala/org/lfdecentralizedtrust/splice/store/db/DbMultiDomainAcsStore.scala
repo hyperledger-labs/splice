@@ -1670,9 +1670,12 @@ final class DbMultiDomainAcsStore[TXE](
           val acsIndexColumnValues = rowData
             .map(rd => getIndexColumnValues(rd.indexColumns))
             .getOrElse(
-              getIndexColumnValues(
-                contractFilter.getAcsIndexColumnNames.map(_ -> Option.empty[String])
-              )
+              if (contractFilter.getAcsIndexColumnNames.isEmpty) SQLActionBuilderChain(sql"")
+              else {
+                sql"," ++ sqlCommaSeparated(
+                  contractFilter.getAcsIndexColumnNames.map(_ => sql"null")
+                )
+              }
             )
           InsertValues(
             acsTable = insertContractValues(
@@ -1714,7 +1717,7 @@ final class DbMultiDomainAcsStore[TXE](
         rowData: AcsRowData,
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
-        indexColumnNameValues: SQLActionBuilder,
+        indexColumnNameValues: SQLActionBuilderChain,
     ): SQLActionBuilderChain = {
       val contractId = rowData.contractId.asInstanceOf[ContractId[Any]]
       val templateId = rowData.identifier
@@ -1877,15 +1880,12 @@ final class DbMultiDomainAcsStore[TXE](
     case class Delete(evt: ExercisedEvent) extends OperationToDo
   }
 
-  private def getIndexColumnValues(data: Seq[(String, IndexColumnValue[?])]): SQLActionBuilder =
-    data
-      .map(_._2)
-      .map(v => sql"$v")
-      .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
-      }
-      .map(s => (sql"," ++ s).toActionBuilder)
-      .getOrElse(sql"")
+  private def getIndexColumnValues(
+      data: Seq[(String, IndexColumnValue[?])]
+  ): SQLActionBuilderChain = {
+    if (data.isEmpty) SQLActionBuilderChain(sql"")
+    else sql"," ++ sqlCommaSeparated(data.map(_._2).map(v => sql"$v"))
+  }
 
   // TODO: this should probably be dropped
   // Note: the column names are hardcoded so they're safe to interpolate raw
