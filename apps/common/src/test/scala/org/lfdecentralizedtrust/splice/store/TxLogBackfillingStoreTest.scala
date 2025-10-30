@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IM
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
   AcsJdbcTypes,
@@ -506,6 +507,12 @@ class TxLogBackfillingStoreTest
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+  }
+  object GenericAcsRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =
+      new HasIndexColumns[GenericAcsRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[

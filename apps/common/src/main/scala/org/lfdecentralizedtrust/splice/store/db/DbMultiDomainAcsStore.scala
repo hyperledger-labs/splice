@@ -63,6 +63,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
@@ -1156,20 +1157,33 @@ final class DbMultiDomainAcsStore[TXE](
                     // TODO (#989): batch inserts
                     todoAcs.map { ac =>
                       for {
-                        _ <- doIngestAcsInsert(
-                          offset,
-                          ac.createdEvent,
-                          stateRowDataFromActiveContract(ac.synchronizerId, ac.reassignmentCounter),
+                        _ <- doIngestAcsInserts(
+                          NonEmptyList
+                            .of(
+                              AcsInsertEntry(
+                                offset,
+                                ac.createdEvent,
+                                stateRowDataFromActiveContract(
+                                  ac.synchronizerId,
+                                  ac.reassignmentCounter,
+                                ),
+                              )
+                            ),
                           summaryState,
                         )
                       } yield ()
                     }
                       ++ todoIncompleteOut.map { evt =>
                         for {
-                          _ <- doIngestAcsInsert(
-                            offset,
-                            evt.createdEvent,
-                            stateRowDataFromUnassign(evt.reassignmentEvent),
+                          _ <- doIngestAcsInserts(
+                            NonEmptyList
+                              .of(
+                                AcsInsertEntry(
+                                  offset,
+                                  evt.createdEvent,
+                                  stateRowDataFromUnassign(evt.reassignmentEvent),
+                                )
+                              ),
                             summaryState,
                           )
                           _ <- doRegisterIncompleteReassignment(
@@ -1183,10 +1197,15 @@ final class DbMultiDomainAcsStore[TXE](
                       }
                       ++ todoIncompleteIn.map { evt =>
                         for {
-                          _ <- doIngestAcsInsert(
-                            offset,
-                            evt.reassignmentEvent.createdEvent,
-                            stateRowDataFromAssign(evt.reassignmentEvent),
+                          _ <- doIngestAcsInserts(
+                            NonEmptyList
+                              .of(
+                                AcsInsertEntry(
+                                  offset,
+                                  evt.reassignmentEvent.createdEvent,
+                                  stateRowDataFromAssign(evt.reassignmentEvent),
+                                )
+                              ),
                             summaryState,
                           )
                           _ <- doRegisterIncompleteReassignment(
@@ -1359,10 +1378,15 @@ final class DbMultiDomainAcsStore[TXE](
                             )
                           } else {
                             DBIO.seq(
-                              doIngestAcsInsert(
-                                reassignment.offset,
-                                assign.createdEvent,
-                                stateRowDataFromAssign(assign),
+                              doIngestAcsInserts(
+                                NonEmptyList
+                                  .of(
+                                    AcsInsertEntry(
+                                      reassignment.offset,
+                                      assign.createdEvent,
+                                      stateRowDataFromAssign(assign),
+                                    )
+                                  ),
                                 summary,
                               ),
                               doRegisterIncompleteReassignment(
@@ -1480,10 +1504,15 @@ final class DbMultiDomainAcsStore[TXE](
                             DBIO.successful(())
                           } else {
                             DBIO.seq(
-                              doIngestAcsInsert(
-                                offset,
-                                createdEvent,
-                                stateRowDataFromActiveContract(synchronizerId, 0L),
+                              doIngestAcsInserts(
+                                NonEmptyList
+                                  .of(
+                                    AcsInsertEntry(
+                                      offset,
+                                      createdEvent,
+                                      stateRowDataFromActiveContract(synchronizerId, 0L),
+                                    )
+                                  ),
                                 summary,
                               )
                             )
@@ -1562,17 +1591,62 @@ final class DbMultiDomainAcsStore[TXE](
       reassignmentUnassignId = Some(String255.tryCreate(event.unassignId)),
     )
 
-    private def doIngestAcsInsert(
+    case class AcsInsertEntry(
         offset: Long,
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
+    )
+    private def doIngestAcsInserts(
+        entries: NonEmptyList[AcsInsertEntry],
         summary: MutableIngestionSummary,
-    )(implicit
-        tc: TraceContext
-    ) = {
+    )(implicit tc: TraceContext) = {
+      val insertValues = entries
+        .map(entry => entry.createdEvent.getContractId -> getInsertValues(entry))
+      val acsTableValues = insertValues.map(_._2.acsTable)
+      val joinedAcsTableValues = acsTableValues.reduceLeft(_ ++ sql"," ++ _)
+      // column names are hardcoded so they can be raw-interpolated
+      val acsIndexColumnNames = mkIndexColumnNames(contractFilter.getAcsIndexColumnNames)
+      val interfaceViewsIndexColumnNames = mkIndexColumnNames(
+        contractFilter.getInterfaceViewsIndexColumnNames
+      )
+      for {
+        rawContractIdToEventNumber <- (sql"""
+                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name, package_name,
+                                           create_arguments, created_event_blob, created_at, contract_expires_at,
+                                           assigned_domain, reassignment_counter, reassignment_target_domain,
+                                           reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
+                                           #$acsIndexColumnNames)
+                values """ ++ joinedAcsTableValues ++ sql" returning contract_id, event_number").toActionBuilder
+          .asUpdateReturning[(String, Long)]
+        rawContractIdToEventNumberMap = rawContractIdToEventNumber.toMap
+        interfaceViewsValues = insertValues.toList.flatMap { case (contractId, insertValue) =>
+          val eventNumber = rawContractIdToEventNumberMap(contractId)
+          insertValue.interfaceViews(eventNumber)
+        }
+        joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
+        _ <- (joinedInterfaceViewsValues match {
+          case None => // no interfaces to insert
+            DBIO.successful(0)
+          case Some(interfaceViewValues) =>
+            (sql"""
+                insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$interfaceViewsIndexColumnNames)
+                values """ ++ interfaceViewValues).toActionBuilder.asUpdate
+        })
+      } yield {
+        summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
+      }
+    }
+
+    case class InsertValues(
+        acsTable: SQLActionBuilderChain,
+        interfaceViews: Long => Seq[SQLActionBuilderChain],
+    )
+    private def getInsertValues(
+        entry: AcsInsertEntry
+    )(implicit tc: TraceContext): InsertValues = {
       (
-        contractFilter.matchingInterfaceRows(createdEvent),
-        contractFilter.matchingContractToRow(createdEvent),
+        contractFilter.matchingInterfaceRows(entry.createdEvent),
+        contractFilter.matchingContractToRow(entry.createdEvent),
       ) match {
         case (Some((fallbackRowData, interfaces)), rowData) =>
           // For the acs_table row:
@@ -1580,39 +1654,55 @@ final class DbMultiDomainAcsStore[TXE](
           // that does not contain any index columns, as the interface table needs to reference the acs_table.
           // If both match, we want to use the row data from the template filter,
           // as that one contains all the information.
-          insertContract(rowData.getOrElse(fallbackRowData), createdEvent, stateData, summary)
-            .flatMap { eventNumber =>
-              DBIO.sequence(interfaces.map { interfaceRow =>
+          val acsIndexColumnValues = rowData
+            .map(rd => getIndexColumnValues(rd.indexColumns))
+            .getOrElse(
+              getIndexColumnValues(
+                contractFilter.getAcsIndexColumnNames.map(_ -> Option.empty[String])
+              )
+            )
+          InsertValues(
+            acsTable = insertContractValues(
+              rowData.getOrElse(fallbackRowData),
+              entry.createdEvent,
+              entry.stateData,
+              acsIndexColumnValues,
+            ),
+            interfaceViews = eventNumber =>
+              interfaces.map { interfaceRow =>
                 val interfaceId = interfaceRow.interfaceId
                 val interfaceIdQualifiedName = QualifiedName(interfaceId)
                 val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
                 val viewJson =
                   AcsJdbcTypes.payloadJsonFromDefinedDataType(interfaceRow.interfaceView)
-                val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
                 val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
-                (sql"""
-                insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$indexColumnNames)
-                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
-              })
-            }
+                (sql"($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson " ++ indexColumnNameValues ++ sql")")
+              },
+          )
         case (None, Some(rowData)) =>
-          insertContract(rowData, createdEvent, stateData, summary)
+          InsertValues(
+            acsTable = insertContractValues(
+              rowData,
+              entry.createdEvent,
+              entry.stateData,
+              getIndexColumnValues(rowData.indexColumns),
+            ),
+            interfaceViews = _ => Seq.empty,
+          )
         case _ =>
           val errMsg =
-            s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested."
+            s"Item at offset ${entry.offset} with contract id ${entry.createdEvent.getContractId} cannot be ingested."
           logger.error(errMsg)
           throw new IllegalArgumentException(errMsg)
       }
     }
 
-    private def insertContract(
+    private def insertContractValues(
         rowData: AcsRowData,
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
-        summary: MutableIngestionSummary,
-    ): DBIOAction[Long, NoStream, Effect.Write & Effect.Read] = {
-      summary.ingestedCreatedEvents.addOne(createdEvent)
-
+        indexColumnNameValues: SQLActionBuilder,
+    ): SQLActionBuilderChain = {
       val contractId = rowData.contractId.asInstanceOf[ContractId[Any]]
       val templateId = rowData.identifier
       val templateIdQualifiedName = QualifiedName(templateId)
@@ -1631,23 +1721,12 @@ final class DbMultiDomainAcsStore[TXE](
         reassignmentUnassignId,
       ) = stateData
 
-      val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
-      val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
-
       import storage.DbStorageConverters.setParameterByteArray
-      (sql"""
-                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name, package_name,
-                                           create_arguments, created_event_blob, created_at, contract_expires_at,
-                                           assigned_domain, reassignment_counter, reassignment_target_domain,
-                                           reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
-                                           #$indexColumnNames)
-                values ($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName, $packageName,
+      (sql"""($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName, $packageName,
                         $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
-              """ ++ indexColumnNameValues ++ sql") returning event_number").toActionBuilder
-        .asUpdateReturning[Long]
-        .head
+              """ ++ indexColumnNameValues ++ sql")")
     }
 
     private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary) = {
@@ -1795,10 +1874,14 @@ final class DbMultiDomainAcsStore[TXE](
       .map(s => (sql"," ++ s).toActionBuilder)
       .getOrElse(sql"")
 
+  // TODO: this should probably be dropped
   // Note: the column names are hardcoded so they're safe to interpolate raw
   private def getIndexColumnNames(data: Seq[(String, IndexColumnValue[?])]): String =
-    if (data.isEmpty) ""
-    else data.map(_._1).mkString(",", ", ", "")
+    mkIndexColumnNames(data.map(_._1))
+
+  private def mkIndexColumnNames(names: Seq[String]): String =
+    if (names.isEmpty) ""
+    else names.mkString(",", ", ", "")
 
   private def doIngestTxLogInsert(
       migrationId: Long,
