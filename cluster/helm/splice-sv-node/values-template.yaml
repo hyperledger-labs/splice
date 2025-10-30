@@ -16,7 +16,7 @@ defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage
 resources:
   limits:
     cpu: 3
-    memory: 4Gi
+    memory: 8Gi
   requests:
     cpu: 1
     memory: 2Gi
