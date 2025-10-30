@@ -14,10 +14,10 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import scala.concurrent.Future
 
 final object SynchronizerMigrationUtil {
-  // We only check confirmationResponseTimeout here as that is what matters for safety and it ensures that
+  // We only check mediatorReactionTimeout here as that is what matters for safety and it ensures that
   // synchronizerIsUnpaused = !synchronizerIsUnpaused instead of checking that all 3 are 0 or both are non-zero.
   def synchronizerIsPaused(params: TopologyResult[SynchronizerParametersState]): Boolean =
-    params.mapping.parameters.confirmationResponseTimeout == NonNegativeFiniteDuration.Zero
+    params.mapping.parameters.mediatorReactionTimeout == NonNegativeFiniteDuration.Zero
 
   def synchronizerIsUnpaused(params: TopologyResult[SynchronizerParametersState]): Boolean =
     !synchronizerIsPaused(params)
@@ -37,7 +37,10 @@ final object SynchronizerMigrationUtil {
         // that no transactions go through.
         confirmationRequestsMaxRate = NonNegativeInt.zero,
         mediatorReactionTimeout = NonNegativeFiniteDuration.Zero,
-        confirmationResponseTimeout = NonNegativeFiniteDuration.Zero,
+        // We want to block all transactions, ideally we would set this to zero but Canton doesn't like it when mediatorReactionTimeout + confirmationResponseTimeout = 0.
+        // So instead we set this to 1 microsecond. This still makes it impossible to get a transaction through as
+        // you need at a minimum two microseconds difference between confirmation request and verdict.
+        confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfMicros(1),
       ),
     )
 
