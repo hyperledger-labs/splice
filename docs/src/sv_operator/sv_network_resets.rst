@@ -37,13 +37,13 @@ To complete the reset, go through the following steps:
 
        Featured app rights will be lost as part of the reset and need to be recreated manually after the reset.
 
-1.  Decommission your old node
+2.  Decommission your old node
 
     a. Uninstall all helm charts.
     b. Delete all PVCs, docker volumes and databases (including databases
        in Amazon AWS, GCP CloudSQL or similar).
 
-1.  Deploy your new node
+3.  Deploy your new node
 
     a. Set the migration id to 0 in helm chart values. The migration id appears in all helm charts,
        both as its own value, e.g.::
@@ -65,7 +65,7 @@ To complete the reset, go through the following steps:
     f. Install all helm charts.
     g. Wait until your SV node is sending status reports.
 
-1.  Verify that network parameters were preserved
+4.  Verify that network parameters were preserved
 
     a. Confirm that the reset did not change the dso rules
        by repeating step 1.a and comparing the result:
@@ -98,10 +98,10 @@ To complete the reset, go through the following steps:
        We usually want TestNet to be one week (approximately 1008 rounds) ahead of MainNet,
        whereas DevNet is usually reset to round 0.
 
-1.  Take a backup of your node identities as they change as part of the
+5.  Take a backup of your node identities as they change as part of the
     reset.
 
-1.  Other post-reset actions
+6.  Other post-reset actions
 
     a. Recreate votes that were ongoing at the time of the reset, see step 1.c.
     b. Re-issue onboarding secrets to validators you are sponsoring (TestNet only, on DevNet they can self-issue secrets).
