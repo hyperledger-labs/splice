@@ -657,7 +657,7 @@ class HttpSvAdminHandler(
                     at,
                   )
                 case None =>
-                  logger.info("Triggerin synchronizer migration dump for expected synchronizer")
+                  logger.info("Triggering synchronizer migration dump for expected synchronizer")
                   DomainMigrationDump
                     .getDomainMigrationDump(
                       config.domains.global.alias,
