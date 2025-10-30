@@ -25,23 +25,26 @@ class SvMigrationApiIntegrationTest extends SvIntegrationTestBase {
     initDso()
 
     clue("triggering the dump fails if no timestamp is provided as the sync must be paused") {
-      a[CommandFailure] should be thrownBy {
-        sv1Backend.triggerDecentralizedSynchronizerMigrationDump(0)
-      }
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        a[CommandFailure] should be thrownBy {
+          sv1Backend.triggerDecentralizedSynchronizerMigrationDump(0)
+        },
+        lines => forAll(lines)(_.errorMessage should include("HTTP 400 Bad Request")),
+      )
     }
     val dumpTimestamp = Instant.now().minus(30, ChronoUnit.SECONDS)
-    sv1Backend.triggerDecentralizedSynchronizerMigrationDump(
-      0,
-      dumpTimestamp.some,
-    )
     val expectedDirectory = migrationDumpPathForSv(
       sv1Backend.name
     ).parent / s"export_at_${dumpTimestamp.toEpochMilli}"
 
     clue(s"export is written at ${expectedDirectory.toString()}") {
+      sv1Backend.triggerDecentralizedSynchronizerMigrationDump(
+        0,
+        dumpTimestamp.some,
+      )
       expectedDirectory.exists shouldBe true
       (expectedDirectory / "domain_migration_dump.json").exists shouldBe true
-      (expectedDirectory / s"$dumpTimestamp-genesis-file").exists shouldBe true
+      (expectedDirectory / s"$dumpTimestamp-genesis-state").exists shouldBe true
       (expectedDirectory / s"$dumpTimestamp-acs-snapshot").exists shouldBe true
     }
   }
