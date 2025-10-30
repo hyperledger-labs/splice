@@ -75,6 +75,8 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
+import java.time.Instant
+
 final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
@@ -1275,8 +1277,9 @@ final class DbMultiDomainAcsStore[TXE](
             handleIngestionSummary(summary)
           }
         case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), domain) =>
+          // TODO: fix this next
           val offset = tree.getOffset
-          ingestTransactionTree(domain, offset, tree).map { summaryState =>
+          ingestTransactionTrees(domain, offset, NonEmptyList.of(tree)).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
@@ -1445,48 +1448,57 @@ final class DbMultiDomainAcsStore[TXE](
       } yield summary
     }
 
-    private def ingestTransactionTree(
+    private def ingestTransactionTrees(
         synchronizerId: SynchronizerId,
         offset: Long,
-        tree: Transaction,
+        trees: NonEmptyList[Transaction],
     )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
       val summary = MutableIngestionSummary.empty
 
-      val workTodo = Trees
-        .foldTree(
-          tree,
-          VectorMap.empty[String, OperationToDo],
-        )(
-          onCreate = (st, ev, _) => {
-            if (contractFilter.contains(ev)) {
-              contractFilter.ensureStakeholderOf(ev)
-              st + (ev.getContractId -> Insert(
-                ev
-              ))
-            } else {
-              summary.numFilteredCreatedEvents += 1
-              st
-            }
-          },
-          onExercise = (st, ev, _) => {
-            if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
-              // optimization: a delete on a contract cancels-out with the corresponding insert
-              if (st.contains(ev.getContractId)) {
-                st - ev.getContractId
-              } else {
-                st + (ev.getContractId -> Delete(ev))
-              }
-            } else {
-              st
-            }
-          },
+      val workTodo = trees
+        .map(tree =>
+          Trees
+            .foldTree(
+              tree,
+              VectorMap.empty[String, OperationToDo],
+            )(
+              onCreate = (st, ev, _) => {
+                if (contractFilter.contains(ev)) {
+                  contractFilter.ensureStakeholderOf(ev)
+                  st + (ev.getContractId -> Insert(
+                    ev
+                  ))
+                } else {
+                  summary.numFilteredCreatedEvents += 1
+                  st
+                }
+              },
+              onExercise = (st, ev, _) => {
+                if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
+                  st + (ev.getContractId -> Delete(ev))
+                } else {
+                  st
+                }
+              },
+            )
         )
-        .toVector
-        .map(_._2)
-      val txLogEntries =
-        if (!tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
-          txLogConfig.parser.parse(tree, synchronizerId, logger)
-        else Seq.empty // do not parse events imported from acs
+        // optimization: a delete on a contract cancels-out with the corresponding insert
+        .foldLeft(VectorMap.empty[String, OperationToDo]) { case (acc, treeOps) =>
+          val (toRemove, toAdd) = treeOps.partition {
+            case (contractId, Delete(_)) if acc.contains(contractId) => true
+            case _ => false
+          }
+          (acc -- toRemove.keys) ++ toAdd
+        }
+        .values
+        .toSeq
+
+      val txLogEntries: Seq[(Instant, TXE)] = trees
+        // do not parse events imported from acs
+        .filter(tree => !tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
+        .flatMap(tree =>
+          txLogConfig.parser.parse(tree, synchronizerId, logger).map(tree.getRecordTime -> _)
+        )
 
       for {
         _ <- storage
@@ -1521,12 +1533,13 @@ final class DbMultiDomainAcsStore[TXE](
                     case Delete(exercisedEvent) =>
                       doDeleteContract(exercisedEvent, summary)
                   })*),
-                  DBIO.seq(txLogEntries.map { txe =>
+                  // TODO: this also needs batching
+                  DBIO.seq(txLogEntries.map { case (recordTime, txe) =>
                     doIngestTxLogInsert(
                       domainMigrationId,
                       synchronizerId,
                       offset,
-                      CantonTimestamp.assertFromInstant(tree.getRecordTime),
+                      CantonTimestamp.assertFromInstant(recordTime),
                       txe,
                       summary,
                     )
@@ -1534,7 +1547,7 @@ final class DbMultiDomainAcsStore[TXE](
                   doInitializeFirstIngestedUpdate(
                     synchronizerId,
                     domainMigrationId,
-                    CantonTimestamp.assertFromInstant(tree.getRecordTime),
+                    CantonTimestamp.assertFromInstant(trees.head.getRecordTime),
                   ),
                 ),
             ),
