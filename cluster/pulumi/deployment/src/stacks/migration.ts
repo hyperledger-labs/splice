@@ -18,19 +18,25 @@ import {
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
+import { deploymentConf } from '../config';
+
 export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
-  const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
-  return migrations
-    .filter(migration => !migration.releaseReference)
-    .map(migration =>
-      allSvsToDeploy.map(sv => {
-        return {
-          project: 'sv-canton',
-          stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
-        };
-      })
-    )
-    .flat();
+  if (deploymentConf.projectWhitelist.has('sv-canton')) {
+    const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
+    return migrations
+      .filter(migration => !migration.releaseReference)
+      .map(migration =>
+        allSvsToDeploy.map(sv => {
+          return {
+            project: 'sv-canton',
+            stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
+          };
+        })
+      )
+      .flat();
+  } else {
+    return [];
+  }
 }
 
 export function installMigrationSpecificStacks(
@@ -39,24 +45,33 @@ export function installMigrationSpecificStacks(
   namespace: string,
   gcpSecret: k8s.core.v1.Secret
 ): void {
-  const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
-  migrations.forEach(migration => {
-    const reference = migration.releaseReference
-      ? gitRepoForRef(
-          `migration-${migration.id}`,
-          migration.releaseReference,
-          allSvsToDeploy.map(sv => {
-            return {
-              project: 'sv-canton',
-              stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
-            };
-          })
-        )
-      : mainReference;
-    allSvsToDeploy.forEach(sv => {
-      createStackForMigration(sv.nodeName, migration.id, reference, envRefs, namespace, gcpSecret);
+  if (deploymentConf.projectWhitelist.has('sv-canton')) {
+    const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
+    migrations.forEach(migration => {
+      const reference = migration.releaseReference
+        ? gitRepoForRef(
+            `migration-${migration.id}`,
+            migration.releaseReference,
+            allSvsToDeploy.map(sv => {
+              return {
+                project: 'sv-canton',
+                stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
+              };
+            })
+          )
+        : mainReference;
+      allSvsToDeploy.forEach(sv => {
+        createStackForMigration(
+          sv.nodeName,
+          migration.id,
+          reference,
+          envRefs,
+          namespace,
+          gcpSecret
+        );
+      });
     });
-  });
+  }
 }
 
 function createStackForMigration(

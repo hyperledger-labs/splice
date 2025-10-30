@@ -12,6 +12,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
 import { config } from '../../../common';
+import { deploymentConf } from '../config';
 
 export function installAllValidatorStacks(
   reference: GitFluxRef,
@@ -19,24 +20,26 @@ export function installAllValidatorStacks(
   namespace: string,
   gcpSecret: k8s.core.v1.Secret
 ): void {
-  const validatorStacksToCreate = deployedValidators.map(validator => {
-    return {
-      validator: validator,
-      stackName: validatorRunbookStackName(validator),
-    };
-  });
-  validatorStacksToCreate.forEach(validator => {
-    createStackCR(
-      validator.stackName,
-      'validator-runbook',
-      namespace,
-      config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'),
-      reference,
-      envRefs,
-      gcpSecret,
-      {
-        SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME: validator.validator,
-      }
-    );
-  });
+  if (deploymentConf.projectWhitelist.has('validator-runbook')) {
+    const validatorStacksToCreate = deployedValidators.map(validator => {
+      return {
+        validator: validator,
+        stackName: validatorRunbookStackName(validator),
+      };
+    });
+    validatorStacksToCreate.forEach(validator => {
+      createStackCR(
+        validator.stackName,
+        'validator-runbook',
+        namespace,
+        config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'),
+        reference,
+        envRefs,
+        gcpSecret,
+        {
+          SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME: validator.validator,
+        }
+      );
+    });
+  }
 }
