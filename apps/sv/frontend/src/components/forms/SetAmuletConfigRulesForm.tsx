@@ -21,6 +21,7 @@ import { buildAmuletConfigChanges } from '../../utils/buildAmuletConfigChanges';
 import { useAppForm } from '../../hooks/form';
 import {
   validateEffectiveDate,
+  validateExpiration,
   validateExpiryEffectiveDate,
   validateSummary,
   validateUrl,
@@ -222,7 +223,13 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
             )}
           </form.AppField>
 
-          <form.AppField name="common.expiryDate">
+          <form.AppField
+            name="common.expiryDate"
+            validators={{
+              onChange: ({ value }) => validateExpiration(value),
+              onBlur: ({ value }) => validateExpiration(value),
+            }}
+          >
             {field => (
               <field.DateField
                 title="Threshold Deadline"

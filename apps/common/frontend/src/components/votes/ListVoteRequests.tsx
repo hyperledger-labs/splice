@@ -6,13 +6,13 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useCallback, useMemo, useState } from 'react';
 
-import { ClickAwayListener } from '@mui/base';
 import CloseIcon from '@mui/icons-material/Close';
 import {
   Badge,
   Box,
   Card,
   CardHeader,
+  ClickAwayListener,
   IconButton,
   Modal,
   Stack,

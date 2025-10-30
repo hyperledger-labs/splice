@@ -81,6 +81,7 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
                     effectiveDate: newDate?.format(dateTimeFormatISO) || undefined,
                   });
                 }}
+                enableAccessibleFieldDOMStructure={false}
                 slotProps={{
                   textField: {
                     fullWidth: true,
