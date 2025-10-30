@@ -272,7 +272,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
   ): Unit = {
     actAndCheck(
       "step forward many rounds", {
-        advanceTimeToRoundOpen
+        actAndCheck("Open round 0", advanceTimeToRoundOpen)(
+          "Alice gets her first faucet coupon",
+          _ => aliceValidatorWalletClient.listValidatorFaucetCoupons().length,
+        )
         (1 to 5).foreach { _ =>
           advanceRoundsToNextRoundOpening
         }
