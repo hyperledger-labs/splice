@@ -148,10 +148,6 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     )
   }
 
-  "SVs can be onboarded a second time" in { implicit env =>
-    initDso()
-  }
-
   "SVs can pause and unpause the domain via SV app API calls" in { implicit env =>
     implicit val ec: ExecutionContext = env.executionContext
     initDso()
