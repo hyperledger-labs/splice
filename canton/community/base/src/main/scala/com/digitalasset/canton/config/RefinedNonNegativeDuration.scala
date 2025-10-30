@@ -148,6 +148,8 @@ trait RefinedNonNegativeDurationCompanion[D <: RefinedNonNegativeDuration[D]] {
   def tryFromJavaDuration(duration: java.time.Duration): D =
     tryFromDuration(Duration.fromNanos(duration.toNanos))
 
+  def ofMicros(millis: Long): D = apply(Duration(millis, TimeUnit.MICROSECONDS))
+
   def ofMillis(millis: Long): D = apply(Duration(millis, TimeUnit.MILLISECONDS))
 
   def ofSeconds(secs: Long): D = apply(Duration(secs, TimeUnit.SECONDS))
