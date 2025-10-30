@@ -7,7 +7,6 @@ pulumiProjectConfig:
   default:
     cloudSql:
       protected: false
-    allowDowngrade: false
 validator1:
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min
