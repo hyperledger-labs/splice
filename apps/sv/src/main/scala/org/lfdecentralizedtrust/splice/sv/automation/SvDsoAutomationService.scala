@@ -307,7 +307,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        connection(SpliceLedgerConnectionPriority.Medium),
+        connection(SpliceLedgerConnectionPriority.High),
         config.extraBeneficiaries,
       )
     )
