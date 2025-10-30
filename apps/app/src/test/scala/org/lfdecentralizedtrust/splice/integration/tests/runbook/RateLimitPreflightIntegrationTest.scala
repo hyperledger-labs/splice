@@ -69,7 +69,7 @@ class RateLimitPreflightIntegrationTest extends IntegrationTestWithSharedEnviron
       forAll(_)(
         // This hits the Canton limit on concurrent requests
         _.message should include(
-          "Reached the limit of concurrent streams for com.digitalasset.canton.admin.participant.v30.ParticipantRepairService/ExportAcsOld"
+          "Reached the limit of concurrent streams for com.digitalasset.canton.admin.participant.v30.ParticipantRepairService/ExportAcs"
         )
       ),
     )
