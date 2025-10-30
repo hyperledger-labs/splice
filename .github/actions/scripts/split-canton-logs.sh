@@ -36,12 +36,18 @@ then
   exit 2
 fi
 
-# Using range addresses to split the file: https://www.gnu.org/software/sed/manual/sed.html#Range-Addresses
-# This will print everything up to and including the shutdown log line.
-sed -n "0,/$SHUTDOWN_MESSAGE_PATTERN/p" "$LOGFILE" >> "$LOGFILE_BEFORE"
+if [[ -f "$LOGFILE_BEFORE" ]]
+then
+  # Using range addresses to split the file: https://www.gnu.org/software/sed/manual/sed.html#Range-Addresses
+  # This will print everything up to and including the shutdown log line.
+  sed -n "0,/$SHUTDOWN_MESSAGE_PATTERN/p" "$LOGFILE" >> "$LOGFILE_BEFORE"
+fi
 
 # This will print the shutdown log line and all lines until the end of the file.
-sed -n "/$SHUTDOWN_MESSAGE_PATTERN/,\$p" "$LOGFILE" >> "$LOGFILE_AFTER"
+if [[ -f "$LOGFILE_AFTER" ]]
+then
+  sed -n "/$SHUTDOWN_MESSAGE_PATTERN/,\$p" "$LOGFILE" >> "$LOGFILE_AFTER"
+fi
 
 # Delete original logfile to ensure every log-line is present in at most one file
 rm -f "$LOGFILE"

@@ -31,7 +31,4 @@ ApiUpdateService.*AbruptTerminationException
 # Consequence of the AbruptTerminationException
 UpdateService/GetUpdates.*failed with INTERNAL
 
-# Consequence of shutting down global domain
-.*The sequencer client\'s healthy subscriptions count is under the configured BFT threshold .* Failed sequencer subscriptions for .* Previous state was Ok.*
-
 # Make sure to have a trailing newline

@@ -1862,6 +1862,8 @@ checkErrors := {
     dir
       .glob("canton-standalone-*.clog")
       .map(_.nameWithoutExtension)
+      .map(_.stripSuffix("_before_shutdown"))
+      .map(_.stripSuffix("_after_shutdown"))
       .foreach { name =>
         splitAndCheckCantonLogFile(
           name,
