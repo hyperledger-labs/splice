@@ -1,6 +1,7 @@
 {
   "name": "@lfdecentralizedtrust/splice-pulumi-policy",
   "main": "src/index.ts",
+  "version": "1.0.0",
   "dependencies": {
     "@pulumi/kubernetes-cert-manager": "0.2.0",
     "@pulumiverse/grafana": "0.16.3",

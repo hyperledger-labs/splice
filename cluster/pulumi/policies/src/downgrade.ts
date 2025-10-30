@@ -41,15 +41,13 @@ export function applyDowngradePolicy(): PolicyPack {
           k8s.helm.v3.Release,
           (_, args, reportViolation) => {
             const newVersion = args.props.version as string;
-            const currentVersion = getHelmAppVersion('ingress-sv', 'sv-1');
+            const currentVersion = getHelmAppVersion(args.props.name, args.props.namespace);
 
             if (allowDowngrade) {
-              console.log('Allow downgrades');
               return;
             }
 
             if (!currentVersion) {
-              console.log('Fresh cluster');
               return;
             }
 
