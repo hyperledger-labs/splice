@@ -274,7 +274,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
       "step forward many rounds", {
         actAndCheck(
           "Advance the first round", {
-            advanceTimeToRoundOpen
             advanceRoundsToNextRoundOpening
           },
         )(
