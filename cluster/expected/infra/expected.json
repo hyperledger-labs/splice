@@ -1722,11 +1722,11 @@
         "resources": {
           "limits": {
             "cpu": "4",
-            "memory": "2024Mi"
+            "memory": "4096Mi"
           },
           "requests": {
             "cpu": "500m",
-            "memory": "512Mi"
+            "memory": "1024Mi"
           }
         },
         "service": {
@@ -1903,11 +1903,11 @@
         "resources": {
           "limits": {
             "cpu": "4",
-            "memory": "2024Mi"
+            "memory": "4096Mi"
           },
           "requests": {
             "cpu": "500m",
-            "memory": "512Mi"
+            "memory": "1024Mi"
           }
         },
         "service": {
@@ -2234,7 +2234,7 @@
             }
           }
         },
-        "autoscaleMax": 20,
+        "autoscaleMax": 30,
         "autoscaleMin": 2,
         "global": {
           "istioNamespace": "cluster-ingress",
