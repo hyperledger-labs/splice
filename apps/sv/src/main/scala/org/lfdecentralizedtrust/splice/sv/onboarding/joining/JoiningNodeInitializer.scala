@@ -314,7 +314,7 @@ class JoiningNodeInitializer(
         SvCantonIdentifierConfig.default(config)
       )
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           localSynchronizerNode.traverse(lsn =>
             SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
               cantonIdentifierConfig,
@@ -399,7 +399,7 @@ class JoiningNodeInitializer(
         waitUntilCometBftNodeIsValidator,
       ).tupled
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           localSynchronizerNode.traverse_ { localSynchronizerNode =>
             for {
               // First, make sure the identity of the new domain nodes is known on the domain
@@ -452,7 +452,7 @@ class JoiningNodeInitializer(
         }
       _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           synchronizerNodeReconciler
             .reconcileSynchronizerNodeConfigIfRequired(
               localSynchronizerNode,
