@@ -1,0 +1,11 @@
+{
+  "name": "common-typeface-lato",
+  "description": "",
+  "version": "1.0.0",
+  "author": "",
+  "keywords": [],
+  "license": "ISC",
+  "main": "index.css",
+  "private": "true",
+  "types": "index.d.ts"
+}
