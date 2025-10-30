@@ -54,16 +54,18 @@ class DomainDataSnapshotGenerator(
   ): Future[DomainDataSnapshot] = for {
     decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
     cantonTimestamp = CantonTimestamp.tryFromInstant(timestamp)
-    topologySnapshot <- sequencerAdminConnection.getGenesisState(cantonTimestamp)
-    acsSnapshot <- acsExporter
-      .exportAcsAtTimestamp(
-        decentralizedSynchronizer,
-        timestamp,
-        force,
-        AcsExportForParties.OnlyForParties(
-          partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_)).toSet
+    (topologySnapshot, acsSnapshot) <- (
+      sequencerAdminConnection.getGenesisState(cantonTimestamp),
+      acsExporter
+        .exportAcsAtTimestamp(
+          decentralizedSynchronizer,
+          timestamp,
+          force,
+          AcsExportForParties.OnlyForParties(
+            partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_)).toSet
+          ),
         ),
-      )
+    ).tupled
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     Some(topologySnapshot),
