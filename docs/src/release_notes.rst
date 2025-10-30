@@ -18,6 +18,11 @@ Upcoming
       implementing auto-merging of holdings and airdrop campaigns, as
       explained in :ref:`holding_utxo_management`.
       The package is optional and not uploaded by default to a validator node.
+    - Extended the ``splice-util-featured-app-proxies.dar``
+      :ref:`package <package-featured-app-proxies>` to
+      support executing :ref:`batch/bulk transfers <type-splice-util-featuredapp-walletuserproxy-walletuserproxybatchtransfer-93002>` of Canton Network token standard tokens,
+      both for featured and unfeatured apps.
+
 
 0.4.22
 ------
