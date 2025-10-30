@@ -340,6 +340,7 @@ case class SvAppBackendConfig(
     // Can be safely set to true for an SV that has completed onboarding unless you
     // 1. try to reset one of your sequencers or mediators
     // 2. change sequencer URLs that need to get published externally.
+    // Read `shouldSkipSynchronizerInitialization` instead when checking if it should be skipped which takes migrations into account.
     skipSynchronizerInitialization: Boolean = false,
     // The maximum delay before submitting a package vetting
     // change. The actual delay will be chosen randomly (uniformly
@@ -356,6 +357,14 @@ case class SvAppBackendConfig(
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
 ) extends SpliceBackendConfig {
+
+  def shouldSkipSynchronizerInitialization =
+    skipSynchronizerInitialization &&
+      onboarding.fold(true) {
+        case _: SvOnboardingConfig.FoundDso => true
+        case _: SvOnboardingConfig.JoinWithKey => true
+        case _: SvOnboardingConfig.DomainMigration => false
+      }
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig

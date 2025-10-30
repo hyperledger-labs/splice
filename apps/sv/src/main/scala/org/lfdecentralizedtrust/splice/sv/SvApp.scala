@@ -468,7 +468,7 @@ class SvApp(
         },
         localSynchronizerNode match {
           case Some(node) =>
-            if (!config.skipSynchronizerInitialization) {
+            if (!config.shouldSkipSynchronizerInitialization) {
               appInitStep(
                 "Ensure that the local mediators's sequencer request amplification config is up to date"
               ) {
