@@ -2208,7 +2208,7 @@ function subcmd_psql() {
   _info "Retrieving DB connection info from pod description..."
   local DB_INIT_COMMAND
   DB_INIT_COMMAND=$(
-    kubectl describe pod \
+    kubectl describe deployment \
       --namespace "${NAMESPACE}" \
       --selector "app=${APPLICATION}" \
     | grep -i psql \
@@ -2219,7 +2219,7 @@ function subcmd_psql() {
     _error "Application ${APPLICATION} in namespace ${NAMESPACE} does not have an associated database."
     exit 1
   fi
-  
+
   eval "set -- $DB_INIT_COMMAND"
   while [ $# -gt 0 ]; do
     case "$1" in

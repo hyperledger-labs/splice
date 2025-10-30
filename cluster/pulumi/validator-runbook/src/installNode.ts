@@ -26,6 +26,7 @@ import {
   nonDevNetNonSvValidatorTopupConfig,
   nonSvValidatorTopupConfig,
   participantBootstrapDumpSecretName,
+  preApproveValidatorRunbook,
   SPLICE_ROOT,
   setupBootstrapping,
   spliceInstanceNames,
@@ -43,7 +44,7 @@ import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-v
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import { installPartyAllocator } from './partyAllocator';
-import { validatorConfig } from './validatorConfig';
+import { validatorConfig, validatorName } from './validatorConfig';
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -76,13 +77,18 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bootstrappingConfig,
     });
 
+  const onboardingSecret =
+    preApproveValidatorRunbook || validatorName != 'validator-runbook'
+      ? validatorConfig.onboardingSecret
+      : undefined;
+
   const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
   const validator = await installValidator({
     xns,
-    onboardingSecret: validatorConfig.onboardingSecret,
+    onboardingSecret,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,

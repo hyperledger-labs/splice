@@ -431,7 +431,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
     find(id("error")).value.text should include(err)
-    click on "clear-error-button"
+    eventuallyClickOn(id("clear-error-button"))
     eventually() {
       find(id("error")) shouldBe None
     }
@@ -576,7 +576,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           if (find(id("logout-button")).isDefined) {
             silentActAndCheck(
               "Auth0 login: Log out",
-              click on id("logout-button"),
+              eventuallyClickOn(id("logout-button")),
             )(
               "Auth0 login: Login button is visible",
               _ => find(id("oidc-login-button")) should not be empty,
@@ -626,7 +626,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ) = {
     silentActAndCheck(
       "Auth0 login: Click the login button",
-      click on "oidc-login-button",
+      eventuallyClickOn(id("oidc-login-button")),
     )(
       "Auth0 login: Login form is visible",
       _ => assertAuth0LoginFormVisible(),
@@ -681,6 +681,15 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       }
     }
     clickOn(query)
+  }
+
+  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
+    clue(s"Waiting for $query to be found") {
+      waitForCondition(query) {
+        ExpectedConditions.visibilityOfElementLocated(_)
+      }
+    }
+    find(query)
   }
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit

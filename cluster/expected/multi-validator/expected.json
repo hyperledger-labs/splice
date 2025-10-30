@@ -259,7 +259,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-0-service-monitor",
+        "name": "multi-participant-0-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -274,12 +274,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-0"
+            "app": "multi-participant-0-3"
           }
         }
       }
     },
-    "name": "multi-participant-0-service-monitor",
+    "name": "multi-participant-0-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -287,7 +287,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-0",
+    "name": "multi-participant-0-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -299,7 +299,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-0"
+          "app": "multi-participant-0-3"
         },
         "namespace": "multi-validator"
       },
@@ -307,7 +307,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-0"
+            "app": "multi-participant-0-3"
           }
         },
         "strategy": {
@@ -316,7 +316,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-0"
+              "app": "multi-participant-0-3"
             }
           },
           "spec": {
@@ -345,7 +345,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -537,7 +537,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -570,7 +570,7 @@
         }
       }
     },
-    "name": "multi-participant-0",
+    "name": "multi-participant-0-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -582,9 +582,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-0"
+          "app": "multi-participant-0-3"
         },
-        "name": "multi-participant-0",
+        "name": "multi-participant-0-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -679,11 +679,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-0"
+          "app": "multi-participant-0-3"
         }
       }
     },
-    "name": "multi-participant-0",
+    "name": "multi-participant-0-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -697,7 +697,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-1-service-monitor",
+        "name": "multi-participant-1-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -712,12 +712,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-1"
+            "app": "multi-participant-1-3"
           }
         }
       }
     },
-    "name": "multi-participant-1-service-monitor",
+    "name": "multi-participant-1-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -725,7 +725,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-1",
+    "name": "multi-participant-1-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -737,7 +737,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-1"
+          "app": "multi-participant-1-3"
         },
         "namespace": "multi-validator"
       },
@@ -745,7 +745,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-1"
+            "app": "multi-participant-1-3"
           }
         },
         "strategy": {
@@ -754,7 +754,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-1"
+              "app": "multi-participant-1-3"
             }
           },
           "spec": {
@@ -783,7 +783,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -975,7 +975,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1008,7 +1008,7 @@
         }
       }
     },
-    "name": "multi-participant-1",
+    "name": "multi-participant-1-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -1020,9 +1020,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-1"
+          "app": "multi-participant-1-3"
         },
-        "name": "multi-participant-1",
+        "name": "multi-participant-1-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1117,11 +1117,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-1"
+          "app": "multi-participant-1-3"
         }
       }
     },
-    "name": "multi-participant-1",
+    "name": "multi-participant-1-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -1135,7 +1135,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-2-service-monitor",
+        "name": "multi-participant-2-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1150,12 +1150,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-2"
+            "app": "multi-participant-2-3"
           }
         }
       }
     },
-    "name": "multi-participant-2-service-monitor",
+    "name": "multi-participant-2-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -1163,7 +1163,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-2",
+    "name": "multi-participant-2-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -1175,7 +1175,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-2"
+          "app": "multi-participant-2-3"
         },
         "namespace": "multi-validator"
       },
@@ -1183,7 +1183,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-2"
+            "app": "multi-participant-2-3"
           }
         },
         "strategy": {
@@ -1192,7 +1192,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-2"
+              "app": "multi-participant-2-3"
             }
           },
           "spec": {
@@ -1221,7 +1221,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1413,7 +1413,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1446,7 +1446,7 @@
         }
       }
     },
-    "name": "multi-participant-2",
+    "name": "multi-participant-2-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -1458,9 +1458,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-2"
+          "app": "multi-participant-2-3"
         },
-        "name": "multi-participant-2",
+        "name": "multi-participant-2-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1555,11 +1555,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-2"
+          "app": "multi-participant-2-3"
         }
       }
     },
-    "name": "multi-participant-2",
+    "name": "multi-participant-2-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -1573,7 +1573,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-3-service-monitor",
+        "name": "multi-participant-3-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1588,12 +1588,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-3"
+            "app": "multi-participant-3-3"
           }
         }
       }
     },
-    "name": "multi-participant-3-service-monitor",
+    "name": "multi-participant-3-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -1601,7 +1601,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-3",
+    "name": "multi-participant-3-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -1613,7 +1613,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-3"
+          "app": "multi-participant-3-3"
         },
         "namespace": "multi-validator"
       },
@@ -1621,7 +1621,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-3"
+            "app": "multi-participant-3-3"
           }
         },
         "strategy": {
@@ -1630,7 +1630,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-3"
+              "app": "multi-participant-3-3"
             }
           },
           "spec": {
@@ -1659,7 +1659,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1851,7 +1851,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1884,7 +1884,7 @@
         }
       }
     },
-    "name": "multi-participant-3",
+    "name": "multi-participant-3-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -1896,9 +1896,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-3"
+          "app": "multi-participant-3-3"
         },
-        "name": "multi-participant-3",
+        "name": "multi-participant-3-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1993,11 +1993,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-3"
+          "app": "multi-participant-3-3"
         }
       }
     },
-    "name": "multi-participant-3",
+    "name": "multi-participant-3-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -2011,7 +2011,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-4-service-monitor",
+        "name": "multi-participant-4-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2026,12 +2026,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-4"
+            "app": "multi-participant-4-3"
           }
         }
       }
     },
-    "name": "multi-participant-4-service-monitor",
+    "name": "multi-participant-4-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -2039,7 +2039,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-4",
+    "name": "multi-participant-4-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -2051,7 +2051,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-4"
+          "app": "multi-participant-4-3"
         },
         "namespace": "multi-validator"
       },
@@ -2059,7 +2059,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-4"
+            "app": "multi-participant-4-3"
           }
         },
         "strategy": {
@@ -2068,7 +2068,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-4"
+              "app": "multi-participant-4-3"
             }
           },
           "spec": {
@@ -2097,7 +2097,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -2289,7 +2289,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -2322,7 +2322,7 @@
         }
       }
     },
-    "name": "multi-participant-4",
+    "name": "multi-participant-4-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -2334,9 +2334,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-4"
+          "app": "multi-participant-4-3"
         },
-        "name": "multi-participant-4",
+        "name": "multi-participant-4-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2431,11 +2431,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-4"
+          "app": "multi-participant-4-3"
         }
       }
     },
-    "name": "multi-participant-4",
+    "name": "multi-participant-4-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -2561,7 +2561,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-0"
+                    "value": "multi-participant-0-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -3000,7 +3000,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-1"
+                    "value": "multi-participant-1-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -3439,7 +3439,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-2"
+                    "value": "multi-participant-2-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -3878,7 +3878,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-3"
+                    "value": "multi-participant-3-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -4317,7 +4317,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-4"
+                    "value": "multi-participant-4-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",

@@ -135,7 +135,7 @@ class SplitwellUpgradeFrontendIntegrationTest
 
           actAndCheck(
             "Alice accepts bob's request",
-            click on className("add-user-link") withClue "alice accepts bob's request",
+            eventuallyClickOn(className("add-user-link")) withClue "alice accepts bob's request",
           )(
             "Group contract id changes",
             _ => {
@@ -159,8 +159,10 @@ class SplitwellUpgradeFrontendIntegrationTest
           // the workflow
           actAndCheck(
             "bob creates AppPaymentRequest and DeliveryOffer",
-            click on cssSelector(
-              s""".group-entry[data-group-id="$abGroupName"] ~ * .settle-my-debts-link"""
+            eventuallyClickOn(
+              cssSelector(
+                s""".group-entry[data-group-id="$abGroupName"] ~ * .settle-my-debts-link"""
+              )
             ),
           )(
             "Bob was redirected to wallet",
@@ -301,7 +303,7 @@ class SplitwellUpgradeFrontendIntegrationTest
       field.underlying.click()
       reactTextInput(field).value = description
     }
-    click on cssSelector(s"$groupEntry .enter-payment-link")
+    eventuallyClickOn(cssSelector(s"$groupEntry .enter-payment-link"))
   }
 }
 

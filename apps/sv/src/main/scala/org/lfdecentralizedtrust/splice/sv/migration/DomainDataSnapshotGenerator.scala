@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.migration.{
   AcsExporter,
   DarExporter,
@@ -22,6 +23,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportForParties
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -59,7 +61,9 @@ class DomainDataSnapshotGenerator(
         decentralizedSynchronizer,
         timestamp,
         force,
-        partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_))*
+        AcsExportForParties.OnlyForParties(
+          partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_)).toSet
+        ),
       )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
@@ -68,6 +72,7 @@ class DomainDataSnapshotGenerator(
     acsTimestamp = timestamp,
     dars,
     synchronizerWasPaused = false,
+    acsFormat = http.DomainDataSnapshot.AcsFormat.LedgerApi,
   )
 
   // This is the safe version used for migrations that exports at the timestamp where we pause the synchronizer.
@@ -148,6 +153,7 @@ class DomainDataSnapshotGenerator(
       acsTimestamp,
       dars,
       synchronizerWasPaused = true,
+      acsFormat = http.DomainDataSnapshot.AcsFormat.LedgerApi,
     )
     logger.info(show"Finished generating $result")
     result

@@ -175,6 +175,21 @@ case class UseToxiproxy(
                         BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
                       ),
                     )
+                  case BftScanClientConfig
+                        .BftCustom(
+                          seedUrls,
+                          _,
+                          _,
+                          amuletRulesCacheTimeToLive,
+                          scansRefreshInterval,
+                        ) =>
+                    val newUrl = addScanAppHttpProxy(n.unwrap, seedUrls.head, basePortBump)
+                    (
+                      n,
+                      config.copy(scanClient =
+                        BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
+                      ),
+                    )
                 }
               }
               .toMap

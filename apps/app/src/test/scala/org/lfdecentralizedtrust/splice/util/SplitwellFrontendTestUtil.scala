@@ -16,7 +16,7 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
       field.underlying.click()
       reactTextInput(field).value = "Team lunch"
     }
-    click on className("enter-payment-link")
+    eventuallyClickOn(className("enter-payment-link"))
   }
 
   def enterSplitwellPayment(
@@ -36,15 +36,15 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
         receiver,
         receiverPartyId.toProtoPrimitive,
       )
-      click on className("transfer-link")
+      eventuallyClickOn(className("transfer-link"))
     }
   }
 
   def createGroup(groupName: String)(implicit webDriver: WebDriverType) = {
     waitForQuery(id("group-id-field"))
-    click on "group-id-field"
+    eventuallyClickOn(id("group-id-field"))
     textField("group-id-field").value = groupName
-    click on "create-group-button"
+    eventuallyClickOn(id("create-group-button"))
   }
   def createGroupAndInviteLink(groupName: String)(implicit
       webDriver: WebDriverType

@@ -89,6 +89,7 @@ Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 ForkJoinIdlenessExecutorService.*shutdown did not complete gracefully in allotted
 
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
+Consensus not reached.*BftScanConnection:ConfigurationProvidedBftScanConnectionIntegrationTest.*
 
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
@@ -114,6 +115,7 @@ Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
 # Ignore scan issues in disaster recovery tests as we don't start scan there
 Failed to connect to scan of .*DisasterRecoveryIntegrationTest
 Failed to connect to scan of .*AppUpgradeIntegrationTest
+Failed to connect to scan of .*ConfigurationProvidedBftScanConnectionIntegrationTest
 
 # Ignore scan connection issues in reonboarding test.
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
