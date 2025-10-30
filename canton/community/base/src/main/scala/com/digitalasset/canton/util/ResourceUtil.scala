@@ -4,12 +4,8 @@
 package com.digitalasset.canton.util
 
 import cats.MonadThrow
-import cats.data.EitherT
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-import scala.util.control.NonFatal
 
 /** Utility code for doing proper resource management. A lot of it is based on
   * https://medium.com/@dkomanov/scala-try-with-resources-735baad0fd7d
@@ -17,7 +13,7 @@ import scala.util.control.NonFatal
 object ResourceUtil {
 
   /** Does resource management the same way as [[withResource]], but returns an Either instead of
-    * throwing exceptions.
+    * throwing exceptions. The exception are fatal exceptions, which are rethrown.
     *
     * @param r
     *   resource that will be used to derive some value and will be closed automatically in the end
@@ -28,12 +24,7 @@ object ResourceUtil {
     *   exception from either the function or the call to the resource's close method.
     */
   def withResourceEither[T <: AutoCloseable, V](r: => T)(f: T => V): Either[Throwable, V] =
-    try {
-      Right(withResource(r)(f))
-    } catch {
-      case NonFatal(e) =>
-        Left(e)
-    }
+    Try(withResource(r)(f)).toEither
 
   /** The given function is applied to the resource and returned. Resource closing is done
     * automatically after the function is applied. This will rethrow any exception thrown by the
@@ -47,58 +38,27 @@ object ResourceUtil {
     * @return
     *   the result of the given function applied to the resource
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  def withResource[T <: AutoCloseable, V](r: => T)(f: T => V): V = {
-    val resource: T = r
-    var exception: Option[Throwable] = None
-    try {
-      f(resource)
-    } catch {
-      case NonFatal(e) =>
-        exception = Some(e)
-        throw e
-    } finally {
-      closeAndAddSuppressed(exception, resource)
-    }
-  }
+  @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
+  def withResource[T <: AutoCloseable, V](r: => T)(f: T => V): V =
+    withResourceM(r)(resource =>
+      // tryCatchAll is analogous to Java's try-with-resource behavior,
+      // which also acts on fatal exceptions like OutOfMemoryError.
+      // See https://docs.oracle.com/javase/specs/jls/se18/html/jls-14.html#jls-14.20.3
+      TryUtil.tryCatchAll(f(resource))
+    ).get
 
   final private[util] class ResourceMonadApplied[M[_]](
       private val dummy: Boolean = true
   ) extends AnyVal {
-    def apply[T <: AutoCloseable, V](r: => T)(
+    def apply[T <: AutoCloseable, V](resource: => T)(
         f: T => M[V]
     )(implicit M: MonadThrow[M], TM: Thereafter[M]): M[V] = {
       import Thereafter.syntax.*
       import cats.syntax.flatMap.*
-      val resource: T = r
-      MonadThrow[M].fromTry(Try(f(resource))).flatten.thereafter(_ => resource.close())
+      lazy val lazyR = resource
+      MonadThrow[M].fromTry(Try(f(lazyR))).flatten.thereafter(_ => lazyR.close())
     }
   }
 
   def withResourceM[M[_]]: ResourceMonadApplied[M] = new ResourceMonadApplied[M]
-
-  def withResourceEitherT[T <: AutoCloseable, E, V, F[_]](r: => T)(f: T => EitherT[Future, E, V])(
-      implicit ec: ExecutionContext
-  ): EitherT[Future, E, V] =
-    withResourceM(r)(f)
-
-  def withResourceFuture[T <: AutoCloseable, V](r: => T)(f: T => Future[V])(implicit
-      ec: ExecutionContext
-  ): Future[V] =
-    withResourceM(r)(f)
-
-  def withResourceFutureUS[T <: AutoCloseable, V](r: => T)(f: T => FutureUnlessShutdown[V])(implicit
-      ec: ExecutionContext
-  ): FutureUnlessShutdown[V] =
-    withResourceM(r)(f)
-
-  def closeAndAddSuppressed(e: Option[Throwable], resource: AutoCloseable): Unit =
-    e.fold(resource.close()) { exception =>
-      try {
-        resource.close()
-      } catch {
-        case NonFatal(suppressed) =>
-          exception.addSuppressed(suppressed)
-      }
-    }
 }

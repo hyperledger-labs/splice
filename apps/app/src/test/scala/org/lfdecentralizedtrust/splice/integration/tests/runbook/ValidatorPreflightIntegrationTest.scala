@@ -65,7 +65,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       auth0Users += (name -> user)
     }
 
-    TraceContext.withNewTraceContext(implicit traceContext => {
+    TraceContext.withNewTraceContext("beforeEach")(implicit traceContext => {
       try {
         addUser("alice")
         addUser("bob")
@@ -142,7 +142,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   private def logout()(implicit webDriver: WebDriverType) = {
     clue("Logging out") {
-      click on "logout-button"
+      eventuallyClickOn(id("logout-button"))
       eventually() {
         (find(id("oidc-login-button")).isDefined || find(
           id("user-id-field")
@@ -200,7 +200,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         actAndCheck(2.minutes)(
           "Accept transfer offer", {
             click on acceptButton
-            click on "navlink-transactions"
+            eventuallyClickOn(id("navlink-transactions"))
           },
         )(
           "Transfer appears in transactions log",
@@ -299,7 +299,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         eventually() {
           findAll(className("add-user-link")).toSeq should not be (empty)
         }
-        actAndCheck("add user", click on className("add-user-link"))(
+        actAndCheck("add user", eventuallyClickOn(className("add-user-link")))(
           "user has been added and invite link disappears",
           _ => findAll(className("add-user-link")).toSeq shouldBe empty,
         )
@@ -510,21 +510,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     go to url
     waitForQuery(id("user-id-field"))
     loginOnceConfirmedToBeAtUrl(username)
-    eventually() {
-      (find(id("onboard-button")).isDefined || find(id("logout-button")).isDefined) shouldBe true
-    }
-    if (find(id("onboard-button")).isDefined) {
-      actAndCheck()(
-        "Onboard wallet user", {
-          click on "onboard-button"
-        },
-      )(
-        "Party ID is displayed after onboarding finishes",
-        _ => {
-          findAll(className("party-id")) should have size 1
-        },
-      )
-    }
+    onboardUserAfterLogin()
     copyPartyId()
   }
 
@@ -532,27 +518,40 @@ abstract class ValidatorPreflightIntegrationTestBase
       user: Auth0User,
       url: String,
   )(implicit webDriver: WebDriverType): String = {
-
     clue(s"Logging in to wallet UI at: ${url}") {
       auth0Login(
         user,
         url,
         () => find(id("onboard-button")) should not be empty,
       )
+    }
+    onboardUserAfterLogin()
+    copyPartyId()
+  }
 
+  private def onboardUserAfterLogin()(implicit webDriver: WebDriverType) = {
+    // After login, the UI fetches the user onboarding status from the validator.
+    // If the user is already onboarded, the party ID is displayed
+    // If the user is not onboarded, the onboard button is displayed
+    eventually() {
+      (find(id("onboard-button")).isDefined || find(className("party-id")).isDefined) shouldBe true
+    }
+
+    if (find(id("onboard-button")).isDefined) {
       // TODO(DACH-NY/canton-network-internal#485): This is a workaround to bypass slowness of wallet user onboarding
       actAndCheck(timeUntilSuccess = 2.minute)(
         "Onboard wallet user", {
-          click on "onboard-button"
+          eventuallyClickOn(id("onboard-button"))
         },
       )(
         "Party ID is displayed after onboarding finishes",
         _ => {
-          findAll(className("party-id")) should have size 1
+          find(className("party-id")) should not be None
         },
       )
-
-      copyPartyId()
+    } else {
+      logger.debug("User is already onboarded")
+      find(className("party-id")) should not be None
     }
   }
 

@@ -8,12 +8,12 @@ import com.digitalasset.canton.participant.DefaultParticipantStateValues
 import com.digitalasset.canton.topology.SynchronizerId
 
 object TestSubmissionTrackingData {
+  import BaseTest.*
 
   lazy val default: SubmissionTrackingData =
     TransactionSubmissionTrackingData(
       DefaultParticipantStateValues.completionInfo(List.empty),
       TransactionSubmissionTrackingData.TimeoutCause,
-      SynchronizerId.tryFromString("da::default"),
-      BaseTest.testedProtocolVersion,
+      SynchronizerId.tryFromString("da::default").toPhysical,
     )
 }

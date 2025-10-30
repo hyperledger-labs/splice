@@ -6,9 +6,9 @@ package com.digitalasset.canton.crypto
 import cats.syntax.either.*
 import com.digitalasset.canton.crypto.SignatureCheckError.{
   InvalidSignature,
-  InvalidSignatureFormat,
   KeyAlgoSpecsMismatch,
   SignatureWithWrongKey,
+  UnsupportedSignatureFormat,
 }
 import com.digitalasset.canton.crypto.SigningError.UnknownSigningKey
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -20,12 +20,58 @@ import scala.annotation.nowarn
 
 trait SigningTest extends AsyncWordSpec with BaseTest with CryptoTestHelper with FailOnShutdown {
 
+  /** @param newCryptoRestricted
+    *   An optional crypto instance with a restricted set of supported algorithms, used to test
+    *   sign/verify behavior under stricter constraints.
+    * @param unsupportedSigningAlgorithmSpec
+    *   An optional algorithm spec unsupported by `newCryptoRestricted`, used for testing.
+    */
   def signingProvider(
       supportedSigningKeySpecs: Set[SigningKeySpec],
       supportedSigningAlgorithmSpecs: Set[SigningAlgorithmSpec],
       supportedSignatureFormats: Set[SignatureFormat],
       newCrypto: => FutureUnlessShutdown[Crypto],
+      newCryptoRestricted: => Option[FutureUnlessShutdown[Crypto]] = None,
+      unsupportedSigningAlgorithmSpec: Option[SigningAlgorithmSpec] = None,
   ): Unit = {
+
+    unsupportedSigningAlgorithmSpec.foreach { unsupported =>
+      s"Fail sign/verify with an unsupported algorithm: $unsupported" in {
+        for {
+          crypto <- newCryptoRestricted.valueOrFail(
+            "no configured crypto with a restricted set of supported schemes"
+          )
+          publicKey <- getSigningPublicKey(
+            crypto,
+            SigningKeyUsage.ProtocolOnly,
+            unsupported.supportedSigningKeySpecs.head,
+          )
+          errSign = crypto.privateCrypto
+            .signBytes(
+              ByteString.empty(),
+              publicKey.id,
+              SigningKeyUsage.ProtocolOnly,
+              unsupported,
+            )
+            .futureValueUS
+          errVerify = crypto.pureCrypto.verifySignature(
+            ByteString.empty(),
+            publicKey,
+            Signature.create(
+              SignatureFormat.Der,
+              ByteString.empty(),
+              publicKey.id,
+              Some(unsupported),
+            ),
+            SigningKeyUsage.ProtocolOnly,
+          )
+        } yield {
+          errSign.left.value shouldBe a[SigningError.NoMatchingAlgorithmSpec]
+          errVerify.left.value shouldBe a[SignatureCheckError.UnsupportedAlgorithmSpec]
+        }
+      }
+    }
+
     forAll(supportedSigningAlgorithmSpecs) { signingAlgorithmSpec =>
       forAll(signingAlgorithmSpec.supportedSigningKeySpecs.forgetNE) { signingKeySpec =>
         require(
@@ -201,7 +247,7 @@ trait SigningTest extends AsyncWordSpec with BaseTest with CryptoTestHelper with
                         // The algo supports the format, but the signature should be bad when interpreted in this other format
                         res shouldBe a[InvalidSignature]
                       } else
-                        res shouldBe a[InvalidSignatureFormat]
+                        res shouldBe a[UnsupportedSignatureFormat]
                     }
                 }
               res = crypto.pureCrypto.verifySignature(

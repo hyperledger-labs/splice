@@ -24,6 +24,7 @@ import com.digitalasset.canton.protocol.messages.{
   ProtocolMessage,
   SignedProtocolMessage,
   TypedSignedProtocolMessageContent,
+  UnsignedProtocolMessage,
 }
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -35,6 +36,7 @@ import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
   VersioningCompanion,
@@ -75,10 +77,10 @@ final case class ClosedEnvelope private (
           }
       case Some(signaturesNE) =>
         TypedSignedProtocolMessageContent
-          .fromByteStringPV(protocolVersion, bytes)
+          .fromByteStringPVV(ProtocolVersionValidation.PV(protocolVersion), bytes)
           .map { typedMessage =>
             OpenEnvelope(
-              SignedProtocolMessage(typedMessage, signaturesNE, protocolVersion),
+              SignedProtocolMessage(typedMessage, signaturesNE),
               recipients,
             )(protocolVersion)
           }
@@ -131,7 +133,7 @@ object ClosedEnvelope extends VersioningCompanion[ClosedEnvelope] {
 
   override def versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(
-      ProtocolVersion.v33
+      ProtocolVersion.v34
     )(v30.Envelope)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
@@ -193,9 +195,9 @@ object ClosedEnvelope extends VersioningCompanion[ClosedEnvelope] {
           signatures,
           protocolVersion,
         )
-      case _ =>
+      case unsignedProtocolMessage: UnsignedProtocolMessage =>
         ClosedEnvelope.create(
-          EnvelopeContent.tryCreate(protocolMessage, protocolVersion).toByteString,
+          EnvelopeContent(unsignedProtocolMessage, protocolVersion).toByteString,
           recipients,
           Seq.empty,
           protocolVersion,

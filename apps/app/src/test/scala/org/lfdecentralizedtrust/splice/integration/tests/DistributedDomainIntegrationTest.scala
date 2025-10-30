@@ -77,7 +77,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               NonNegativeFiniteDuration.ofSeconds(10),
             )
             val endpoints = connections.map { s =>
-              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _) =>
+              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _, _) =>
                 endpoint
               }
             }
@@ -162,6 +162,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
       parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
       parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+      parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
     }
 
     bracket(
@@ -192,6 +193,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
             parameters.confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
             parameters.mediatorReactionTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+            parameters.confirmationResponseTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
           },
       )
 
@@ -210,6 +212,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
             parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
             parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+            parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
           },
       )
     }

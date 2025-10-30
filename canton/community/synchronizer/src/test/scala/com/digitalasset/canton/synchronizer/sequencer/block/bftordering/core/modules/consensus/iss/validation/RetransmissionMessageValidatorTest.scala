@@ -5,8 +5,8 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation.RetransmissionMessageValidator.RetransmissionResponseValidationError
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
@@ -24,10 +24,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   EpochInfo,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.Consensus.RetransmissionsMessage.{
-  RetransmissionRequest,
-  RetransmissionResponse,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.Consensus.RetransmissionsMessage.RetransmissionResponse
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.{
   Commit,
   PrePrepare,
@@ -164,14 +161,14 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
       val cc = CommitCertificate(pp, Seq(commit(EpochNumber.First, 0L, pp.message.hash)))
 
       val result =
-        validator.validateRetransmissionResponse(RetransmissionResponse.create(otherId, Seq(cc)))
+        validator.validateRetransmissionResponse(RetransmissionResponse(otherId, Seq(cc)))
       result shouldBe Right(())
     }
 
     "error when message has no commit certificates" in {
       val validator = new RetransmissionMessageValidator(epoch)
       val result =
-        validator.validateRetransmissionResponse(RetransmissionResponse.create(otherId, Seq.empty))
+        validator.validateRetransmissionResponse(RetransmissionResponse(otherId, Seq.empty))
       result shouldBe Left(
         RetransmissionResponseValidationError.MalformedMessage(
           otherId,
@@ -187,7 +184,7 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
 
       val result =
         validator.validateRetransmissionResponse(
-          RetransmissionResponse.create(otherId, Seq(cc1, cc2))
+          RetransmissionResponse(otherId, Seq(cc1, cc2))
         )
       result shouldBe Left(
         RetransmissionResponseValidationError.MalformedMessage(
@@ -202,7 +199,7 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
       val cc = CommitCertificate(prePrepare(epochNumber = 10L, blockNumber = 10L), Seq.empty)
 
       val result =
-        validator.validateRetransmissionResponse(RetransmissionResponse.create(otherId, Seq(cc)))
+        validator.validateRetransmissionResponse(RetransmissionResponse(otherId, Seq(cc)))
       result shouldBe Left(
         RetransmissionResponseValidationError.WrongEpoch(
           otherId,
@@ -218,7 +215,7 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
         CommitCertificate(prePrepare(epochNumber = 0L, blockNumber = epochLength + 2), Seq.empty)
 
       val result =
-        validator.validateRetransmissionResponse(RetransmissionResponse.create(otherId, Seq(cc)))
+        validator.validateRetransmissionResponse(RetransmissionResponse(otherId, Seq(cc)))
       result shouldBe Left(
         RetransmissionResponseValidationError.MalformedMessage(
           otherId,
@@ -233,7 +230,7 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
 
       val result =
         validator.validateRetransmissionResponse(
-          RetransmissionResponse.create(otherId, Seq(cc, cc))
+          RetransmissionResponse(otherId, Seq(cc, cc))
         )
       result shouldBe Left(
         RetransmissionResponseValidationError.MalformedMessage(
@@ -248,7 +245,7 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
       val cc = CommitCertificate(prePrepare(epochNumber = 0L, blockNumber = 0L), Seq.empty)
 
       val result =
-        validator.validateRetransmissionResponse(RetransmissionResponse.create(otherId, Seq(cc)))
+        validator.validateRetransmissionResponse(RetransmissionResponse(otherId, Seq(cc)))
       result shouldBe Left(
         RetransmissionResponseValidationError.MalformedMessage(
           otherId,
@@ -274,13 +271,13 @@ object RetransmissionMessageValidatorTest {
 
   def retransmissionRequest(segments: Seq[SegmentStatus])(implicit
       synchronizerProtocolVersion: ProtocolVersion
-  ): RetransmissionRequest =
-    RetransmissionRequest.create(EpochStatus(otherId, EpochNumber.First, segments))
+  ): EpochStatus =
+    EpochStatus.create(otherId, EpochNumber.First, segments)(synchronizerProtocolVersion)
 
   def prePrepare(
       epochNumber: Long,
       blockNumber: Long,
-      block: OrderingBlock = OrderingBlock(Seq.empty),
+      block: OrderingBlock = OrderingBlock.empty,
   )(implicit synchronizerProtocolVersion: ProtocolVersion) =
     PrePrepare
       .create(

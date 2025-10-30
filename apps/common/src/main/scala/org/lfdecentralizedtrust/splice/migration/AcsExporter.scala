@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
 import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -39,11 +39,11 @@ class AcsExporter(
       parties: PartyId*
   )(implicit
       tc: TraceContext
-  ): Future[ByteString] = {
+  ): Future[Seq[ByteString]] = {
     participantAdminConnection.downloadAcsSnapshot(
       parties = parties.toSet,
-      filterSynchronizerId = Some(domain),
-      timestamp = Some(timestamp),
+      synchronizerId = domain,
+      timestampOrOffset = Left(timestamp),
       force = force,
     )
   }
@@ -51,13 +51,13 @@ class AcsExporter(
   def safeExportParticipantPartiesAcsFromPausedDomain(domain: SynchronizerId)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
+  ): EitherT[Future, AcsExportFailure, (Seq[ByteString], Instant)] = {
     EitherT {
       for {
         participantId <- participantAdminConnection.getId()
         parties <- participantAdminConnection
           .listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(domain).some,
+            store = TopologyStoreId.Synchronizer(domain).some,
             filterParticipant = participantId.toProtoPrimitive,
           )
           .map(_.map(_.mapping.partyId))
@@ -70,7 +70,7 @@ class AcsExporter(
   private def safeExportAcsFromPausedDomain(domain: SynchronizerId, parties: PartyId*)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
+  ): EitherT[Future, AcsExportFailure, (Seq[ByteString], Instant)] = {
     for {
       paramsState <- domainStateTopology
         .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
@@ -83,11 +83,11 @@ class AcsExporter(
       _ <- EitherT.liftF[Future, AcsExportFailure, Unit](
         waitUntilSynchronizerTime(domain, paramsState.acsExportWaitTimestamp)
       )
-      snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
+      snapshot <- EitherT.liftF[Future, AcsExportFailure, Seq[ByteString]](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties.toSet,
-          filterSynchronizerId = Some(domain),
-          timestamp = Some(paramsState.exportTimestamp),
+          synchronizerId = domain,
+          timestampOrOffset = Left(paramsState.exportTimestamp),
           force = true,
         )
       )

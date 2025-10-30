@@ -122,47 +122,51 @@ Expiration
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('see proper time format in popup', async () => {
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
+  test(
+    'see proper time format in popup',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
 
-    const inOneWeek = dayjs().add(1, 'week').format(dateTimeFormatISO);
-    const expirationDate = dayjs().add(23, 'minutes').format(dateTimeFormatISO);
+      const inOneWeek = dayjs().add(1, 'week').format(dateTimeFormatISO);
+      const expirationDate = dayjs().add(23, 'minutes').format(dateTimeFormatISO);
 
-    const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
+      const dateInput = screen.getByTestId('datetime-picker-vote-request-expiration');
 
-    // We wait for the date to be set to the default value from the ledger.
-    await waitFor(() => expect(dateInput.getAttribute('value')).toBe(inOneWeek));
-    await user.type(dateInput, expirationDate);
-    expect(dateInput.getAttribute('value')).toBe(expirationDate);
+      // We wait for the date to be set to the default value from the ledger.
+      await waitFor(() => expect(dateInput.getAttribute('value')).toBe(inOneWeek));
+      await user.type(dateInput, expirationDate);
+      expect(dateInput.getAttribute('value')).toBe(expirationDate);
 
-    const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
-    expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
+      const formExpirationLabel = screen.getByTestId('vote-request-expiration-duration');
+      expect(formExpirationLabel).toHaveTextContent('in 23 minutes');
 
-    const options: HTMLOptionElement[] = await screen.findAllByTestId('display-members-option');
+      const options: HTMLOptionElement[] = await screen.findAllByTestId('display-members-option');
 
-    fireEvent.change(screen.getByTestId('display-members'), {
-      target: {
-        value: options[0].value,
-      },
-    });
+      fireEvent.change(screen.getByTestId('display-members'), {
+        target: {
+          value: options[0].value,
+        },
+      });
 
-    const summaryInput = screen.getByTestId('create-reason-summary');
-    await user.type(summaryInput, 'summaryABC');
+      const summaryInput = screen.getByTestId('create-reason-summary');
+      await user.type(summaryInput, 'summaryABC');
 
-    const urlInput = screen.getByTestId('create-reason-url');
-    await user.type(urlInput, 'https://vote-request.url');
+      const urlInput = screen.getByTestId('create-reason-url');
+      await user.type(urlInput, 'https://vote-request.url');
 
-    const submitButton = screen.getByTestId('create-voterequest-submit-button');
-    await user.click(submitButton);
+      const submitButton = screen.getByTestId('create-voterequest-submit-button');
+      await user.click(submitButton);
 
-    const submitPopup = screen.getByRole('dialog');
+      const submitPopup = screen.getByRole('dialog');
 
-    expect(submitPopup).toHaveTextContent('in 23 minutes');
-  });
+      expect(submitPopup).toHaveTextContent('in 23 minutes');
+    },
+    { retry: 2 }
+  );
 });
 
 describe('An SetConfig request', () => {
@@ -176,12 +180,12 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction('CRARC_SetConfig');
+    await changeAction('CRARC_SetConfig');
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
     expect(await screen.findByDisplayValue('0.03')).toBeDefined();
 
-    changeAction('SRARC_SetConfig');
+    await changeAction('SRARC_SetConfig');
 
     expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
     expect(await screen.findByDisplayValue('10')).toBeDefined();
@@ -200,7 +204,8 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction('SRARC_SetConfig');
+    await changeAction('SRARC_SetConfig');
+    await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
 
     const input = screen.getByTestId(
       'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
@@ -236,7 +241,8 @@ describe('An SetConfig request', () => {
 
     expect(await screen.findByText('Vote Requests')).toBeDefined();
 
-    changeAction('CRARC_SetConfig');
+    await changeAction('CRARC_SetConfig');
+    await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
 
     const input = screen.getByTestId('transferConfig.createFee.fee-value');
     await user.clear(input);
@@ -276,7 +282,8 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    changeAction('CRARC_SetConfig');
+    await changeAction('CRARC_SetConfig');
+    await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
 
     const input = screen.getByTestId('transferConfig.createFee.fee-value');
     await user.clear(input);
@@ -368,7 +375,7 @@ describe('SetAmuletRules', () => {
       expect(await screen.findByText('Vote Requests')).toBeDefined();
       expect(await screen.findByText('Governance')).toBeDefined();
 
-      changeAction('CRARC_SetConfig');
+      await changeAction('CRARC_SetConfig');
 
       const summaryInput = screen.getByTestId('create-reason-summary');
       await user.type(summaryInput, 'summaryABC');

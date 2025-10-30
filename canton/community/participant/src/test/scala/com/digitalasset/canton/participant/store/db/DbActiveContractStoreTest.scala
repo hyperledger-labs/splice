@@ -57,7 +57,7 @@ trait DbActiveContractStoreTest extends AsyncWordSpec with BaseTest with ActiveC
         new DbActiveContractStore(
           storage,
           synchronizerId,
-          enableAdditionalConsistencyChecks = true,
+          enableAdditionalConsistencyChecks = Some(1000),
           PrunableByTimeParameters.testingParams,
           indexStore,
           timeouts,
@@ -67,7 +67,6 @@ trait DbActiveContractStoreTest extends AsyncWordSpec with BaseTest with ActiveC
       ec =>
         createDbContractStoreForTesting(
           storage,
-          testedProtocolVersion,
           loggerFactory,
         )(ec),
     )

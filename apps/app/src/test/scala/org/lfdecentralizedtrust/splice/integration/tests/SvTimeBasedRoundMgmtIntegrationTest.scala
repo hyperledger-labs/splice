@@ -19,7 +19,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     })
 
     // one tick - round 0 closes.
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     eventually()(
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
@@ -27,7 +27,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       ) should have size 1
     )
     // next tick - round 1 closes.
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     eventually()(
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
@@ -35,7 +35,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       ) should have size 2
     )
     // next tick - round 2 closes.
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     eventually()(
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
@@ -61,7 +61,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
           )
       val rounds =
         transactions.flatMap(
-          DecodeUtil.decodeAllCreatedTree(splice.round.ClosedMiningRound.COMPANION)(_)
+          DecodeUtil.decodeAllCreated(splice.round.ClosedMiningRound.COMPANION)(_)
         )
       rounds should have size 1
     }
@@ -111,7 +111,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       },
     )
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     // latest OpenMiningRound was created with doubled tick duration.
     eventually()({
@@ -227,7 +227,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       },
     )
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     // latest OpenMiningRound was created with reduced tick duration.
     eventually()({
@@ -417,8 +417,8 @@ class SvTimeBasedRoundMgmtIntegrationTest
       },
     )
 
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
 
     // config101 is never used as there is no round created at a time between now + 150 and now + 151 seconds
     eventually()({
@@ -456,7 +456,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       },
     )
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     actAndCheck(
       "set reduced tick duration", {
@@ -483,7 +483,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       },
     )
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     // As the first advanceRoundsByOneTick above advances the time by exactly 160 seconds
     // and this is when the dso automaotion exercise the dso choice to advance rounds,

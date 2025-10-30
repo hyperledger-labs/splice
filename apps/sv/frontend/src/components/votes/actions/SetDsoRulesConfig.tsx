@@ -152,7 +152,9 @@ const SetDsoRulesConfig: React.FC<{
 
   return (
     <Stack direction="column" mb={4} spacing={1}>
-      <Typography variant="h6">Configuration</Typography>
+      <Typography variant="h6" data-testid="set-dso-rules-config-header">
+        Configuration
+      </Typography>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
         <JsonEditor
           data={configuration}

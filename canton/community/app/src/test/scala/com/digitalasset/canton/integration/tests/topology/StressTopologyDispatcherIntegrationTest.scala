@@ -7,7 +7,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{DbConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{
   InstanceReference,
@@ -16,12 +16,10 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.{PublicKey, SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
-}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
   TestConsoleEnvironment,
@@ -50,6 +48,10 @@ trait StressTopologyDispatcherIntegrationTest
       .addConfigTransform(
         _.focus(_.parameters.timeouts.processing.verifyActive)
           .replace(config.NonNegativeDuration.ofSeconds(120))
+      )
+      .addConfigTransform(
+        // The default of 20 seconds is too low after switching to the AZ runners
+        ConfigTransforms.setDelayLoggingThreshold(NonNegativeFiniteDuration.ofSeconds(30))
       )
 
   private def addParties(
@@ -233,7 +235,7 @@ trait StressTopologyDispatcherIntegrationTest
 
 class StressTopologyDispatcherReferenceIntegrationTestPostgres
     extends StressTopologyDispatcherIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 class StressTopologyDispatcherBftOrderingIntegrationTestPostgres

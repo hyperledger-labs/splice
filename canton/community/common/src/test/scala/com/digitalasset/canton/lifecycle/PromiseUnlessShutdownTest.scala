@@ -23,17 +23,17 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
 
     "complete a promise with an outcome" in {
       val p = PromiseUnlessShutdown.unsupervised[Int]()
-      p.outcome(42)
+      p.outcome_(42)
 
       // Ignore second outcome
-      p.outcome(23)
+      p.outcome_(23)
 
       p.future.futureValue shouldBe UnlessShutdown.Outcome(42)
     }
 
     "complete a promise due to shutdown" in {
       val p = PromiseUnlessShutdown.unsupervised[Int]()
-      p.shutdown()
+      p.shutdown_()
       p.future.futureValue shouldBe UnlessShutdown.AbortedDueToShutdown
     }
 
@@ -43,7 +43,7 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(WARN))(
         {
           val p = PromiseUnlessShutdown.supervised[Int](
-            "supervised-promise",
+            "supervised-promise-out-of-time",
             new FutureSupervisor.Impl(config.NonNegativeDuration(5.second)),
             1.second,
             Level.WARN,
@@ -54,7 +54,7 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
           Threading.sleep(3.second.toMillis)
 
           // Eventually complete the promise
-          p.outcome(42)
+          p.outcome_(42)
           f.futureValue shouldBe UnlessShutdown.Outcome(42)
 
           // Wait for the scheduled task to run and flush the WARN log
@@ -69,7 +69,9 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
         entries => {
           assert(entries.nonEmpty)
           forEvery(entries)(
-            _.warningMessage should include("supervised-promise has not completed after")
+            _.warningMessage should include(
+              "supervised-promise-out-of-time has not completed after"
+            )
           )
         },
       )
@@ -81,7 +83,7 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
       val promise = loggerFactory.assertLogs(SuppressionRule.LevelAndAbove(WARN))(
         {
           val p = PromiseUnlessShutdown.supervised[Int](
-            "supervised-promise",
+            "supervised-promise-only-on-access",
             new FutureSupervisor.Impl(config.NonNegativeDuration(5.second)),
             1.second,
             Level.WARN,
@@ -94,7 +96,7 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
           p
         }
       )
-      promise.outcome(1)
+      promise.outcome_(1)
       promise.futureUS.futureValueUS shouldBe 1
     }
 

@@ -35,7 +35,10 @@ class WalletFrontendTimeBasedIntegrationTest
 
         // After a short delay, the UI should realize that the user is not onboarded,
         // and switch to the onboarding page.
-        click on "onboard-button"
+        val onboardButton = eventually() {
+          find(id("onboard-button")).valueOrFail("Onboard button not found")
+        }
+        click on onboardButton
         // The onboard button should immediately be disabled, to prevent further clicking.
         try {
           find(id("onboard-button")) match {
@@ -59,7 +62,7 @@ class WalletFrontendTimeBasedIntegrationTest
         browseToAliceWallet(aliceDamlUser)
         actAndCheck(
           "Alice logs out", {
-            click on "logout-button"
+            eventuallyClickOn(id("logout-button"))
           },
         )("Alice sees the login screen again", _ => find(id("login-button")) should not be empty)
       }

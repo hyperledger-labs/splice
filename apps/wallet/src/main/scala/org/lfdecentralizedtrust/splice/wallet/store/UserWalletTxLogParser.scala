@@ -102,8 +102,8 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, root: TreeEvent, synchronizerId: SynchronizerId)(
-      implicit tc: TraceContext
+  private def parseTree(tree: Transaction, root: Event, synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
   ): Eval[State] = {
     import Eval.{now, defer}
     root match {
@@ -850,7 +850,7 @@ class UserWalletTxLogParser(
     }
   }
   private def parseTrees(
-      tree: TransactionTree,
+      tree: Transaction,
       rootsEventIds: List[Integer],
       synchronizerId: SynchronizerId,
   )(implicit
@@ -860,7 +860,7 @@ class UserWalletTxLogParser(
     roots.foldMap(parseTree(tree, _, synchronizerId))
   }
 
-  override def tryParse(tx: TransactionTree, synchronizerId: SynchronizerId)(implicit
+  override def tryParse(tx: Transaction, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     parseTrees(tx, tx.getRootNodeIds.asScala.toList, synchronizerId).value
@@ -876,7 +876,7 @@ class UserWalletTxLogParser(
     Some(UnknownTxLogEntry(eventId))
 
   private def fromAnsEntryPaymentCollection(
-      tree: TransactionTree,
+      tree: Transaction,
       exercised: ExercisedEvent,
       synchronizerId: SynchronizerId,
       transactionSubtype: TransferTransactionSubtype,
@@ -1073,7 +1073,7 @@ object UserWalletTxLogParser {
       )
     }
 
-    def ensureBalanceChangeTxLogEntry(tx: TransactionTree, party: PartyId) = {
+    def ensureBalanceChangeTxLogEntry(tx: Transaction, party: PartyId) = {
       if (this.filterByParty(party).entries.isEmpty) {
         // This can happen in two cases:
         // 1. We're parsing as the receiver. In that case, the balance change txlog entry
@@ -1109,8 +1109,8 @@ object UserWalletTxLogParser {
         a.appended(b)
     }
     def fromAmuletExpire(
-        tx: TransactionTree,
-        event: TreeEvent,
+        tx: Transaction,
+        event: Event,
         owner: String,
         transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
@@ -1127,7 +1127,7 @@ object UserWalletTxLogParser {
       )
     }
     def fromCreateTransferOffer(
-        tx: TransactionTree,
+        tx: Transaction,
         offerCid: transferCodegen.TransferOffer.ContractId,
     ): State = {
       val transferOffer =
@@ -1153,7 +1153,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferAccept(
-        tx: TransactionTree,
+        tx: Transaction,
         acceptedCid: transferCodegen.AcceptedTransferOffer.ContractId,
     ): State = {
       val acceptedTransferOffer =
@@ -1190,7 +1190,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferComplete(
-        tx: TransactionTree,
+        tx: Transaction,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value.trackingInfo
@@ -1232,7 +1232,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransfer(
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         transactionSubtype: TransferTransactionSubtype,
@@ -1258,7 +1258,7 @@ object UserWalletTxLogParser {
     }
 
     def fromCreateBuyTrafficRequest(
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
         buyTrafficRequestId: trafficRequestCodegen.BuyTrafficRequest.ContractId,
     ): State = {
@@ -1278,7 +1278,7 @@ object UserWalletTxLogParser {
     }
 
     def fromBuyTrafficRequestComplete(
-        tx: TransactionTree,
+        tx: Transaction,
         node: ExerciseNode[?, BuyTrafficRequest_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value.trackingInfo
@@ -1319,7 +1319,7 @@ object UserWalletTxLogParser {
 
     def fromBuyMemberTraffic(
         node: ExerciseNode[AmuletRules_BuyMemberTraffic.Arg, AmuletRules_BuyMemberTraffic.Res],
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
     ): State = {
       val sender = node.argument.value.provider
@@ -1354,7 +1354,7 @@ object UserWalletTxLogParser {
           AmuletRules_CreateExternalPartySetupProposal.Arg,
           AmuletRules_CreateExternalPartySetupProposal.Res,
         ],
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
     ): State = {
       State.fromTransferPreapprovalPurchase(
@@ -1371,7 +1371,7 @@ object UserWalletTxLogParser {
           AmuletRules_CreateTransferPreapproval.Arg,
           AmuletRules_CreateTransferPreapproval.Res,
         ],
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
     ): State = {
       State.fromTransferPreapprovalPurchase(
@@ -1388,7 +1388,7 @@ object UserWalletTxLogParser {
           TransferPreapproval_Renew.Arg,
           TransferPreapproval_Renew.Res,
         ],
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
     ): State = {
       State.fromTransferPreapprovalPurchase(
@@ -1401,7 +1401,7 @@ object UserWalletTxLogParser {
     }
 
     private def fromTransferPreapprovalPurchase(
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
         provider: String,
         summary: TransferSummary,
@@ -1429,7 +1429,7 @@ object UserWalletTxLogParser {
     }
 
     def fromCollectEntryPayment(
-        tx: TransactionTree,
+        tx: Transaction,
         event: ExercisedEvent,
         producedAmulet: ContractId[AmuletCreate.T],
         stateFromPaymentCollection: State,
@@ -1452,8 +1452,8 @@ object UserWalletTxLogParser {
       * These are choices that create exactly one new amulet in their transaction subtree.
       */
     def fromAmuletCreateSummary(
-        tx: TransactionTree,
-        event: TreeEvent,
+        tx: Transaction,
+        event: Event,
         acsum: AmuletCreateSummary[_ <: ContractId[AmuletCreate.T]],
         transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
@@ -1477,7 +1477,7 @@ object UserWalletTxLogParser {
     }
 
     def fromNotification(
-        tx: TransactionTree,
+        tx: Transaction,
         eventId: String,
         transactionSubtype: NotificationTransactionSubtype,
         details: String,
@@ -1509,7 +1509,7 @@ object UserWalletTxLogParser {
       )
     )
 
-    private def getAmuletCreateEvent(tx: TransactionTree, cid: ContractId[AmuletCreate.T]) =
+    private def getAmuletCreateEvent(tx: Transaction, cid: ContractId[AmuletCreate.T]) =
       tx.findCreation(AmuletCreate.companion, cid)
         .map(_.payload)
         .getOrElse(

@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 import cats.data.OptionT
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
@@ -35,7 +35,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
 
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -69,7 +69,7 @@ class ReceiveSvRewardCouponTrigger(
           val filterParty = beneficiary.beneficiary.filterString
           participantAdminConnection
             .listPartyToParticipant(
-              store = Some(TopologyStoreId.SynchronizerStore(dsoRules.domain)),
+              store = Some(TopologyStoreId.Synchronizer(dsoRules.domain)),
               filterParty = filterParty,
             )
             .map { txs =>
@@ -99,7 +99,7 @@ class ReceiveSvRewardCouponTrigger(
       val beneficiariesWithoutLatestPackages =
         extraBeneficiaries.diff(beneficiariesWithLatestVettedPackages)
       if (beneficiariesWithoutLatestPackages.isEmpty) {
-        logger.info(s"All beneficiaries vetted the latest packages.")
+        logger.debug(s"All beneficiaries vetted the latest packages.")
       } else {
         logger.warn(
           s"Beneficiaries did not vet the latest packages: $beneficiariesWithoutLatestPackages"
@@ -246,11 +246,14 @@ object ReceiveSvRewardCouponTrigger {
         param("round", _.round),
       )
 
-    override def roundDetails: (Long, Instant) =
-      Long.unbox(round.payload.round.number) -> round.payload.opensAt
+    def roundNumber: Long = Long.unbox(round.payload.round.number)
 
-    override def tickDuration: Duration =
-      Duration.of(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
+    def opensAt: Instant = round.payload.opensAt
+
+    override def scheduleAtMaxTargetTime: Instant =
+      opensAt.plus(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
+
+    def closesAt: Instant = round.payload.targetClosesAt
   }
 
   def svLatestVettedPackages(packages: PackageConfig): Seq[String] = Seq(

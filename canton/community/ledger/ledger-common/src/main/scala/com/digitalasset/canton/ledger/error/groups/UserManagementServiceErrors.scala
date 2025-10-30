@@ -87,7 +87,7 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
     }
   }
 
-  @Explanation("The user referred to by the request was not found.")
+  @Explanation("The user / idp combination referred to by the request was not found.")
   @Resolution(
     "Check that you are connecting to the right participant node and the user-id is spelled correctly, if yes, create the user."
   )
@@ -106,6 +106,30 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
       )
     }
   }
+
+  @Explanation(
+    "There was attempt to update a user while a different process deleted the user at the same time."
+  )
+  @Resolution(
+    "Read all users again and reattempt the operation with another user."
+  )
+  object UserDeletedWhileUpdating
+      extends ErrorCode(
+        id = "USER_DELETED_WHILE_UPDATING",
+        ErrorCategory.ContentionOnSharedResources,
+      ) {
+    final case class Reject(operation: String, userId: String)(implicit
+        loggingContext: ErrorLoggingContext
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause =
+            s"Update operation for user '$userId' failed because user was removed in the meantime"
+        ) {
+      override def resources: Seq[(ErrorResource, String)] = Seq(
+        ErrorResource.User -> userId
+      )
+    }
+  }
+
   @Explanation("There already exists a user with the same user-id.")
   @Resolution(
     "Check that you are connecting to the right participant node and the user-id is spelled correctly, or use the user that already exists."

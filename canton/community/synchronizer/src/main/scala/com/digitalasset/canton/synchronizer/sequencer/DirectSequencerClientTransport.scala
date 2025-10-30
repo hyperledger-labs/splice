@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
 import com.digitalasset.canton.lifecycle.{
@@ -33,7 +34,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   SendAsyncError,
   SignedContent,
   SubmissionRequest,
-  SubscriptionRequestV2,
+  SubscriptionRequest,
   TopologyStateForInitRequest,
   TopologyStateForInitResponse,
 }
@@ -65,7 +66,6 @@ class DirectSequencerClientTransport(
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
     protocolVersion: ProtocolVersion,
-    progressSupervisorO: Option[ProgressSupervisor] = None,
 )(implicit materializer: Materializer, ec: ExecutionContext)
     extends SequencerClientTransport
     with SequencerClientTransportPekko
@@ -110,7 +110,7 @@ class DirectSequencerClientTransport(
       }
       .leftMap(_.toString)
 
-  override def subscribe[E](request: SubscriptionRequestV2, handler: SequencedEventHandler[E])(
+  override def subscribe[E](request: SubscriptionRequest, handler: SequencedEventHandler[E])(
       implicit traceContext: TraceContext
   ): SequencerSubscription[E] = new SequencerSubscription[E] {
 
@@ -125,7 +125,7 @@ class DirectSequencerClientTransport(
     {
       val subscriptionET =
         subscriptionFactory
-          .createV2(
+          .create(
             request.timestamp,
             request.member,
             {
@@ -140,7 +140,7 @@ class DirectSequencerClientTransport(
             case Success(UnlessShutdown.Outcome(Right(subscription))) =>
               closeReasonPromise.completeWith(subscription.closeReason)
 
-              performUnlessClosing(functionFullName) {
+              synchronizeWithClosingSync(functionFullName) {
                 subscriptionRef.set(Some(subscription))
               } onShutdown {
                 subscription.close()
@@ -173,17 +173,22 @@ class DirectSequencerClientTransport(
     }
   }
 
+  override def getTime(timeout: Duration)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Option[CantonTimestamp]] =
+    EitherT.right[String](sequencer.sequencingTime)
+
   override def subscriptionRetryPolicy: SubscriptionErrorRetryPolicy =
     // unlikely there will be any errors with this direct transport implementation
     SubscriptionErrorRetryPolicy.never
 
   override type SubscriptionError = DirectSequencerClientTransport.SubscriptionError
 
-  override def subscribe(request: SubscriptionRequestV2)(implicit
+  override def subscribe(request: SubscriptionRequest)(implicit
       traceContext: TraceContext
   ): SequencerSubscriptionPekko[SubscriptionError] = {
     val sourceF = sequencer
-      .readV2(request.member, request.timestamp)
+      .read(request.member, request.timestamp)
       .value
       .unwrap
       .map {
@@ -203,20 +208,8 @@ class DirectSequencerClientTransport(
           source.map(_.leftMap(SequencedEventError.apply))
       }
     val health = new DirectSequencerClientTransportHealth(logger)
-
-    val source = (progressSupervisorO match {
-      case Some(progressSupervisor) =>
-        Source
-          .futureSource(sourceF)
-          .map { eventOrError =>
-            eventOrError.foreach { event =>
-              progressSupervisor.disarm(event.timestamp)(event.traceContext)
-            }
-            eventOrError
-          }
-      case None =>
-        Source.futureSource(sourceF)
-    })
+    val source = Source
+      .futureSource(sourceF)
       .watchTermination() { (matF, terminationF) =>
         val directExecutionContext = DirectExecutionContext(noTracingLogger)
         val killSwitchF = matF.map { case (killSwitch, _) => killSwitch }(directExecutionContext)

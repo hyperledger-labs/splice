@@ -18,11 +18,8 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.KeyPurpose
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
@@ -32,7 +29,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Temporary
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactions, TimeQuery}
 import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
-import com.digitalasset.canton.topology.{SynchronizerId, TopologyManagerError}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, TopologyManagerError}
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.google.protobuf.ByteString
 import monocle.macros.syntax.lens.*
@@ -76,7 +73,7 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
       val counter = new AtomicInteger(0)
       override def setup: MediatorSetupGroup = new MediatorSetupGroup(this) {
         override def assign(
-            synchronizerId: SynchronizerId,
+            synchronizerId: PhysicalSynchronizerId,
             sequencerConnections: SequencerConnections,
             validation: SequencerConnectionValidation,
             waitForReady: Boolean,
@@ -106,7 +103,7 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
       }
     }
 
-  var synchronizerId1: SynchronizerId = _
+  private var synchronizerId1: PhysicalSynchronizerId = _
 
   "distributed environment" should {
     "fail if trying to bootstrap a sequencer with multiple effective transactions per unique key" in {
@@ -188,14 +185,15 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
       mediator.start()
       sequencer.start()
 
-      def bootstrapSynchronizer = bootstrap.synchronizer(
-        daName.unwrap,
-        synchronizerOwners = Seq(sequencer),
-        synchronizerThreshold = PositiveInt.one,
-        sequencers = Seq(sequencer),
-        mediators = Seq(mediator),
-        staticSynchronizerParameters = EnvironmentDefinition.defaultStaticSynchronizerParameters,
-      )
+      def bootstrapSynchronizer = bootstrap
+        .synchronizer(
+          daName.unwrap,
+          synchronizerOwners = Seq(sequencer),
+          synchronizerThreshold = PositiveInt.one,
+          sequencers = Seq(sequencer),
+          mediators = Seq(mediator),
+          staticSynchronizerParameters = EnvironmentDefinition.defaultStaticSynchronizerParameters,
+        )
 
       clue("bootstrap synchronizer #1")(intercept[RuntimeException] {
         bootstrapSynchronizer
@@ -234,7 +232,7 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
       mediator.stop()
     }
 
-    "fail if trying to boostrap a synchronizer with a sequencer or mediator already initialized previously with another synchronizer" in {
+    "fail if trying to bootstrap a synchronizer with a sequencer or mediator already initialized previously with another synchronizer" in {
       implicit env =>
         import env.*
 
@@ -309,7 +307,7 @@ class RobustSynchronizerBootstrapIntegrationTestPostgres
     extends RobustSynchronizerBootstrapIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("secondSequencer"), Set("sequencerToFail")).map(

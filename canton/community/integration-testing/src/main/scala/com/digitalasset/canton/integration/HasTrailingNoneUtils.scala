@@ -8,11 +8,9 @@ import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.{CantonConfig, ConsoleCommandTimeout}
 import com.digitalasset.canton.console.ParticipantReference
-import com.digitalasset.canton.examples.java.trailingnone.TrailingNone
 import com.digitalasset.canton.environment.CantonEnvironment
+import com.digitalasset.canton.examples.java.trailingnone.TrailingNone
 import com.digitalasset.canton.topology.PartyId
-
-import scala.jdk.CollectionConverters.MapHasAsScala
 
 /** Adds the ability to create TrailingNone instances to integration tests.
   */
@@ -26,23 +24,14 @@ trait HasTrailingNoneUtils {
       optTimeout: Option[config.NonNegativeDuration] = Some(
         ConsoleCommandTimeout.defaultLedgerCommandsTimeout
       ),
-  ): LedgerApiTypeWrappers.WrappedContractEntry = {
+  ): Unit = {
     if (participant.packages.find_by_module("TrailingNone").isEmpty) {
       participant.dars.upload(CantonExamplesPath)
     }
     val cmd =
       TrailingNone.create(partyId.toProtoPrimitive, java.util.Optional.empty()).commands.loneElement
-    val contractId = participant.ledger_api.javaapi.commands
+    participant.ledger_api.javaapi.commands
       .submit(Seq(partyId), Seq(cmd), commandId = commandId, optTimeout = optTimeout)
-      .getEventsById
-      .asScala
-      .headOption
-      .value
-      ._2
-      .getContractId
-    trailingNoneAcsWithBlobs(participant, partyId)
-      .find(_.contractId == contractId)
-      .value
   }
 
   def trailingNoneAcsWithBlobs(

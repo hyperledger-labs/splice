@@ -8,16 +8,19 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.SyncCryptoError
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider.AuthenticatedMessageType
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Epoch
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssSegmentModule.BlockCompletionTimeout
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssSegmentModule.{
+  BlockCompletionTimeout,
+  EmptyBlockCreationTimeout,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.PbftBlockState.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.EpochInProgress
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.shortType
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider.AuthenticatedMessageType
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
-  BftNodeId,
   BlockNumber,
   EpochNumber,
   FutureId,
@@ -30,7 +33,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.CommitCertificate
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.BlockMetadata
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.Consensus.RetransmissionsMessage.RetransmissionsNetworkMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Availability,
@@ -47,6 +49,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
+import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success, Try}
@@ -66,11 +69,15 @@ class IssSegmentModule[E <: Env[E]](
     parent: ModuleRef[Consensus.Message[E]],
     availability: ModuleRef[Availability.Message[E]],
     p2pNetworkOut: ModuleRef[P2PNetworkOut.Message],
+    metrics: BftOrderingMetrics,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit synchronizerProtocolVersion: ProtocolVersion, metricsContext: MetricsContext)
     extends Module[E, ConsensusSegment.Message]
     with NamedLogging {
+
+  private val thisNode = epoch.currentMembership.myId
+  private val areWeOriginalLeaderOfSegment = thisNode == segmentState.segment.originalLeader
 
   private val viewChangeTimeoutManager =
     new TimeoutManager[E, ConsensusSegment.Message, BlockNumber](
@@ -78,8 +85,13 @@ class IssSegmentModule[E <: Env[E]](
       BlockCompletionTimeout,
       segmentState.segment.firstBlockNumber,
     )
-  private val thisNode = epoch.currentMembership.myId
-  private val areWeOriginalLeaderOfSegment = thisNode == segmentState.segment.originalLeader
+
+  private val blockStartTimeoutManager =
+    new TimeoutManager[E, ConsensusSegment.Message, BlockNumber](
+      loggerFactory,
+      EmptyBlockCreationTimeout,
+      segmentState.segment.firstBlockNumber,
+    )
 
   private val leaderSegmentState: Option[LeaderSegmentState] =
     if (areWeOriginalLeaderOfSegment)
@@ -92,6 +104,13 @@ class IssSegmentModule[E <: Env[E]](
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var nextFutureId = FutureId.First
   private val waitingForFutureIds = mutable.Set.empty[FutureId]
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private var waitingForProposalSince: Option[Instant] = None
+
+  private val runningBlocks = mutable.Map[BlockNumber, Instant]()
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private var lastProposedBlockCommitInstant = Option.empty[Instant]
 
   override protected def receiveInternal(consensusMessage: ConsensusSegment.Message)(implicit
       context: E#ActorContextT[ConsensusSegment.Message],
@@ -108,14 +127,14 @@ class IssSegmentModule[E <: Env[E]](
         def processOldViewEvent(event: ConsensusSegment.ConsensusMessage.PbftEvent): Unit =
           // we don't want to send or store any messages as part of rehydrating old views
           // the main purpose here is simply to populate prepare certificates that may be used in future view changes
-          segmentState.processEvent(event).discard
+          segmentState.processEvent(event, rehydrated = true).discard
 
         def processCurrentViewMessages(
             pbftEvent: ConsensusSegment.ConsensusMessage.PbftEvent
         ): Unit =
           // for the latest view, we don't want to store again messages as part of rehydration,
           // but we do want to make sure we send (this could potentially resend but that's OK)
-          processPbftEvent(pbftEvent, storeMessages = false)
+          processPbftEvent(pbftEvent, storeMessages = false, rehydrated = true)
 
         def rehydrateMessages(
             messages: Seq[SignedMessage[ConsensusSegment.ConsensusMessage.PbftNetworkMessage]],
@@ -168,42 +187,84 @@ class IssSegmentModule[E <: Env[E]](
           }
         }
 
-      case ConsensusSegment.ConsensusMessage.BlockProposal(orderingBlock, forEpochNumber) =>
-        val logPrefix = s"$messageType: received block from local availability with batch IDs: " +
-          s"${orderingBlock.proofs.map(_.batchId)}"
-
-        leaderSegmentState.foreach { mySegmentState =>
-          // Depending on the timing of events, it is possible that Consensus has an outstanding
-          // proposal request to Availability when a view change occurs. A completed view change often
-          // leads to completed blocks, and even a completed epoch. As a result, Consensus may receive
-          // a proposal (in response to a prior request) that it can no longer assign to
-          // a slot in the local segment. `moreSlotsToAssign` is designed to detect such scenarios.
-          // The proposal will be in this case ignored, which means that Availability will never get an ack
-          // for it, so when we start a new epoch and make a new proposal request, we should get the same
-          // proposal again.
-          if (mySegmentState.moreSlotsToAssign) {
-            // Such outstanding proposal (requested before a view change) could end up coming after the epoch changes.
-            // In that case we also want to discard it by detecting that this request was not made during the current epoch.
-            if (forEpochNumber != epoch.info.number) {
-              logger.info(
-                s"$logPrefix. Ignoring it because it is from epoch $forEpochNumber and we're in epoch ${epoch.info.number}."
-              )
-            } else if (orderingBlock.proofs.nonEmpty || mySegmentState.isProgressBlocked) {
-              orderBlock(orderingBlock, mySegmentState, logPrefix)
-            } else {
-              logger.debug(
-                s"$logPrefix. Not using empty block because we are not blocking progress."
-              )
-              // Re-issue a pull from availability because we have discarded the previous one.
-              logger.debug(s"initiating pull after ignoring empty block")
-              initiatePull()
+      case ConsensusSegment.ConsensusMessage.LocalAvailability(localAvailabilityMessage) =>
+        localAvailabilityMessage match {
+          case Consensus.LocalAvailability.NoProposalAvailableYet =>
+            // If Availability signals not to have a proposal available after Consensus requests one,
+            // then Consensus will either choose to order an empty block immediately, if this leader
+            // is blocking progress for other segments. Otherwise, it won't do anything for the moment.
+            val logPrefix =
+              s"$messageType: received message from local availability that no proposals are available yet"
+            leaderSegmentState.foreach { mySegmentState =>
+              if (mySegmentState.moreSlotsToAssign && mySegmentState.isProgressBlocked) {
+                orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+              } else {
+                logger.debug(
+                  s"$logPrefix. Since we are not blocking progress, nothing to do at the moment."
+                )
+              }
             }
-          } else {
-            logger.info(
-              s"$logPrefix. Not using block because we can't assign more slots at the moment. Probably because of a view change."
-            )
+          case Consensus.LocalAvailability.ProposalCreated(orderingBlock, forEpochNumber) =>
+            val logPrefix =
+              s"$messageType: received block from local availability with batch IDs: " +
+                s"${orderingBlock.proofs.map(_.batchId)}"
+
+            leaderSegmentState.foreach { mySegmentState =>
+              // Depending on the timing of events, it is possible that Consensus has an outstanding
+              // proposal request to Availability when a view change occurs. A completed view change often
+              // leads to completed blocks, and even a completed epoch. As a result, Consensus may receive
+              // a proposal (in response to a prior request) that it can no longer assign to
+              // a slot in the local segment.
+              //
+              // It is also possible that Consensus orders an empty block before receiving a proposal from Availability,
+              // either to unblock other leaders' progress or to avoid a view change from happening.
+              //
+              // `moreSlotsToAssign` is designed to detect such scenarios.
+              // The proposal will be in this case ignored, which means that Availability will never get an ack
+              // for it, so when we start a new epoch and make a new proposal request, we should get the same
+              // proposal again.
+              if (mySegmentState.moreSlotsToAssign) {
+                // An outstanding proposal, requested before a view change, could end up coming after the epoch changes.
+                // In that case we also want to discard it by detecting that this request was not made during the current epoch.
+                if (forEpochNumber != epoch.info.number) {
+                  resetWaitingForProposal()
+                  logger.info(
+                    s"$logPrefix. Ignoring it because it is from epoch $forEpochNumber and we're in epoch ${epoch.info.number}."
+                  )
+                } else {
+                  emitProposalWaitLatency()
+                  orderBlock(orderingBlock, mySegmentState, logPrefix)
+                }
+              } else {
+                resetWaitingForProposal()
+                logger.info(
+                  s"$logPrefix. Not using block because we can't assign more slots at the moment. Probably because of a view change."
+                )
+              }
+            }
+        }
+
+      case ConsensusSegment.ConsensusMessage.BlockOrdered(metadata, isEmpty) =>
+        leaderSegmentState.foreach { mySegmentState =>
+          mySegmentState.confirmCompleteBlockStored(metadata.blockNumber, isEmpty)
+          // If this leader is waiting to start ordering a new block and, after confirming completion of this block,
+          // it considers itself to be blocking progress for other segments, then it will start ordering an empty block
+          if (mySegmentState.moreSlotsToAssign && mySegmentState.isProgressBlocked) {
+            val logPrefix =
+              s"$messageType: new block completed and we are not blocking progress"
+            orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
           }
         }
+
+      case ConsensusSegment.Internal.BlockInactivityTimeout =>
+        leaderSegmentState.foreach { mySegmentState =>
+          if (mySegmentState.moreSlotsToAssign) {
+            val logPrefix =
+              s"$messageType: block timeout reached so ordering an empty block"
+            orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+          }
+        }
+
       case ConsensusSegment.ConsensusMessage.MessageFromPipeToSelf(event, futureId) =>
         waitingForFutureIds.remove(futureId).discard
         event.foreach(receiveInternal(_))
@@ -222,20 +283,21 @@ class IssSegmentModule[E <: Env[E]](
           p2pNetworkOut.asyncSend(
             P2PNetworkOut.send(
               P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(msg),
-              to = from,
+              destinationBftNodeId = from,
             )
           )
         }
         if (toRetransmit.commitCerts.nonEmpty) {
-          signRetransmissionNetworkMessageAndSend(
-            Consensus.RetransmissionsMessage.RetransmissionResponse
-              .create(epoch.currentMembership.myId, toRetransmit.commitCerts),
-            to = from,
+          p2pNetworkOut.asyncSend(
+            P2PNetworkOut.send(
+              P2PNetworkOut.BftOrderingNetworkMessage.RetransmissionMessage(
+                Consensus.RetransmissionsMessage
+                  .RetransmissionResponse(epoch.currentMembership.myId, toRetransmit.commitCerts)
+              ),
+              destinationBftNodeId = from,
+            )
           )
         }
-
-      case ConsensusSegment.ConsensusMessage.BlockOrdered(metadata) =>
-        leaderSegmentState.foreach(_.confirmCompleteBlockStored(metadata.blockNumber))
 
       case blockStored @ ConsensusSegment.Internal.OrderedBlockStored(
             commitCertificate,
@@ -244,6 +306,8 @@ class IssSegmentModule[E <: Env[E]](
         val orderedBlock = blockStored.orderedBlock
         val blockNumber = orderedBlock.metadata.blockNumber
         val orderedBatchIds = orderedBlock.batchRefs.map(_.batchId)
+
+        emitSegmentBlockCommitLatency(blockNumber)
 
         logger.debug(
           s"$messageType: DB stored block w/ ${orderedBlock.metadata}, view number $viewNumber and batches $orderedBatchIds"
@@ -298,7 +362,13 @@ class IssSegmentModule[E <: Env[E]](
         //  by a concurrent segment leader module (which is created for the new epoch after the ack is sent).
         //  See https://pekko.apache.org/docs/pekko/current/general/message-delivery-reliability.html#ordering-of-local-message-sends
         //  for more information.
-        parent.asyncSend(Consensus.ConsensusMessage.BlockOrdered(orderedBlock, commitCertificate))
+        parent.asyncSend(
+          Consensus.ConsensusMessage.BlockOrdered(
+            orderedBlock,
+            commitCertificate,
+            hasCompletedLedSegment = leaderSegmentState.exists(!_.moreSlotsToAssign),
+          )
+        )
 
       case ConsensusSegment.ConsensusMessage.CompletedEpoch(epochNumber) =>
         if (epoch.info.number == epochNumber) {
@@ -335,7 +405,11 @@ class IssSegmentModule[E <: Env[E]](
       context: E#ActorContextT[ConsensusSegment.Message],
       traceContext: TraceContext,
   ): Unit = {
+    resetWaitingForProposal()
+
     logger.debug(s"$logPrefix. Starting consensus process.")
+    blockStartTimeoutManager.cancelTimeout()
+
     val orderedBlock = mySegmentState.assignToSlot(orderingBlock, latestCompletedEpochLastCommits)
     val prePrepare =
       ConsensusSegment.ConsensusMessage.PrePrepare.create(
@@ -352,11 +426,12 @@ class IssSegmentModule[E <: Env[E]](
   private def processPbftEvent(
       pbftEvent: ConsensusSegment.ConsensusMessage.PbftEvent,
       storeMessages: Boolean = storePbftMessages,
+      rehydrated: Boolean = false,
   )(implicit
       context: E#ActorContextT[ConsensusSegment.Message],
       traceContext: TraceContext,
   ): Unit = {
-    val processResults = segmentState.processEvent(pbftEvent)
+    val processResults = segmentState.processEvent(pbftEvent, rehydrated)
 
     def handleStore(store: StoreResult, sendMsg: () => Unit): Unit = store match {
       case StorePrePrepare(prePrepare) =>
@@ -374,7 +449,7 @@ class IssSegmentModule[E <: Env[E]](
             Some(prePrepare.message.stored)
         }
       case StorePrepares(prepares) =>
-        pipeToSelfWithFutureTracking(epochStore.addPrepares(prepares)) {
+        pipeToSelfWithFutureTracking(epochStore.addPreparesAtomically(prepares)) {
           case Failure(exception) =>
             Some(ConsensusSegment.Internal.AsyncException(exception))
           case Success(_) =>
@@ -427,7 +502,12 @@ class IssSegmentModule[E <: Env[E]](
             case Right(signedMessage) =>
               context.pureFuture(Right(signedMessage))
           }
-        pipeToSelfWithFutureTracking(context.sequenceFuture(futures)) {
+        pipeToSelfWithFutureTracking(
+          context.sequenceFuture(
+            futures,
+            orderingStage = Some("consensus-segment-sign-pre-prepares-for-new-view"),
+          )
+        ) {
           case Failure(exception) =>
             logAsyncException(exception)
             None
@@ -450,10 +530,15 @@ class IssSegmentModule[E <: Env[E]](
           logger.debug(
             s"Sending PBFT message to $nodes: $pbftMessage"
           )
+          pbftMessage.message match {
+            case PrePrepare(BlockMetadata(_, blockNumber), _, _, _, _, _) =>
+              runningBlocks.put(blockNumber, Instant.now()).discard
+            case _ =>
+          }
           p2pNetworkOut.asyncSend(
             P2PNetworkOut.Multicast(
               P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(pbftMessage),
-              to = nodes,
+              destinationBftNodeIds = nodes,
             )
           )
         }
@@ -493,15 +578,15 @@ class IssSegmentModule[E <: Env[E]](
       traceContext: TraceContext,
   ): Unit =
     // Persist ordered block to epochStore and then self-send ack message.
-    pipeToSelf(
-      epochStore.addOrderedBlock(
+    pipeToSelfWithFutureTracking(
+      epochStore.addOrderedBlockAtomically(
         commitCertificate.prePrepare,
         commitCertificate.commits,
       )
     ) {
-      case Failure(exception) => ConsensusSegment.Internal.AsyncException(exception)
+      case Failure(exception) => Some(ConsensusSegment.Internal.AsyncException(exception))
       case Success(_) =>
-        ConsensusSegment.Internal.OrderedBlockStored(commitCertificate, viewNumber)
+        Some(ConsensusSegment.Internal.OrderedBlockStored(commitCertificate, viewNumber))
     }
 
   private def logAsyncException(exception: Throwable)(implicit traceContext: TraceContext): Unit =
@@ -532,41 +617,18 @@ class IssSegmentModule[E <: Env[E]](
         Some(PbftSignedNetworkMessage(signedMessage))
     }
 
-  private def signRetransmissionNetworkMessageAndSend(
-      message: RetransmissionsNetworkMessage,
-      to: BftNodeId,
-  )(implicit
-      context: E#ActorContextT[ConsensusSegment.Message],
-      traceContext: TraceContext,
-  ): Unit =
-    pipeToSelfWithFutureTracking(
-      cryptoProvider.signMessage(
-        message,
-        AuthenticatedMessageType.BftSignedRetransmissionMessage,
-      )
-    ) {
-      case Failure(exception) =>
-        logAsyncException(exception)
-        None
-      case Success(Left(errors)) =>
-        logger.error(s"Can't sign retransmission message ${shortType(message)}: $errors")
-        None
-      case Success(Right(signedMessage)) =>
-        p2pNetworkOut.asyncSend(
-          P2PNetworkOut.send(
-            P2PNetworkOut.BftOrderingNetworkMessage.RetransmissionMessage(
-              signedMessage
-            ),
-            to,
-          )
-        )
-        None
-    }
-
   private def initiatePull(
       orderedBatchIds: Seq[BatchId] = Seq.empty
-  )(implicit traceContext: TraceContext): Unit = {
+  )(implicit
+      traceContext: TraceContext,
+      context: E#ActorContextT[ConsensusSegment.Message],
+  ): Unit = {
     logger.debug("Consensus requesting new proposal from local availability")
+    if (leaderSegmentState.exists(_.moreSlotsToAssign))
+      waitingForProposalSince = Some(Instant.now())
+    blockStartTimeoutManager.scheduleTimeout(
+      ConsensusSegment.Internal.BlockInactivityTimeout
+    )
     availability.asyncSend(
       Availability.Consensus.CreateProposal(
         epoch.currentMembership.orderingTopology,
@@ -589,8 +651,36 @@ class IssSegmentModule[E <: Env[E]](
     }
   }
 
+  private def emitProposalWaitLatency(): Unit = {
+    import metrics.performance.orderingStageLatency.*
+    emitOrderingStageLatency(
+      labels.stage.values.consensus.BlockProposalWait,
+      waitingForProposalSince,
+      cleanup = () => resetWaitingForProposal(),
+    )
+  }
+
+  private def resetWaitingForProposal(): Unit =
+    waitingForProposalSince = None
+
+  private def emitSegmentBlockCommitLatency(blockNumber: BlockNumber): Unit = {
+    import metrics.performance.orderingStageLatency.*
+    emitOrderingStageLatency(
+      labels.stage.values.consensus.SegmentProposalToCommitLatency,
+      runningBlocks.get(blockNumber),
+      cleanup = () =>
+        runningBlocks.remove(blockNumber).foreach { _ =>
+          emitOrderingStageLatency(
+            labels.stage.values.consensus.SegmentBlockCommitLatency,
+            lastProposedBlockCommitInstant,
+            cleanup = () => lastProposedBlockCommitInstant = Some(Instant.now()),
+          )
+        },
+    )
+  }
+
   @VisibleForTesting
-  private[bftordering] def generateFutureId(): FutureId = {
+  private[iss] def generateFutureId(): FutureId = {
     val id = nextFutureId
     waitingForFutureIds.add(id).discard
     nextFutureId = FutureId(nextFutureId + 1)
@@ -598,7 +688,7 @@ class IssSegmentModule[E <: Env[E]](
   }
 
   @VisibleForTesting
-  private[bftordering] def allFuturesHaveFinished: Boolean = waitingForFutureIds.isEmpty
+  private[iss] def allFuturesHaveFinished: Boolean = waitingForFutureIds.isEmpty
 
   private def closeSegment(
       epochNumber: EpochNumber,
@@ -609,6 +699,7 @@ class IssSegmentModule[E <: Env[E]](
       traceContext: TraceContext,
   ): Unit = {
     viewChangeTimeoutManager.cancelTimeout()
+    blockStartTimeoutManager.cancelTimeout()
     context.become(
       new SegmentClosingBehaviour[E](
         waitingForFutureIds,
@@ -626,4 +717,5 @@ class IssSegmentModule[E <: Env[E]](
 
 object IssSegmentModule {
   val BlockCompletionTimeout: FiniteDuration = 10.seconds
+  val EmptyBlockCreationTimeout: FiniteDuration = 5.seconds
 }

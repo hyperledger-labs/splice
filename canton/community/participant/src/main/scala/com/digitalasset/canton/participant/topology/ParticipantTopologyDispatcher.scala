@@ -16,12 +16,11 @@ import com.digitalasset.canton.common.sequencer.{
 }
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.{Crypto, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.config.ParticipantNodeParameterConfig
 import com.digitalasset.canton.participant.store.SyncPersistentState
 import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError
@@ -32,11 +31,10 @@ import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithIni
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.version.{ParticipantProtocolFeatureFlags, ProtocolVersion}
+import com.digitalasset.canton.version.ParticipantProtocolFeatureFlags
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.*
@@ -79,7 +77,7 @@ class ParticipantTopologyDispatcher(
     * topology state onto the synchronizers
     */
   private[topology] val synchronizers =
-    new TrieMap[SynchronizerAlias, NonEmpty[Seq[SynchronizerOutbox]]]()
+    new TrieMap[PhysicalSynchronizerId, NonEmpty[Seq[SynchronizerOutbox]]]()
 
   def queueStatus: TopologyQueueStatus = {
     val (dispatcher, clients) = synchronizers.values.foldLeft((0, 0)) {
@@ -97,21 +95,21 @@ class ParticipantTopologyDispatcher(
   }
 
   def synchronizerDisconnected(
-      synchronizerAlias: SynchronizerAlias
+      synchronizerId: PhysicalSynchronizerId
   )(implicit traceContext: TraceContext): Unit =
-    synchronizers.remove(synchronizerAlias) match {
+    synchronizers.remove(synchronizerId) match {
       case Some(outboxes) =>
-        state.synchronizerIdForAlias(synchronizerAlias).foreach(disconnectOutboxes)
+        disconnectOutboxes(synchronizerId)
         outboxes.foreach(_.close())
       case None =>
-        logger.debug(s"Topology pusher already disconnected from $synchronizerAlias")
+        logger.debug(s"Topology pusher already disconnected from $synchronizerId")
     }
 
-  def awaitIdle(synchronizerAlias: SynchronizerAlias, timeout: Duration)(implicit
+  def awaitIdle(synchronizerId: PhysicalSynchronizerId, timeout: Duration)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Boolean] =
     synchronizers
-      .get(synchronizerAlias)
+      .get(synchronizerId)
       .fold(
         EitherT.leftT[FutureUnlessShutdown, Boolean](
           SynchronizerRegistryError.SynchronizerRegistryInternalError
@@ -125,7 +123,7 @@ class ParticipantTopologyDispatcher(
         )
       )
 
-  private def getState(synchronizerId: SynchronizerId)(implicit
+  private def getState(synchronizerId: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, SyncPersistentState] =
     EitherT
@@ -156,57 +154,55 @@ class ParticipantTopologyDispatcher(
     }
   })
 
-  def trustSynchronizer(synchronizerId: SynchronizerId)(implicit
+  def trustSynchronizer(synchronizerId: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] = {
+    val logicalSynchronizerId = synchronizerId.logical
+    val featureFlagsForPV = ParticipantProtocolFeatureFlags.supportedFeatureFlagsByPV.getOrElse(
+      synchronizerId.protocolVersion,
+      Set.empty,
+    )
+
     def alreadyTrustedInStoreWithSupportedFeatures(
         store: TopologyStore[?]
     ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Boolean] =
       EitherT.right(
-        performUnlessClosingUSF(functionFullName)(
+        synchronizeWithClosing(functionFullName)(
           store
             .findPositiveTransactions(
               asOf = CantonTimestamp.MaxValue,
               asOfInclusive = true,
               isProposal = false,
               types = Seq(SynchronizerTrustCertificate.code),
-              filterUid = Some(Seq(participantId.uid)),
+              filterUid = Some(NonEmpty(Seq, participantId.uid)),
               filterNamespace = None,
             )
             .map(_.toTopologyState.exists {
               // If certificate is missing feature flags, re-issue the trust certificate with it
-              case SynchronizerTrustCertificate(`participantId`, `synchronizerId`, featureFlags)
-                  if missingFeatureFlags(featureFlags).isEmpty =>
-                true
+              case SynchronizerTrustCertificate(
+                    `participantId`,
+                    `logicalSynchronizerId`,
+                    featureFlags,
+                  ) =>
+                featureFlagsForPV.diff(featureFlags.toSet).isEmpty
               case _ => false
             })
         )
       )
 
-    def featureFlagsForPV: Set[ParticipantTopologyFeatureFlag] = config.parameters match {
-      case participantParameters: ParticipantNodeParameterConfig
-          if participantParameters.protocolFeatureFlags =>
-        state
-          .protocolVersionFor(synchronizerId)
-          .flatMap(ParticipantProtocolFeatureFlags.supportedFeatureFlagsByPV.get)
-          .getOrElse(Set.empty)
-      case _ => Set.empty[ParticipantTopologyFeatureFlag]
-    }
-
-    def missingFeatureFlags(featureFlags: Seq[ParticipantTopologyFeatureFlag]) =
-      featureFlagsForPV.diff(featureFlags.toSet)
-
     def trustSynchronizer(
         state: SyncPersistentState
     ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] =
-      performUnlessClosingEitherUSF(functionFullName) {
-        MonadUtil.unlessM(alreadyTrustedInStoreWithSupportedFeatures(manager.store)) {
+      MonadUtil.unlessM(
+        alreadyTrustedInStoreWithSupportedFeatures(manager.store)
+      ) {
+        synchronizeWithClosing(functionFullName) {
           manager
             .proposeAndAuthorize(
               TopologyChangeOp.Replace,
               SynchronizerTrustCertificate(
                 participantId,
-                synchronizerId,
+                logicalSynchronizerId,
                 featureFlagsForPV.toSeq,
               ),
               serial = None,
@@ -222,59 +218,57 @@ class ParticipantTopologyDispatcher(
             )
         }
       }
+
     // check if cert already exists in the synchronizer store
     getState(synchronizerId).flatMap(state =>
-      MonadUtil.unlessM(alreadyTrustedInStoreWithSupportedFeatures(state.topologyStore))(
+      MonadUtil.unlessM(
+        alreadyTrustedInStoreWithSupportedFeatures(state.topologyStore)
+      )(
         trustSynchronizer(state)
       )
     )
   }
 
   def onboardToSynchronizer(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       alias: SynchronizerAlias,
       sequencerConnectClient: SequencerConnectClient,
-      protocolVersion: ProtocolVersion,
   )(implicit
       executionContext: ExecutionContextExecutor,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Boolean] =
-    getState(synchronizerId).flatMap { _ =>
+    getState(psid).flatMap { state =>
       SynchronizerOnboardingOutbox
         .initiateOnboarding(
           alias,
-          synchronizerId,
-          protocolVersion,
+          psid,
           participantId,
           sequencerConnectClient,
           manager.store,
           topologyConfig,
           timeouts,
           loggerFactory
-            .append("synchronizerId", synchronizerId.toString)
+            .append("synchronizerId", psid.toString)
             .appendUnnamedKey("onboarding", "onboarding"),
-          crypto,
+          SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
         )
     }
 
   def createHandler(
       synchronizerAlias: SynchronizerAlias,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
       client: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
       timeTracker: SynchronizerTimeTracker,
   ): ParticipantTopologyDispatcherHandle = {
-    val synchronizerLoggerFactory = loggerFactory.append("synchronizerId", synchronizerId.toString)
+    val synchronizerLoggerFactory =
+      loggerFactory.append("synchronizerId", sequencerClient.psid.toString)
     new ParticipantTopologyDispatcherHandle {
       val handle = new SequencerBasedRegisterTopologyTransactionHandle(
         sequencerClient,
-        synchronizerId,
         participantId,
         timeTracker,
         clock,
         config.topology,
-        protocolVersion,
         timeouts,
         synchronizerLoggerFactory,
       )
@@ -282,44 +276,41 @@ class ParticipantTopologyDispatcher(
       override def synchronizerConnected()(implicit
           traceContext: TraceContext
       ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] =
-        getState(synchronizerId)
+        getState(sequencerClient.psid)
           .flatMap { state =>
             val queueBasedSynchronizerOutbox = new QueueBasedSynchronizerOutbox(
               synchronizerAlias = synchronizerAlias,
-              synchronizerId = synchronizerId,
               memberId = participantId,
-              protocolVersion = protocolVersion,
               handle = handle,
               targetClient = client,
               synchronizerOutboxQueue = state.synchronizerOutboxQueue,
               targetStore = state.topologyStore,
               timeouts = timeouts,
               loggerFactory = synchronizerLoggerFactory,
-              crypto = crypto,
+              crypto = SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
               topologyConfig = topologyConfig,
             )
 
             val storeBasedSynchronizerOutbox = new StoreBasedSynchronizerOutbox(
               synchronizerAlias = synchronizerAlias,
-              synchronizerId = synchronizerId,
               memberId = participantId,
-              protocolVersion = protocolVersion,
               handle = handle,
               targetClient = client,
               authorizedStore = manager.store,
               targetStore = state.topologyStore,
               timeouts = timeouts,
               loggerFactory = loggerFactory,
-              crypto = crypto,
+              crypto = SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
               topologyConfig = topologyConfig,
               futureSupervisor = futureSupervisor,
             )
+            val psid = client.psid
             ErrorUtil.requireState(
-              !synchronizers.contains(synchronizerAlias),
-              s"topology pusher for $synchronizerAlias already exists",
+              !synchronizers.contains(psid),
+              s"topology pusher for $psid already exists",
             )
             val outboxes = NonEmpty(Seq, queueBasedSynchronizerOutbox, storeBasedSynchronizerOutbox)
-            synchronizers += synchronizerAlias -> outboxes
+            synchronizers += psid -> outboxes
 
             state.topologyManager.addObserver(new TopologyManagerObserver {
               override def addedNewTransactions(
@@ -334,20 +325,19 @@ class ParticipantTopologyDispatcher(
 
             outboxes.forgetNE.parTraverse_(
               _.startup().leftMap(
-                SynchronizerRegistryError.InitialOnboardingError.Error(_)
+                SynchronizerRegistryError.InitialOnboardingError.Error(_): SynchronizerRegistryError
               )
             )
           }
     }
   }
 
-  private def disconnectOutboxes(synchronizerId: SynchronizerId)(implicit
+  private def disconnectOutboxes(synchronizerId: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): Unit = {
     logger.debug("Clearing synchronizer topology manager observers")
     state.get(synchronizerId).foreach(_.topologyManager.clearObservers())
   }
-
 }
 
 /** Utility class to dispatch the initial set of onboarding transactions to a synchronizer
@@ -359,15 +349,14 @@ class ParticipantTopologyDispatcher(
   */
 private class SynchronizerOnboardingOutbox(
     synchronizerAlias: SynchronizerAlias,
-    val synchronizerId: SynchronizerId,
-    val protocolVersion: ProtocolVersion,
+    val psid: PhysicalSynchronizerId,
     participantId: ParticipantId,
     sequencerConnectClient: SequencerConnectClient,
     val authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
     override protected val topologyConfig: TopologyConfig,
     val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    override protected val crypto: Crypto,
+    override protected val crypto: SynchronizerCrypto,
 ) extends StoreBasedSynchronizerOutboxDispatchHelper
     with FlagCloseable {
 
@@ -399,17 +388,17 @@ private class SynchronizerOnboardingOutbox(
   ]] =
     for {
       candidates <- EitherT.right(
-        performUnlessClosingUSF(functionFullName)(
+        synchronizeWithClosing(functionFullName)(
           authorizedStore
-            .findParticipantOnboardingTransactions(participantId, synchronizerId)
+            .findParticipantOnboardingTransactions(participantId, psid.logical)
         )
       )
       applicable <- EitherT.right(
-        performUnlessClosingUSF(functionFullName)(onlyApplicable(candidates))
+        synchronizeWithClosing(functionFullName)(onlyApplicable(candidates))
       )
       _ <- EitherT.fromEither[FutureUnlessShutdown](initializedWith(applicable))
       // Try to convert if necessary the topology transactions for the required protocol version of the synchronizer
-      convertedTxs <- performUnlessClosingEitherUSF(functionFullName) {
+      convertedTxs <- synchronizeWithClosing(functionFullName) {
         convertTransactions(applicable).leftMap[SynchronizerRegistryError](
           SynchronizerRegistryError.TopologyConversionError.Error(_)
         )
@@ -457,15 +446,14 @@ private class SynchronizerOnboardingOutbox(
 object SynchronizerOnboardingOutbox {
   def initiateOnboarding(
       synchronizerAlias: SynchronizerAlias,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
+      synchronizerId: PhysicalSynchronizerId,
       participantId: ParticipantId,
       sequencerConnectClient: SequencerConnectClient,
       authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
       topologyConfig: TopologyConfig,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
-      crypto: Crypto,
+      crypto: SynchronizerCrypto,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -473,7 +461,6 @@ object SynchronizerOnboardingOutbox {
     val outbox = new SynchronizerOnboardingOutbox(
       synchronizerAlias,
       synchronizerId,
-      protocolVersion,
       participantId,
       sequencerConnectClient,
       authorizedStore,

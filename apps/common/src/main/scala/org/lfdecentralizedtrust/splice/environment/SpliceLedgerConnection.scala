@@ -8,7 +8,7 @@ import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityPro
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
 import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
-import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, Transaction, User}
 import com.digitalasset.base.error.ErrorResource
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
@@ -27,8 +27,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
@@ -86,6 +85,12 @@ class BaseLedgerConnection(
 
   import BaseLedgerConnection.*
 
+  def deleteUser(
+      userId: String,
+      identityProviderId: Option[String] = None,
+  )(implicit tc: TraceContext): Future[Unit] =
+    client.deleteUser(userId, identityProviderId)
+
   def ledgerEnd()(implicit
       traceContext: TraceContext
   ): Future[Long] =
@@ -97,7 +102,7 @@ class BaseLedgerConnection(
     client.latestPrunedOffset()
 
   def activeContracts(
-      filter: com.daml.ledger.api.v2.transaction_filter.TransactionFilter,
+      eventFormat: com.daml.ledger.api.v2.transaction_filter.EventFormat,
       offset: Long,
   )(implicit tc: TraceContext): Future[
     (
@@ -109,7 +114,7 @@ class BaseLedgerConnection(
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset,
-        filter = Some(filter),
+        eventFormat = Some(eventFormat),
       )
     )
     for {
@@ -142,7 +147,7 @@ class BaseLedgerConnection(
         Seq[IncompleteReassignmentEvent.Unassign],
         Seq[IncompleteReassignmentEvent.Assign],
     )
-  ] = activeContracts(filter.toTransactionFilter, offset)
+  ] = activeContracts(filter.toEventFormat, offset)
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext
@@ -190,7 +195,12 @@ class BaseLedgerConnection(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
-        party <- ensurePartyAllocated(AuthorizedStore, hint, None, participantAdminConnection)
+        party <- ensurePartyAllocated(
+          TopologyStoreId.Authorized,
+          hint,
+          None,
+          participantAdminConnection,
+        )
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
       } yield (),
@@ -294,7 +304,7 @@ class BaseLedgerConnection(
   )(implicit traceContext: TraceContext): Future[PartyId] =
     for {
       party <- ensurePartyAllocated(
-        AuthorizedStore,
+        TopologyStoreId.Authorized,
         sanitizeUserIdToPartyString(user),
         None,
         participantAdminConnection,
@@ -1361,7 +1371,7 @@ object SpliceLedgerConnection {
 
   def decodeExerciseResult[T](
       update: Update[T],
-      transaction: TransactionTree,
+      transaction: Transaction,
   ): T = {
     val rootEventIds = transaction.getRootNodeIds.asScala.toSeq
     if (rootEventIds.size == 1) {

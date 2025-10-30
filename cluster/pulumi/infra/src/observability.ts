@@ -559,6 +559,27 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
+  if (infraConfig.prometheus.installPrometheusPushgateway) {
+    new k8s.helm.v3.Release('prometheus-pushgateway', {
+      name: 'prometheus-pushgateway',
+      chart: 'prometheus-pushgateway',
+      version: '3.4.1',
+      namespace: namespaceName,
+      repositoryOpts: {
+        repo: 'https://prometheus-community.github.io/helm-charts',
+      },
+      values: {
+        serviceMonitor: {
+          enabled: true,
+          namespace: namespaceName,
+          additionalLabels: { release: 'prometheus-grafana-monitoring' },
+        },
+        ...infraAffinityAndTolerations,
+      },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
+    });
+  }
+
   return prometheusStack;
 }
 
@@ -750,7 +771,32 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
               monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
             ),
-            'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+            'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
+              'sv-status-report_alerts.yaml',
+              [
+                {
+                  reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '5m',
+                  teamLabel: 'canton-network',
+                  subtitle: 'internal SVs 5m',
+                  uid: 'adlmhpz5iv4sgc',
+                },
+                {
+                  reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '15m',
+                  teamLabel: 'support',
+                  subtitle: 'internal SVs 15m',
+                  uid: 'bdlmhpz5iv4sgc',
+                },
+                {
+                  reportPublisherFormula: '!~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '15m',
+                  teamLabel: 'da',
+                  subtitle: 'external SVs 15m',
+                  uid: 'cdlmhpz5iv4sgc',
+                },
+              ]
+            ),
             ...(enableMiningRoundAlert
               ? {
                   'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
@@ -842,6 +888,70 @@ function readGrafanaAlertingFile(file: string) {
     : fileContent;
 }
 
+type ReportMatchOperator = '=~' | '!~';
+type ReportPublisherList = 'Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node';
+type ReportPublisherFormula = `${ReportMatchOperator}"${ReportPublisherList}"`;
+type NotificationDelay = '5m' | '15m';
+type TeamLabel = 'canton-network' | 'support' | 'da';
+type RulesUID = 'adlmhpz5iv4sgc' | 'bdlmhpz5iv4sgc' | 'cdlmhpz5iv4sgc';
+
+interface AlertRulesConfig {
+  reportPublisherFormula: ReportPublisherFormula;
+  notificationDelay: NotificationDelay;
+  teamLabel: TeamLabel;
+  subtitle: string;
+  uid: RulesUID;
+}
+
+interface GrafanaRule {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface GrafanaRuleGroup {
+  name: string;
+  rules: GrafanaRule[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface GrafanaRuleFile {
+  groups: GrafanaRuleGroup[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+// reads grafana alerting template rule from file, fill it with alert rules custom configurations and append to rules
+function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRulesConfig[]) {
+  const fileContent = fs.readFileSync(
+    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    'utf-8'
+  );
+
+  const content: GrafanaRuleFile = yaml.load(fileContent) as GrafanaRuleFile;
+  if (!content?.groups?.[0]?.rules?.[0]) {
+    throw new Error(`Invalid or empty rule template, Expected 'groups[0].rules[0]' to exist.`);
+  }
+
+  const genericAlertRule = yaml.dump(content.groups[0].rules[0]);
+
+  content.groups[0].rules = rules.map(rule => {
+    const newRuleString = genericAlertRule
+      .replace('$REPORT_PUBLISHER_FORMULA', rule.reportPublisherFormula)
+      .replace('$NOTIFICATION_DELAY', rule.notificationDelay)
+      .replace('$TEAM_LABEL', rule.teamLabel)
+      .replace('$SUB_TITLE', rule.subtitle)
+      .replace('$RULE_UID', rule.uid);
+    return yaml.load(newRuleString) as GrafanaRule;
+  });
+  const newFileContent = yaml.dump(content);
+
+  // Ignore no data or data source error if the cluster is reset periodically
+  return shouldIgnoreNoDataOrDataSourceError
+    ? newFileContent.replace(/(execErrState|noDataState): .+/g, '$1: OK')
+    : newFileContent;
+}
+
 function readAlertingManagerFile(file: string) {
   return fs.readFileSync(`${SPLICE_ROOT}/cluster/pulumi/infra/alert-manager/${file}`, 'utf-8');
 }
@@ -865,6 +975,9 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
     'grafana-pg',
     'grafana-pg-secret',
     { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
-    true // overrideDbSizeFromValues
+    true, // overrideDbSizeFromValues
+    false, // disableProtection
+    undefined, // chart version
+    true // useInfraAffinityAndTolerations
   );
 }

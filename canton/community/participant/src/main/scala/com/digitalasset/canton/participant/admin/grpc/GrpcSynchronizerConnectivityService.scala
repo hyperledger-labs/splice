@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.admin.grpc
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.RegisterSynchronizerRequest.SynchronizerConnection
@@ -21,10 +22,13 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
-import com.digitalasset.canton.participant.sync.CantonSyncService
-import com.digitalasset.canton.participant.sync.CantonSyncService.ConnectSynchronizer
-import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceInternalError.SynchronizerIsMissingInternally
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceInternalError.{
+  PhysicalSynchronizerIdNotConfigured,
+  SynchronizerIsMissingInternally,
+}
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceUnknownSynchronizer
+import com.digitalasset.canton.participant.sync.SynchronizerConnectionsManager.ConnectSynchronizer
+import com.digitalasset.canton.participant.sync.{CantonSyncService, SyncServiceError}
 import com.digitalasset.canton.participant.synchronizer.{
   SynchronizerAliasManager,
   SynchronizerConnectionConfig,
@@ -33,6 +37,7 @@ import com.digitalasset.canton.participant.synchronizer.{
 }
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
@@ -66,15 +71,24 @@ class GrpcSynchronizerConnectivityService(
       synchronizerAlias: SynchronizerAlias
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
     for {
-      synchronizerId <- EitherT.fromOption[FutureUnlessShutdown](
-        aliasManager
-          .synchronizerIdForAlias(synchronizerAlias),
-        SynchronizerIsMissingInternally(synchronizerAlias, "aliasManager"),
+      synchronizerConnectionConfig <- EitherT.fromEither[FutureUnlessShutdown](
+        sync.synchronizerConnectionConfigStore
+          .getActive(synchronizerAlias)
+          .leftMap(err =>
+            SyncServiceError.SyncServiceAliasResolution
+              .Error(synchronizerAlias, err.message)
+          )
       )
-      client <- EitherT.fromOption[FutureUnlessShutdown](
-        sync.syncCrypto.ips
-          .forSynchronizer(synchronizerId),
-        SynchronizerIsMissingInternally(synchronizerAlias, "ips"),
+      client <- EitherT.fromEither[FutureUnlessShutdown](
+        synchronizerConnectionConfig.configuredPSId.toOption
+          .toRight(PhysicalSynchronizerIdNotConfigured(synchronizerAlias, "connectivity service"))
+          .flatMap(
+            sync.syncCrypto.ips
+              .forSynchronizer(_)
+              .toRight(
+                SynchronizerIsMissingInternally(synchronizerAlias, "ips")
+              )
+          )
       )
       active <- EitherT
         .right(client.awaitUS(_.isParticipantActive(sync.participantId), timeouts.network.unwrap))
@@ -138,7 +152,9 @@ class GrpcSynchronizerConnectivityService(
     val v30.ReconnectSynchronizerRequest(synchronizerAlias, keepRetrying) = request
     val ret = for {
       alias <- parseSynchronizerAlias(synchronizerAlias)
-      success <- sync.connectSynchronizer(alias, keepRetrying, ConnectSynchronizer.Connect)
+      success <- sync
+        .connectSynchronizer(alias, keepRetrying, ConnectSynchronizer.Connect)
+        .map(_.isDefined)
       _ <- waitUntilActiveIfSuccess(success, alias)
     } yield v30.ReconnectSynchronizerResponse(connectedSuccessfully = success)
     _mapErrNewEUS(ret)
@@ -194,7 +210,8 @@ class GrpcSynchronizerConnectivityService(
       case (alias, (synchronizerId, healthy)) =>
         new v30.ListConnectedSynchronizersResponse.Result(
           synchronizerAlias = alias.unwrap,
-          synchronizerId = synchronizerId.toProtoPrimitive,
+          physicalSynchronizerId = synchronizerId.toProtoPrimitive,
+          synchronizerId = synchronizerId.logical.toProtoPrimitive,
           healthy = healthy.unwrap,
         )
     }.toSeq))
@@ -209,11 +226,11 @@ class GrpcSynchronizerConnectivityService(
       v30.ListRegisteredSynchronizersResponse(
         results = registeredSynchronizers
           .filter(_.status.isActive)
-          .map(_.config)
           .map(cnf =>
             new v30.ListRegisteredSynchronizersResponse.Result(
-              config = Some(cnf.toProtoV30),
-              connected = connected.contains(cnf.synchronizerAlias),
+              config = Some(cnf.config.toProtoV30),
+              connected = connected.contains(cnf.config.synchronizerAlias),
+              physicalSynchronizerId = cnf.configuredPSId.toOption.map(_.toProtoPrimitive),
             )
           )
       )
@@ -238,11 +255,13 @@ class GrpcSynchronizerConnectivityService(
       _ <- sync.addSynchronizer(config, validation)
 
       _ = logger.info(s"Connecting to synchronizer $config")
-      success <- sync.connectSynchronizer(
-        synchronizerAlias = config.synchronizerAlias,
-        keepRetrying = false,
-        connectSynchronizer = ConnectSynchronizer.Connect,
-      )
+      success <- sync
+        .connectSynchronizer(
+          synchronizerAlias = config.synchronizerAlias,
+          keepRetrying = false,
+          connectSynchronizer = ConnectSynchronizer.Connect,
+        )
+        .map(_.isDefined)
       _ <- waitUntilActiveIfSuccess(success, config.synchronizerAlias)
 
     } yield v30.ConnectSynchronizerResponse(success)
@@ -278,15 +297,15 @@ class GrpcSynchronizerConnectivityService(
         _ <-
           if (performHandshake) {
             logger.info(s"Performing handshake to synchronizer $config")
-            for {
-              success <-
-                sync.connectSynchronizer(
-                  synchronizerAlias = config.synchronizerAlias,
-                  keepRetrying = false,
-                  connectSynchronizer = ConnectSynchronizer.HandshakeOnly,
-                )
-              _ <- waitUntilActiveIfSuccess(success, config.synchronizerAlias)
-            } yield ()
+            // Since we don't retry, any error is returned as left and therefore will be returned to the caller.
+            // If the connectSynchronizer is successful, it means that the topology has been successfully initalized.
+            sync
+              .connectSynchronizer(
+                synchronizerAlias = config.synchronizerAlias,
+                keepRetrying = false,
+                connectSynchronizer = ConnectSynchronizer.HandshakeOnly,
+              )
+              .leftWiden[CantonBaseError]
           } else EitherT.rightT[FutureUnlessShutdown, CantonBaseError](())
       } yield v30.RegisterSynchronizerResponse()
 
@@ -299,15 +318,22 @@ class GrpcSynchronizerConnectivityService(
       request: v30.ModifySynchronizerRequest
   ): Future[v30.ModifySynchronizerResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val v30.ModifySynchronizerRequest(newConfigPO, sequencerConnectionValidationPO) = request
+    val v30.ModifySynchronizerRequest(psidPO, newConfigPO, sequencerConnectionValidationPO) =
+      request
+
     val ret = for {
+      psidO <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          psidPO.traverse(PhysicalSynchronizerId.fromProtoPrimitive(_, "physical_synchronizer_id"))
+        )
+        .leftMap(err => ProtoDeserializationFailure.WrapNoLoggingStr(err.message))
       config <- EitherT.fromEither[FutureUnlessShutdown](
         parseSynchronizerConnectionConfig(newConfigPO, "new_config")
       )
       validation <- EitherT.fromEither[FutureUnlessShutdown](
         parseSequencerConnectionValidation(sequencerConnectionValidationPO)
       )
-      _ <- sync.modifySynchronizer(config, validation).leftWiden[CantonBaseError]
+      _ <- sync.modifySynchronizer(psidO, config, validation).leftWiden[CantonBaseError]
     } yield v30.ModifySynchronizerResponse()
     _mapErrNewEUS(ret)
   }
@@ -331,7 +357,8 @@ class GrpcSynchronizerConnectivityService(
     _mapErrNewEUS(ret)
   }
 
-  /** Get the synchronizer id of the given synchronizer alias
+  /** Get the physical synchronizer id of the given synchronizer alias (corresponding to the active
+    * connection)
     */
   override def getSynchronizerId(
       request: v30.GetSynchronizerIdRequest
@@ -341,11 +368,12 @@ class GrpcSynchronizerConnectivityService(
     val ret = for {
       alias <- parseSynchronizerAlias(synchronizerAlias)
       connectionConfig <-
-        sync
-          .synchronizerConnectionConfigByAlias(alias)
+        EitherT
+          .fromEither[FutureUnlessShutdown](
+            sync.getSynchronizerConnectionConfigForAlias(alias, onlyActive = true)
+          )
           .leftMap(_ => SyncServiceUnknownSynchronizer.Error(alias))
           .map(_.config)
-          .mapK(FutureUnlessShutdown.outcomeK)
       result <-
         sequencerInfoLoader
           .loadAndAggregateSequencerEndpoints(
@@ -361,10 +389,13 @@ class GrpcSynchronizerConnectivityService(
             SynchronizerRegistryError.fromSequencerInfoLoaderError(err)
           )
       _ <- aliasManager
-        .processHandshake(connectionConfig.synchronizerAlias, result.synchronizerId)
+        .processHandshake(connectionConfig.synchronizerAlias, result.psid)
         .leftMap(SynchronizerRegistryHelpers.fromSynchronizerAliasManagerError)
         .leftWiden[CantonBaseError]
-    } yield v30.GetSynchronizerIdResponse(synchronizerId = result.synchronizerId.toProtoPrimitive)
+    } yield v30.GetSynchronizerIdResponse(
+      physicalSynchronizerId = result.psid.toProtoPrimitive,
+      synchronizerId = result.psid.logical.toProtoPrimitive,
+    )
     _mapErrNewEUS(ret)
   }
 

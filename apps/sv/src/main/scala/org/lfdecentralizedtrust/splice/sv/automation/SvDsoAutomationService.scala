@@ -232,7 +232,6 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
-        config.topologyChangeDelayDuration,
       )
     )
 
@@ -301,7 +300,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        connection(SpliceLedgerConnectionPriority.Medium),
+        connection(SpliceLedgerConnectionPriority.High),
         config.extraBeneficiaries,
       )
     )

@@ -64,10 +64,7 @@ object TopologyChangeOp {
     }
 
   implicit val setParameterTopologyChangeOp: SetParameter[TopologyChangeOp] = (v, pp) =>
-    v match {
-      case Remove => pp.setInt(1)
-      case Replace => pp.setInt(2)
-    }
+    pp.setInt(v.toProto.value)
 
 }
 
@@ -192,7 +189,7 @@ object TopologyTransaction
 
   val versioningTable: VersioningTable =
     VersioningTable(
-      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.TopologyTransaction)(
+      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.TopologyTransaction)(
         supportedProtoVersionMemoized(_)(fromProtoV30),
         _.toProtoV30,
       )

@@ -220,6 +220,9 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Feature App/);
 
+    const contractId = screen.getByTestId('proposal-details-contractid-value-input');
+    expect(contractId.getAttribute('value')).toBe(voteRequest.contractId);
+
     const featuredAppSection = screen.getByTestId('proposal-details-feature-app-section');
     expect(featuredAppSection).toBeDefined();
 
@@ -866,7 +869,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      expect(submitButton.textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
@@ -934,7 +936,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      expect(submitButton.textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');

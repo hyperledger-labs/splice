@@ -9,11 +9,11 @@ import com.daml.logging.entries.LoggingEntries
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.{GrpcApiService, StreamingServiceLifecycleManagement}
+import com.digitalasset.canton.ledger.api.validation.ValueValidator.requirePresence
 import com.digitalasset.canton.ledger.api.validation.{
   FieldValidator,
   FormatValidator,
   ParticipantOffsetValidator,
-  ValidationErrors,
 }
 import com.digitalasset.canton.ledger.participant.state.SyncService
 import com.digitalasset.canton.ledger.participant.state.index.{
@@ -37,7 +37,6 @@ import io.grpc.stub.StreamObserver
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 final class ApiStateService(
@@ -56,7 +55,6 @@ final class ApiStateService(
     with GrpcApiService
     with NamedLogging {
 
-  @nowarn("cat=deprecation")
   override def getActiveContracts(
       request: GetActiveContractsRequest,
       responseObserver: StreamObserver[GetActiveContractsResponse],
@@ -66,34 +64,8 @@ final class ApiStateService(
     registerStream(responseObserver) {
 
       val result = for {
-        filters <- (request.filter, request.verbose, request.eventFormat) match {
-          case (Some(_), _, Some(_)) =>
-            Left(
-              ValidationErrors.invalidArgument(
-                s"Both filter/verbose and event_format is specified. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-              )
-            )
-
-          case (Some(legacyFilter), legacyVerbose, None) =>
-            FormatValidator.validate(legacyFilter, legacyVerbose)
-
-          case (None, true, Some(_)) =>
-            Left(
-              ValidationErrors.invalidArgument(
-                s"Both filter/verbose and event_format is specified. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-              )
-            )
-
-          case (None, false, Some(eventFormat)) =>
-            FormatValidator.validate(eventFormat)
-
-          case (None, _, None) =>
-            Left(
-              ValidationErrors.invalidArgument(
-                s"Either filter/verbose or event_format is required. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-              )
-            )
-        }
+        eventFormatProto <- requirePresence(request.eventFormat, "event_format")
+        eventFormat <- FormatValidator.validate(eventFormatProto)
 
         activeAt <- ParticipantOffsetValidator.validateNonNegative(
           request.activeAtOffset,
@@ -101,14 +73,14 @@ final class ApiStateService(
         )
       } yield {
         withEnrichedLoggingContext(telemetry)(
-          logging.eventFormat(filters)
+          logging.eventFormat(eventFormat)
         ) { implicit loggingContext =>
           logger.info(
             s"Received request for active contracts: $request, ${loggingContext.serializeFiltered("filters")}."
           )
           acsService
             .getActiveContracts(
-              filter = filters,
+              eventFormat = eventFormat,
               activeAt = activeAt,
             )
         }
@@ -162,7 +134,8 @@ final class ApiStateService(
                       GetConnectedSynchronizersResponse.ConnectedSynchronizer(
                         synchronizerAlias =
                           connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
-                        synchronizerId = connectedSynchronizer.synchronizerId.toProtoPrimitive,
+                        synchronizerId =
+                          connectedSynchronizer.synchronizerId.logical.toProtoPrimitive,
                         permission = permission,
                       )
                     )
@@ -170,7 +143,8 @@ final class ApiStateService(
                       GetConnectedSynchronizersResponse.ConnectedSynchronizer(
                         synchronizerAlias =
                           connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
-                        synchronizerId = connectedSynchronizer.synchronizerId.toProtoPrimitive,
+                        synchronizerId =
+                          connectedSynchronizer.synchronizerId.logical.toProtoPrimitive,
                         permission = ParticipantPermission.PARTICIPANT_PERMISSION_UNSPECIFIED,
                       )
                     )
@@ -200,11 +174,11 @@ final class ApiStateService(
     implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
 
     updateService
-      .latestPrunedOffsets()
-      .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
+      .latestPrunedOffset()
+      .map { prunedUptoInclusive =>
         GetLatestPrunedOffsetsResponse(
           participantPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
-          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive.fold(0L)(_.unwrap),
+          allDivulgedContractsPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
         )
       }
       .thereafter(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])

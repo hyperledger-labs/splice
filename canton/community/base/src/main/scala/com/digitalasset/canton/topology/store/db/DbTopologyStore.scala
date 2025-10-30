@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.topology.store.db
 
-import cats.syntax.functorFilter.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String185, String300}
@@ -350,12 +350,31 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
             ++ sql")"
         )
         ++ sql" OR "
-        // SynchronizerTrustCertificate filtering
+        // SynchronizerTrustCertificate filtering for the party
         ++ Seq(
           sql"(transaction_type = ${SynchronizerTrustCertificate.code}"
           // In SynchronizerTrustCertificate part of the filter, compare not only to participant, but also to party identifier
           // to enable searching for the admin party
             ++ conditionalAppend(filterParty, filterPartyIdentifier, filterPartyNamespaceO)
+            ++ sql")"
+        )
+        ++ sql" OR "
+        // SynchronizerTrustCertificate filtering for the participant state
+        ++ Seq(
+          sql"(transaction_type = ${SynchronizerTrustCertificate.code}"
+            ++ conditionalAppend(
+              filterParticipant,
+              filterParticipantIdentifier,
+              filterParticipantNamespaceO,
+            )
+            ++ sql")"
+        )
+        ++ sql" OR "
+        // OwnerToKeyMapping filtering:
+        // We also need to include the owner to key mappings in our result such that we can determine
+        // whether a participant is actually active
+        ++ Seq(
+          sql"(transaction_type = ${OwnerToKeyMapping.code}"
             ++ conditionalAppend(
               filterParticipant,
               filterParticipantIdentifier,
@@ -366,23 +385,14 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
         ++ sql")"
     )
     toStoredTopologyTransactions(storage.query(query, operationName = functionFullName))
-      .map(
-        _.result.toSet
-          .flatMap[PartyId](_.mapping match {
-            case ptp: PartyToParticipant
-                if filterParticipant.isEmpty || ptp.participants
-                  .exists(
-                    _.participantId.uid
-                      .matchesFilters(filterParticipantIdentifier, filterParticipantNamespaceO)
-                  ) =>
-              Set(ptp.partyId)
-            case cert: SynchronizerTrustCertificate
-                if filterParty.isEmpty || cert.participantId.adminParty.uid
-                  .matchesFilters(filterPartyIdentifier, filterPartyNamespaceO) =>
-              Set(cert.participantId.adminParty)
-            case _ => Set.empty
-          })
-      )
+      .map { txs =>
+        val mappings = txs.result.map(_.mapping)
+        TopologyStore.determineValidParties(
+          mappings,
+          filterParty = filterParty,
+          filterParticipant = filterParticipant,
+        )
+      }
   }
 
   override def findPositiveTransactions(
@@ -390,8 +400,8 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Seq[TopologyMapping.Code],
-      filterUid: Option[Seq[UniqueIdentifier]],
-      filterNamespace: Option[Seq[Namespace]],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[PositiveStoredTopologyTransactions] =
     findTransactionsBatchingUidFilter(
       asOf,
@@ -544,33 +554,6 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
       .map(res => res.result.map(TopologyStore.Change.selectChange).distinct)
   }
 
-  protected def doFindCurrentAndUpcomingChangeDelays(sequencedTime: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Iterable[GenericStoredTopologyTransaction]] = {
-    val query = buildQueryForTransactions(
-      sql""" AND transaction_type = ${SynchronizerParametersState.code}
-             AND (valid_from >= $sequencedTime OR valid_until is NULL OR valid_until >= $sequencedTime)
-             AND (valid_until is NULL or valid_from != valid_until)
-             AND sequenced < $sequencedTime
-             AND is_proposal = false """
-    )
-    toStoredTopologyTransactions(storage.query(query, operationName = functionFullName))
-      .map(_.result)
-  }
-
-  override def findExpiredChangeDelays(
-      validUntilMinInclusive: CantonTimestamp,
-      validUntilMaxExclusive: CantonTimestamp,
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[TopologyStore.Change.TopologyDelay]] = {
-    val query = buildQueryForTransactions(
-      sql" AND transaction_type = ${SynchronizerParametersState.code} AND $validUntilMinInclusive <= valid_until AND valid_until < $validUntilMaxExclusive AND is_proposal = false "
-    )
-    toStoredTopologyTransactions(storage.query(query, operationName = functionFullName))
-      .map(_.result.mapFilter(TopologyStore.Change.selectTopologyDelay))
-  }
-
   override def maxTimestamp(sequencedTime: SequencedTime, includeRejected: Boolean)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] = {
@@ -708,35 +691,70 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Set[TopologyMapping.Code],
-      filterUid: Option[Seq[UniqueIdentifier]],
-      filterNamespace: Option[Seq[Namespace]],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
       filterOp: Option[TopologyChangeOp],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[GenericStoredTopologyTransactions] = {
-    def forwardBatch(filterUidsNew: Option[Seq[UniqueIdentifier]]) =
+    def forwardBatch(
+        filterUidsNew: Option[NonEmpty[Seq[UniqueIdentifier]]],
+        filterNamespaceNew: Option[NonEmpty[Seq[Namespace]]],
+    ) =
       findTransactionsSingleBatch(
         asOf,
         asOfInclusive,
         isProposal,
         types,
         filterUidsNew,
-        filterNamespace,
+        filterNamespaceNew,
         filterOp,
       )
 
-    filterUid.map(
-      // Optimization: remove uid-filters made redundant by namespace filters
-      _.filterNot(uid => filterNamespace.exists(_.contains(uid.namespace)))
-    ) match {
-      case None => forwardBatch(None)
-      case Some(uids) =>
-        MonadUtil
-          .batchedSequentialTraverse(
-            parallelism = storage.threadsAvailableForWriting,
-            chunkSize = maxItemsInSqlQuery,
-          )(uids)(batchedUidFilters => forwardBatch(Some(batchedUidFilters)).map(_.result))
-          .map(StoredTopologyTransactions(_))
+    // Optimization: remove uid-filters made redundant by namespace filters
+    val explicitUidFilters = filterUid
+      .flatMap(uids =>
+        NonEmpty.from(uids.filterNot(uid => filterNamespace.exists(_.contains(uid.namespace))))
+      )
+
+    // if both filters are empty, we can simply run a single batch
+    if (filterNamespace.isEmpty && explicitUidFilters.isEmpty) {
+      forwardBatch(None, None)
+    } else {
+      // split both filters into batches. we need to jump through a few hoops to go
+      // from Option[NonEmpty[Seq[X]]] to
+      // Seq[ // collection containing the batches
+      //   Option[ // we need to retain optionality, so that we can zip the filters together and allow for a different number of uid/namespaces filter batches
+      //     NonEmpty[Seq[X]] // finally the actual batch
+      //   ]
+      // ]
+      // because grouped doesn't return NonEmpty collections.
+      val chunkedUids = explicitUidFilters.flatTraverse(uids =>
+        uids
+          .grouped(maxItemsInSqlQuery.value)
+          .toSeq
+          .map[Option[NonEmpty[Seq[UniqueIdentifier]]]](NonEmpty.from)
+      )
+      val chunkedNamespaces =
+        filterNamespace.flatTraverse(ns =>
+          ns.grouped(maxItemsInSqlQuery.value)
+            .toSeq
+            .map[Option[NonEmpty[Seq[Namespace]]]](NonEmpty.from)
+        )
+      // since the filters are ORed in the query, we can simply interlace them in the same chunk.
+      // if one of the filters has fewer chunks, we simply pad with None
+      val chunkedFilters = chunkedUids.zipAll(chunkedNamespaces, None, None)
+
+      MonadUtil
+        .parTraverseWithLimit(
+          parallelism = storage.threadsAvailableForWriting
+        )(chunkedFilters) { case (batchedUidFilters, batchedNamespaceFilters) =>
+          forwardBatch(
+            batchedUidFilters,
+            batchedNamespaceFilters,
+          ).map(_.result)
+        }
+        .map(chunkedResult => StoredTopologyTransactions(chunkedResult.flatten))
     }
   }
 
@@ -745,49 +763,44 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Set[TopologyMapping.Code],
-      filterUid: Option[Seq[UniqueIdentifier]],
-      filterNamespace: Option[Seq[Namespace]],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
       filterOp: Option[TopologyChangeOp],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[GenericStoredTopologyTransactions] = {
     val hasUidFilter = filterUid.nonEmpty || filterNamespace.nonEmpty
-    // exit early if the caller produced an empty uid/namespace filter batch:
-    if (hasUidFilter && filterUid.forall(_.isEmpty) && filterNamespace.forall(_.isEmpty)) {
-      FutureUnlessShutdown.pure(StoredTopologyTransactions.empty)
-    } else {
-      val filterUidStr = filterUid.map(f => s"uids ${f.mkString(", ")}")
-      val filterNamespaceStr = filterNamespace.map(f => s"namespaces ${f.mkString(", ")}")
-      val filterOpStr = filterOp.map(f => s"op $f")
-      val filters = filterUidStr.toList ++ filterNamespaceStr ++ filterOpStr
-      val filterStr = if (filters.nonEmpty) s" with filters for ${filters.mkString("; ")}" else ""
-      logger.debug(
-        s"Querying transactions as of $asOf for types $types$filterStr"
-      )
+    val filterUidStr = filterUid.map(f => s"uids ${f.mkString(", ")}")
+    val filterNamespaceStr = filterNamespace.map(f => s"namespaces ${f.mkString(", ")}")
+    val filterOpStr = filterOp.map(f => s"op $f")
+    val filters = filterUidStr.toList ++ filterNamespaceStr ++ filterOpStr
+    val filterStr = if (filters.nonEmpty) s" with filters for ${filters.mkString("; ")}" else ""
+    logger.debug(
+      s"Querying transactions as of $asOf for types $types$filterStr"
+    )
 
-      val timeRangeFilter = asOfQuery(asOf, asOfInclusive)
-      val isProposalFilter = sql" AND is_proposal = $isProposal"
-      val changeOpFilter = filterOp.fold(sql"")(op => sql" AND operation = $op")
-      val mappingTypeFilter = typeFilter(types)
-      val uidNamespaceFilter =
-        if (hasUidFilter) {
-          val namespaceFilter = filterNamespace.toList.flatMap(_.map(ns => sql"namespace = $ns"))
-          val uidFilter =
-            filterUid.toList.flatten.map(uid =>
-              sql"(identifier = ${uid.identifier} AND namespace = ${uid.namespace})"
-            )
-          sql" AND (" ++ (namespaceFilter ++ uidFilter).intercalate(sql" OR ") ++ sql")"
-        } else SQLActionBuilderChain(sql"")
+    val timeRangeFilter = asOfQuery(asOf, asOfInclusive)
+    val isProposalFilter = sql" AND is_proposal = $isProposal"
+    val changeOpFilter = filterOp.fold(sql"")(op => sql" AND operation = $op")
+    val mappingTypeFilter = typeFilter(types)
+    val uidNamespaceFilter =
+      if (hasUidFilter) {
+        val namespaceFilter = filterNamespace.toList.flatMap(_.map(ns => sql"namespace = $ns"))
+        val uidFilter =
+          filterUid.toList.flatten.map(uid =>
+            sql"(identifier = ${uid.identifier} AND namespace = ${uid.namespace})"
+          )
+        sql" AND (" ++ (namespaceFilter ++ uidFilter).intercalate(sql" OR ") ++ sql")"
+      } else SQLActionBuilderChain(sql"")
 
-      toStoredTopologyTransactions(
-        storage.query(
-          buildQueryForTransactions(
-            timeRangeFilter ++ isProposalFilter ++ changeOpFilter ++ mappingTypeFilter ++ uidNamespaceFilter
-          ),
-          operationName = "singleBatch",
-        )
+    toStoredTopologyTransactions(
+      storage.query(
+        buildQueryForTransactions(
+          timeRangeFilter ++ isProposalFilter ++ changeOpFilter ++ mappingTypeFilter ++ uidNamespaceFilter
+        ),
+        operationName = "singleBatch",
       )
-    }
+    )
   }
 
   private def typeFilter(types: Set[TopologyMapping.Code]): SQLActionBuilderChain =
@@ -972,18 +985,22 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
 
   override def findEffectiveStateChanges(
       fromEffectiveInclusive: CantonTimestamp,
+      filterTypes: Option[Seq[TopologyMapping.Code]],
       onlyAtEffective: Boolean,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[EffectiveStateChange]] = {
     val effectiveOperator = if (onlyAtEffective) "=" else ">="
+
     val subQuery =
       sql""" AND (
                valid_from #$effectiveOperator $fromEffectiveInclusive
                OR valid_until #$effectiveOperator $fromEffectiveInclusive
              )
              AND (valid_until IS NULL OR valid_from != valid_until)
-             AND is_proposal = false """
+             AND is_proposal = false """ ++
+        typeFilter(filterTypes.fold(Set.empty[TopologyMapping.Code])(_.toSet))
+
     toStoredTopologyTransactions(
       storage.query(
         buildQueryForTransactions(

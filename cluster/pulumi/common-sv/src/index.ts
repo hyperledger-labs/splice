@@ -10,3 +10,4 @@ export * from './participant';
 export * from './svConfigs';
 export * from './dsoConfig';
 export * from './loopback';
+export * from './approvedIdentities';

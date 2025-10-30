@@ -78,6 +78,7 @@ abstract class AutomationService(
         s"Registering unexpected trigger $triggerName; possibly missing from $companion's expectedTriggerClasses"
       )(TraceContext.empty)
     val paused = automationConfig.pausedTriggers contains triggerName
+    logger.debug(s"Starting trigger $triggerName")(TraceContext.empty)
     trigger.run(paused)
   }
 

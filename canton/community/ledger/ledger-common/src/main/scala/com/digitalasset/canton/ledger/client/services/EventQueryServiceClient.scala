@@ -8,25 +8,35 @@ import com.daml.ledger.api.v2.event_query_service.{
   GetEventsByContractIdRequest,
   GetEventsByContractIdResponse,
 }
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, Filters}
 import com.digitalasset.canton.ledger.client.LedgerClient
 
 import scala.concurrent.Future
 
-class EventQueryServiceClient(service: EventQueryServiceStub) {
+class EventQueryServiceClient(
+    service: EventQueryServiceStub,
+    getDefaultToken: () => Option[String] = () => None,
+) {
   def getEventsByContractId(
       contractId: String,
       requestingParties: Seq[String],
       token: Option[String] = None,
-  ): Future[GetEventsByContractIdResponse] =
+  ): Future[GetEventsByContractIdResponse] = {
+    val eventFormat = EventFormat(
+      filtersByParty = requestingParties.map(_ -> Filters(Nil)).toMap,
+      filtersForAnyParty = None,
+      verbose = true,
+    )
+
     LedgerClient
-      .stub(service, token)
+      .stub(service, token.orElse(getDefaultToken()))
       .getEventsByContractId(
         GetEventsByContractIdRequest(
           contractId = contractId,
-          requestingParties = requestingParties,
-          eventFormat = None,
+          eventFormat = Some(eventFormat),
         )
       )
+  }
 
 //  TODO(#16065)
 //  def getEventsByContractKey(
@@ -37,7 +47,7 @@ class EventQueryServiceClient(service: EventQueryServiceStub) {
 //      token: Option[String] = None,
 //  ): Future[GetEventsByContractKeyResponse] =
 //    LedgerClient
-//      .stub(service, token)
+//      .stub(service, token.orElse(getDefaultToken())))
 //      .getEventsByContractKey(
 //        GetEventsByContractKeyRequest(
 //          contractKey = Some(contractKey),

@@ -4,11 +4,12 @@
 package com.digitalasset.canton.platform.store.interfaces
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
+import com.digitalasset.canton.crypto.Hash as CantonHash
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.TransactionShape
 import com.digitalasset.canton.ledger.api.TransactionShape.{AcsDelta, LedgerEffects}
-import com.digitalasset.canton.ledger.participant.state.ReassignmentInfo
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent
+import com.digitalasset.canton.ledger.participant.state.{Reassignment, ReassignmentInfo}
 import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStore.EventSequentialId
 import com.digitalasset.canton.platform.{ContractId, Identifier}
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext}
@@ -32,7 +33,7 @@ object TransactionLogUpdate {
   /** Complete view of a ledger transaction.
     *
     * @param updateId
-    *   The transaction it.
+    *   The transaction id.
     * @param workflowId
     *   The workflow id.
     * @param effectiveAt
@@ -56,6 +57,7 @@ object TransactionLogUpdate {
       completionStreamResponse: Option[CompletionStreamResponse],
       synchronizerId: String,
       recordTime: Timestamp,
+      externalTransactionHash: Option[CantonHash],
   )(implicit override val traceContext: TraceContext)
       extends TransactionLogUpdate
 
@@ -80,17 +82,12 @@ object TransactionLogUpdate {
       recordTime: Timestamp,
       completionStreamResponse: Option[CompletionStreamResponse],
       reassignmentInfo: ReassignmentInfo,
-      reassignment: ReassignmentAccepted.Reassignment,
+      reassignment: Reassignment.Batch,
+      synchronizerId: String,
   )(implicit override val traceContext: TraceContext)
       extends TransactionLogUpdate {
 
-    def stakeholders: List[Ref.Party] = reassignment match {
-      case TransactionLogUpdate.ReassignmentAccepted.Assigned(createdEvent) =>
-        createdEvent.flatEventWitnesses.toList
-
-      case TransactionLogUpdate.ReassignmentAccepted.Unassigned(unassign) =>
-        unassign.stakeholders
-    }
+    def stakeholders: Set[Ref.Party] = reassignment.iterator.flatMap(_.stakeholders).toSet
   }
 
   final case class TopologyTransactionEffective(
@@ -101,14 +98,6 @@ object TransactionLogUpdate {
       events: Vector[PartyToParticipantAuthorization],
   )(implicit override val traceContext: TraceContext)
       extends TransactionLogUpdate
-
-  object ReassignmentAccepted {
-    sealed trait Reassignment
-    final case class Assigned(createdEvent: CreatedEvent) extends Reassignment
-    final case class Unassigned(
-        unassign: com.digitalasset.canton.ledger.participant.state.Reassignment.Unassign
-    ) extends Reassignment
-  }
 
   /* Models all but divulgence events */
   sealed trait Event extends Product with Serializable {
@@ -123,6 +112,7 @@ object TransactionLogUpdate {
     def witnesses(transactionShape: TransactionShape): Set[Party]
     def submitters: Set[Party]
     def templateId: Identifier
+    def packageName: PackageName
     def contractId: ContractId
   }
 
@@ -134,6 +124,7 @@ object TransactionLogUpdate {
       contractId: ContractId,
       ledgerEffectiveTime: Timestamp,
       templateId: Identifier,
+      representativePackageId: Ref.PackageId,
       packageName: PackageName,
       packageVersion: Option[Ref.PackageVersion],
       commandId: String,
@@ -148,7 +139,7 @@ object TransactionLogUpdate {
       createKeyHash: Option[Hash],
       createKey: Option[GlobalKey],
       createKeyMaintainers: Option[Set[Party]],
-      driverMetadata: Bytes,
+      authenticationData: Bytes,
   ) extends Event {
     def witnesses(transactionShape: TransactionShape): Set[Party] =
       transactionShape match {

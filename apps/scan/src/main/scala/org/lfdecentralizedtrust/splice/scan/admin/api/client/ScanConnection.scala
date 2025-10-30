@@ -307,6 +307,21 @@ object ScanConnection {
       retryConnectionOnInitialFailure,
     )
 
+  def directConnection(
+      config: ScanAppClientConfig,
+      upgradesConfig: UpgradesConfig,
+      clock: Clock,
+      retryProvider: RetryProvider,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+      mat: Materializer,
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+  ): SingleScanConnection =
+    new SingleScanConnection(config, upgradesConfig, clock, retryProvider, loggerFactory)
+
   private[client] case class CachedAmuletRules(
       cacheValidUntil: CantonTimestamp,
       amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],

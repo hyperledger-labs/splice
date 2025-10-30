@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.transaction.TreeEvent.Kind
 import com.daml.ledger.javaapi.data.codegen.Choice
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.crypto.{PrivateKey, SigningPrivateKey, SigningPublicKey}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -232,13 +232,31 @@ class TokenStandardCliIntegrationTest
       output.status should be("success")
       output.synchronizerId should be(decentralizedSynchronizerId.toProtoPrimitive)
 
+      import com.daml.ledger.api.v2.transaction_filter.*
+
       val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
-        .by_id(Set(checkingPartyId), output.updateId)
+        .update_by_id(
+          output.updateId,
+          UpdateFormat(
+            includeTransactions = Some(
+              TransactionFormat(
+                eventFormat = Some(
+                  EventFormat(filtersByParty =
+                    Map(checkingPartyId.toProtoPrimitive -> Filters(Nil))
+                  )
+                ),
+                transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+              )
+            ),
+            includeReassignments = None,
+            includeTopologyEvents = None,
+          ),
+        )
         .valueOrFail(s"No transaction tree found for output: $output")
 
-      inside(txTree.eventsById) { events =>
-        forExactly(1, events.map(_._2.kind)) {
-          case Kind.Exercised(value) =>
+      inside(txTree) { case LedgerApiCommands.UpdateService.TransactionWrapper(tx) =>
+        forExactly(1, tx.events.map(_.event)) {
+          case com.daml.ledger.api.v2.event.Event.Event.Exercised(value) =>
             value.choice should be(expectedChoice.name)
           case _ => fail("not an exercised event")
         }

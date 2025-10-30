@@ -103,12 +103,13 @@ sealed case class MemoizedEvidenceSUT(b: Byte)(
 }
 
 object MemoizedEvidenceSUT
-    extends BaseVersioningCompanion[MemoizedEvidenceSUT, Nothing, MemoizedEvidenceSUT, Unit] {
+    extends BaseVersioningCompanion[MemoizedEvidenceSUT, Nothing, MemoizedEvidenceSUT, Unit]
+    with IgnoreInSerializationTestExhaustivenessCheck {
 
   val name: String = "MemoizedEvidenceSUT"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> UnsupportedProtoCodec(ProtocolVersion.v33)
+    ProtoVersion(30) -> UnsupportedProtoCodec(ProtocolVersion.v34)
   )
 
   private val defaultProtocolVersionRepresentative = protocolVersionRepresentativeFor(

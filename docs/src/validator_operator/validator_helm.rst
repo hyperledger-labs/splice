@@ -782,3 +782,31 @@ values for ``splice-participant`` or ``splice-validator``:
       - name: my-extra-container
         image: busybox
         command: [ "sh", "-c", "echo 'example extra container'" ]
+
+.. _helm-validator-volume-ownership:
+
+Working around volume ownership issues
+--------------------------------------
+
+The containers in the ``splice-validator`` chart run as non-root users (specifically, user:group 1001:1001) for security reasons.
+The pod mounts volumes for use by the containers, and these volumes need to be owned by the user that the containers run as.
+The Helm chart uses an ``fsGroup`` `security context <https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>`_ to ensure that the mounted volumes are owned by the correct user.
+In certain environments, however, this does not work as expected and the mounted volumes are owned by root.
+If you encounter this issue, you can work around it by creating init containers that change the ownership of the mounted volumes to the correct user.
+
+For example, for the `/domain-upgrade-dump` volume (required for synchronizer upgrades),
+you can add the following to your ``validator-values.yaml`` file:
+
+.. code-block:: yaml
+
+    extraInitContainers:
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+
+
+A similar workaround will be required for mounting a usable `/participant-bootstrapping-dump`
+(required when recovering from identities backup).

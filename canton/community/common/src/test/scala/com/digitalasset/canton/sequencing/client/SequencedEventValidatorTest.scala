@@ -96,7 +96,7 @@ class SequencedEventValidatorTest
     "check the synchronizer id" in { fixture =>
       import fixture.*
       val incorrectSynchronizerId =
-        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("wrong-synchronizer::id"))
+        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("wrong-synchronizer::id")).toPhysical
       val validator = mkValidator()
       val wrongSynchronizer = createEvent(incorrectSynchronizerId).futureValueUS
       val err = validator
@@ -210,7 +210,7 @@ class SequencedEventValidatorTest
     "reject messages with unexpected synchronizer ids" in { fixture =>
       import fixture.*
       val incorrectSynchronizerId =
-        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("wrong-synchronizer::id"))
+        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("wrong-synchronizer::id")).toPhysical
       val event = createEvent(incorrectSynchronizerId, counter = 0L).futureValueUS
       val validator = mkValidator()
       val result = validator
@@ -252,6 +252,14 @@ class SequencedEventValidatorTest
       when(syncCrypto.pureCrypto).thenReturn(subscriberCryptoApi.pureCrypto)
       when(syncCrypto.snapshot(timestamp = ts(1))(fixtureTraceContext))
         .thenAnswer[CantonTimestamp](tm => subscriberCryptoApi.snapshot(tm)(fixtureTraceContext))
+      when(
+        syncCrypto.hypotheticalSnapshot(timestamp = ts(1), desiredTimestamp = ts(1))(
+          fixtureTraceContext
+        )
+      )
+        .thenAnswer[CantonTimestamp](tm =>
+          subscriberCryptoApi.hypotheticalSnapshot(tm, tm)(fixtureTraceContext)
+        )
       when(syncCrypto.topologyKnownUntilTimestamp).thenReturn(CantonTimestamp.MaxValue)
       val validator = mkValidator(syncCryptoApi = syncCrypto)
       val priorEvent =
@@ -268,7 +276,6 @@ class SequencedEventValidatorTest
           counter = 42,
           topologyTimestampO = Some(ts(1)),
         ).futureValueUS
-
       valueOrFail(
         validator.validate(
           Some(priorEvent),
@@ -632,7 +639,6 @@ class SequencedEventValidatorTest
           syncCryptoApi,
           deliver4.timestamp,
           Some(deliver3.timestamp),
-          testedProtocolVersion,
           warnIfApproximate = false,
         )
         .failOnShutdown

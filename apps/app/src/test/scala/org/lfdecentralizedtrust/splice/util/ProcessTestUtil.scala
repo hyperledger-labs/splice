@@ -125,7 +125,8 @@ trait ProcessTestUtil { this: BaseTest =>
     )
     startProcess(
       defaultArgsCanton(logSuffix) ++ args,
-      extraEnv = extraEnv,
+      // Using the same memory settings as in the `./start-canton.sh` script
+      extraEnv = extraEnv :+ (("JAVA_TOOL_OPTIONS", "-Xms6g -Xmx8g")),
     )
   }
 

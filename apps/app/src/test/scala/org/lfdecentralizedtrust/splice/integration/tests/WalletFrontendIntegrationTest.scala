@@ -44,7 +44,7 @@ class WalletFrontendIntegrationTest
 
           actAndCheck(
             "User onboards themselves", {
-              click on "onboard-button"
+              eventuallyClickOn(id("onboard-button"))
             },
           )(
             "User is logged in and onboarded",
@@ -122,9 +122,9 @@ class WalletFrontendIntegrationTest
           actAndCheck(
             "Alice taps balance with more than 10 decimal places in the wallet", {
               browseToAliceWallet(aliceDamlUser)
-              click on "tap-amount-field"
+              eventuallyClickOn(id("tap-amount-field"))
               numberField("tap-amount-field").value = manyDigits
-              click on "tap-button"
+              eventuallyClickOn(id("tap-button"))
             },
           )(
             "Alice has unchanged balance and sees error message",
@@ -173,7 +173,7 @@ class WalletFrontendIntegrationTest
 
           actAndCheck(
             "Alice self-features herself", {
-              click on "self-feature"
+              eventuallyClickOn(id("self-feature"))
             },
           )(
             "Alice sees herself as featured",

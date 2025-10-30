@@ -5,10 +5,10 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Config,
   ChartValues,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
+  getLedgerApiAudience,
   getParticipantKmsHelmResources,
   InstalledHelmChart,
   installSpliceHelmChart,
@@ -19,7 +19,6 @@ import {
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
-import { svsConfig } from './config';
 import { SingleSvConfiguration } from './singleSvConfig';
 
 export interface SvParticipant {
@@ -67,7 +66,7 @@ export function installSvParticipant(
     },
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: getLedgerApiAudience(auth0Config),
       jwksUrl: `https://${auth0Config.auth0Domain}/.well-known/jwks.json`,
     },
     ...kmsValues,
@@ -94,7 +93,7 @@ export function installSvParticipant(
       additionalJvmOptions: getAdditionalJvmOptions(svConfig.participant?.additionalJvmOptions),
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
-      resources: svsConfig?.participant.resources,
+      resources: svConfig.participant?.resources,
     },
     version,
     {

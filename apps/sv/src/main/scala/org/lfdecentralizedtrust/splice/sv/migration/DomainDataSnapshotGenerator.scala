@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.migration.{
   AcsExporter,
   DarExporter,
@@ -67,6 +68,8 @@ class DomainDataSnapshotGenerator(
     acsSnapshot,
     acsTimestamp = timestamp,
     dars,
+    synchronizerWasPaused = false,
+    acsFormat = http.DomainDataSnapshot.AcsFormat.LedgerApi,
   )
 
   // This is the safe version used for migrations that exports at the timestamp where we pause the synchronizer.
@@ -146,6 +149,8 @@ class DomainDataSnapshotGenerator(
       acsSnapshot,
       acsTimestamp,
       dars,
+      synchronizerWasPaused = true,
+      acsFormat = http.DomainDataSnapshot.AcsFormat.LedgerApi,
     )
     logger.info(show"Finished generating $result")
     result

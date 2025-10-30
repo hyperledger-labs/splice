@@ -123,7 +123,7 @@ describe('Update SV Reward Weight Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBe(null);
   });
 
   test('expiry date must be in the future', async () => {
@@ -142,13 +142,13 @@ describe('Update SV Reward Weight Form', () => {
 
     await user.type(expiryDateInput, thePast);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
     await user.type(expiryDateInput, theFuture);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText('Expiration must be in the future')).toBeNull();
     });
   });
@@ -230,6 +230,37 @@ describe('Update SV Reward Weight Form', () => {
 
     await validateCurrentWeightFor('Digital-Asset-2', '10');
     await validateCurrentWeightFor('Digital-Asset-Eng-2', '12345');
+  });
+
+  test('Weight is reset when sv changes', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput).toBeDefined();
+    expect(weightInput.getAttribute('value')).toBe('');
+
+    // set the weight before changing sv
+    await user.type(weightInput, '10999');
+    expect(weightInput.getAttribute('value')).toBe('10999');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    expect(weightInput.getAttribute('value')).toBe('');
   });
 
   test('Weight must be a valid number', async () => {
@@ -345,7 +376,7 @@ describe('Update SV Reward Weight Form', () => {
     });
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
-    expect(weightInput).toBeDefined();
+    expect(weightInput.getAttribute('value')).toBe('');
     await user.type(weightInput, '1000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
@@ -355,7 +386,7 @@ describe('Update SV Reward Weight Form', () => {
     });
     await user.click(submitButton); //review proposal
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.getByTestId('config-change-current-value').textContent).toBe('12345');
       expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
     });

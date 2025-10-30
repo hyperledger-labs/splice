@@ -5,8 +5,8 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   BlockNumber,
@@ -91,7 +91,7 @@ class PreviousEpochsRetransmissionsTrackerTest extends AnyWordSpec with BftSeque
         new PreviousEpochsRetransmissionsTracker(howManyEpochsToKeep = 5, loggerFactory)
 
       tracker.processRetransmissionsRequest(
-        ConsensusStatus.EpochStatus(
+        ConsensusStatus.EpochStatus.create(
           anotherId,
           epoch0,
           Seq(
@@ -115,7 +115,7 @@ class PreviousEpochsRetransmissionsTrackerTest extends AnyWordSpec with BftSeque
 
       inside(
         tracker.processRetransmissionsRequest(
-          ConsensusStatus.EpochStatus(
+          ConsensusStatus.EpochStatus.create(
             anotherId,
             epoch0,
             Seq(
@@ -153,7 +153,7 @@ class PreviousEpochsRetransmissionsTrackerTest extends AnyWordSpec with BftSeque
 
       inside(
         tracker.processRetransmissionsRequest(
-          ConsensusStatus.EpochStatus(
+          ConsensusStatus.EpochStatus.create(
             anotherId,
             epoch0,
             Seq(
@@ -173,7 +173,7 @@ class PreviousEpochsRetransmissionsTrackerTest extends AnyWordSpec with BftSeque
       )
 
       tracker.processRetransmissionsRequest(
-        ConsensusStatus.EpochStatus(
+        ConsensusStatus.EpochStatus.create(
           anotherId,
           epoch0,
           Seq(

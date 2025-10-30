@@ -9,7 +9,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
@@ -22,7 +22,6 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
 import com.digitalasset.canton.util.{DelayUtil, EitherTUtil, FutureUnlessShutdownUtil, retry}
-import com.digitalasset.canton.version.ProtocolVersion
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -31,23 +30,20 @@ import scala.concurrent.{ExecutionContext, Promise}
 
 class QueueBasedSynchronizerOutbox(
     synchronizerAlias: SynchronizerAlias,
-    val synchronizerId: SynchronizerId,
     val memberId: Member,
-    val protocolVersion: ProtocolVersion,
     val handle: RegisterTopologyTransactionHandle,
     val targetClient: SynchronizerTopologyClientWithInit,
     val synchronizerOutboxQueue: SynchronizerOutboxQueue,
     val targetStore: TopologyStore[TopologyStoreId.SynchronizerStore],
     val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    val crypto: Crypto,
+    val crypto: SynchronizerCrypto,
     override protected val topologyConfig: TopologyConfig,
     maybeObserverCloseable: Option[AutoCloseable] = None,
 )(implicit executionContext: ExecutionContext)
     extends SynchronizerOutbox
     with QueueBasedSynchronizerOutboxDispatchHelper
     with FlagCloseable {
-
   protected def awaitTransactionObserved(
       transaction: GenericSignedTopologyTransaction,
       timeout: Duration,
@@ -138,7 +134,7 @@ class QueueBasedSynchronizerOutbox(
   def startup()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] =
-    performUnlessClosingEitherUSF(functionFullName) {
+    synchronizeWithClosing(functionFullName) {
       if (hasUnsentTransactions) ensureIdleFutureIsSet()
       logger.debug(
         s"Resuming dispatching, pending=$hasUnsentTransactions"
@@ -150,7 +146,7 @@ class QueueBasedSynchronizerOutbox(
   protected def kickOffFlush(): Unit =
     // It's fine to ignore shutdown because we do not await the future anyway.
     if (initialized.get()) {
-      TraceContext.withNewTraceContext(implicit tc =>
+      TraceContext.withNewTraceContext("flush_outbox")(implicit tc =>
         EitherTUtil.doNotAwait(
           flush().onShutdown(Either.unit),
           "synchronizer outbox flusher",
@@ -215,7 +211,7 @@ class QueueBasedSynchronizerOutbox(
       if (initialize)
         initialized.set(true)
       if (hasUnsentTransactions) {
-        val pendingAndApplicableF = performUnlessClosingUSF(functionFullName)(for {
+        val pendingAndApplicableF = synchronizeWithClosing(functionFullName)(for {
           // find pending transactions
           pending <- findPendingTransactions()
           // filter out applicable
@@ -235,7 +231,7 @@ class QueueBasedSynchronizerOutbox(
 
           _ = lastDispatched.set(notPresent.lastOption)
           // Try to convert if necessary the topology transactions for the required protocol version of the synchronizer
-          convertedTxs <- performUnlessClosingEitherUSF(functionFullName) {
+          convertedTxs <- synchronizeWithClosing(functionFullName) {
             convertTransactions(notPresent)
           }
           // dispatch to synchronizer

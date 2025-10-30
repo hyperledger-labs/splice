@@ -3,9 +3,30 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "0",
+          "contractId" : "1",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amulet" : {
+              "amount" : {
+                "createdAt" : {
+                  "number" : "1"
+                },
+                "initialAmount" : "1064.0304414400",
+                "ratePerRound" : {
+                  "rate" : "0.0038051800"
+                }
+              },
+              "dso" : "dso::normalized",
+              "owner" : "alice::normalized"
+            },
+            "lock" : {
+              "expiresAt" : "2025-06-18T00:00:00.000000Z",
+              "holders" : [
+                "dso::normalized"
+              ],
+              "optContext" : "transfer to 'bob::normalized'"
+            }
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -67,7 +88,19 @@
         "createdEvent" : {
           "contractId" : "2",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "1.0000000000",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "dso::normalized",
+            "owner" : "alice::normalized"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -122,7 +155,19 @@
         "createdEvent" : {
           "contractId" : "3",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "4100.8695585600",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "dso::normalized",
+            "owner" : "alice::normalized"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -177,7 +222,11 @@
         "createdEvent" : {
           "contractId" : "4",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : "30.0000000000",
+            "issuer" : "alice::normalized",
+            "owner" : "alice::normalized"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -285,7 +334,11 @@
         "createdEvent" : {
           "contractId" : "6",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : "40.0000000000",
+            "issuer" : "alice::normalized",
+            "owner" : "alice::normalized"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [

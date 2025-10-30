@@ -58,6 +58,8 @@ class EventSpec extends AnyFlatSpec with Matchers with ScalaCheckDrivenPropertyC
       mutatingSignatories,
       mutatingObservers,
       base.createdAt,
+      base.isAcsDelta,
+      base.getRepresentativePackageId,
     )
 
     mutatingWitnesses.add("INTRUDER!")

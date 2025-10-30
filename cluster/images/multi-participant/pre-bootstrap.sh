@@ -14,6 +14,7 @@ function write_participant_config() {
     local health_port=$(( base_port + 61 ))
     local ledger_port=$(( base_port + 1 ))
     local admin_port=$(( base_port + 2 ))
+    local http_ledger_port=$(( base_port + 3))
 
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
 
@@ -84,6 +85,11 @@ canton.participants.participant_$index = {
         rate-limit.max-api-services-queue-size = 80000
     }
 
+    http-ledger-api {
+      address = 0.0.0.0
+      port = $http_ledger_port
+    }
+
     parameters {
         # tune the synchronisation protocols contract store cache
         caching {
@@ -115,7 +121,10 @@ canton.participants.participant_$index = {
         }
     }
 
-    topology.broadcast-batch-size = 1
+    topology {
+      broadcast-batch-size = 1
+      validate-initial-topology-snapshot = false
+    }
 }
 EOF
 

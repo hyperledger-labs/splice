@@ -18,6 +18,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.sequencing.protocol.{AggregationId, AggregationRule}
 import com.digitalasset.canton.sequencing.traffic.TrafficConsumed
 import com.digitalasset.canton.synchronizer.block.data.{BlockInfo, SequencerBlockStore}
+import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
 import com.digitalasset.canton.synchronizer.sequencer.{
   AggregatedSender,
   FreshInFlightAggregation,
@@ -107,7 +108,6 @@ class BlockSequencerStateAsyncWriterTest
       trafficStore,
       futureSupervisor,
       AsyncWriterParameters(
-        enabled = true,
         trafficBatchSize = PositiveInt.two,
         aggregationBatchSize = PositiveInt.two,
         blockInfoBatchSize = PositiveInt.two,
@@ -140,14 +140,11 @@ class BlockSequencerStateAsyncWriterTest
   private lazy val sender1 =
     AggregatedSender(
       DefaultTestIdentities.participant2,
-      CantonTimestamp.Epoch,
-      Seq.empty,
-      CantonTimestamp.Epoch,
+      AggregationBySender(CantonTimestamp.Epoch, Seq.empty),
     )
   private lazy val sender2 = sender1.copy(sender = DefaultTestIdentities.participant3)
   private lazy val fresh =
     FreshInFlightAggregation(
-      CantonTimestamp.Epoch,
       CantonTimestamp.Epoch,
       AggregationRule(
         eligibleMembers = NonEmpty.mk(Seq, member): NonEmpty[Seq[Member]],

@@ -3,7 +3,8 @@
 
 package com.digitalasset.canton.participant.store
 
-import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
 import org.scalatest.wordspec.AsyncWordSpec
@@ -12,7 +13,7 @@ trait SynchronizerParameterStoreTest extends FailOnShutdown { this: AsyncWordSpe
 
   private val synchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizerId::synchronizerId")
-  )
+  ).toPhysical
 
   private def anotherProtocolVersion(testedProtocolVersion: ProtocolVersion): ProtocolVersion =
     if (testedProtocolVersion.isDev)
@@ -20,7 +21,7 @@ trait SynchronizerParameterStoreTest extends FailOnShutdown { this: AsyncWordSpe
     else
       ProtocolVersion.dev
 
-  def synchronizerParameterStore(mk: SynchronizerId => SynchronizerParameterStore): Unit = {
+  def synchronizerParameterStore(mk: PhysicalSynchronizerId => SynchronizerParameterStore): Unit = {
 
     "setParameters" should {
       "store new parameters" in {
@@ -37,8 +38,9 @@ trait SynchronizerParameterStoreTest extends FailOnShutdown { this: AsyncWordSpe
       "be idempotent" in {
         val store = mk(synchronizerId)
         val params =
-          BaseTest.defaultStaticSynchronizerParametersWith(protocolVersion =
-            anotherProtocolVersion(testedProtocolVersion)
+          BaseTest.defaultStaticSynchronizerParametersWith(
+            topologyChangeDelay = StaticSynchronizerParameters.defaultTopologyChangeDelay,
+            protocolVersion = anotherProtocolVersion(testedProtocolVersion),
           )
         for {
           _ <- store.setParameters(params)
@@ -53,8 +55,9 @@ trait SynchronizerParameterStoreTest extends FailOnShutdown { this: AsyncWordSpe
         val store = mk(synchronizerId)
         val params = defaultStaticSynchronizerParameters
         val modified =
-          BaseTest.defaultStaticSynchronizerParametersWith(protocolVersion =
-            anotherProtocolVersion(testedProtocolVersion)
+          BaseTest.defaultStaticSynchronizerParametersWith(
+            topologyChangeDelay = StaticSynchronizerParameters.defaultTopologyChangeDelay,
+            protocolVersion = anotherProtocolVersion(testedProtocolVersion),
           )
         for {
           _ <- store.setParameters(params)

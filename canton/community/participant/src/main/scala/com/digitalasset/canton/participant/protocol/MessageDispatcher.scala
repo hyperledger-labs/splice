@@ -44,11 +44,10 @@ import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
 import com.digitalasset.canton.topology.processing.{SequencedTime, TopologyTransactionProcessor}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{Checked, ErrorUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
 import com.google.common.annotations.VisibleForTesting
 import com.google.rpc.status.Status
@@ -64,9 +63,7 @@ import scala.concurrent.ExecutionContext
 trait MessageDispatcher { this: NamedLogging =>
   import MessageDispatcher.*
 
-  protected def protocolVersion: ProtocolVersion
-
-  protected def synchronizerId: SynchronizerId
+  protected def synchronizerId: PhysicalSynchronizerId
 
   protected def participantId: ParticipantId
 
@@ -623,19 +620,17 @@ trait MessageDispatcher { this: NamedLogging =>
         ts,
         s"Received messages with wrong synchronizer ids ${wrongMsgs.map(_.protocolMessage.synchronizerId)}. Discarding them.",
       ).discard
-      ()
     }
 
   protected def alarm(sc: SequencerCounter, ts: CantonTimestamp, msg: String)(implicit
       traceContext: TraceContext
-  ): Unit = SyncServiceAlarm.Warn(s"(sequencer counter: $sc, timestamp: $ts): $msg").report()
+  ): Unit =
+    SyncServiceAlarm.Warn(s"(sequencer counter: $sc, timestamp: $ts): $msg").report()
 
   protected def logTimeProof(sc: SequencerCounter, ts: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Unit =
-    logger.debug(
-      show"Processing time-proof at sc=$sc, ts=$ts"
-    )
+    logger.info(show"Processing time-proof at sc=$sc, ts=$ts")
 
   private def withMsgId(msgId: Option[MessageId]): String = msgId match {
     case Some(id) => s", messageId=$id"
@@ -747,7 +742,7 @@ private[participant] object MessageDispatcher {
   final case class ResultKind(viewType: ViewType, run: () => HandlerResult) extends MessageKind {
     override protected def pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
   }
-  final case class AcsCommitment(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
+  final case class AcsCommitment(run: () => HandlerResult) extends MessageKind
   final case class MalformedMessage(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
   final case class UnspecifiedMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
   final case class CausalityMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
@@ -769,8 +764,7 @@ private[participant] object MessageDispatcher {
 
   trait Factory[+T <: MessageDispatcher] {
     def create(
-        protocolVersion: ProtocolVersion,
-        synchronizerId: SynchronizerId,
+        psid: PhysicalSynchronizerId,
         participantId: ParticipantId,
         requestTracker: RequestTracker,
         requestProcessors: RequestProcessors,
@@ -786,8 +780,7 @@ private[participant] object MessageDispatcher {
     )(implicit ec: ExecutionContext, tracer: Tracer): T
 
     def create(
-        protocolVersion: ProtocolVersion,
-        synchronizerId: SynchronizerId,
+        psid: PhysicalSynchronizerId,
         participantId: ParticipantId,
         requestTracker: RequestTracker,
         transactionProcessor: TransactionProcessor,
@@ -814,8 +807,7 @@ private[participant] object MessageDispatcher {
       }
 
       create(
-        protocolVersion,
-        synchronizerId,
+        psid,
         participantId,
         requestTracker,
         requestProcessors,

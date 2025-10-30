@@ -11,7 +11,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse.ContractEntry
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution, RpcError}
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -28,10 +28,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.party.{
-  PartyReplicationAdminWorkflow,
-  PartyReplicator,
-}
+import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.participant.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.participant.sync.CantonSyncService
@@ -46,7 +43,7 @@ import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced, TracerProvider}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ResourceUtil.withResource
-import com.digitalasset.canton.util.{DamlPackageLoader, EitherTUtil, FutureUtil}
+import com.digitalasset.canton.util.{DamlPackageLoader, EitherTUtil, FutureUtil, MonadUtil}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.language.Ast
 import com.google.protobuf.ByteString
@@ -55,8 +52,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Flow
 
 import java.io.InputStream
-import scala.annotation.nowarn
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 /** Manages our admin workflow applications (ping, party management). Currently, each is an
   * individual application with their own ledger connection and acting independently.
@@ -67,7 +63,7 @@ class AdminWorkflowServices(
     packageService: PackageService,
     syncService: CantonSyncService,
     participantId: ParticipantId,
-    adminToken: CantonAdminToken,
+    adminTokenDispenser: CantonAdminTokenDispenser,
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
     protected val clock: Clock,
@@ -86,7 +82,7 @@ class AdminWorkflowServices(
 
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
-  withNewTraceContext { implicit traceContext =>
+  withNewTraceContext("load_admin_workflows_dar") { implicit traceContext =>
     if (syncService.isActive() && parameters.adminWorkflow.autoLoadDar) {
       logger.debug("Loading admin workflows DAR")
       // load the admin workflows daml archive before moving forward
@@ -133,7 +129,7 @@ class AdminWorkflowServices(
   val partyManagementO: Option[
     (FutureUnlessShutdown[ResilientLedgerSubscription[?, ?]], PartyReplicationAdminWorkflow)
   ] =
-    parameters.unsafeOnlinePartyReplication.map(_ =>
+    parameters.unsafeOnlinePartyReplication.map(config =>
       createService(
         "party-management",
         // TODO(#20637): Don't resubscribe if the ledger api has been pruned as that would mean missing updates that
@@ -143,18 +139,11 @@ class AdminWorkflowServices(
         new PartyReplicationAdminWorkflow(
           connection,
           participantId,
-          // See the note in the PartyReplicator pertaining to lifetime.
-          new PartyReplicator(
-            participantId,
-            syncService,
-            futureSupervisor,
-            parameters.exitOnFatalFailures,
-            parameters.processingTimeouts,
-            loggerFactory,
-          ),
           syncService,
           clock,
+          config,
           futureSupervisor,
+          parameters.exitOnFatalFailures,
           timeouts,
           loggerFactory,
         )
@@ -200,25 +189,6 @@ class AdminWorkflowServices(
       pkgRes <- pkgs.keys.toList.parTraverse(lc.packageService.getPackageStatus(_))
     } yield pkgRes.forall(pkgResponse => pkgResponse.packageStatus.isPackageStatusRegistered)
 
-  private def handleDamlErrorDuringPackageLoading(
-      res: EitherT[FutureUnlessShutdown, RpcError, Unit]
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, IllegalStateException, Unit] =
-    EitherTUtil
-      .leftSubflatMap(res) {
-        case CantonPackageServiceError.IdentityManagerParentError(
-              ParticipantTopologyManagerError.IdentityManagerParentError(
-                NoAppropriateSigningKeyInStore.Failure(_, _) | SecretKeyNotInStore.Failure(_)
-              )
-            ) =>
-          // Log error by creating error object, but continue processing.
-          AdminWorkflowServices.CanNotAutomaticallyVetAdminWorkflowPackage.Error().discard
-          Either.unit
-        case err =>
-          Left(new IllegalStateException(CantonError.stringFromContext(err)))
-      }
-
   private def adminWorkflowsAreLoaded()(implicit
       traceContext: TraceContext
   ): UnlessShutdown[Boolean] =
@@ -231,17 +201,17 @@ class AdminWorkflowServices(
         }
 
         for {
-          adminWorkflowLoaded <- isLoaded(AdminWorkflowServices.AdminWorkflowDarResourceName)
+          adminWorkflowLoaded <- isLoaded(AdminWorkflowServices.PingDarResourceFileName)
           partReplicationWorkflowLoaded <-
             if (config.parameters.unsafeOnlinePartyReplication.isDefined)
-              isLoaded(AdminWorkflowServices.PartyReplicationDarResourceName)
+              isLoaded(AdminWorkflowServices.PartyReplicationDarResourceFileName)
             else FutureUnlessShutdown.pure(true)
         } yield adminWorkflowLoaded && partReplicationWorkflowLoaded
       }
     }
 
   /** Parses dar and checks if all contained packages are already loaded and recorded in the
-    * indexer. If not, loads the dar.
+    * indexer. If not, loads the dar. Does NOT vet the dar.
     * @throws java.lang.IllegalStateException
     *   if the daml archive cannot be found on the classpath
     */
@@ -253,30 +223,18 @@ class AdminWorkflowServices(
           val packages = AdminWorkflowServices.getDarPackages(darName)
           FutureUnlessShutdown
             .outcomeF(checkPackagesStatus(packages, conn))
-            .flatMap { isAlreadyLoaded =>
-              if (!isAlreadyLoaded)
+            .flatMap(isAlreadyLoaded =>
+              MonadUtil.when(!isAlreadyLoaded)(
                 EitherTUtil.toFutureUnlessShutdown(loadDamlArchiveResource(darName))
-              else {
-                logger.debug("Admin workflow packages are already present. Skipping loading.")
-                // vet any packages that have not yet been vetted
-                EitherTUtil.toFutureUnlessShutdown(
-                  handleDamlErrorDuringPackageLoading(
-                    packageService
-                      .vetPackages(
-                        packages.keys.toSeq,
-                        synchronizeVetting = PackageVettingSynchronization.NoSync,
-                      )
-                  )
-                )
-              }
-            }
+              )
+            )
         }
 
         val resultUS = for {
-          _ <- load(AdminWorkflowServices.AdminWorkflowDarResourceName)
+          _ <- load(AdminWorkflowServices.PingDarResourceFileName)
           _ <-
             if (config.parameters.unsafeOnlinePartyReplication.isDefined)
-              load(AdminWorkflowServices.PartyReplicationDarResourceName)
+              load(AdminWorkflowServices.PartyReplicationDarResourceFileName)
             else FutureUnlessShutdown.pure(())
         } yield ()
 
@@ -306,14 +264,13 @@ class AdminWorkflowServices(
   ): EitherT[FutureUnlessShutdown, IllegalStateException, Unit] = {
     val bytes =
       withResource(AdminWorkflowServices.getDarInputStream(darName))(ByteString.readFrom)
-    handleDamlErrorDuringPackageLoading(
+    AdminWorkflowServices.handleDamlErrorDuringPackageLoading(darName)(
       packageService
         .upload(
           darBytes = bytes,
           description = Some("System package"),
           submissionIdO = None,
-          vetAllPackages = true,
-          synchronizeVetting = PackageVettingSynchronization.NoSync,
+          vettingInfo = None,
           expectedMainPackageId = None,
         )
         .void
@@ -331,11 +288,10 @@ class AdminWorkflowServices(
       CommandClientConfiguration.default, // not used by admin workflows
       tracerProvider,
       loggerFactory,
-      Some(adminToken.secret),
+      Some(adminTokenDispenser),
     )
   }
 
-  @nowarn("cat=deprecation")
   private def createService[S <: AdminWorkflowService](
       userId: String,
       resubscribeIfPruned: Boolean,
@@ -352,7 +308,11 @@ class AdminWorkflowServices(
         FutureUnlessShutdown.outcomeF {
           client.stateService.getLedgerEndOffset().flatMap { offset =>
             client.stateService
-              .getActiveContractsSource(filter = service.filters, validAtOffset = offset)
+              .getActiveContractsSource(
+                eventFormat = service.eventFormat,
+                validAtOffset = offset,
+                token = None,
+              )
               .map(_.contractEntry)
               .collect { case ContractEntry.ActiveContract(contract) =>
                 contract
@@ -365,7 +325,7 @@ class AdminWorkflowServices(
                   makeSource = subscribeOffset =>
                     client.updateService.getUpdatesSource(
                       begin = subscribeOffset,
-                      filter = service.filters,
+                      eventFormat = service.eventFormat,
                     ),
                   consumingFlow = Flow[GetUpdatesResponse]
                     .map(_.update)
@@ -398,8 +358,13 @@ class AdminWorkflowServices(
 
 object AdminWorkflowServices extends AdminWorkflowServicesErrorGroup {
 
-  private val AdminWorkflowDarResourceName: String = "dar/AdminWorkflows.dar"
-  private val PartyReplicationDarResourceName: String = "PartyReplication.dar"
+  val PingDarResourceName: String = "canton-builtin-admin-workflow-ping"
+  val PingDarResourceFileName: String = s"$PingDarResourceName.dar"
+  val PartyReplicationDarResourceName: String =
+    "canton-builtin-admin-workflow-party-replication-alpha"
+  private val PartyReplicationDarResourceFileName: String =
+    s"$PartyReplicationDarResourceName.dar"
+  val AdminWorkflowNames: Set[String] = Set(PingDarResourceName, PartyReplicationDarResourceName)
 
   private def getDarInputStream(resourceName: String): InputStream =
     Option(
@@ -412,15 +377,41 @@ object AdminWorkflowServices extends AdminWorkflowServicesErrorGroup {
         )
     }
 
-  private def getDarPackages(darName: String): Map[PackageId, Ast.Package] =
+  private[participant] def getDarPackages(darName: String): Map[PackageId, Ast.Package] =
     DamlPackageLoader
       .getPackagesFromInputStream(darName, getDarInputStream(darName))
       .valueOr(err =>
         throw new IllegalStateException(s"Unable to load admin workflow packages: $err")
       )
 
-  lazy val AdminWorkflowPackages: Map[PackageId, Ast.Package] =
-    getDarPackages(AdminWorkflowDarResourceName) ++ getDarPackages(PartyReplicationDarResourceName)
+  private[participant] def handleDamlErrorDuringPackageLoading(adminWorkflow: String)(
+      res: EitherT[FutureUnlessShutdown, RpcError, Unit]
+  )(implicit
+      ec: ExecutionContext,
+      loggingContext: ErrorLoggingContext,
+  ): EitherT[FutureUnlessShutdown, IllegalStateException, Unit] =
+    EitherTUtil
+      .leftSubflatMap(res) {
+        case CantonPackageServiceError.IdentityManagerParentError(
+              ParticipantTopologyManagerError.IdentityManagerParentError(
+                NoAppropriateSigningKeyInStore.Failure(_, _) | SecretKeyNotInStore.Failure(_)
+              )
+            ) =>
+          // Log error by creating error object, but continue processing.
+          AdminWorkflowServices.CanNotAutomaticallyVetAdminWorkflowPackage
+            .Error(adminWorkflow)
+            .discard
+          Either.unit
+        case err =>
+          Left(new IllegalStateException(CantonError.stringFromContext(err)))
+      }
+
+  lazy val PingPackages: Map[PackageId, Ast.Package] = getDarPackages(PingDarResourceFileName)
+  lazy val PartyReplicationPackages: Map[PackageId, Ast.Package] = getDarPackages(
+    PartyReplicationDarResourceFileName
+  )
+  lazy val AllBuiltInPackages: Map[PackageId, Ast.Package] =
+    PingPackages ++ PartyReplicationPackages
 
   @Explanation(
     """This error indicates that the admin workflow package could not be vetted. The admin workflows is
@@ -442,10 +433,10 @@ object AdminWorkflowServices extends AdminWorkflowServicesErrorGroup {
         id = "CAN_NOT_AUTOMATICALLY_VET_ADMIN_WORKFLOW_PACKAGE",
         ErrorCategory.BackgroundProcessDegradationWarning,
       ) {
-    final case class Error()(implicit val loggingContext: ErrorLoggingContext)
+    final case class Error(adminWorkflow: String)(implicit val loggingContext: ErrorLoggingContext)
         extends CantonError.Impl(
           cause =
-            "Unable to vet `AdminWorkflows` automatically. Please ensure you vet this package before using one of the admin workflows."
+            s"Unable to vet `$adminWorkflow` automatically. Please ensure you vet this package before using one of the admin workflows."
         )
 
   }

@@ -13,7 +13,7 @@ import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, H
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -36,7 +36,7 @@ private[participant] class JournalGarbageCollector(
     acs: ActiveContractStore,
     submissionTrackerStore: SubmissionTrackerStore,
     inFlightSubmissionStore: Eval[InFlightSubmissionStore],
-    synchronizerId: SynchronizerId,
+    psid: PhysicalSynchronizerId,
     journalGarbageCollectionDelay: NonNegativeFiniteDuration,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -48,7 +48,7 @@ private[participant] class JournalGarbageCollector(
   ): Unit = flush(traceContext)
 
   override protected def run()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    performUnlessClosingUSF(functionFullName) {
+    synchronizeWithClosing(functionFullName) {
       for {
         synchronizerIndex <- synchronizerIndexF(implicitly)
         safeToPruneTsO <-
@@ -58,7 +58,7 @@ private[participant] class JournalGarbageCollector(
             sortedReconciliationIntervalsProvider,
             acsCommitmentStore,
             inFlightSubmissionStore.value,
-            synchronizerId,
+            psid.logical,
             checkForOutstandingCommitments = false,
           )
         _ <- safeToPruneTsO.fold(FutureUnlessShutdown.unit) { ts =>
@@ -77,11 +77,11 @@ private[participant] class JournalGarbageCollector(
     logger.debug(s"Starting periodic background pruning of journals up to $pruneTs")
     val acsDescription = s"Periodic ACS prune at $pruneTs"
     // Clean unused entries from the ACS
-    val acsF = performUnlessClosingUSF(acsDescription)(acs.prune(pruneTs.forgetRefinement))
+    val acsF = synchronizeWithClosing(acsDescription)(acs.prune(pruneTs.forgetRefinement))
     val submissionTrackerStoreDescription =
       s"Periodic submission tracker store prune at $pruneTs"
     // Clean unused entries from the submission tracker store
-    val submissionTrackerStoreF = performUnlessClosingUSF(submissionTrackerStoreDescription)(
+    val submissionTrackerStoreF = synchronizeWithClosing(submissionTrackerStoreDescription)(
       submissionTrackerStore.prune(pruneTs.forgetRefinement)
     )
     Seq(acsF, submissionTrackerStoreF).sequence_.onShutdown(())

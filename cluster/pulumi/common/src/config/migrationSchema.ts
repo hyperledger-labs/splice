@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 
-import { CnChartVersion, parsedVersion } from '../artifacts';
+import { CnChartVersion } from '../artifacts';
 import { spliceEnvConfig } from './envConfig';
 
 export const defaultActiveMigration = {
@@ -21,7 +21,7 @@ const migrationVersion = z.string().transform<CnChartVersion>((version, ctx) => 
     });
     return z.NEVER;
   } else {
-    return parsedVersion(version);
+    return CnChartVersion.parse(version);
   }
 });
 

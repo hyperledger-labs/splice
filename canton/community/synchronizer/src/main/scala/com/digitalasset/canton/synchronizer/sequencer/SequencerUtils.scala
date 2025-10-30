@@ -4,7 +4,11 @@
 package com.digitalasset.canton.synchronizer.sequencer
 
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.DynamicSynchronizerParametersWithValidity
+import com.digitalasset.canton.protocol.{
+  DynamicSynchronizerParametersHistory,
+  DynamicSynchronizerParametersWithValidity,
+}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 object SequencerUtils {
 
@@ -27,7 +31,7 @@ object SequencerUtils {
     *   `listDynamicSynchronizerParametersChanges`)
     * @return
     */
-  def maxSequencingTimeBoundAt(
+  def maxSequencingTimeUpperBoundAt(
       timestamp: CantonTimestamp,
       parameterChanges: Seq[DynamicSynchronizerParametersWithValidity],
   ): CantonTimestamp =
@@ -46,4 +50,26 @@ object SequencerUtils {
       }
       if (newBound > previousBound) newBound else previousBound
     }
+
+  /** Computes the offset that the sequencer will add to all events (effectively only timeproofs are
+    * allowed) past the synchronizer upgrade time to immediately time out the in-flight requests in
+    * the participants and mediators. The base of the calculation is the max possible decision time
+    * that can exists in the participant, namely sequencing time + mediator reaction timeout +
+    * confirmation response timeout (at that sequencing time).
+    * @param upgradeTime
+    *   The actual upgrade time, as in Successor.upgradeTime
+    * @param parameterChanges
+    *   List of synchronizer parameter changes at the effective time of the upgrade announcement.
+    * @return
+    *   an offset that will time out all in-flight requests in the participants and mediators
+    */
+  def timeOffsetPastSynchronizerUpgrade(
+      upgradeTime: CantonTimestamp,
+      parameterChanges: Seq[DynamicSynchronizerParametersWithValidity],
+  ): NonNegativeFiniteDuration = {
+    val maxTime =
+      DynamicSynchronizerParametersHistory.latestDecisionDeadline(parameterChanges, upgradeTime)
+
+    NonNegativeFiniteDuration.tryCreate(maxTime - upgradeTime)
+  }
 }

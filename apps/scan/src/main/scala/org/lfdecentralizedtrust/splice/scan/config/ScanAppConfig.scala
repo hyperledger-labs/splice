@@ -76,6 +76,10 @@ final case class ScanCacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(2),
       maxSize = 1000,
     ),
+    openMiningRounds: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 1,
+    ),
     amuletRules: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),
       maxSize = 1,

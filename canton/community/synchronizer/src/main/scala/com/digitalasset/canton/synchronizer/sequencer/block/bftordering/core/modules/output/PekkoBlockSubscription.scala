@@ -88,7 +88,7 @@ class PekkoBlockSubscription[E <: Env[E]](
     // don't add new messages to queue if we are closing the queue, or we get a StreamDetached exception
     // We merely synchronize the call to the queue, but don't wait until the queue actually has space
     // to avoid long delays upon closing.
-    performUnlessClosing("enqueue block") {
+    synchronizeWithClosingSync("enqueue block") {
       logger.debug(s"Received block ${block.blockHeight}")
       queue.offer(block)
     }.foreach(_.onComplete {
@@ -115,7 +115,7 @@ class PekkoBlockSubscription[E <: Env[E]](
       case Failure(exception) =>
         if (!isClosing) {
           // if this happens when we're not closing, it is most likely because the stream itself was closed by the BlockSequencer
-          logger.debug(
+          logger.info(
             s"Failure to add OutputBlock w/ height=${block.blockHeight} to block queue. Likely due to the stream being shutdown: $exception"
           )
         } else {

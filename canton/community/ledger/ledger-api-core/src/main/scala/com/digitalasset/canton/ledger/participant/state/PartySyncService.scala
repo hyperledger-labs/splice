@@ -36,6 +36,9 @@ trait PartySyncService {
     *   A party identifier suggestion
     * @param submissionId
     *   Client picked submission identifier for matching the responses with the request.
+    * @param synchronizerIdO
+    *   The synchronizer on which the party should be allocated. Can be omitted if the participant
+    *   is connected to only one synchronizer.
     * @param externalPartyOnboardingDetails
     *   Onboarding information when allocating an external party
     * @return
@@ -44,6 +47,7 @@ trait PartySyncService {
   def allocateParty(
       hint: Ref.Party,
       submissionId: Ref.SubmissionId,
+      synchronizerIdO: Option[SynchronizerId],
       externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
   )(implicit
       traceContext: TraceContext

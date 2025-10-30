@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as sinon from 'sinon';
 import { setMocks } from '@pulumi/pulumi/runtime/mocks';
 
-import { Auth0ClientSecret, Auth0ClusterConfig } from './auth0types';
+import { Auth0ClientSecret, Auth0ClusterConfig } from './auth0/auth0types';
 import { isMainNet } from './config';
 
 export enum PulumiFunction {

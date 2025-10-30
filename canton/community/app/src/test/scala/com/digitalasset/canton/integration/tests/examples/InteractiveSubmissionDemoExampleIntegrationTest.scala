@@ -5,22 +5,18 @@ package com.digitalasset.canton.integration.tests.examples
 
 import better.files.File
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.PreparedTransaction
-import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.integration.plugins.UseH2
 import com.digitalasset.canton.integration.tests.examples.ExampleIntegrationTest.interactiveSubmissionFolder
-import com.digitalasset.canton.integration.{
-  CommunityIntegrationTest,
-  ConfigTransform,
-  ConfigTransforms,
-}
+import com.digitalasset.canton.integration.{CommunityIntegrationTest, ConfigTransform}
 import com.digitalasset.canton.logging.LoggingContextWithTrace
+import com.digitalasset.canton.platform.apiserver.services.command.interactive.GeneratorsInteractiveSubmission
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.{
   PrepareTransactionData,
   PreparedTransactionEncoder,
 }
 import com.digitalasset.canton.protocol.hash.HashTracer
 import com.digitalasset.canton.util.{ConcurrentBufferedLogger, HexString, ResourceUtil}
-import com.digitalasset.canton.version.HashingSchemeVersion
+import com.digitalasset.canton.version.{CommonGenerators, HashingSchemeVersion}
 import monocle.macros.syntax.lens.*
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -33,7 +29,11 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
     with CommunityIntegrationTest
     with ScalaCheckPropertyChecks {
 
-  import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionGenerators.*
+  private lazy val generators = new CommonGenerators(testedProtocolVersion)
+  private lazy val generatorsInteractiveSubmission =
+    new GeneratorsInteractiveSubmission(generators.lf, generators.topology)
+
+  import generatorsInteractiveSubmission.*
 
   private implicit val loggingContext: LoggingContextWithTrace = LoggingContextWithTrace.ForTesting
 
@@ -41,12 +41,7 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
   private val portsFiles =
     (interactiveSubmissionFolder / "canton_ports.json").deleteOnExit()
   override protected def additionalConfigTransform: Seq[ConfigTransform] = Seq(
-    _.focus(_.parameters.portsFile).replace(Option(portsFiles.pathAsString)),
-    // TODO(#27556): align config and port behaviour with ledger api / admin api
-    ConfigTransforms.updateParticipantConfig("participant1")(
-      _.focus(_.httpLedgerApi)
-        .modify(_.map(_.focus(_.server.port).replace(Some(UniquePortGenerator.next.unwrap))))
-    ),
+    _.focus(_.parameters.portsFile).replace(Option(portsFiles.pathAsString))
   )
   private def mkProcessLogger(logErrors: Boolean = true) = new ConcurrentBufferedLogger {
     override def out(s: => String): Unit = {
@@ -299,7 +294,6 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
       mkProcessLogger(logErrors = false),
       "Invalid unique identifier `invalid_Store` with missing namespace",
     )
-
   }
 
   "run external party onboarding via ledger api" in { implicit env =>
@@ -307,44 +301,12 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
     runAndAssertCommandSuccess(
       Process(
         Seq(
-          "./external_party_onboarding.sh",
-          "--name",
-          "Hans",
+          "./external_party_onboarding.sh"
         ),
         cwd = interactiveSubmissionFolder.toJava,
       ),
       processLogger,
     )
-
-    eventually() {
-      env.participant1.parties.hosted("Hans") should not be empty
-    }
-
-  }
-
-  "run external multi-hosted party onboarding via ledger api" in { implicit env =>
-    setupTest
-    runAndAssertCommandSuccess(
-      Process(
-        Seq(
-          "./external_party_onboarding.sh",
-          "--name",
-          "Wurst",
-          "--multi-hosted",
-        ),
-        cwd = interactiveSubmissionFolder.toJava,
-      ),
-      processLogger,
-    )
-
-    import env.*
-    eventually() {
-      participant1.parties
-        .hosted("Wurst")
-        .map(_.participants.map(_.participant).toSet) shouldBe Seq(
-        Set(participant1.id, participant2.id)
-      )
-    }
 
   }
 

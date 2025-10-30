@@ -92,19 +92,19 @@ class AllocationsFrontendIntegrationTest
           .sendKeys(wantedAllocation.transferLegId)
         textField("create-allocation-settlement-ref-id").underlying
           .sendKeys(wantedAllocation.settlement.settlementRef.id)
-        click on "create-allocation-transfer-leg-receiver"
+        eventuallyClickOn(id("create-allocation-transfer-leg-receiver"))
         setAnsField(
           textField("create-allocation-transfer-leg-receiver"),
           receiver.toProtoPrimitive,
           receiver.toProtoPrimitive,
         )
-        click on "create-allocation-settlement-executor"
+        eventuallyClickOn(id("create-allocation-settlement-executor"))
         setAnsField(
           textField("create-allocation-settlement-executor"),
           validatorPartyId.toProtoPrimitive,
           validatorPartyId.toProtoPrimitive,
         )
-        click on "create-allocation-amulet-amount"
+        eventuallyClickOn(id("create-allocation-amulet-amount"))
         numberField("create-allocation-amulet-amount").value = ""
         numberField("create-allocation-amulet-amount").underlying.sendKeys(
           wantedAllocation.transferLeg.amount.toString
@@ -134,7 +134,7 @@ class AllocationsFrontendIntegrationTest
         setMeta(wantedAllocation.settlement.meta, "settlement")
         setMeta(wantedAllocation.transferLeg.meta, "transfer-leg")
 
-        click on "create-allocation-submit-button"
+        eventuallyClickOn(id("create-allocation-submit-button"))
       },
     )(
       "the allocation is created",
@@ -162,7 +162,7 @@ class AllocationsFrontendIntegrationTest
     import scala.jdk.CollectionConverters.*
 
     meta.values.asScala.zipWithIndex.foreach { case ((key, value), index) =>
-      click on s"$idPrefix-add-meta"
+      eventuallyClickOn(id(s"$idPrefix-add-meta"))
       textField(s"$idPrefix-meta-key-$index").underlying.sendKeys(key)
       textField(s"$idPrefix-meta-value-$index").underlying.sendKeys(value)
     }
@@ -230,7 +230,9 @@ class AllocationsFrontendIntegrationTest
               otcTrade.aliceRequest.transferLegs.asScala
                 .find(_._2.sender == aliceParty.toProtoPrimitive)
                 .valueOrFail("Couldn't find alice's transfer leg")
-            click on s"transfer-leg-${otcTrade.trade.id.contractId}-$aliceTransferLegId-accept"
+            eventuallyClickOn(
+              id(s"transfer-leg-${otcTrade.trade.id.contractId}-$aliceTransferLegId-accept")
+            )
           },
         )(
           "the allocation is shown",
@@ -295,7 +297,7 @@ class AllocationsFrontendIntegrationTest
   private def browseToAllocationsPage()(implicit driver: WebDriverType) = {
     actAndCheck(
       "go to allocations page", {
-        click on "navlink-allocations"
+        eventuallyClickOn(id("navlink-allocations"))
       },
     )(
       "allocations page is shown",

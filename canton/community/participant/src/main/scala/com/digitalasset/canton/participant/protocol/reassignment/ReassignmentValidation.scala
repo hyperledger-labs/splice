@@ -5,48 +5,19 @@ package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import cats.syntax.functor.*
+import com.daml.logging.LoggingContext
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.participant.protocol.ContractAuthenticator
-import com.digitalasset.canton.protocol.Stakeholders
+import com.digitalasset.canton.protocol.ReassignmentId
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, ReassignmentTag}
+import com.digitalasset.canton.util.{ContractValidator, EitherTUtil, MonadUtil, ReassignmentTag}
 
 import scala.concurrent.ExecutionContext
-
-private[reassignment] class ReassignmentValidation(contractAuthenticator: ContractAuthenticator) {
-  def checkMetadata(reassignmentRequest: FullReassignmentViewTree)(implicit
-      ec: ExecutionContext
-  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] = {
-
-    val declaredViewStakeholders = reassignmentRequest.stakeholders
-    val declaredContractStakeholders = Stakeholders(reassignmentRequest.contract.metadata)
-
-    EitherT.fromEither(for {
-      _ <- Either.cond(
-        declaredViewStakeholders == declaredContractStakeholders,
-        (),
-        ReassignmentValidationError.StakeholdersMismatch(
-          reassignmentRequest.reassignmentRef,
-          declaredViewStakeholders = declaredViewStakeholders,
-          expectedStakeholders = declaredContractStakeholders,
-        ),
-      )
-      _ <- contractAuthenticator
-        .authenticateSerializable(reassignmentRequest.contract)
-        .leftMap(error =>
-          ReassignmentValidationError.ContractIdAuthenticationFailure(
-            reassignmentRequest.reassignmentRef,
-            error,
-            reassignmentRequest.contractId,
-          )
-        )
-    } yield ())
-  }
-}
 
 object ReassignmentValidation {
 
@@ -93,4 +64,59 @@ object ReassignmentValidation {
           }
       )
     } yield ()
+
+  def authenticateContractAndStakeholders(
+      contractValidator: ContractValidator,
+      reassignmentRequest: FullReassignmentViewTree,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] = {
+    val declaredViewStakeholders = reassignmentRequest.stakeholders
+    val declaredContractStakeholders = reassignmentRequest.contracts.stakeholders
+
+    for {
+      _ <- EitherT.fromEither[FutureUnlessShutdown](
+        Either.cond(
+          declaredViewStakeholders == declaredContractStakeholders,
+          (),
+          ReassignmentValidationError.StakeholdersMismatch(
+            reassignmentRequest.reassignmentRef,
+            declaredViewStakeholders = declaredViewStakeholders,
+            expectedStakeholders = declaredContractStakeholders,
+          ): ReassignmentValidationError,
+        )
+      )
+
+      _ <- MonadUtil.sequentialTraverse(reassignmentRequest.contracts.contracts.forgetNE) {
+        reassign =>
+          contractValidator
+            .authenticate(reassign.contract.inst, reassign.contract.templateId.packageId)(
+              ec,
+              traceContext,
+              LoggingContext.empty,
+            )
+            .leftMap { reason =>
+              ReassignmentValidationError.ContractAuthenticationFailure(
+                reassignmentRequest.reassignmentRef,
+                reason,
+                reassign.contract.contractId,
+              ): ReassignmentValidationError
+            }
+      }
+    } yield ()
+  }
+
+  def ensureMediatorActive(
+      topologySnapshot: ReassignmentTag[TopologySnapshot],
+      mediator: MediatorGroupRecipient,
+      reassignmentId: ReassignmentId,
+  )(implicit
+      traceContext: TraceContext,
+      ec: ExecutionContext,
+  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError.MediatorInactive, Unit] =
+    EitherT(topologySnapshot.unwrap.isMediatorActive(mediator).map { isActive =>
+      Either
+        .cond(isActive, (), ReassignmentValidationError.MediatorInactive(reassignmentId, mediator))
+    })
 }

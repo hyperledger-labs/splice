@@ -7,7 +7,6 @@ package com.daml.ledger.api.v2.admin;
 
 import "com/daml/ledger/api/v2/admin/object_meta.proto";
 import "com/daml/ledger/api/v2/crypto.proto";
-import "com/daml/ledger/api/v2/interactive/interactive_submission_service.proto";
 import "google/protobuf/field_mask.proto";
 
 option csharp_namespace = "Com.Daml.Ledger.Api.V2.Admin";
@@ -182,6 +181,17 @@ message AllocatePartyRequest {
   // The id of the ``Identity Provider``
   // Optional, if not set, assume the party is managed by the default identity provider or party is not hosted by the participant.
   string identity_provider_id = 4;
+
+  // The synchronizer, on which the party should be allocated.
+  // For backwards compatibility, this field may be omitted, if the participant is connected to only one synchronizer.
+  // Otherwise a synchronizer must be specified.
+  // Optional
+  string synchronizer_id = 5;
+
+  // The user who will get the act_as rights to the newly allocated party.
+  // If set to an empty string (the default), no user will get rights to the party.
+  // Optional
+  string user_id = 6;
 }
 
 message AllocatePartyResponse {
@@ -196,7 +206,7 @@ message AllocateExternalPartyRequest {
     // Additional signatures for this transaction specifically
     // Use for transactions that require additional signatures beyond the namespace key signatures
     // e.g: PartyToKeyMapping must be signed by all registered keys
-    repeated interactive.Signature signatures = 2;
+    repeated Signature signatures = 2;
   }
 
   // TODO(#27670) support synchronizer aliases
@@ -218,7 +228,7 @@ message AllocateExternalPartyRequest {
 
   // Optional signatures of the combined hash of all onboarding_transactions
   // This may be used instead of providing signatures on each individual transaction
-  repeated interactive.Signature multi_hash_signatures = 3;
+  repeated Signature multi_hash_signatures = 3;
 
   // The id of the ``Identity Provider``
   // If not set, assume the party is managed by the default identity provider.

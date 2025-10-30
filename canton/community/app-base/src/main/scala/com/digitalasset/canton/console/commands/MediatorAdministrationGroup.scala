@@ -4,8 +4,8 @@
 package com.digitalasset.canton.console.commands
 
 import com.digitalasset.canton.admin.api.client.commands.MediatorAdministrationCommands.{
+  FindPruningTimestampCommand,
   Initialize,
-  LocatePruningTimestampCommand,
   Prune,
 }
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -31,7 +31,7 @@ import com.digitalasset.canton.mediator.admin.v30.Verdict
 import com.digitalasset.canton.networking.grpc.RecordingStreamObserver
 import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.NoTracing
 
 import scala.concurrent.duration.FiniteDuration
@@ -123,11 +123,11 @@ class MediatorPruningAdministrationGroup(
       |When pruning the mediator manually via `prune_at` and with the intent to prune in batches, specify
       |a value such as 1000 to obtain a pruning timestamp that corresponds to the "end" of the batch."""
   )
-  def locate_pruning_timestamp(
+  def find_pruning_timestamp(
       index: PositiveInt = PositiveInt.tryCreate(1)
   ): Option[CantonTimestamp] =
     consoleEnvironment.run {
-      runner.adminCommand(LocatePruningTimestampCommand(index))
+      runner.adminCommand(FindPruningTimestampCommand(index))
     }
 
 }
@@ -135,7 +135,7 @@ class MediatorPruningAdministrationGroup(
 class MediatorSetupGroup(node: MediatorReference) extends ConsoleCommandGroup.Impl(node) {
   @Help.Summary("Assign a mediator to a synchronizer")
   def assign(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       sequencerConnections: SequencerConnections,
       sequencerConnectionValidation: SequencerConnectionValidation =
         SequencerConnectionValidation.All,

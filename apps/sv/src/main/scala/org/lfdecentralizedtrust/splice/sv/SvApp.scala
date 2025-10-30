@@ -11,6 +11,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   CryptoConfig,
   CryptoProvider,
@@ -219,11 +220,14 @@ class SvApp(
           svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
               CryptoConfig(provider = CryptoProvider.Jce),
-              ProtocolVersion.v33,
+              ProtocolVersion.v34,
+              // TODO(#456) Use the proper serial
+              NonNegativeInt.zero,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
-            ),
+            )
+            .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal),
           svSynchronizerConfig.sequencer.internalApi,
           svSynchronizerConfig.sequencer.externalPublicApiUrl,
           svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
@@ -646,6 +650,7 @@ class SvApp(
         timeouts,
         httpClient,
         templateDecoder,
+        httpRateLimiter,
       )
     }
   }
@@ -788,6 +793,7 @@ object SvApp {
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
       decoder: TemplateJsonDecoder,
+      httpRateLimiter: HttpRateLimiter,
   ) extends FlagCloseableAsync
       with HasHealth {
     override def isHealthy: Boolean =
@@ -811,6 +817,7 @@ object SvApp {
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
         SyncCloseable("admin handler", svAdminHandler.close()),
         SyncCloseable("storage", storage.close()),
+        SyncCloseable("http rate limiter", httpRateLimiter.close()),
       )
   }
 
