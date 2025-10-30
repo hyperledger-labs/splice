@@ -85,6 +85,9 @@ class AcsExporter(
           force = true,
         )
       )
+      _ = logger.info(
+        "Exported ACS for all the parties hosted on the participant for paused synchronizer"
+      )
     } yield {
       snapshot -> paramsState.exportTimestamp
     }
