@@ -8,6 +8,17 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+  - Daml
+
+    - Added the ``splice-util-token-standard-wallet.dar``
+      :ref:`package <package-splice-util-token-standard-wallet>` that provides support for
+      implementing auto-merging of holdings and airdrop campaigns, as
+      explained in :ref:`holding_utxo_management`.
+      The package is optional and not uploaded by default to a validator node.
+
 0.4.22
 ------
 
