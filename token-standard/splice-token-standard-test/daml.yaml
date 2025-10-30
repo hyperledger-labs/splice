@@ -16,7 +16,7 @@ description: |
   as Daml script code can currently not be shared via .dars across SDKs. The dependencies
   are normal .dar files and can be shared by copying the .dars.
   (TODO(#594): remove this limitation)
-version: 1.0.6
+version: 1.0.7
 source: daml
 dependencies:
   - daml-prim
@@ -40,4 +40,4 @@ codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
     decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceTokenTransferTest
-    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
+    output-directory: target/daml-codegen-java

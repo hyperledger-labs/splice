@@ -53,7 +53,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
   ) {
     super('canton:network:Deployment', name, {}, opts);
 
-    const newOpts = { ...opts, parent: this, dependsOn: [args.namespace] };
+    const newOpts = { ...opts, parent: this, dependsOn: [args.namespace] as pulumi.Resource[] };
     const zeroPad = (num: number, places: number) => String(num).padStart(places, '0');
     this.deployment = new k8s.apps.v1.Deployment(
       name,
@@ -81,6 +81,11 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
               },
             },
             spec: {
+              securityContext: {
+                runAsUser: 1001,
+                runAsGroup: 1001,
+                fsGroup: 1001,
+              },
               containers: [
                 {
                   name: args.imageName,
@@ -215,7 +220,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
           },
         },
       },
-      newOpts
+      { ...newOpts, dependsOn: newOpts.dependsOn.concat([this.deployment]) }
     );
 
     const monitor = new ServiceMonitor(

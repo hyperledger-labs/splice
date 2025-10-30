@@ -60,7 +60,7 @@ final case class MigrationSynchronizersState(
     currentState.base.validFrom
   }
   def acsExportWaitTimestamp: Instant = {
-    // At exportTimestamp we set mediatorReactionTimeout = 0. This means any confirmation request after exportTimestamp
+    // At exportTimestamp we set mediatorReactionTimeout = 0 and confirmationResponseTimeout = 1 microsecond. This means any confirmation request after exportTimestamp
     // will fail. Confirmation requests before exportTimestamp can take confirmationResponseTimeout + mediatorReactionTimeout to time out
     // so if we wait until then we know that there are no more in-flight requests.
     exportTimestamp

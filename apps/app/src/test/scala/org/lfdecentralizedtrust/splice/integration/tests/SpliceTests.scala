@@ -5,8 +5,7 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricsContext, MetricsInfoFilter}
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
@@ -24,14 +23,9 @@ import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.NoReportingTracerProvider
-import com.digitalasset.canton.tracing.TracingConfig.Tracer
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.typesafe.scalalogging.LazyLogging
-import io.opentelemetry.api.OpenTelemetry
-import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
-import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 import org.apache.pekko.http.scaladsl.Http
@@ -67,7 +61,6 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
-import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Failure, Success, Try}
 
 /** Analogue to Canton's CommunityTests */
@@ -91,39 +84,6 @@ object SpliceTests extends LazyLogging {
     NoOpMetricsFactory,
   )(NoReportingTracerProvider.tracer)
 
-  private val configuredOpenTelemetry: OpenTelemetry =
-    if (IsCI) {
-      logger.info("Initializing opentelemetry to expose test metrics on port 25001")
-      OpenTelemetryFactory
-        .initializeOpenTelemetry(
-          initializeGlobalOpenTelemetry = true,
-          attachReporters = sdkMeterProviderBuilder => {
-            sdkMeterProviderBuilder.registerMetricReader(
-              PrometheusHttpServer
-                .builder()
-                .setHost("localhost")
-                .setPort(25001)
-                .build()
-            )
-          },
-          metricsEnabled = true,
-          config = Tracer(),
-          histogramConfigs = Seq.empty,
-          loggerFactory = NamedLoggerFactory.root,
-          cardinality = MetricStorage.DEFAULT_MAX_CARDINALITY,
-          testingSupportAdhocMetrics = false,
-          histogramInventory = new HistogramInventory(),
-          histogramFilter = new MetricsInfoFilter(Seq.empty, Set.empty),
-        )
-        .tap { otel =>
-          sys.addShutdownHook {
-            logger.info("Shutting down opentelemetry test metrics")
-            otel.close()
-          }
-        }
-        .openTelemetry
-    } else OpenTelemetry.noop()
-
   type SpliceTestConsoleEnvironment = TestConsoleEnvironment[SpliceConfig, SpliceEnvironment]
   type SharedSpliceEnvironment =
     SharedEnvironment[SpliceConfig, SpliceEnvironment]
@@ -145,12 +105,7 @@ object SpliceTests extends LazyLogging {
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new OpenTelemetryMetricsFactory(
-        configuredOpenTelemetry.getMeterProvider.get("cn_tests"),
-        Set.empty,
-        Some(noTracingLogger.underlying),
-        MetricsContext.Empty,
-      )
+      new InMemoryMetricsFactory
     }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -248,12 +203,7 @@ object SpliceTests extends LazyLogging {
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new OpenTelemetryMetricsFactory(
-        configuredOpenTelemetry.getMeterProvider.get("cn_tests"),
-        Set.empty,
-        Some(noTracingLogger.underlying),
-        MetricsContext.Empty,
-      )
+      new InMemoryMetricsFactory
     }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -364,13 +314,13 @@ object SpliceTests extends LazyLogging {
         newUser: String,
     ): AuthTokenSourceConfig = {
       conf match {
-        case AuthTokenSourceConfig.Static(_, adminToken) => {
+        case AuthTokenSourceConfig.Static(_, adminToken, expiration) => {
           val secret = "test" // used for all of our tests
-          val userToken = AuthUtil.LedgerApi.testToken(newUser, secret)
+          val userToken = AuthUtil.LedgerApi.testToken(newUser, secret, expiration)
           AuthTokenSourceConfig.Static(userToken, adminToken)
         }
-        case AuthTokenSourceConfig.SelfSigned(audience, _, secret, adminToken) => {
-          AuthTokenSourceConfig.SelfSigned(audience, newUser, secret, adminToken)
+        case AuthTokenSourceConfig.SelfSigned(audience, _, secret, adminToken, expiration) => {
+          AuthTokenSourceConfig.SelfSigned(audience, newUser, secret, adminToken, expiration)
         }
         case _ => conf
       }

@@ -983,7 +983,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-1-sv-1",
+    "name": "splice-auth0-ui-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1049,7 +1049,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-ui-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1643,7 +1643,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -1670,6 +1670,11 @@
             "name": "Digital-Asset-1",
             "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -1888,11 +1893,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "4Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
+            "memory": "2Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
@@ -2505,7 +2509,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -2532,6 +2536,11 @@
             "name": "Digital-Asset-1",
             "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -2723,11 +2732,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "4Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
+            "memory": "2Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-da-1:5012",

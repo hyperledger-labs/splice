@@ -76,7 +76,7 @@ class HttpTokenStandardMetadataHandler(
   private def lookupTotalSupplyByLatestAcsSnapshot()(implicit tc: TraceContext) = {
     for {
       latestSnapshot <- OptionT(
-        acsSnapshotStore.lookupSnapshotBefore(
+        acsSnapshotStore.lookupSnapshotAtOrBefore(
           acsSnapshotStore.currentMigrationId,
           CantonTimestamp.now(),
         )

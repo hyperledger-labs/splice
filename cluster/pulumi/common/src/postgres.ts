@@ -9,7 +9,11 @@ import { Resource } from '@pulumi/pulumi';
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, CloudSqlConfig, config } from './config';
 import { spliceConfig } from './config/config';
-import { installSpliceHelmChart } from './helm';
+import {
+  appsAffinityAndTolerations,
+  infraAffinityAndTolerations,
+  installSpliceHelmChart,
+} from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
 
@@ -196,7 +200,8 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     values?: ChartValues,
     overrideDbSizeFromValues?: boolean,
     disableProtection?: boolean,
-    version?: CnChartVersion
+    version?: CnChartVersion,
+    useInfraAffinityAndTolerations: boolean = false
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
@@ -237,7 +242,9 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       {
         aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
         dependsOn: [passwordSecret],
-      }
+      },
+      true,
+      useInfraAffinityAndTolerations ? infraAffinityAndTolerations : appsAffinityAndTolerations
     );
     this.pg = pg;
 

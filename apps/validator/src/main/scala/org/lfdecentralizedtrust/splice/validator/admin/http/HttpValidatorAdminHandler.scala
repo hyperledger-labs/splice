@@ -94,6 +94,7 @@ class HttpValidatorAdminHandler(
     participantAdminConnection,
     retryProvider,
     loggerFactory,
+    config.parameters.enabledFeatures,
   )
 
   private def requireWalletEnabled[T](handleRequest: UserWalletManager => T): T = {
@@ -181,7 +182,11 @@ class HttpValidatorAdminHandler(
           .map { response =>
             v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(
               definitions
-                .GetValidatorDomainDataSnapshotResponse(response.toHttp, response.migrationId)
+                // DR dumps don't separate output files
+                .GetValidatorDomainDataSnapshotResponse(
+                  response.toHttp(outputDirectory = None),
+                  response.migrationId,
+                )
             )
           }
       } yield res

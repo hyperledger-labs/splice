@@ -33,7 +33,8 @@ class DomainDataRestorer(
       synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
       dars: Seq[Dar],
-      acsSnapshot: ByteString,
+      acsSnapshot: Seq[ByteString],
+      legacyAcsImport: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
@@ -64,7 +65,7 @@ class DomainDataRestorer(
               RetryFor.ClientCalls,
             )
         _ = logger.info("Importing the ACS")
-        _ <- importAcs(acsSnapshot)
+        _ <- importAcs(acsSnapshot, legacyAcsImport)
         _ = logger.info("Imported the ACS")
         _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           synchronizerAlias,
@@ -93,10 +94,18 @@ class DomainDataRestorer(
       }
   }
 
-  private def importAcs(acs: ByteString)(implicit tc: TraceContext) = {
-    participantAdminConnection.uploadAcsSnapshot(
-      acs
-    )
+  private def importAcs(acs: Seq[ByteString], legacyAcsImport: Boolean)(implicit
+      tc: TraceContext
+  ) = {
+    if (legacyAcsImport) {
+      participantAdminConnection.uploadAcsSnapshotLegacy(
+        acs
+      )
+    } else {
+      participantAdminConnection.uploadAcsSnapshot(
+        acs
+      )
+    }
   }
 
   private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {

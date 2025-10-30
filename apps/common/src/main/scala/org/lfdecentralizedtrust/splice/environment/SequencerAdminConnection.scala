@@ -69,8 +69,8 @@ class SequencerAdminConnection(
 
   def getGenesisState(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[ByteString] = {
-    val responseObserver = new ByteStringStreamObserver[GenesisStateV2Response](_.chunk)
+  ): Future[Seq[ByteString]] = {
+    val responseObserver = new SeqAccumulatingObserver[GenesisStateV2Response]()
     runCmd(
       TopologyAdminCommands.Read
         .GenesisStateV2(
@@ -78,7 +78,7 @@ class SequencerAdminConnection(
           synchronizerStore = None,
           observer = responseObserver,
         )
-    ).flatMap(_ => responseObserver.resultBytes)
+    ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
   }
 
   def getOnboardingState(sequencerId: SequencerId)(implicit
@@ -101,7 +101,7 @@ class SequencerAdminConnection(
     topologySnapshot.result.foreach(_.writeDelimitedTo(domainParameters.protocolVersion, builder))
     runCmd(
       SequencerAdminCommands.InitializeFromGenesisStateV2(
-        builder.toByteString,
+        Seq(builder.toByteString),
         domainParameters,
       )
     )
@@ -110,7 +110,7 @@ class SequencerAdminConnection(
   /** This is used for initializing the sequencer after hard domain migrations.
     */
   def initializeFromGenesisState(
-      genesisState: ByteString,
+      genesisState: Seq[ByteString],
       domainParameters: StaticSynchronizerParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(

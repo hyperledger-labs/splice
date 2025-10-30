@@ -82,7 +82,7 @@ function configureIstiod(
       // https://artifacthub.io/packages/helm/istio-official/istiod
       values: {
         autoscaleMin: 2,
-        autoscaleMax: 20,
+        autoscaleMax: 30,
         ...infraAffinityAndTolerations,
         global: {
           istioNamespace: ingressNs.metadata.name,
@@ -343,11 +343,11 @@ function configureGatewayService(
         resources: {
           requests: {
             cpu: '500m',
-            memory: '512Mi',
+            memory: '1024Mi',
           },
           limits: {
             cpu: '4',
-            memory: '2024Mi',
+            memory: '4096Mi',
           },
         },
         autoscaling: {

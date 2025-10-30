@@ -109,6 +109,9 @@ final class DomainParamsStore(
     metrics.mediatorReactionTimeout.updateValue(
       params.mapping.parameters.mediatorReactionTimeout.toScala.toMillis
     )
+    metrics.confirmationResponseTimeout.updateValue(
+      params.mapping.parameters.confirmationResponseTimeout.toScala.toMillis
+    )
     blocking {
       synchronized {
         val newState = state.copy(lastParams = Some(params))
@@ -169,9 +172,22 @@ object DomainParamsStore {
         -1L,
       )(MetricsContext.Empty)
 
+    val confirmationResponseTimeout: Gauge[Long] =
+      metricsFactory.gauge(
+        MetricInfo(
+          name = prefix :+ "confirmation-response-timeout-ms",
+          summary = "DynamicSynchronizerParameters.confirmationResponseTimeout",
+          description =
+            "Last known value of DynamicSynchronizerParameters.confirmationResponseTimeout in ms on the configured global domain.",
+          qualification = Traffic,
+        ),
+        -1L,
+      )(MetricsContext.Empty)
+
     override def close(): Unit = {
       confirmationRequestsMaxRate.close()
       mediatorReactionTimeout.close()
+      confirmationResponseTimeout.close()
     }
   }
 }

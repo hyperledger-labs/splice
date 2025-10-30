@@ -88,7 +88,7 @@ const ActionCard = (props: ActionCardProps) => {
         }}
       >
         <Grid container spacing={1}>
-          <Grid xs={3}>
+          <Grid size={{ xs: 3 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 ACTION
@@ -98,7 +98,7 @@ const ActionCard = (props: ActionCardProps) => {
               </Typography>
             </Box>
           </Grid>
-          <Grid xs={2}>
+          <Grid size={{ xs: 2 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 CREATED AT
@@ -112,7 +112,7 @@ const ActionCard = (props: ActionCardProps) => {
               </Typography>
             </Box>
           </Grid>
-          <Grid xs={2}>
+          <Grid size={{ xs: 2 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 THRESHOLD DEADLINE
@@ -126,7 +126,7 @@ const ActionCard = (props: ActionCardProps) => {
               </Typography>
             </Box>
           </Grid>
-          <Grid xs={2}>
+          <Grid size={{ xs: 2 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 REQUESTER

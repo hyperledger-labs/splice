@@ -7,6 +7,8 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
+import { config, isMainNet } from '../config';
+import { CLUSTER_BASENAME, fixedTokens } from '../utils';
 import type {
   Auth0Client,
   Auth0SecretMap,
@@ -16,12 +18,8 @@ import type {
   Auth0Config,
   Auth0ClusterConfig,
 } from './auth0types';
-import { config, isMainNet } from './config';
-import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
-
-export const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 /* Access tokens deployed into a cluster need to have a lifetime at
  * least as long as the cluster is expected to run. This means that
@@ -95,6 +93,12 @@ export class Auth0Fetch implements Auth0Client {
   }
 
   public async loadAuth0Cache(): Promise<void> {
+    if (!fixedTokens()) {
+      await pulumi.log.debug('Fixed tokens not enabled, skipping Auth0 cache load');
+      this.auth0Cache = undefined;
+      return;
+    }
+
     await pulumi.log.debug('Loading Auth0 Cache');
     const cacheMap = {} as Auth0CacheMap;
 
@@ -110,12 +114,12 @@ export class Auth0Fetch implements Auth0Client {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
       }
 
-      this.auth0Cache = cacheMap;
       await pulumi.log.debug('Auth0 cache loaded...');
     } catch (e) {
-      this.auth0Cache = undefined;
-      await pulumi.log.debug('No Auth0 cache secret found.');
+      await pulumi.log.warn('No Auth0 cache secret found');
     }
+
+    this.auth0Cache = cacheMap;
   }
 
   public async saveAuth0Cache(): Promise<void> {
@@ -123,7 +127,7 @@ export class Auth0Fetch implements Auth0Client {
     await pulumi.log.debug('Saving Auth0 cache');
 
     if (!this.auth0Cache) {
-      await pulumi.log.debug('No auth0 cache loaded in Auth0Fetch');
+      await pulumi.log.debug('No auth0 cache to save');
       return;
     }
 
@@ -182,7 +186,7 @@ export class Auth0Fetch implements Auth0Client {
   public async getClientAccessToken(
     clientId: string,
     clientSecret: string,
-    audience?: string
+    audience: string
   ): Promise<string> {
     await pulumi.log.debug('Getting access token for Auth0 client: ' + clientId);
 
@@ -201,10 +205,8 @@ export class Auth0Fetch implements Auth0Client {
       }
     }
 
-    const aud = audience || DEFAULT_AUDIENCE;
-
     await pulumi.log.debug(
-      'Querying access token for Auth0 client: ' + clientId + ' with audience ' + aud
+      'Querying access token for Auth0 client: ' + clientId + ' with audience ' + audience
     );
     const auth0 = new AuthenticationClient({
       domain: this.cfg.auth0Domain,
@@ -213,7 +215,7 @@ export class Auth0Fetch implements Auth0Client {
     });
 
     const tokenResponse = await auth0.oauth.clientCredentialsGrant({
-      audience: aud,
+      audience,
     });
 
     const { expires_in } = tokenResponse.data;
@@ -259,152 +261,6 @@ export function requireAuth0ClientId(clientIdMap: ClientIdMap, app: string): str
   }
 
   return appClientId;
-}
-
-function lookupClientSecrets(
-  allSecrets: Auth0SecretMap,
-  clientIdMap: ClientIdMap,
-  app: string
-): Auth0ClientSecret {
-  const appClientId = requireAuth0ClientId(clientIdMap, app);
-
-  const clientSecret = allSecrets.get(appClientId);
-
-  if (!clientSecret) {
-    throw new Error(`Client unknown to Auth0: ${app} (Client ID: ${appClientId})`);
-  }
-
-  /* This should never happen, allSecrets contains elements stored with their
-   * client_id as the key. */
-  if (clientSecret.client_id !== appClientId) {
-    throw new Error(
-      `client_id in secret map does not match expected value: ${clientSecret.client_id} !== ${appClientId}`
-    );
-  }
-
-  return clientSecret;
-}
-
-async function auth0Secret(
-  auth0Client: Auth0Client,
-  allSecrets: Auth0SecretMap,
-  clientName: string
-): Promise<{ [key: string]: string }> {
-  const cfg = auth0Client.getCfg();
-  const clientSecrets = lookupClientSecrets(allSecrets, cfg.appToClientId, clientName);
-  const audience: string = cfg.appToClientAudience[clientName] || DEFAULT_AUDIENCE;
-
-  const clientId = clientSecrets.client_id;
-  const clientSecret = clientSecrets.client_secret;
-
-  if (fixedTokens()) {
-    const accessToken = await auth0Client.getClientAccessToken(clientId, clientSecret, audience);
-    return {
-      audience,
-      token: accessToken,
-      'ledger-api-user': clientId + '@clients',
-    };
-  } else {
-    return {
-      audience,
-      url: `https://${cfg.auth0Domain}/.well-known/openid-configuration`,
-      'client-id': clientId,
-      'client-secret': clientSecret,
-      'ledger-api-user': clientId + '@clients',
-    };
-  }
-}
-
-export async function installLedgerApiUserSecret(
-  auth0Client: Auth0Client,
-  xns: ExactNamespace,
-  secretNameApp: string,
-  clientName: string
-): Promise<k8s.core.v1.Secret> {
-  const secrets = await auth0Client.getSecrets();
-  const secret = await auth0Secret(auth0Client, secrets, clientName);
-  const ledgerApiUserOnly = {
-    'ledger-api-user': secret['ledger-api-user'],
-  };
-
-  return new k8s.core.v1.Secret(
-    `splice-auth0-user-${xns.logicalName}-${secretNameApp}-${clientName}`,
-    {
-      metadata: {
-        name: `splice-app-${secretNameApp}-ledger-api-user`,
-        namespace: xns.ns.metadata.name,
-      },
-      stringData: ledgerApiUserOnly,
-    },
-    {
-      dependsOn: xns.ns,
-    }
-  );
-}
-
-export async function installAuth0Secret(
-  auth0Client: Auth0Client,
-  xns: ExactNamespace,
-  secretNameApp: string,
-  clientName: string
-): Promise<k8s.core.v1.Secret> {
-  const secrets = await auth0Client.getSecrets();
-  const secret = await auth0Secret(auth0Client, secrets, clientName);
-
-  return new k8s.core.v1.Secret(
-    `splice-auth0-secret-${xns.logicalName}-${clientName}`,
-    {
-      metadata: {
-        name: `splice-app-${secretNameApp}-ledger-api-auth`,
-        namespace: xns.ns.metadata.name,
-      },
-      stringData: secret,
-    },
-    {
-      dependsOn: xns.ns,
-    }
-  );
-}
-
-export async function installAuth0UISecret(
-  auth0Client: Auth0Client,
-  xns: ExactNamespace,
-  secretNameApp: string,
-  clientName: string
-): Promise<k8s.core.v1.Secret> {
-  const secrets = await auth0Client.getSecrets();
-  const namespaceClientIds = auth0Client.getCfg().namespaceToUiToClientId[xns.logicalName];
-  if (!namespaceClientIds) {
-    throw new Error(`No Auth0 client IDs configured for namespace: ${xns.logicalName}`);
-  }
-  const id = lookupClientSecrets(secrets, namespaceClientIds, secretNameApp).client_id;
-
-  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id);
-}
-
-export function installAuth0UiSecretWithClientId(
-  auth0Client: Auth0Client,
-  xns: ExactNamespace,
-  secretNameApp: string,
-  clientName: string,
-  clientId: string | Promise<string>
-): k8s.core.v1.Secret {
-  return new k8s.core.v1.Secret(
-    `splice-auth0-ui-secret-${xns.logicalName}-${clientName}`,
-    {
-      metadata: {
-        name: `splice-app-${secretNameApp}-ui-auth`,
-        namespace: xns.ns.metadata.name,
-      },
-      stringData: {
-        url: `https://${auth0Client.getCfg().auth0Domain}`,
-        'client-id': clientId,
-      },
-    },
-    {
-      dependsOn: xns.ns,
-    }
-  );
 }
 
 export function auth0UserNameEnvVar(

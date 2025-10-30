@@ -94,7 +94,7 @@ class ScanEventHistoryIntegrationTest
     }
 
     // Basic checks for page limit and encoding
-    val smallerLimit = eventHistory.size - 1
+    val smallerLimit = math.max(1, eventHistory.size - 1)
     val withCompactEncoding = sv1ScanBackend.getEventHistory(
       count = smallerLimit,
       after = Some(cursorBeforeTap),
@@ -126,6 +126,13 @@ class ScanEventHistoryIntegrationTest
     toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
 
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
+
+    eventually() {
+      // Check that mediator connection really doesn't work anymore.
+      sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
+    }
+
+    // after this point, scan should be unable to ingest any verdicts
 
     val _ = onboardAliceAndBob()
 

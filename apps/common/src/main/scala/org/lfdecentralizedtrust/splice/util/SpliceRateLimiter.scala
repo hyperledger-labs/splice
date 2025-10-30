@@ -12,7 +12,8 @@ import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import java.time.Instant
 import scala.concurrent.Future
 
-case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext) {
+case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext)
+    extends AutoCloseable {
 
   val meter: MetricHandle.Meter = otelFactory.meter(
     MetricInfo(
@@ -21,6 +22,19 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit m
       Saturation,
     )
   )
+
+  val gauge: MetricHandle.Gauge[Double] = otelFactory.gauge(
+    MetricInfo(
+      SpliceMetrics.MetricsPrefix :+ "rate_limiting_max_limit_per_second",
+      "Max allowed rate per second",
+      Saturation,
+    ),
+    0,
+  )
+
+  override def close(): Unit = {
+    gauge.close()
+  }
 
 }
 
@@ -38,6 +52,9 @@ class SpliceRateLimiter(
 
   // noinspection UnstableApiUsage
   private val rateLimiter = RateLimiter.create(config.ratePerSecond)
+  metrics.gauge.updateValue(config.ratePerSecond)(
+    MetricsContext("limiter" -> name)
+  )
 
   def markRun(): Boolean = {
     if (config.enabled && Instant.now().isAfter(enforceAfter)) {

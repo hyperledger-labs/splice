@@ -15,7 +15,7 @@ function getValidatorConfig(validatorName: string) {
   return config;
 }
 
-const validatorName = config.requireEnv('SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME');
+export const validatorName = config.requireEnv('SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME');
 export const validatorConfig = getValidatorConfig(validatorName);
 
 console.error(

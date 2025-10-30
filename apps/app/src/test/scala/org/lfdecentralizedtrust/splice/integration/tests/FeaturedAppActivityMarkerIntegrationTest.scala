@@ -1,5 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -13,10 +16,8 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   FeaturedAppActivityMarkerTrigger,
 }
 import org.lfdecentralizedtrust.splice.util.*
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
 
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
@@ -71,51 +72,45 @@ class FeaturedAppActivityMarkerIntegrationTest
 
     val markerMultiplier = 10
 
-    actAndCheck(
+    actAndCheck(timeUntilSuccess = 60.seconds)(
       "Create activity markers", {
         for (i <- 1 to markerMultiplier) {
-          // Added the 'eventually' here and below because sometimes the command submissions fail due to synchronizers not being
-          // connected early enough. See https://github.com/DACH-NY/cn-test-failures/issues/6024 for some context.
-          eventually(retryOnTestFailuresOnly = false)(
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-              .submitJava(
-                Seq(alice),
-                commands = aliceFeaturedAppRightCid
-                  .exerciseFeaturedAppRight_CreateActivityMarker(
-                    Seq(
-                      new featuredapprightv1.AppRewardBeneficiary(
-                        alice.toProtoPrimitive,
-                        BigDecimal(0.2).bigDecimal,
-                      ),
-                      new featuredapprightv1.AppRewardBeneficiary(
-                        charlie.toProtoPrimitive,
-                        BigDecimal(0.8).bigDecimal,
-                      ),
-                    ).asJava
-                  )
-                  .commands
-                  .asScala
-                  .toSeq,
-              )
-          )
-          eventually(retryOnTestFailuresOnly = false)(
-            bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-              .submitJava(
-                Seq(bob),
-                commands = bobFeaturedAppRightCid
-                  .exerciseFeaturedAppRight_CreateActivityMarker(
-                    Seq(
-                      new featuredapprightv1.AppRewardBeneficiary(
-                        bob.toProtoPrimitive,
-                        BigDecimal(1.0).bigDecimal,
-                      )
-                    ).asJava
-                  )
-                  .commands
-                  .asScala
-                  .toSeq,
-              )
-          )
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              Seq(alice),
+              commands = aliceFeaturedAppRightCid
+                .exerciseFeaturedAppRight_CreateActivityMarker(
+                  Seq(
+                    new featuredapprightv1.AppRewardBeneficiary(
+                      alice.toProtoPrimitive,
+                      BigDecimal(0.2).bigDecimal,
+                    ),
+                    new featuredapprightv1.AppRewardBeneficiary(
+                      charlie.toProtoPrimitive,
+                      BigDecimal(0.8).bigDecimal,
+                    ),
+                  ).asJava
+                )
+                .commands
+                .asScala
+                .toSeq,
+            )
+          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              Seq(bob),
+              commands = bobFeaturedAppRightCid
+                .exerciseFeaturedAppRight_CreateActivityMarker(
+                  Seq(
+                    new featuredapprightv1.AppRewardBeneficiary(
+                      bob.toProtoPrimitive,
+                      BigDecimal(1.0).bigDecimal,
+                    )
+                  ).asJava
+                )
+                .commands
+                .asScala
+                .toSeq,
+            )
         }
         // unpause all activity marker triggers here, so they can start to get to work
         env.svs.local.foreach(

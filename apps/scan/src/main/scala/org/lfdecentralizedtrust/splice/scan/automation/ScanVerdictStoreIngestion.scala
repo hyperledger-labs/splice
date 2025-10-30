@@ -25,7 +25,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
-import com.digitalasset.canton.util.PekkoUtil
+import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
 import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -71,9 +71,11 @@ class ScanVerdictStoreIngestion(
       val base: Source[Seq[v30.Verdict], NotUsed] =
         Source
           .future(
-            store
-              .maxVerdictRecordTime(migrationId)
-              .map(_.getOrElse(CantonTimestamp.MinValue))
+            store.waitUntilInitialized.flatMap(_ =>
+              store
+                .maxVerdictRecordTime(migrationId)
+                .map(_.getOrElse(CantonTimestamp.MinValue))
+            )
           )
           .map { ts =>
             logger.info(s"Streaming verdicts starting from $ts")
@@ -96,6 +98,15 @@ class ScanVerdictStoreIngestion(
           lastEmittedElement: Option[Seq[v30.Verdict]],
           lastFailure: Option[Throwable],
       ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
+        val prefixMsg =
+          s"RetrySourcePolicy for restart of mediatorClientSource with ${delay} delay:"
+        lastFailure match {
+          case Some(t) =>
+            ingestionMetrics.restartErrors.mark()
+            logger.info(s"$prefixMsg Last failure: ${ErrorUtil.messageWithStacktrace(t)}")
+          case None =>
+            logger.debug(s"$prefixMsg No failure, normal restart.")
+        }
         // always restart, even if the connection was closed normally (eg after a mediator restart)
         Some(delay -> ())
       }

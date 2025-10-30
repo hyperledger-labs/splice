@@ -59,7 +59,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         browseToAliceWallet(aliceDamlUser)
         val (_, subscriptionRows) = actAndCheck(
           "Alice goes to the subscriptions page", {
-            click on "navlink-subscriptions"
+            eventuallyClickOn(id("navlink-subscriptions"))
           },
         )(
           "Alice sees her subscriptions",
@@ -112,7 +112,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         browseToAliceWallet(aliceDamlUser)
         actAndCheck(
           "Alice goes to the subscriptions page", {
-            click on "navlink-subscriptions"
+            eventuallyClickOn(id("navlink-subscriptions"))
           },
         )(
           "Alice sees the subscription, but cannot cancel it",
@@ -178,7 +178,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         )
 
         clue("Alice accepts the subscription") {
-          click on className("sub-request-accept-button")
+          eventuallyClickOn(className("sub-request-accept-button"))
         }
 
         actAndCheck(

@@ -63,4 +63,8 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ["vite.config.mjs"],
+    languageOptions: { globals: globals.node },
+  },
 ]);

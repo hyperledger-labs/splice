@@ -101,10 +101,10 @@ class DsoPartyMigration(
           "download_acs_snapshot",
           show"Download ACS snapshot for DSO at $authorizedAt",
           participantAdminConnection
-            .downloadAcsSnapshot(
+            .downloadAcsSnapshotNonChunked(
               Set(dsoParty),
-              filterSynchronizerId = Some(decentralizedSynchronizer),
-              timestamp = Some(authorizedAt),
+              filterSynchronizerId = decentralizedSynchronizer,
+              timestampOrOffset = Left(authorizedAt),
             )
             .recoverWith { case ex: StatusRuntimeException =>
               val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)

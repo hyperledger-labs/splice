@@ -11,7 +11,11 @@ python3Packages.buildPythonPackage rec {
 
   propagatedBuildInputs = with python3Packages; [
     plumbum
+    setuptools
   ];
+
+  pyproject = true;
+  build-system = [ python3Packages.setuptools ];
 
   postInstall = ''
     ln -s $out/bin/git-search-replace.py $out/bin/gsr

@@ -105,10 +105,11 @@ trait ExternallySignedTxTest
         4000000.0,
         UUID.randomUUID.toString,
       )
-      aliceValidatorBackend
-        .getExternalPartyBalance(partyId)
-        .totalUnlockedCoin shouldBe "4000000.0000000000"
-
+      eventually() {
+        aliceValidatorBackend
+          .getExternalPartyBalance(partyId)
+          .totalUnlockedCoin shouldBe "4000000.0000000000"
+      }
       val partyHint2 = UUID.randomUUID().toString
       val keyName2 = "party-key-2"
       runProcess(

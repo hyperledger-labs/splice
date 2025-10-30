@@ -4,6 +4,7 @@ import {
   exactNamespace,
   numInstances,
   imagePullSecret,
+  DecentralizedSynchronizerUpgradeConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
@@ -30,10 +31,13 @@ export async function installNode(): Promise<void> {
     };
 
     const participant = new MultiParticipant(
-      `multi-participant-${i}`,
+      `multi-participant-${i}-${DecentralizedSynchronizerUpgradeConfig.active.id}`,
       {
         namespace: namespace.ns,
-        postgres: { ...postgresConf, db: `cantonnet_p` },
+        postgres: {
+          ...postgresConf,
+          db: `participant_${DecentralizedSynchronizerUpgradeConfig.active.id}`,
+        },
       },
       { dependsOn: [postgres] }
     );

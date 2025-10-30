@@ -49,11 +49,11 @@ class DamlCIUpgradeVotePreflightTest
 
       clue(s"sv1 create vote request") {
         withWebUiSv("sv1") { implicit webDriver =>
-          click on "navlink-votes"
+          eventuallyClickOn(id("navlink-votes"))
           val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
           dropDownAction.selectByValue("CRARC_SetConfig")
 
-          click on "action-change-dialog-proceed"
+          eventuallyClickOn(id("action-change-dialog-proceed"))
 
           // 20m to be effective so as to give enough time to upgrade the SV and Validator runbooks.
           // The expiration doesn't matter so as long as it's enough for SVs to vote, but it needs to be less than the effective date.
@@ -102,22 +102,22 @@ class DamlCIUpgradeVotePreflightTest
         svsF.par.foreach { svF =>
           svF { implicit webDriver =>
             eventuallySucceeds() {
-              click on "navlink-votes"
-              click on "tab-panel-action-needed"
-              click on className("vote-row-action")
+              eventuallyClickOn(id("navlink-votes"))
+              eventuallyClickOn(id("tab-panel-action-needed"))
+              eventuallyClickOn(className("vote-row-action"))
             }
-            click on "cast-vote-button"
-            click on "accept-vote-button"
-            click on "save-vote-button"
-            click on "vote-confirmation-dialog-accept-button"
+            eventuallyClickOn(id("cast-vote-button"))
+            eventuallyClickOn(id("accept-vote-button"))
+            eventuallyClickOn(id("save-vote-button"))
+            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
           }
         }
       }
 
       clue("The request is displayed in the in progress section") {
         withWebUiSv("sv1") { implicit webDriver =>
-          click on "navlink-votes"
-          click on "tab-panel-in-progress"
+          eventuallyClickOn(id("navlink-votes"))
+          eventuallyClickOn(id("tab-panel-in-progress"))
 
           val tbody = find(id("sv-voting-in-progress-table-body"))
           inside(tbody) { case Some(tb) =>
