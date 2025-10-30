@@ -360,11 +360,11 @@ case class SvAppBackendConfig(
 
   def shouldSkipSynchronizerInitialization =
     skipSynchronizerInitialization &&
-  onboarding.fold(true){
-    case _ : SvOnboardingConfig.FoundDso => true
-    case _ : SvOnboardingConfig.JoinWithKey => true
-    case _ : SvOnboardingConfig.DomainMigration => false
-  }
+      onboarding.fold(true) {
+        case _: SvOnboardingConfig.FoundDso => true
+        case _: SvOnboardingConfig.JoinWithKey => true
+        case _: SvOnboardingConfig.DomainMigration => false
+      }
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
