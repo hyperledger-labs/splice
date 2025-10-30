@@ -1107,6 +1107,8 @@ components:
         migration_id:
           type: integer
           format: int64
+        timestamp:
+          type: string
 
     GetDomainMigrationDumpResponse:
       type: object
