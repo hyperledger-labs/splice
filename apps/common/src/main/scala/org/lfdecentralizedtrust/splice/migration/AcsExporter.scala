@@ -7,7 +7,7 @@ import cats.data.EitherT
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -46,8 +46,8 @@ class AcsExporter(
     getPartiesForWhichToExport(domain, parties).flatMap(parties =>
       participantAdminConnection.downloadAcsSnapshot(
         parties = parties,
-        filterSynchronizerId = Some(domain),
-        timestamp = Some(timestamp),
+        synchronizerId = domain,
+        timestampOrOffset = Left(timestamp),
         force = force,
       )
     )
@@ -80,8 +80,8 @@ class AcsExporter(
       snapshot <- EitherT.liftF[Future, AcsExportFailure, Seq[ByteString]](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties,
-          filterSynchronizerId = Some(domain),
-          timestamp = Some(paramsState.exportTimestamp),
+          synchronizerId = domain,
+          timestampOrOffset = Left(paramsState.exportTimestamp),
           force = true,
         )
       )
@@ -103,7 +103,7 @@ class AcsExporter(
             participantId <- participantAdminConnection.getId()
             parties <- participantAdminConnection
               .listPartyToParticipant(
-                store = TopologyStoreId.SynchronizerStore(syncId).some,
+                store = TopologyStoreId.Synchronizer(syncId).some,
                 filterParticipant = participantId.toProtoPrimitive,
               )
               .map(_.map(_.mapping.partyId).toSet)
