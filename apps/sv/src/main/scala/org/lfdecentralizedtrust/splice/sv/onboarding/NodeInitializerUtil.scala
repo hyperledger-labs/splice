@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
   NetworkAppClientConfig,
   SpliceInstanceNamesConfig,
   UpgradesConfig,
@@ -134,6 +135,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       localSynchronizerNode: Option[LocalSynchronizerNode],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
+      enabledFeatures: EnabledFeaturesConfig,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -157,6 +159,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       spliceInstanceNamesConfig,
       loggerFactory,
       packageVersionSupport,
+      enabledFeatures,
     )
 
   protected def newDsoPartyHosting(

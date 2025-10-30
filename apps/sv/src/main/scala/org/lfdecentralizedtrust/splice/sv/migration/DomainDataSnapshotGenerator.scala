@@ -23,6 +23,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportForParties
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -60,7 +61,9 @@ class DomainDataSnapshotGenerator(
         decentralizedSynchronizer,
         timestamp,
         force,
-        partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_))*
+        AcsExportForParties.OnlyForParties(
+          partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_)).toSet
+        ),
       )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
