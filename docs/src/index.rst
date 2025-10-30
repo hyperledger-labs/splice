@@ -53,11 +53,6 @@ Global Synchronizer for the Canton Network
    background/tokenomics/index.rst
    background/preapprovals
 
-.. todo:: Add Background sections containing
-
-          - security (starting from key usage doc and risk of key compromise)
-          - comparison to other chains
-
 .. toctree::
    :maxdepth: 2
    :caption: Scalability

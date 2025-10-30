@@ -6,12 +6,15 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 
 import scala.util.matching.Regex
 
-class FeaturedAppProxiesCompatibilityIntegrationTest extends IntegrationTest {
+class OptionalSpliceUtilDarCompatibilityIntegrationTest extends IntegrationTest {
 
   override lazy val resetRequiredTopologyState = false
 
   private val proxiesDarCurrentPath = File(
     "daml/splice-util-featured-app-proxies/src/main/resources/dar/splice-util-featured-app-proxies-current.dar"
+  )
+  private val walletDarCurrentPath = File(
+    "daml/splice-util-token-standard-wallet/src/main/resources/dar/splice-util-token-standard-wallet-current.dar"
   )
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
@@ -20,12 +23,13 @@ class FeaturedAppProxiesCompatibilityIntegrationTest extends IntegrationTest {
       .withManualStart
 
   "upload all splice-util-featured-app-proxies.dar files w/o error" in { implicit env =>
-    val darPattern: Regex = """splice-util-featured-app-proxies.*\.dar""".r
+    val darPattern: Regex = """splice-util-(featured-app-proxies|token-standard-wallet).*\.dar""".r
 
     val darPaths = File("daml/dars").listRecursively
       .filter(f => f.isRegularFile && darPattern.matches(f.name))
       .toSeq
       .appended(proxiesDarCurrentPath)
+      .appended(walletDarCurrentPath)
 
     darPaths
       .foreach { f =>
