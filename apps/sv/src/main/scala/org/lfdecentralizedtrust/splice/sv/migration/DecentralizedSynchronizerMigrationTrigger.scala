@@ -34,7 +34,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     dsoStore: SvDsoStore,
     ledgerConnection: SpliceLedgerConnection,
     protected val participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection0: SequencerAdminConnection,
+    sequencerAdminConnection: SequencerAdminConnection,
     protected val dumpPath: Path,
     featureConfig: EnabledFeaturesConfig,
 )(implicit
@@ -51,11 +51,6 @@ final class DecentralizedSynchronizerMigrationTrigger(
   // Disabling domain time and domain paused sync, as it runs after the domain is paused
   override protected lazy val context: TriggerContext =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
-
-  override val sequencerAdminConnection
-      : Some[org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection] = Some(
-    sequencerAdminConnection0
-  )
 
   val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
     participantAdminConnection,
