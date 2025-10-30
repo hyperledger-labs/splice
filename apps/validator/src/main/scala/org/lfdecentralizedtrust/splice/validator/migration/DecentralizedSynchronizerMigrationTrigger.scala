@@ -45,8 +45,6 @@ final class DecentralizedSynchronizerMigrationTrigger(
   override protected lazy val context =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
-  override protected val sequencerAdminConnection: None.type = None
-
   private val dumpGenerator = new DomainMigrationDumpGenerator(
     ledgerConnection,
     participantAdminConnection,

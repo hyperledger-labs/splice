@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.migration
 
-import cats.syntax.traverse.*
+import cats.syntax.apply.*
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
@@ -13,12 +13,13 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.migration.{
   AcsExporter,
   DarExporter,
+  MigrationSynchronizersState,
   SynchronizerParametersStateTopologyConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -29,8 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataSnapshotGenerator(
     participantAdminConnection: ParticipantAdminConnection,
-    // TODO(DACH-NY/canton-network-node#11099) Read everything from the participant connection once the genesis state API is available there.
-    sequencerAdminConnection: Option[SequencerAdminConnection],
+    sequencerAdminConnection: SequencerAdminConnection,
     dsoStore: SvDsoStore,
     acsExporter: AcsExporter,
     retryProvider: RetryProvider,
@@ -54,7 +54,7 @@ class DomainDataSnapshotGenerator(
   ): Future[DomainDataSnapshot] = for {
     decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
     cantonTimestamp = CantonTimestamp.tryFromInstant(timestamp)
-    topologySnapshot <- sequencerAdminConnection.traverse(_.getGenesisState(cantonTimestamp))
+    topologySnapshot <- sequencerAdminConnection.getGenesisState(cantonTimestamp)
     acsSnapshot <- acsExporter
       .exportAcsAtTimestamp(
         decentralizedSynchronizer,
@@ -66,12 +66,66 @@ class DomainDataSnapshotGenerator(
       )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
-    topologySnapshot,
+    Some(topologySnapshot),
     acsSnapshot,
     acsTimestamp = timestamp,
     dars,
     synchronizerWasPaused = false,
   )
+
+  private def exportGenesisState(
+      decentralizedSynchronizer: SynchronizerId,
+      participantParamsState: MigrationSynchronizersState,
+      timestamp: CantonTimestamp,
+  )(implicit ec: ExecutionContext, tc: TraceContext) = {
+    for {
+      // The sequencer can lag behind and queries will not fail but silently return an earlier state, so synchronize on it.
+      // See https://github.com/DACH-NY/canton/issues/20658
+      _ <- retryProvider.waitUntil(
+        RetryFor.Automation,
+        "sequencer_paused_domain",
+        "sequencer observes SynchronizerParametersState that pauses domain",
+        for {
+          sequencerDomainParameters <- sequencerAdminConnection.getSynchronizerParametersState(
+            decentralizedSynchronizer
+          )
+        } yield {
+          if (
+            sequencerDomainParameters.base.serial < participantParamsState.currentState.base.serial
+          ) {
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${participantParamsState.currentState.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
+              )
+              .asRuntimeException()
+          }
+        },
+        logger,
+      )
+      sequencerDomainParamsPaused <- domainStateTopology
+        .firstAuthorizedStateForTheLatestSynchronizerParametersState(
+          decentralizedSynchronizer
+        )
+        .getOrElse {
+          throw Status.FAILED_PRECONDITION
+            .withDescription("No domain state topology found")
+            .asRuntimeException()
+        }
+      sequencerPausedTimestamp = CantonTimestamp.tryFromInstant(
+        sequencerDomainParamsPaused.exportTimestamp
+      )
+      _ = if (sequencerPausedTimestamp != timestamp) {
+        throw Status.INTERNAL
+          .withDescription(
+            s"Participant sees domain as paused at $timestamp while sequencer sees domain as paused at ${sequencerPausedTimestamp}"
+          )
+          .asRuntimeException()
+      }
+      _ = logger.info("Starting export of genesis state from sequencer")
+      genesisState <- sequencerAdminConnection.getGenesisState(timestamp)
+      _ = logger.info("Finished export of genesis state from sequencer")
+    } yield genesisState
+  }
 
   // This is the safe version used for migrations that exports at the timestamp where we pause the synchronizer.
   def getDomainMigrationSnapshot(implicit
@@ -90,63 +144,19 @@ class DomainDataSnapshotGenerator(
       }
     timestamp = CantonTimestamp.tryFromInstant(participantParamsState.exportTimestamp)
     _ = logger.info(s"Taking domain migration snapshot at $timestamp")
-    genesisState <- sequencerAdminConnection.traverse { sequencerConnection =>
-      for {
-        // The sequencer can lag behind and queries will not fail but silently return an earlier state, so synchronize on it.
-        // See https://github.com/DACH-NY/canton/issues/20658
-        _ <- retryProvider.waitUntil(
-          RetryFor.Automation,
-          "sequencer_paused_domain",
-          "sequencer observes SynchronizerParametersState that pauses domain",
-          for {
-            sequencerDomainParameters <- sequencerConnection.getSynchronizerParametersState(
-              decentralizedSynchronizer
-            )
-          } yield {
-            if (
-              sequencerDomainParameters.base.serial < participantParamsState.currentState.base.serial
-            ) {
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${participantParamsState.currentState.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
-                )
-                .asRuntimeException()
-            }
-          },
-          logger,
+    (genesisState, (acsSnapshot, acsTimestamp)) <- (
+      exportGenesisState(decentralizedSynchronizer, participantParamsState, timestamp),
+      acsExporter
+        .safeExportParticipantPartiesAcsFromPausedDomain(decentralizedSynchronizer)
+        .leftMap(failure =>
+          Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
         )
-        sequencerDomainParamsPaused <- domainStateTopology
-          .firstAuthorizedStateForTheLatestSynchronizerParametersState(
-            decentralizedSynchronizer
-          )
-          .getOrElse {
-            throw Status.FAILED_PRECONDITION
-              .withDescription("No domain state topology found")
-              .asRuntimeException()
-          }
-        sequencerPausedTimestamp = CantonTimestamp.tryFromInstant(
-          sequencerDomainParamsPaused.exportTimestamp
-        )
-        _ = if (sequencerPausedTimestamp != timestamp) {
-          throw Status.INTERNAL
-            .withDescription(
-              s"Participant sees domain as paused at $timestamp while sequencer sees domain as paused at ${sequencerPausedTimestamp}"
-            )
-            .asRuntimeException()
-        }
-        genesisState <- sequencerConnection.getGenesisState(timestamp)
-      } yield genesisState
-    }
-    (acsSnapshot, acsTimestamp) <- acsExporter
-      .safeExportParticipantPartiesAcsFromPausedDomain(decentralizedSynchronizer)
-      .leftMap(failure =>
-        Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
-      )
-      .rethrowT
+        .rethrowT,
+    ).tupled
     dars <- darExporter.exportAllDars()
   } yield {
     val result = DomainDataSnapshot(
-      genesisState,
+      Some(genesisState),
       acsSnapshot,
       acsTimestamp,
       dars,
