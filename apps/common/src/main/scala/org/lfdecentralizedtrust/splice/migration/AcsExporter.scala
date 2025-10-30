@@ -42,8 +42,8 @@ class AcsExporter(
   ): Future[Seq[ByteString]] = {
     participantAdminConnection.downloadAcsSnapshot(
       parties = parties.toSet,
-      filterSynchronizerId = Some(domain),
-      timestamp = Some(timestamp),
+      synchronizerId = domain,
+      timestampOrOffset = Left(timestamp),
       force = force,
     )
   }
@@ -86,8 +86,8 @@ class AcsExporter(
       snapshot <- EitherT.liftF[Future, AcsExportFailure, Seq[ByteString]](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties.toSet,
-          filterSynchronizerId = Some(domain),
-          timestamp = Some(paramsState.exportTimestamp),
+          synchronizerId = domain,
+          timestampOrOffset = Left(paramsState.exportTimestamp),
           force = true,
         )
       )
