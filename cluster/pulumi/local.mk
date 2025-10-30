@@ -18,7 +18,7 @@ $(dir)/clean:
 $(dir)/format: $(dir)/.build
 	cd $(@D) && npm run format:fix
 
-pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell policies
+pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell
 
 .PHONY: $(dir)/test $(dir)/update-expected
 $(dir)/test: $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)
