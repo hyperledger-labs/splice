@@ -74,6 +74,7 @@ you can set up ``MergeDelegation`` contracts for your users as follows.
 4. Accept the ``MergeDelegationProposal`` contracts by
    exercising their ``Accept`` choice using your wallet provider's party.
 
+
 Using MergeDelegations
 ----------------------
 
@@ -109,6 +110,29 @@ as follows.
 
 Optionally, you can add transfers from your operator party to the merge calls to implement
 airdrop campaigns in a batched fashion.
+
+
+Upgrading from custom MergeDelegation implementations
+------------------------------------------------------
+
+Some wallet providers already implement their own custom merge delegation contracts.
+They can continue to use them alongside the ``MergeDelegation`` contracts provided
+by Splice.
+There is no requirement to upgrade to the Splice-provided contracts.
+
+However, if you would like to upgrade to the Splice-provided contracts
+(e.g., to benefit from the additional features),
+then you can do so as follows.
+
+1. Add a ``CustomMergeDelegation_Upgrade`` choice to your ``CustomMergeDelegation`` template
+   that creates a ``MergeDelegation`` contract for the user. Make the choice ``consuming``,
+   so that the old ``CustomMergeDelegation`` contract is archived as part of exercising the upgrade choice.
+2. Bump the version of your custom merge delegation ``.dar`` file
+   and build a new release.
+3. Upload the new ``custom-merge-delegation.dar`` file to your validator node.
+4. Call the ``CustomMergeDelegation_Upgrade`` choice on all existing
+   ``CustomMergeDelegation`` contracts to upgrade them to the Splice-provided
+   ``MergeDelegation`` contracts
 
 
 .. _token_standard_usage:

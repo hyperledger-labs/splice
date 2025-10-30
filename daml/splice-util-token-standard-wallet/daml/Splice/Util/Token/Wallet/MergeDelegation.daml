@@ -1,3 +1,6 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
 -- | Delegation from users to wallet operators allowing them to merge
 -- their token standard holdings; and optionally transfer tokens from
 -- the operator to the user as part of the merge operation, e.g., for
@@ -70,8 +73,11 @@ template MergeDelegation
           -- implement extraTransfers or reward distributions as part of the merge
           -- operation.
           --
-          -- Extra transfers only work for users that have preapproved incoming transfers
-          -- from the operator, which is why they are enabled by default.
+          -- Note that extra transfers only work for users that have preapproved
+          -- incoming transfers from the operator. Therefore there is no
+          -- additional restriction on the merge delegation to let users decide
+          -- whether to allow or disallow those transfers as it is already
+          -- controlled through the preapproval.
         optFeaturedAppRight : Optional FeaturedAppRightCall
           -- ^ The featured app right to use to feature the operator's merging activity.
       controller operator
