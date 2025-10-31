@@ -224,12 +224,12 @@ Configuring automatic traffic purchases
 
 Your node is configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
 :ref:`automatically purchase traffic <traffic_topup>`.
-To tune to your needs, you can set environment variables:
+To tune to your needs, you can set environment variables, for example:
 
 .. code-block:: bash
 
-   EXPORT TARGET_TRAFFIC_THROUGHPUT=<target throughput in bytes per second>
-   EXPORT MIN_TRAFFIC_TOPUP_INTERVAL=<minimum top-up interval in seconds>
+   EXPORT TARGET_TRAFFIC_THROUGHPUT=20000 # target throughput in bytes/second
+   EXPORT MIN_TRAFFIC_TOPUP_INTERVAL="1m" # minimum interval between top-ups
 
 On each successful top-up, the validator app purchases a `top-up amount` of roughly ``targetThroughput * minTopupInterval`` bytes of traffic
 (specific amount can vary due to rounding-up).
