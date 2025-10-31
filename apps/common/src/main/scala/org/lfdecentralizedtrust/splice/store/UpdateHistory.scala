@@ -63,6 +63,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.util.MonadUtil
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -322,8 +323,8 @@ class UpdateHistory(
       override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        Future
-          .traverse(batch.toList) { updateOrCheckpoint =>
+        MonadUtil
+          .sequentialTraverse(batch.toList) { updateOrCheckpoint =>
             val offset: Long = updateOrCheckpoint.offset
             val recordTime = updateOrCheckpoint match {
               case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>

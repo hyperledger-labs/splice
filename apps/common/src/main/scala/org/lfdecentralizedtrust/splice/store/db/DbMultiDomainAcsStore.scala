@@ -64,6 +64,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
+import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
@@ -1255,8 +1256,8 @@ final class DbMultiDomainAcsStore[TXE](
         traceContext: TraceContext
     ): Future[Unit] = {
       val steps = batchInsertionSteps(batch)
-      Future
-        .traverse(steps) {
+      MonadUtil
+        .sequentialTraverse(steps) {
           case batch: IngestTransactionTreesBatch =>
             storage
               .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
