@@ -5,6 +5,5 @@ export * from './config';
 export * from './contexts';
 export * from './hooks';
 export * from './models';
-export * from './beta-theme';
 export * from './theme';
 export * from './utils';

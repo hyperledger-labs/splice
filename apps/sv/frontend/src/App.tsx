@@ -7,7 +7,6 @@ import {
   ErrorRouterPage,
   UserProvider,
   theme,
-  betaTheme,
   SvClientProvider,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
@@ -30,6 +29,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from './contexts/SvAppVotesHooksContext';
+import { betaTheme } from './beta-theme';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
 import Dso from './routes/dso';

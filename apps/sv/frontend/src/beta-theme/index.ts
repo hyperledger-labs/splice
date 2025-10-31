@@ -4,7 +4,7 @@ import 'common-typeface-termina/index.css';
 
 import { createTheme, TypographyStyle } from '@mui/material';
 
-import { generateHslPalette, generateRemValue, stylePillButton } from '../theme/utils';
+import { generateHslPalette, generateRemValue, stylePillButton } from './utils';
 
 // // TS module augmentation to add custom theme vars for storing our custom color values
 declare module '@mui/material/styles' {
