@@ -1,0 +1,212 @@
+package org.lfdecentralizedtrust.splice.unit.http
+
+import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
+import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.{BaseTest, FutureHelpers, HasActorSystem, HasExecutionContext}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.server.Directives.{complete, *}
+import org.apache.pekko.http.scaladsl.server.Route
+import org.lfdecentralizedtrust.splice.environment.NodeBase
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.scalatest.wordspec.AsyncWordSpec
+
+import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContext, Future}
+
+class HttpProxyTest
+    extends AsyncWordSpec
+    with BaseTest
+    with HasActorSystem
+    with HasExecutionContext
+    with NamedLogging
+    with TinyProxySupport
+    with HttpServerSupport
+    with SystemPropertiesSupport {
+
+  "Http proxy settings" should {
+    "be supported in httpClient used in NodeBase using http.proxyPort, http.proxyHost" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+          withProperties(props) {
+            assertProxiedGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "if not set, not use the proxy" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val serverPort = serverBinding.localAddress.getPort
+          val response = executeRequest(serverBinding).futureValue
+          response.status shouldBe StatusCodes.OK
+          proxy.process.hasNoErrors shouldBe true
+          proxy.proxiedConnectRequest(serverPort) shouldBe false
+        }
+      }
+    }
+    "be supported in httpClient used in NodeBase using https.proxyPort, https.proxyHost" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("https.proxyHost", "localhost")
+            .set("https.proxyPort", proxy.port.toString)
+          withProperties(props) {
+            assertProxiedGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "be supported in httpClient used in NodeBase using http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
+      val user = "user"
+      val password = "pass1"
+      withProxy(auth = Some((user, password))) { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            .set("http.proxyUser", user)
+            .set("http.proxyPassword", password)
+          withProperties(props) {
+            assertProxiedGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "be supported in httpClient used in NodeBase using https.proxyPort, https.proxyHost, https.proxyUser and https.proxyPassword" in {
+      val user = "user"
+      val password = "pass1"
+      withProxy(auth = Some((user, password))) { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("https.proxyHost", "localhost")
+            .set("https.proxyPort", proxy.port.toString)
+            .set("https.proxyUser", user)
+            .set("https.proxyPassword", password)
+          withProperties(props) {
+            assertProxiedGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "fail if http.proxyUser and http.proxyPassword are not set and proxy requires auth" in {
+      val user = "user"
+      val password = "pass1"
+      withProxy(auth = Some((user, password))) { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+          withProperties(props) {
+            executeRequest(serverBinding).failed.futureValue.getMessage should include(
+              "407 Proxy Authentication Required"
+            )
+          }
+        }
+      }
+    }
+    "fail with Unauthorized with bad credentials and proxy requires auth" in {
+      val user = "user"
+      val password = "pass1"
+      withProxy(auth = Some((user, password))) { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            .set("http.proxyUser", user)
+            .set("http.proxyPassword", "fail")
+          withProperties(props) {
+            executeRequest(serverBinding).failed.futureValue.getMessage should include(
+              "401 Unauthorized"
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private def executeRequest(serverBinding: ServerBinding) = {
+    val serverPort = serverBinding.localAddress.getPort
+    val httpClient = NodeBase.buildHttpClient(
+      ApiLoggingConfig(),
+      HttpClient.HttpRequestParameters(NonNegativeDuration(30.seconds)),
+      logger,
+    )
+    val uriString = s"http://localhost:$serverPort"
+
+    httpClient
+      .executeRequest(
+        HttpRequest(uri = Uri(uriString))
+      )
+  }
+
+  private def assertProxiedGetRequest(proxy: HttpProxy, serverBinding: ServerBinding) = {
+    val serverPort = serverBinding.localAddress.getPort
+    val response = executeRequest(serverBinding).futureValue
+    response.status shouldBe StatusCodes.OK
+    proxy.process.hasNoErrors shouldBe true
+    proxy.proxiedConnectRequest(serverPort) shouldBe true
+  }
+}
+
+object Routes {
+  def respondWithOK: Route = get {
+    complete(StatusCodes.OK)
+  }
+}
+
+trait SystemPropertiesSupport {
+  def withProperties[T](props: SystemProperties)(testCode: => T): T = {
+    try {
+      testCode
+    } finally {
+      props.reset()
+    }
+  }
+}
+case class SystemProperties(props: Map[String, Option[String]] = Map()) {
+  def set(key: String, value: String): SystemProperties = {
+    if (props.contains(key)) {
+      throw new IllegalArgumentException(s"System property $key is already set")
+    }
+    val newProps = SystemProperties(
+      props + (key -> Option(System.getProperty(value)))
+    )
+    System.setProperty(key, value)
+    newProps
+  }
+  def reset(): Unit = {
+    props.foreach { case (key, value) =>
+      value.foreach(v => System.setProperty(key, v))
+      if (value.isEmpty) System.clearProperty(key)
+    }
+  }
+}
+
+trait HttpServerSupport extends FutureHelpers {
+  def withHttpServer[T](route: Route)(testCode: ServerBinding => T)(implicit
+      ac: ActorSystem,
+      ec: ExecutionContext,
+  ): T = {
+    val bindingFut = start(route)
+    try {
+      testCode(bindingFut.futureValue)
+    } finally {
+      bindingFut
+        .flatMap(_.unbind())
+        .recover { case _ => Done }
+        .futureValue
+    }
+  }
+  def start(route: Route)(implicit ac: ActorSystem): Future[ServerBinding] = {
+    Http()
+      .newServerAt("0.0.0.0", 0)
+      .bind(route)
+  }
+}
