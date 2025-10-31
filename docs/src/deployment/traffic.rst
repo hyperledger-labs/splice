@@ -169,7 +169,8 @@ Additionally, to prevent top-up transactions from failing due to an already depl
 the validator app will
 :ref:`abort ledger submissions if the balance has fallen below a predefined amount<error-below-reserved-traffic-amount>`.
 
-For configuring the built-in top-up automation, please refer to the :ref:`validator deployment guide <helm_validator_topup>`.
+For configuring the built-in top-up automation, please refer to the :ref:`Kubernetes validator deployment guide <helm_validator_topup>`
+or the corresponding :ref:`Docker-compose one<compose_validator_topup>`.
 Configuring alternative methods for buying traffic, e.g., using third-party services, exceeds the scope of this documentation.
 
 .. _traffic_wasted:
