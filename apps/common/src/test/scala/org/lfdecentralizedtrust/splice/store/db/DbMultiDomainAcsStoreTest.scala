@@ -41,6 +41,8 @@ import slick.jdbc.JdbcProfile
 
 import java.time.Instant
 import scala.concurrent.Future
+import StoreTest.*
+import cats.data.NonEmptyList
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -339,11 +341,13 @@ class DbMultiDomainAcsStoreTest
           _ <- initWithAcs(acsOffset = 0)(store)
           o1 <- store.lookupLastIngestedOffset()
           _ = o1 shouldBe Some(0)
-          _ <- store.testIngestionSink.ingestUpdate(
-            TreeUpdateOrOffsetCheckpoint.Checkpoint(
-              new OffsetCheckpoint(
-                5,
-                Collections.emptyList(),
+          _ <- store.testIngestionSink.ingestUpdateBatch(
+            NonEmptyList.of(
+              TreeUpdateOrOffsetCheckpoint.Checkpoint(
+                new OffsetCheckpoint(
+                  5,
+                  Collections.emptyList(),
+                )
               )
             )
           )

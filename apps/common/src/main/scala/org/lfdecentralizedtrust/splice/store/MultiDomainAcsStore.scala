@@ -3,9 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.store
 
+import cats.data.NonEmptyList
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
+import com.daml.ledger.api.v2.transaction_filter.{CumulativeFilter, EventFormat}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.{
   Interface,
   Template as TemplateCompanion,
@@ -18,7 +19,6 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
   ReassignmentEvent,
-  TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
@@ -751,14 +751,9 @@ object MultiDomainAcsStore extends StoreErrors {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def ingestUpdate(update: TreeUpdateOrOffsetCheckpoint)(implicit
+    def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit]
-
-    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] =
-      ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))
   }
 
   object IngestionSink {

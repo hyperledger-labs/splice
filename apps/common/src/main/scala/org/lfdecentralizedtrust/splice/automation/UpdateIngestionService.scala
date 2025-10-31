@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
+import cats.data.NonEmptyList
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{
@@ -85,16 +86,28 @@ class UpdateIngestionService(
           } yield offset
       }
     } yield new SpliceLedgerSubscription(
-      source = connection.updates(subscribeFrom, filter),
+      source = connection
+        .updates(subscribeFrom, filter)
+        .groupedWithin(
+          config.ingestion.maxBatchSize,
+          config.ingestion.batchWaitTime.asFiniteApproximation,
+        ),
       map = process,
       retryProvider = retryProvider,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),
     )
 
   private def process(
-      msg: GetTreeUpdatesResponse
-  )(implicit traceContext: TraceContext) =
-    ingestionSink.ingestUpdate(msg.updateOrCheckpoint)
+      msgs: Seq[GetTreeUpdatesResponse]
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    NonEmptyList.fromFoldable(msgs) match {
+      case Some(batch) =>
+        ingestionSink.ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
+      case None =>
+        logger.warn("Received empty batch of updates to ingest. This is never supposed to happen.")
+        Future.unit
+    }
+  }
 
   private def ingestAcsAndInFlight(
       offset: Long

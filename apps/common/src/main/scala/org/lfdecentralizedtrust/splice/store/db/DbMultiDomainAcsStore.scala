@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
-import cats.data.{NonEmptyList, OptionT}
+import cats.data.{NonEmptyList, NonEmptyVector, OptionT}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
@@ -75,6 +75,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
+import java.lang
 import java.time.Instant
 
 final class DbMultiDomainAcsStore[TXE](
@@ -1250,223 +1251,228 @@ final class DbMultiDomainAcsStore[TXE](
       }
     }
 
-    override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
+    override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
-      updateOrCheckpoint match {
-        case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), domain) =>
-          ingestReassignment(reassignment.offset, reassignment).map { summaryState =>
-            state
-              .getAndUpdate(s =>
-                s.withUpdate(
-                  s.acsSize + summaryState.acsSizeDiff,
-                  reassignment.offset,
-                )
+      val steps = batchInsertionSteps(batch)
+      Future
+        .traverse(steps) {
+          case batch: IngestTransactionTreesBatch =>
+            storage
+              .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
+              .map { summaryState =>
+                // TODO: is this right? can we use this for signaling?
+                val lastOffset = batch.batch.last.tree.getOffset
+                state
+                  .getAndUpdate(s =>
+                    s.withUpdate(
+                      s.acsSize + summaryState.acsSizeDiff,
+                      batch.batch.last.tree.getOffset,
+                    )
+                  )
+                  .signalOffsetChanged(lastOffset)
+                // TODO: numbers will be off: repeated per batch, so change this
+                batch.batch.toVector.foreach { item =>
+                  val summary =
+                    summaryState.toIngestionSummary(
+                      updateId = Some(item.tree.getUpdateId),
+                      synchronizerId = Some(item.synchronizerId),
+                      offset = item.tree.getOffset,
+                      recordTime = Some(CantonTimestamp.assertFromInstant(item.tree.getRecordTime)),
+                      newAcsSize = state.get().acsSize,
+                      metrics,
+                    )
+                  logger.debug(show"Ingested transaction $summary")
+                  handleIngestionSummary(summary)
+                }
+              }
+          case IngestReassignment(reassignment, synchronizerId) =>
+            storage
+              .queryAndUpdate(
+                ingestReassignment(reassignment.offset, reassignment.transfer),
+                "ingestReassignment",
               )
-              .signalOffsetChanged(reassignment.offset)
-            val summary =
-              summaryState.toIngestionSummary(
-                updateId = None,
-                synchronizerId = Some(domain),
-                offset = reassignment.offset,
-                recordTime = Some(reassignment.recordTime),
-                newAcsSize = state.get().acsSize,
-                metrics,
+              .map { summaryState =>
+                state
+                  .getAndUpdate(s =>
+                    s.withUpdate(
+                      s.acsSize + summaryState.acsSizeDiff,
+                      reassignment.offset,
+                    )
+                  )
+                  .signalOffsetChanged(reassignment.offset)
+                val summary =
+                  summaryState.toIngestionSummary(
+                    updateId = None,
+                    synchronizerId = Some(synchronizerId),
+                    offset = reassignment.offset,
+                    recordTime = Some(reassignment.recordTime),
+                    newAcsSize = state.get().acsSize,
+                    metrics,
+                  )
+                logger.debug(show"Ingested reassignment $summary")
+                handleIngestionSummary(summary)
+              }
+          case UpdateCheckpoint(checkpoint) =>
+            val offset = checkpoint.checkpoint.getOffset
+            storage
+              .queryAndUpdate(
+                ingestUpdateAtOffset(offset, DBIO.unit, isOffsetCheckpoint = true),
+                "ingestOffsetCheckpoint",
               )
-            logger.debug(show"Ingested reassignment $summary")
-            handleIngestionSummary(summary)
-          }
-        case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), domain) =>
-          // TODO: fix this next
-          val offset = tree.getOffset
-          ingestTransactionTrees(domain, offset, NonEmptyList.of(tree)).map { summaryState =>
-            state
-              .getAndUpdate(s =>
-                s.withUpdate(
-                  s.acsSize + summaryState.acsSizeDiff,
-                  offset,
-                )
-              )
-              .signalOffsetChanged(offset)
-            val summary =
-              summaryState.toIngestionSummary(
-                updateId = Some(tree.getUpdateId),
-                synchronizerId = Some(domain),
-                offset = offset,
-                recordTime = Some(CantonTimestamp.assertFromInstant(tree.getRecordTime)),
-                newAcsSize = state.get().acsSize,
-                metrics,
-              )
-            logger.debug(show"Ingested transaction $summary")
-            handleIngestionSummary(summary)
-          }
-        case TreeUpdateOrOffsetCheckpoint.Checkpoint(checkpoint) =>
-          val offset = checkpoint.getOffset
-          storage
-            .queryAndUpdate(
-              ingestUpdateAtOffset(offset, DBIO.unit, isOffsetCheckpoint = true),
-              "ingestOffsetCheckpoint",
-            )
-            .map { _ =>
-              state
-                .getAndUpdate(s => s.withUpdate(s.acsSize, offset))
-                .signalOffsetChanged(offset)
-              val summary =
-                MutableIngestionSummary.empty.toIngestionSummary(
-                  updateId = None,
-                  synchronizerId = None,
-                  offset = offset,
-                  recordTime = None,
-                  newAcsSize = state.get().acsSize,
-                  metrics,
-                )
-              logger.debug(show"Ingested offset checkpoint $offset")
-              handleIngestionSummary(summary)
-            }
-
-      }
+              .map { _ =>
+                state
+                  .getAndUpdate(s => s.withUpdate(s.acsSize, offset))
+                  .signalOffsetChanged(offset)
+                val summary =
+                  MutableIngestionSummary.empty.toIngestionSummary(
+                    updateId = None,
+                    synchronizerId = None,
+                    offset = offset,
+                    recordTime = None,
+                    newAcsSize = state.get().acsSize,
+                    metrics,
+                  )
+                logger.debug(show"Ingested offset checkpoint $offset")
+                handleIngestionSummary(summary)
+              }
+        }
+        .map(_ => ())
     }
 
     private def ingestReassignment(
         offset: Long,
         reassignment: Reassignment[ReassignmentEvent],
-    )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
+    )(implicit tc: TraceContext) = {
       val summary = MutableIngestionSummary.empty
-      for {
-        _ <- storage
-          .queryAndUpdate(
-            ingestUpdateAtOffset(
-              offset,
-              DBIO
-                .seq(
-                  reassignment.event match {
-                    case assign: ReassignmentEvent.Assign
-                        if !contractFilter.contains(assign.createdEvent) =>
-                      summary.numFilteredAssignEvents += 1
+      ingestUpdateAtOffset(
+        offset,
+        DBIO
+          .seq(
+            reassignment.event match {
+              case assign: ReassignmentEvent.Assign
+                  if !contractFilter.contains(assign.createdEvent) =>
+                summary.numFilteredAssignEvents += 1
+                DBIO.successful(())
+              case assign: ReassignmentEvent.Assign =>
+                contractFilter.ensureStakeholderOf(assign.createdEvent)
+                for {
+                  case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
+                    Seq(
+                      hasIncompleteReassignments(assign.createdEvent.getContractId),
+                      hasAcsEntry(assign.createdEvent.getContractId),
+                    )
+                  )
+                  alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
+                  _ <-
+                    if (alreadyArchived) {
+                      doRegisterIncompleteReassignment(
+                        assign.createdEvent.getContractId,
+                        assign.source,
+                        assign.unassignId,
+                        true,
+                        summary,
+                      )
+                    } else if (_hasAcsEntry) {
+                      DBIO.seq(
+                        doSetContractStateActive(
+                          assign.createdEvent.getContractId,
+                          assign.target,
+                          assign.counter,
+                          summary,
+                        ),
+                        doRegisterIncompleteReassignment(
+                          assign.createdEvent.getContractId,
+                          assign.source,
+                          assign.unassignId,
+                          true,
+                          summary,
+                        ),
+                      )
+                    } else {
+                      DBIO.seq(
+                        doIngestAcsInserts(
+                          NonEmptyList
+                            .of(
+                              AcsInsertEntry(
+                                reassignment.offset,
+                                assign.createdEvent,
+                                stateRowDataFromAssign(assign),
+                              )
+                            ),
+                          summary,
+                        ),
+                        doRegisterIncompleteReassignment(
+                          assign.createdEvent.getContractId,
+                          assign.source,
+                          assign.unassignId,
+                          true,
+                          summary,
+                        ),
+                      )
+                    }
+                } yield ()
+              case unassign: ReassignmentEvent.Unassign =>
+                for {
+                  case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
+                    Seq(
+                      hasIncompleteReassignments(unassign.contractId.contractId),
+                      hasAcsEntry(unassign.contractId.contractId),
+                    )
+                  )
+                  filteredOut = !_hasAcsEntry & !_hasIncompleteReassignments
+                  alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
+                  _ <-
+                    if (filteredOut) {
+                      summary.numFilteredUnassignEvents += 1
                       DBIO.successful(())
-                    case assign: ReassignmentEvent.Assign =>
-                      contractFilter.ensureStakeholderOf(assign.createdEvent)
-                      for {
-                        case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
-                          Seq(
-                            hasIncompleteReassignments(assign.createdEvent.getContractId),
-                            hasAcsEntry(assign.createdEvent.getContractId),
-                          )
-                        )
-                        alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
-                        _ <-
-                          if (alreadyArchived) {
-                            doRegisterIncompleteReassignment(
-                              assign.createdEvent.getContractId,
-                              assign.source,
-                              assign.unassignId,
-                              true,
-                              summary,
-                            )
-                          } else if (_hasAcsEntry) {
-                            DBIO.seq(
-                              doSetContractStateActive(
-                                assign.createdEvent.getContractId,
-                                assign.target,
-                                assign.counter,
-                                summary,
-                              ),
-                              doRegisterIncompleteReassignment(
-                                assign.createdEvent.getContractId,
-                                assign.source,
-                                assign.unassignId,
-                                true,
-                                summary,
-                              ),
-                            )
-                          } else {
-                            DBIO.seq(
-                              doIngestAcsInserts(
-                                NonEmptyList
-                                  .of(
-                                    AcsInsertEntry(
-                                      reassignment.offset,
-                                      assign.createdEvent,
-                                      stateRowDataFromAssign(assign),
-                                    )
-                                  ),
-                                summary,
-                              ),
-                              doRegisterIncompleteReassignment(
-                                assign.createdEvent.getContractId,
-                                assign.source,
-                                assign.unassignId,
-                                true,
-                                summary,
-                              ),
-                            )
-                          }
-                      } yield ()
-                    case unassign: ReassignmentEvent.Unassign =>
-                      for {
-                        case Seq(_hasIncompleteReassignments, _hasAcsEntry) <- DBIO.sequence(
-                          Seq(
-                            hasIncompleteReassignments(unassign.contractId.contractId),
-                            hasAcsEntry(unassign.contractId.contractId),
-                          )
-                        )
-                        filteredOut = !_hasAcsEntry & !_hasIncompleteReassignments
-                        alreadyArchived = !_hasAcsEntry & _hasIncompleteReassignments
-                        _ <-
-                          if (filteredOut) {
-                            summary.numFilteredUnassignEvents += 1
-                            DBIO.successful(())
-                          } else if (alreadyArchived) {
-                            doRegisterIncompleteReassignment(
-                              unassign.contractId.contractId,
-                              unassign.source,
-                              unassign.unassignId,
-                              false,
-                              summary,
-                            )
-                          } else {
-                            DBIO.seq(
-                              doSetContractStateInFlight(
-                                unassign,
-                                summary,
-                              ),
-                              doRegisterIncompleteReassignment(
-                                unassign.contractId.contractId,
-                                unassign.source,
-                                unassign.unassignId,
-                                false,
-                                summary,
-                              ),
-                            )
-                          }
-                      } yield ()
-                  }
-                ),
-            ),
-            "ingestReassignment",
-          )
-      } yield summary
+                    } else if (alreadyArchived) {
+                      doRegisterIncompleteReassignment(
+                        unassign.contractId.contractId,
+                        unassign.source,
+                        unassign.unassignId,
+                        false,
+                        summary,
+                      )
+                    } else {
+                      DBIO.seq(
+                        doSetContractStateInFlight(
+                          unassign,
+                          summary,
+                        ),
+                        doRegisterIncompleteReassignment(
+                          unassign.contractId.contractId,
+                          unassign.source,
+                          unassign.unassignId,
+                          false,
+                          summary,
+                        ),
+                      )
+                    }
+                } yield ()
+            }
+          ),
+      ).map(_ => summary)
     }
 
     private def ingestTransactionTrees(
-        synchronizerId: SynchronizerId,
-        offset: Long,
-        trees: NonEmptyList[Transaction],
-    )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
+        trees: IngestTransactionTreesBatch
+    )(implicit tc: TraceContext) = {
       val summary = MutableIngestionSummary.empty
 
-      val workTodo = trees
+      val workTodo = trees.batch
         .map(tree =>
           Trees
             .foldTree(
-              tree,
+              tree.tree,
               VectorMap.empty[String, OperationToDo],
             )(
               onCreate = (st, ev, _) => {
                 if (contractFilter.contains(ev)) {
                   contractFilter.ensureStakeholderOf(ev)
                   st + (ev.getContractId -> Insert(
-                    ev
+                    ev,
+                    tree.synchronizerId,
                   ))
                 } else {
                   summary.numFilteredCreatedEvents += 1
@@ -1493,67 +1499,69 @@ final class DbMultiDomainAcsStore[TXE](
         .values
         .toSeq
 
-      val txLogEntries: Seq[(Instant, TXE)] = trees
+      val txLogEntries: Seq[(Instant, (TXE, lang.Long, SynchronizerId))] = trees.batch
         // do not parse events imported from acs
-        .filter(tree => !tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
+        .filter(tree => !tree.tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
         .flatMap(tree =>
-          txLogConfig.parser.parse(tree, synchronizerId, logger).map(tree.getRecordTime -> _)
+          txLogConfig.parser
+            .parse(tree.tree, tree.synchronizerId, logger)
+            .map(tree.tree.getRecordTime -> (_, tree.tree.getOffset, tree.synchronizerId))
         )
+      val synchronizerIdsToMinRecordTime =
+        trees.batch.groupBy(_.synchronizerId).map { case (synchronizerId, batch) =>
+          synchronizerId -> batch.map(_.tree.getRecordTime).minimumBy(_.toEpochMilli)
+        }
 
-      for {
-        _ <- storage
-          .queryAndUpdate(
-            ingestUpdateAtOffset(
-              offset,
-              DBIO
-                .seq(
-                  DBIO.seq(workTodo.map({
-                    case Insert(createdEvent) =>
-                      for {
-                        alreadyArchived <- hasIncompleteReassignments(createdEvent.getContractId)
-                        _ <-
-                          if (alreadyArchived) {
-                            DBIO.successful(())
-                          } else {
-                            DBIO.seq(
-                              doIngestAcsInserts(
-                                NonEmptyList
-                                  .of(
-                                    AcsInsertEntry(
-                                      offset,
-                                      createdEvent,
-                                      stateRowDataFromActiveContract(synchronizerId, 0L),
-                                    )
-                                  ),
-                                summary,
+      ingestUpdateAtOffset(
+        trees.batch.last.tree.getOffset,
+        DBIO
+          .seq(
+            DBIO.seq(workTodo.map({
+              case Insert(createdEvent, synchronizerId) =>
+                for {
+                  alreadyArchived <- hasIncompleteReassignments(createdEvent.getContractId)
+                  _ <-
+                    if (alreadyArchived) {
+                      DBIO.successful(())
+                    } else {
+                      DBIO.seq(
+                        doIngestAcsInserts(
+                          NonEmptyList
+                            .of(
+                              AcsInsertEntry(
+                                createdEvent.getOffset,
+                                createdEvent,
+                                stateRowDataFromActiveContract(synchronizerId, 0L),
                               )
-                            )
-                          }
-                      } yield ()
-                    case Delete(exercisedEvent) =>
-                      doDeleteContract(exercisedEvent, summary)
-                  })*),
-                  // TODO: this also needs batching
-                  DBIO.seq(txLogEntries.map { case (recordTime, txe) =>
-                    doIngestTxLogInsert(
-                      domainMigrationId,
-                      synchronizerId,
-                      offset,
-                      CantonTimestamp.assertFromInstant(recordTime),
-                      txe,
-                      summary,
-                    )
-                  }*),
-                  doInitializeFirstIngestedUpdate(
-                    synchronizerId,
-                    domainMigrationId,
-                    CantonTimestamp.assertFromInstant(trees.head.getRecordTime),
-                  ),
-                ),
-            ),
-            "ingestTransactionTree",
-          )
-      } yield summary
+                            ),
+                          summary,
+                        )
+                      )
+                    }
+                } yield ()
+              case Delete(exercisedEvent) =>
+                doDeleteContract(exercisedEvent, summary)
+            })*),
+            // TODO: these also need batching
+            DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
+              doIngestTxLogInsert(
+                domainMigrationId,
+                synchronizerId,
+                offset,
+                CantonTimestamp.assertFromInstant(recordTime),
+                txe,
+                summary,
+              )
+            }*),
+            DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map { case (synchronizerId, recordTime) =>
+              doInitializeFirstIngestedUpdate(
+                synchronizerId,
+                domainMigrationId,
+                CantonTimestamp.assertFromInstant(recordTime),
+              )
+            }*),
+          ),
+      ).map(_ => summary)
     }
 
     private def hasAcsEntry(contractId: String) = (sql"""
@@ -1605,7 +1613,7 @@ final class DbMultiDomainAcsStore[TXE](
     )
 
     case class AcsInsertEntry(
-        offset: Long,
+        offset: Long, // not always the same as `createdEvent.getOffset`
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
     )
@@ -1707,7 +1715,7 @@ final class DbMultiDomainAcsStore[TXE](
           )
         case _ =>
           val errMsg =
-            s"Item at offset ${entry.offset} with contract id ${entry.createdEvent.getContractId} cannot be ingested."
+            s"Item at offset ${entry.createdEvent.getOffset} with contract id ${entry.createdEvent.getContractId} cannot be ingested."
           logger.error(errMsg)
           throw new IllegalArgumentException(errMsg)
       }
@@ -1876,7 +1884,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
 
     sealed trait OperationToDo
-    case class Insert(evt: CreatedEvent) extends OperationToDo
+    case class Insert(evt: CreatedEvent, synchronizerId: SynchronizerId) extends OperationToDo
     case class Delete(evt: ExercisedEvent) extends OperationToDo
   }
 
@@ -2288,5 +2296,37 @@ object DbMultiDomainAcsStore {
         "key" -> Json.obj(key.map { case (k, v) => k -> Json.fromString(v) }.toSeq*),
       )
     }
+  }
+
+  sealed trait BatchStep
+  case class UpdateCheckpoint(checkpoint: TreeUpdateOrOffsetCheckpoint.Checkpoint) extends BatchStep
+  case class IngestReassignment(update: ReassignmentUpdate, synchronizerId: SynchronizerId)
+      extends BatchStep
+  case class IngestTransactionTreesBatch(batch: NonEmptyVector[IngestTransactionTree])
+      extends BatchStep
+  case class IngestTransactionTree(tree: Transaction, synchronizerId: SynchronizerId)
+  def batchInsertionSteps(
+      batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint]
+  ): Vector[BatchStep] = {
+    val steps = batch.map(toBatchStep)
+    steps.tail.foldLeft(Vector[BatchStep](steps.head)) {
+      case (
+            accExceptLast :+ IngestTransactionTreesBatch(existingBatch),
+            IngestTransactionTreesBatch(moreItems),
+          ) =>
+        accExceptLast :+ IngestTransactionTreesBatch(existingBatch ++: moreItems)
+      case (acc, next) =>
+        acc :+ next
+    }
+  }
+  private def toBatchStep(op: TreeUpdateOrOffsetCheckpoint): BatchStep = op match {
+    case TreeUpdateOrOffsetCheckpoint.Update(reassignment: ReassignmentUpdate, synchronizerId) =>
+      IngestReassignment(reassignment, synchronizerId)
+    case checkpoint: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
+      UpdateCheckpoint(checkpoint)
+    case TreeUpdateOrOffsetCheckpoint.Update(update: TransactionTreeUpdate, synchronizerId) =>
+      IngestTransactionTreesBatch(
+        NonEmptyVector.of(IngestTransactionTree(update.tree, synchronizerId))
+      )
   }
 }
