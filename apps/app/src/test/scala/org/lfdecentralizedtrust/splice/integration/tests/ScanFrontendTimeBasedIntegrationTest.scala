@@ -669,7 +669,7 @@ class ScanFrontendTimeBasedIntegrationTest
         )(
           "a new validator row is added",
           _ => {
-            checkLastValidatorLicenseRow(
+            checkValidatorLicenseRow(
               licenseRows.size.toLong,
               sv1Backend.getDsoInfo().svParty,
               newValidatorParty,
