@@ -68,7 +68,7 @@ Noticed an DsoRules epoch change.*DecentralizedSynchronizerMigrationIntegrationT
 # Nevertheless, it is still useful to have the warning in production environments, where this should never happen.
 Skipped.*faucet coupons from last claimed round.*to current round
 
-# Sometimes the CircleCI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+# Sometimes CI the executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
 DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
 
 # The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
