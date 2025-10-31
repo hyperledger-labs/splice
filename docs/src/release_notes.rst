@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.23
+------
 
   - Daml
 
@@ -18,6 +18,22 @@ Upcoming
       implementing auto-merging of holdings and airdrop campaigns, as
       explained in :ref:`holding_utxo_management`.
       The package is optional and not uploaded by default to a validator node.
+
+  - Performance improvements
+
+    - Scan
+
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+
+    - SV app
+
+        - Improve amulet expiry by using batching. `View PR. <https://github.com/hyperledger-labs/splice/pull/2893>`_
+
+  - Deployment
+
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR. <https://github.com/hyperledger-labs/splice/pull/2972>`_
 
 0.4.22
 ------
