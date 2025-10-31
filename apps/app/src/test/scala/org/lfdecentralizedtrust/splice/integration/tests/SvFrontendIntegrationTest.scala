@@ -20,6 +20,10 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultDsoRulesConfig
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.validator.automation.{
+  ReceiveFaucetCouponTrigger,
+  TransferCommandSendTrigger,
+}
 import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
@@ -139,26 +143,36 @@ class SvFrontendIntegrationTest
           },
         )
 
-        val licenseRows = getLicensesTableRows
-        val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
+        // The ReceiveFaucetCouponTrigger, via RecordValidatorLivenessActivity, continuously
+        // recreates the existing ValidatorLicenses. This interferes with the following
+        // test due to its short tick duration, so we pause the trigger for this check.
+        TriggerTestUtil.setTriggersWithin(triggersToPauseAtStart =
+          Seq(
+            sv1ValidatorBackend.validatorAutomation
+              .trigger[ReceiveFaucetCouponTrigger]
+          )
+        ) {
+          val licenseRows = getLicensesTableRows
+          val newValidatorParty = allocateRandomSvParty("splice-client", Some(2))
 
-        actAndCheck(
-          "onboard new validator using the secret",
-          sv1Backend.onboardValidator(
-            newValidatorParty,
-            newSecret,
-            s"${newValidatorParty.uid.identifier}@example.com",
-          ),
-        )(
-          "a new validator row is added",
-          _ => {
-            checkLastValidatorLicenseRow(
-              licenseRows.size.toLong,
-              sv1Backend.getDsoInfo().svParty,
+          actAndCheck(
+            "onboard new validator using the secret",
+            sv1Backend.onboardValidator(
               newValidatorParty,
-            )
-          },
-        )
+              newSecret,
+              s"${newValidatorParty.uid.identifier}@example.com",
+            ),
+          )(
+            "a new validator row is added",
+            _ => {
+              checkLastValidatorLicenseRow(
+                licenseRows.size.toLong,
+                sv1Backend.getDsoInfo().svParty,
+                newValidatorParty,
+              )
+            },
+          )
+        }
       }
     }
 
