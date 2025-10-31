@@ -61,7 +61,7 @@ export function installCantonComponents(
     auth0Client,
     xns,
     `sv-canton-migration-${migrationId}`,
-    svConfig.auth0SvAppName
+    'sv'
   );
   const ledgerApiUserSecretSource = auth0UserNameEnvVarSource(
     `sv-canton-migration-${migrationId}`,
