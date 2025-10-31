@@ -40,18 +40,17 @@ export function applyDowngradePolicy(): PolicyPack {
         validateResource: validateResourceOfType(
           k8s.helm.v3.Release,
           (_, args, reportViolation) => {
-            const newVersion = args.props.version as string;
-            const currentVersion = getHelmAppVersion(args.props.name, args.props.namespace);
-
             if (allowDowngrade) {
               return;
             }
 
+            const currentVersion = getHelmAppVersion(args.props.name, args.props.namespace);
             if (!currentVersion) {
               return;
             }
 
-            if (newVersion && semver.valid(currentVersion) && semver.valid(newVersion)) {
+            const newVersion = args.props.version as string;
+            if (newVersion) {
               if (semver.lt(newVersion, currentVersion)) {
                 reportViolation(
                   `Deployment '${args.name}' cannot be downgraded from appVersion '${currentVersion}' to '${newVersion}'.` +

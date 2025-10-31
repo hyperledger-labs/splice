@@ -1,8 +1,4 @@
 {
   "extends": "../tsconfig.json",
-  "include": [
-    "src/**/*.ts",
-    "*.ts",
-    "../common/src/operator/stack.ts"
-  ]
+  "include": ["src/**/*.ts", "*.ts"]
 }

@@ -10,6 +10,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {spliceEnvConfig} from "@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig";
+import {allowDowngrade} from "@lfdecentralizedtrust/splice-pulumi-common";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
@@ -57,7 +58,7 @@ export function pulumiOptsWithPrefix(
     },
     signal: abortSignal,
     color: 'always',
-    policyPacks: [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
+    policyPacks: allowDowngrade ? [] : [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
   };
 }
 
