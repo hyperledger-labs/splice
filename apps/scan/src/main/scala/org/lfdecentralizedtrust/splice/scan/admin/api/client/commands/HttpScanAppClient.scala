@@ -1410,6 +1410,8 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdateByIdV1Response.OK(response) =>
         Right(response)
+      case http.GetUpdateByIdV1Response.NotFound(_) =>
+        Left(s"Update with ID $updateId not found")
     }
   }
 
