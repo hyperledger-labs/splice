@@ -46,8 +46,8 @@ class AcsExporter(
     getPartiesForWhichToExport(domain, parties).flatMap(parties =>
       participantAdminConnection.downloadAcsSnapshot(
         parties = parties,
-        synchronizerId = domain,
-        timestampOrOffset = Left(timestamp),
+        filterSynchronizerId = Some(domain),
+        timestamp = Some(timestamp),
         force = force,
       )
     )
@@ -80,8 +80,8 @@ class AcsExporter(
       snapshot <- EitherT.liftF[Future, AcsExportFailure, Seq[ByteString]](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties,
-          synchronizerId = domain,
-          timestampOrOffset = Left(paramsState.exportTimestamp),
+          filterSynchronizerId = Some(domain),
+          timestamp = Some(paramsState.exportTimestamp),
           force = true,
         )
       )
