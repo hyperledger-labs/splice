@@ -3401,7 +3401,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV sv-1 on test-stack",
       "name": "SV1 SV Backend (Pulumi managed, test-stack)"
     },
     "name": "sv1SvBackendApp",
@@ -3449,7 +3449,7 @@
         "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
       ],
       "crossOriginAuth": false,
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV1",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV sv-1",
       "name": "SV1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-2.mock.network.canton.global",
@@ -3509,7 +3509,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV sv-1 on test-stack",
       "name": "SV1 Validator Backend (Pulumi managed, test-stack)"
     },
     "name": "sv1ValidatorBackendApp",
@@ -3561,7 +3561,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for Digital-Asset-1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV sv-da-1 on test-stack",
       "name": "SVDA1 SV Backend (Pulumi managed, test-stack)"
     },
     "name": "svda1SvBackendApp",
@@ -3609,7 +3609,7 @@
         "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
       ],
       "crossOriginAuth": false,
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for Digital-Asset-1",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV sv-da-1",
       "name": "SVDA1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-1.mock.network.canton.global",
@@ -3669,7 +3669,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for Digital-Asset-1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV sv-da-1 on test-stack",
       "name": "SVDA1 Validator Backend (Pulumi managed, test-stack)"
     },
     "name": "svda1ValidatorBackendApp",
