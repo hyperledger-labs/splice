@@ -137,7 +137,7 @@ class ScanVerdictStoreIngestion(
             val lastRecordTime = batch.lastOption
               .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
               .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
+            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
             ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
             Success(
               TaskSuccess(

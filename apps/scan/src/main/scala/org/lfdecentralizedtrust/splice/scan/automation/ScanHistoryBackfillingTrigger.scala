@@ -279,13 +279,16 @@ class ScanHistoryBackfillingTrigger(
         historyMetrics.UpdateHistoryBackfilling.completed.updateValue(0)
         // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
         historyMetrics.UpdateHistoryBackfilling.latestRecordTime.updateValue(
-          workDone.lastBackfilledRecordTime.toMicros
+          workDone.lastBackfilledRecordTime
         )(MetricsContext.Empty)
         historyMetrics.UpdateHistoryBackfilling.updateCount.inc(
           workDone.backfilledUpdates
         )(MetricsContext.Empty)
-        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledEvents)(
-          MetricsContext.Empty
+        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledCreatedEvents)(
+          MetricsContext("event_type" -> "created")
+        )
+        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledExercisedEvents)(
+          MetricsContext("event_type" -> "exercised")
         )
         TaskSuccess("Backfilling step completed")
       case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
