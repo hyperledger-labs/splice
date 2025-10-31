@@ -23,13 +23,13 @@ Release Notes
 
     - Scan
 
-        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/hyperledger-labs/splice/pull/2860>`_
 
-        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/hyperledger-labs/splice/pull/2861>`_
 
   - Deployment
 
-    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR. <https://github.com/hyperledger-labs/splice/pull/2972>`_
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/hyperledger-labs/splice/pull/2972>`_
 
 0.4.22
 ------
