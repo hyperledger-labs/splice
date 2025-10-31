@@ -15,6 +15,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   Navigate,
+  Outlet,
   Route,
   RouterProvider,
   createBrowserRouter,
@@ -28,6 +29,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from './contexts/SvAppVotesHooksContext';
+import { betaTheme } from './beta-theme';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
 import Dso from './routes/dso';
@@ -73,6 +75,14 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
+const BetaThemeWrapper: React.FC<React.PropsWithChildren> = () => {
+  return (
+    <ThemeProvider theme={betaTheme}>
+      <Outlet />
+    </ThemeProvider>
+  );
+};
+
 const App: React.FC = () => {
   const config = useSvConfig();
   const router = createBrowserRouter(
@@ -91,13 +101,15 @@ const App: React.FC = () => {
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="amulet-price" element={<AmuletPrice />} />
           <Route path="votes" element={<Voting />} />
-          <Route
-            path="governance-beta"
-            element={<Navigate to="/governance-beta/proposals" replace />}
-          />
-          <Route path="governance-beta/proposals" element={<Governance />} />
-          <Route path="governance-beta/proposals/create" element={<CreateProposal />} />
-          <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
+          <Route element={<BetaThemeWrapper />}>
+            <Route
+              path="governance-beta"
+              element={<Navigate to="/governance-beta/proposals" replace />}
+            />
+            <Route path="governance-beta/proposals" element={<Governance />} />
+            <Route path="governance-beta/proposals/create" element={<CreateProposal />} />
+            <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
+          </Route>
         </Route>
       </Route>
     )

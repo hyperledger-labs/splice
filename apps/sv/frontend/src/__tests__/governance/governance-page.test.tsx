@@ -41,8 +41,8 @@ describe.skip('Governance Page', () => {
     await login(user);
     await navigateToGovernancePage(user);
 
-    const title = screen.getByTestId('governance-page-title');
-    expect(title).toBeDefined();
+    const title = screen.getByTestId('governance-page-header-title');
+    expect(title).toBeInTheDocument();
   });
 
   test('should render all Governance Page sections', async () => {
