@@ -1268,7 +1268,7 @@ final class DbMultiDomainAcsStore[TXE](
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
-                      batch.batch.last.tree.getOffset,
+                      lastOffset,
                     )
                   )
                   .signalOffsetChanged(lastOffset)
