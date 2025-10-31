@@ -324,6 +324,10 @@ data DsoRules_ValidatorLicense_WithdrawResult = DsoRules_ValidatorLicense_Withdr
 
 data DsoRules_Execute_ValidatorLicense_InstructionResult = DsoRules_Execute_ValidatorLicense_InstructionResult
 
+data ValidatorLicense_Instruction_ExpireResult = ValidatorLicense_Instruction_ExpireResult
+
+data DsoRules_ExpireValidatorLicenseInstructionResult = DsoRules_ExpireValidatorLicenseInstructionResult
+
 
 -- Workflow templates
 ---------------------
@@ -451,11 +455,16 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
+    validatorLicenseInstructionTimeout : Optional RelTime -- ^ The TTL for a `ValidatorLicense_Instruction`
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
+
+-- | Read the `validatorLicenseInstructionTimeout` from the `DsoRulesConfig` with a default value of 1 hour.
+getValidatorLicenseInstructionTimeout : DsoRulesConfig -> RelTime
+getValidatorLicenseInstructionTimeout config = fromOptional (hours 1) config.validatorLicenseInstructionTimeout
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -1559,25 +1568,31 @@ template DsoRules with
       with
         updates : [ValidatorWeightUpdate]
       controller dso
-      do instructionCids <- forA updates $ \update -> do
+      do now <- getTime
+         let expiresAt = now `addRelTime` getValidatorLicenseInstructionTimeout config
+         instructionCids <- forA updates $ \update -> do
            require ("Weight is non-negative for " <> show update.validator) (update.weight >= 0.0)
            create ValidatorLicense_Instruction
              with
                dso
                validator = update.validator
                instructionType = VLI_ChangeWeight with weight = update.weight
+               expiresAt
          return DsoRules_ValidatorLicense_ChangeWeightResult with ..
 
     nonconsuming choice DsoRules_ValidatorLicense_Withdraw : DsoRules_ValidatorLicense_WithdrawResult
       with
         validators : [Party]
       controller dso
-      do instructionCids <- forA validators $ \validator ->
+      do now <- getTime
+         let expiresAt = now `addRelTime` getValidatorLicenseInstructionTimeout config
+         instructionCids <- forA validators $ \validator ->
            create ValidatorLicense_Instruction
              with
                dso
                validator
                instructionType = VLI_Withdraw
+               expiresAt
          return DsoRules_ValidatorLicense_WithdrawResult with ..
 
     nonconsuming choice DsoRules_Execute_ValidatorLicense_Instruction : DsoRules_Execute_ValidatorLicense_InstructionResult
@@ -1599,6 +1614,17 @@ template DsoRules with
              exercise validatorLicenseCid ValidatorLicense_Withdraw with reason = "revoked by governance decision"
              pure ()
          return DsoRules_Execute_ValidatorLicense_InstructionResult
+
+    nonconsuming choice DsoRules_ExpireValidatorLicenseInstruction : DsoRules_ExpireValidatorLicenseInstructionResult
+      with
+        staleInstructionCid : ContractId ValidatorLicense_Instruction
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        fetchChecked (ForDso with dso) staleInstructionCid
+        exercise staleInstructionCid ValidatorLicense_Instruction_Expire
+        return DsoRules_ExpireValidatorLicenseInstructionResult
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
@@ -1865,12 +1891,17 @@ template ValidatorLicense_Instruction
     dso : Party
     validator : Party
     instructionType : ValidatorLicense_InstructionType
-    -- TODO: expiry
+    expiresAt : Time
   where
     ensure case instructionType of
       VLI_ChangeWeight weight -> weight >= 0.0
       VLI_Withdraw -> True
     signatory dso
+
+    choice ValidatorLicense_Instruction_Expire : ValidatorLicense_Instruction_ExpireResult
+      controller dso
+      do assertDeadlineExceeded "expiresAt" expiresAt
+         return ValidatorLicense_Instruction_ExpireResult
 
 
 -- instances
@@ -1911,6 +1942,7 @@ instance Patchable DsoRulesConfig where
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
+    validatorLicenseInstructionTimeout = patch new.validatorLicenseInstructionTimeout base.validatorLicenseInstructionTimeout current.validatorLicenseInstructionTimeout
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with
