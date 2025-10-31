@@ -328,7 +328,7 @@
         }
       }
     },
-    "name": "splice-auth0-secret-validator1-validator1",
+    "name": "splice-auth0-secret-validator1-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

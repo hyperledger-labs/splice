@@ -1130,11 +1130,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-1-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1151,11 +1151,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-2-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-2-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1172,11 +1172,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-3-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-3-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1193,11 +1193,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-4-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-4-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1214,11 +1214,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-1-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1235,11 +1235,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-2-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-2-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1256,11 +1256,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-3-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-3-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1277,11 +1277,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-4-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-4-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
