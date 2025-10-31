@@ -781,11 +781,6 @@ components:
           type: boolean
           description: |
             If set to true, acs_snapshot is a filename
-        acs_format:
-          type: string
-          enum:
-            - admin_api
-            - ledger_api
 
     GetValidatorDomainDataSnapshotResponse:
       type: object

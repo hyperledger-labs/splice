@@ -24,7 +24,6 @@ final case class DomainDataSnapshot(
     dars: Seq[Dar],
     // true if we exported for a proper migration, false for DR.
     synchronizerWasPaused: Boolean,
-    acsFormat: http.DomainDataSnapshot.AcsFormat,
 ) extends PrettyPrinting {
   // if output directory is specified we use the new format, otherwise the old one.
   // Only the DR endpoint should use the old one.
@@ -43,7 +42,6 @@ final case class DomainDataSnapshot(
       }.toVector,
       synchronizerWasPaused = Some(synchronizerWasPaused),
       separatePayloadFiles = Some(outputDirectory.isDefined),
-      acsFormat = Some(acsFormat),
     )
   }
 
@@ -92,7 +90,6 @@ object DomainDataSnapshot {
         acsTimestamp,
         dars,
         src.synchronizerWasPaused.getOrElse(false),
-        acsFormat = src.acsFormat.getOrElse(http.DomainDataSnapshot.AcsFormat.AdminApi),
       )
     )
   }
