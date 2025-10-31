@@ -3727,7 +3727,7 @@
     "id": "",
     "inputs": {
       "addPreviousOutputInEnv": true,
-      "create": "bash ../../../cluster/pulumi/infra/prometheus-crd-update.sh 0.85.0"
+      "create": "bash SPLICE_ROOT/cluster/pulumi/infra/prometheus-crd-update.sh 0.85.0"
     },
     "name": "update-prometheus-crd-0.85.0",
     "provider": "",

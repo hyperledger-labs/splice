@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as sinon from 'sinon';
 import { setMocks } from '@pulumi/pulumi/runtime/mocks';
 
-import { DEFAULT_AUDIENCE } from './auth0/audiences';
 import {
   Auth0ClientSecret,
   Auth0ClusterConfig,
@@ -14,6 +13,9 @@ import {
   NamespacedAuth0Configs,
 } from './auth0/auth0types';
 import { isMainNet } from './config';
+
+// Importing DEFAULT_AUDIENCE from auth0/audiences.ts creates a nightmare of things getting initialized too early, so we just redefine it here
+const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 export enum PulumiFunction {
   // tokens for functions being called during the test run,
