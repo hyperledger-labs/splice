@@ -1,0 +1,4 @@
+name: policies
+runtime: nodejs
+description: Contain all pulumi policies
+main: policies/
