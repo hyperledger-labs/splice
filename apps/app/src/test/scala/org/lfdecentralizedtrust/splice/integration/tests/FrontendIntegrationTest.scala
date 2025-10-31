@@ -442,7 +442,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     */
   protected def screenshot()(implicit webDriver: WebDriverType): Unit = {
     clue("Saving screenshot") {
-      val screenshotFile = webDriver.getScreenshotAs(OutputType.FILE)
+      val fullScreen = webDriver.findElement(By.tagName("body"))
+      val screenshotFile = fullScreen.getScreenshotAs(OutputType.FILE)
       val time = Calendar.getInstance.getTime
       val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
       val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString

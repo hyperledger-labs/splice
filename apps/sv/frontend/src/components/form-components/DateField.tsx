@@ -40,6 +40,7 @@ export const DateField: React.FC<DateFieldProps> = props => {
           minDateTime={minDate || dayjs()}
           ampm={false}
           onChange={newDate => field.handleChange(newDate?.format(dateTimeFormatISO)!)}
+          enableAccessibleFieldDOMStructure={false}
           slotProps={{
             textField: {
               fullWidth: true,

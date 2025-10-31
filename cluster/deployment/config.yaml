@@ -103,14 +103,12 @@ multiValidator:
         cpu: '1'
         memory: '8Gi'
       limits:
-        cpu: '6'
         memory: '16Gi'
     validator:
       requests:
         cpu: '0.5'
         memory: '2400Mi'
       limits:
-        cpu: '4'
         memory: '8Gi'
     postgres:
       requests:

@@ -4,11 +4,9 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-
 import org.lfdecentralizedtrust.splice.util.*
-
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.{CompactJson, ProtobufJson}
 import definitions.EventHistoryItem
@@ -127,75 +125,111 @@ class ScanEventHistoryIntegrationTest
 
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    eventually() {
-      // Check that mediator connection really doesn't work anymore.
-      sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
+    clue("Wait until mediator connectivity is really down") {
+      eventually() {
+        // Check that mediator connection really doesn't work anymore.
+        sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
+      }
     }
-
     // after this point, scan should be unable to ingest any verdicts
 
     val _ = onboardAliceAndBob()
 
-    // There may be some data already in scan's DB even with disabled proxy
-    // Get the last available event in DB
-    val cursorBefore = eventuallySucceeds() { lastCursor() }
+    def maxVerdictTime =
+      sv1ScanBackend.appState.eventStore.verdictStore.maxVerdictRecordTime(0).futureValue
+    def maxUpdateTime =
+      sv1ScanBackend.appState.eventStore.verdictStore.maxUpdateRecordTime(0).futureValue
 
-    // Also record wallet top event to derive updateIds for taps
-    val topBeforeO = withoutDevNetTopups(
-      aliceWalletClient
-        .listTransactions(beginAfterId = None, pageSize = 1)
-    ).headOption.map(_.eventId)
-
-    // Generate new updates while mediator ingestion is unavailable
-    aliceWalletClient.tap(5)
-    aliceWalletClient.tap(6)
-
-    // While mediator ingestion is down, history after cursor should be empty due to capping
-    val historyWhileDown = sv1ScanBackend.getEventHistory(
-      count = pageLimit,
-      after = Some(cursorBefore),
-      encoding = CompactJson,
-    )
-    historyWhileDown shouldBe empty
-
-    // Fetch the updateIds for the taps from wallet history
-    val expectedUpdateIds = eventuallySucceeds() {
-      val latest =
-        withoutDevNetTopups(aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10))
-      val newSinceTop = topBeforeO match {
-        case Some(prev) => latest.takeWhile(_.eventId != prev)
-        case None => latest
+    // Event history is capped both by the verdict store and UpdateHistory.
+    // To get the correct value for `cursorBefore` below, we need
+    // to make sure UpdateHistory is not lagging behind at this point.
+    clue("UpdateHistory is not lagging behind verdict store") {
+      eventually() {
+        maxUpdateTime should be >= maxVerdictTime
       }
-      newSinceTop.size should be >= 2
-      newSinceTop.take(2).map(e => EventId.updateIdFromEventId(e.eventId)).toVector
     }
 
-    // getEventById should cause 404 while the verdict store has not synced
-    expectedUpdateIds.foreach { id =>
-      val res = sv1ScanBackend.getEventById(
-        id,
-        Some(CompactJson),
+    // There may be some data already in scan's DB even with disabled proxy
+    val cursorBefore = clue("Get the last available event in DB") {
+      eventuallySucceeds() {
+        lastCursor()
+      }
+    }
+
+    val topBeforeO = clue("record wallet top event to derive updateIds for taps") {
+      withoutDevNetTopups(
+        aliceWalletClient
+          .listTransactions(beginAfterId = None, pageSize = 1)
+      ).headOption.map(_.eventId)
+    }
+
+    actAndCheck()(
+      "Generate new updates while mediator ingestion is unavailable", {
+        val maxUpdateTimeBeforeTap = maxUpdateTime
+        aliceWalletClient.tap(5)
+        aliceWalletClient.tap(6)
+        maxUpdateTimeBeforeTap
+      },
+    )(
+      "The new updates were ingested in UpdateHistory",
+      maxUpdateTimeBeforeTap => {
+        val maxUpdateTimeAfterTap = maxUpdateTime
+        maxUpdateTimeAfterTap should be > maxUpdateTimeBeforeTap
+      },
+    )
+
+    clue("While mediator ingestion is down, history after cursor should be empty due to capping") {
+      val historyWhileDown = sv1ScanBackend.getEventHistory(
+        count = pageLimit,
+        after = Some(cursorBefore),
+        encoding = CompactJson,
       )
-      res shouldBe None
+      historyWhileDown shouldBe empty
     }
 
-    // Re-enable mediator connectivity and expect ingestion to resume
-    toxiproxy.enableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
-
-    eventually() {
-      val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBefore))
-      eventHistory should not be empty
+    val expectedUpdateIds = clue("Fetch the updateIds for the taps from wallet history") {
+      eventuallySucceeds() {
+        val latest =
+          withoutDevNetTopups(
+            aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10)
+          )
+        val newSinceTop = topBeforeO match {
+          case Some(prev) => latest.takeWhile(_.eventId != prev)
+          case None => latest
+        }
+        newSinceTop.size should be >= 2
+        newSinceTop.take(2).map(e => EventId.updateIdFromEventId(e.eventId)).toVector
+      }
     }
-    expectedUpdateIds.foreach { id =>
-      val eventByIdO = sv1ScanBackend.getEventById(
-        id,
-        Some(CompactJson),
-      )
-      eventByIdO match {
-        case Some(eventById) =>
-          eventById.update shouldBe defined
-          eventById.verdict shouldBe defined
-        case None => fail("Expected event for update id but got None")
+
+    clue("getEventById should cause 404 while the verdict store has not synced") {
+      expectedUpdateIds.foreach { id =>
+        val res = sv1ScanBackend.getEventById(
+          id,
+          Some(CompactJson),
+        )
+        res shouldBe None
+      }
+    }
+
+    clue("Re-enable mediator connectivity and expect ingestion to resume") {
+      toxiproxy.enableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
+
+      eventually() {
+        val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBefore))
+        eventHistory should not be empty
+      }
+      expectedUpdateIds.foreach { id =>
+        val eventByIdO = sv1ScanBackend.getEventById(
+          id,
+          Some(CompactJson),
+        )
+        eventByIdO match {
+          case Some(eventById) =>
+            eventById.update shouldBe defined
+            eventById.verdict shouldBe defined
+          case None => fail("Expected event for update id but got None")
+        }
       }
     }
   }

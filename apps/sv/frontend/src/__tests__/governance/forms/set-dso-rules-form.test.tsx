@@ -5,7 +5,7 @@ import {
   dateTimeFormatISO,
   nextScheduledSynchronizerUpgradeFormat,
 } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { rest } from 'msw';
@@ -111,7 +111,6 @@ describe('Set DSO Config Rules Form', () => {
   });
 
   test('expiry date must be in the future', async () => {
-    const user = userEvent.setup();
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -124,22 +123,20 @@ describe('Set DSO Config Rules Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(expiryDateInput, thePast);
+    fireEvent.change(expiryDateInput, { target: { value: thePast } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
+      expect(screen.queryByText('Expiration must be in the future')).toBeInTheDocument();
     });
 
-    await user.type(expiryDateInput, theFuture);
+    fireEvent.change(expiryDateInput, { target: { value: theFuture } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+      expect(screen.queryByText('Expiration must be in the future')).not.toBeInTheDocument();
     });
   });
 
   test('effective date must be after expiry date', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -152,19 +149,25 @@ describe('Set DSO Config Rules Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-    await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
+    fireEvent.change(expiryDateInput, { target: { value: expiryDate.format(dateTimeFormatISO) } });
+    fireEvent.change(effectiveDateInput, {
+      target: { value: effectiveDate.format(dateTimeFormatISO) },
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).toBeInTheDocument();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(effectiveDateInput, validEffectiveDate);
+    fireEvent.change(effectiveDateInput, { target: { value: validEffectiveDate } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -362,8 +365,6 @@ describe('Set DSO Config Rules Form', () => {
 
 describe('Next Scheduled Synchronizer Upgrade', () => {
   test('render default time for next scheduled upgrade', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -374,7 +375,8 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     expect(effectiveDateInput).toBeDefined();
 
     const tenDaysFromNow = dayjs().add(10, 'day').format(dateTimeFormatISO);
-    await user.type(effectiveDateInput, tenDaysFromNow);
+
+    fireEvent.change(effectiveDateInput, { target: { value: tenDaysFromNow } });
 
     const defaultTimeDisplay = screen.getByTestId('next-scheduled-upgrade-time-default');
     expect(defaultTimeDisplay).toBeDefined();
@@ -467,7 +469,8 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
 
     const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
     const effectiveDate = dayjs().add(10, 'day').format(dateTimeFormatISO);
-    await user.type(effectiveDateInput, effectiveDate);
+
+    fireEvent.change(effectiveDateInput, { target: { value: effectiveDate } });
 
     expect(screen.queryByText(errorMessage)).toBeNull();
 

@@ -351,6 +351,7 @@ class SvApp(
                 retryProvider,
                 config.spliceInstanceNames,
                 loggerFactory,
+                config.parameters.enabledFeatures,
               )
               initializer.bootstrapDso()
             }
@@ -393,6 +394,7 @@ class SvApp(
               retryProvider,
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
+              config.parameters.enabledFeatures,
             ).migrateDomain()
           }
         case None =>
@@ -548,15 +550,18 @@ class SvApp(
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
-          Some(
-            localSynchronizerNode
-              .getOrElse(
-                sys.error("SV app should always have a sequencer connection for domain migrations")
-              )
-              .sequencerAdminConnection
-          ),
+          localSynchronizerNode
+            .getOrElse(
+              sys.error("SV app should always have a sequencer connection for domain migrations")
+            )
+            .sequencerAdminConnection,
           dsoStore,
-          new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          new AcsExporter(
+            participantAdminConnection,
+            retryProvider,
+            config.parameters.enabledFeatures.enableNewAcsExport,
+            loggerFactory,
+          ),
           retryProvider,
           loggerFactory,
         ),

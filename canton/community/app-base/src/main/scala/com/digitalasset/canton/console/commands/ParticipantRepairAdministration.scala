@@ -384,7 +384,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
-            Seq(ByteString.copyFrom(File(importFilePath).loadBytes)),
+            ByteString.copyFrom(File(importFilePath).loadBytes),
             if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
             contractImportMode = contractImportMode,
             excludedStakeholders,

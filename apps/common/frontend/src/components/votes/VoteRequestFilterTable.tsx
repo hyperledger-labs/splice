@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import React from 'react';
 
 import { Chip, Typography } from '@mui/material';
+import type { GridColDef } from '@mui/x-data-grid';
 import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 
 import {
@@ -28,7 +29,7 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
   openModalWithVoteRequest,
   tableBodyId,
 }) => {
-  const columns = [
+  const columns: GridColDef[] = [
     {
       field: 'action',
       headerName: 'Action',
