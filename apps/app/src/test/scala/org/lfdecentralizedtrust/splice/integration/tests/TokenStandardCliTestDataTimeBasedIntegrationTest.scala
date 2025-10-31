@@ -200,6 +200,14 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       aliceValidatorWalletClient.tap(BigDecimal(1000))
       createTransferPreapprovalEnsuringItExists(aliceWalletClient, aliceValidatorBackend)
       createTransferPreapprovalEnsuringItExists(aliceValidatorWalletClient, aliceValidatorBackend)
+      eventually() {
+        sv1ScanBackend.lookupTransferPreapprovalByParty(
+          PartyId.tryFromProtoPrimitive(aliceWalletClient.userStatus().party)
+        ) should be(defined)
+        sv1ScanBackend.lookupTransferPreapprovalByParty(
+          PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
+        ) should be(defined)
+      }
 
       val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
@@ -553,6 +561,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               aliceWalletClient,
               aliceValidatorBackend,
             ) // it was deleted before
+            eventually() {
+              sv1ScanBackend.lookupTransferPreapprovalByParty(
+                PartyId.tryFromProtoPrimitive(aliceWalletClient.userStatus().party)
+              ) should be(defined)
+            }
             charlieWalletClient.transferPreapprovalSend(
               alice.partyId,
               charlieAmount - 11,

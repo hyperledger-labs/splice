@@ -30,6 +30,7 @@ import org.scalatest.Succeeded
 import java.time.Instant
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import StoreTest.*
 
 class AcsSnapshotStoreTest
     extends StoreTest

@@ -467,7 +467,9 @@ class WalletTxLogTimeBasedIntegrationTest
             case (transfer: TransferTxLogEntry) +: _ =>
               EventId.updateIdFromEventId(transfer.eventId)
           }
-          val createTransferUpdate = sv1ScanBackend.getUpdate(createTransferUpdateId, CompactJson)
+          val createTransferUpdate = eventuallySucceeds() {
+            sv1ScanBackend.getUpdate(createTransferUpdateId, CompactJson)
+          }
           createTransferUpdate match {
             case UpdateHistoryItem.members.UpdateHistoryReassignment(_) =>
               fail("cannot be a reassignment")

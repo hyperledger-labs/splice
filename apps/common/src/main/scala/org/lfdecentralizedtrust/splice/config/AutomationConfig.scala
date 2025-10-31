@@ -98,6 +98,7 @@ case class AutomationConfig(
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
     ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
+    ingestion: IngestionConfig = IngestionConfig(),
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName
@@ -108,3 +109,8 @@ case class AutomationConfig(
   def topupTriggerPollingInterval_ : NonNegativeFiniteDuration =
     topupTriggerPollingInterval.getOrElse(pollingInterval)
 }
+
+case class IngestionConfig(
+    maxBatchSize: Int = 100,
+    batchWaitTime: PositiveFiniteDuration = PositiveFiniteDuration.ofMillis(500L),
+)

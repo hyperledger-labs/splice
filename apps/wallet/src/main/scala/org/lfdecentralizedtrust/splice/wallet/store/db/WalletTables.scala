@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String3}
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 
 object WalletTables extends AcsTables {
 
@@ -30,15 +31,37 @@ object WalletTables extends AcsTables {
       transferPreapprovalReceiver: Option[PartyId] = None,
   ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "reward_coupon_round" -> IndexColumnValue(rewardCouponRound),
-      "reward_coupon_weight" -> IndexColumnValue(rewardCouponWeight),
-      "transfer_preapproval_receiver" -> IndexColumnValue(transferPreapprovalReceiver),
+      UserWalletAcsStoreRowData.IndexColumns.reward_coupon_round -> rewardCouponRound,
+      UserWalletAcsStoreRowData.IndexColumns.reward_coupon_weight -> rewardCouponWeight,
+      UserWalletAcsStoreRowData.IndexColumns.transfer_preapproval_receiver -> transferPreapprovalReceiver,
     )
+  }
+  object UserWalletAcsStoreRowData {
+    implicit val hasIndexColumns: HasIndexColumns[UserWalletAcsStoreRowData] =
+      new HasIndexColumns[UserWalletAcsStoreRowData] {
+        override def indexColumnNames: Seq[String] = IndexColumns.All
+      }
+    private object IndexColumns {
+      val reward_coupon_round = "reward_coupon_round"
+      val reward_coupon_weight = "reward_coupon_weight"
+      val transfer_preapproval_receiver = "transfer_preapproval_receiver"
+      val All = Seq(
+        reward_coupon_round,
+        reward_coupon_weight,
+        transfer_preapproval_receiver,
+      )
+    }
   }
 
   case class UserWalletAcsInterfaceViewRowData(contract: Contract[?, ?])
       extends AcsInterfaceViewRowData.AcsInterfaceViewRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+  object UserWalletAcsInterfaceViewRowData {
+    implicit val hasIndexColumns: HasIndexColumns[UserWalletAcsInterfaceViewRowData] =
+      new HasIndexColumns[UserWalletAcsInterfaceViewRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   case class ExternalPartyWalletAcsStoreRowData(
@@ -47,8 +70,20 @@ object WalletTables extends AcsTables {
   ) extends AcsRowData.AcsRowDataFromContract {
     override val contractExpiresAt: Option[Timestamp] = None
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "reward_coupon_round" -> IndexColumnValue(rewardCouponRound)
+      ExternalPartyWalletAcsStoreRowData.IndexColumns.reward_coupon_round -> IndexColumnValue(
+        rewardCouponRound
+      )
     )
+  }
+  object ExternalPartyWalletAcsStoreRowData {
+    implicit val hasIndexColumns: HasIndexColumns[ExternalPartyWalletAcsStoreRowData] =
+      new HasIndexColumns[ExternalPartyWalletAcsStoreRowData] {
+        override def indexColumnNames: Seq[String] = IndexColumns.All
+      }
+    private object IndexColumns {
+      val reward_coupon_round = "reward_coupon_round"
+      val All = Seq(reward_coupon_round)
+    }
   }
 
   case class UserWalletTxLogStoreRowData(
