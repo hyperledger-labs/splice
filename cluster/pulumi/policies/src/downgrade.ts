@@ -53,8 +53,8 @@ export function applyDowngradePolicy(): PolicyPack {
             if (newVersion) {
               if (semver.lt(newVersion, currentVersion)) {
                 reportViolation(
-                  `Deployment '${args.name}' cannot be downgraded from appVersion '${currentVersion}' to '${newVersion}'.` +
-                    ` To override, configure this policy with 'allowDowngrades: true'.`
+                  `Deployment '${args.name}' cannot be downgraded from version '${currentVersion}' to '${newVersion}'.` +
+                    ` To override, configure this policy with 'allowDowngrade: true' (see cluster readme).`
                 );
               }
             }
