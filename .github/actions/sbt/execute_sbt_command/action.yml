@@ -71,8 +71,13 @@ runs:
               SBT_CMD+=(${{ inputs.cmd }})
 
               # Run command
-              timeout --kill-after=30s ${{ inputs.timeout }} "${SBT_CMD[@]}" 2>&1 |
-                tee sbt_output
+              timeout --kill-after=30s ${{ inputs.timeout }} "${SBT_CMD[@]}" 2>&1 | tee sbt_output || status=$?
+              if [ $status != 0 ]; then
+                if [ $status = 124 ]; then
+                  echo "Killed SBT after timeout ${{ inputs.timeout }}"
+                fi
+                exit $status
+              fi
 
               echo "After SBT"
 
