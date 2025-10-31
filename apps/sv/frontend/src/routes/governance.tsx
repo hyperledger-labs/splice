@@ -7,7 +7,7 @@ import {
   ActionRequiredSection,
   ActionRequiredData,
 } from '../components/governance/ActionRequiredSection';
-import { Loading, useVotesHooks, PageHeader } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Loading, useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
 import { ContractId } from '@daml/types';
@@ -16,6 +16,7 @@ import {
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
+import { PageHeader } from '../components/beta';
 import { ProposalListingSection } from '../components/governance/ProposalListingSection';
 import {
   actionTagToTitle,
