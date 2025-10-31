@@ -87,7 +87,7 @@ const ActionCard = (props: ActionCardProps) => {
           justifyContent: 'space-between',
         }}
       >
-        <Grid container spacing={1}>
+        <Grid flexGrow={1} container spacing={1}>
           <Grid size={{ xs: 3 }}>
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
