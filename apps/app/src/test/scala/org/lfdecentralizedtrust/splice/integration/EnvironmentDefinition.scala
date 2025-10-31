@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration
 
 import better.files.{File, Resource}
 import com.digitalasset.canton.admin.api.client.data.User
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 import com.digitalasset.canton.config.{
   ClockConfig,
@@ -378,6 +379,22 @@ case class EnvironmentDefinition(
         _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
       )(config)
     )
+
+  def withoutAliceValidatorConnectingToSplitwell: EnvironmentDefinition = {
+    this
+      .addConfigTransform((_, conf) =>
+        conf.copy(validatorApps =
+          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
+            _.map { aliceValidatorConfig =>
+              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+              aliceValidatorConfig.copy(
+                domains = withoutExtraDomains
+              )
+            }
+          }
+        )
+      )
+  }
 
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
