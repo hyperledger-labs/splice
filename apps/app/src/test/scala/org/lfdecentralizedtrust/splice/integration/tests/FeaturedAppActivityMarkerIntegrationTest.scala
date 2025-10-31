@@ -72,7 +72,7 @@ class FeaturedAppActivityMarkerIntegrationTest
 
     val markerMultiplier = 10
 
-    actAndCheck(timeUntilSuccess = 40.seconds)(
+    actAndCheck(timeUntilSuccess = 60.seconds)(
       "Create activity markers", {
         for (i <- 1 to markerMultiplier) {
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands

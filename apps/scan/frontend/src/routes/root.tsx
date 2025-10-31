@@ -4,7 +4,7 @@ import { useGetRoundOfLatestData } from '@lfdecentralizedtrust/splice-common-fro
 import React, { useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
-import { Grid, Tab, Tabs, Typography, Box } from '@mui/material';
+import { Tab, Tabs, Typography, Box, Grid } from '@mui/material';
 
 import Layout from '../components/Layout';
 import NetworkInfo from '../components/NetworkInfo';
@@ -46,13 +46,13 @@ const Root: React.FC = () => {
   return (
     <Layout>
       <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>
-        <Grid item xs={8}>
+        <Grid size={{ xs: 8 }}>
           <Typography variant="h5">
             Explore, search and find answers to current network configuration details.
           </Typography>
         </Grid>
 
-        <Grid item xs={4}>
+        <Grid size={{ xs: 4 }}>
           <div id="as-of-round">
             <Typography variant="body2" data-testid="round-of-latest-data-text">
               The content on this page is computed as of round:{' '}
@@ -61,15 +61,15 @@ const Root: React.FC = () => {
           </div>
         </Grid>
 
-        <Grid item xs={12} lg={6} data-testid="circulating-supply-container">
+        <Grid size={{ xs: 12, lg: 6 }} data-testid="circulating-supply-container">
           <TotalAmuletBalance />
         </Grid>
 
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <TotalRewards />
         </Grid>
 
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Box mb={0}>
             <Tabs value={selected}>
               {navLinks.map(navLink => {
@@ -89,9 +89,9 @@ const Root: React.FC = () => {
         </Grid>
 
         {/** spacer element to separate NetworkInfo from tables on large screen widths */}
-        <Grid item xs={0} lg={1} />
+        <Grid size={{ xs: 0, lg: 1 }} />
 
-        <Grid item xs={12} lg={5}>
+        <Grid size={{ xs: 12, lg: 5 }}>
           <NetworkInfo />
         </Grid>
       </Grid>

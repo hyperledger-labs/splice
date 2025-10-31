@@ -57,5 +57,5 @@ class HttpRateLimiter(
     }
   }
 
-  def close(): Unit = metrics.view.values.foreach(_.gauge.close())
+  def close(): Unit = metrics.view.values.foreach(_.close())
 }

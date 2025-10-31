@@ -12,7 +12,8 @@ import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import java.time.Instant
 import scala.concurrent.Future
 
-case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext) {
+case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext)
+    extends AutoCloseable {
 
   val meter: MetricHandle.Meter = otelFactory.meter(
     MetricInfo(
@@ -30,6 +31,10 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit m
     ),
     0,
   )
+
+  override def close(): Unit = {
+    gauge.close()
+  }
 
 }
 

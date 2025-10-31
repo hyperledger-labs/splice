@@ -30,6 +30,20 @@ Upcoming
 
     - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
 
+  - Daml
+
+    - Added the ``splice-util-token-standard-wallet.dar``
+      :ref:`package <package-splice-util-token-standard-wallet>` that provides support for
+      implementing auto-merging of holdings and airdrop campaigns, as
+      explained in :ref:`holding_utxo_management`.
+      The package is optional and not uploaded by default to a validator node.
+    - Extended the ``splice-util-featured-app-proxies.dar``
+      :ref:`package <package-featured-app-proxies>` to
+      support executing :ref:`batch/bulk transfers <type-splice-util-featuredapp-walletuserproxy-walletuserproxybatchtransfer-93002>` of Canton Network token standard tokens,
+      both for featured and unfeatured apps.
+
+
+
 0.4.22
 ------
 

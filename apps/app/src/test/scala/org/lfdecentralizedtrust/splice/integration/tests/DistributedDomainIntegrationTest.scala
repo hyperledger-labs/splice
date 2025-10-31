@@ -158,7 +158,8 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
       parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
       parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
-      parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+      parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration
+        .ofMicros(1)
     }
 
     bracket(
@@ -189,7 +190,8 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
             parameters.confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
             parameters.mediatorReactionTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
-            parameters.confirmationResponseTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+            parameters.confirmationResponseTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration
+              .ofMicros(1)
           },
       )
 
@@ -208,7 +210,8 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
             parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
             parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
-            parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+            parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration
+              .ofMicros(1)
           },
       )
     }

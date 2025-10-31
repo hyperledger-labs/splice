@@ -180,7 +180,7 @@ describe('Wallet user can', () => {
       });
       expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('checkbox', { name: 'Use Token Standard Transfer' })
+        screen.queryByRole('switch', { name: 'Use Token Standard Transfer' })
       ).not.toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Send' }));
@@ -619,7 +619,7 @@ function transferTests(disableTokenStandard: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function toggleTokenStandard(user: any): Promise<void> {
     if (disableTokenStandard) {
-      await user.click(screen.getByRole('checkbox', { name: 'Use Token Standard Transfer' }));
+      await user.click(screen.getByRole('switch', { name: 'Use Token Standard Transfer' }));
     }
   }
 
