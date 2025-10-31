@@ -186,7 +186,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerHookVersion}`,
+                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerVersion}`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
