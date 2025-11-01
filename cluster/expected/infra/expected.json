@@ -37,7 +37,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://ledger_api.sv-1.test-stack.canton.network",
-      "name": "Ledger API for SV sv-1 on test-stack (Pulumi managed)"
+      "name": "Ledger API for SV sv-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 2592000
     },
     "name": "LedgerApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -49,7 +50,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://ledger_api.sv-da-1.test-stack.canton.network",
-      "name": "Ledger API for SV sv-da-1 on test-stack (Pulumi managed)"
+      "name": "Ledger API for SV sv-da-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 2592000
     },
     "name": "LedgerApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -117,7 +119,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://sv.sv-1.test-stack.canton.network/api",
-      "name": "SV App API for SV sv-1 on test-stack (Pulumi managed)"
+      "name": "SV App API for SV sv-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 2592000
     },
     "name": "SvAppApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -129,7 +132,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://sv.sv-da-1.test-stack.canton.network/api",
-      "name": "SV App API for SV sv-da-1 on test-stack (Pulumi managed)"
+      "name": "SV App API for SV sv-da-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 2592000
     },
     "name": "SvAppApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -261,7 +265,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://validator.sv-1.test-stack.canton.network/api",
-      "name": "Validator App API for SV sv-1 on test-stack (Pulumi managed)"
+      "name": "Validator App API for SV sv-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "ValidatorAppApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -273,7 +278,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://validator.sv-da-1.test-stack.canton.network/api",
-      "name": "Validator App API for SV sv-da-1 on test-stack (Pulumi managed)"
+      "name": "Validator App API for SV sv-da-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "ValidatorAppApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
