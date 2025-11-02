@@ -302,7 +302,7 @@ amulet_transferFactory_transferImpl this _self arg = do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
           inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
-          result <- exercisePaymentTransfer paymentContext Transfer with
+          result <- exercisePaymentTransfer dso paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
             inputs

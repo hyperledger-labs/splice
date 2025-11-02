@@ -79,10 +79,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
         )
         outputs
   expectedTransferFees <- sum <$> exerciseComputeFees dso paymentContext sender receiverOutputsForActualTransfer
-  openRound <- fetchChecked (ForDso with dso) paymentContext.context.openMiningRound
-  let lockDuration = transferBefore `subTime` requestedAt
-  let approximateHoldingFees = holdingFeesForDuration lockDuration openRound
-  let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
+  let feesReserveAmount = expectedTransferFees * feeReserveMultiplier
 
   -- lock the amulet
   transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) paymentContext inputHoldingCids
