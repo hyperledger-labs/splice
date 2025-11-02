@@ -12,12 +12,17 @@ import {
   Auth0NamespaceConfig,
   DEFAULT_AUDIENCE,
   NamespacedAuth0Configs,
+  fixedTokens,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   standardSvConfigs,
   extraSvConfigs,
   dsoSize,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+
+function tokenLifetime(): number {
+  return fixedTokens() ? 2592000 : 86400; // TODO(DACH-NY/canton-network-internal#2114): Move this to the cluster config? We want it to be long for fixed token clusters
+}
 
 function ledgerApiAudience(
   svNamespace: string,
@@ -36,6 +41,7 @@ function ledgerApiAudience(
         name: `Ledger API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://ledger_api.${svNamespace}.${clusterBasename}.canton.network`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
+        tokenLifetime: tokenLifetime(),
       },
       { provider: auth0DomainProvider }
     );
@@ -78,6 +84,7 @@ function svAppAudience(
         name: `SV App API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://sv.${svNamespace}.${clusterBasename}.canton.network/api`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
+        tokenLifetime: tokenLifetime(),
       },
       { provider: auth0DomainProvider }
     );
@@ -106,6 +113,7 @@ function validatorAppAudience(
         name: `Validator App API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
         identifier: `https://validator.${svNamespace}.${clusterBasename}.canton.network/api`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
+        tokenLifetime: tokenLifetime(),
       },
       { provider: auth0DomainProvider }
     );
