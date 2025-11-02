@@ -38,7 +38,7 @@
       "allowOfflineAccess": true,
       "identifier": "https://ledger_api.sv-1.test-stack.canton.network",
       "name": "Ledger API for SV sv-1 on test-stack (Pulumi managed)",
-      "tokenLifetime": 2592000
+      "tokenLifetime": 86400
     },
     "name": "LedgerApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -51,7 +51,7 @@
       "allowOfflineAccess": true,
       "identifier": "https://ledger_api.sv-da-1.test-stack.canton.network",
       "name": "Ledger API for SV sv-da-1 on test-stack (Pulumi managed)",
-      "tokenLifetime": 2592000
+      "tokenLifetime": 86400
     },
     "name": "LedgerApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -120,7 +120,7 @@
       "allowOfflineAccess": true,
       "identifier": "https://sv.sv-1.test-stack.canton.network/api",
       "name": "SV App API for SV sv-1 on test-stack (Pulumi managed)",
-      "tokenLifetime": 2592000
+      "tokenLifetime": 86400
     },
     "name": "SvAppApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -133,7 +133,7 @@
       "allowOfflineAccess": true,
       "identifier": "https://sv.sv-da-1.test-stack.canton.network/api",
       "name": "SV App API for SV sv-da-1 on test-stack (Pulumi managed)",
-      "tokenLifetime": 2592000
+      "tokenLifetime": 86400
     },
     "name": "SvAppApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
