@@ -359,6 +359,8 @@ describe('Proposal Details Content', () => {
 
     const maxNumInputsNewValue = within(changes[1]).getByTestId('config-change-new-value');
     expect(maxNumInputsNewValue.textContent).toBe('4');
+
+    expect(screen.getByTestId('json-diffs-details')).toBeInTheDocument();
   });
 
   test('should render dso rules config changes', () => {
@@ -438,6 +440,8 @@ describe('Proposal Details Content', () => {
       'config-change-new-value'
     );
     expect(dsoNumUnclaimedRewardsThresholdNewValue.textContent).toBe('20');
+
+    expect(screen.getByTestId('json-diffs-details')).toBeInTheDocument();
   });
 });
 

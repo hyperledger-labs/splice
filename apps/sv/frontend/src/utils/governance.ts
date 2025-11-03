@@ -128,24 +128,32 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
         return {
           rightContractId: dsoAction.value.rightCid,
         } as UnfeatureAppProposal;
-      case 'SRARC_SetConfig':
-        return {
+      case 'SRARC_SetConfig': {
+        const p: DsoRulesConfigProposal = {
           configChanges: buildDsoConfigChanges(
             dsoAction.value.baseConfig,
             dsoAction.value.newConfig
           ),
-        } as DsoRulesConfigProposal;
+          baseConfig: dsoAction.value.baseConfig,
+          newConfig: dsoAction.value.newConfig,
+        };
+        return p;
+      }
     }
   } else if (action.tag === 'ARC_AmuletRules') {
     const amuletAction = action.value.amuletRulesAction;
     switch (amuletAction.tag) {
-      case 'CRARC_SetConfig':
-        return {
+      case 'CRARC_SetConfig': {
+        const p: AmuletRulesConfigProposal = {
           configChanges: buildAmuletConfigChanges(
             amuletAction.value.baseConfig,
             amuletAction.value.newConfig
           ),
-        } as AmuletRulesConfigProposal;
+          baseConfig: amuletAction.value.baseConfig,
+          newConfig: amuletAction.value.newConfig,
+        };
+        return p;
+      }
     }
   }
 }
