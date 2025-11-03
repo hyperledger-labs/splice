@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningTr
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -22,6 +23,8 @@ class SequencerPruningIntegrationTest
 
   override protected def runEventHistorySanityCheck: Boolean = false
 
+  val retentionPeriodForTest = 120.seconds
+
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     super.environmentDefinition
@@ -35,7 +38,7 @@ class SequencerPruningIntegrationTest
                     pruning = Some(
                       SequencerPruningConfig(
                         pruningInterval = NonNegativeFiniteDuration(2.seconds),
-                        retentionPeriod = NonNegativeFiniteDuration(120.seconds),
+                        retentionPeriod = NonNegativeFiniteDuration(retentionPeriodForTest),
                       )
                     )
                   )
@@ -75,6 +78,7 @@ class SequencerPruningIntegrationTest
       )
 
   "sequencer can be pruned even if a participant is down" in { implicit env =>
+    val initTimeLowerBound = System.currentTimeMillis()
     clue("Initialize DSO with 2 SVs") {
       startAllSync(
         sv1ScanBackend,
@@ -110,16 +114,28 @@ class SequencerPruningIntegrationTest
       participantId
     }
 
-    // We only start the sequencer pruning triggers here to make sure that our own nodes are likely to
-    // have produced their first acknowledgement.
-    // This is slightly racy but checking their last acknowledgement explicitly is a bit awkward and
-    // this should be good enough for tests.
-    Seq(sv1Backend, sv2Backend).foreach { sv =>
-      sv.dsoAutomation.trigger[SequencerPruningTrigger].resume()
+    clue("Wait until we're closer to being beyond the retention period") {
+      val timeSinceInitLowerBound = System.currentTimeMillis() - initTimeLowerBound
+      val timeToSleep = retentionPeriodForTest.toMillis - timeSinceInitLowerBound
+      if (timeToSleep > 0) {
+        Threading.sleep(timeToSleep)
+      }
+    }
+
+    clue("Do a random action to ensure SVs have recent activity") {
+      sv1WalletClient.tap(walletAmuletToUsd(10.0))
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-      {},
+      {
+        // We only start the sequencer pruning triggers here to make sure that our own nodes are likely to
+        // have produced their first acknowledgement.
+        // This is slightly racy but checking their last acknowledgement explicitly is a bit awkward and
+        // this should be good enough for tests.
+        Seq(sv1Backend, sv2Backend).foreach { sv =>
+          sv.dsoAutomation.trigger[SequencerPruningTrigger].resume()
+        }
+      },
       entries => {
         forAtLeast(2, entries)(
           // we will see that the sequencer is pruned
