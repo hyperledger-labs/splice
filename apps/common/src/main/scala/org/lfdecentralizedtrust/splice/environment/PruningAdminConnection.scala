@@ -17,7 +17,7 @@ trait PruningAdminConnection {
   protected val pruningCommands: PruningSchedulerCommands[_]
 
   private def setPruningSchedule(
-    config: PruningConfig,
+      config: PruningConfig
   )(implicit tc: TraceContext): Future[Unit] =
     runCmd(pruningCommands.SetScheduleCommand(config.cron, config.maxDuration, config.retention))
 
@@ -34,25 +34,24 @@ trait PruningAdminConnection {
     *      specified retention period.
     */
   def ensurePruningSchedule(
-    config: Option[PruningConfig],
+      config: Option[PruningConfig]
   )(implicit tc: TraceContext): Future[Unit] =
     config match {
-      case None => retryProvider.ensureThatB(
-        RetryFor.WaitingOnInitDependency,
-        "pruning_schedule_remove",
-        s"Pruning schedule is removed",
-        getPruningSchedule().map(_.isEmpty),
-        clearPruningSchedule(),
-        logger,
-      )
+      case None =>
+        retryProvider.ensureThatB(
+          RetryFor.WaitingOnInitDependency,
+          "pruning_schedule_remove",
+          s"Pruning schedule is removed",
+          getPruningSchedule().map(_.isEmpty),
+          clearPruningSchedule(),
+          logger,
+        )
       case Some(c) =>
         retryProvider.ensureThatB(
           RetryFor.WaitingOnInitDependency,
           "pruning_schedule_set",
           s"Pruning schedule is set to $c",
-          getPruningSchedule().map(scheduleO =>
-            scheduleO.contains(c.toSchedule),
-          ),
+          getPruningSchedule().map(scheduleO => scheduleO.contains(c.toSchedule)),
           setPruningSchedule(c),
           logger,
         )

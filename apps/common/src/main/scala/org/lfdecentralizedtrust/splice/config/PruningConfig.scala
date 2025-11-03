@@ -16,6 +16,6 @@ final case class PruningConfig(
   def toSchedule: PruningSchedule = PruningSchedule(
     cron,
     maxDuration,
-    retention
+    retention,
   )
 }
