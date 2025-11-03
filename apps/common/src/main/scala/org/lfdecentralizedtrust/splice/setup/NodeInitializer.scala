@@ -376,7 +376,7 @@ class NodeInitializer(
     val allOtkSignatures = ownerToKeyMappings
       .map(_.transaction)
       .flatMap(_.signatures)
-      .map(_.signature)
+      .map(_.signature.authorizingLongTermKey)
       .distinct
     val currentKeys = ownerToKeyMappings
       .map(_.transaction)
