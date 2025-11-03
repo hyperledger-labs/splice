@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import cats.data.NonEmptyList
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.SynchronizerAlias
@@ -8,6 +9,7 @@ import org.lfdecentralizedtrust.splice.console.{ParticipantClientReference, SvAp
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
+
 import scala.jdk.OptionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
@@ -15,6 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SequencerConfig,
   SynchronizerNodeConfig,
 }
+
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -36,7 +39,7 @@ class ValidatorSequencerConnectionIntegrationTest
             c.copy(
               domains = c.domains.copy(
                 global = c.domains.global.copy(
-                  sequencerNames = Some(Seq(getSvName(1), getSvName(2)))
+                  sequencerNames = Some(NonEmptyList.of(getSvName(1), getSvName(2)))
                 )
               ),
               automation =

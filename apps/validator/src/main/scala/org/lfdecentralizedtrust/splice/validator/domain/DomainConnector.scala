@@ -194,8 +194,10 @@ class DomainConnector(
         )
       val svFilteredSequencers = config.domains.global.sequencerNames match {
         case Some(allowedNames) =>
-          val allowedNamesSet = allowedNames.toSet
-          logger.debug(s"Filtering sequencers to only include: ${allowedNames.mkString(", ")}")
+          val allowedNamesSet = allowedNames.toList.toSet
+          logger.debug(
+            s"Filtering sequencers to only include: ${allowedNames.toList.mkString(", ")}"
+          )
           filteredSequencers.map { domainSequencer =>
             domainSequencer.copy(sequencers =
               domainSequencer.sequencers.filter(s => allowedNamesSet.contains(s.svName))

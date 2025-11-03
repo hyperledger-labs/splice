@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.config
 
+import cats.data.NonEmptyList
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.config.*
@@ -101,7 +102,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
     /** An optional, static list of trusted sequencer names to connect to.
       * sequencerNames is mutually exclusive with `url`.
       */
-    sequencerNames: Option[Seq[String]] = None,
+    sequencerNames: Option[NonEmptyList[String]] = None,
 
     // TODO(#3059): Add a threshold parameter to configure the number of sequencers that must be connected
 ) {
