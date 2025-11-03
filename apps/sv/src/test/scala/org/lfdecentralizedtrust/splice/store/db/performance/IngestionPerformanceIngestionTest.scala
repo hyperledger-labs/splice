@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.store.db.performance
 
+import cats.data.NonEmptyList
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Transaction}
 import com.daml.metrics.api.noop.NoOpMetricsFactory
@@ -15,6 +16,7 @@ import org.apache.pekko.Done
 import org.apache.pekko.stream.connectors.csv.scaladsl.CsvParsing
 import org.apache.pekko.stream.connectors.csv.scaladsl.CsvToMap
 import org.apache.pekko.stream.scaladsl.{FileIO, Sink}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
@@ -26,6 +28,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.sv.store.SvStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.util.{
+  PackageQualifiedName,
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
   ValueJsonCodecProtobuf as ProtobufCodec,
@@ -51,74 +54,100 @@ class IngestionPerformanceIngestionTest
     val store = mkStore()
     store.multiDomainAcsStore.ingestionSink.initialize().futureValue
     val timings = mutable.ListBuffer[Long]()
+    val ingestionConfig = IngestionConfig()
     FileIO
       .fromPath(Paths.get(getClass.getResource("/performance/creates.csv").toURI))
       .via(CsvParsing.lineScanner(maximumLineLength = Int.MaxValue))
       .via(CsvToMap.toMapAsStrings(StandardCharsets.UTF_8))
+      .groupedWithin(
+        ingestionConfig.maxBatchSize,
+        ingestionConfig.batchWaitTime.asFiniteApproximation,
+      )
       .zipWithIndex
-      .runWith(Sink.foreachAsync(parallelism = 1) { case (line, index) =>
-        println(s"Ingesting $index")
-        val synchronizerId = SynchronizerId.tryFromString(line("domain_id"))
-        val recordTime = CantonTimestamp.MinValue.plusSeconds(index)
-        val before = System.currentTimeMillis()
-        store.multiDomainAcsStore.ingestionSink
-          .ingestUpdate(
-            TreeUpdateOrOffsetCheckpoint.Update(
-              update = TransactionTreeUpdate(
-                new Transaction(
-                  UUID.randomUUID().toString, // updateId
-                  "canton-network-acs-import-something", // commandId
-                  "canton-network-acs-import-something", // workflowId
-                  recordTime.toInstant, // effectiveAt
-                  java.util.List.of(
-                    new CreatedEvent(
-                      parseArray(line("observers")), // witnessParties
-                      index, // offset
-                      1, // nodeId
-                      new Identifier(
-                        line("template_id_package_id"),
-                        line("template_id_module_name"),
-                        line("template_id_entity_name"),
-                      ), // templateId
-                      "splice-package", // packageName
-                      line("contract_id"), // contractId
-                      ProtobufCodec
-                        .deserializeValue(line("create_arguments"))
-                        .asRecord()
-                        .get(), // arguments
-                      ByteString.copyFromUtf8(line("create_arguments")), // createdEventBlob
-                      java.util.Map.of(), // interfaceViews
-                      java.util.Map.of(), // failedInterfaceViews
-                      java.util.Optional.empty(), // contractKey
-                      parseArray(line("signatories")), // signatories
-                      parseArray(line("observers")), // observers
-                      recordTime.toInstant, // createdAt
-                      false, // acsDelta
-                      "splice-package", // representativePackageId
-                    )
-                  ), // events
-                  index, // offset
-                  synchronizerId.toProtoPrimitive,
-                  TraceContextOuterClass.TraceContext.newBuilder().build(),
-                  recordTime.toInstant,
-                )
-              ),
-              synchronizerId = synchronizerId,
-            )
+      .runWith(Sink.foreachAsync(parallelism = 1) { case (_batch, index) =>
+        val batch = _batch.map(_.map { case (key, value) =>
+          key -> value.replace(
+            "DSO::12209471e1a52edc2995ad347371597a5872f2704cb2cb4bb330a849e7309598259e",
+            dsoParty.toProtoPrimitive,
           )
+        })
+        println(s"Ingesting batch $index of ${batch.length} elements")
+        val txs = batch.map { line =>
+          val synchronizerId = SynchronizerId.tryFromString(line("domain_id"))
+          val recordTime = CantonTimestamp.MinValue.plusSeconds(index)
+          val templateId = new Identifier(
+            line("template_id_package_id"),
+            line("template_id_module_name"),
+            line("template_id_entity_name"),
+          )
+          val packageName = PackageQualifiedName.getFromResources(templateId).packageName
+          TreeUpdateOrOffsetCheckpoint.Update(
+            update = TransactionTreeUpdate(
+              new Transaction(
+                UUID.randomUUID().toString, // updateId
+                "canton-network-acs-import-something", // commandId
+                "canton-network-acs-import-something", // workflowId
+                recordTime.toInstant, // effectiveAt
+                java.util.List.of(
+                  new CreatedEvent(
+                    parseArray(line("observers")), // witnessParties
+                    index, // offset
+                    1, // nodeId
+                    templateId, // templateId
+                    packageName, // packageName
+                    line("contract_id"), // contractId
+                    ProtobufCodec
+                      .deserializeValue(line("create_arguments"))
+                      .asRecord()
+                      .get(), // arguments
+                    ByteString.copyFromUtf8(line("create_arguments")), // createdEventBlob
+                    java.util.Map.of(), // interfaceViews
+                    java.util.Map.of(), // failedInterfaceViews
+                    java.util.Optional.empty(), // contractKey
+                    parseArray(line("signatories")), // signatories
+                    parseArray(line("observers")), // observers
+                    recordTime.toInstant, // createdAt
+                    false, // acsDelta
+                    templateId.getPackageId, // representativePackageId
+                  )
+                ), // events
+                index, // offset
+                synchronizerId.toProtoPrimitive,
+                TraceContextOuterClass.TraceContext.newBuilder().build(),
+                recordTime.toInstant,
+              )
+            ),
+            synchronizerId = synchronizerId,
+          )
+        }
+
+        val before = System.nanoTime()
+        store.multiDomainAcsStore.ingestionSink
+          .ingestUpdateBatch(NonEmptyList.fromListUnsafe(txs.toList))
           .map { _ =>
-            val after = System.currentTimeMillis()
+            val after = System.nanoTime()
             val duration = after - before
-            timings += duration
+            timings ++= Seq.fill(batch.length)(duration / batch.length)
             val avg = timings.sum.toDouble / timings.size
             println(
-              f"Ingested $index in $duration ms, average time: $avg%.2f ms over ${timings.size} records, total time: ${timings.sum} ms"
+              f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over ${timings.size} records, total time: ${timings.sum} ns"
             )
           }
       })
       .futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(12, "hours"))) should be(
       Done
     )
+
+    import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+    storage
+      .querySingle(
+        sql"select count(*) from dso_acs_store".as[Int].headOption,
+        "count",
+      )
+      .value
+      .failOnShutdown("")
+      .futureValue
+      .valueOrFail("count is there") should be >= 600_000
   }
 
   private def parseArray(str: String) = {
