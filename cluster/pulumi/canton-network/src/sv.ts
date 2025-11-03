@@ -130,9 +130,7 @@ export async function installSvNode(
 
   const auth0Secrets: CnInput<pulumi.Resource>[] = await installSvAppSecrets(
     xns,
-    baseConfig.auth0Client,
-    baseConfig.auth0SvAppName,
-    baseConfig.nodeName
+    baseConfig.auth0Client
   );
 
   const periodicBackupConfig: BackupConfig | undefined = baseConfig.periodicBackupConfig
@@ -511,7 +509,7 @@ function installSvApp(
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
     auth: {
-      audience: getSvAppApiAudience(config.auth0Client.getCfg()),
+      audience: getSvAppApiAudience(config.auth0Client.getCfg(), xns.logicalName),
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
     contactPoint: daContactPoint,

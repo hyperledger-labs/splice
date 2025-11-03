@@ -44,6 +44,7 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
       getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
         Promise.resolve('access_token'),
       getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
+      reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
     });
   }
 }
