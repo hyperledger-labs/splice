@@ -50,7 +50,7 @@ class ValidatorSequencerConnectionIntegrationTest
       )
       .withManualStart
 
-  "validator with 'sequencerNames' config connects to specified sequencers and tracks URL changes" in {
+  "validator with 'sequencerNames' set in config connects to specified sequencers and tracks URL changes of sequencers" in {
     implicit env =>
       startAllSync(
         sv1Backend,
