@@ -1,9 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ContractId } from '@daml/types';
+import type { ContractId, Optional } from '@daml/types';
 import type {
   ActionRequiringConfirmation,
+  DsoRulesConfig,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import type { ConfigFieldState } from '../components/form-components/ConfigField';
@@ -12,6 +13,7 @@ import type { OffboardSvFormData } from '../components/forms/OffboardSvForm';
 import type { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
 import type { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
 import type { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
+import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 
 export interface OffBoardMemberProposal {
   memberToOffboard: string;
@@ -54,10 +56,14 @@ export interface UpdateSvRewardWeightProposal {
 
 export interface AmuletRulesConfigProposal {
   configChanges: ConfigChange[];
+  baseConfig: AmuletConfig<'USD'>;
+  newConfig: AmuletConfig<'USD'>;
 }
 
 export interface DsoRulesConfigProposal {
   configChanges: ConfigChange[];
+  baseConfig: Optional<DsoRulesConfig>;
+  newConfig: DsoRulesConfig;
 }
 
 export type Proposal =
@@ -79,6 +85,8 @@ export type ProposalActionMap = {
   // If no proposal type is defined, can use unknown or a specific type:
   CRARC_AddFutureAmuletConfigSchedule: unknown;
 };
+
+export type ProposalActionKeys = keyof ProposalActionMap;
 
 export type ProposalDetails = {
   actionName: string;
