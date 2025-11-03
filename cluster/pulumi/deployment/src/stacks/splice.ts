@@ -6,6 +6,7 @@ import {
   deployedValidators,
   validatorRunbookStackName,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { deploymentConf } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/config';
 import {
   GitFluxRef,
   StackFromRef,
@@ -15,17 +16,15 @@ import {
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
-import { deploymentConf } from '../config';
-
 export function getSpliceStacksFromMainReference(): StackFromRef[] {
   const ret: StackFromRef[] = [];
-  if (deploymentConf.projectWhitelist.has('sv-runbook')) {
+  if (deploymentConf.projectsToDeploy.has('sv-runbook')) {
     ret.push({ project: 'sv-runbook', stack: `sv-runbook.${CLUSTER_BASENAME}` });
   }
-  if (deploymentConf.projectWhitelist.has('multi-validator')) {
+  if (deploymentConf.projectsToDeploy.has('multi-validator')) {
     ret.push({ project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` });
   }
-  if (deploymentConf.projectWhitelist.has('validator-runbook')) {
+  if (deploymentConf.projectsToDeploy.has('validator-runbook')) {
     deployedValidators.forEach(validator => {
       ret.push({
         project: 'validator-runbook',
@@ -33,16 +32,16 @@ export function getSpliceStacksFromMainReference(): StackFromRef[] {
       });
     });
   }
-  if (deploymentConf.projectWhitelist.has('validator1')) {
+  if (deploymentConf.projectsToDeploy.has('validator1')) {
     ret.push({ project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` });
   }
-  if (deploymentConf.projectWhitelist.has('splitwell')) {
+  if (deploymentConf.projectsToDeploy.has('splitwell')) {
     ret.push({ project: 'splitwell', stack: `splitwell.${CLUSTER_BASENAME}` });
   }
-  if (deploymentConf.projectWhitelist.has('infra')) {
+  if (deploymentConf.projectsToDeploy.has('infra')) {
     ret.push({ project: 'infra', stack: `infra.${CLUSTER_BASENAME}` });
   }
-  if (deploymentConf.projectWhitelist.has('canton-network')) {
+  if (deploymentConf.projectsToDeploy.has('canton-network')) {
     ret.push({ project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` });
   }
   return ret;
@@ -54,7 +53,7 @@ export function installSpliceStacks(
   namespace: string,
   gcpSecret: k8s.core.v1.Secret
 ): void {
-  if (deploymentConf.projectWhitelist.has('sv-runbook')) {
+  if (deploymentConf.projectsToDeploy.has('sv-runbook')) {
     createStackCR(
       'sv-runbook',
       'sv-runbook',
@@ -65,7 +64,7 @@ export function installSpliceStacks(
       gcpSecret
     );
   }
-  if (deploymentConf.projectWhitelist.has('multi-validator')) {
+  if (deploymentConf.projectsToDeploy.has('multi-validator')) {
     createStackCR(
       'multi-validator',
       'multi-validator',
@@ -78,16 +77,16 @@ export function installSpliceStacks(
       []
     );
   }
-  if (deploymentConf.projectWhitelist.has('validator1')) {
+  if (deploymentConf.projectsToDeploy.has('validator1')) {
     createStackCR('validator1', 'validator1', namespace, false, reference, envRefs, gcpSecret);
   }
-  if (deploymentConf.projectWhitelist.has('splitwell')) {
+  if (deploymentConf.projectsToDeploy.has('splitwell')) {
     createStackCR('splitwell', 'splitwell', namespace, false, reference, envRefs, gcpSecret);
   }
-  if (deploymentConf.projectWhitelist.has('infra')) {
+  if (deploymentConf.projectsToDeploy.has('infra')) {
     createStackCR('infra', 'infra', namespace, false, reference, envRefs, gcpSecret);
   }
-  if (deploymentConf.projectWhitelist.has('canton-network')) {
+  if (deploymentConf.projectsToDeploy.has('canton-network')) {
     createStackCR(
       'canton-network',
       'canton-network',

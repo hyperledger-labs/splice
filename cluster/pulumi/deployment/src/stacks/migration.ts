@@ -8,6 +8,7 @@ import {
   DomainMigrationIndex,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { allSvsToDeploy, svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { deploymentConf } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/config';
 import {
   GitFluxRef,
   gitRepoForRef,
@@ -18,10 +19,8 @@ import {
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
-import { deploymentConf } from '../config';
-
 export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
-  if (deploymentConf.projectWhitelist.has('sv-canton')) {
+  if (deploymentConf.projectsToDeploy.has('sv-canton')) {
     const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
     return migrations
       .filter(migration => !migration.releaseReference)
@@ -45,7 +44,7 @@ export function installMigrationSpecificStacks(
   namespace: string,
   gcpSecret: k8s.core.v1.Secret
 ): void {
-  if (deploymentConf.projectWhitelist.has('sv-canton')) {
+  if (deploymentConf.projectsToDeploy.has('sv-canton')) {
     const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
     migrations.forEach(migration => {
       const reference = migration.releaseReference

@@ -5,6 +5,7 @@ import {
   deployedValidators,
   validatorRunbookStackName,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { deploymentConf } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/config';
 import { GitFluxRef } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/flux-source';
 import {
   createStackCR,
@@ -12,7 +13,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
 import { config } from '../../../common';
-import { deploymentConf } from '../config';
 
 export function installAllValidatorStacks(
   reference: GitFluxRef,
@@ -20,7 +20,7 @@ export function installAllValidatorStacks(
   namespace: string,
   gcpSecret: k8s.core.v1.Secret
 ): void {
-  if (deploymentConf.projectWhitelist.has('validator-runbook')) {
+  if (deploymentConf.projectsToDeploy.has('validator-runbook')) {
     const validatorStacksToCreate = deployedValidators.map(validator => {
       return {
         validator: validator,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { deploymentConf } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/config';
 import {
   GitFluxRef,
   StackFromRef,
@@ -11,10 +12,8 @@ import {
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
-import { deploymentConf } from '../config';
-
 export function getGithubActionsStackFromMainReference(): Array<StackFromRef> {
-  if (deploymentConf.projectWhitelist.has('gha')) {
+  if (deploymentConf.projectsToDeploy.has('gha')) {
     return [{ project: 'gha', stack: `gha.${CLUSTER_BASENAME}` }];
   } else {
     return [];
@@ -27,7 +26,7 @@ export function installGithubActionsStack(
   namespace: string,
   gcpSecret: k8s.core.v1.Secret
 ): void {
-  if (deploymentConf.projectWhitelist.has('gha')) {
+  if (deploymentConf.projectsToDeploy.has('gha')) {
     createStackCR('gha', 'gha', namespace, false, reference, envRefs, gcpSecret);
   }
 }
