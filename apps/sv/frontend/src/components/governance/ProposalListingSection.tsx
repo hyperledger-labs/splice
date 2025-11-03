@@ -19,8 +19,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { PageSectionHeader } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Link as RouterLink } from 'react-router-dom';
+import { PageSectionHeader } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
 interface ProposalListingSectionProps {

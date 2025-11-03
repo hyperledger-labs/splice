@@ -36,7 +36,6 @@ import {
   ListVoteRequests,
   ActionView,
 } from './votes';
-import { PageSectionHeader } from './beta';
 
 export {
   ActionView,
@@ -68,7 +67,6 @@ export {
   Loading,
   Login,
   LoginFailed,
-  PageSectionHeader,
   PartyId,
   PrettyJsonDiff,
   RateDisplay,
