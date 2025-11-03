@@ -16,7 +16,7 @@ import {
   ExactNamespace,
   failOnAppVersionMismatch,
   imagePullSecret,
-  installAuth0Secret,
+  installLedgerApiSecret,
   installSpliceHelmChart,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -128,7 +128,7 @@ export async function installSplitwell(
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = imagePullDeps.concat(
-    await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell')
+    await installLedgerApiSecret(auth0Client, xns, 'splitwell')
   );
 
   return await installValidatorApp({

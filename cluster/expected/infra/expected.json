@@ -37,7 +37,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://ledger_api.sv-1.test-stack.canton.network",
-      "name": "Ledger API for SV sv-1 on test-stack (Pulumi managed)"
+      "name": "Ledger API for SV sv-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "LedgerApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -49,7 +50,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://ledger_api.sv-da-1.test-stack.canton.network",
-      "name": "Ledger API for SV sv-da-1 on test-stack (Pulumi managed)"
+      "name": "Ledger API for SV sv-da-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "LedgerApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -117,7 +119,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://sv.sv-1.test-stack.canton.network/api",
-      "name": "SV App API for SV sv-1 on test-stack (Pulumi managed)"
+      "name": "SV App API for SV sv-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "SvAppApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -129,7 +132,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://sv.sv-da-1.test-stack.canton.network/api",
-      "name": "SV App API for SV sv-da-1 on test-stack (Pulumi managed)"
+      "name": "SV App API for SV sv-da-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "SvAppApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -261,7 +265,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://validator.sv-1.test-stack.canton.network/api",
-      "name": "Validator App API for SV sv-1 on test-stack (Pulumi managed)"
+      "name": "Validator App API for SV sv-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "ValidatorAppApisv1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -273,7 +278,8 @@
     "inputs": {
       "allowOfflineAccess": true,
       "identifier": "https://validator.sv-da-1.test-stack.canton.network/api",
-      "name": "Validator App API for SV sv-da-1 on test-stack (Pulumi managed)"
+      "name": "Validator App API for SV sv-da-1 on test-stack (Pulumi managed)",
+      "tokenLifetime": 86400
     },
     "name": "ValidatorAppApisvda1",
     "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
@@ -3401,7 +3407,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV sv-1 on test-stack",
       "name": "SV1 SV Backend (Pulumi managed, test-stack)"
     },
     "name": "sv1SvBackendApp",
@@ -3449,7 +3455,7 @@
         "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
       ],
       "crossOriginAuth": false,
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV1",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV sv-1",
       "name": "SV1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-2.mock.network.canton.global",
@@ -3509,7 +3515,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV sv-1 on test-stack",
       "name": "SV1 Validator Backend (Pulumi managed, test-stack)"
     },
     "name": "sv1ValidatorBackendApp",
@@ -3561,7 +3567,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for Digital-Asset-1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV sv-da-1 on test-stack",
       "name": "SVDA1 SV Backend (Pulumi managed, test-stack)"
     },
     "name": "svda1SvBackendApp",
@@ -3609,7 +3615,7 @@
         "https://sv.sv-1.mock.global.canton.network.digitalasset.com"
       ],
       "crossOriginAuth": false,
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for Digital-Asset-1",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV sv-da-1",
       "name": "SVDA1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-1.mock.network.canton.global",
@@ -3669,7 +3675,7 @@
     "id": "",
     "inputs": {
       "appType": "non_interactive",
-      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for Digital-Asset-1 on test-stack",
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Validator backend for SV sv-da-1 on test-stack",
       "name": "SVDA1 Validator Backend (Pulumi managed, test-stack)"
     },
     "name": "svda1ValidatorBackendApp",
