@@ -44,6 +44,9 @@ object Dependencies {
   lazy val pekko_spray_json =
     "org.apache.pekko" %% "pekko-http-spray-json" % CantonDependencies.pekko_http_version
 
+  lazy val pekko_connectors_csv =
+    "org.apache.pekko" %% "pekko-connectors-csv" % CantonDependencies.pekko_version
+
   lazy val better_files = CantonDependencies.better_files
 
   lazy val google_cloud_storage =
