@@ -357,8 +357,11 @@ class NodeInitializer(
         filterNamespace = Some(member.namespace),
       )
       ownerToKeyMappings = nsTxHistory.filter(_.transaction.mapping match {
-        case mapping: OwnerToKeyMapping if mapping.member == member => true
-        case _ => false
+        case mapping: OwnerToKeyMapping => mapping.member == member
+        case _ =>
+          throw Status.INTERNAL
+            .withDescription("Should only be of type OwnerToKeyMapping.")
+            .asRuntimeException()
       })
       _ <-
         if (ownerToKeyMappings.isEmpty) {
@@ -391,7 +394,9 @@ class NodeInitializer(
     }
     val toRotate = currentKeys.map(_.id).filterNot(allOtkSignatures.contains)
     if (toRotate.nonEmpty) {
-      logger.info(s"The following keys with missing signature need to be rotated: $toRotate")
+      logger.info(
+        s"The following keys with missing signature need to be rotated: $toRotate, this is expected for nodes that joined MainNet before version 0.3.1."
+      )
       for {
         newKeys <- Future.traverse(currentKeys) {
           case key: SigningPublicKey if toRotate.contains(key.id) =>
