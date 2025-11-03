@@ -21,7 +21,6 @@ import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningS
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -63,7 +62,8 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -312,13 +312,11 @@ class ParticipantAdminConnection(
       filterSynchronizerId: Option[SynchronizerId] = None,
       timestamp: Option[Instant] = None,
       force: Boolean = false,
-  )(implicit traceContext: TraceContext): Future[ByteString] = {
+  )(implicit traceContext: TraceContext): Future[Seq[ByteString]] = {
     logger.debug(
       show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
     )
-    val requestComplete = Promise[ByteString]()
-    // TODO(DACH-NY/canton-network-node#3298) just concatenate the byteString here. Make it scale to 2M contracts.
-    val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsOldResponse](requestComplete)
+    val observer = new SeqAccumulatingObserver[ExportAcsOldResponse]
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(
         parties = parties,
@@ -328,20 +326,36 @@ class ParticipantAdminConnection(
         observer,
         force,
       )
-    ).discard
-    requestComplete.future
+    ).flatMap(_ => observer.resultFuture).map(_.map(_.chunk))
   }
 
-  def uploadAcsSnapshot(acsBytes: ByteString)(implicit
+  def downloadAcsSnapshotNonChunked(
+      parties: Set[PartyId],
+      filterSynchronizerId: Option[SynchronizerId] = None,
+      timestamp: Option[Instant] = None,
+      force: Boolean = false,
+  )(implicit traceContext: TraceContext): Future[ByteString] =
+    downloadAcsSnapshot(parties, filterSynchronizerId, timestamp, force).map(chunks =>
+      ByteString.copyFrom(chunks.asJava)
+    )
+
+  def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
+    val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
+      case Seq(bytes) =>
+        // Caller has not chunked the bytes, this is possible for SVs that try to onboard or for validator recovery.
+        // The chuning logic here matches what GrpcStreamingUtils.streamToServer does
+        bytes.toByteArray.grouped(1024 * 1024 * 2).map(ByteString.copyFrom(_)).toSeq
+      case _ => acsBytes
+    }
     retryProvider.retryForClientCalls(
       "import_acs",
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
           .ImportAcsOld(
-            acsBytes,
+            chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             allowContractIdSuffixRecomputation = false,
           ),

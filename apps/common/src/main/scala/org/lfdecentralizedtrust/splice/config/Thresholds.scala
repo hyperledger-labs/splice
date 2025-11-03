@@ -59,4 +59,8 @@ object Thresholds {
     val f = floor((svNum - 1) / 3.0).toInt
     PositiveInt.tryCreate(ceil((svNum + f + 1) / 2.0).toInt)
   }
+
+  def requiredNumScanThreshold(svNum: Int) = {
+    FPlus1Threshold(svNum)
+  }
 }

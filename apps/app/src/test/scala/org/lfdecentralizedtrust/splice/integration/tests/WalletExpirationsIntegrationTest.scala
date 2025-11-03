@@ -7,10 +7,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
-  AdvanceOpenMiningRoundTrigger,
-  ExpiredAmuletTrigger,
-}
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import org.lfdecentralizedtrust.splice.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.{
@@ -129,57 +126,5 @@ class WalletExpirationsIntegrationTest
         }
       }
     }
-
-    "auto-expire amulet" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-
-      val tapAmountUsd = 0.000005
-      clue(s"Alice taps $tapAmountUsd USD") {
-        aliceWalletClient.tap(tapAmountUsd)
-        eventually() {
-          aliceWalletClient.list().amulets should have length 1
-          aliceWalletClient.list().lockedAmulets should have length 0
-          // we have 0 holding fees because the amulets were created in the same round we are currently in
-          aliceWalletClient.list().amulets.head.accruedHoldingFee shouldBe 0
-          assertInRange(aliceWalletClient.list().amulets.head.effectiveAmount, (0, 1))
-        }
-      }
-
-      val startRound = aliceWalletClient.list().amulets.head.round
-
-      // advance 2 rounds.
-      advanceRoundsByOneTickViaAutomation()
-      advanceRoundsByOneTickViaAutomation()
-
-      clue("Check wallet after advancing to next 2 round") {
-        eventually()(aliceWalletClient.list().amulets.head.round shouldBe startRound + 2)
-        aliceWalletClient.list().amulets should have length 1
-
-        // The amulet is expired but not yet archived.
-        // They will be archived when no amulets can be used as transfer input.
-        // ie, in 2 round
-        aliceWalletClient
-          .list()
-          .amulets
-          .head
-          .accruedHoldingFee shouldBe walletUsdToAmulet(tapAmountUsd)
-        aliceWalletClient.list().amulets.head.effectiveAmount shouldBe 0
-      }
-
-      // advance 2 more rounds.
-      advanceRoundsByOneTickViaAutomation()
-      advanceRoundsByOneTickViaAutomation()
-
-      setTriggersWithin(
-        Seq.empty,
-        triggersToResumeAtStart =
-          activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger]),
-      ) {
-        clue("Check wallet after advancing to next 2 rounds") {
-          eventually()(aliceWalletClient.list().amulets shouldBe empty)
-        }
-      }
-    }
-
   }
 }

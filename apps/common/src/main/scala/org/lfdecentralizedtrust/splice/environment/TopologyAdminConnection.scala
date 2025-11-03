@@ -577,8 +577,6 @@ abstract class TopologyAdminConnection(
         Seq(
           TopologyMapping.Code.NamespaceDelegation,
           TopologyMapping.Code.OwnerToKeyMapping,
-          // only relevant for participants
-          TopologyMapping.Code.VettedPackages,
         )
       ),
       filterNamespace = participantId.namespace.filterString,

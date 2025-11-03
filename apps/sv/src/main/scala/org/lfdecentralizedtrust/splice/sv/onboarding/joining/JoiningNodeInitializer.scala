@@ -252,6 +252,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 upgradesConfig,
                 packageVersionSupport,
+                config.parameters.enabledFeatures,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -314,7 +315,7 @@ class JoiningNodeInitializer(
         SvCantonIdentifierConfig.default(config)
       )
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           localSynchronizerNode.traverse(lsn =>
             SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
               cantonIdentifierConfig,
@@ -382,7 +383,7 @@ class JoiningNodeInitializer(
         dsoPartyId,
       )
       _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
+        RetryFor.WaitingOnInitDependencyLong,
         "dso_rules_visible",
         show"the DsoRules and AmuletRules are visible",
         dsoStore.getDsoRules().map(_ => ()),
@@ -408,7 +409,7 @@ class JoiningNodeInitializer(
         waitUntilCometBftNodeIsValidator,
       ).tupled
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           localSynchronizerNode.traverse_ { localSynchronizerNode =>
             for {
               // First, make sure the identity of the new domain nodes is known on the domain
@@ -461,7 +462,7 @@ class JoiningNodeInitializer(
         }
       _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           synchronizerNodeReconciler
             .reconcileSynchronizerNodeConfigIfRequired(
               localSynchronizerNode,
@@ -854,6 +855,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNode,
                   upgradesConfig,
                   packageVersionSupport,
+                  config.parameters.enabledFeatures,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias

@@ -5,10 +5,7 @@ package org.lfdecentralizedtrust.splice.migration
 
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess}
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  SequencerAdminConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.migration
 import org.lfdecentralizedtrust.splice.util.BackupDump
 import com.digitalasset.canton.data.CantonTimestamp
@@ -25,13 +22,13 @@ import java.nio.file.Path
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class DomainMigrationTrigger[T: Codec](implicit
+abstract class DomainMigrationTrigger[T](implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
+    codec: Codec[T],
 ) extends ScheduledTaskTrigger[DomainMigrationTrigger.Task] {
   protected val participantAdminConnection: ParticipantAdminConnection
-  protected val sequencerAdminConnection: Option[SequencerAdminConnection]
   protected val dumpPath: Path
   protected val currentMigrationId: Long
 

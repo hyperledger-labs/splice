@@ -20,6 +20,44 @@ Upcoming
       - ``/v0/admin/users/offboard``:
         Offboarding a user now also deletes the ledger API user in the participant node.
 
+  - Scan
+
+    - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
+      Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
+      or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
+
+  - Docs
+
+    - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+
+0.4.23
+------
+
+  - Daml
+
+    - Added the ``splice-util-token-standard-wallet.dar``
+      :ref:`package <package-splice-util-token-standard-wallet>` that provides support for
+      implementing auto-merging of holdings and airdrop campaigns, as
+      explained in :ref:`holding_utxo_management`.
+      The package is optional and not uploaded by default to a validator node.
+    - Extended the ``splice-util-featured-app-proxies.dar``
+      :ref:`package <package-featured-app-proxies>` to
+      support executing :ref:`batch/bulk transfers <type-splice-util-featuredapp-walletuserproxy-walletuserproxybatchtransfer-93002>` of Canton Network token standard tokens,
+      both for featured and unfeatured apps.
+
+
+  - Performance improvements
+
+    - Scan
+
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+
+  - Deployment
+
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/hyperledger-labs/splice/pull/2972>`_
+
 0.4.22
 ------
 

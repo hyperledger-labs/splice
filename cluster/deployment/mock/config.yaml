@@ -25,7 +25,7 @@ synchronizerMigration:
     - id: 1
       version: 0.3.18
       releaseReference:
-        gitReference: "refs/heads/release-line-0.3.18"
+        gitReference: "981227e62011e386cca3cdb5f00b472cf05a12c4"
         repoUrl: https://github.com/hyperledger-labs/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
@@ -109,13 +109,6 @@ loadTester:
     enabled: true
 svs:
   default:
-    validatorApp:
-      resources:
-        requests:
-          cpu: "1"
-          memory: '1Gi'
-        limits:
-          memory: '2Gi'
     scanApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
@@ -143,11 +136,6 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomParticipantJvmFlag"
-      resources:
-        requests:
-          memory: '12Gi'
-        limits:
-          memory: '18Gi'
     sequencer:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME

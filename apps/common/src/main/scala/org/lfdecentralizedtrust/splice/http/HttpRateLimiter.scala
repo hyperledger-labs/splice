@@ -15,10 +15,11 @@ import java.time.Instant
 class HttpRateLimiter(
     config: RateLimitersConfig,
     metricsFactory: LabeledMetricsFactory,
-) {
+) extends AutoCloseable {
 
   // need to cache it as the pekko reoutes get evaluated for each request
   private val rateLimiters = scala.collection.concurrent.TrieMap[String, SpliceRateLimiter]()
+  private val metrics = scala.collection.concurrent.TrieMap[String, SpliceRateLimitMetrics]()
 
   def withRateLimit(service: String)(operation: String): Directive0 = {
     val rateLimiter = rateLimiters.getOrElseUpdate(
@@ -26,10 +27,13 @@ class HttpRateLimiter(
       new SpliceRateLimiter(
         operation,
         config.forRateLimiter(operation),
-        SpliceRateLimitMetrics(metricsFactory)(
-          MetricsContext(
-            "http_service" -> service
-          )
+        metrics.getOrElseUpdate(
+          service,
+          SpliceRateLimitMetrics(metricsFactory)(
+            MetricsContext(
+              "http_service" -> service
+            )
+          ),
         ),
         // the rate limiter has a cold start, to avoid the first request being rejected
         // we enforce the rate limit only after 1 second
@@ -52,4 +56,6 @@ class HttpRateLimiter(
       }
     }
   }
+
+  def close(): Unit = metrics.view.values.foreach(_.close())
 }

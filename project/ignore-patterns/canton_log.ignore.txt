@@ -151,4 +151,11 @@ ACS_COMMITMENT_DEGRADATION
 # TODO(#2706) Investigate and remove once fixed
 Waiting for allocation of.*on synchronizer splitwell.*timed out
 
+# rejections when the sync is paused
+# error code will change in the future to MAX_SEQUENCING_TIME_EXCEEDED
+SEQUENCER_SUBMISSION_REQUEST_REFUSED.* The estimated sequencing time .* is already past the max sequencing time
+
+# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+
 # Make sure to have a trailing newline

@@ -299,7 +299,7 @@ case class EnvironmentDefinition(
   def withAmuletPrice(price: BigDecimal): EnvironmentDefinition =
     addConfigTransforms((_, conf) => ConfigTransforms.setAmuletPrice(price)(conf))
 
-  /** For an SV’s sequencer to be safely usable, we need to wait for participantResponseTimeout + mediatorResponseTimeout.
+  /** For an SV’s sequencer to be safely usable, we need to wait for confirmationResponseTimeout + mediatorResponseTimeout.
     * However, in some tests, we do care that an SV can connect to their own sequencer reasonably quickly.
     * To make that work, we lower the delay to a number that is not fully safe but empirically
     * long enough that all in-flight transactions succeed or fail before.

@@ -308,7 +308,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         actAndCheck(
           "Load second page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees second page of transactions appended",
@@ -319,7 +319,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         actAndCheck(
           "Load third page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees third page of transactions appended",
@@ -331,7 +331,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         // we have to click the button one last time to know there's no more data to fetch
         actAndCheck(
           "Load final empty page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees there are no more transactions to load",

@@ -79,7 +79,9 @@ class ReconcileSequencerConnectionsTrigger(
             case _ => domainTime
           }
           for {
-            sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(maxDomainTime)
+            (sequencerConnections, _) <- domainConnector.getSequencerConnectionsFromScan(
+              Left(maxDomainTime)
+            )
             _ <- MonadUtil.sequentialTraverse_(sequencerConnections.toList) {
               case (alias, connections) =>
                 val sequencerConnectionConfig = NonEmpty.from(connections) match {

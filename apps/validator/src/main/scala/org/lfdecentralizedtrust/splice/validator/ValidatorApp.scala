@@ -232,7 +232,7 @@ class ValidatorApp(
               case Some(migrationDump) =>
                 for {
                   allSequencerConnections <- domainConnector
-                    .getDecentralizedSynchronizerSequencerConnections(now)
+                    .getDecentralizedSynchronizerSequencerConnections(clock)
                   sequencerConnections = allSequencerConnections.values.toSeq match {
                     case Seq() =>
                       sys.error("Expected at least one sequencer connection but got 0")
@@ -286,7 +286,7 @@ class ValidatorApp(
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
                     domainConnector
-                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(now)
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock)
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
@@ -598,6 +598,18 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _) =>
+          seedUrls
+            .traverse { url =>
+              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+              MinimalScanConnection(
+                config,
+                amuletAppParameters.upgradesConfig,
+                retryProvider,
+                loggerFactory,
+              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+            }
+            .map(_ => ())
         case BftScanClientConfig.Bft(seedUrls, _, _) =>
           seedUrls
             .traverse { url =>
@@ -892,6 +904,7 @@ class ValidatorApp(
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
+        config.parameters.enabledFeatures,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

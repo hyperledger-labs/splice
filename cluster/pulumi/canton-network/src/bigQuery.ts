@@ -9,7 +9,7 @@ import {
   InstalledHelmChart,
   installPostgresPasswordSecret,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+import { clusterProdLike, config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import {
   Postgres,
   CloudPostgres,
@@ -40,7 +40,13 @@ const replicatorUserName = 'bqdatastream';
 const replicationSlotName = 'update_history_datastream_r_slot';
 const publicationName = 'update_history_datastream_pub';
 // what tables from Scan to replicate to BigQuery
-const tablesToReplicate = ['update_history_creates', 'update_history_exercises'];
+const tablesToReplicate = [
+  'update_history_creates',
+  'update_history_exercises',
+  'scan_verdict_store',
+  'scan_verdict_transaction_view_store',
+];
+const flywayMigrationToWaitFor = 'V047__verdict_history_id.sql';
 
 function cloudsdkComputeRegion() {
   return config.requireEnv('CLOUDSDK_COMPUTE_REGION');
@@ -161,7 +167,7 @@ function installDatastream(
           },
           // editing dataFreshness does not alter existing BQ tables, see its
           // docstring or https://github.com/hyperledger-labs/splice/issues/2011
-          dataFreshness: '14400s',
+          dataFreshness: clusterProdLike ? '14400s' : '0s',
         },
         destinationConnectionProfile: destination.name,
       },
@@ -453,17 +459,16 @@ function createPublicationAndReplicationSlots(
       --private-network-project="${gcp.organizations.getProjectOutput({}).apply(proj => proj.name)}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
-      --tables-to-replicate-length="${tablesToReplicate.length}" \\
-      --db-name="${dbName}" \\
       --schema-name="${schemaName}" \\
-      --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}" \\
       --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \\
       --postgres-user-name="${postgres.user.name}" \\
       --publication-name="${publicationName}" \\
       --replication-slot-name="${replicationSlotName}" \\
       --replicator-user-name="${replicatorUserName}" \\
       --postgres-instance-name="${postgres.databaseInstance.name}" \\
-      --scan-app-database-name="${scanAppDatabaseName(postgres)}"`;
+      --scan-app-database-name="${scanAppDatabaseName(postgres)}" \\
+      --flyway-migration-to-wait-for="${flywayMigrationToWaitFor}" \\
+      `;
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
     {
@@ -473,6 +478,7 @@ function createPublicationAndReplicationSlots(
     {
       deletedWith: postgres.databaseInstance,
       dependsOn: [scan, postgres.databaseInstance, replicatorUser],
+      deleteBeforeReplace: true,
     }
   );
 }

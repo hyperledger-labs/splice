@@ -79,11 +79,11 @@ class SplitwellFrontendIntegrationTest
           findAll(className("balances-table-row")).toSeq should have length 2
         }
 
-        inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
+        inside(eventuallyFind(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "1200.0"
         }
-        inside(find(className("enter-payment-description-field"))) { case Some(field) =>
+        inside(eventuallyFind(className("enter-payment-description-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "Team lunch"
         }
@@ -91,11 +91,11 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
-        inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
+        inside(eventuallyFind(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "333.0"
         }
-        inside(find(className("enter-payment-description-field"))) { case Some(field) =>
+        inside(eventuallyFind(className("enter-payment-description-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "Digestivs"
         }

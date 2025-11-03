@@ -16,7 +16,7 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
       field.underlying.click()
       reactTextInput(field).value = "Team lunch"
     }
-    click on className("enter-payment-link")
+    eventuallyClickOn(className("enter-payment-link"))
   }
 
   def enterSplitwellPayment(
@@ -26,29 +26,32 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
   )(implicit
       webDriver: WebDriverType
   ) = {
-    inside(find(className("transfer-amount-field"))) { case Some(field) =>
-      field.underlying.click()
-      reactTextInput(field).value = quantity.toString
+    eventually() {
+      inside(find(className("transfer-amount-field"))) { case Some(field) =>
+        field.underlying.click()
+        reactTextInput(field).value = quantity.toString
+      }
+      setAnsField(
+        reactTextInput(find(className("transfer-receiver-field")).value),
+        receiver,
+        receiverPartyId.toProtoPrimitive,
+      )
+      eventuallyClickOn(className("transfer-link"))
     }
-    setAnsField(
-      reactTextInput(find(className("transfer-receiver-field")).value),
-      receiver,
-      receiverPartyId.toProtoPrimitive,
-    )
-    click on className("transfer-link")
   }
 
   def createGroup(groupName: String)(implicit webDriver: WebDriverType) = {
     waitForQuery(id("group-id-field"))
-    click on "group-id-field"
+    eventuallyClickOn(id("group-id-field"))
     textField("group-id-field").value = groupName
-    click on "create-group-button"
+    eventuallyClickOn(id("create-group-button"))
   }
   def createGroupAndInviteLink(groupName: String)(implicit
       webDriver: WebDriverType
   ): String = {
+    createGroup(groupName)
+
     eventually() {
-      createGroup(groupName)
       val createInviteElements = findAll(className("create-invite-link"))
       withClue(s"Create invite elements not found $createInviteElements") {
         val createInviteButton = createInviteElements
@@ -71,9 +74,14 @@ trait SplitwellFrontendTestUtil extends TestCommon with AnsTestUtil {
   }
 
   def requestGroupMembership(invite: String)(implicit webDriver: WebDriverType) = {
-    val field = textField(id("group-invite-field"))
+    val field = eventually() {
+      textField(id("group-invite-field"))
+    }
     field.value = invite
-    click on id("request-membership-link")
+    val link = eventually() {
+      find(id("request-membership-link")).valueOrFail("Request membership link not found")
+    }
+    click on link
   }
 
   def getGroupContractIds()(implicit driver: WebDriverType): Set[String] =

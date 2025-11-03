@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to be read here)
-import { DecentralizedSynchronizerUpgradeConfig, DomainMigrationIndex } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  DecentralizedSynchronizerUpgradeConfig,
+  DomainMigrationIndex,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import { allSvsToDeploy } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { StaticSvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 
@@ -38,9 +41,10 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
     installNode.installNode(migrationId, sv.nodeName, {
       getSecrets: () => Promise.resolve(secrets),
       /* eslint-disable @typescript-eslint/no-unused-vars */
-      getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
+      getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
         Promise.resolve('access_token'),
       getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
+      reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
     });
   }
 }

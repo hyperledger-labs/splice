@@ -179,7 +179,7 @@ jobs:
       test_names_file: 'test-full-class-names.log'
       start_canton_options: -w
       # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
-      parallelism: 10
+      parallelism: 11
       test_name: wall-clock-time
       with_gcp_creds: true
       skip_if_regex: "\\[bft\\]"
