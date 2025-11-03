@@ -102,6 +102,8 @@ case class ValidatorDecentralizedSynchronizerConfig(
       * sequencerNames is mutually exclusive with `url`.
       */
     sequencerNames: Option[Seq[String]] = None,
+
+    // TODO(#3059): Add a threshold parameter to configure the number of sequencers that must be connected
 ) {
 
   /** Converts the reservedTraffic into an Option that is set to None if the validator is not
