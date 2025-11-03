@@ -7,17 +7,35 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import org.lfdecentralizedtrust.splice.SpliceMetrics
 import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
-import org.lfdecentralizedtrust.splice.auth.{AuthToken, AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
+import org.lfdecentralizedtrust.splice.auth.{
+  AuthToken,
+  AuthTokenManager,
+  AuthTokenSource,
+  AuthTokenSourceNone,
+}
 import org.lfdecentralizedtrust.splice.automation.AutomationService
-import org.lfdecentralizedtrust.splice.config.{BaseParticipantClientConfig, SharedSpliceAppParameters}
+import org.lfdecentralizedtrust.splice.config.{
+  BaseParticipantClientConfig,
+  SharedSpliceAppParameters,
+}
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  HasHealth,
+  ResourceTemplateDecoder,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync, HasCloseContext, SyncCloseable}
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  HasCloseContext,
+  SyncCloseable,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
@@ -29,7 +47,13 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
 import org.apache.pekko.http.scaladsl.{ClientTransport, ConnectionContext, Http}
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpHeader,
+  HttpRequest,
+  HttpResponse,
+}
 import org.apache.pekko.http.scaladsl.server.Directive0
 import org.apache.pekko.http.scaladsl.settings.ClientConnectionSettings
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
@@ -429,8 +453,11 @@ object NodeBase {
         dispatchRequest(request).map { response =>
           val responseTraceCtx = traceContextFromHeaders(response.headers)
           val end = System.currentTimeMillis()
-          logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
-          logger.debug(msg(s"Received response with status code: ${response.status}"))(
+          logger.debug(
+            msg(
+              s"HTTP request took ${end - start} ms to complete. Received response with status code: ${response.status}"
+            )
+          )(
             responseTraceCtx
           )
           if (logPayload) {
