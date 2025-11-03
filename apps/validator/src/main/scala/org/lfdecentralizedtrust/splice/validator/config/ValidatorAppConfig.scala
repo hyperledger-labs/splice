@@ -98,9 +98,8 @@ case class ValidatorDecentralizedSynchronizerConfig(
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
 
-    /** An optional statically specified sequencerNames for a sequencer to use to connect.
-      * specifies the trusted set of sequencers the participant should connect to.
-      * If set, the url parameter should not be set.
+    /** An optional, static list of trusted sequencer names to connect to.
+      * sequencerNames is mutually exclusive with `url`.
       */
     sequencerNames: Option[Seq[String]] = None,
 ) {
