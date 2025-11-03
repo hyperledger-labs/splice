@@ -3,8 +3,9 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ArrowForward, ContentCopy } from '@mui/icons-material';
-import { Alert, Badge, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
+import { PageSectionHeader } from '../../components/beta';
 
 export interface ActionRequiredData {
   contractId: ContractId<VoteRequest>;
@@ -26,18 +27,11 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 
   return (
     <Box sx={{ mb: 4 }} data-testid="action-required-section">
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" id="action-required-header" data-testid="action-required-header">
-          Action Required
-        </Typography>
-        <Badge
-          badgeContent={actionRequiredRequests.length}
-          color="error"
-          sx={{ ml: 2 }}
-          id="action-required-badge-count"
-          data-testid="action-required-badge-count"
-        />
-      </Box>
+      <PageSectionHeader
+        title="Action Required"
+        badgeCount={actionRequiredRequests.length}
+        data-testid="action-required"
+      />
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
         {actionRequiredRequests.length === 0 ? (

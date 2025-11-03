@@ -2,5 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import PageHeader from './PageHeader';
+import PageSectionHeader from './PageSectionHeader';
 
-export { PageHeader };
+export { PageHeader, PageSectionHeader };
