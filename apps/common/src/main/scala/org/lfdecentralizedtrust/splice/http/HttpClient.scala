@@ -58,7 +58,7 @@ object HttpClient {
 
       override def withOverrideParameters(
           newParameters: HttpClient.HttpRequestParameters
-      ): HttpClient = HttpClient(apiLoggingConfig, outerRequestParameters, logger)
+      ): HttpClient = HttpClient(apiLoggingConfig, newParameters, logger)
 
       override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
         implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
