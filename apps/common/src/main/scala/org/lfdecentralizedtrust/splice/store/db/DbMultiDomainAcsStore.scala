@@ -1262,29 +1262,28 @@ final class DbMultiDomainAcsStore[TXE](
             storage
               .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
               .map { summaryState =>
-                val lastOffset = batch.batch.last.tree.getOffset
+                val lastTree = batch.batch.last.tree
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
-                      lastOffset,
+                      lastTree.getOffset,
                     )
                   )
-                  .signalOffsetChanged(lastOffset)
-                // TODO: numbers will be off: repeated per batch, so change this
-                batch.batch.toVector.foreach { item =>
-                  val summary =
-                    summaryState.toIngestionSummary(
-                      updateId = Some(item.tree.getUpdateId),
-                      synchronizerId = Some(item.synchronizerId),
-                      offset = item.tree.getOffset,
-                      recordTime = Some(CantonTimestamp.assertFromInstant(item.tree.getRecordTime)),
-                      newAcsSize = state.get().acsSize,
-                      metrics,
-                    )
-                  logger.debug(show"Ingested transaction $summary")
-                  handleIngestionSummary(summary)
-                }
+                  .signalOffsetChanged(lastTree.getOffset)
+                val summary =
+                  summaryState.toIngestionSummary(
+                    updateId = None,
+                    synchronizerId = None,
+                    offset = lastTree.getOffset,
+                    recordTime = Some(CantonTimestamp.assertFromInstant(lastTree.getRecordTime)),
+                    newAcsSize = state.get().acsSize,
+                    metrics,
+                  )
+                logger.debug(
+                  show"Ingested transaction batch of ${batch.batch.length} elements: $summary"
+                )
+                handleIngestionSummary(summary)
               }
           case IngestReassignment(reassignment, synchronizerId) =>
             storage
@@ -1644,14 +1643,14 @@ final class DbMultiDomainAcsStore[TXE](
           insertValue.interfaceViews(eventNumber)
         }
         joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
-        _ <- (joinedInterfaceViewsValues match {
+        _ <- joinedInterfaceViewsValues match {
           case None => // no interfaces to insert
             DBIO.successful(0)
           case Some(interfaceViewValues) =>
             (sql"""
                 insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$interfaceViewsIndexColumnNames)
                 values """ ++ interfaceViewValues).toActionBuilder.asUpdate
-        })
+        }
       } yield {
         summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
       }
