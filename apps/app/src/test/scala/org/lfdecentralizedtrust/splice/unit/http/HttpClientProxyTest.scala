@@ -43,10 +43,11 @@ class HttpClientProxyTest
       withProxy() { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val serverPort = serverBinding.localAddress.getPort
+          val host = "localhost"
           val response = executeRequest(serverBinding).futureValue
           response.status shouldBe StatusCodes.OK
           proxy.process.hasNoErrors shouldBe true
-          proxy.proxiedConnectRequest(serverPort) shouldBe false
+          proxy.proxiedConnectRequest(host, serverPort) shouldBe false
         }
       }
     }
@@ -147,10 +148,11 @@ class HttpClientProxyTest
 
   private def assertProxiedGetRequest(proxy: HttpProxy, serverBinding: ServerBinding) = {
     val serverPort = serverBinding.localAddress.getPort
+    val host = "localhost"
     val response = executeRequest(serverBinding).futureValue
     response.status shouldBe StatusCodes.OK
     proxy.process.hasNoErrors shouldBe true
-    proxy.proxiedConnectRequest(serverPort) shouldBe true
+    proxy.proxiedConnectRequest(host, serverPort) shouldBe true
   }
 }
 

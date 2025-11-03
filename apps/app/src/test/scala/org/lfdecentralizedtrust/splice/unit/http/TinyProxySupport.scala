@@ -12,8 +12,18 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.sys.process.{Process, ProcessLogger}
 import scala.concurrent.duration.*
 
+/** Support trait to start and manage a tinyproxy HTTP proxy for use in tests.
+  */
 trait TinyProxySupport {
   object HttpProxy {
+
+    /** Create and start a tinyproxy process with a basic configuration.
+      * A temporary file is created to hold the configuration, and deleted when the proxy is stopped.
+      * The stdout is scraped to determine when the proxy is ready.
+      * @param maxStartupTime The maximum time to wait for the proxy to start.
+      * @param auth Optional basic auth credentials (username, password) that will be required by the proxy.
+      * @return the HttpProxy instance representing the started proxy.
+      */
     def apply(maxStartupTime: Duration, auth: Option[(String, String)]): HttpProxy = {
       val configFile = File.createTempFile("tinyproxy", ".conf")
       val proxyPort = 3128
@@ -40,7 +50,7 @@ trait TinyProxySupport {
       waitUntilStarted(maxStartupTime.toMillis)
       TinyProxy(proxyProcess, proxyPort, configFile)
     }
-
+    // creates a basic config file that allows localhost to connect, and optionally sets required basic auth
     private def createConfig(
         configFile: File,
         proxyPort: Int,
@@ -57,15 +67,16 @@ trait TinyProxySupport {
            |""".stripMargin
       Files.write(configFile.toPath, config.getBytes(StandardCharsets.UTF_8))
     }
-
+    // Represents a running tinyproxy process, with methods to check its status and stop it
     case class TinyProxy(process: ProxyProcess, port: Int, configFile: File) extends HttpProxy {
       def hasNoErrors: Boolean = process.hasNoErrors
-      def proxiedConnectRequest(serverPort: Int): Boolean = {
+      // Verifies that tinyproxy logged that it handled a CONNECT request to proxy to the given server port on localhost
+      def proxiedConnectRequest(host: String, serverPort: Int): Boolean = {
         List(
-          process.stdOutLines.exists(_.contains(s"CONNECT localhost:$serverPort")),
-          process.stdOutLines.exists(_.contains(s"opening connection to localhost:$serverPort")),
+          process.stdOutLines.exists(_.contains(s"CONNECT $host:$serverPort")),
+          process.stdOutLines.exists(_.contains(s"opening connection to $host:$serverPort")),
           process.stdOutLines.exists(
-            _.contains(s"opensock: getaddrinfo returned for localhost:$serverPort")
+            _.contains(s"opensock: getaddrinfo returned for $host:$serverPort")
           ),
         ).forall(_ == true)
       }
@@ -76,6 +87,7 @@ trait TinyProxySupport {
     }
   }
 
+  // Runs the tinyproxy process with the given config file, capturing stdout and stderr
   class ProxyProcess(configFile: File) {
     private val cmd = s"tinyproxy -d -c ${configFile.getAbsolutePath}"
     private val processBuilder = Process(cmd)
@@ -102,14 +114,33 @@ trait TinyProxySupport {
     def destroy(): Unit = process.destroy()
   }
 
+  /** A running tinyproxy HTTP proxy instance.
+    */
   trait HttpProxy {
+
+    /** The port the proxy is listening on */
     def port: Int
+
+    /** The tinyproxy process and its stdout and sterr output */
     def process: ProxyProcess
+
+    /** Whether the proxy has logged any errors to stderr */
     def hasNoErrors: Boolean
-    def proxiedConnectRequest(serverPort: Int): Boolean
+
+    /** Whether the proxy has logged handling a CONNECT request to the given host and server port */
+    def proxiedConnectRequest(host: String, serverPort: Int): Boolean
+
+    /** Stop the proxy and clean up any resources */
     def stop(): Unit
   }
 
+  /** Helper method to create a tinyproxy instance for the duration of the test code.
+    * @param auth Optional basic auth credentials (username, password) required by the proxy.
+    * @param maxStartupTime The maximum time to wait for the proxy to start.
+    * @param testCode The test code to run with the started proxy.
+    * @tparam T the result of the test code.
+    * @return the result of the test code.
+    */
   def withProxy[T](
       auth: Option[(String, String)] = None,
       maxStartupTime: FiniteDuration = 5.seconds,

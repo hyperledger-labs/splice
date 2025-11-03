@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.lifecycle.{
@@ -36,38 +36,22 @@ import com.digitalasset.canton.lifecycle.{
   HasCloseContext,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
-import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider, W3CTraceContext}
-import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ReleaseVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
-import org.apache.pekko.http.scaladsl.{ClientTransport, ConnectionContext, Http}
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpHeader,
-  HttpRequest,
-  HttpResponse,
-}
+import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.server.Directive0
-import org.apache.pekko.http.scaladsl.settings.ClientConnectionSettings
-import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
-
-import java.net.InetSocketAddress
 import java.time
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
-import javax.net.ssl.SSLContext
 import scala.annotation.nowarn
-import scala.collection.immutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
-import scala.util.control.NonFatal
 
 /** A running instance of a canton node. See Node for the subclass that provides the default initialization for most apps. */
 abstract class NodeBase[State <: AutoCloseable & HasHealth](
