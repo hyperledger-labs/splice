@@ -1229,11 +1229,10 @@ final class DbMultiDomainAcsStore[TXE](
           val newAcsSize = summaryState.acsSizeDiff
           val summary = summaryState.toIngestionSummary(
             updateId = None,
-            synchronizerId = None,
             offset = offset,
-            recordTime = None,
+            synchronizerIdToRecordTime = Map.empty,
             newAcsSize = newAcsSize,
-            metrics,
+            metrics = metrics,
           )
           state
             .getAndUpdate(
@@ -1263,6 +1262,12 @@ final class DbMultiDomainAcsStore[TXE](
               .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
               .map { summaryState =>
                 val lastTree = batch.batch.last.tree
+                val synchronizerIdToRecordTime = batch.batch
+                  .groupBy(_.synchronizerId)
+                  .view
+                  .mapValues(trees =>
+                    CantonTimestamp.assertFromInstant(trees.last.tree.getRecordTime)
+                  )
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
@@ -1274,11 +1279,10 @@ final class DbMultiDomainAcsStore[TXE](
                 val summary =
                   summaryState.toIngestionSummary(
                     updateId = None,
-                    synchronizerId = None,
                     offset = lastTree.getOffset,
-                    recordTime = Some(CantonTimestamp.assertFromInstant(lastTree.getRecordTime)),
+                    synchronizerIdToRecordTime = synchronizerIdToRecordTime.toMap,
                     newAcsSize = state.get().acsSize,
-                    metrics,
+                    metrics = metrics,
                   )
                 logger.debug(
                   show"Ingested transaction batch of ${batch.batch.length} elements: $summary"
@@ -1303,11 +1307,10 @@ final class DbMultiDomainAcsStore[TXE](
                 val summary =
                   summaryState.toIngestionSummary(
                     updateId = None,
-                    synchronizerId = Some(synchronizerId),
+                    synchronizerIdToRecordTime = Map(synchronizerId -> reassignment.recordTime),
                     offset = reassignment.offset,
-                    recordTime = Some(reassignment.recordTime),
                     newAcsSize = state.get().acsSize,
-                    metrics,
+                    metrics = metrics,
                   )
                 logger.debug(show"Ingested reassignment $summary")
                 handleIngestionSummary(summary)
@@ -1326,11 +1329,10 @@ final class DbMultiDomainAcsStore[TXE](
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
                     updateId = None,
-                    synchronizerId = None,
+                    synchronizerIdToRecordTime = Map.empty,
                     offset = offset,
-                    recordTime = None,
                     newAcsSize = state.get().acsSize,
-                    metrics,
+                    metrics = metrics,
                   )
                 logger.debug(show"Ingested offset checkpoint $offset")
                 handleIngestionSummary(summary)
@@ -2203,9 +2205,8 @@ object DbMultiDomainAcsStore {
 
     def toIngestionSummary(
         updateId: Option[String],
-        synchronizerId: Option[SynchronizerId],
+        synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
         offset: Long,
-        recordTime: Option[CantonTimestamp],
         newAcsSize: Int,
         metrics: StoreMetrics,
     ): IngestionSummary = {
@@ -2214,18 +2215,15 @@ object DbMultiDomainAcsStore {
       metrics.acsSize.updateValue(newAcsSize.toLong)
       metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
       metrics.completedIngestions.mark()
-      synchronizerId.foreach { synchronizer =>
-        recordTime.foreach { recordTime =>
-          metrics
-            .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
-            .updateValue(recordTime.toEpochMilli)
-        }
+      synchronizerIdToRecordTime.foreach { case (synchronizer, recordTime) =>
+        metrics
+          .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
+          .updateValue(recordTime.toEpochMilli)
       }
       IngestionSummary(
         updateId = updateId,
-        synchronizerId = synchronizerId,
         offset = Some(offset),
-        recordTime = recordTime,
+        synchronizerIdToRecordTime = synchronizerIdToRecordTime,
         newAcsSize = newAcsSize,
         ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
         numFilteredCreatedEvents = this.numFilteredCreatedEvents,
