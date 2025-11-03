@@ -380,7 +380,7 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      replaceOnChanges: ['values.annotations'],
+      replaceOnChanges: ['values.annotations', 'values.service.annotations'],
       deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
