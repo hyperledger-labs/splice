@@ -77,12 +77,14 @@ class DockerComposeValidatorFrontendIntegrationTest
         webDriver: WebDriverType
     ): Unit = {
       seleniumText(find(id("logged-in-user"))) should startWith(userPrefix)
-      val balanceUsd = find(id("wallet-balance-usd"))
-        .valueOrFail("Couldn't find balance")
-        .text
-        .split(" ")
-        .head
-      balanceUsd.toDouble should be > tappedAmount - 5.0
+      eventually() {
+        val balanceUsd = find(id("wallet-balance-usd"))
+          .valueOrFail("Couldn't find balance")
+          .text
+          .split(" ")
+          .head
+        balanceUsd.toDouble should be > tappedAmount - 5.0
+      }
     }
 
     val backupsDir: Path =
