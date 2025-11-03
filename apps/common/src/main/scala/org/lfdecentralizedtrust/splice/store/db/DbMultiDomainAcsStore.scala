@@ -1262,7 +1262,6 @@ final class DbMultiDomainAcsStore[TXE](
             storage
               .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
               .map { summaryState =>
-                // TODO: is this right? can we use this for signaling?
                 val lastOffset = batch.batch.last.tree.getOffset
                 state
                   .getAndUpdate(s =>
@@ -1543,7 +1542,6 @@ final class DbMultiDomainAcsStore[TXE](
               case Delete(exercisedEvent) =>
                 doDeleteContract(exercisedEvent, summary)
             })*),
-            // TODO: these also need batching
             DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
               doIngestTxLogInsert(
                 domainMigrationId,
@@ -1896,7 +1894,6 @@ final class DbMultiDomainAcsStore[TXE](
     else sql"," ++ sqlCommaSeparated(data.map(_._2).map(v => sql"$v"))
   }
 
-  // TODO: this should probably be dropped
   // Note: the column names are hardcoded so they're safe to interpolate raw
   private def getIndexColumnNames(data: Seq[(String, IndexColumnValue[?])]): String =
     mkIndexColumnNames(data.map(_._1))
