@@ -10,14 +10,13 @@ import org.apache.pekko.http.scaladsl.Http.ServerBinding
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, StatusCodes, Uri}
 import org.apache.pekko.http.scaladsl.server.Directives.{complete, *}
 import org.apache.pekko.http.scaladsl.server.Route
-import org.lfdecentralizedtrust.splice.environment.NodeBase
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
-class HttpProxyTest
+class HttpClientProxyTest
     extends AsyncWordSpec
     with BaseTest
     with HasActorSystem
@@ -27,8 +26,8 @@ class HttpProxyTest
     with HttpServerSupport
     with SystemPropertiesSupport {
 
-  "Http proxy settings" should {
-    "be supported in httpClient used in NodeBase using http.proxyPort, http.proxyHost" in {
+  "HttpClient proxy settings" should {
+    "support proxy configuration via http.proxyPort, http.proxyHost" in {
       withProxy() { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val props = SystemProperties()
@@ -40,7 +39,7 @@ class HttpProxyTest
         }
       }
     }
-    "if not set, not use the proxy" in {
+    "not use the proxy if no configuration set" in {
       withProxy() { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val serverPort = serverBinding.localAddress.getPort
@@ -51,7 +50,7 @@ class HttpProxyTest
         }
       }
     }
-    "be supported in httpClient used in NodeBase using https.proxyPort, https.proxyHost" in {
+    "support proxy configuration via https.proxyPort, https.proxyHost" in {
       withProxy() { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val props = SystemProperties()
@@ -63,7 +62,7 @@ class HttpProxyTest
         }
       }
     }
-    "be supported in httpClient used in NodeBase using http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
+    "support proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
       val user = "user"
       val password = "pass1"
       withProxy(auth = Some((user, password))) { proxy =>
@@ -79,7 +78,7 @@ class HttpProxyTest
         }
       }
     }
-    "be supported in httpClient used in NodeBase using https.proxyPort, https.proxyHost, https.proxyUser and https.proxyPassword" in {
+    "support proxy configuration via https.proxyPort, https.proxyHost, https.proxyUser and https.proxyPassword" in {
       val user = "user"
       val password = "pass1"
       withProxy(auth = Some((user, password))) { proxy =>
@@ -95,7 +94,7 @@ class HttpProxyTest
         }
       }
     }
-    "fail if http.proxyUser and http.proxyPassword are not set and proxy requires auth" in {
+    "fail to connect (Proxy Authentication Required) if http.proxyUser and http.proxyPassword are not set and proxy requires auth" in {
       val user = "user"
       val password = "pass1"
       withProxy(auth = Some((user, password))) { proxy =>
@@ -111,7 +110,7 @@ class HttpProxyTest
         }
       }
     }
-    "fail with Unauthorized with bad credentials and proxy requires auth" in {
+    "fail to connect (Unauthorized) using bad proxy credentials" in {
       val user = "user"
       val password = "pass1"
       withProxy(auth = Some((user, password))) { proxy =>
@@ -133,7 +132,7 @@ class HttpProxyTest
 
   private def executeRequest(serverBinding: ServerBinding) = {
     val serverPort = serverBinding.localAddress.getPort
-    val httpClient = NodeBase.buildHttpClient(
+    val httpClient = HttpClient(
       ApiLoggingConfig(),
       HttpClient.HttpRequestParameters(NonNegativeDuration(30.seconds)),
       logger,
