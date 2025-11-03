@@ -857,14 +857,14 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "audience": "https://canton.network.global",
-          "client-id": "sv-1-client-id",
+          "client-id": "sv1-sv-client-id",
           "client-secret": "***",
-          "ledger-api-user": "sv-1-client-id@clients",
+          "ledger-api-user": "sv1-sv-client-id@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "splice-auth0-secret-sv-1-sv-1",
+    "name": "splice-auth0-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -889,7 +889,32 @@
         }
       }
     },
-    "name": "splice-auth0-secret-sv-1-sv1_validator",
+    "name": "splice-auth0-secret-sv-1-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-da-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "sv-da-1-sv-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-da-1-sv-client-id@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -914,32 +939,7 @@
         }
       }
     },
-    "name": "splice-auth0-secret-sv-da-1-sv-da-1_validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
-        "namespace": "sv-da-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "sv-da-1-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "sv-da-1-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "splice-auth0-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-secret-sv-da-1-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

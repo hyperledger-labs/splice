@@ -174,7 +174,7 @@ class RecoverExternalPartyIntegrationTest
       }
       val acsSnapshotFile = Files.createTempFile("acs", ".snapshot")
       Files.write(acsSnapshotFile, acsSnapshot.toByteArray())
-      bobValidatorBackend.participantClient.repair.import_acs(acsSnapshotFile.toString)
+      bobValidatorBackend.participantClient.repair.import_acs_old(acsSnapshotFile.toString)
       bobValidatorBackend.participantClient.synchronizers.reconnect_all()
     }
 
