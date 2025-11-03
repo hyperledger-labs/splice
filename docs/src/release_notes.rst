@@ -30,6 +30,10 @@ Upcoming
 
     - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
 
+  - Mediator
+
+    - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
+
 0.4.23
 ------
 
