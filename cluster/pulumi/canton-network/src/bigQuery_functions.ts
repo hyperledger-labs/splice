@@ -291,8 +291,8 @@ const TransferSummary_minted = new BQScalarFunction(
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) AS validatorRewardAmount,
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) AS svRewardAmount,
       IFNULL(
-        \`PARSE_BIGNUMERIC(JSON_VALUE(tr_json,
-          \`$$FUNCTIONS_DATASET$$.daml_record_path\`(path, 'optional_numeric')))\`, 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
+        PARSE_BIGNUMERIC(JSON_VALUE(tr_json,
+          \`$$FUNCTIONS_DATASET$$.daml_record_path\`([11], 'optional_numeric'))), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
     )
   `
 );
