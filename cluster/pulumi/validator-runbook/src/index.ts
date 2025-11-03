@@ -1,8 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, Auth0Fetch, config } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { infraStack } from '@lfdecentralizedtrust/splice-pulumi-common/src/stackReferences';
+import {
+  Auth0Fetch,
+  config,
+  getAuth0ClusterConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { installNode } from './installNode';
 
@@ -16,7 +18,7 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
 
 // TODO(DACH-NY/canton-network-node#8008): Reduce duplication from sv-runbook stack
 async function main() {
-  const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
+  const auth0ClusterCfg = getAuth0ClusterConfig();
   if (!auth0ClusterCfg.validatorRunbook) {
     throw new Error('missing validator runbook auth0 output');
   }
