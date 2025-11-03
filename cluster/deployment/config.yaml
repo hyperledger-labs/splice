@@ -40,7 +40,7 @@ pulumiProjectConfig:
       enterprisePlus: false
     skipSynchronizerInitialization: true
     # default not allowing version downgrades in our apps
-    allowDowngrade: false
+    allowDowngrade: true
   sv-runbook:
     cloudSql:
       enabled: false
