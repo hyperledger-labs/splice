@@ -1052,6 +1052,7 @@ lazy val `apps-sv` =
       libraryDependencies ++= Seq(
         pekko_http_cors,
         scalapb_runtime,
+        pekko_connectors_csv % "test",
       ),
       Compile / unmanagedJars := Attributed
         .blankSeq(Seq(file(s"${sys.env("COMETBFT_PROTO")}/canton-drivers-proto.jar"))),

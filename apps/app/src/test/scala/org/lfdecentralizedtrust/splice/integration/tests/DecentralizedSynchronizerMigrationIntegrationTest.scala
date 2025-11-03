@@ -427,6 +427,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
       eventually() {
         validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty
+
         validatorBackend.scanProxy.lookupTransferPreapprovalByParty(
           externalParty
         ) should not be empty

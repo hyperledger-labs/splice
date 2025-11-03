@@ -27,6 +27,7 @@ org.lfdecentralizedtrust.splice.store.db.DbSvDsoStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvSvStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
+org.lfdecentralizedtrust.splice.store.db.performance.IngestionPerformanceIngestionTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
 org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconcilerSpec
