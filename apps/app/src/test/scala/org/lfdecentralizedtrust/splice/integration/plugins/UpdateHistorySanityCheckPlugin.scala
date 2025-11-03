@@ -18,6 +18,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
@@ -127,27 +128,39 @@ class UpdateHistorySanityCheckPlugin(
 
   private def compareHistories(
       scans: Seq[ScanAppBackendReference]
-  ): Unit = {
+  )(implicit tc: TraceContext): Unit = {
     val (founders, others) = scans.partition(_.config.isFirstSv)
     val founder = founders.loneElement
     val founderHistory = paginateHistory(founder, None, Chain.empty).toVector
+    val dsoRules = DsoRules.fromJson(founder.getDsoInfo().dsoRules.contract.payload.noSpaces)
     forAll(others) { otherScan =>
-      withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
-        val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
-        // One of them might be more advanced than the other.
-        // That's fine, we mostly want to check that backfilling works as expected.
-        val minSize = Math.min(founderHistory.size, otherScanHistory.size)
-        val otherComparable = otherScanHistory
-          .take(minSize)
-        val founderComparable = founderHistory
-          .take(minSize)
-        val different = otherComparable
-          .zip(founderComparable)
-          .collect {
-            case (otherItem, founderItem) if founderItem != otherItem =>
-              otherItem -> founderItem
-          }
-        different should be(empty)
+      val svPartyId = otherScan.getDsoInfo().svPartyId
+      if (!dsoRules.svs.containsKey()) {
+        // namely: the SV will not see transactions to the DSO, but will still see transactions involving itself, so this breaks comparison:
+        // U1: DSO-only
+        // U2: Involves SV
+        // founder sees U1, U2 but otherScan only U2
+        logger.info(
+          s"Looks like the owner of Scan ${otherScan.name} (partyId=$svPartyId) was offboarded, so the history might not match. Ignoring."
+        )
+      } else {
+        withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
+          val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
+          // One of them might be more advanced than the other.
+          // That's fine, we mostly want to check that backfilling works as expected.
+          val minSize = Math.min(founderHistory.size, otherScanHistory.size)
+          val otherComparable = otherScanHistory
+            .take(minSize)
+          val founderComparable = founderHistory
+            .take(minSize)
+          val different = otherComparable
+            .zip(founderComparable)
+            .collect {
+              case (otherItem, founderItem) if founderItem != otherItem =>
+                otherItem -> founderItem
+            }
+          different should be(empty)
+        }
       }
     }
   }
