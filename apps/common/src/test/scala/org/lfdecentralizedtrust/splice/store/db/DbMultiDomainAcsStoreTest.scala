@@ -43,6 +43,7 @@ import java.time.Instant
 import scala.concurrent.Future
 import StoreTest.*
 import cats.data.NonEmptyList
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbMultiDomainAcsStoreTest
@@ -768,6 +769,7 @@ class DbMultiDomainAcsStoreTest
         migrationTimeInfo,
       ),
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      IngestionConfig(),
     )
   }
 

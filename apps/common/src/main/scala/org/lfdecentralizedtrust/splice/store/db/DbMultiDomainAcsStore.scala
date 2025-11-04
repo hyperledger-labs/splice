@@ -67,6 +67,7 @@ import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -94,6 +95,7 @@ final class DbMultiDomainAcsStore[TXE](
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
     retryProvider: RetryProvider,
+    ingestionConfig: IngestionConfig,
     /** Allows processing the summary in a store-specific manner, e.g., to produce metrics
       * on ingestion of certain contracts.
       */
@@ -1588,7 +1590,7 @@ final class DbMultiDomainAcsStore[TXE](
       if (contractIds.isEmpty) DBIO.successful(Set.empty)
       else {
         DBIO
-          .sequence(contractIds.grouped(10000).map { contractIds =>
+          .sequence(contractIds.grouped(ingestionConfig.maxLookupsPerStatement).map { contractIds =>
             (sql"""
            select distinct contract_id from incomplete_reassignments
            where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id in """ ++ inClause(
@@ -1642,7 +1644,7 @@ final class DbMultiDomainAcsStore[TXE](
         entries: NonEmptyList[AcsInsertEntry],
         summary: MutableIngestionSummary,
     )(implicit tc: TraceContext) = {
-      DBIO.sequence(entries.grouped(1000).map { entries =>
+      DBIO.sequence(entries.grouped(ingestionConfig.maxEntriesPerInsert).map { entries =>
         val insertValues = entries
           .map(entry => entry.createdEvent.getContractId -> getInsertValues(entry))
         val acsTableValues = insertValues.map(_._2.acsTable)
@@ -1779,7 +1781,7 @@ final class DbMultiDomainAcsStore[TXE](
     private def doDeleteContracts(events: Seq[ExercisedEvent], summary: MutableIngestionSummary) = {
       if (events.isEmpty) DBIO.successful(())
       else {
-        DBIO.sequence(events.grouped(1000).map { events =>
+        DBIO.sequence(events.grouped(ingestionConfig.maxDeletesPerStatement).map { events =>
           (sql"""
             delete from #$acsTableName
             where store_id = $acsStoreId

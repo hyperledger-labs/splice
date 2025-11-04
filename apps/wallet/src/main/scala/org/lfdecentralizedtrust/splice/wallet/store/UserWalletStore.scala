@@ -44,6 +44,7 @@ import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -481,6 +482,7 @@ object UserWalletStore {
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -495,6 +497,7 @@ object UserWalletStore {
           retryProvider,
           domainMigrationInfo,
           participantId,
+          ingestionConfig,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
