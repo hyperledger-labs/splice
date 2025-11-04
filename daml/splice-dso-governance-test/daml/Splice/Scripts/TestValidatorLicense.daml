@@ -1,0 +1,61 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestValidatorLicense where
+
+import DA.Assert
+import Daml.Script
+import DA.Time
+
+import Splice.ValidatorLicense
+import Splice.DsoRules
+import Splice.Scripts.DsoTestUtils
+
+
+testGrantValidatorLicense : Script ()
+testGrantValidatorLicense = do
+  (app, dso, (_, sv2, _, _)) <- initMainNet
+
+  -- a new validator prepares his participant
+  v1 <- allocateParty "v1"
+
+  now <- getTime
+
+  -- sv2 grants a validator license to v1
+  result <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    DsoRules_GrantValidatorLicense with
+      sponsor = sv2
+      validator = v1
+
+  -- v1 received a validator license
+  [(validatorLicenseCid, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = None
+    metadata = None
+    lastActiveAt = Some now
+    weight = None
+    kind = Some NonOperatorLicense
+
+  result.validatorLicense === validatorLicenseCid
+
+  -- v1 can report activity
+  passTime (hours 1)
+  activityTime <- getTime
+
+  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
+
+  [(_, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = None
+    metadata = None
+    lastActiveAt = Some activityTime
+    weight = None
+    kind = Some NonOperatorLicense
+
+  pure ()
