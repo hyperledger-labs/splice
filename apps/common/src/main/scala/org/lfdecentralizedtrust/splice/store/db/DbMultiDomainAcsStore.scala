@@ -1462,7 +1462,7 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit tc: TraceContext) = {
       val summary = MutableIngestionSummary.empty
 
-      val workTodo = trees.batch
+      val workTodo: Seq[OperationToDo] = trees.batch
         .map(tree =>
           Trees
             .foldTree(
@@ -1514,55 +1514,58 @@ final class DbMultiDomainAcsStore[TXE](
           synchronizerId -> batch.map(_.tree.getRecordTime).minimumBy(_.toEpochMilli)
         }
 
-      ingestUpdateAtOffset(
-        trees.batch.last.tree.getOffset,
-        DBIO
-          .seq(
-            DBIO.seq(workTodo.map({
-              case Insert(createdEvent, synchronizerId) =>
-                for {
-                  alreadyArchived <- hasIncompleteReassignments(createdEvent.getContractId)
-                  _ <-
-                    if (alreadyArchived) {
-                      DBIO.successful(())
-                    } else {
-                      DBIO.seq(
-                        doIngestAcsInserts(
-                          NonEmptyList
-                            .of(
-                              AcsInsertEntry(
-                                createdEvent.getOffset,
-                                createdEvent,
-                                stateRowDataFromActiveContract(synchronizerId, 0L),
-                              )
-                            ),
-                          summary,
-                        )
-                      )
-                    }
-                } yield ()
-              case Delete(exercisedEvent) =>
-                doDeleteContract(exercisedEvent, summary)
-            })*),
-            DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
-              doIngestTxLogInsert(
-                domainMigrationId,
-                synchronizerId,
-                offset,
-                CantonTimestamp.assertFromInstant(recordTime),
-                txe,
-                summary,
-              )
-            }*),
-            DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map { case (synchronizerId, recordTime) =>
-              doInitializeFirstIngestedUpdate(
-                synchronizerId,
-                domainMigrationId,
-                CantonTimestamp.assertFromInstant(recordTime),
-              )
-            }*),
-          ),
-      ).map(_ => summary)
+      val allDbOps = for {
+        insertsToAlreadyArchived <- DBIO.sequence(
+          workTodo
+            .collect { case insert: Insert =>
+              // TODO: batch this
+              hasIncompleteReassignments(insert.evt.getContractId).map(insert -> _)
+            }
+        )
+        insertsToDo = insertsToAlreadyArchived.collect {
+          case (insert, alreadyArchived) if !alreadyArchived => insert
+        }
+        _ <- NonEmptyList.fromList(insertsToDo.toList) match {
+          case Some(inserts) =>
+            doIngestAcsInserts(
+              inserts.map(insert =>
+                AcsInsertEntry(
+                  insert.evt.getOffset,
+                  insert.evt,
+                  stateRowDataFromActiveContract(insert.synchronizerId, 0L),
+                )
+              ),
+              summary,
+            ).map(_ => ())
+          case None =>
+            DBIO.successful(())
+        }
+        // TODO: batch this too
+        _ <- DBIO.seq(workTodo.collect { case Delete(exercisedEvent) =>
+          doDeleteContract(exercisedEvent, summary)
+        }*)
+        // TODO (#3048): batch this
+        _ <- DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
+          doIngestTxLogInsert(
+            domainMigrationId,
+            synchronizerId,
+            offset,
+            CantonTimestamp.assertFromInstant(recordTime),
+            txe,
+            summary,
+          )
+        }*)
+        _ <- DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map {
+          case (synchronizerId, recordTime) =>
+            doInitializeFirstIngestedUpdate(
+              synchronizerId,
+              domainMigrationId,
+              CantonTimestamp.assertFromInstant(recordTime),
+            )
+        }*)
+      } yield summary
+
+      ingestUpdateAtOffset(trees.batch.last.tree.getOffset, allDbOps).map(_ => summary)
     }
 
     private def hasAcsEntry(contractId: String) = (sql"""
