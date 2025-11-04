@@ -33,6 +33,10 @@ if git diff --exit-code --quiet "${docker_runner_file}" "${runner_hook_file}"; t
   exit 0
 fi
 
+make --directory "${SPLICE_ROOT}" --jobs \
+  cluster/images/splice-test-docker-runner/docker-build \
+  cluster/images/splice-test-runner-hook/docker-build
+
 git add --all
 updated_branch="gha-runner-version-bump-$(date +%Y-%m-%d)"
 git switch -c "${updated_branch}"

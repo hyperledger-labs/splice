@@ -22,3 +22,12 @@ jobs:
           additional_nix_args: "--keep GH_TOKEN"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report Failures on Slack & Github
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        uses: ./.github/actions/tests/failure_notifications
+        with:
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
