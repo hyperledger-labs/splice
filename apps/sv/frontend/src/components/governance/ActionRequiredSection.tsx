@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { ContentCopy, East } from '@mui/icons-material';
-import { Alert, Box, Button, Card, Chip, Grid, IconButton, Stack, Typography } from '@mui/material';
+import { East } from '@mui/icons-material';
+import { Alert, Box, Button, Card, Grid, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import { PageSectionHeader } from '../../components/beta';
+import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
 
 export interface ActionRequiredData {
@@ -122,29 +122,6 @@ const ActionCard = (props: ActionCardProps) => {
     </Card>
   );
 };
-
-interface MemberIdentifierProps {
-  partyId: string;
-  isYou: boolean;
-}
-
-const MemberIdentifier: React.FC<MemberIdentifierProps> = ({ partyId, isYou }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-    <Typography
-      variant="body1"
-      fontWeight="medium"
-      fontFamily="Source Code Pro"
-      fontSize="14px"
-      data-testid="action-required-requester"
-    >
-      {partyId}
-    </Typography>
-    <IconButton color="secondary" onClick={() => navigator.clipboard.writeText(partyId)}>
-      <ContentCopy sx={{ fontSize: '14px' }} />
-    </IconButton>
-    {isYou && <Chip label="You" size="small" data-testid="action-required-you" />}
-  </Box>
-);
 
 interface ActionCardSegmentProps {
   title: string;
