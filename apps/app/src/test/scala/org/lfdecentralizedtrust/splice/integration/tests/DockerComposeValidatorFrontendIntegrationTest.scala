@@ -77,14 +77,12 @@ class DockerComposeValidatorFrontendIntegrationTest
         webDriver: WebDriverType
     ): Unit = {
       seleniumText(find(id("logged-in-user"))) should startWith(userPrefix)
-      eventually() {
-        val balanceUsd = find(id("wallet-balance-usd"))
-          .valueOrFail("Couldn't find balance")
-          .text
-          .split(" ")
-          .head
-        balanceUsd.toDouble should be > tappedAmount - 5.0
-      }
+      val balanceUsd = find(id("wallet-balance-usd"))
+        .valueOrFail("Couldn't find balance")
+        .text
+        .split(" ")
+        .head
+      balanceUsd.toDouble should be > tappedAmount - 5.0
     }
 
     val backupsDir: Path =
@@ -337,13 +335,20 @@ class DockerComposeValidatorFrontendIntegrationTest
       withFrontEnd("frontend") { implicit webDriver =>
         val validatorUserPassword = sys.env(s"COMPOSE_VALIDATOR_WEB_UI_PASSWORD")
         eventuallySucceeds()(go to s"http://wallet.localhost")
-        completeAuth0LoginWithAuthorization(
-          "http://wallet.localhost",
-          "admin@compose-validator.com",
-          validatorUserPassword,
-          () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
+
+        actAndCheck()(
+          s"Validator login to wallet via auth0",
+          completeAuth0LoginWithAuthorization(
+            "http://wallet.localhost",
+            "admin@compose-validator.com",
+            validatorUserPassword,
+            () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
+          ),
+        )(
+          "User is already logged in, and sees their balance",
+          _ => userLoggedInAndHasBalance("da-ComposeValidator-1::", adminTap),
         )
-        userLoggedInAndHasBalance("da-ComposeValidator-1::", adminTap)
+
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
           "admin@compose-validator.com",
