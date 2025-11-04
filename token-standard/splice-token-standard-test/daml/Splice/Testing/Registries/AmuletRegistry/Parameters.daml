@@ -88,6 +88,8 @@ defaultAmuletConfig = AmuletConfig with
   -- Amount of the AppRewardCoupon contract that a FeaturedAppActivityMarker is converted to.
   featuredAppActivityMarkerAmount = Some defaultFeaturedAppActivityMarkerAmount
 
+  developmentFundConfig = None
+
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
 defaultAmuletConfigSchedule = Schedule with
