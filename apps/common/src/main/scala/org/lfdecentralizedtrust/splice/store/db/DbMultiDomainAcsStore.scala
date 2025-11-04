@@ -1229,11 +1229,10 @@ final class DbMultiDomainAcsStore[TXE](
           val newAcsSize = summaryState.acsSizeDiff
           val summary = summaryState.toIngestionSummary(
             updateId = None,
-            synchronizerId = None,
             offset = offset,
-            recordTime = None,
+            synchronizerIdToRecordTime = Map.empty,
             newAcsSize = newAcsSize,
-            metrics,
+            metrics = metrics,
           )
           state
             .getAndUpdate(
@@ -1255,6 +1254,7 @@ final class DbMultiDomainAcsStore[TXE](
     override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
+      metrics.batchSize.update(batch.length)
       val steps = batchInsertionSteps(batch)
       MonadUtil
         .sequentialTraverse(steps) {
@@ -1262,29 +1262,33 @@ final class DbMultiDomainAcsStore[TXE](
             storage
               .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
               .map { summaryState =>
-                val lastOffset = batch.batch.last.tree.getOffset
+                val lastTree = batch.batch.last.tree
+                val synchronizerIdToRecordTime = batch.batch
+                  .groupBy(_.synchronizerId)
+                  .view
+                  .mapValues(trees =>
+                    CantonTimestamp.assertFromInstant(trees.last.tree.getRecordTime)
+                  )
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
-                      lastOffset,
+                      lastTree.getOffset,
                     )
                   )
-                  .signalOffsetChanged(lastOffset)
-                // TODO: numbers will be off: repeated per batch, so change this
-                batch.batch.toVector.foreach { item =>
-                  val summary =
-                    summaryState.toIngestionSummary(
-                      updateId = Some(item.tree.getUpdateId),
-                      synchronizerId = Some(item.synchronizerId),
-                      offset = item.tree.getOffset,
-                      recordTime = Some(CantonTimestamp.assertFromInstant(item.tree.getRecordTime)),
-                      newAcsSize = state.get().acsSize,
-                      metrics,
-                    )
-                  logger.debug(show"Ingested transaction $summary")
-                  handleIngestionSummary(summary)
-                }
+                  .signalOffsetChanged(lastTree.getOffset)
+                val summary =
+                  summaryState.toIngestionSummary(
+                    updateId = None,
+                    offset = lastTree.getOffset,
+                    synchronizerIdToRecordTime = synchronizerIdToRecordTime.toMap,
+                    newAcsSize = state.get().acsSize,
+                    metrics = metrics,
+                  )
+                logger.debug(
+                  show"Ingested transaction batch of ${batch.batch.length} elements: $summary"
+                )
+                handleIngestionSummary(summary)
               }
           case IngestReassignment(reassignment, synchronizerId) =>
             storage
@@ -1304,11 +1308,10 @@ final class DbMultiDomainAcsStore[TXE](
                 val summary =
                   summaryState.toIngestionSummary(
                     updateId = None,
-                    synchronizerId = Some(synchronizerId),
+                    synchronizerIdToRecordTime = Map(synchronizerId -> reassignment.recordTime),
                     offset = reassignment.offset,
-                    recordTime = Some(reassignment.recordTime),
                     newAcsSize = state.get().acsSize,
-                    metrics,
+                    metrics = metrics,
                   )
                 logger.debug(show"Ingested reassignment $summary")
                 handleIngestionSummary(summary)
@@ -1327,11 +1330,10 @@ final class DbMultiDomainAcsStore[TXE](
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
                     updateId = None,
-                    synchronizerId = None,
+                    synchronizerIdToRecordTime = Map.empty,
                     offset = offset,
-                    recordTime = None,
                     newAcsSize = state.get().acsSize,
-                    metrics,
+                    metrics = metrics,
                   )
                 logger.debug(show"Ingested offset checkpoint $offset")
                 handleIngestionSummary(summary)
@@ -1460,7 +1462,7 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit tc: TraceContext) = {
       val summary = MutableIngestionSummary.empty
 
-      val workTodo = trees.batch
+      val workTodo: Seq[OperationToDo] = trees.batch
         .map(tree =>
           Trees
             .foldTree(
@@ -1512,55 +1514,58 @@ final class DbMultiDomainAcsStore[TXE](
           synchronizerId -> batch.map(_.tree.getRecordTime).minimumBy(_.toEpochMilli)
         }
 
-      ingestUpdateAtOffset(
-        trees.batch.last.tree.getOffset,
-        DBIO
-          .seq(
-            DBIO.seq(workTodo.map({
-              case Insert(createdEvent, synchronizerId) =>
-                for {
-                  alreadyArchived <- hasIncompleteReassignments(createdEvent.getContractId)
-                  _ <-
-                    if (alreadyArchived) {
-                      DBIO.successful(())
-                    } else {
-                      DBIO.seq(
-                        doIngestAcsInserts(
-                          NonEmptyList
-                            .of(
-                              AcsInsertEntry(
-                                createdEvent.getOffset,
-                                createdEvent,
-                                stateRowDataFromActiveContract(synchronizerId, 0L),
-                              )
-                            ),
-                          summary,
-                        )
-                      )
-                    }
-                } yield ()
-              case Delete(exercisedEvent) =>
-                doDeleteContract(exercisedEvent, summary)
-            })*),
-            DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
-              doIngestTxLogInsert(
-                domainMigrationId,
-                synchronizerId,
-                offset,
-                CantonTimestamp.assertFromInstant(recordTime),
-                txe,
-                summary,
-              )
-            }*),
-            DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map { case (synchronizerId, recordTime) =>
-              doInitializeFirstIngestedUpdate(
-                synchronizerId,
-                domainMigrationId,
-                CantonTimestamp.assertFromInstant(recordTime),
-              )
-            }*),
-          ),
-      ).map(_ => summary)
+      val allDbOps = for {
+        insertsToAlreadyArchived <- DBIO.sequence(
+          workTodo
+            .collect { case insert: Insert =>
+              // TODO: batch this
+              hasIncompleteReassignments(insert.evt.getContractId).map(insert -> _)
+            }
+        )
+        insertsToDo = insertsToAlreadyArchived.collect {
+          case (insert, alreadyArchived) if !alreadyArchived => insert
+        }
+        _ <- NonEmptyList.fromList(insertsToDo.toList) match {
+          case Some(inserts) =>
+            doIngestAcsInserts(
+              inserts.map(insert =>
+                AcsInsertEntry(
+                  insert.evt.getOffset,
+                  insert.evt,
+                  stateRowDataFromActiveContract(insert.synchronizerId, 0L),
+                )
+              ),
+              summary,
+            ).map(_ => ())
+          case None =>
+            DBIO.successful(())
+        }
+        // TODO: batch this too
+        _ <- DBIO.seq(workTodo.collect { case Delete(exercisedEvent) =>
+          doDeleteContract(exercisedEvent, summary)
+        }*)
+        // TODO (#3048): batch this
+        _ <- DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
+          doIngestTxLogInsert(
+            domainMigrationId,
+            synchronizerId,
+            offset,
+            CantonTimestamp.assertFromInstant(recordTime),
+            txe,
+            summary,
+          )
+        }*)
+        _ <- DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map {
+          case (synchronizerId, recordTime) =>
+            doInitializeFirstIngestedUpdate(
+              synchronizerId,
+              domainMigrationId,
+              CantonTimestamp.assertFromInstant(recordTime),
+            )
+        }*)
+      } yield summary
+
+      ingestUpdateAtOffset(trees.batch.last.tree.getOffset, allDbOps).map(_ => summary)
     }
 
     private def hasAcsEntry(contractId: String) = (sql"""
@@ -1644,14 +1649,14 @@ final class DbMultiDomainAcsStore[TXE](
           insertValue.interfaceViews(eventNumber)
         }
         joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
-        _ <- (joinedInterfaceViewsValues match {
+        _ <- joinedInterfaceViewsValues match {
           case None => // no interfaces to insert
             DBIO.successful(0)
           case Some(interfaceViewValues) =>
             (sql"""
                 insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$interfaceViewsIndexColumnNames)
                 values """ ++ interfaceViewValues).toActionBuilder.asUpdate
-        })
+        }
       } yield {
         summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
       }
@@ -2204,9 +2209,8 @@ object DbMultiDomainAcsStore {
 
     def toIngestionSummary(
         updateId: Option[String],
-        synchronizerId: Option[SynchronizerId],
+        synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
         offset: Long,
-        recordTime: Option[CantonTimestamp],
         newAcsSize: Int,
         metrics: StoreMetrics,
     ): IngestionSummary = {
@@ -2215,18 +2219,15 @@ object DbMultiDomainAcsStore {
       metrics.acsSize.updateValue(newAcsSize.toLong)
       metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
       metrics.completedIngestions.mark()
-      synchronizerId.foreach { synchronizer =>
-        recordTime.foreach { recordTime =>
-          metrics
-            .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
-            .updateValue(recordTime.toEpochMilli)
-        }
+      synchronizerIdToRecordTime.foreach { case (synchronizer, recordTime) =>
+        metrics
+          .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
+          .updateValue(recordTime.toEpochMilli)
       }
       IngestionSummary(
         updateId = updateId,
-        synchronizerId = synchronizerId,
         offset = Some(offset),
-        recordTime = recordTime,
+        synchronizerIdToRecordTime = synchronizerIdToRecordTime,
         newAcsSize = newAcsSize,
         ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
         numFilteredCreatedEvents = this.numFilteredCreatedEvents,
@@ -2303,19 +2304,35 @@ object DbMultiDomainAcsStore {
   case class IngestTransactionTreesBatch(batch: NonEmptyVector[IngestTransactionTree])
       extends BatchStep
   case class IngestTransactionTree(tree: Transaction, synchronizerId: SynchronizerId)
-  def batchInsertionSteps(
+
+  /** Rolls up consecutive transaction tree updates into a single "step".
+    * Also removes all TreeUpdateOrOffsetCheckpoint.Checkpoint except if it's the last element of the batch,
+    * as their offset will be overridden by the next update.
+    */
+  private def batchInsertionSteps(
       batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint]
   ): Vector[BatchStep] = {
     val steps = batch.map(toBatchStep)
-    steps.tail.foldLeft(Vector[BatchStep](steps.head)) {
-      case (
-            accExceptLast :+ IngestTransactionTreesBatch(existingBatch),
-            IngestTransactionTreesBatch(moreItems),
-          ) =>
-        accExceptLast :+ IngestTransactionTreesBatch(existingBatch ++: moreItems)
-      case (acc, next) =>
-        acc :+ next
-    }
+    steps.tail
+      .foldLeft(Vector[BatchStep](steps.head)) {
+        case (
+              accExceptLast :+ IngestTransactionTreesBatch(existingBatch),
+              IngestTransactionTreesBatch(moreItems),
+            ) =>
+          accExceptLast :+ IngestTransactionTreesBatch(existingBatch ++: moreItems)
+        case (acc, next) =>
+          acc :+ next
+      }
+      .view
+      .zipWithIndex
+      .filter {
+        // checkpoints are only useful if they're the last operation of the batch
+        case (_: UpdateCheckpoint, index) =>
+          index == batch.size - 1
+        case _ => true
+      }
+      .map(_._1)
+      .toVector
   }
   private def toBatchStep(op: TreeUpdateOrOffsetCheckpoint): BatchStep = op match {
     case TreeUpdateOrOffsetCheckpoint.Update(reassignment: ReassignmentUpdate, synchronizerId) =>

@@ -15,15 +15,21 @@ import Splice.Util.FeaturedApp.WalletUserProxy
 
 import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 
 import Daml.Script
 
+import DA.Action (void)
 import DA.Assert ((===))
 import DA.List (sortOn)
+import qualified DA.Map as Map
 import qualified DA.TextMap as TextMap
-import DA.Optional (isSome)
+import DA.Optional (isSome, fromOptional)
 import DA.Time
+import DA.Traversable (forA)
+
+import Prelude hiding (forA)
 
 import Splice.Amulet (AppRewardCoupon(..))
 
@@ -149,6 +155,172 @@ test_two_step_featured_app_markers = do
   WalletClient.checkBalance bob registry.instrumentId 10.0
 
 
+-- Testing batch transfer via wallet proxy
+--------------------------------------------
+
+test_featured_batch_transfer : Script ()
+test_featured_batch_transfer = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  provider <- setupWalletProvider registry "walletProvider" None
+
+  alice <- allocatePartyExact "alice"
+  bob <- allocatePartyExact "bob"
+  charlie <- allocatePartyExact "charlie"
+
+  -- charlie has a preapproval
+  now <- getTime
+  AmuletRegistry.createTransferPreapproval registry charlie charlie (now `addRelTime` days 90)
+
+  -- setup alice with 1000 Amulet tokens
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+
+  -- create two transfers to batch: alice -> bob and alice -> charlie
+  aliceHoldings <- WalletClient.listHoldingCids alice registry.instrumentId
+  transfer1 <- mkImmediateTransfer registry alice bob 20.0 aliceHoldings
+  transfer2 <- mkImmediateTransfer registry alice charlie 50.0 [] -- no holdings, as they will be funneled in
+
+  -- execute batch transfer via wallet proxy
+  executeBatchTransfer provider.provider (Some provider.featuredAppRightCid) [transfer1, transfer2]
+
+  -- check featured app markers: there should be four of them, 2 per transfer as the user is also a beneficiary
+  markers <- query @Splice.Amulet.FeaturedAppActivityMarker provider.provider
+  length markers === 4
+
+  -- bob accepts the transfer
+  [(bobInstrCid, _)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  contextBob <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid emptyMetadata
+  _ <- submitWithDisclosures' bob contextBob.disclosures $ exerciseCmd
+    bobInstrCid
+    TransferInstruction_Accept with
+      extraArgs = ExtraArgs with
+        context = contextBob.choiceContext
+        meta = emptyMetadata
+
+  -- check holdings
+  checkExactlyOneHolding registry 930.0 alice
+  checkExactlyOneHolding registry 20.0 bob
+  checkExactlyOneHolding registry 50.0 charlie
+
+
+test_unfeatured_multi_registry_batch_transfer : Script ()
+test_unfeatured_multi_registry_batch_transfer = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- We don't yet have a mock token in the Splice repo that we could use to simulate a completely
+  -- different token registry. For testing the logic it is though sufficient to create a second
+  -- instance of Amulet with a different DSO party.
+  registry2 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+    dsoPartyName = "mock-other-admin-party"
+
+  alice <- allocatePartyExact "alice"
+  bob <- allocatePartyExact "bob"
+  charlie <- allocatePartyExact "charlie"
+
+  -- create preapprovals in both registries to simplify the test
+  now <- getTime
+  AmuletRegistry.createTransferPreapproval registry bob bob (now `addRelTime` days 90)
+  AmuletRegistry.createTransferPreapproval registry charlie charlie (now `addRelTime` days 90)
+  AmuletRegistry.createTransferPreapproval registry2 charlie charlie (now `addRelTime` days 90)
+
+  -- alice creates their own unfeatured wallet proxy
+  _ <- submit alice $ createCmd WalletUserProxy with
+    provider = alice
+    providerWeight = 1.0
+    userWeight = 0.0
+    extraBeneficiaries = []
+    optAllowList = Some [alice]
+
+  -- setup alice with 1000 Amulet tokens
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+  AmuletRegistry.tapLockedAndUnlockedFunds registry2 alice 500.0
+
+  -- create two transfers to batch: alice -> bob and alice -> charlie
+  aliceHoldings <- WalletClient.listHoldingCids alice registry.instrumentId
+  aliceHoldings2 <- WalletClient.listHoldingCids alice registry2.instrumentId
+  transfer1 <- mkImmediateTransfer registry alice bob 20.0 aliceHoldings
+  transfer2 <- mkImmediateTransfer registry2 alice charlie 80.0 aliceHoldings2
+  transfer3 <- mkImmediateTransfer registry alice charlie 50.0 [] -- no holdings, as they will be funneled in
+
+  -- execute batch transfer via wallet proxy
+  executeBatchTransfer alice None [transfer1, transfer2, transfer3]
+
+  -- check holdings
+  checkExactlyOneHolding registry 930.0 alice
+  checkExactlyOneHolding registry 20.0 bob
+  checkExactlyOneHolding registry 50.0 charlie
+
+  WalletClient.checkBalance bob registry2.instrumentId 0.0
+  checkExactlyOneHolding registry2 420.0 alice
+  checkExactlyOneHolding registry2 80.0 charlie
+
+
+-- | Execute a batch of transfers.
+executeBatchTransfer : Party -> Optional (ContractId FeaturedAppRight) -> [WithDisclosures TransferFactoryCall] -> Script ()
+executeBatchTransfer operator optFeaturedAppRightCid transferCalls = do
+  [(proxyCid, _)] <- query @WalletUserProxy operator
+  proxyD <- queryDisclosure' @WalletUserProxy operator proxyCid
+  appRightD <- forA optFeaturedAppRightCid $ \cid ->
+    queryDisclosure' @Splice.Amulet.FeaturedAppRight operator (fromInterfaceContractId cid)
+
+  -- note the explicit disclosure of both the app right and the wallet proxy on top of the
+  -- contracts required to be disclosed for the transfers
+  let allDisclosures = mconcat (map (.disclosures) transferCalls) <> proxyD <> fromOptional mempty appRightD
+  let batchCalls = map (.value) transferCalls
+  let sender = getFirstSender batchCalls
+
+  void $ submit (actAs sender <> discloseMany (Map.values allDisclosures.disclosures)) $
+    exerciseCmd proxyCid WalletUserProxy_BatchTransfer with
+      transferCalls = batchCalls
+      optFeaturedAppRightCid
+
+
+-- tools to contstruct transfers
+--------------------------------
+
+data WithDisclosures a = WithDisclosures with
+  value : a
+  disclosures : Disclosures'
+
+instance Functor WithDisclosures where
+  fmap f (WithDisclosures with value; disclosures) =
+    WithDisclosures with value = f value; disclosures
+
+
+-- Note: we intentionally do not provide an Applicative instance to simplify reading the code below.
+
+-- | Build a transfer that we expect to execute immediately
+mkImmediateTransfer
+  : AmuletRegistry.AmuletRegistry -> Party -> Party -> Decimal -> [ContractId Holding]
+  -> Script (WithDisclosures TransferFactoryCall)
+mkImmediateTransfer registry sender receiver amount inputHoldingCids = do
+  now <- getTime
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = Api.Token.TransferInstructionV1.Transfer with
+        sender
+        receiver
+        amount
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids
+        meta = emptyMetadata
+    extraArgs = emptyExtraArgs
+  pure $ WithDisclosures with
+    value = TransferFactoryCall with
+      factoryCid = enrichedChoice.factoryCid
+      choiceArg = enrichedChoice.arg
+    disclosures = enrichedChoice.disclosures
+
+
+-- Setup tools
+--------------
+
 setupWalletProvider : AmuletRegistry.AmuletRegistry -> Text -> Optional [Party] -> Script WalletProviderData
 setupWalletProvider registry name optAllowList = do
   -- Setup a wallet provider that is featured
@@ -188,3 +360,10 @@ expectActivityMarkers registry aliceProvider alice = do
           weight = 0.9
         ]
   expectedMarkers === map (._2) activityMarkers
+
+-- | Check that a user has exactly one holding with the expected amount.
+checkExactlyOneHolding : AmuletRegistry.AmuletRegistry -> Decimal -> Party -> Script ()
+checkExactlyOneHolding registry expectedAmount user = do
+  WalletClient.checkBalance user registry.instrumentId expectedAmount
+  holdingCids <- WalletClient.listHoldingCids user registry.instrumentId
+  length holdingCids === 1

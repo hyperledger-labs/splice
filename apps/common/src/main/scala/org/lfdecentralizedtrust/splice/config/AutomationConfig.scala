@@ -111,6 +111,5 @@ case class AutomationConfig(
 }
 
 case class IngestionConfig(
-    maxBatchSize: Int = 100,
-    batchWaitTime: PositiveFiniteDuration = PositiveFiniteDuration.ofMillis(50L),
+    maxBatchSize: Int = 100
 )

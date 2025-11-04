@@ -88,10 +88,7 @@ class UpdateIngestionService(
     } yield new SpliceLedgerSubscription(
       source = connection
         .updates(subscribeFrom, filter)
-        .groupedWithin(
-          config.ingestion.maxBatchSize,
-          config.ingestion.batchWaitTime.asFiniteApproximation,
-        ),
+        .batch(config.ingestion.maxBatchSize.toLong, Vector(_))(_ :+ _),
       map = process,
       retryProvider = retryProvider,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),

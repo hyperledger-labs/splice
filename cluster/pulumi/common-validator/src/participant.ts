@@ -68,7 +68,7 @@ export function installParticipant(
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: getLedgerApiAudience(auth0Config),
+      targetAudience: getLedgerApiAudience(auth0Config, xns.logicalName),
     },
   };
 

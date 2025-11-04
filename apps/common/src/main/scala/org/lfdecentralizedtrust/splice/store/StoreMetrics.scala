@@ -3,11 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Meter, Timer}
+import com.daml.metrics.api.MetricHandle.{Gauge, Histogram, LabeledMetricsFactory, Meter, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+
 import scala.collection.concurrent.TrieMap
 
 class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: MetricsContext)
@@ -44,6 +45,14 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
       "The number of transaction log entries ingested by this store. Note that there can be more than one entry per transaction.",
     )
   )(metricsContext)
+
+  val batchSize: Histogram = metricsFactory.histogram(
+    MetricInfo(
+      name = prefix :+ "ingestion-batch-size",
+      summary = "The number of TreeUpdateOrOffsetCheckpoint in each batch",
+      Traffic,
+    )
+  )
 
   val completedIngestions: Meter = metricsFactory.meter(
     MetricInfo(
