@@ -388,7 +388,6 @@ template DevelopmentFundCoupon
   with
     dso : Party
     amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
-    round : Round -- ^ The round when the coupon is created.
   where
     signatory dso
     ensure amount > 0.0
