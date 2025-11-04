@@ -5,7 +5,7 @@ import { Badge, Box, Typography } from '@mui/material';
 interface PageSectionHeaderProps {
   title: string;
   badgeCount?: number;
-  'data-testid'?: string;
+  'data-testid': string;
 }
 
 const PageSectionHeader: React.FC<PageSectionHeaderProps> = ({
@@ -21,7 +21,7 @@ const PageSectionHeader: React.FC<PageSectionHeaderProps> = ({
       badgeContent={badgeCount}
       color="error"
       sx={{ ml: 2 }}
-      id="action-required-badge-count"
+      id={`${testId}-badge-count`}
       data-testid={`${testId}-badge-count`}
     />
   </Box>

@@ -7,7 +7,7 @@ import React from 'react';
 interface PageHeaderProps {
   title: string;
   actionElement?: React.ReactNode;
-  'data-testid'?: string;
+  'data-testid': string;
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({ title, actionElement, 'data-testid': testId }) => (

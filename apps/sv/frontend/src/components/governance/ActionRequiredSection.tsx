@@ -84,23 +84,38 @@ const ActionCard = (props: ActionCardProps) => {
       >
         <Grid flexGrow={1} container spacing={1}>
           <Grid size={2}>
-            <ActionCardSegment title="ACTION" content={action} data-testid="action" />
+            <ActionCardSegment
+              title="ACTION"
+              content={action}
+              data-testid="action-required-action"
+            />
           </Grid>
           <Grid size={2}>
-            <ActionCardSegment title="CREATED AT" content={createdAt} data-testid="created-at" />
+            <ActionCardSegment
+              title="CREATED AT"
+              content={createdAt}
+              data-testid="action-required-created-at"
+            />
           </Grid>
           <Grid size={2}>
             <ActionCardSegment
               title="THRESHOLD DEADLINE"
               content={votingEnds}
-              data-testid="voting-closes"
+              data-testid="action-required-voting-closes"
             />
           </Grid>
           <Grid size={4}>
             <Box>
               <ActionCardSegment
                 title="REQUESTER"
-                content={<MemberIdentifier partyId={requester} isYou={isYou ?? false} />}
+                content={
+                  <MemberIdentifier
+                    partyId={requester}
+                    isYou={isYou ?? false}
+                    data-testid="action-required-requester-identifier"
+                  />
+                }
+                data-testid="action-required-requester"
               />
             </Box>
           </Grid>
@@ -126,7 +141,7 @@ const ActionCard = (props: ActionCardProps) => {
 interface ActionCardSegmentProps {
   title: string;
   content: React.ReactNode;
-  'data-testid'?: string;
+  'data-testid': string;
 }
 
 const ActionCardSegment: React.FC<ActionCardSegmentProps> = ({
@@ -134,7 +149,7 @@ const ActionCardSegment: React.FC<ActionCardSegmentProps> = ({
   content,
   'data-testid': testId,
 }) => (
-  <Stack height="100%" justifyContent="space-between">
+  <Stack height="100%" justifyContent="space-between" data-testid={testId}>
     <Typography
       fontSize={12}
       lineHeight={2}
@@ -143,6 +158,7 @@ const ActionCardSegment: React.FC<ActionCardSegmentProps> = ({
       variant="subtitle2"
       color="text.light"
       gutterBottom
+      data-testid={`${testId}-title`}
     >
       {title}
     </Typography>
@@ -153,8 +169,7 @@ const ActionCardSegment: React.FC<ActionCardSegmentProps> = ({
         fontWeight="medium"
         fontSize={14}
         lineHeight={2}
-        // Add data-testid prop only if it's defined
-        {...(testId ? { 'data-testid': `action-required-${testId}` } : {})}
+        data-testid={`${testId}-content`}
       >
         {content}
       </Typography>
