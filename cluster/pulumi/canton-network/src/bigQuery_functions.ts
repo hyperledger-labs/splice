@@ -65,6 +65,7 @@ const daml_prim_path = new BQScalarFunction(
   STRING,
   `
       CASE selector
+        WHEN 'optional_numeric' THEN '.optional.value.numeric'
         WHEN 'numeric' THEN '.numeric'
         WHEN 'contractId' THEN '.contractId'
         WHEN 'list' THEN '.list.elements'
@@ -289,7 +290,9 @@ const TransferSummary_minted = new BQScalarFunction(
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) AS appRewardAmount,
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) AS validatorRewardAmount,
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) AS svRewardAmount,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [11]), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
+      IFNULL(
+        PARSE_BIGNUMERIC(JSON_VALUE(tr_json,
+          \`$$FUNCTIONS_DATASET$$.daml_record_path\`([11], 'optional_numeric'))), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
     )
   `
 );
