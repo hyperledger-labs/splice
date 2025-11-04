@@ -20,6 +20,7 @@ async function main() {
     getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
       Promise.resolve('access_token'),
     getCfg: () => cantonNetworkAuth0Config,
+    reuseNamespaceConfig: function (fromNamespace: string, toNamespace: string): void {},
   });
 }
 

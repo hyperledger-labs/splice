@@ -14,6 +14,7 @@ import {
   numNodesPerInstance,
   loadTesterConfig,
   CnChartVersion,
+  getNamespaceConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { Resource } from '@pulumi/pulumi';
@@ -29,8 +30,8 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     const loopback = installLoopback(xns);
 
     const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
-    const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
-    const audience = config.requireEnv('OIDC_AUTHORITY_VALIDATOR_AUDIENCE');
+    const oauthClientId = getNamespaceConfig(auth0Client.getCfg(), 'validator1').uiClientIds.wallet;
+    const audience = config.requireEnv('OIDC_AUTHORITY_VALIDATOR_AUDIENCE'); // TODO(#2873): Is there a good reason we don't read this from the same config?
     const usersPassword = config.requireEnv('K6_USERS_PASSWORD');
 
     // use internal cluster hostnames for the prometheus endpoint
