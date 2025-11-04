@@ -59,10 +59,7 @@ class IngestionPerformanceIngestionTest
       .fromPath(Paths.get(getClass.getResource("/performance/creates.csv").toURI))
       .via(CsvParsing.lineScanner(maximumLineLength = Int.MaxValue))
       .via(CsvToMap.toMapAsStrings(StandardCharsets.UTF_8))
-      .groupedWithin(
-        ingestionConfig.maxBatchSize,
-        ingestionConfig.batchWaitTime.asFiniteApproximation,
-      )
+      .batch(ingestionConfig.maxBatchSize.toLong, Vector(_))(_ :+ _)
       .zipWithIndex
       .runWith(Sink.foreachAsync(parallelism = 1) { case (_batch, index) =>
         val batch = _batch.map(_.map { case (key, value) =>
