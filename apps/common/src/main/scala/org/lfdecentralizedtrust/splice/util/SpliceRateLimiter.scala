@@ -6,14 +6,22 @@ package org.lfdecentralizedtrust.splice.util
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricQualification.Saturation
 import com.daml.metrics.api.{MetricHandle, MetricInfo, MetricsContext}
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.TracedLogger
 import com.google.common.util.concurrent.RateLimiter
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
 import java.time.Instant
+import java.util
+import java.util.Collections
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 
-case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext)
-    extends AutoCloseable {
+case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory, logger: TracedLogger)(implicit
+    mc: MetricsContext
+) extends AutoCloseable {
+
+  private val gaugesToClose = Collections.synchronizedList(new util.ArrayList[AutoCloseable]())
 
   val meter: MetricHandle.Meter = otelFactory.meter(
     MetricInfo(
@@ -23,17 +31,22 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit m
     )
   )
 
-  val gauge: MetricHandle.Gauge[Double] = otelFactory.gauge(
-    MetricInfo(
-      SpliceMetrics.MetricsPrefix :+ "rate_limiting_max_limit_per_second",
-      "Max allowed rate per second",
-      Saturation,
-    ),
-    0,
-  )
+  /*we need to pass the full context when we create it to avoid duplicate values warnings*/
+  def gauge(implicit extraMc: MetricsContext): MetricHandle.Gauge[Double] = {
+    val createdGauge = otelFactory.gauge[Double](
+      MetricInfo(
+        SpliceMetrics.MetricsPrefix :+ "rate_limiting_max_limit_per_second",
+        "Max allowed rate per second",
+        Saturation,
+      ),
+      0,
+    )(mc.merge(extraMc))
+    gaugesToClose.add(createdGauge)
+    createdGauge
+  }
 
   override def close(): Unit = {
-    gauge.close()
+    LifeCycle.close(gaugesToClose.asScala.toSeq*)(logger)
   }
 
 }
@@ -52,9 +65,12 @@ class SpliceRateLimiter(
 
   // noinspection UnstableApiUsage
   private val rateLimiter = RateLimiter.create(config.ratePerSecond)
-  metrics.gauge.updateValue(config.ratePerSecond)(
-    MetricsContext("limiter" -> name)
-  )
+  metrics
+    .gauge(
+      MetricsContext("limiter" -> name)
+    )
+    .updateValue(config.ratePerSecond)(
+    )
 
   def markRun(): Boolean = {
     if (config.enabled && Instant.now().isAfter(enforceAfter)) {
