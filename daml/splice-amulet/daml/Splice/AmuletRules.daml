@@ -787,8 +787,8 @@ data TransferInputsSummary = TransferInputsSummary with
       -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
       -- on package upload because `TransferInputsSummary` is serializable.
     totalDevelopmentFundAmount : Optional Decimal
-      -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
-      -- on package upload because `TransferInputsSummary` is serializable.
+      -- ^ Note: Same rationale as above — made optional to ensure compatibility with
+      -- the upgrade checker on package upload because `TransferInputsSummary` is serializable.
   deriving (Eq, Show)
 
 type TransferOutputsSummary = [PreprocessedTransferOutput]
