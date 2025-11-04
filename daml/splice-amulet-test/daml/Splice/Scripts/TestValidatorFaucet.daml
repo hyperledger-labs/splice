@@ -4,11 +4,14 @@
 module Splice.Scripts.TestValidatorFaucet where
 
 import DA.Assert
+import DA.List (head)
+import DA.Optional (fromOptional)
 import DA.Time
 
 import Daml.Script
 
 import Splice.Amulet
+import Splice.Issuance
 import Splice.Scripts.Util
 import Splice.ValidatorLicense
 import Splice.Util
@@ -103,3 +106,89 @@ test_ValidatorFaucet = do
       openRoundCid = round2._1
 
     return ()
+
+-- Helper function to test validator faucet with different weights
+testValidatorFaucetWithWeight_Helper : Decimal -> Optional Decimal -> Decimal -> Script ()
+testValidatorFaucetWithWeight_Helper bobWeight bobExpectedMin bobExpectedMax = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+    [(aliceLicenseCid, aliceLicense)] <- query @ValidatorLicense aliceValidator.primaryParty
+    [(bobLicenseCid, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
+
+    -- Update bob's license to have the specified weight
+    submit app.dso $ archiveCmd bobLicenseCid
+    now <- getTime
+    bobLicenseCid <- submitMulti [bobValidator.primaryParty, app.dso] [] $ createCmd bobLicense with
+      weight = Some bobWeight
+      lastActiveAt = Some now
+
+    aliceBalanceBefore <- getNormalizedBalance aliceValidator.primaryParty
+    bobBalanceBefore <- getNormalizedBalance bobValidator.primaryParty
+
+    -- Get the current open round
+    rounds <- getOpenRoundsSorted app
+    let (round0Cid, round0) = head rounds
+
+    -- Both alice and bob record liveness activity
+    passTime (hours 1)
+    aliceResult <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+    let aliceLicenseCid = aliceResult.licenseCid
+
+    bobResult <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+    let bobLicenseCid = bobResult.licenseCid
+
+    -- Verify the activity records were created with correct weights
+    aliceRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
+      (\r -> r.validator == aliceValidator.primaryParty && r.round == round0.round)
+    bobRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
+      (\r -> r.validator == bobValidator.primaryParty && r.round == round0.round)
+
+    length aliceRecords === 1
+    length bobRecords === 1
+
+    let [(_, aliceRecord)] = aliceRecords
+    let [(_, bobRecord)] = bobRecords
+
+    aliceRecord.weight === None
+    bobRecord.weight === Some bobWeight
+
+    runNextIssuance app
+    runNextIssuance app
+
+    runAmuletDepositBots app
+
+    aliceBalanceAfter <- getNormalizedBalance aliceValidator.primaryParty
+    bobBalanceAfter <- getNormalizedBalance bobValidator.primaryParty
+
+    let aliceReward = aliceBalanceAfter - aliceBalanceBefore
+    let bobReward = bobBalanceAfter - bobBalanceBefore
+
+    let aliceExpectedMin = 2.8
+    let aliceExpectedMax = 3.0
+
+    require "Alice should receive default rewards" (aliceReward >= aliceExpectedMin && aliceReward <= aliceExpectedMax)
+
+    case bobExpectedMin of
+      Some minVal -> require "Bob should receive expected reward based on weight" (bobReward >= minVal && bobReward <= bobExpectedMax)
+      None -> require "Bob should not receive rewards" (bobReward <= bobExpectedMax)
+
+    return ()
+
+-- With weight 3.0, Bob should receive 3x Alice's rewards
+test_ValidatorFaucetWithWeight3: Script ()
+test_ValidatorFaucetWithWeight3 = do
+    let bobWeight = 3.0
+        bobExpectedMin = Some 8.4
+        bobExpectedMax = 9.0
+    testValidatorFaucetWithWeight_Helper bobWeight bobExpectedMin bobExpectedMax
+
+-- With weight 0.0, Bob should receive no rewards
+test_ValidatorFaucetWithWeight0: Script ()
+test_ValidatorFaucetWithWeight0 = do
+    -- bob actually loses balance when doing minting with 0 weight. So just confirm bobExpectedMax
+    let bobWeight = 0.0
+        bobExpectedMin = None
+        bobExpectedMax = 0.0
+    testValidatorFaucetWithWeight_Helper bobWeight bobExpectedMin bobExpectedMax
