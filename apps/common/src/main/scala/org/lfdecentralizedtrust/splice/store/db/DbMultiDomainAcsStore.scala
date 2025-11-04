@@ -1518,7 +1518,7 @@ final class DbMultiDomainAcsStore[TXE](
         insertContractIdsWithIncompleteReassignments <- checkIncompleteReassignments(
           workTodo.collect { case insert: Insert =>
             insert.evt.getContractId
-          }.toSet
+          }
         )
         insertsToDo = workTodo.collect {
           case insert: Insert
@@ -1578,20 +1578,24 @@ final class DbMultiDomainAcsStore[TXE](
           """).as[Int].head.map(_ > 0)
 
     private def hasIncompleteReassignments(contractId: String) =
-      checkIncompleteReassignments(Set(contractId)).map(_.nonEmpty)
+      checkIncompleteReassignments(Seq(contractId)).map(_.nonEmpty)
 
     /** @return which contract ids have incomplete reassignments
       */
     private def checkIncompleteReassignments(
-        contractIds: Set[String]
+        contractIds: Seq[String]
     ): DBIOAction[Set[String], NoStream, Effect.Read] = {
       if (contractIds.isEmpty) DBIO.successful(Set.empty)
       else {
-        (sql"""
+        DBIO
+          .sequence(contractIds.grouped(10000).map { contractIds =>
+            (sql"""
            select distinct contract_id from incomplete_reassignments
            where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id in """ ++ inClause(
-          contractIds
-        )).toActionBuilder.as[String].map(_.toSet)
+              contractIds
+            )).toActionBuilder.as[String].map(_.toSet)
+          })
+          .map(_.foldLeft(Set.empty[String])(_ ++ _))
       }
     }
 
@@ -1638,41 +1642,43 @@ final class DbMultiDomainAcsStore[TXE](
         entries: NonEmptyList[AcsInsertEntry],
         summary: MutableIngestionSummary,
     )(implicit tc: TraceContext) = {
-      val insertValues = entries
-        .map(entry => entry.createdEvent.getContractId -> getInsertValues(entry))
-      val acsTableValues = insertValues.map(_._2.acsTable)
-      val joinedAcsTableValues = acsTableValues.reduceLeft(_ ++ sql"," ++ _)
-      // column names are hardcoded so they can be raw-interpolated
-      val acsIndexColumnNames = mkIndexColumnNames(contractFilter.getAcsIndexColumnNames)
-      val interfaceViewsIndexColumnNames = mkIndexColumnNames(
-        contractFilter.getInterfaceViewsIndexColumnNames
-      )
-      for {
-        rawContractIdToEventNumber <- (sql"""
+      DBIO.sequence(entries.grouped(1000).map { entries =>
+        val insertValues = entries
+          .map(entry => entry.createdEvent.getContractId -> getInsertValues(entry))
+        val acsTableValues = insertValues.map(_._2.acsTable)
+        val joinedAcsTableValues = acsTableValues.reduceLeft(_ ++ sql"," ++ _)
+        // column names are hardcoded so they can be raw-interpolated
+        val acsIndexColumnNames = mkIndexColumnNames(contractFilter.getAcsIndexColumnNames)
+        val interfaceViewsIndexColumnNames = mkIndexColumnNames(
+          contractFilter.getInterfaceViewsIndexColumnNames
+        )
+        for {
+          rawContractIdToEventNumber <- (sql"""
                 insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name, package_name,
                                            create_arguments, created_event_blob, created_at, contract_expires_at,
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$acsIndexColumnNames)
                 values """ ++ joinedAcsTableValues ++ sql" returning contract_id, event_number").toActionBuilder
-          .asUpdateReturning[(String, Long)]
-        rawContractIdToEventNumberMap = rawContractIdToEventNumber.toMap
-        interfaceViewsValues = insertValues.toList.flatMap { case (contractId, insertValue) =>
-          val eventNumber = rawContractIdToEventNumberMap(contractId)
-          insertValue.interfaceViews(eventNumber)
-        }
-        joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
-        _ <- joinedInterfaceViewsValues match {
-          case None => // no interfaces to insert
-            DBIO.successful(0)
-          case Some(interfaceViewValues) =>
-            (sql"""
+            .asUpdateReturning[(String, Long)]
+          rawContractIdToEventNumberMap = rawContractIdToEventNumber.toMap
+          interfaceViewsValues = insertValues.toList.flatMap { case (contractId, insertValue) =>
+            val eventNumber = rawContractIdToEventNumberMap(contractId)
+            insertValue.interfaceViews(eventNumber)
+          }
+          joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
+          _ <- joinedInterfaceViewsValues match {
+            case None => // no interfaces to insert
+              DBIO.successful(0)
+            case Some(interfaceViewValues) =>
+              (sql"""
                 insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$interfaceViewsIndexColumnNames)
                 values """ ++ interfaceViewValues).toActionBuilder.asUpdate
+          }
+        } yield {
+          summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
         }
-      } yield {
-        summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
-      }
+      })
     }
 
     case class InsertValues(
@@ -1773,22 +1779,24 @@ final class DbMultiDomainAcsStore[TXE](
     private def doDeleteContracts(events: Seq[ExercisedEvent], summary: MutableIngestionSummary) = {
       if (events.isEmpty) DBIO.successful(())
       else {
-        (sql"""
-        delete from #$acsTableName
-        where store_id = $acsStoreId
-          and migration_id = $domainMigrationId
-          and contract_id in """ ++ inClause(
-          events.map(_.getContractId)
-        ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
-          val deletedCidSet = deletedCids.toSet
-          val ingestedArchivedEvents =
-            events.filter(evt => deletedCidSet.contains(evt.getContractId))
-          summary.ingestedArchivedEvents.addAll(ingestedArchivedEvents)
-          // there were no contracts with some id. This can happen because:
-          // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
-          // but that might still satisfy some other filter, so the contract was never inserted
-          summary.numFilteredArchivedEvents += (events.length - deletedCids.size)
-        }
+        DBIO.sequence(events.grouped(1000).map { events =>
+          (sql"""
+            delete from #$acsTableName
+            where store_id = $acsStoreId
+              and migration_id = $domainMigrationId
+              and contract_id in """ ++ inClause(
+            events.map(_.getContractId)
+          ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
+            val deletedCidSet = deletedCids.toSet
+            val ingestedArchivedEvents =
+              events.filter(evt => deletedCidSet.contains(evt.getContractId))
+            summary.ingestedArchivedEvents.addAll(ingestedArchivedEvents)
+            // there were no contracts with some id. This can happen because:
+            // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
+            // but that might still satisfy some other filter, so the contract was never inserted
+            summary.numFilteredArchivedEvents += (events.length - deletedCids.size)
+          }
+        })
       }
     }
 
