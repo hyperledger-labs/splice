@@ -81,11 +81,11 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const action = screen.getByTestId('action-required-action');
+    const action = screen.getByTestId('action-required-action-content');
     expect(action).toBeDefined();
     expect(action.textContent).toBe(actionRequired.actionName);
 
-    const createdAt = screen.getByTestId('action-required-created-at');
+    const createdAt = screen.getByTestId('action-required-created-at-content');
     expect(createdAt).toBeDefined();
     expect(createdAt.textContent).toBe(actionRequired.createdAt);
 
