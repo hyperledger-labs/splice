@@ -468,3 +468,7 @@ instance HasCheckedFetch FeaturedAppActivityMarker ForDso where
 
 instance HasCheckedFetch UnclaimedActivityRecord ForOwner where
   contractGroupId UnclaimedActivityRecord{..} = ForOwner with dso; owner = beneficiary
+
+instance HasCheckedFetch DevelopmentFundCoupon ForDso where
+  contractGroupId DevelopmentFundCoupon{..} = ForDso with dso
+
