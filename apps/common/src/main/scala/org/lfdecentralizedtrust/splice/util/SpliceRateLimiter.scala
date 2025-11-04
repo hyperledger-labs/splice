@@ -66,12 +66,14 @@ class SpliceRateLimiter(
 ) {
 
   // noinspection UnstableApiUsage
+  private val limiter = RateLimiter.create(config.ratePerSecond)
+  // lazy to ensure metrics get registered only if the limiter is actually used
   private lazy val rateLimiter = {
     metrics
       .recordMaxLimit(config.ratePerSecond)(
         MetricsContext("limiter" -> name)
       )
-    RateLimiter.create(config.ratePerSecond)
+    limiter
   }
 
   def markRun(): Boolean = {
