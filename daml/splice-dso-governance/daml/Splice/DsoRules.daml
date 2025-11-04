@@ -253,6 +253,9 @@ data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult wit
 data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
     unclaimedReward: ContractId UnclaimedReward
 
+data DsoRules_MergeDevelopmentFundCouponsResult = DsoRules_MergeDevelopmentFundCouponsResult with
+    developmentFundCoupon : ContractId DevelopmentFundCoupon
+
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
     closedRound : ContractId ClosedMiningRound
 
@@ -1317,6 +1320,19 @@ template DsoRules with
         result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
         return DsoRules_MergeUnclaimedRewardsResult with
           unclaimedReward = result.unclaimedRewardCid
+
+    -- Batch merge of of development fund coupons
+    nonconsuming choice DsoRules_MergeDevelopmentFundCoupons : DsoRules_MergeDevelopmentFundCouponsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        developmentFundCouponCids : [ContractId DevelopmentFundCoupon]
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        result <- exercise amuletRulesCid AmuletRules_MergeDevelopmentFundCoupons with ..
+        return DsoRules_MergeDevelopmentFundCouponsResult with
+          developmentFundCoupon = result.developmentFundCouponCid
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with
