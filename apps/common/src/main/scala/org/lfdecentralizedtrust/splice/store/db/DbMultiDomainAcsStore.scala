@@ -1254,6 +1254,7 @@ final class DbMultiDomainAcsStore[TXE](
     override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
+      metrics.batchSize.update(batch.length)
       val steps = batchInsertionSteps(batch)
       MonadUtil
         .sequentialTraverse(steps) {
