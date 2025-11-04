@@ -76,6 +76,9 @@ data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResu
 data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewardsResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data AmuletRules_MergeDevelopmentFundCouponsResult = AmuletRules_MergeDevelopmentFundCouponsResult with
+    developmentFundCouponCid : ContractId DevelopmentFundCoupon
+
 data AmuletRules_SetConfigResult = AmuletRules_SetConfigResult with
     newAmuletRules : ContractId AmuletRules
 
@@ -583,6 +586,26 @@ template AmuletRules
           amount = sum archivedAmounts
 
         return AmuletRules_MergeUnclaimedRewardsResult with ..
+
+    -- Batch merge of development fund coupons
+    nonconsuming choice AmuletRules_MergeDevelopmentFundCoupons : AmuletRules_MergeDevelopmentFundCouponsResult
+      with
+        developmentFundCouponCids : [ContractId DevelopmentFundCoupon]
+      controller dso
+      do
+        require "More than one development fund coupon contracts" (length developmentFundCouponCids > 1)
+
+        -- archive all given coupons
+        archivedAmounts <- forA developmentFundCouponCids $ \developmentFundCouponCid -> do
+          developmentFundCoupon <- fetchAndArchive (ForDso with dso) developmentFundCouponCid
+          pure developmentFundCoupon.amount
+
+        -- create a new development fund coupon over the total
+        developmentFundCouponCid <- create DevelopmentFundCoupon with
+          dso
+          amount = sum archivedAmounts
+
+        return AmuletRules_MergeDevelopmentFundCouponsResult with ..
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
