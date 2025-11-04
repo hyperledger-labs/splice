@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.util
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricQualification.Saturation
 import com.daml.metrics.api.{MetricHandle, MetricInfo, MetricsContext}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.TracedLogger
 import com.google.common.util.concurrent.RateLimiter
@@ -41,7 +42,7 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory, logger: Tr
       ),
       limit,
     )(mc.merge(extraMc))
-    gaugesToClose.add(createdGauge)
+    gaugesToClose.add(createdGauge).discard
   }
 
   override def close(): Unit = {
