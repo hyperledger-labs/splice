@@ -33,6 +33,7 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   packageConfig = config.packageConfig
   transferPreapprovalFee = fmap (/ amuletPrice) config.transferPreapprovalFee
   featuredAppActivityMarkerAmount = fmap (/ amuletPrice) config.featuredAppActivityMarkerAmount
+  developmentFundConfig = config.developmentFundConfig
 
 test : Script ()
 test = script do
