@@ -4,6 +4,7 @@
 module Splice.Scripts.TestValidatorLicense where
 
 import DA.Assert
+import DA.Action (unless)
 import DA.List
 import Daml.Script
 import DA.Time
@@ -11,7 +12,9 @@ import DA.Time
 import Splice.ValidatorLicense
 import Splice.DsoRules
 import Splice.Scripts.DsoTestUtils
+import Splice.Scripts.Util
 import Splice.Types
+import Splice.Round
 
 
 testGrantValidatorLicense : Script ()
@@ -276,3 +279,82 @@ test_MergeValidatorLicense = do
   mergedLicense3.kind === Some NonOperatorLicense
 
   pure()
+
+-- Test that runNextIssuanceD properly handles ValidatorLicense weights
+-- in the optTotalValidatorLivenessActivityRecords calculation
+-- Bob has been given a large weight to trigger the use of `cappedRewardsToIssue` (in computeIssuanceTranche)
+-- which would result in alice getting lower rewards than the default value of about 2.85
+test_ValidatorLivenessWeightInRunNextIssuanceD : Script ()
+test_ValidatorLivenessWeightInRunNextIssuanceD = do
+    let bobWeight = 15000.0
+        aliceExpectedMin = 2.5
+        aliceExpectedMax = 2.55
+        bobExpectedMin = aliceExpectedMin * bobWeight
+        bobExpectedMax = aliceExpectedMax * bobWeight
+
+    (app, dso, (_, _, _, _)) <- initDevNet
+
+    -- Setup alice and bob
+    aliceValidator <- setupValidator' app "v_alice"
+    alice <- setupUser app "alice" aliceValidator.primaryParty
+    bobValidator <- setupValidator' app "v_bob"
+    bob <- setupUser app "bob" bobValidator.primaryParty
+
+    [(aliceLicenseCid, aliceLicense)] <- query @ValidatorLicense aliceValidator.primaryParty
+    [(bobLicenseCid, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
+
+    -- Update bob license to have specified weight
+    submit app.dso $ archiveCmd bobLicenseCid
+    bobLicenseCid <- submitMulti [bobValidator.primaryParty, app.dso] [] $ createCmd bobLicense with
+      weight = Some bobWeight
+
+    aliceBalanceBefore <- getNormalizedBalance aliceValidator.primaryParty
+    bobBalanceBefore <- getNormalizedBalance bobValidator.primaryParty
+
+    -- Get the current open round
+    rounds <- getOpenRoundsSorted app
+    let (round0Cid, round0) = head rounds
+
+    -- Both record liveness activity
+    passTime (hours 1)
+    aliceResult <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+    let aliceLicenseCid = aliceResult.licenseCid
+
+    bobResult <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+    let bobLicenseCid = bobResult.licenseCid
+
+    -- Verify the activity records were created with correct weights
+    aliceRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
+      (\r -> r.validator == aliceValidator.primaryParty && r.round == round0.round)
+    bobRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
+      (\r -> r.validator == bobValidator.primaryParty && r.round == round0.round)
+
+    length aliceRecords === 1
+    length bobRecords === 1
+
+    let [(_, aliceRecord)] = aliceRecords
+    let [(_, bobRecord)] = bobRecords
+
+    aliceRecord.weight === None
+    bobRecord.weight === Some bobWeight
+
+    runNextIssuanceD app 1.0
+    runNextIssuanceD app 1.0
+
+    runAmuletDepositBots app
+
+    aliceBalanceAfter <- getNormalizedBalance aliceValidator.primaryParty
+    bobBalanceAfter <- getNormalizedBalance bobValidator.primaryParty
+
+    let aliceReward = aliceBalanceAfter - aliceBalanceBefore
+    let bobReward = bobBalanceAfter - bobBalanceBefore
+
+    unless (aliceReward >= aliceExpectedMin && aliceReward <= aliceExpectedMax) $
+      abort ("Alice should receive reward lower than the default 2.85. Expected within: [" <> show aliceExpectedMin <> ", " <> show aliceExpectedMax <> "], Got: " <> show aliceReward)
+
+    unless (bobReward >= bobExpectedMin && bobReward <= bobExpectedMax) $
+      abort ("Bob should receive ~15000 times rewards. Expected within: [" <> show bobExpectedMin <> ", " <> show bobExpectedMax <> "], Got: " <> show bobReward)
+
+    return ()

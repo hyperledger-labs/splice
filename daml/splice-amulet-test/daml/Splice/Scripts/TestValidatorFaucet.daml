@@ -192,3 +192,74 @@ test_ValidatorFaucetWithWeight0 = do
         bobExpectedMin = None
         bobExpectedMax = 0.0
     testValidatorFaucetWithWeight_Helper bobWeight bobExpectedMin bobExpectedMax
+
+-- Test that runNextIssuance properly handles ValidatorLicense weights
+-- in the optTotalValidatorLivenessActivityRecords calculation
+-- Bob has been given a large weight to trigger the use of `cappedRewardsToIssue` (in computeIssuanceTranche)
+-- which would result in alice getting lower rewards than the default value of about 2.85
+test_ValidatorLivenessWeightInRunNextIssuance : Script ()
+test_ValidatorLivenessWeightInRunNextIssuance = do
+    let bobWeight = 15000.0
+        aliceExpectedMin = 2.5
+        aliceExpectedMax = 2.55
+        bobExpectedMin = aliceExpectedMin * bobWeight
+        bobExpectedMax = aliceExpectedMax * bobWeight
+
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+    [(aliceLicenseCid, aliceLicense)] <- query @ValidatorLicense aliceValidator.primaryParty
+    [(bobLicenseCid, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
+
+    -- Update bob's license to have the specified weight
+    submit app.dso $ archiveCmd bobLicenseCid
+    bobLicenseCid <- submitMulti [bobValidator.primaryParty, app.dso] [] $ createCmd bobLicense with
+      weight = Some bobWeight
+
+    aliceBalanceBefore <- getNormalizedBalance aliceValidator.primaryParty
+    bobBalanceBefore <- getNormalizedBalance bobValidator.primaryParty
+
+    -- Get the current open round
+    rounds <- getOpenRoundsSorted app
+    let (round0Cid, round0) = head rounds
+
+    -- Both alice and bob record liveness activity
+    passTime (hours 1)
+    aliceResult <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+    let aliceLicenseCid = aliceResult.licenseCid
+
+    bobResult <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+    let bobLicenseCid = bobResult.licenseCid
+
+    -- Verify the activity records were created with correct weights
+    aliceRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
+      (\r -> r.validator == aliceValidator.primaryParty && r.round == round0.round)
+    bobRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
+      (\r -> r.validator == bobValidator.primaryParty && r.round == round0.round)
+
+    length aliceRecords === 1
+    length bobRecords === 1
+
+    let [(_, aliceRecord)] = aliceRecords
+    let [(_, bobRecord)] = bobRecords
+
+    aliceRecord.weight === None
+    bobRecord.weight === Some bobWeight
+
+    runNextIssuance app
+    runNextIssuance app
+
+    runAmuletDepositBots app
+
+    aliceBalanceAfter <- getNormalizedBalance aliceValidator.primaryParty
+    bobBalanceAfter <- getNormalizedBalance bobValidator.primaryParty
+
+    let aliceReward = aliceBalanceAfter - aliceBalanceBefore
+    let bobReward = bobBalanceAfter - bobBalanceBefore
+
+    require ("Alice should receive reward lower than the default 2.85. Expected within: [" <> show aliceExpectedMin <> ", " <> show aliceExpectedMax <> "], Got: " <> show aliceReward) (aliceReward >= aliceExpectedMin && aliceReward <= aliceExpectedMax)
+
+    require ("Bob should receive ~15000 times rewards. Expected within: [" <> show bobExpectedMin <> ", " <> show bobExpectedMax <> "], Got: " <> show bobReward) (bobReward >= bobExpectedMin && bobReward <= bobExpectedMax)
+
+    return ()
