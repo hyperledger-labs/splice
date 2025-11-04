@@ -29,6 +29,7 @@ Upcoming
   - Docs
 
     - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+    - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
 
   - Mediator
 

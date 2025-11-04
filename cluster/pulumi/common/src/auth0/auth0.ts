@@ -8,7 +8,8 @@ import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
 import { config, isMainNet } from '../config';
-import { CLUSTER_BASENAME, fixedTokens } from '../utils';
+import { infraStack } from '../stackReferences';
+import { fixedTokens } from '../utils';
 import { DEFAULT_AUDIENCE } from './audiences';
 import type {
   Auth0Client,
@@ -300,8 +301,7 @@ export enum Auth0ClientType {
   MAINSTACK,
 }
 
-function getAuth0ClusterConfig(): Output<Auth0ClusterConfig> {
-  const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
+export function getAuth0ClusterConfig(): Output<Auth0ClusterConfig> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infraOutput: pulumi.Output<any> = infraStack.requireOutput('auth0');
   return infraOutput.apply(output => {

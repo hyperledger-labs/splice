@@ -582,6 +582,7 @@ class SvApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         metrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
 
       route = cors(

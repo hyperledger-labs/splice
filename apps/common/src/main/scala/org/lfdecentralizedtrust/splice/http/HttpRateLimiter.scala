@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.http
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.logging.TracedLogger
 import org.apache.pekko.http.scaladsl.model.{HttpEntity, StatusCodes}
 import org.apache.pekko.http.scaladsl.server.Directive0
 import org.lfdecentralizedtrust.splice.config.RateLimitersConfig
@@ -15,6 +16,7 @@ import java.time.Instant
 class HttpRateLimiter(
     config: RateLimitersConfig,
     metricsFactory: LabeledMetricsFactory,
+    logger: TracedLogger,
 ) extends AutoCloseable {
 
   // need to cache it as the pekko reoutes get evaluated for each request
@@ -29,7 +31,7 @@ class HttpRateLimiter(
         config.forRateLimiter(operation),
         metrics.getOrElseUpdate(
           service,
-          SpliceRateLimitMetrics(metricsFactory)(
+          SpliceRateLimitMetrics(metricsFactory, logger)(
             MetricsContext(
               "http_service" -> service
             )
