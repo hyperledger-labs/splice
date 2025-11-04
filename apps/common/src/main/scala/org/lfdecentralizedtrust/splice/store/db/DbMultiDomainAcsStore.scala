@@ -2301,19 +2301,35 @@ object DbMultiDomainAcsStore {
   case class IngestTransactionTreesBatch(batch: NonEmptyVector[IngestTransactionTree])
       extends BatchStep
   case class IngestTransactionTree(tree: Transaction, synchronizerId: SynchronizerId)
-  def batchInsertionSteps(
+
+  /** Rolls up consecutive transaction tree updates into a single "step".
+    * Also removes all TreeUpdateOrOffsetCheckpoint.Checkpoint except if it's the last element of the batch,
+    * as their offset will be overridden by the next update.
+    */
+  private def batchInsertionSteps(
       batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint]
   ): Vector[BatchStep] = {
     val steps = batch.map(toBatchStep)
-    steps.tail.foldLeft(Vector[BatchStep](steps.head)) {
-      case (
-            accExceptLast :+ IngestTransactionTreesBatch(existingBatch),
-            IngestTransactionTreesBatch(moreItems),
-          ) =>
-        accExceptLast :+ IngestTransactionTreesBatch(existingBatch ++: moreItems)
-      case (acc, next) =>
-        acc :+ next
-    }
+    steps.tail
+      .foldLeft(Vector[BatchStep](steps.head)) {
+        case (
+              accExceptLast :+ IngestTransactionTreesBatch(existingBatch),
+              IngestTransactionTreesBatch(moreItems),
+            ) =>
+          accExceptLast :+ IngestTransactionTreesBatch(existingBatch ++: moreItems)
+        case (acc, next) =>
+          acc :+ next
+      }
+      .view
+      .zipWithIndex
+      .filter {
+        // checkpoints are only useful if they're the last operation of the batch
+        case (_: UpdateCheckpoint, index) =>
+          index == batch.size - 1
+        case _ => true
+      }
+      .map(_._1)
+      .toVector
   }
   private def toBatchStep(op: TreeUpdateOrOffsetCheckpoint): BatchStep = op match {
     case TreeUpdateOrOffsetCheckpoint.Update(reassignment: ReassignmentUpdate, synchronizerId) =>
