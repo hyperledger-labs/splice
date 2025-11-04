@@ -43,6 +43,7 @@ import java.time.Instant
 import scala.concurrent.Future
 import StoreTest.*
 import cats.data.NonEmptyList
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -608,6 +609,54 @@ class DbMultiDomainAcsStoreTest
         txLogs <- store2TimeTooEarlyDR.listTxLogEntries()
         _ = txLogs should have size 1
       } yield succeed
+    }
+
+    "can ingest large batches" in {
+      implicit val store = mkStore()
+      // 100 txs of 1000 CreatedEvents each
+      val batchSize = 100
+      val createdEventsPerBatch = 1000
+      val bigBatch = (1 to batchSize).map(i =>
+        TreeUpdateOrOffsetCheckpoint.Update(
+          TransactionTreeUpdate(
+            mkTx(
+              offset = i.toLong,
+              events = (1 to createdEventsPerBatch).map(j =>
+                toCreatedEvent(
+                  amulet(providerParty(j), j, j.toLong, BigDecimal(0.001)),
+                  Seq(providerParty(j), dsoParty),
+                  Seq(providerParty(j), dsoParty),
+                  Map(
+                    holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView(
+                      providerParty(j),
+                      j,
+                      dsoParty,
+                      "AMT",
+                    ).toValue
+                  ),
+                  Map.empty,
+                )
+              ),
+              synchronizerId = d1,
+              recordTime = Instant.EPOCH.plusSeconds(i.toLong),
+            )
+          ),
+          d1,
+        )
+      )
+
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- store.ingestionSink.ingestUpdateBatch(NonEmptyList.fromListUnsafe(bigBatch.toList))
+        count <- storage
+          .querySingle(
+            sql"select count(*) from acs_store_template".as[Int].headOption,
+            "bigBatchCount",
+          )
+          .value
+          .failOnShutdown("test doesn't shutdown")
+      } yield count should be(Some(batchSize * createdEventsPerBatch))
     }
   }
 
