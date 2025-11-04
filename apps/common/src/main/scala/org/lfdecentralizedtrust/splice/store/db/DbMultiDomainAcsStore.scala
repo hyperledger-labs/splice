@@ -1515,15 +1515,15 @@ final class DbMultiDomainAcsStore[TXE](
         }
 
       val allDbOps = for {
-        insertsToAlreadyArchived <- DBIO.sequence(
-          workTodo
-            .collect { case insert: Insert =>
-              // TODO: batch this
-              hasIncompleteReassignments(insert.evt.getContractId).map(insert -> _)
-            }
+        insertContractIdsWithIncompleteReassignments <- checkIncompleteReassignments(
+          workTodo.collect { case insert: Insert =>
+            insert.evt.getContractId
+          }.toSet
         )
-        insertsToDo = insertsToAlreadyArchived.collect {
-          case (insert, alreadyArchived) if !alreadyArchived => insert
+        insertsToDo = workTodo.collect {
+          case insert: Insert
+              if !insertContractIdsWithIncompleteReassignments.contains(insert.evt.getContractId) =>
+            insert
         }
         _ <- NonEmptyList.fromList(insertsToDo.toList) match {
           case Some(inserts) =>
@@ -1540,10 +1540,12 @@ final class DbMultiDomainAcsStore[TXE](
           case None =>
             DBIO.successful(())
         }
-        // TODO: batch this too
-        _ <- DBIO.seq(workTodo.collect { case Delete(exercisedEvent) =>
-          doDeleteContract(exercisedEvent, summary)
-        }*)
+        _ <- doDeleteContracts(
+          workTodo.collect { case Delete(exercisedEvent) =>
+            exercisedEvent
+          },
+          summary,
+        )
         // TODO (#3048): batch this
         _ <- DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
           doIngestTxLogInsert(
@@ -1575,12 +1577,23 @@ final class DbMultiDomainAcsStore[TXE](
       )}
           """).as[Int].head.map(_ > 0)
 
-    private def hasIncompleteReassignments(contractId: String) = (sql"""
-           select count(*) from incomplete_reassignments
-           where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id = ${lengthLimited(
-        contractId
-      )}
-          """).as[Int].head.map(_ > 0)
+    private def hasIncompleteReassignments(contractId: String) =
+      checkIncompleteReassignments(Set(contractId)).map(_.nonEmpty)
+
+    /** @return which contract ids have incomplete reassignments
+      */
+    private def checkIncompleteReassignments(
+        contractIds: Set[String]
+    ): DBIOAction[Set[String], NoStream, Effect.Read] = {
+      if (contractIds.isEmpty) DBIO.successful(Set.empty)
+      else {
+        (sql"""
+           select distinct contract_id from incomplete_reassignments
+           where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id in """ ++ inClause(
+          contractIds
+        )).toActionBuilder.as[String].map(_.toSet)
+      }
+    }
 
     private def stateRowDataFromActiveContract(
         synchronizerId: SynchronizerId,
@@ -1757,20 +1770,25 @@ final class DbMultiDomainAcsStore[TXE](
               """ ++ indexColumnNameValues ++ sql")")
     }
 
-    private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary) = {
-      sqlu"""
+    private def doDeleteContracts(events: Seq[ExercisedEvent], summary: MutableIngestionSummary) = {
+      if (events.isEmpty) DBIO.successful(())
+      else {
+        (sql"""
         delete from #$acsTableName
         where store_id = $acsStoreId
           and migration_id = $domainMigrationId
-          and contract_id = ${lengthLimited(event.getContractId)}
-      """.map {
-        case 1 =>
-          summary.ingestedArchivedEvents.addOne(event)
-        case _ =>
-          // there was actually no contract with that id. This can happen because:
+          and contract_id in """ ++ inClause(
+          events.map(_.getContractId)
+        ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
+          val deletedCidSet = deletedCids.toSet
+          val ingestedArchivedEvents =
+            events.filter(evt => deletedCidSet.contains(evt.getContractId))
+          summary.ingestedArchivedEvents.addAll(ingestedArchivedEvents)
+          // there were no contracts with some id. This can happen because:
           // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
           // but that might still satisfy some other filter, so the contract was never inserted
-          summary.numFilteredArchivedEvents += 1
+          summary.numFilteredArchivedEvents += (events.length - deletedCids.size)
+        }
       }
     }
 
