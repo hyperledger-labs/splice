@@ -32,21 +32,22 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory, logger: Tr
   )
 
   /*we need to pass the full context when we create it to avoid duplicate values warnings*/
-  def gauge(implicit extraMc: MetricsContext): MetricHandle.Gauge[Double] = {
+  def recordMaxLimit(limit: Double)(implicit extraMc: MetricsContext): Unit = {
     val createdGauge = otelFactory.gauge[Double](
       MetricInfo(
         SpliceMetrics.MetricsPrefix :+ "rate_limiting_max_limit_per_second",
         "Max allowed rate per second",
         Saturation,
       ),
-      0,
+      limit,
     )(mc.merge(extraMc))
     gaugesToClose.add(createdGauge)
-    createdGauge
   }
 
   override def close(): Unit = {
-    LifeCycle.close(gaugesToClose.asScala.toSeq*)(logger)
+    val gaugesThatWillBeClosed = gaugesToClose.asScala.toSeq
+    gaugesToClose.clear()
+    LifeCycle.close(gaugesThatWillBeClosed*)(logger)
   }
 
 }
@@ -64,13 +65,13 @@ class SpliceRateLimiter(
 ) {
 
   // noinspection UnstableApiUsage
-  private val rateLimiter = RateLimiter.create(config.ratePerSecond)
-  metrics
-    .gauge(
-      MetricsContext("limiter" -> name)
-    )
-    .updateValue(config.ratePerSecond)(
-    )
+  private lazy val rateLimiter = {
+    metrics
+      .recordMaxLimit(config.ratePerSecond)(
+        MetricsContext("limiter" -> name)
+      )
+    RateLimiter.create(config.ratePerSecond)
+  }
 
   def markRun(): Boolean = {
     if (config.enabled && Instant.now().isAfter(enforceAfter)) {
