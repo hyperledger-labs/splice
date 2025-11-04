@@ -616,11 +616,12 @@ class DbMultiDomainAcsStoreTest
       // 100 txs of 1000 CreatedEvents each
       val batchSize = 100
       val createdEventsPerBatch = 1000
-      val bigBatch = (1 to batchSize).map(i =>
+      def bigBatch() = (1 to batchSize).map { i =>
+        val offset = nextOffset() // mutable state
         TreeUpdateOrOffsetCheckpoint.Update(
           TransactionTreeUpdate(
             mkTx(
-              offset = i.toLong,
+              offset = offset,
               events = (1 to createdEventsPerBatch).map(j =>
                 toCreatedEvent(
                   amulet(providerParty(j), j, j.toLong, BigDecimal(0.001)),
@@ -643,12 +644,12 @@ class DbMultiDomainAcsStoreTest
           ),
           d1,
         )
-      )
+      }
 
       for {
         _ <- initWithAcs()
         _ <- assertList()
-        _ <- store.ingestionSink.ingestUpdateBatch(NonEmptyList.fromListUnsafe(bigBatch.toList))
+        _ <- store.ingestionSink.ingestUpdateBatch(NonEmptyList.fromListUnsafe(bigBatch().toList))
         count <- storage
           .querySingle(
             sql"select count(*) from acs_store_template".as[Int].headOption,
