@@ -13,7 +13,7 @@ const PageSectionHeader: React.FC<PageSectionHeaderProps> = ({
   badgeCount,
   'data-testid': testId,
 }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', mb: '18px' }}>
+  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
     <Typography variant="h3" fontFamily="lato" fontSize={18} data-testid={`${testId}-title`}>
       {title}
     </Typography>

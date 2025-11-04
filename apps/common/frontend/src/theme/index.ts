@@ -37,6 +37,7 @@ declare module '@mui/material/styles' {
     colors?: {
       neutral?: Record<string, string>;
       primary?: Record<string, string>;
+      secondary?: string;
       mainnet: string;
       testnet: string;
       devnet: string;
