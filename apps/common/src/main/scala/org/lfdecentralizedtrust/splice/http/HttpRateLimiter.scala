@@ -24,19 +24,20 @@ class HttpRateLimiter(
   private val metrics = scala.collection.concurrent.TrieMap[String, SpliceRateLimitMetrics]()
 
   def withRateLimit(service: String)(operation: String): Directive0 = {
+    val rateLimiterMetrics = metrics.getOrElseUpdate(
+      service,
+      SpliceRateLimitMetrics(metricsFactory, logger)(
+        MetricsContext(
+          "http_service" -> service
+        )
+      ),
+    )
     val rateLimiter = rateLimiters.getOrElseUpdate(
       operation,
       new SpliceRateLimiter(
         operation,
         config.forRateLimiter(operation),
-        metrics.getOrElseUpdate(
-          service,
-          SpliceRateLimitMetrics(metricsFactory, logger)(
-            MetricsContext(
-              "http_service" -> service
-            )
-          ),
-        ),
+        rateLimiterMetrics,
         // the rate limiter has a cold start, to avoid the first request being rejected
         // we enforce the rate limit only after 1 second
         Instant.now().plusSeconds(1),
