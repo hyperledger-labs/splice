@@ -30,6 +30,7 @@ Upcoming
 
     - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
     - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
+    - Add a section on :ref:`wallet_how_to_earn_featured_app_rewards`
 
 0.4.23
 ------
