@@ -25,7 +25,7 @@ import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee)
+import Splice.AmuletConfig (AmuletConfig(..), DevelopmentFundConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee)
 import qualified Splice.AmuletConfig as Unit
 import Splice.Schedule
 import Splice.Expiry
@@ -128,11 +128,13 @@ template AmuletRules
         -- one under their control.
       controller Set.toList (transferControllers transfer)
       do
+        now <- getTime
         checkExpectedDso dso expectedDso
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
-        executeTransfer rewardsConfig context dso transfer
+            configUsd = getValueAsOf now configSchedule
+        executeTransfer rewardsConfig context dso configUsd.developmentFundConfig transfer
 
     nonconsuming choice AmuletRules_CreateExternalPartySetupProposal : AmuletRules_CreateExternalPartySetupProposalResult
       -- ^ Propose to host an external party
@@ -155,7 +157,8 @@ template AmuletRules
         require "preapprovalExpiresAt is not in the past" (preapprovalExpiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (preapprovalExpiresAt `subTime` now) configUsd context.context dso
-        (transferResult, meta) <- splitAndBurn validator amuletPaid inputs context.context dso "create ExternalPartySetupProposal"
+        (transferResult, meta) <-
+          splitAndBurn validator amuletPaid inputs context.context dso "create ExternalPartySetupProposal" configUsd.developmentFundConfig
         proposalCid <- create ExternalPartySetupProposal with
           user
           validator
@@ -183,7 +186,8 @@ template AmuletRules
         require "expiresAt is not in the past" (expiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (expiresAt `subTime` now) configUsd context.context dso
-        (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "create TransferPreapproval"
+        (transferResult, meta) <-
+          splitAndBurn provider amuletPaid inputs context.context dso "create TransferPreapproval" configUsd.developmentFundConfig
         transferPreapprovalCid <- create TransferPreapproval with
           receiver
           provider
@@ -222,7 +226,8 @@ template AmuletRules
         let transferConfigAmulet = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
         (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
         -- We want to burn exactly trafficCostAmulet, and createFee is already burnt by the self-transfer itself, so we subtract the createFee from the amount we split off and burn explicitly.
-        (transferResult, meta) <- splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase"
+        (transferResult, meta) <-
+          splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase" configUsd.developmentFundConfig
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
           dso
@@ -716,11 +721,13 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
     issueValidatorRewards : Bool
 
 -- | Execute a transfer.
-executeTransfer : RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer config context dso t = do
+executeTransfer
+  : RewardsIssuanceConfig -> TransferContext -> Party -> Optional DevelopmentFundConfig -> Transfer
+  -> Update TransferResult
+executeTransfer config context dso optFundConfig t  = do
   -- compute summaries
   csum <- summarizeAndValidateContext context dso t
-  isum <- summarizeAndConsumeInputs csum dso t.sender t.inputs
+  isum <- summarizeAndConsumeInputs csum dso t.sender t.inputs optFundConfig
   osum <- preprocessOutputs csum.config t.sender t.outputs
   summary <- summarizeTransfer t.sender csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
@@ -749,6 +756,7 @@ executeTransfer config context dso t = do
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
           optionalNonZeroMetadata unclaimedActivityRecordAmountMetaKey summary.inputUnclaimedActivityRecordAmount $
+          optionalNonZeroMetadata developmentFundAmountMetaKey summary.inputDevelopmentFundAmount $
           TextMap.empty
 
   return TransferResult with
@@ -776,6 +784,9 @@ data TransferInputsSummary = TransferInputsSummary with
     amountArchivedAsOfRoundZero : Decimal
     changeToHoldingFeesRate : Decimal
     totalUnclaimedActivityRecordAmount : Optional Decimal
+      -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
+      -- on package upload because `TransferInputsSummary` is serializable.
+    totalDevelopmentFundAmount : Optional Decimal
       -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
       -- on package upload because `TransferInputsSummary` is serializable.
   deriving (Eq, Show)
@@ -831,11 +842,12 @@ getIssuingMiningRound csum round = do
     Some issuingRound -> pure issuingRound
 
 summarizeAndConsumeInputs
-  : TransferContextSummary -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeAndConsumeInputs csum dso sender inps = do
+  : TransferContextSummary -> Party -> Party -> [TransferInput] -> Optional DevelopmentFundConfig -> Update TransferInputsSummary
+summarizeAndConsumeInputs csum dso sender inps optFundConfig = do
     foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
   where
     forOwner = ForOwner with dso; owner = sender
+    forDso = ForDso with dso
 
     initialSummary = TransferInputsSummary with
       totalAmuletAmount = 0.0
@@ -847,6 +859,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
       amountArchivedAsOfRoundZero = 0.0
       changeToHoldingFeesRate = 0.0
       totalUnclaimedActivityRecordAmount = Some 0.0
+      totalDevelopmentFundAmount = Some 0.0
 
     summarizeAndConsumeInput _round s (InputAmulet amuletCid) = do
       amulet <- fetchAndArchive forOwner amuletCid
@@ -863,6 +876,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero + getValueAsOfRound0 amulet.amount
         changeToHoldingFeesRate = s.changeToHoldingFeesRate - amulet.amount.ratePerRound.rate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputAppRewardCoupon couponCid) = do
       coupon <- fetchAndArchive forOwner couponCid
@@ -881,10 +895,11 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputValidatorRewardCoupon couponCid) = do
       -- we must and do use the validator right to archive the coupon of the user
-      coupon <- fetchButArchiveLater (ForDso with dso) couponCid
+      coupon <- fetchButArchiveLater forDso couponCid
       do
         rightCid <- getValidatorRight csum coupon.user
         exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
@@ -902,6 +917,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputSvRewardCoupon couponCid) = do
       -- we use the SvRewardCoupon_ArchiveAsBeneficiary choice to signal the archival of the coupon
@@ -920,6 +936,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputValidatorLivenessActivityRecord recordCid) = do
       record <- fetchAndArchive forOwner recordCid
@@ -936,6 +953,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (ExtTransferInput _dummyUnitField optInputValidatorFaucetCoupon) = do
       optional (pure s) (summarizeAndConsumeValidatorFaucetInput s) optInputValidatorFaucetCoupon
@@ -954,6 +972,26 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
+
+    summarizeAndConsumeInput _round s (InputDevelopmentFundCoupon couponCid) = do
+      case optFundConfig of
+        None -> abort "DevelopmentFundCoupon cannot be consumed without AmuletConfig/DevelopmentFundConfig configured"
+        Some config ->
+          require "sender matches the beneficiary defined in AmuletConfig/DevelopmentFundConfig" $
+            sender == config.beneficiary
+      coupon <- fetchAndArchive forDso couponCid
+      return TransferInputsSummary with
+        totalAmuletAmount = s.totalAmuletAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
+        totalSvRewardAmount = s.totalSvRewardAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = (+ coupon.amount) <$> s.totalDevelopmentFundAmount
 
     summarizeAndConsumeValidatorFaucetInput s couponCid = do
       coupon <- fetchAndArchive forOwner couponCid
@@ -970,6 +1008,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
 -- | Deduplicate lock-holders to store them and charge for them at most once
 dedupOutputLockHolders : TransferOutput -> TransferOutput
@@ -1029,6 +1068,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       + fromOptional 0.0 inp.totalUnclaimedActivityRecordAmount
       + inp.totalValidatorFaucetAmount
       + inp.totalSvRewardAmount
+      + fromOptional 0.0 inp.totalDevelopmentFundAmount
       - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigAmulet.createFee.fee leftOverAmount
     senderChangeAmount = leftOverAmount - senderChangeFee
@@ -1054,6 +1094,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       inputUnclaimedActivityRecordAmount = inp.totalUnclaimedActivityRecordAmount
       inputValidatorFaucetAmount = Some inp.totalValidatorFaucetAmount
       inputSvRewardAmount = inp.totalSvRewardAmount
+      inputDevelopmentFundAmount = inp.totalDevelopmentFundAmount
       holdingFees = inp.totalHoldingFees
       outputFees
       senderChangeFee
@@ -1245,6 +1286,7 @@ data TransferInput
         -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
+  | InputDevelopmentFundCoupon (ContractId DevelopmentFundCoupon)
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
@@ -1347,6 +1389,9 @@ data TransferSummary = TransferSummary with
       -- ^ Added in CIP-3. Total amount of validator faucet coupon issuance input into this transfer.
     inputUnclaimedActivityRecordAmount : Optional Decimal
       -- ^ Total amount of unclaimed activity record issuance input into this transfer.
+      -- Note: Made optional as the addition of this field is checked by the upgrade checker.
+    inputDevelopmentFundAmount : Optional Decimal
+      -- ^ Total amount of development fund coupon issuance input into this transfer.
       -- Note: Made optional as the addition of this field is checked by the upgrade checker.
   deriving (Show, Eq)
 
@@ -1510,7 +1555,8 @@ template TransferPreapproval
          amuletRules <- fetchPublicReferenceData (ForDso dso) context.amuletRules (AmuletRules_Fetch dso)
          let configUsd = getValueAsOf now amuletRules.configSchedule
          (amuletPaid, _) <- computeTransferPreapprovalFee extension configUsd context.context dso
-         (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "renew TransferPreapproval"
+         (transferResult, meta) <-
+           splitAndBurn provider amuletPaid inputs context.context dso "renew TransferPreapproval" configUsd.developmentFundConfig
          transferPreapprovalCid <- create this with
            lastRenewedAt = now
            expiresAt = newExpiresAt
@@ -1568,13 +1614,15 @@ computeTransferPreapprovalFee duration amuletConfig context dso = do
   let feeAmulet = feeUsd / contextMiningRound.amuletPrice
   pure (feeAmulet, feeUsd)
 
-splitAndBurn : Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update (TransferResult, Metadata)
-splitAndBurn sender amount inputs context dso usage = do
+splitAndBurn
+  : Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Optional DevelopmentFundConfig
+  -> Update (TransferResult, Metadata)
+splitAndBurn sender amount inputs context dso usage optFundConfig = do
 -- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  transferResult <- executeTransfer rewardsConfig context dso Transfer with
+  transferResult <- executeTransfer rewardsConfig context dso optFundConfig Transfer with
     sender
     provider = sender
     inputs
