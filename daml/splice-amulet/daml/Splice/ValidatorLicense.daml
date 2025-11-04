@@ -153,6 +153,8 @@ template ValidatorLicense with
            lastActiveAt = Some now
          pure (ValidatorLicense_ReportActiveResult licenseCid)
 
+defaultValidatorLicenseWeight : Decimal
+defaultValidatorLicenseWeight = 1.0
 
 metadataUpdateMinInterval : RelTime
 metadataUpdateMinInterval = hours 1
