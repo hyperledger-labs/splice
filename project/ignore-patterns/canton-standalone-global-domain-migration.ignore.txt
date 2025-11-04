@@ -24,6 +24,3 @@ P2P connectivity is not ready
 
 # Consequence of shutting down global domain
 .*The sequencer client\'s healthy subscriptions count is under the configured BFT threshold .* Failed sequencer subscriptions for .* Previous state was Ok.*
-
-# TODO(#3069): Double-check this is expected (and unavoidable)
-Dynamic synchronizer parameters to compute earliest available pruning timestamp not found
