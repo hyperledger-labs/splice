@@ -110,6 +110,7 @@ testUsageFees = do
     inputUnclaimedActivityRecordAmount = Some 0.0
     inputValidatorFaucetAmount = Some 0.0
     inputSvRewardAmount = 0.0
+    inputDevelopmentFundAmount = Some 0.0
     inputAmuletAmount = 100.0
     balanceChanges = Map.empty
     holdingFees = 0.0 -- no holding fees charged on transfer
