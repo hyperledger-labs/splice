@@ -58,6 +58,7 @@ class ExternalPartyWalletService(
       retryProvider,
       domainMigrationInfo,
       participantId,
+      automationConfig.ingestion,
     )
 
   val automation = new ExternalPartyWalletAutomationService(

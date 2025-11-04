@@ -16,6 +16,7 @@ import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -313,6 +314,7 @@ object ScanStore {
       cacheConfigs: ScanCacheConfig,
       enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
+      ingestionConfig: IngestionConfig,
       initialRound: Long,
   )(implicit
       ec: ExecutionContext,
@@ -334,6 +336,7 @@ object ScanStore {
             domainMigrationInfo,
             participantId,
             enableImportUpdateBackfill,
+            ingestionConfig,
             metrics,
             initialRound,
           ),

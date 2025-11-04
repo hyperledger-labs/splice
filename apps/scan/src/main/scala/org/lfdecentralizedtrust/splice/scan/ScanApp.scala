@@ -183,6 +183,7 @@ class ScanApp(
         config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        config.automation.ingestion,
         initialRound.toLong,
       )
       acsSnapshotStore = AcsSnapshotStore(

@@ -82,6 +82,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     retryProvider,
     domainMigrationInfo,
     participantId,
+    config.automation.ingestion,
   )
 
   protected def newSvSvAutomationService(
@@ -126,6 +127,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       retryProvider,
       domainMigrationInfo,
       participantId,
+      config.automation.ingestion,
     )
   }
 

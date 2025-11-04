@@ -43,6 +43,7 @@ import java.time.Instant
 import scala.concurrent.Future
 import StoreTest.*
 import cats.data.NonEmptyList
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbMultiDomainAcsStoreTest
@@ -649,7 +650,9 @@ class DbMultiDomainAcsStoreTest
       for {
         _ <- initWithAcs()
         _ <- assertList()
-        _ <- store.ingestionSink.ingestUpdateBatch(NonEmptyList.fromListUnsafe(bigBatch().toList))
+        _ <- store.testIngestionSink.ingestUpdateBatch(
+          NonEmptyList.fromListUnsafe(bigBatch().toList)
+        )
         count <- storage
           .querySingle(
             sql"select count(*) from acs_store_template".as[Int].headOption,
@@ -768,6 +771,7 @@ class DbMultiDomainAcsStoreTest
         migrationTimeInfo,
       ),
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      IngestionConfig(),
     )
   }
 
