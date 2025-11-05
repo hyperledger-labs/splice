@@ -155,6 +155,10 @@ test_MergeValidatorLicense_NegativeScenarios = do
   pure()
 
 -- Test that minimum weight is preserved when merging licenses
+-- Note: Weight with `Some` values can only happen via SV vote, and therefore is preferred over `None`
+-- We don't want any single SV to overwrite the weight of a ValidatorLicense by
+-- simply granting a new one with weight `None`. Therefore we prefer the `Some`
+-- values even if they happen to be higher than the default value of 1.0 of `None`
 test_MergeValidatorLicense_WeightMerging : Script ()
 test_MergeValidatorLicense_WeightMerging = do
   (_, dso, (sv1, sv2, _, _)) <- initDevNet
