@@ -1,13 +1,12 @@
 {
   "name": "@lfdecentralizedtrust/splice-pulumi-policy",
   "main": "src/index.ts",
-  "version": "1.0.0",
   "dependencies": {
     "@pulumi/kubernetes-cert-manager": "0.2.0",
     "@pulumiverse/grafana": "0.16.3",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@pulumi/gcp": "8.32.1",
-    "@pulumi/policy": "^1.18.1"
+    "@pulumi/policy": "1.20.0"
   },
   "overrides": {
     "@pulumi/kubernetes-cert-manager": {
