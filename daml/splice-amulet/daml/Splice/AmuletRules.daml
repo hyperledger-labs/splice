@@ -1012,9 +1012,9 @@ summarizeAndConsumeInputs csum dso sender inps optFundConfig = do
     summarizeAndConsumeInput _round s (InputDevelopmentFundCoupon couponCid) = do
       case optFundConfig of
         None -> abort "DevelopmentFundCoupon cannot be consumed without AmuletConfig/DevelopmentFundConfig configured"
-        Some config ->
+        Some fundConfig ->
           require "sender matches the beneficiary defined in AmuletConfig/DevelopmentFundConfig" $
-            sender == config.beneficiary
+            sender == fundConfig.beneficiary
       coupon <- fetchAndArchive forDso couponCid
       return TransferInputsSummary with
         totalAmuletAmount = s.totalAmuletAmount
