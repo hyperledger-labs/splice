@@ -420,6 +420,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigReader[IngestionConfig] = deriveReader[IngestionConfig]
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
     implicit val LedgerApiClientConfigReader: ConfigReader[LedgerApiClientConfig] =
@@ -853,6 +854,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigWriter[IngestionConfig] = deriveWriter[IngestionConfig]
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
     implicit val LedgerApiClientConfigWriter: ConfigWriter[LedgerApiClientConfig] =

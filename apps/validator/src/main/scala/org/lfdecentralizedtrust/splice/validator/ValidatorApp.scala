@@ -766,6 +766,7 @@ class ValidatorApp(
         retryProvider,
         domainMigrationInfo,
         participantId,
+        config.automation.ingestion,
       )
       domainTimeAutomationService = new DomainTimeAutomationService(
         config.domains.global.alias,
