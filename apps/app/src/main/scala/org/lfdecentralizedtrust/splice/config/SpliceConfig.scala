@@ -689,13 +689,20 @@ object SpliceConfig {
       }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigReader: ConfigReader[ParticipantPruningConfig] =
-      deriveReader[ParticipantPruningConfig]
+    implicit val pruningConfigReader: ConfigReader[PruningConfig] =
+      deriveReader[PruningConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
         val participantIdentifier =
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
+          _ <- Either.cond(
+            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+            ),
+          )
           _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
             (),
@@ -1024,8 +1031,8 @@ object SpliceConfig {
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigWriter: ConfigWriter[ParticipantPruningConfig] =
-      deriveWriter[ParticipantPruningConfig]
+    implicit val pruningConfigWriter: ConfigWriter[PruningConfig] =
+      deriveWriter[PruningConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

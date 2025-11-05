@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.config
 
+import cats.data.NonEmptyList
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.config.*
@@ -97,6 +98,13 @@ case class ValidatorDecentralizedSynchronizerConfig(
       */
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
+
+    /** An optional, static list of trusted sequencer names to connect to.
+      * sequencerNames is mutually exclusive with `url`.
+      */
+    sequencerNames: Option[NonEmptyList[String]] = None,
+
+    // TODO(#3059): Add a threshold parameter to configure the number of sequencers that must be connected
 ) {
 
   /** Converts the reservedTraffic into an Option that is set to None if the validator is not
@@ -125,17 +133,6 @@ final case class MigrateValidatorPartyConfig(
     // if it is not set, it will get the list of parties from the participant
     // otherwise, it will be used to filter the list of parties to migrate
     partiesToMigrate: Option[Seq[String]] = None,
-)
-
-/** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
-  *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
-  *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
-  *      specified retention period.
-  */
-final case class ParticipantPruningConfig(
-    cron: String,
-    maxDuration: PositiveDurationSeconds,
-    retention: PositiveDurationSeconds,
 )
 
 case class ValidatorAppBackendConfig(
@@ -196,7 +193,7 @@ case class ValidatorAppBackendConfig(
       NonNegativeFiniteDuration.ofSeconds(5),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
-    participantPruningSchedule: Option[ParticipantPruningConfig] = None,
+    participantPruningSchedule: Option[PruningConfig] = None,
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,

@@ -239,6 +239,7 @@ class SvApp(
             svSynchronizerConfig.sequencer,
             cometBftConfig,
           ),
+          svSynchronizerConfig.mediator.pruning,
         )
       )
     initialize(
@@ -471,16 +472,23 @@ class SvApp(
         localSynchronizerNode match {
           case Some(node) =>
             if (!config.shouldSkipSynchronizerInitialization) {
-              appInitStep(
-                "Ensure that the local mediators's sequencer request amplification config is up to date"
-              ) {
-                // Normally we set this up during mediator init
-                // but if the config changed without a mediator reset we need to update it here.
-                node.ensureMediatorSequencerRequestAmplification()
-              }
+              for {
+                _ <- appInitStep(
+                  "Ensure that the local mediators's sequencer request amplification config is up to date"
+                ) {
+                  // Normally we set this up during mediator init
+                  // but if the config changed without a mediator reset we need to update it here.
+                  node.ensureMediatorSequencerRequestAmplification()
+                }
+                _ <- appInitStep(
+                  "Ensure that the local mediators's pruning config is up to date"
+                ) {
+                  node.ensureMediatorPruningSchedule()
+                }
+              } yield ()
             } else {
               logger.info(
-                "Skipping mediator sequencer amplification configuration because skipSynchronizerInitialization is enabled"
+                "Skipping mediator configuration because skipSynchronizerInitialization is enabled"
               )
               Future.unit
             }
@@ -574,6 +582,7 @@ class SvApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         metrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
 
       route = cors(

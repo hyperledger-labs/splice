@@ -1261,7 +1261,6 @@ final class DbMultiDomainAcsStore[TXE](
         traceContext: TraceContext
     ): Future[Unit] = {
       metrics.updateLastSeenMetrics(batch.last)
-
       metrics.batchSize.update(batch.length)
       val steps = batchInsertionSteps(batch)
       MonadUtil
@@ -1642,7 +1641,8 @@ final class DbMultiDomainAcsStore[TXE](
     )
 
     case class AcsInsertEntry(
-        offset: Long, // not always the same as `createdEvent.getOffset`
+        // not always the same as `createdEvent.getOffset`: when `ingestACS`ing, it's `participantBegin`
+        offset: Long,
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
     )

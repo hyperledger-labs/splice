@@ -322,6 +322,7 @@ class ScanApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         nodeMetrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
