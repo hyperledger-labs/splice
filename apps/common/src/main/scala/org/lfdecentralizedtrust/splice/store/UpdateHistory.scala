@@ -64,7 +64,6 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.discard.Implicits.*
-import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import com.digitalasset.canton.util.MonadUtil
 
 /** Stores all original daml updates visible to `updateStreamParty`.
@@ -2301,14 +2300,7 @@ class UpdateHistory(
           if (!itemExists) {
             DBIOAction
               .sequence(items.map { item =>
-                val dbio = ingestUpdate_(item.update, migrationId)
-                oMetrics
-                  .map(metrics =>
-                    SpliceMetrics.timeDBIO(dbio, metrics.UpdateHistory.latency)(
-                      metrics.metricsContextFromUpdate(item.update, backfilling = true)
-                    )
-                  )
-                  .getOrElse(dbio)
+                ingestUpdate_(item.update, migrationId)
               })
           } else {
             DBIOAction.successful(())
