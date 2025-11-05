@@ -73,6 +73,7 @@ data IssuingRoundParameters = IssuingRoundParameters with
     unclaimedValidatorRewards : Decimal
     unclaimedSvRewards : Decimal -- ^ Can be non-zero due to rounding, or no SV having had the chance to claim their coupons.
     issuancePerValidatorFaucetCoupon : Decimal
+    amuletsToIssueToDevelopmentFund : Decimal
   deriving (Eq, Show)
 
 validateOpenMiningRoundSummary : CanAssert m => OpenMiningRoundSummary -> m ()
@@ -82,8 +83,10 @@ validateOpenMiningRoundSummary summary = do
     require "totalUnfeaturedAppRewardCoupons >= 0.0" (summary.totalUnfeaturedAppRewardCoupons >= 0.0)
     require "totalValidatorFaucetCoupons >= 0" (getTotalValidatorFaucetCoupons summary >= 0)
 
-computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
-computeIssuingRoundParameters tickDuration amuletPrice config summary =
+computeIssuingRoundParameters
+  : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> Optional Decimal
+  -> IssuingRoundParameters
+computeIssuingRoundParameters tickDuration amuletPrice config summary optDevelopmentFundPercentage =
     IssuingRoundParameters with
       issuancePerValidatorRewardCoupon = validatorRewardIssuance.issuancePerCoupon
       issuancePerUnfeaturedAppRewardCoupon = unfeaturedAppIssuance.issuancePerCoupon
@@ -94,9 +97,15 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       unclaimedAppRewards = featuredAppIssuance.unclaimedRewards
       unclaimedSvRewards
       issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
+      amuletsToIssueToDevelopmentFund
   where
+    developmentFundPercentage = fromOptional 0.0 optDevelopmentFundPercentage
+    remainingEmissionPercentage = 1.0 - developmentFundPercentage
+
     amuletsToIssueToSvs =
-      amuletsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
+      amuletsToIssueInRound * remainingEmissionPercentage
+        - validatorRewardIssuance.rewardsToIssue
+        - unfeaturedAppIssuance.rewardsToIssue
 
     issuancePerSvRewardCoupon =
       if summary.totalSvRewardWeight == 0
@@ -114,8 +123,11 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       intToDecimal (convertRelTimeToMicroseconds tickDuration)
     amuletsToIssueInRound = config.amuletToIssuePerYear / roundsPerYear
 
+    adjustedAmuletsToIssueInRound = amuletsToIssueInRound * remainingEmissionPercentage
+    amuletsToIssueToDevelopmentFund = amuletsToIssueInRound * developmentFundPercentage
+
     validatorRewardIssuance = computeIssuanceTranche
-      (amuletsToIssueInRound * config.validatorRewardPercentage)
+      (adjustedAmuletsToIssueInRound * config.validatorRewardPercentage)
       config.validatorRewardCap
       summary.totalValidatorRewardCoupons
 
@@ -126,7 +138,7 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       (intToDecimal $ getTotalValidatorFaucetCoupons summary)
 
     unfeaturedAppIssuance = computeIssuanceTranche
-      (amuletsToIssueInRound * config.appRewardPercentage)
+      (adjustedAmuletsToIssueInRound * config.appRewardPercentage)
       config.unfeaturedAppRewardCap
       (summary.totalFeaturedAppRewardCoupons + summary.totalUnfeaturedAppRewardCoupons)
 

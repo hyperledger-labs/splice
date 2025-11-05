@@ -64,6 +64,7 @@ data AmuletRules_AdvanceOpenMiningRoundsResult = AmuletRules_AdvanceOpenMiningRo
 
 data AmuletRules_MiningRound_StartIssuingResult = AmuletRules_MiningRound_StartIssuingResult with
     issuingRoundCid : ContractId IssuingMiningRound
+    developmentFundCouponCid : Optional (ContractId DevelopmentFundCoupon)
 
 data AmuletRules_MiningRound_CloseResult = AmuletRules_MiningRound_CloseResult with
     closedRoundCid : ContractId ClosedMiningRound
@@ -445,11 +446,14 @@ template AmuletRules
         summary : OpenMiningRoundSummary
       controller dso
       do
+        now <- getTime
         miningRound <- fetchAndArchive (ForDso with dso) miningRoundCid
         validateOpenMiningRoundSummary summary
 
-        let params = computeIssuingRoundParameters
-              miningRound.tickDuration miningRound.amuletPrice miningRound.issuanceConfig summary
+        let
+          optDevelopmentFundPercentage = (.percentage) <$> (getValueAsOf now configSchedule).developmentFundConfig
+          params = computeIssuingRoundParameters
+            miningRound.tickDuration miningRound.amuletPrice miningRound.issuanceConfig summary optDevelopmentFundPercentage
 
         -- record unclaimed reward contract
         let totalUnclaimedRewards = params.unclaimedValidatorRewards + params.unclaimedAppRewards + params.unclaimedSvRewards
@@ -458,8 +462,16 @@ template AmuletRules
             dso
             amount = totalUnclaimedRewards
 
+        -- record development fund coupon contract
+        developmentFundCouponCid <-
+          if params.amuletsToIssueToDevelopmentFund > 0.0
+            then
+              Some <$> create DevelopmentFundCoupon with
+                dso
+                amount = params.amuletsToIssueToDevelopmentFund
+            else pure None
+
         -- create issuing round
-        now <- getTime
         let tickDuration = miningRound.tickDuration
         let opensAt = addRelTime now tickDuration
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
