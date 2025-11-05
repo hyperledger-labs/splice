@@ -163,13 +163,13 @@ export const Governance: React.FC = () => {
   return (
     <Box sx={{ p: 4 }}>
       <PageHeader
-        data-testid="governance-page-header"
         title="Governance"
         actionElement={
           <Button variant="pill" component={RouterLink} to={`/governance-beta/proposals/create`}>
             Initiate Proposal
           </Button>
         }
+        data-testid="governance-page-header"
       />
 
       <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />

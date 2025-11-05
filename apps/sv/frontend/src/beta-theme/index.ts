@@ -3,66 +3,9 @@
 import 'common-typeface-termina/index.css';
 import 'common-typeface-lato/index.css';
 
-import { createTheme, TypographyStyle } from '@mui/material';
+import { createTheme } from '@mui/material';
 
 import { generateHslPalette, generateRemValue, stylePillButton } from './utils';
-
-// // TS module augmentation to add custom theme vars for storing our custom color values
-declare module '@mui/material/styles' {
-  interface Theme {
-    fonts: {
-      sansSerif: TypographyStyle;
-      monospace: TypographyStyle;
-    };
-  }
-
-  interface ThemeOptions {
-    fonts?: {
-      sansSerif: TypographyStyle;
-      monospace: TypographyStyle;
-    };
-  }
-
-  interface Palette {
-    colors: {
-      neutral: Record<string, string>;
-      primary: Record<string, string>;
-      mainnet: string;
-      testnet: string;
-      devnet: string;
-      scratchnet: string;
-    };
-  }
-  // allow configuration using `createTheme`
-  interface PaletteOptions {
-    colors?: {
-      neutral?: Record<string, string>;
-      primary?: Record<string, string>;
-      mainnet: string;
-      testnet: string;
-      devnet: string;
-      scratchnet: string;
-    };
-  }
-}
-
-declare module '@mui/material/Button' {
-  interface ButtonPropsVariantOverrides {
-    pill: true;
-  }
-}
-
-declare module '@mui/material/Typography' {
-  interface TypographyPropsVariantOverrides {
-    pill: true;
-  }
-}
-
-declare module '@mui/material/TableCell' {
-  interface TableCellPropsVariantOverrides {
-    party: true;
-  }
-}
 
 let betaTheme = createTheme({
   /**
@@ -76,6 +19,7 @@ let betaTheme = createTheme({
     colors: {
       neutral: generateHslPalette(0, 0, [0, 10, 15, 25, 30, 40, 50, 60, 70, 80]),
       primary: generateHslPalette(195, 96, [79, 89]),
+      secondary: '#F3FF97',
       mainnet: '#F8FDCD',
       testnet: '#C8F1FE',
       devnet: '#C6B2FF',
@@ -110,6 +54,9 @@ betaTheme = createTheme(betaTheme, {
     },
     background: {
       default: betaTheme.palette.colors.neutral[10],
+    },
+    text: {
+      light: '#E2E2E2',
     },
   },
 });
