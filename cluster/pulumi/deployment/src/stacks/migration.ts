@@ -7,7 +7,10 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { allSvsToDeploy, svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  allSvNamesToDeploy,
+  svRunbookNodeName,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
 import { deploymentConf } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/config';
 import {
   GitFluxRef,
@@ -25,10 +28,10 @@ export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
     return migrations
       .filter(migration => !migration.releaseReference)
       .map(migration =>
-        allSvsToDeploy.map(sv => {
+        allSvNamesToDeploy.map(nodeName => {
           return {
             project: 'sv-canton',
-            stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
+            stack: `sv-canton.${nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
           };
         })
       )
@@ -51,23 +54,16 @@ export function installMigrationSpecificStacks(
         ? gitRepoForRef(
             `migration-${migration.id}`,
             migration.releaseReference,
-            allSvsToDeploy.map(sv => {
+            allSvNamesToDeploy.map(nodeName => {
               return {
                 project: 'sv-canton',
-                stack: `sv-canton.${sv.nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
+                stack: `sv-canton.${nodeName}-migration-${migration.id}.${CLUSTER_BASENAME}`,
               };
             })
           )
         : mainReference;
-      allSvsToDeploy.forEach(sv => {
-        createStackForMigration(
-          sv.nodeName,
-          migration.id,
-          reference,
-          envRefs,
-          namespace,
-          gcpSecret
-        );
+      allSvNamesToDeploy.forEach(nodeName => {
+        createStackForMigration(nodeName, migration.id, reference, envRefs, namespace, gcpSecret);
       });
     });
   }
@@ -85,7 +81,7 @@ function createStackForMigration(
     `sv-canton.${sv}-migration-${migrationId}`,
     'sv-canton',
     namespace,
-    sv === svRunbookConfig.nodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
+    sv === svRunbookNodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
     reference,
     envRefs,
     gcpSecret,
