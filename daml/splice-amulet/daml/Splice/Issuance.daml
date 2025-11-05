@@ -57,8 +57,8 @@ data OpenMiningRoundSummary = OpenMiningRoundSummary with
     totalUnfeaturedAppRewardCoupons : Decimal
     totalSvRewardWeight : Int
     optTotalValidatorFaucetCoupons : Optional Int
-    optTotalValidatorLivenessActivityRecords : Optional Decimal -- ^ Replaces optTotalValidatorFaucetCoupons
-      -- ^ Introduced as part of CIP-3.
+      -- ^ Introduced as part of CIP-3. Deprecated in favor of `optTotalValidatorLivenessActivityRecords`
+    optTotalValidatorLivenessActivityRecords : Optional Decimal -- ^ Replaces `optTotalValidatorFaucetCoupons`
   deriving (Eq, Show)
 
 getTotalValidatorFaucetCoupons : OpenMiningRoundSummary -> Decimal
