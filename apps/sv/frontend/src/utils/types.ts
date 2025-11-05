@@ -27,6 +27,12 @@ export interface UnfeatureAppProposal {
   rightContractId: string;
 }
 
+export interface UnclaimedActivityRecordProposal {
+  beneficiary: string;
+  amount: string;
+  mintBefore: string;
+}
+
 /**
  * A config change represents a field that has been changed in a config.
  * This could be DSO or Amulet Configs.
@@ -71,6 +77,7 @@ export type Proposal =
   | FeatureAppProposal
   | UnfeatureAppProposal
   | UpdateSvRewardWeightProposal
+  | UnclaimedActivityRecordProposal
   | AmuletRulesConfigProposal
   | DsoRulesConfigProposal
   | undefined;
@@ -80,6 +87,7 @@ export type ProposalActionMap = {
   SRARC_GrantFeaturedAppRight: FeatureAppProposal;
   SRARC_RevokeFeaturedAppRight: UnfeatureAppProposal;
   SRARC_UpdateSvRewardWeight: UpdateSvRewardWeightProposal;
+  SRARC_CreateUnallocatedUnclaimedActivityRecord: UnclaimedActivityRecordProposal;
   CRARC_SetConfig: AmuletRulesConfigProposal;
   SRARC_SetConfig: DsoRulesConfigProposal;
   // If no proposal type is defined, can use unknown or a specific type:
@@ -119,7 +127,8 @@ export type SupportedActionTag =
   | 'SRARC_OffboardSv'
   | 'SRARC_RevokeFeaturedAppRight'
   | 'SRARC_SetConfig'
-  | 'SRARC_UpdateSvRewardWeight';
+  | 'SRARC_UpdateSvRewardWeight'
+  | 'SRARC_CreateUnallocatedUnclaimedActivityRecord';
 
 export type ProposalListingStatus =
   | 'Accepted'

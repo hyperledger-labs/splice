@@ -12,6 +12,7 @@ import {
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
+  UnclaimedActivityRecordProposal,
   UpdateSvRewardWeightProposal,
 } from '../../utils/types';
 import userEvent from '@testing-library/user-event';
@@ -297,6 +298,47 @@ describe('Proposal Details Content', () => {
     expect(screen.getByTestId('config-change-field-label').textContent).toBe('Weight');
     expect(screen.getByTestId('config-change-current-value').textContent).toBe('999');
     expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
+  });
+
+  test('should render unallocated unclaimed activity record details', () => {
+    const proposalDetails: ProposalDetails = {
+      actionName: 'Create Unclaimed Activity Record',
+      action: 'SRARC_CreateUnallocatedUnclaimedActivityRecord',
+      createdAt: '2025-01-01 13:00',
+      url: 'https://example.com',
+      summary: 'Summary of the proposal',
+      proposal: {
+        beneficiary: 'sv1',
+        amount: '10',
+        mintBefore: '2025-01-01 13:00',
+      } as UnclaimedActivityRecordProposal,
+    };
+
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
+          contractId={voteRequest.contractId}
+          proposalDetails={proposalDetails}
+          votingInformation={voteRequest.votingInformation}
+          votes={voteRequest.votes}
+        />
+      </Wrapper>
+    );
+
+    const action = screen.getByTestId('proposal-details-action-value');
+    expect(action.textContent).toMatch(/Create Unclaimed Activity Record/);
+
+    const beneficiary = screen
+      .getByTestId('proposal-details-beneficiary-input')
+      .getAttribute('value');
+    expect(beneficiary).toMatch(/sv1/);
+
+    const amount = screen.getByTestId('proposal-details-amount-value');
+    expect(amount.textContent).toMatch(/10/);
+
+    const mustMintBefore = screen.getByTestId('proposal-details-must-mint-before-value');
+    expect(mustMintBefore.textContent).toMatch(/2025-01-01 13:00/);
   });
 
   test('should render amulet rules config proposal details', () => {
