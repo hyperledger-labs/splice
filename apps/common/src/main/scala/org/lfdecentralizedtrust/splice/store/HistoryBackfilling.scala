@@ -357,7 +357,8 @@ object HistoryBackfilling {
   object DestinationHistory {
     case class InsertResult(
         backfilledUpdates: Long,
-        backfilledEvents: Long,
+        backfilledCreatedEvents: Long,
+        backfilledExercisedEvents: Long,
         lastBackfilledRecordTime: CantonTimestamp,
     )
   }

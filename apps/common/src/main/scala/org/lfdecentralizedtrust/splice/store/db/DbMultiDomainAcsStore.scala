@@ -618,12 +618,16 @@ final class DbMultiDomainAcsStore[TXE](
               .transactionally,
             "destinationHistory.insert",
           )
-        } yield DestinationHistory.InsertResult(
-          backfilledUpdates = trees.size.toLong,
-          backfilledEvents =
-            trees.foldLeft(0L)((sum, tree) => sum + tree.getEventsById.size().toLong),
-          lastBackfilledRecordTime = CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
-        )
+        } yield {
+          val ingestedEvents = IngestedEvents.eventCount(trees)
+          DestinationHistory.InsertResult(
+            backfilledUpdates = trees.size.toLong,
+            backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
+            backfilledCreatedEvents = ingestedEvents.numCreatedEvents,
+            lastBackfilledRecordTime =
+              CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
+          )
+        }
       }
 
       override def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit] = {
@@ -1256,6 +1260,7 @@ final class DbMultiDomainAcsStore[TXE](
     override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
+      metrics.updateLastSeenMetrics(batch.last)
       metrics.batchSize.update(batch.length)
       val steps = batchInsertionSteps(batch)
       MonadUtil
@@ -2247,6 +2252,12 @@ object DbMultiDomainAcsStore {
       // to not miss any place that might need updating.
       metrics.acsSize.updateValue(newAcsSize.toLong)
       metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
+      metrics.eventCount.inc(this.ingestedCreatedEvents.length.toLong)(
+        MetricsContext("event_type" -> "created")
+      )
+      metrics.eventCount.inc(this.ingestedArchivedEvents.length.toLong)(
+        MetricsContext("event_type" -> "archived")
+      )
       metrics.completedIngestions.mark()
       synchronizerIdToRecordTime.foreach { case (synchronizer, recordTime) =>
         metrics

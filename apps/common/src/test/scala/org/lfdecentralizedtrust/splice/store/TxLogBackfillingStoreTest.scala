@@ -390,12 +390,12 @@ class TxLogBackfillingStoreTest
         // first iteration: processes one regular update and skips the import updates
         workDone1 <- backfillOnce(store2, history2)
         _ = workDone1 shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableNow(
-          DestinationHistory.InsertResult(1L, 1L, CantonTimestamp.assertFromInstant(t(3)))
+          DestinationHistory.InsertResult(1L, 1L, 0L, CantonTimestamp.assertFromInstant(t(3)))
         )
         // second iteration: continues with regular updates from migration 1
         workDone2 <- backfillOnce(store2, history2)
         _ = workDone2 shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableNow(
-          DestinationHistory.InsertResult(2L, 2L, CantonTimestamp.assertFromInstant(t(1)))
+          DestinationHistory.InsertResult(2L, 2L, 0L, CantonTimestamp.assertFromInstant(t(1)))
         )
       } yield succeed
     }
