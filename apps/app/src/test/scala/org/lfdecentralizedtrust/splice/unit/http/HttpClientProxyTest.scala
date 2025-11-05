@@ -7,12 +7,20 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.Http.ServerBinding
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpRequest,
+  StatusCodes,
+  Uri,
+}
 import org.apache.pekko.http.scaladsl.server.Directives.{complete, *}
 import org.apache.pekko.http.scaladsl.server.Route
+import org.lfdecentralizedtrust.splice.auth.RSAVerifier
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.scalatest.wordspec.AsyncWordSpec
 
+import java.net.URI
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -79,6 +87,35 @@ class HttpClientProxyTest
         }
       }
     }
+    "Ensure jwks URL used in JwkProvider supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
+      val user = "user"
+      val password = "pass1"
+      val timeout = NonNegativeDuration(5.seconds)
+      withProxy(auth = Some((user, password))) { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props =
+            SystemProperties()
+              .set("http.proxyHost", "localhost")
+              .set("http.proxyPort", proxy.port.toString)
+              .set("http.proxyUser", user)
+              .set("http.proxyPassword", password)
+          withProperties(props) {
+            val verifier = new RSAVerifier(
+              "fake-audience",
+              new URI(
+                s"http://localhost:${serverBinding.localAddress.getPort}/.well-known/jwks.json"
+              ).toURL,
+              RSAVerifier.TimeoutsConfig(
+                timeout,
+                timeout,
+              ),
+            )
+            verifier.provider.get(Routes.testJwksKeyId).getId shouldBe Routes.testJwksKeyId
+          }
+        }
+      }
+    }
+
     "support proxy configuration via https.proxyPort, https.proxyHost, https.proxyUser and https.proxyPassword" in {
       val user = "user"
       val password = "pass1"
@@ -157,8 +194,39 @@ class HttpClientProxyTest
 }
 
 object Routes {
+  val testJwksKeyId = "test-key"
   def respondWithOK: Route = get {
-    complete(StatusCodes.OK)
+    // fake JWKS response to make sure http.proxy settings are used when RSAVerifier fetches JWKS
+    pathPrefix(".well-known" / "jwks.json") {
+      complete(
+        HttpEntity(
+          ContentTypes.`application/json`,
+          s"""
+            |{
+            |  "keys":
+            |  [
+            |    {
+            |      "kty": "RSA",
+            |      "use": "sig",
+            |      "n": "fake-n",
+            |      "e": "additional",
+            |      "kid": "$testJwksKeyId",
+            |      "x5t": "fake",
+            |      "x5c":
+            |      [
+            |        "fake-x5c"
+            |      ],
+            |      "alg": "RS256"
+            |    }
+            |  ]
+            |}
+          """.stripMargin,
+        )
+      )
+    } ~
+      pathEnd {
+        complete(StatusCodes.OK)
+      }
   }
 }
 

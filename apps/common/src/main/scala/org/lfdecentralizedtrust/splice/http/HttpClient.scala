@@ -39,6 +39,35 @@ trait HttpClient {
 object HttpClient {
   case class HttpRequestParameters(requestTimeout: NonNegativeDuration)
 
+  object ProxySettings {
+    def readFromEnvVars(): Option[ProxySettings] = {
+      def host(scheme: String) = s"$scheme.proxyHost"
+      def port(scheme: String) = s"$scheme.proxyPort"
+      def user(scheme: String) = s"$scheme.proxyUser"
+      def password(scheme: String) = s"$scheme.proxyPassword"
+      def prop(property: String): Option[String] =
+        Option(System.getProperty(property)).map(_.trim)
+      def props(scheme: String) =
+        (prop(host(scheme)), prop(port(scheme)), prop(user(scheme)), prop(password(scheme)))
+      def mkSettings(scheme: String) = props(scheme) match {
+        case (Some(host), Some(port), Some(user), Some(password)) =>
+          Some(
+            ProxySettings(
+              InetSocketAddress.createUnresolved(host, port.toInt),
+              Some(BasicHttpCredentials(user, password)),
+            )
+          )
+        case (Some(host), Some(port), None, None) =>
+          Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
+        case _ => None
+      }
+
+      mkSettings("http").orElse(mkSettings("https"))
+    }
+  }
+
+  case class ProxySettings(address: InetSocketAddress, creds: Option[BasicHttpCredentials] = None)
+
   def apply(outerRequestParameters: HttpClient.HttpRequestParameters, logger: TracedLogger)(implicit
       ac: ActorSystem,
       ec: ExecutionContextExecutor,
@@ -139,38 +168,17 @@ object HttpClient {
         }
       }
     }
+
   private def traceContextFromHeaders(headers: immutable.Seq[HttpHeader]) = {
     W3CTraceContext
       .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
       .map(_.toTraceContext)
       .getOrElse(TraceContext.empty)
   }
+
   private def createClientConnectionSettings()(implicit ac: ActorSystem) = {
-    case class ProxySettings(address: InetSocketAddress, creds: Option[BasicHttpCredentials] = None)
-    def host(scheme: String) = s"$scheme.proxyHost"
-    def port(scheme: String) = s"$scheme.proxyPort"
-    def user(scheme: String) = s"$scheme.proxyUser"
-    def password(scheme: String) = s"$scheme.proxyPassword"
-    def prop(property: String): Option[String] =
-      Option(System.getProperty(property)).map(_.trim)
-    def props(scheme: String) =
-      (prop(host(scheme)), prop(port(scheme)), prop(user(scheme)), prop(password(scheme)))
-    def proxySettings(scheme: String) = props(scheme) match {
-      case (Some(host), Some(port), Some(user), Some(password)) =>
-        Some(
-          ProxySettings(
-            InetSocketAddress.createUnresolved(host, port.toInt),
-            Some(BasicHttpCredentials(user, password)),
-          )
-        )
-      case (Some(host), Some(port), None, None) =>
-        Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
-      case _ => None
-    }
 
-    val proxySettingsO = proxySettings("http").orElse(proxySettings("https"))
-
-    proxySettingsO.fold(ClientConnectionSettings(ac)) { proxySettings =>
+    ProxySettings.readFromEnvVars().fold(ClientConnectionSettings(ac)) { proxySettings =>
       proxySettings.creds.fold(
         ClientConnectionSettings(ac).withTransport(
           ClientTransport.httpsProxy(proxySettings.address)
