@@ -61,6 +61,13 @@ defaultAmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerCo
 defaultFeaturedAppActivityMarkerAmount : Decimal
 defaultFeaturedAppActivityMarkerAmount = 1.0
 
+-- Note: In the final PR, `developmentFundConfig` should not be set to None.
+-- The definition of `defaultAmuletConfig` will change from
+--   `defaultAmuletConfig : AmuletConfig USD`
+-- to
+--   `defaultAmuletConfig : Party -> AmuletConfig USD`,
+-- where the `Party` parameter represents the Foundation beneficiary.
+--
 -- | Default proposal for issuance curve and tickDuration
 defaultAmuletConfig : AmuletConfig USD
 defaultAmuletConfig = AmuletConfig with
