@@ -183,6 +183,7 @@ class ScanApp(
         config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        config.automation.ingestion,
         initialRound.toLong,
       )
       acsSnapshotStore = AcsSnapshotStore(
@@ -223,7 +224,7 @@ class ScanApp(
       )(ec)
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
-          RetryFor.WaitingOnInitDependency,
+          RetryFor.WaitingOnInitDependencyLong,
           "wait_open_mining",
           "there is an OpenMiningRound contract",
           store.multiDomainAcsStore

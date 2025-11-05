@@ -72,8 +72,6 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
-export const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
-
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );

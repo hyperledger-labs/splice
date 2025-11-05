@@ -65,6 +65,7 @@ import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.discard.Implicits.*
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import com.digitalasset.canton.util.MonadUtil
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -322,97 +323,104 @@ class UpdateHistory(
         Future.unit
       }
 
-      override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
+      override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        val offset: Long = updateOrCheckpoint.offset
-        val recordTime = updateOrCheckpoint match {
-          case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
-            Some(reassignment.recordTime)
-          case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
-            Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
-          case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) =>
-            None
-        }
-
-        val timeIngestion = oMetrics
-          .map(metrics =>
-            (future: Future[Unit]) =>
-              metrics.UpdateHistory.latency
-                .timeFuture[Unit](future)(
-                  metrics.metricsContextFromUpdate(updateOrCheckpoint, backfilling = false)
-                )
-          )
-          .getOrElse(identity[Future[Unit]])
-
-        timeIngestion {
-          // Note: in theory, it's enough if this action is atomic - there should only be a single
-          // ingestion sink storing updates for the given (participant, party, migrationId) tuple,
-          // so there should be no concurrent updates.
-          // In practice, we still want to have some protection against duplicate inserts, in case
-          // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
-          // This is implemented with a unique index in the database schema.
-          val action = readOffsetAction()
-            .flatMap({
-              case None =>
-                logger.debug(
-                  s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
-                )
-                for {
-                  ingestedEvents <- ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId)
-                  _ <- updateOffset(offset)
-                } yield ingestedEvents
-              case Some(lastIngestedOffset) =>
-                if (offset <= lastIngestedOffset) {
-                  updateOrCheckpoint match {
-                    case _: TreeUpdateOrOffsetCheckpoint.Update =>
-                      logger.warn(
-                        s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                          "This is expected if the SQL query was automatically retried after a transient database error. " +
-                          "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                          "ingesting into the same logical database."
-                      )
-                    case _: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
-                      // we can receive an offset equal to the last ingested and that can be safely ignore
-                      if (offset < lastIngestedOffset) {
-                        logger.warn(
-                          s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                            "This is expected if the SQL query was automatically retried after a transient database error. " +
-                            "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                            "ingesting into the same logical database."
-                        )
-                      }
-                  }
-                  DBIO.successful(IngestedEvents(0, 0))
-                } else {
-                  logger.debug(
-                    s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
-                  )
-                  for {
-                    ingestedEvents <- ingestUpdateOrCheckpoint_(
-                      updateOrCheckpoint,
-                      domainMigrationId,
-                    )
-                    _ <- updateOffset(offset)
-                  } yield ingestedEvents
-                }
-            })
-            .transactionally
-
-          storage
-            .queryAndUpdate(action, "ingestUpdate")
-            .map { ingestedEvents =>
-              recordTime.foreach(advanceLastIngestedRecordTime)
-              oMetrics.foreach { metrics =>
-                metrics.UpdateHistory.eventCount.inc(ingestedEvents.numCreatedEvents)(
-                  MetricsContext("event_type" -> "created")
-                )
-                metrics.UpdateHistory.eventCount.inc(ingestedEvents.numExercisedEvents)(
-                  MetricsContext("event_type" -> "exercised")
-                )
-              }
+        MonadUtil
+          .sequentialTraverse(batch.toList) { updateOrCheckpoint =>
+            val offset: Long = updateOrCheckpoint.offset
+            val recordTime = updateOrCheckpoint match {
+              case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+                Some(reassignment.recordTime)
+              case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+                Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
+              case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) =>
+                None
             }
-        }
+
+            val timeIngestion = oMetrics
+              .map(metrics =>
+                (future: Future[Unit]) =>
+                  metrics.UpdateHistory.latency
+                    .timeFuture[Unit](future)(
+                      metrics.metricsContextFromUpdate(updateOrCheckpoint, backfilling = false)
+                    )
+              )
+              .getOrElse(identity[Future[Unit]])
+
+            timeIngestion {
+              // Note: in theory, it's enough if this action is atomic - there should only be a single
+              // ingestion sink storing updates for the given (participant, party, migrationId) tuple,
+              // so there should be no concurrent updates.
+              // In practice, we still want to have some protection against duplicate inserts, in case
+              // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
+              // This is implemented with a unique index in the database schema.
+              val action = readOffsetAction()
+                .flatMap({
+                  case None =>
+                    logger.debug(
+                      s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
+                    )
+                    for {
+                      ingestedEvents <- ingestUpdateOrCheckpoint_(
+                        updateOrCheckpoint,
+                        domainMigrationId,
+                      )
+                      _ <- updateOffset(offset)
+                    } yield ingestedEvents
+                  case Some(lastIngestedOffset) =>
+                    if (offset <= lastIngestedOffset) {
+                      updateOrCheckpoint match {
+                        case _: TreeUpdateOrOffsetCheckpoint.Update =>
+                          logger.warn(
+                            s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                              "This is expected if the SQL query was automatically retried after a transient database error. " +
+                              "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                              "ingesting into the same logical database."
+                          )
+                        case _: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
+                          // we can receive an offset equal to the last ingested and that can be safely ignore
+                          if (offset < lastIngestedOffset) {
+                            logger.warn(
+                              s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                                "This is expected if the SQL query was automatically retried after a transient database error. " +
+                                "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                                "ingesting into the same logical database."
+                            )
+                          }
+                      }
+                      DBIO.successful(IngestedEvents(0, 0))
+                    } else {
+                      logger.debug(
+                        s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
+                      )
+                      for {
+                        ingestedEvents <- ingestUpdateOrCheckpoint_(
+                          updateOrCheckpoint,
+                          domainMigrationId,
+                        )
+                        _ <- updateOffset(offset)
+                      } yield ingestedEvents
+                    }
+                })
+                .transactionally
+
+              storage
+                .queryAndUpdate(action, "ingestUpdate")
+                .map { ingestedEvents =>
+                  recordTime.foreach(advanceLastIngestedRecordTime)
+                  oMetrics.foreach { metrics =>
+                    metrics.UpdateHistory.eventCount.inc(ingestedEvents.numCreatedEvents)(
+                      MetricsContext("event_type" -> "created")
+                    )
+                    metrics.UpdateHistory.eventCount.inc(ingestedEvents.numExercisedEvents)(
+                      MetricsContext("event_type" -> "exercised")
+                    )
+                  }
+                }
+            }
+          }
+          .map(_ => ())
       }
 
       private def updateOffset(offset: Long): DBIOAction[?, NoStream, Effect.Write] =

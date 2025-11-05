@@ -94,7 +94,7 @@ object SvOnboardingConfig {
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
-      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
+      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
   ) extends SvOnboardingConfig
@@ -340,6 +340,7 @@ case class SvAppBackendConfig(
     // Can be safely set to true for an SV that has completed onboarding unless you
     // 1. try to reset one of your sequencers or mediators
     // 2. change sequencer URLs that need to get published externally.
+    // Read `shouldSkipSynchronizerInitialization` instead when checking if it should be skipped which takes migrations into account.
     skipSynchronizerInitialization: Boolean = false,
     // The maximum delay before submitting a package vetting
     // change. The actual delay will be chosen randomly (uniformly
@@ -356,6 +357,14 @@ case class SvAppBackendConfig(
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
 ) extends SpliceBackendConfig {
+
+  def shouldSkipSynchronizerInitialization =
+    skipSynchronizerInitialization &&
+      onboarding.fold(true) {
+        case _: SvOnboardingConfig.FoundDso => true
+        case _: SvOnboardingConfig.JoinWithKey => true
+        case _: SvOnboardingConfig.DomainMigration => false
+      }
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -417,7 +426,7 @@ final case class SvSequencerConfig(
     adminApi: FullClientConfig,
     internalApi: FullClientConfig,
     externalPublicApiUrl: String,
-    // This needs to be participantResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
+    // This needs to be confirmationResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
     // does not have to serve requests that have been in flight before the sequencer's signing keys became valid.
     // See also https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
     // The default value of 60 seconds is based on Canton defaulting to 30s for each of those.

@@ -111,7 +111,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         )
         actAndCheck(
           "onboard alice",
-          click on "onboard-button",
+          eventuallyClickOn(id("onboard-button")),
         )(
           "Alice is logged in",
           _ => seleniumText(find(id("logged-in-user"))) should not be "",
@@ -259,7 +259,7 @@ class DockerComposeValidatorFrontendIntegrationTest
 
           actAndCheck(
             "onboard alice",
-            click on "onboard-button",
+            eventuallyClickOn(id("onboard-button")),
           )(
             "Alice is logged in and maintained her balance",
             _ => userLoggedInAndHasBalance("alice", aliceTap),

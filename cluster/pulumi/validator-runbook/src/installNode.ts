@@ -26,6 +26,7 @@ import {
   nonDevNetNonSvValidatorTopupConfig,
   nonSvValidatorTopupConfig,
   participantBootstrapDumpSecretName,
+  preApproveValidatorRunbook,
   SPLICE_ROOT,
   setupBootstrapping,
   spliceInstanceNames,
@@ -36,13 +37,14 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getValidatorAppApiAudience,
+  getNamespaceConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import { installPartyAllocator } from './partyAllocator';
-import { validatorConfig } from './validatorConfig';
+import { validatorConfig, validatorName } from './validatorConfig';
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -64,6 +66,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const xns = exactNamespace(validatorConfig.namespace, true);
 
+  auth0Client.reuseNamespaceConfig('validator', xns.logicalName);
+
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
@@ -73,13 +77,18 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bootstrappingConfig,
     });
 
+  const onboardingSecret =
+    preApproveValidatorRunbook || validatorName != 'validator-runbook'
+      ? validatorConfig.onboardingSecret
+      : undefined;
+
   const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
   const validator = await installValidator({
     xns,
-    onboardingSecret: validatorConfig.onboardingSecret,
+    onboardingSecret,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -172,11 +181,6 @@ async function installValidator(
     },
   };
 
-  const validatorNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['validator'];
-  if (!validatorNameSpaceAuth0Clients) {
-    throw new Error('No validator namespace in auth0 config');
-  }
-
   const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const validatorValuesFromYamlFiles = {
@@ -249,7 +253,7 @@ async function installValidator(
     ...validatorValuesWithOnboardingOverride,
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
-      audience: getValidatorAppApiAudience(auth0Client.getCfg()),
+      audience: getValidatorAppApiAudience(auth0Client.getCfg(), xns.logicalName),
     },
   };
 
@@ -263,7 +267,7 @@ async function installValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = validatorNameSpaceAuth0Clients['cns'];
+  const cnsUiClientId = getNamespaceConfig(auth0Client.getCfg(), xns.logicalName).uiClientIds.cns;
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }

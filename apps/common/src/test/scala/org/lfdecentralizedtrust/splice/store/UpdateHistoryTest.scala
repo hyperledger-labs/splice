@@ -29,6 +29,8 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import UpdateHistory.UpdateHistoryResponse
+import StoreTest.*
+import cats.data.NonEmptyList
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -605,11 +607,13 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           _ <- initStore(store)
           o1 <- store.lookupLastIngestedOffset()
           _ = o1 shouldBe None
-          _ <- store.testIngestionSink.ingestUpdate(
-            TreeUpdateOrOffsetCheckpoint.Checkpoint(
-              new OffsetCheckpoint(
-                5,
-                Collections.emptyList(),
+          _ <- store.testIngestionSink.ingestUpdateBatch(
+            NonEmptyList.of(
+              TreeUpdateOrOffsetCheckpoint.Checkpoint(
+                new OffsetCheckpoint(
+                  5,
+                  Collections.emptyList(),
+                )
               )
             )
           )

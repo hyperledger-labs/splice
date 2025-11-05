@@ -598,6 +598,18 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _) =>
+          seedUrls
+            .traverse { url =>
+              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+              MinimalScanConnection(
+                config,
+                amuletAppParameters.upgradesConfig,
+                retryProvider,
+                loggerFactory,
+              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+            }
+            .map(_ => ())
         case BftScanClientConfig.Bft(seedUrls, _, _) =>
           seedUrls
             .traverse { url =>
@@ -761,6 +773,7 @@ class ValidatorApp(
         retryProvider,
         domainMigrationInfo,
         participantId,
+        config.automation.ingestion,
       )
       domainTimeAutomationService = new DomainTimeAutomationService(
         config.domains.global.alias,
@@ -882,6 +895,7 @@ class ValidatorApp(
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
+        config.parameters.enabledFeatures,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

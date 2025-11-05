@@ -268,21 +268,19 @@ trait AcsQueries extends AcsJdbcTypes {
   /** Constructions like `seq.mkString("(", ",", ")")` are dangerous because they can lead to SQL injection.
     * Prefer using this instead, or [[inClause]] when in a `WHERE x IN`.
     */
-  protected def sqlCommaSeparated[V](
-      seq: Iterable[V]
-  )(implicit
-      sp: SetParameter[V]
-  ): SQLActionBuilder = {
+  protected def sqlCommaSeparated(
+      seq: Iterable[SQLActionBuilder]
+  ): SQLActionBuilderChain = {
     seq
-      .map(v => sql"$v")
+      .map(SQLActionBuilderChain(_))
       .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
+        acc ++ sql"," ++ next
       }
-      .getOrElse(sql"")
+      .getOrElse(SQLActionBuilderChain(sql""))
   }
 
   protected def inClause[V: SetParameter](seq: Iterable[V]): SQLActionBuilderChain =
-    sql"(" ++ sqlCommaSeparated(seq) ++ sql")"
+    sql"(" ++ sqlCommaSeparated(seq.map(v => sql"$v")) ++ sql")"
 
   protected def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(
       row: AcsQueries.SelectFromAcsTableResult

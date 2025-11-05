@@ -7,6 +7,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{TransferInputStore, TransferInputStoreTest}
@@ -155,6 +156,7 @@ class DbExternalPartyWalletStoreTest
         None,
       ),
       participantId = mkParticipantId("ExternalPartyWalletStoreTest"),
+      IngestionConfig(),
     )
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

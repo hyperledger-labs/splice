@@ -351,6 +351,7 @@ class SvApp(
                 retryProvider,
                 config.spliceInstanceNames,
                 loggerFactory,
+                config.parameters.enabledFeatures,
               )
               initializer.bootstrapDso()
             }
@@ -393,6 +394,7 @@ class SvApp(
               retryProvider,
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
+              config.parameters.enabledFeatures,
             ).migrateDomain()
           }
         case None =>
@@ -468,7 +470,7 @@ class SvApp(
         },
         localSynchronizerNode match {
           case Some(node) =>
-            if (!config.skipSynchronizerInitialization) {
+            if (!config.shouldSkipSynchronizerInitialization) {
               appInitStep(
                 "Ensure that the local mediators's sequencer request amplification config is up to date"
               ) {
@@ -548,15 +550,18 @@ class SvApp(
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
-          Some(
-            localSynchronizerNode
-              .getOrElse(
-                sys.error("SV app should always have a sequencer connection for domain migrations")
-              )
-              .sequencerAdminConnection
-          ),
+          localSynchronizerNode
+            .getOrElse(
+              sys.error("SV app should always have a sequencer connection for domain migrations")
+            )
+            .sequencerAdminConnection,
           dsoStore,
-          new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          new AcsExporter(
+            participantAdminConnection,
+            retryProvider,
+            config.parameters.enabledFeatures.enableNewAcsExport,
+            loggerFactory,
+          ),
           retryProvider,
           loggerFactory,
         ),

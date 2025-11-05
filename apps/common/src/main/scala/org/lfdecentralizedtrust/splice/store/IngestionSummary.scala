@@ -17,9 +17,8 @@ import com.digitalasset.canton.topology.SynchronizerId
 
 final case class IngestionSummary(
     updateId: Option[String],
-    synchronizerId: Option[SynchronizerId],
     offset: Option[Long],
-    recordTime: Option[CantonTimestamp],
+    synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
     newAcsSize: Int,
     ingestedCreatedEvents: Vector[CreatedEvent],
     numFilteredCreatedEvents: Int,
@@ -41,9 +40,8 @@ private[store] object IngestionSummary {
 
   private val Empty: IngestionSummary = IngestionSummary(
     updateId = None,
-    synchronizerId = None,
     offset = None,
-    recordTime = None,
+    synchronizerIdToRecordTime = Map.empty,
     newAcsSize = 0,
     ingestedCreatedEvents = Vector.empty,
     updatedContractStates = Vector.empty,
@@ -70,10 +68,9 @@ private[store] object IngestionSummary {
     prettyNode(
       "", // intentionally left empty, as that worked better in the log messages above
       paramIfDefined("updateId", _.updateId.map(_.unquoted)),
-      paramIfDefined("synchronizerId", _.synchronizerId),
       paramIfDefined("offset", _.offset),
-      paramIfDefined("recordTime", _.recordTime.map(_.toString.unquoted)),
       param("newAcsSize", _.newAcsSize),
+      param("synchronizerIdToRecordTime", _.synchronizerIdToRecordTime),
       paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),
       paramIfNonZero("numFilteredCreatedEvents", _.numFilteredCreatedEvents),
       paramIfNonEmpty("ingestedArchivedEvents", _.ingestedArchivedEvents),

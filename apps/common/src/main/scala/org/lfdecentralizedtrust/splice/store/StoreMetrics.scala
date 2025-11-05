@@ -3,7 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Meter, Timer}
+import com.daml.metrics.api.MetricHandle.{
+  Counter,
+  Gauge,
+  Histogram,
+  LabeledMetricsFactory,
+  Meter,
+  Timer,
+}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.SynchronizerId
@@ -55,6 +62,14 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
         Traffic,
       )
     )(metricsContext)
+
+  val batchSize: Histogram = metricsFactory.histogram(
+    MetricInfo(
+      name = prefix :+ "ingestion-batch-size",
+      summary = "The number of TreeUpdateOrOffsetCheckpoint in each batch",
+      Traffic,
+    )
+  )
 
   val completedIngestions: Meter = metricsFactory.meter(
     MetricInfo(

@@ -142,6 +142,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         validatorConfig.parameters.circuitBreakers,
+        validatorConfig.parameters.enabledFeatures,
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -180,6 +181,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         svConfig.parameters.circuitBreakers,
+        svConfig.parameters.enabledFeatures,
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -217,6 +219,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         scanConfig.parameters.circuitBreakers,
+        scanConfig.parameters.enabledFeatures,
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -254,6 +257,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         splitwellConfig.parameters.circuitBreakers,
+        splitwellConfig.parameters.enabledFeatures,
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -411,9 +415,12 @@ object SpliceConfig {
       deriveReader[RateLimitersConfig]
     implicit val spliceRateLimiterConfig: ConfigReader[SpliceRateLimitConfig] =
       deriveReader[SpliceRateLimitConfig]
+    implicit val enabledFeaturesConfigReader: ConfigReader[EnabledFeaturesConfig] =
+      deriveReader[EnabledFeaturesConfig]
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigReader[IngestionConfig] = deriveReader[IngestionConfig]
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
     implicit val LedgerApiClientConfigReader: ConfigReader[LedgerApiClientConfig] =
@@ -427,6 +434,9 @@ object SpliceConfig {
     implicit val scanClientConfigTrustSingleConfigReader
         : ConfigReader[BftScanClientConfig.TrustSingle] =
       deriveReader[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigBftCustomConfigReader
+        : ConfigReader[BftScanClientConfig.BftCustom] =
+      deriveReader[BftScanClientConfig.BftCustom]
     implicit val scanClientConfigSeedsConfigReader: ConfigReader[BftScanClientConfig.Bft] =
       deriveReader[BftScanClientConfig.Bft]
     implicit val scanClientConfigConfigReader: ConfigReader[BftScanClientConfig] =
@@ -814,6 +824,9 @@ object SpliceConfig {
     implicit val spliceRateLimiterConfig: ConfigWriter[SpliceRateLimitConfig] =
       deriveWriter[SpliceRateLimitConfig]
 
+    implicit val enabledFeaturesConfigWriter: ConfigWriter[EnabledFeaturesConfig] =
+      deriveWriter[EnabledFeaturesConfig]
+
     implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
       new FieldCoproductHint[AuthTokenSourceConfig]("type")
     implicit val authTokenSourceNoneWriter: ConfigWriter[AuthTokenSourceConfig.None] =
@@ -834,6 +847,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigWriter[IngestionConfig] = deriveWriter[IngestionConfig]
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
     implicit val LedgerApiClientConfigWriter: ConfigWriter[LedgerApiClientConfig] =
@@ -847,6 +861,9 @@ object SpliceConfig {
     implicit val scanClientConfigTrustSingleConfigWriter
         : ConfigWriter[BftScanClientConfig.TrustSingle] =
       deriveWriter[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigBftCustomConfigWriter
+        : ConfigWriter[BftScanClientConfig.BftCustom] =
+      deriveWriter[BftScanClientConfig.BftCustom]
     implicit val scanClientConfigSeedsConfigWriter: ConfigWriter[BftScanClientConfig.Bft] =
       deriveWriter[BftScanClientConfig.Bft]
     implicit val scanClientConfigConfigWriter: ConfigWriter[BftScanClientConfig] =
