@@ -7,7 +7,7 @@ package org.lfdecentralizedtrust.splice.validator.store.db
   * This is an internal store, separate from the main ACS tables.
   */
 
-object ScanConfigTables {
+object ValidatorInternalTables {
 
   /** The name of the table created by V050__validator_local.sql. */
   val tableName: String = "validator_scan_config"

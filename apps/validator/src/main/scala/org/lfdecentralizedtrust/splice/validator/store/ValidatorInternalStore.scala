@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.validator.store.db.ScanConfigTables.ScanConfigRow
+import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorInternalTables.ScanConfigRow
 
 import scala.concurrent.Future
 
