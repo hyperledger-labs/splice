@@ -69,11 +69,18 @@ trait TinyProxySupport {
     }
     // Represents a running tinyproxy process, with methods to check its status and stop it
     case class TinyProxy(process: ProxyProcess, port: Int, configFile: File) extends HttpProxy {
+
       def hasNoErrors: Boolean = process.hasNoErrors
       // Verifies that tinyproxy logged that it handled a CONNECT request to proxy to the given server port on localhost
       def proxiedConnectRequest(host: String, serverPort: Int): Boolean = {
+        val connectPattern = s"^CONNECT.*$host:$serverPort.*".r
         List(
-          process.stdOutLines.exists(_.contains(s"CONNECT $host:$serverPort")),
+          process.stdOutLines.exists { line =>
+            line match {
+              case connectPattern() => true
+              case _ => false
+            }
+          },
           process.stdOutLines.exists(_.contains(s"opening connection to $host:$serverPort")),
           process.stdOutLines.exists(
             _.contains(s"opensock: getaddrinfo returned for $host:$serverPort")

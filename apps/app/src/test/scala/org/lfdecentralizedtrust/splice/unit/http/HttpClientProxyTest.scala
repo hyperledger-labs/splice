@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.unit.http
 
+import com.auth0.jwk.{JwkProvider, JwkProviderBuilder}
 import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.{BaseTest, FutureHelpers, HasActorSystem, HasExecutionContext}
@@ -20,7 +21,7 @@ import org.lfdecentralizedtrust.splice.auth.RSAVerifier
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.scalatest.wordspec.AsyncWordSpec
 
-import java.net.URI
+import java.net.{InetSocketAddress, URI}
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -90,27 +91,67 @@ class HttpClientProxyTest
     "Ensure jwks URL used in JwkProvider supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
       val user = "user"
       val password = "pass1"
-      val timeout = NonNegativeDuration(5.seconds)
       withProxy(auth = Some((user, password))) { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val proxyHost = "localhost"
+          val serverHost = "localhost"
+          val serverPort = serverBinding.localAddress.getPort
           val props =
             SystemProperties()
-              .set("http.proxyHost", "localhost")
+              .set("http.proxyHost", proxyHost)
               .set("http.proxyPort", proxy.port.toString)
               .set("http.proxyUser", user)
               .set("http.proxyPassword", password)
           withProperties(props) {
+            val jwksUrl = new URI(
+              s"http://localhost:${serverPort}/.well-known/jwks.json"
+            ).toURL
+
+            val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
+              .cached(false)
+              .proxied(
+                new java.net.Proxy(
+                  java.net.Proxy.Type.HTTP,
+                  new InetSocketAddress(proxyHost, proxy.port),
+                )
+              )
+              .build()
+
+            provider.get(Routes.testJwksKeyId).getId shouldBe Routes.testJwksKeyId
+            proxy.proxiedConnectRequest(serverHost, serverPort) shouldBe true
+          }
+        }
+      }
+    }
+    "Ensure jwks URL used in RSAVerifier supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
+      val user = "user"
+      val password = "pass1"
+      withProxy(auth = Some((user, password))) { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val proxyHost = "localhost"
+          val serverHost = "localhost"
+          val serverPort = serverBinding.localAddress.getPort
+          val timeout = NonNegativeDuration(5.seconds)
+          val props =
+            SystemProperties()
+              .set("http.proxyHost", proxyHost)
+              .set("http.proxyPort", proxy.port.toString)
+              .set("http.proxyUser", user)
+              .set("http.proxyPassword", password)
+          withProperties(props) {
+            val jwksUrl = new URI(
+              s"http://localhost:${serverPort}/.well-known/jwks.json"
+            ).toURL
             val verifier = new RSAVerifier(
               "fake-audience",
-              new URI(
-                s"http://localhost:${serverBinding.localAddress.getPort}/.well-known/jwks.json"
-              ).toURL,
+              jwksUrl,
               RSAVerifier.TimeoutsConfig(
                 timeout,
                 timeout,
               ),
             )
             verifier.provider.get(Routes.testJwksKeyId).getId shouldBe Routes.testJwksKeyId
+            proxy.proxiedConnectRequest(serverHost, serverPort) shouldBe true
           }
         }
       }
