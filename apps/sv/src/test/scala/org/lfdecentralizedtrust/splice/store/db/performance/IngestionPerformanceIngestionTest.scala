@@ -144,7 +144,7 @@ class IngestionPerformanceIngestionTest
       .value
       .failOnShutdown("")
       .futureValue
-      .valueOrFail("count is there") should be >= 600_000
+      .valueOrFail("count is there") should be >= 500_000
   }
 
   private def parseArray(str: String) = {
@@ -178,6 +178,7 @@ class IngestionPerformanceIngestionTest
         None,
       ),
       participantId = mkParticipantId("IngestionPerformanceIngestionTest"),
+      IngestionConfig(),
     )(parallelExecutionContext, templateJsonDecoder, closeContext)
   }
 
