@@ -102,7 +102,7 @@ class UpdateIngestionService(
         logger.debug(s"Processing batch of ${batch.size} elements")
         ingestionSink.ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
       case None =>
-        logger.warn("Received empty batch of updates to ingest. This is never supposed to happen.")
+        logger.error("Received empty batch of updates to ingest. This is never supposed to happen.")
         Future.unit
     }
   }

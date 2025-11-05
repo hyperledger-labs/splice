@@ -1636,7 +1636,8 @@ final class DbMultiDomainAcsStore[TXE](
     )
 
     case class AcsInsertEntry(
-        offset: Long, // not always the same as `createdEvent.getOffset`
+        // not always the same as `createdEvent.getOffset`: when `ingestACS`ing, it's `participantBegin`
+        offset: Long,
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
     )
