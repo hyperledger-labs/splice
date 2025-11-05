@@ -1009,11 +1009,10 @@ template DsoRules with
         return DsoRules_GrantValidatorLicenseResult with ..
 
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
-      -- ^ Note: removes the old duplicated licenses and creates a new one with merged fields:
+      -- ^ Note: removes the old duplicated licenses and creates a new one with merged fields having value:
       -- - lastReceivedFor: max value among all licenses
       -- - weight: min value among all licenses
-      -- - kind: Some OperatorLicense if any license has None or Some OperatorLicense
-      -- There should never be duplicates going forward.
+      -- - kind: `Some OperatorLicense` if any license has `None` or `Some OperatorLicense`
       with
         validatorLicenseCids : [ContractId ValidatorLicense]
         sv : Optional Party
