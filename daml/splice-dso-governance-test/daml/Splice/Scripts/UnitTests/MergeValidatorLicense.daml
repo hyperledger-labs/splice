@@ -136,8 +136,8 @@ test_FaucetStateSelection_MaxLastReceivedFor = do
   mergedLicense.sponsor === license2.sponsor
   mergedLicense.metadata === license2.metadata
 
-test_ValidationError : Script ()
-test_ValidationError = do
+test_mergeValidation : Script ()
+test_mergeValidation = do
   dso <- allocateParty "dso"
   validator1 <- allocateParty "validator1"
   validator2 <- allocateParty "validator2"

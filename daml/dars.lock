@@ -65,7 +65,7 @@ splice-dso-governance 0.1.6 4e7653cfbf7ca249de4507aca9cd3b91060e5489042a522c589d
 splice-dso-governance 0.1.7 d406eba1132d464605f4dae3edf8cf5ecbbb34bd8edef0e047e7e526d328718c
 splice-dso-governance 0.1.8 1790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948
 splice-dso-governance 0.1.9 9ee83bfd872f91e659b8a8439c5b4eaf240bcf6f19698f884d7d7993ab48c401
-splice-dso-governance-test 0.1.24 cbb625082418c104013504880b1fea35cbd3c1f5af9abd0ad3d634833b364db2
+splice-dso-governance-test 0.1.24 ebf06c7b79bb8bc1a4212023e8cc5909ee2f1f85e7d0bf716cec304e4968144a
 splice-token-standard-test 1.0.8 dcdec431f26859405abdf673ab975d99da057ee666855bd57eac8cf30a909474
 splice-token-test-dummy-holding 0.0.1 1cd171c6c42ab46dc9cf12d80c6111369e00cea5cdf054924b4f26ce94b1ef5b
 splice-token-test-dummy-holding 0.0.2 4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d
@@ -78,6 +78,7 @@ splice-util 0.1.4 b7356fbb2cf8a3b22194d8c743c3c216d9c7527b257c8c38b257eb22942be3
 splice-util-featured-app-proxies 1.0.0 48e0c4fe4ea05e3b740404ebe37004ddd741efbdcd665c1c3199a5d6d9d944d7
 splice-util-featured-app-proxies 1.1.0 81dd5a9e5c02d0de03208522a895fb85eeb12fbea4aca7c4ad0ad106f3b0bfce
 splice-util-featured-app-proxies 1.2.0 653c48879064332d34af5008bdfd8e349493460e67e62b85e8e7e3392831c842
+splice-util-featured-app-proxies-test 1.0.5 99e0036390fed0d75c0cf59f7221ff459282d710228b29537d4d1c2e7dd38303
 splice-util-token-standard-wallet 1.0.0 1da198cb7968fa478cfa12aba9fdf128a63a8af6ab284ea6be238cf92a3733ac
 splice-util-token-standard-wallet-test 1.0.1 abba6ef9207a941705368e46d5c2a428bc8a5279e1714eb81ad2b20223b599f4
 splice-validator-lifecycle 0.1.0 cef96fac957362f1fc097120bd13686cac7f84fbc8053afa994a1f9214d9570c
