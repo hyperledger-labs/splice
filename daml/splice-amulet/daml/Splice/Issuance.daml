@@ -102,7 +102,7 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary optDevelop
     developmentFundPercentage = fromOptional 0.0 optDevelopmentFundPercentage
 
     amuletsToIssueToSvs =
-      amuletsToIssueInRound * remainingEmissionPercentage
+      adjustedAmuletsToIssueInRound
         - validatorRewardIssuance.rewardsToIssue
         - unfeaturedAppIssuance.rewardsToIssue
 
