@@ -68,6 +68,7 @@ class PruningIntegrationTest
               config.validatorApps.updatedWith(InstanceName.tryCreate("sv1Validator")) {
                 _.map { config =>
                   config.copy(
+                    // schedule needs to be defined to activate pruning
                     participantPruningSchedule = Some(
                       PruningConfig(
                         "0 /1 * * * ?",
@@ -101,6 +102,34 @@ class PruningIntegrationTest
               )
           ),
       )
+
+  "participant can be pruned" should {
+
+    "when configured, sv1 participant prunes every minute" in { implicit env =>
+      implicit val actorSystem: ActorSystem = env.actorSystem
+
+      initDsoWithSv1Only()
+
+      clue("Check sv1 participant has the expected smallest pruning schedule") {
+        sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
+          PruningSchedule(
+            "0 /1 * * * ?",
+            PositiveDurationSeconds.tryFromDuration(1.seconds),
+            PositiveDurationSeconds.tryFromDuration(1.seconds),
+          )
+        )
+      }
+
+      findExpectedLogInFile(
+        "About to prune\\s+up to Offset.*participant=sv1Participant",
+        "log/canton.clog",
+        logger,
+      )
+        .futureValue(timeout =
+          PatienceConfiguration.Timeout(FiniteDuration(70, "seconds"))
+        ) shouldBe true
+    }
+  }
 
   "sequencer can be pruned even if a participant is down" in { implicit env =>
     clue("Initialize DSO with 2 SVs") {
@@ -163,33 +192,5 @@ class PruningIntegrationTest
       },
       timeUntilSuccess = 3.minutes,
     )
-  }
-
-  "participant can be pruned" should {
-
-    "when configured, sv1 participant prunes every minute" in { implicit env =>
-      implicit val actorSystem: ActorSystem = env.actorSystem
-
-      initDsoWithSv1Only()
-
-      clue("Check sv1 participant has the expected smallest pruning schedule") {
-        sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
-          PruningSchedule(
-            "0 /1 * * * ?",
-            PositiveDurationSeconds.tryFromDuration(1.seconds),
-            PositiveDurationSeconds.tryFromDuration(1.seconds),
-          )
-        )
-      }
-
-      findExpectedLogInFile(
-        "About to prune\\s+up to Offset.*participant=sv1Participant",
-        "log/canton.clog",
-        logger,
-      )
-        .futureValue(timeout =
-          PatienceConfiguration.Timeout(FiniteDuration(70, "seconds"))
-        ) shouldBe true
-    }
   }
 }
