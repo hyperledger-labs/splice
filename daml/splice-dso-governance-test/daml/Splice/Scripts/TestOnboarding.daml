@@ -9,7 +9,6 @@ import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
-import DA.List
 
 import Splice.ValidatorLicense
 
