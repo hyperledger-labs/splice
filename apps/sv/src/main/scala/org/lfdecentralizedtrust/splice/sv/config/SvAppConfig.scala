@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
@@ -448,6 +449,13 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    pruning: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Run every 10min,
+        maxDuration = PositiveDurationSeconds.ofMinutes(5),
+        retention = PositiveDurationSeconds.ofDays(30),
+      )
+    ),
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

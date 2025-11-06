@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.http
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.logging.TracedLogger
 import org.apache.pekko.http.scaladsl.model.{HttpEntity, StatusCodes}
 import org.apache.pekko.http.scaladsl.server.Directive0
 import org.lfdecentralizedtrust.splice.config.RateLimitersConfig
@@ -15,6 +16,7 @@ import java.time.Instant
 class HttpRateLimiter(
     config: RateLimitersConfig,
     metricsFactory: LabeledMetricsFactory,
+    logger: TracedLogger,
 ) extends AutoCloseable {
 
   // need to cache it as the pekko reoutes get evaluated for each request
@@ -22,19 +24,20 @@ class HttpRateLimiter(
   private val metrics = scala.collection.concurrent.TrieMap[String, SpliceRateLimitMetrics]()
 
   def withRateLimit(service: String)(operation: String): Directive0 = {
+    val rateLimiterMetrics = metrics.getOrElseUpdate(
+      service,
+      SpliceRateLimitMetrics(metricsFactory, logger)(
+        MetricsContext(
+          "http_service" -> service
+        )
+      ),
+    )
     val rateLimiter = rateLimiters.getOrElseUpdate(
       operation,
       new SpliceRateLimiter(
         operation,
         config.forRateLimiter(operation),
-        metrics.getOrElseUpdate(
-          service,
-          SpliceRateLimitMetrics(metricsFactory)(
-            MetricsContext(
-              "http_service" -> service
-            )
-          ),
-        ),
+        rateLimiterMetrics,
         // the rate limiter has a cold start, to avoid the first request being rejected
         // we enforce the rate limit only after 1 second
         Instant.now().plusSeconds(1),

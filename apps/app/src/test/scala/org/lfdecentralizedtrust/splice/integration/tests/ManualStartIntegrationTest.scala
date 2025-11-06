@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceBackendConfig}
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, PruningConfig, SpliceBackendConfig}
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -25,7 +25,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.config.ParticipantPruningConfig
 
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
@@ -63,7 +62,7 @@ class ManualStartIntegrationTest
               aliceValidatorConfig.copy(
                 domains = withoutExtraDomains,
                 participantPruningSchedule = Some(
-                  ParticipantPruningConfig(
+                  PruningConfig(
                     "0 0 * * * ?",
                     PositiveDurationSeconds.tryFromDuration(1.hours),
                     PositiveDurationSeconds.tryFromDuration(30.hours),
@@ -169,7 +168,9 @@ class ManualStartIntegrationTest
           )
         }
 
-        clue("SV1 and SV2 have configured amplification on the mediator sequencer connection") {
+        clue(
+          "SV1 and SV2 have configured amplification and pruning on the mediator sequencer connection"
+        ) {
           Seq(
             mediatorAdminConnection("sv1", sv1Backend.config),
             mediatorAdminConnection("sv2", sv2Backend.config),
@@ -182,6 +183,11 @@ class ManualStartIntegrationTest
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
             sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
+            mediatorConnection.getPruningSchedule().futureValue.value shouldBe PruningSchedule(
+              "0 /10 * * * ?",
+              PositiveDurationSeconds.ofMinutes(5),
+              PositiveDurationSeconds.ofDays(30),
+            )
             // otherwise we get log warnings
             mediatorConnection.close()
           }

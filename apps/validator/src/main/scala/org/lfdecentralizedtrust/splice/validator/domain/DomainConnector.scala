@@ -192,8 +192,22 @@ class DomainConnector(
           // so this is just an extra safeguard.
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
+      val svFilteredSequencers = config.domains.global.sequencerNames match {
+        case Some(allowedNames) =>
+          val allowedNamesSet = allowedNames.toList.toSet
+          logger.debug(
+            s"Filtering sequencers to only include: ${allowedNames.toList.mkString(", ")}"
+          )
+          filteredSequencers.map { domainSequencer =>
+            domainSequencer.copy(sequencers =
+              domainSequencer.sequencers.filter(s => allowedNamesSet.contains(s.svName))
+            )
+          }
+        case None =>
+          filteredSequencers
+      }
       (
-        filteredSequencers.map { domainSequencer =>
+        svFilteredSequencers.map { domainSequencer =>
           config.domains.global.alias ->
             extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
         }.toMap,

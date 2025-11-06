@@ -3,9 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.store
 
+import cats.data.NonEmptyList
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
+import com.daml.ledger.api.v2.transaction_filter.{CumulativeFilter, EventFormat}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.{
   Interface,
   Template as TemplateCompanion,
@@ -18,7 +19,6 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
   ReassignmentEvent,
-  TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
@@ -303,6 +303,9 @@ object MultiDomainAcsStore extends StoreErrors {
         )
       }
     }
+
+    def getAcsIndexColumnNames: Seq[String]
+    def getInterfaceViewsIndexColumnNames: Seq[String]
   }
 
   private type DecodeFromCreatedEvent[TCid <: ContractId[T], T <: Template] =
@@ -351,6 +354,9 @@ object MultiDomainAcsStore extends StoreErrors {
         Identifier, // interfaces are not (currently) upgradeable, so we match by package-id
         InterfaceFilter[?, ?, ?, IR],
       ],
+  )(implicit
+      hasAcsIndexColumns: AcsRowData.HasIndexColumns[R],
+      hasInterfaceViewsIndexColumns: AcsRowData.HasIndexColumns[IR],
   ) extends ContractFilter[R, IR] {
 
     override val ingestionFilter =
@@ -359,6 +365,10 @@ object MultiDomainAcsStore extends StoreErrors {
         // In interface filters the ledger API warns when using a package id so we convert to a package name here.
         interfaceFilters.keys.map(PackageQualifiedName.getFromResources(_)).toSeq,
       )
+
+    def getAcsIndexColumnNames: Seq[String] = hasAcsIndexColumns.indexColumnNames
+    def getInterfaceViewsIndexColumnNames: Seq[String] =
+      hasInterfaceViewsIndexColumns.indexColumnNames
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
       val matchesTemplate = templateFilters
@@ -438,6 +448,8 @@ object MultiDomainAcsStore extends StoreErrors {
           PackageQualifiedName,
           TemplateFilter[?, ?, R],
         ],
+    )(implicit
+        hasAcsIndexColumns: AcsRowData.HasIndexColumns[R]
     ): SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested] =
       SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested](
         primaryParty,
@@ -739,14 +751,9 @@ object MultiDomainAcsStore extends StoreErrors {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def ingestUpdate(update: TreeUpdateOrOffsetCheckpoint)(implicit
+    def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit]
-
-    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] =
-      ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))
   }
 
   object IngestionSink {

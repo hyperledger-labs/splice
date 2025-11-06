@@ -183,6 +183,7 @@ class ScanApp(
         config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        config.automation.ingestion,
         initialRound.toLong,
       )
       acsSnapshotStore = AcsSnapshotStore(
@@ -321,6 +322,7 @@ class ScanApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         nodeMetrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))

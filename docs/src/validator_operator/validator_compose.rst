@@ -217,6 +217,21 @@ you wish to migrate, follow the instructions for associating a user with a party
 :ref:`Users, Parties and Wallets in the Splice Wallet section <validator-users>`, but replace
 the admin party ID with the party ID which you wish to associate with each user.
 
+.. _compose_validator_topup:
+
+Configuring Automatic Traffic Purchases
++++++++++++++++++++++++++++++++++++++++
+
+Your node is configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
+(see :ref:`automatically purchase traffic <traffic_topup>`).
+To tune to your needs, you can set environment variables, for example:
+
+.. code-block:: bash
+
+   export TARGET_TRAFFIC_THROUGHPUT=20000 # target throughput in bytes/second
+   export MIN_TRAFFIC_TOPUP_INTERVAL="1m" # minimum interval between top-ups
+
+.. include:: ../common/traffic_topups.rst
 
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++

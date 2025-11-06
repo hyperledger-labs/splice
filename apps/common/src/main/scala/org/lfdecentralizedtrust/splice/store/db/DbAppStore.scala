@@ -11,6 +11,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.ExecutionContext
@@ -27,6 +28,7 @@ abstract class DbTxLogAppStore[TXE](
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
     backfillingRequired: BackfillingRequirement,
+    ingestionConfig: IngestionConfig,
     oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -42,6 +44,7 @@ abstract class DbTxLogAppStore[TXE](
       enableissue12777Workaround = enableissue12777Workaround,
       enableImportUpdateBackfill = enableImportUpdateBackfill,
       backfillingRequired,
+      ingestionConfig,
       oHistoryMetrics = oHistoryMetrics,
     )
     with TxLogAppStore[TXE] {
@@ -59,6 +62,7 @@ abstract class DbTxLogAppStore[TXE](
       txLogConfig,
       domainMigrationInfo,
       retryProvider,
+      ingestionConfig,
       handleIngestionSummary,
     )
 }
@@ -73,6 +77,7 @@ abstract class DbAppStore(
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
     backfillingRequired: BackfillingRequirement,
+    ingestionConfig: IngestionConfig,
     oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
     protected val ec: ExecutionContext,
@@ -98,6 +103,7 @@ abstract class DbAppStore(
       TxLogStore.Config.empty,
       domainMigrationInfo,
       retryProvider,
+      ingestionConfig,
       handleIngestionSummary,
     )
 

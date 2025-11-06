@@ -81,19 +81,19 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const action = screen.getByTestId('action-required-action');
+    const action = screen.getByTestId('action-required-action-content');
     expect(action).toBeDefined();
     expect(action.textContent).toBe(actionRequired.actionName);
 
-    const createdAt = screen.getByTestId('action-required-created-at');
+    const createdAt = screen.getByTestId('action-required-created-at-content');
     expect(createdAt).toBeDefined();
     expect(createdAt.textContent).toBe(actionRequired.createdAt);
 
-    const votingCloses = screen.getByTestId('action-required-voting-closes');
+    const votingCloses = screen.getByTestId('action-required-voting-closes-content');
     expect(votingCloses).toBeDefined();
     expect(votingCloses.textContent).toBe(actionRequired.votingCloses);
 
-    const requester = screen.getByTestId('action-required-requester');
+    const requester = screen.getByTestId('action-required-requester-identifier-party-id');
     expect(requester).toBeDefined();
     expect(requester.textContent).toBe(actionRequired.requester);
 
@@ -117,7 +117,7 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const isYou = screen.getByTestId('action-required-you');
+    const isYou = screen.getByTestId('action-required-requester-identifier-you');
     expect(isYou).toBeDefined();
   });
 
@@ -136,7 +136,7 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(() => screen.getByTestId('action-required-you')).toThrowError(
+    expect(() => screen.getByTestId('action-required-requester-identifier-you')).toThrowError(
       /Unable to find an element/
     );
   });

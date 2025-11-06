@@ -155,4 +155,10 @@ Waiting for allocation of.*on synchronizer splitwell.*timed out
 # error code will change in the future to MAX_SEQUENCING_TIME_EXCEEDED
 SEQUENCER_SUBMISSION_REQUEST_REFUSED.* The estimated sequencing time .* is already past the max sequencing time
 
+# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+
+# TODO(#3069): Byproduct of mediator pruning; double-check this is expected (and unavoidable)
+Dynamic synchronizer parameters to compute earliest available pruning timestamp not found
+
 # Make sure to have a trailing newline

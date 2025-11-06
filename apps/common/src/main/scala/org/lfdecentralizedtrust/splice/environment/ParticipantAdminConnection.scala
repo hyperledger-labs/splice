@@ -15,12 +15,11 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
-  PruningSchedule,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -84,18 +83,20 @@ class ParticipantAdminConnection(
     )
     with HasParticipantId
     with ParticipantAdminDarsConnection
-    with StatusAdminConnection {
+    with StatusAdminConnection
+    with PruningAdminConnection {
   override val serviceName = "Canton Participant Admin API"
 
-  val pruningCommands = new PruningSchedulerCommands[PruningServiceStub](
-    PruningServiceGrpc.stub,
-    _.setSchedule(_),
-    _.clearSchedule(_),
-    _.setCron(_),
-    _.setMaxDuration(_),
-    _.setRetention(_),
-    _.getSchedule(_),
-  )
+  override val pruningCommands: PruningSchedulerCommands[PruningServiceGrpc.PruningServiceStub] =
+    new PruningSchedulerCommands[PruningServiceStub](
+      PruningServiceGrpc.stub,
+      _.setSchedule(_),
+      _.clearSchedule(_),
+      _.setCron(_),
+      _.setMaxDuration(_),
+      _.setRetention(_),
+      _.getSchedule(_),
+    )
 
   override type Status = ParticipantStatus
 
@@ -719,38 +720,6 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
-
-  private def setPruningSchedule(
-      cron: String,
-      maxDuration: PositiveDurationSeconds,
-      retention: PositiveDurationSeconds,
-  )(implicit tc: TraceContext): Future[Unit] =
-    runCmd(pruningCommands.SetScheduleCommand(cron, maxDuration, retention))
-
-  private def getPruningSchedule()(implicit tc: TraceContext): Future[Option[PruningSchedule]] =
-    runCmd(pruningCommands.GetScheduleCommand())
-
-  /** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
-    *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
-    *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
-    *      specified retention period.
-    */
-  def ensurePruningSchedule(
-      cron: String,
-      maxDuration: PositiveDurationSeconds,
-      retention: PositiveDurationSeconds,
-  )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.ensureThatB(
-      RetryFor.WaitingOnInitDependency,
-      "participant_pruning_schedule",
-      s"Pruning schedule is set to ($cron, $maxDuration, $retention)",
-      getPruningSchedule().map(scheduleO =>
-        scheduleO.contains(PruningSchedule(cron, maxDuration, retention))
-      ),
-      setPruningSchedule(cron, maxDuration, retention),
-      logger,
-    )
-
 }
 
 object ParticipantAdminConnection {

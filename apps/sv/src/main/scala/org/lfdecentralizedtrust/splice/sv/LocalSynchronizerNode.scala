@@ -35,6 +35,7 @@ import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
+import org.lfdecentralizedtrust.splice.config.PruningConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpClient
@@ -63,6 +64,7 @@ final class LocalSynchronizerNode(
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
+    mediatorPruningConfig: Option[PruningConfig],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -492,6 +494,11 @@ final class LocalSynchronizerNode(
           mediatorSequencerAmplification,
         ),
       logger,
+    )
+
+  def ensureMediatorPruningSchedule()(implicit tc: TraceContext): Future[Unit] =
+    mediatorAdminConnection.ensurePruningSchedule(
+      mediatorPruningConfig
     )
 
   override protected def onClosed(): Unit = {
