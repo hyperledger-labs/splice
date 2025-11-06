@@ -69,12 +69,12 @@ runs:
         echo "Latest nix cache:"
 
         wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" -O cache.tar.gz || true
-        if [ ! -s cache.tar.gz ]; then
-          echo "Cache not found, fetching latest instead"
-          latest=$(curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name')
-          wget -q "https://storage.googleapis.com/splice-nix-cache-public/${latest}" -O cache.tar.gz
-
-        fi
+        # TODO (#2663): restore this, keep in mind that caches from a different HOME dir will not work
+        # if [ ! -s cache.tar.gz ]; then
+          # echo "Cache not found, fetching latest instead"
+          # latest=$(curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name')
+          # wget -q "https://storage.googleapis.com/splice-nix-cache-public/${latest}" -O cache.tar.gz
+        # fi
 
         sudo mkdir -p /cache/nix/${cache_key}
         sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
