@@ -10,6 +10,6 @@ object ValidatorInternalTables {
   case class ScanConfigRow(
       svName: String,
       scanUrl: String,
-      restart_count: Int,
+      restartCount: Int,
   )
 }

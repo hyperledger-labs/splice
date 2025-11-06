@@ -33,14 +33,14 @@ class DbValidatorInternalStore(
     row => {
       pp.setString(row.svName)
       pp.setString(row.scanUrl)
-      pp.setInt(row.restart_count)
+      pp.setInt(row.restartCount)
     }
 
   private implicit val getScanConfigRow: GetResult[ScanConfigRow] = GetResult { r =>
     ScanConfigRow(
       svName = r.nextString(),
       scanUrl = r.nextString(),
-      restart_count = r.nextInt(),
+      restartCount = r.nextInt(),
     )
   }
 
@@ -50,7 +50,7 @@ class DbValidatorInternalStore(
     fus.unwrap.map {
       case UnlessShutdown.Outcome(value) => value
       case UnlessShutdown.AbortedDueToShutdown =>
-        throw new Exception("Operation aborted due to shutdown.")
+        throw new RuntimeException("Operation aborted due to shutdown.")
     }
 
   override def setScanConfigs(rows: Seq[ScanConfigRow])(implicit tc: TraceContext): Future[Unit] = {

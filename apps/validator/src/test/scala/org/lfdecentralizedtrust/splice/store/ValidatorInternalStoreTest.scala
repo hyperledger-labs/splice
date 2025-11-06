@@ -18,9 +18,6 @@ import scala.concurrent.Future
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 
-/** Abstract test suite for implementations of ValidatorInternalStore.
-  * Follows the pattern of Canton's base test classes.
-  */
 abstract class ValidatorInternalStoreTest
     extends AsyncWordSpec
     with Matchers
@@ -58,8 +55,8 @@ abstract class ValidatorInternalStoreTest
         )
 
         val configsR3 = Seq(
-          ScanConfigRow("SV4", "url-d", 3),
-          ScanConfigRow("SV1", "url-a", 3),
+          ScanConfigRow("SV1", "url-d", 3),
+          ScanConfigRow("SV2", "url-a", 3),
         )
 
         for {
@@ -86,8 +83,8 @@ abstract class ValidatorInternalStoreTest
         val tc = TraceContext.empty
 
         val configs = Seq(
-          ScanConfigRow("A", "url-a", 5),
-          ScanConfigRow("B", "url-b", 5),
+          ScanConfigRow("SV1", "url-a", 5),
+          ScanConfigRow("SV2", "url-b", 5),
         )
 
         for {
