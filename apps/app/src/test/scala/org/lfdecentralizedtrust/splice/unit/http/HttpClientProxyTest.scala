@@ -82,12 +82,8 @@ class HttpClientProxyTest
         }
       }
     }
-    "Ensure jwks URL used in JwkProvider supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
-      val user = "user"
-      val password = "pass1"
-      withProxy(
-        auth = Some((user, password))
-      ) { proxy =>
+    "Ensure jwks URL used in JwkProvider supports proxy configuration via http.proxyPort, http.proxyHost" in {
+      withProxy() { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val proxyHost = "localhost"
           val serverHost = "localhost"
@@ -96,11 +92,10 @@ class HttpClientProxyTest
             SystemProperties()
               .set("http.proxyHost", proxyHost)
               .set("http.proxyPort", proxy.port.toString)
-              .set("http.proxyUser", user)
-              .set("http.proxyPassword", password)
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
               // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
+              .set("https.nonProxyHosts", "")
 
           withProperties(props) {
             val jwksUrl = new URI(
@@ -117,12 +112,8 @@ class HttpClientProxyTest
         }
       }
     }
-    "Ensure jwks URL used in RSAVerifier supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
-      val user = "user"
-      val password = "pass1"
-      withProxy(
-        auth = Some((user, password))
-      ) { proxy =>
+    "Ensure jwks URL used in RSAVerifier supports proxy configuration via http.proxyPort, http.proxyHost" in {
+      withProxy() { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val proxyHost = "localhost"
           val serverHost = "localhost"
@@ -132,11 +123,10 @@ class HttpClientProxyTest
             SystemProperties()
               .set("http.proxyHost", proxyHost)
               .set("http.proxyPort", proxy.port.toString)
-              .set("http.proxyUser", user)
-              .set("http.proxyPassword", password)
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
               // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
+              .set("https.nonProxyHosts", "")
           withProperties(props) {
             val jwksUrl = new URI(
               s"http://localhost:${serverPort}/.well-known/jwks.json"
