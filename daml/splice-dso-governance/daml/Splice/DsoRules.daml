@@ -9,9 +9,9 @@ import DA.Action (void, unless)
 import DA.Assert
 import DA.Either (partitionEithers)
 import DA.Exception
-import DA.Foldable (forA_, all, minimum)
+import DA.Foldable (forA_, all)
 import DA.List as List hiding (all)
-import DA.Optional (isNone, fromSome, fromOptional, isSome, catOptionals)
+import DA.Optional (isNone, fromSome, fromOptional, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -33,6 +33,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DsoRules.Utils
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
@@ -1018,35 +1019,13 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do _ <- getAndValidateSvParty this sv
-         require "Number of validatorLicense contracts to merge is >= 2" (length validatorLicenseCids >= 2)
          validatorLicenses <- forA validatorLicenseCids $ fetchAndArchive (ForDso this.dso)
-         require "All validatorLicenses map to the same validator" ( length (dedup (map (.validator) validatorLicenses)) == 1)
 
-         -- Merge the licenses:
-         -- 1. Use the max lastReceivedFor for faucetState (take the license with max lastReceivedFor as base)
-         -- 2. Use the min weight (treating None as 1.0)
-         -- 3. Use Some OperatorLicense for kind if any license has None or Some OperatorLicense
-         let baseLicense = maximumOn (\license ->
-                     case license.faucetState of
-                         None    -> Round 0
-                         Some r  -> r.lastReceivedFor) validatorLicenses
+         mergedLicense <- case mergeValidatorLicenses validatorLicenses of
+           Left err -> abort err
+           Right license -> pure license
 
-         -- Calculate merged weight: use minimum weight among all licenses, or None if all are None
-         let weights = catOptionals $ map (.weight) validatorLicenses
-         let mergedWeight = if null weights then None else Some (minimum weights)
-
-         -- Calculate merged kind: use OperatorLicense if any license has None or Some OperatorLicense
-         let hasOperatorLicense license = case license
-               None -> True
-               Some OperatorLicense -> True
-               Some _ -> False
-         let mergedKind = if any hasOperatorLicense validatorLicenses
-                          then Some OperatorLicense
-                          else Some NonOperatorLicense
-
-         cid <- create baseLicense with
-           weight = mergedWeight
-           kind = mergedKind
+         cid <- create mergedLicense
          pure $ DsoRules_MergeValidatorLicenseResult cid
 
     -- SV onboarding

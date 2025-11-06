@@ -1,0 +1,171 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.MergeValidatorLicense where
+
+import DA.Assert
+import Daml.Script
+
+import Splice.ValidatorLicense
+import Splice.DsoRules.Utils
+import Splice.Types (Round(..))
+
+-- Weight merging: minimum weight is selected from non-None values
+test_WeightMerging : Script ()
+test_WeightMerging = do
+  dso <- allocateParty "dso"
+  validator <- allocateParty "validator"
+  sponsor <- allocateParty "sponsor"
+  now <- getTime
+
+  let createLicense : Optional Decimal -> Round -> ValidatorLicense
+      createLicense weight lastReceivedFor =
+        ValidatorLicense with
+          validator
+          sponsor
+          dso
+          faucetState = Some FaucetState with
+            firstReceivedFor = Round 0
+            lastReceivedFor
+            numCouponsMissed = 0
+          metadata = None
+          lastActiveAt = Some now
+          weight
+          kind = Some OperatorLicense
+
+  -- Scenario 1: Minimum among some weights
+  let license1a = createLicense None (Round 1)
+  let license2a = createLicense (Some 2.0) (Round 2)
+  let license3a = createLicense (Some 1.5) (Round 3)
+  let Right mergedLicense1 = mergeValidatorLicenses [license1a, license2a, license3a]
+  mergedLicense1.weight === Some 1.5
+
+  -- Scenario 2: All None weights
+  let license1b = createLicense None (Round 1)
+  let license2b = createLicense None (Round 2)
+  let Right mergedLicense2 = mergeValidatorLicenses [license1b, license2b]
+  mergedLicense2.weight === None
+
+-- kind merging: `None` kind is same as `Some OperatorLicense`
+-- So OperatorLicense takes precedence over NonOperatorLicense
+test_KindMerging : Script ()
+test_KindMerging = do
+  dso <- allocateParty "dso"
+  validator <- allocateParty "validator"
+  sponsor <- allocateParty "sponsor"
+  now <- getTime
+
+  let createLicense : Optional LicenseKind -> Round -> ValidatorLicense
+      createLicense kind lastReceivedFor =
+        ValidatorLicense with
+          validator
+          sponsor
+          dso
+          faucetState = Some FaucetState with
+            firstReceivedFor = Round 0
+            lastReceivedFor
+            numCouponsMissed = 0
+          metadata = None
+          lastActiveAt = Some now
+          weight = None
+          kind
+
+  -- Scenario 1: None + NonOperator → Operator
+  let license1a = createLicense None (Round 1)
+  let license2a = createLicense (Some NonOperatorLicense) (Round 2)
+  let Right mergedLicense1 = mergeValidatorLicenses [license1a, license2a]
+  mergedLicense1.kind === Some OperatorLicense
+
+  -- Scenario 2: Operator + NonOperator → Operator
+  let license1b = createLicense (Some OperatorLicense) (Round 1)
+  let license2b = createLicense (Some NonOperatorLicense) (Round 2)
+  let Right mergedLicense2 = mergeValidatorLicenses [license1b, license2b]
+  mergedLicense2.kind === Some OperatorLicense
+
+  -- Scenario 3: NonOperator + NonOperator → NonOperator
+  let license1c = createLicense (Some NonOperatorLicense) (Round 1)
+  let license2c = createLicense (Some NonOperatorLicense) (Round 2)
+  let Right mergedLicense3 = mergeValidatorLicenses [license1c, license2c]
+  mergedLicense3.kind === Some NonOperatorLicense
+
+-- Faucet state selection: license with highest lastReceivedFor is used as base
+test_FaucetStateSelection_MaxLastReceivedFor : Script ()
+test_FaucetStateSelection_MaxLastReceivedFor = do
+  dso <- allocateParty "dso"
+  validator <- allocateParty "validator"
+  sponsor1 <- allocateParty "sponsor1"
+  sponsor2 <- allocateParty "sponsor2"
+  now <- getTime
+
+  let license1 = ValidatorLicense with
+        validator
+        sponsor = sponsor1
+        dso
+        faucetState = Some FaucetState with
+          firstReceivedFor = Round 0
+          lastReceivedFor = Round 1
+          numCouponsMissed = 0
+        metadata = Some ValidatorLicenseMetadata with
+          version = "0.1.0"
+          contactPoint = "v1@example.com"
+          lastUpdatedAt = now
+        lastActiveAt = Some now
+        weight = None
+        kind = None
+
+  let license2 = ValidatorLicense with
+        validator
+        sponsor = sponsor2
+        dso
+        faucetState = Some FaucetState with
+          firstReceivedFor = Round 0
+          lastReceivedFor = Round 5  -- Highest lastReceivedFor
+          numCouponsMissed = 2
+        metadata = Some ValidatorLicenseMetadata with
+          version = "0.2.0"
+          contactPoint = "v2@example.com"
+          lastUpdatedAt = now
+        lastActiveAt = Some now
+        weight = None
+        kind = None
+
+  let Right mergedLicense = mergeValidatorLicenses [license1, license2]
+
+  -- Should use faucetState, sponsor and metadata from license2 (having highest lastReceivedFor)
+  mergedLicense.faucetState === license2.faucetState
+  mergedLicense.sponsor === license2.sponsor
+  mergedLicense.metadata === license2.metadata
+
+test_ValidationError : Script ()
+test_ValidationError = do
+  dso <- allocateParty "dso"
+  validator1 <- allocateParty "validator1"
+  validator2 <- allocateParty "validator2"
+  sponsor <- allocateParty "sponsor"
+  now <- getTime
+
+  let license1 = ValidatorLicense with
+        validator = validator1
+        sponsor
+        dso
+        faucetState = None
+        metadata = None
+        lastActiveAt = Some now
+        weight = None
+        kind = None
+
+  let license2 = ValidatorLicense with
+        validator = validator2
+        sponsor
+        dso
+        faucetState = None
+        metadata = None
+        lastActiveAt = Some now
+        weight = None
+        kind = None
+
+  let result = mergeValidatorLicenses [license1]
+  result === Left "Number of validatorLicense contracts to merge is >= 2"
+
+  let result = mergeValidatorLicenses [license1, license2]
+  result === Left "All validatorLicenses map to the same validator"

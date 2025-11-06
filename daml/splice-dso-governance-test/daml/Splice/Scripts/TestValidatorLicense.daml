@@ -5,7 +5,7 @@ module Splice.Scripts.TestValidatorLicense where
 
 import DA.Assert
 import DA.Action (unless)
-import DA.List
+import DA.List (head)
 import Daml.Script
 import DA.Time
 
@@ -14,7 +14,6 @@ import Splice.DsoRules
 import Splice.Scripts.DsoTestUtils
 import Splice.Scripts.Util
 import Splice.Types
-import Splice.Round
 
 
 testGrantValidatorLicense : Script ()
@@ -65,12 +64,10 @@ testGrantValidatorLicense = do
 
   pure ()
 
--- Test basic merge functionality with faucet state preservation
-test_MergeValidatorLicense_BasicMerge : Script ()
-test_MergeValidatorLicense_BasicMerge = do
+testMergeValidatorLicense : Script ()
+testMergeValidatorLicense = do
   (_, dso, (sv1, sv2, _, _)) <- initDevNet
 
-  -- a new validator prepares his participant
   v1 <- allocateParty "v1"
   now <- getTime
 
@@ -89,6 +86,7 @@ test_MergeValidatorLicense_BasicMerge = do
     lastActiveAt = Some now
     weight = None
     kind = None
+
 
   validatorLicense2Cid <- submit dso $ createCmd ValidatorLicense with
     validator = v1
@@ -106,240 +104,18 @@ test_MergeValidatorLicense_BasicMerge = do
     weight = None
     kind = None
 
-  -- there are two validator licenses for v1
   validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
   length validatorLicenses === 2
 
   -- the license with the highest lastReceivedFor is kept
   [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid] (Some sv1))
+  DsoRules_MergeValidatorLicenseResult _ <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid] (Some sv1))
   validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
   length validatorLicenses === 1
   (head validatorLicenses)._2.faucetState === Some FaucetState with
     firstReceivedFor = Round 0
     lastReceivedFor = Round 2
     numCouponsMissed = 0
-
-  pure()
-
--- Test that we cannot merge a single contract or contracts for different validators
-test_MergeValidatorLicense_NegativeScenarios : Script ()
-test_MergeValidatorLicense_NegativeScenarios = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
-
-  v1 <- allocateParty "v1"
-  now <- getTime
-
-  validatorLicense1Cid <- submit dso $ createCmd ValidatorLicense with
-    validator = v1
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 1
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = None
-
-  [(rulesCid, _)] <- query @DsoRules dso
-
-  -- we can't merge a single contract
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid] (Some sv1))
-
-  -- we can't merge contracts for different validator names
-  [(validatorLicenseSv2Cid, _)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == sv2)
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicenseSv2Cid] (Some sv1))
-
-  pure()
-
--- Test that minimum weight is preserved when merging licenses
--- Note: Weight with `Some` values can only happen via SV vote, and therefore is preferred over `None`
--- We don't want any single SV to overwrite the weight of a ValidatorLicense by
--- simply granting a new one with weight `None`. Therefore we prefer the `Some`
--- values even if they happen to be higher than the default value of 1.0 of `None`
-test_MergeValidatorLicense_WeightMerging : Script ()
-test_MergeValidatorLicense_WeightMerging = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
-
-  v2 <- allocateParty "v2"
-  now <- getTime
-
-  validatorLicenseW1 <- submit dso $ createCmd ValidatorLicense with
-    validator = v2
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 1
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = Some OperatorLicense
-
-  validatorLicenseW2 <- submit dso $ createCmd ValidatorLicense with
-    validator = v2
-    sponsor = sv2
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 3
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = Some 2.0
-    kind = Some OperatorLicense
-
-  validatorLicenseW3 <- submit dso $ createCmd ValidatorLicense with
-    validator = v2
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 2
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = Some 1.5
-    kind = Some OperatorLicense
-
-  [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult mergedWeightLicense <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseW1, validatorLicenseW2, validatorLicenseW3] (Some sv1))
-  [(_, mergedLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v2)
-  -- The merged license should have the minimum weight (1.5) and the highest lastReceivedFor (Round 3)
-  mergedLicense.weight === Some 1.5
-  mergedLicense.faucetState === Some FaucetState with
-    firstReceivedFor = Round 0
-    lastReceivedFor = Round 3
-    numCouponsMissed = 0
-
-  pure()
-
--- Test merging None kind with Some NonOperatorLicense results in Some OperatorLicense
-test_MergeValidatorLicense_KindMerging_NoneWithNonOperator : Script ()
-test_MergeValidatorLicense_KindMerging_NoneWithNonOperator = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
-
-  v3 <- allocateParty "v3"
-  now <- getTime
-
-  validatorLicenseK1 <- submit dso $ createCmd ValidatorLicense with
-    validator = v3
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 1
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = None  -- None should be treated as OperatorLicense
-
-  validatorLicenseK2 <- submit dso $ createCmd ValidatorLicense with
-    validator = v3
-    sponsor = sv2
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 2
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = Some NonOperatorLicense
-
-  [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult mergedKind1 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseK1, validatorLicenseK2] (Some sv1))
-  [(_, mergedLicense1)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v3)
-  -- Should be OperatorLicense because one license had None
-  mergedLicense1.kind === Some OperatorLicense
-
-  pure()
-
--- Test merging Some OperatorLicense with Some NonOperatorLicense results in Some OperatorLicense
-test_MergeValidatorLicense_KindMerging_OperatorWithNonOperator : Script ()
-test_MergeValidatorLicense_KindMerging_OperatorWithNonOperator = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
-
-  v4 <- allocateParty "v4"
-  now <- getTime
-
-  validatorLicenseK3 <- submit dso $ createCmd ValidatorLicense with
-    validator = v4
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 1
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = Some OperatorLicense
-
-  validatorLicenseK4 <- submit dso $ createCmd ValidatorLicense with
-    validator = v4
-    sponsor = sv2
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 2
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = Some NonOperatorLicense
-
-  [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult mergedKind2 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseK3, validatorLicenseK4] (Some sv1))
-  [(_, mergedLicense2)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v4)
-  -- Should be OperatorLicense to prevent downgrading
-  mergedLicense2.kind === Some OperatorLicense
-
-  pure()
-
--- Test merging all Some NonOperatorLicense results in Some NonOperatorLicense
-test_MergeValidatorLicense_KindMerging_AllNonOperator : Script ()
-test_MergeValidatorLicense_KindMerging_AllNonOperator = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
-
-  v5 <- allocateParty "v5"
-  now <- getTime
-
-  validatorLicenseK5 <- submit dso $ createCmd ValidatorLicense with
-    validator = v5
-    sponsor = sv1
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 1
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = Some NonOperatorLicense
-
-  validatorLicenseK6 <- submit dso $ createCmd ValidatorLicense with
-    validator = v5
-    sponsor = sv2
-    dso
-    faucetState = Some FaucetState with
-      firstReceivedFor = Round 0
-      lastReceivedFor = Round 2
-      numCouponsMissed = 0
-    metadata = None
-    lastActiveAt = Some now
-    weight = None
-    kind = Some NonOperatorLicense
-
-  [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult mergedKind3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseK5, validatorLicenseK6] (Some sv1))
-  [(_, mergedLicense3)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v5)
-  -- Should be NonOperatorLicense since all licenses are NonOperatorLicense
-  mergedLicense3.kind === Some NonOperatorLicense
 
   pure()
 
@@ -355,19 +131,19 @@ test_ValidatorLivenessWeightInRunNextIssuanceD = do
         bobExpectedMin = aliceExpectedMin * bobWeight
         bobExpectedMax = aliceExpectedMax * bobWeight
 
-    (app, dso, (_, _, _, _)) <- initDevNet
+    (app, _, (_, _, _, _)) <- initDevNet
 
     -- Setup alice and bob
     aliceValidator <- setupValidator' app "v_alice"
-    alice <- setupUser app "alice" aliceValidator.primaryParty
+    _ <- setupUser app "alice" aliceValidator.primaryParty
     bobValidator <- setupValidator' app "v_bob"
-    bob <- setupUser app "bob" bobValidator.primaryParty
+    _ <- setupUser app "bob" bobValidator.primaryParty
 
-    [(aliceLicenseCid, aliceLicense)] <- query @ValidatorLicense aliceValidator.primaryParty
-    [(bobLicenseCid, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
+    [(aliceLicenseCid, _)] <- query @ValidatorLicense aliceValidator.primaryParty
+    [(bobLicenseCidInitial, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
 
     -- Update bob license to have specified weight
-    submit app.dso $ archiveCmd bobLicenseCid
+    submit app.dso $ archiveCmd bobLicenseCidInitial
     bobLicenseCid <- submitMulti [bobValidator.primaryParty, app.dso] [] $ createCmd bobLicense with
       weight = Some bobWeight
 
@@ -380,13 +156,11 @@ test_ValidatorLivenessWeightInRunNextIssuanceD = do
 
     -- Both record liveness activity
     passTime (hours 1)
-    aliceResult <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+    _ <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0Cid
-    let aliceLicenseCid = aliceResult.licenseCid
 
-    bobResult <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+    _ <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0Cid
-    let bobLicenseCid = bobResult.licenseCid
 
     -- Verify the activity records were created with correct weights
     aliceRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
