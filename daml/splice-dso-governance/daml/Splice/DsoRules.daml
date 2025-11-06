@@ -254,7 +254,7 @@ data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult
     unclaimedReward: ContractId UnclaimedReward
 
 data DsoRules_MergeDevelopmentFundCouponsResult = DsoRules_MergeDevelopmentFundCouponsResult with
-    developmentFundCoupon : ContractId DevelopmentFundCoupon
+    result : AmuletRules_MergeDevelopmentFundCouponResult
 
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
     closedRound : ContractId ClosedMiningRound
