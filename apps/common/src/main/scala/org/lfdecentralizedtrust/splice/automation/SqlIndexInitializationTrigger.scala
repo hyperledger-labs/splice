@@ -13,6 +13,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTrigger.IndexAction
+import org.lfdecentralizedtrust.splice.store.db.AdvisoryLockIds
+import org.lfdecentralizedtrust.splice.store.db.AdvisoryLockIds.withExclusiveTransactionLock
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -117,8 +119,12 @@ class SqlIndexInitializationTrigger(
     case Task.ExecuteAction(IndexAction.Drop(indexName)) =>
       logger.info(s"Dropping index $indexName")
       storage
-        .update(
-          sqlu"drop index concurrently if exists #$indexName",
+        .queryAndUpdate(
+          withExclusiveTransactionLock(
+            storage,
+            AdvisoryLockIds.sqlIndexInitializationTrigger,
+            sqlu"drop index concurrently if exists #$indexName",
+          ),
           "drop_" + indexName,
         )
         .unwrap
@@ -130,7 +136,14 @@ class SqlIndexInitializationTrigger(
     case Task.ExecuteAction(IndexAction.Create(indexName, createAction)) =>
       logger.info(s"Creating index $indexName")
       storage
-        .update(createAction, "create_" + indexName)
+        .queryAndUpdate(
+          withExclusiveTransactionLock(
+            storage,
+            AdvisoryLockIds.sqlIndexInitializationTrigger,
+            createAction,
+          ),
+          "create_" + indexName,
+        )
         .unwrap
         .map { _ =>
           logger.info(s"Finished creating index $indexName")
@@ -145,6 +158,7 @@ class SqlIndexInitializationTrigger(
       logger.info(s"Confirmed action completed for index ${action.indexName}")
       Future.successful(TaskSuccess(s"Confirmed action completed for index ${action.indexName}"))
   }
+
 }
 
 object SqlIndexInitializationTrigger {
