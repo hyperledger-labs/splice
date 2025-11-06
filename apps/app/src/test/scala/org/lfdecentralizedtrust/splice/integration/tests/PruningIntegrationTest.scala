@@ -121,7 +121,7 @@ class PruningIntegrationTest
       }
 
       findExpectedLogInFile(
-        "About to prune\\s+up to Offset.*participant=sv1Participant",
+        "Pruned up to Offset.*participant=sv1Participant",
         "log/canton.clog",
         logger,
       )
