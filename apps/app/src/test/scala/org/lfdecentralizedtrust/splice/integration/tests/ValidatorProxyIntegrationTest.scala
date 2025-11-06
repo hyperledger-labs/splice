@@ -40,7 +40,7 @@ class ValidatorProxyIntegrationTest
           aliceWalletClient.tap(10)
           val aliceTxs = aliceWalletClient.listTransactions(None, 10)
           aliceTxs should not be empty
-          // the proxy should have seen connections to scan, sv1, alice's wallet and validator, and the participant (at least once each)
+          // the proxy should have seen connections to scan, sv1, alice's wallet and validator, participant and the sequencer (at least once each)
           proxy.proxiedConnectRequest(
             host,
             sv1ScanBackend.config.clientAdminApi.port.unwrap,
@@ -61,6 +61,11 @@ class ValidatorProxyIntegrationTest
             host,
             sv1ScanBackend.config.participantClient.ledgerApi.clientConfig.port.unwrap,
           ) shouldBe true
+          proxy.proxiedConnectRequest(
+            host,
+            sv1Backend.sequencerClient.config.clientAdminApi.port.unwrap,
+          ) shouldBe true
+
           proxy.hasNoErrors shouldBe true
         }
       }
