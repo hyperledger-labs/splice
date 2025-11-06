@@ -4,7 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   MediatorAdminConnection,
@@ -94,6 +98,7 @@ class DomainMigrationInitializer(
         Option[SvOnboardingConfig.JoinWithKey],
         Option[CometBftNode],
     ) => JoiningNodeInitializer,
+    enabledFeatures: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -224,6 +229,7 @@ class DomainMigrationInitializer(
           spliceInstanceNamesConfig,
           loggerFactory,
           packageVersionSupport,
+          enabledFeatures,
         )
       // We register the traffic triggers earlier for domain migrations to ensure that SV nodes obtain
       // unlimited traffic and prevent lock-out issues due to lack of traffic (see #13868)

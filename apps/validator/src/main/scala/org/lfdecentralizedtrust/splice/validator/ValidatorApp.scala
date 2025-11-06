@@ -427,14 +427,7 @@ class ValidatorApp(
                 }
               }
             }
-            _ <- MonadUtil.sequentialTraverse_(config.participantPruningSchedule.toList) {
-              pruningConfig =>
-                participantAdminConnection.ensurePruningSchedule(
-                  pruningConfig.cron,
-                  pruningConfig.maxDuration,
-                  pruningConfig.retention,
-                )
-            }
+            _ <- participantAdminConnection.ensurePruningSchedule(config.participantPruningSchedule)
           } yield initialSynchronizerTime
         }
     } yield initialSynchronizerTime
@@ -773,6 +766,7 @@ class ValidatorApp(
         retryProvider,
         domainMigrationInfo,
         participantId,
+        config.automation.ingestion,
       )
       domainTimeAutomationService = new DomainTimeAutomationService(
         config.domains.global.alias,
@@ -894,6 +888,7 @@ class ValidatorApp(
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
+        config.parameters.enabledFeatures,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

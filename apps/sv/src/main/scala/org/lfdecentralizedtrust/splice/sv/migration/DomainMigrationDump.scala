@@ -105,4 +105,37 @@ object DomainMigrationDump {
     )
   }
 
+  def getDomainMigrationDumpUnsafe(
+      synchronizerAlias: SynchronizerAlias,
+      ledgerConnection: SpliceLedgerConnection,
+      participantAdminConnection: ParticipantAdminConnection,
+      synchronizerNode: LocalSynchronizerNode,
+      loggerFactory: NamedLoggerFactory,
+      dsoStore: SvDsoStore,
+      migrationId: Long,
+      domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
+      atTime: Instant,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DomainMigrationDump] = {
+    for {
+      identities <- getSynchronizerNodeIdentities(
+        participantAdminConnection,
+        synchronizerNode,
+        dsoStore,
+        synchronizerAlias,
+        loggerFactory,
+      )
+      participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
+      participantUsersData <- participantUsersDataExporter.exportParticipantUsersData()
+      snapshot <- domainDataSnapshotGenerator.getDomainDataSnapshot(atTime, None, force = false)
+    } yield DomainMigrationDump(
+      migrationId,
+      identities,
+      snapshot,
+      participantUsersData,
+      Instant.now(),
+    )
+  }
 }

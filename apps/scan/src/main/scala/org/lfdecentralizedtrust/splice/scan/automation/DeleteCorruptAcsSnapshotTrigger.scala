@@ -68,7 +68,7 @@ class DeleteCorruptAcsSnapshotTrigger(
       } yield {
         historyMetrics.CorruptAcsSnapshots.count.inc()
         historyMetrics.CorruptAcsSnapshots.latestRecordTime.updateValue(
-          lastSnapshot.snapshotRecordTime.toMicros
+          lastSnapshot.snapshotRecordTime
         )
         TaskSuccess(
           s"Successfully deleted snapshot $lastSnapshot."

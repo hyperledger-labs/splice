@@ -15,6 +15,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -188,6 +189,7 @@ class DbSvSvStoreTest
         None,
       ),
       participantId = mkParticipantId("SvSvStoreTest"),
+      IngestionConfig(),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

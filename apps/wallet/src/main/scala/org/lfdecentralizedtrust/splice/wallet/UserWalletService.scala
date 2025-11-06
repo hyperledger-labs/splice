@@ -81,6 +81,7 @@ class UserWalletService(
       retryProvider,
       domainMigrationInfo,
       participantId,
+      automationConfig.ingestion,
     )
 
   val treasury: TreasuryService = new TreasuryService(

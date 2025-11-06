@@ -128,6 +128,7 @@ class SplitwellApp(
       retryProvider,
       migrationInfo,
       participantId,
+      config.automation.ingestion,
     )
     automation = new SplitwellAutomationService(
       config.automation,

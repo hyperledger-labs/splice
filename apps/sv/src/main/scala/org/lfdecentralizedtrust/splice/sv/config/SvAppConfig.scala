@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
@@ -94,7 +95,7 @@ object SvOnboardingConfig {
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
-      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
+      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
   ) extends SvOnboardingConfig
@@ -340,6 +341,7 @@ case class SvAppBackendConfig(
     // Can be safely set to true for an SV that has completed onboarding unless you
     // 1. try to reset one of your sequencers or mediators
     // 2. change sequencer URLs that need to get published externally.
+    // Read `shouldSkipSynchronizerInitialization` instead when checking if it should be skipped which takes migrations into account.
     skipSynchronizerInitialization: Boolean = false,
     // The maximum delay before submitting a package vetting
     // change. The actual delay will be chosen randomly (uniformly
@@ -356,6 +358,14 @@ case class SvAppBackendConfig(
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
 ) extends SpliceBackendConfig {
+
+  def shouldSkipSynchronizerInitialization =
+    skipSynchronizerInitialization &&
+      onboarding.fold(true) {
+        case _: SvOnboardingConfig.FoundDso => true
+        case _: SvOnboardingConfig.JoinWithKey => true
+        case _: SvOnboardingConfig.DomainMigration => false
+      }
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -439,6 +449,13 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    pruning: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Run every 10min,
+        maxDuration = PositiveDurationSeconds.ofMinutes(5),
+        retention = PositiveDurationSeconds.ofDays(30),
+      )
+    ),
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

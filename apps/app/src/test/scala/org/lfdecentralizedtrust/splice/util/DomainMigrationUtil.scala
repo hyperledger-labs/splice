@@ -87,7 +87,8 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     ) { params =>
       params.mapping.parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
       params.mapping.parameters.mediatorReactionTimeout should be > NonNegativeFiniteDuration.Zero
-      params.mapping.parameters.confirmationResponseTimeout should be > NonNegativeFiniteDuration.Zero
+      params.mapping.parameters.confirmationResponseTimeout should be > NonNegativeFiniteDuration
+        .tryOfMicros(1)
     }
   }
 

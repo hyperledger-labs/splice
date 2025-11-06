@@ -9,6 +9,7 @@ import {
   PulumiAbortController,
   pulumiOptsWithPrefix,
 } from './pulumi';
+import {UpOptions} from "@pulumi/pulumi/automation/stack";
 
 export function refreshOperation(
   stack: automation.Stack,

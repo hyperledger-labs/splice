@@ -287,25 +287,13 @@
   },
   {
     "custom": true,
-    "id": "",
+    "id": "organization/infra/infra.mock",
     "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "dmFsaWRhdG9yc2VjcmV0"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-validator",
-        "namespace": "validator"
-      },
-      "type": "Opaque"
+      "name": "organization/infra/infra.mock"
     },
-    "name": "splice-app-validator-validator-onboarding-validator",
+    "name": "organization/infra/infra.mock",
     "provider": "",
-    "type": "kubernetes:core/v1:Secret"
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,
@@ -713,13 +701,6 @@
           "id": "3"
         },
         "nodeIdentifier": "validator-runbook",
-        "onboardingSecretFrom": {
-          "secretKeyRef": {
-            "key": "secret",
-            "name": "splice-app-validator-onboarding-validator",
-            "optional": false
-          }
-        },
         "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",

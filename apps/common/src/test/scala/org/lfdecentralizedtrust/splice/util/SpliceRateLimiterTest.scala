@@ -10,6 +10,7 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.stream.testkit.StreamSpec
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
+import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitMetrics, SpliceRateLimiter}
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest.runRateLimited
 
 import scala.concurrent.Future
@@ -24,53 +25,53 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
   "the rate limiter" should {
 
     "accept requests under limit" in {
-      val (rateLimitMetrics, rateLimiter) = newRateLimiter
+      withRateLimiter { case (rateLimitMetrics, rateLimiter) =>
+        runThroughRateLimiter(rateLimiter, 9).reduce(_ && _) shouldBe true
 
-      runThroughRateLimiter(rateLimiter, 9).reduce(_ && _) shouldBe true
-
-      rateLimitMetrics.meter.valueFilteredOnLabels(
-        LabelFilter(
-          "result",
-          "accepted",
-        ),
-        LabelFilter(
-          "limiter",
-          "test",
-        ),
-      ) shouldBe elementsToRun
+        rateLimitMetrics.meter.valueFilteredOnLabels(
+          LabelFilter(
+            "result",
+            "accepted",
+          ),
+          LabelFilter(
+            "limiter",
+            "test",
+          ),
+        ) shouldBe elementsToRun
+      }
     }
 
     "reject requests that are over the limit" in {
-      val (rateLimitMetrics, rateLimiter) = newRateLimiter
+      withRateLimiter { case (rateLimitMetrics, rateLimiter) =>
+        val results = runThroughRateLimiter(rateLimiter, 11)
 
-      val results = runThroughRateLimiter(rateLimiter, 11)
+        val (accepted, rejected) = results.partition(identity)
 
-      val (accepted, rejected) = results.partition(identity)
+        // estimate for running 9 seconds
+        accepted.length should (be > 85 and be < 95)
 
-      // estimate for running 9 seconds
-      accepted.length should (be > 85 and be < 95)
+        rateLimitMetrics.meter.valueFilteredOnLabels(
+          LabelFilter(
+            "result",
+            "accepted",
+          ),
+          LabelFilter(
+            "limiter",
+            "test",
+          ),
+        ) should be(accepted.length)
 
-      rateLimitMetrics.meter.valueFilteredOnLabels(
-        LabelFilter(
-          "result",
-          "accepted",
-        ),
-        LabelFilter(
-          "limiter",
-          "test",
-        ),
-      ) should be(accepted.length)
-
-      rateLimitMetrics.meter.valueFilteredOnLabels(
-        LabelFilter(
-          "result",
-          "rejected",
-        ),
-        LabelFilter(
-          "limiter",
-          "test",
-        ),
-      ) should be(rejected.length)
+        rateLimitMetrics.meter.valueFilteredOnLabels(
+          LabelFilter(
+            "result",
+            "rejected",
+          ),
+          LabelFilter(
+            "limiter",
+            "test",
+          ),
+        ) should be(rejected.length)
+      }
 
     }
 
@@ -86,15 +87,19 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
     } futureValue
   }
 
-  private def newRateLimiter = {
+  private def withRateLimiter[A](f: (SpliceRateLimitMetrics, SpliceRateLimiter) => A): A = {
     val metricsFactory = new InMemoryMetricsFactory()
-    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory)(MetricsContext.Empty)
+    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory, logger)(MetricsContext.Empty)
     val rateLimiter = new SpliceRateLimiter(
       "test",
       SpliceRateLimitConfig(enabled = true, 10),
       rateLimitMetrics,
     )
-    rateLimitMetrics -> rateLimiter
+    try {
+      f(rateLimitMetrics, rateLimiter)
+    } finally {
+      rateLimitMetrics.close()
+    }
   }
 }
 

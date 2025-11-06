@@ -522,7 +522,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -960,7 +959,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -1398,7 +1396,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -1836,7 +1833,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -2274,7 +2270,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -2739,7 +2734,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
@@ -3178,7 +3172,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
@@ -3617,7 +3610,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
@@ -4056,7 +4048,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
@@ -4495,7 +4486,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
@@ -4752,6 +4742,16 @@
     "name": "multi-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,

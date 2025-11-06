@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummytwointerfaces.DummyTwoInterfaces
 import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -53,12 +54,24 @@ abstract class MultiDomainAcsStoreTest[
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
+  object GenericAcsRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =
+      new HasIndexColumns[GenericAcsRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
+  }
 
   case class GenericInterfaceRowData(
       override val interfaceId: Identifier,
       override val interfaceView: DamlRecord[?],
   ) extends AcsInterfaceViewRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+  object GenericInterfaceRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericInterfaceRowData] =
+      new HasIndexColumns[GenericInterfaceRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[

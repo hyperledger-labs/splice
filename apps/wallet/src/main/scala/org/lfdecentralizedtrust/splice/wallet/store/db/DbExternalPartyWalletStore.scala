@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.*
@@ -31,6 +32,7 @@ class DbExternalPartyWalletStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -55,6 +57,7 @@ class DbExternalPartyWalletStore(
       enableissue12777Workaround = false,
       enableImportUpdateBackfill = false,
       BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with ExternalPartyWalletStore
     with AcsTables

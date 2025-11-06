@@ -1473,6 +1473,7 @@ function subcmd_debug_shell() {
     VERSION_NUMBER=$(get-snapshot-version)
   fi
   repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
+  user="$(whoami)"
 
   local SHELL_COMMAND="${*:-/bin/bash}"
 
@@ -1481,12 +1482,12 @@ function subcmd_debug_shell() {
 apiVersion: v1
 kind: Pod
 metadata:
-  name: splice-debug
+  name: splice-debug-${user}
   labels:
     app: splice-debug
 spec:
   containers:
-  - name: splice-debug
+  - name: splice-debug-${user}
     image: $repo/splice-debug:${VERSION_NUMBER}
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
@@ -1499,12 +1500,12 @@ EOF
 
   # shellcheck disable=SC2086
   ( _info "Waiting for debug pod to become ready" && \
-    kubectl wait --for=condition=Ready pod splice-debug --timeout=30s && \
+    kubectl wait --for=condition=Ready pod "splice-debug-$user" --timeout=30s && \
     _info "Opening terminal on debug pod" && \
-    kubectl exec -it splice-debug -- $SHELL_COMMAND ) || true
+    kubectl exec -it "splice-debug-$user" -- $SHELL_COMMAND ) || true
 
   _info "Deleting debug pod"
-  kubectl delete pod splice-debug
+  kubectl delete pod "splice-debug-$user"
 }
 
 ###
@@ -2208,7 +2209,7 @@ function subcmd_psql() {
   _info "Retrieving DB connection info from pod description..."
   local DB_INIT_COMMAND
   DB_INIT_COMMAND=$(
-    kubectl describe pod \
+    kubectl describe deployment \
       --namespace "${NAMESPACE}" \
       --selector "app=${APPLICATION}" \
     | grep -i psql \
@@ -2219,7 +2220,7 @@ function subcmd_psql() {
     _error "Application ${APPLICATION} in namespace ${NAMESPACE} does not have an associated database."
     exit 1
   fi
-  
+
   eval "set -- $DB_INIT_COMMAND"
   while [ $# -gt 0 ]; do
     case "$1" in

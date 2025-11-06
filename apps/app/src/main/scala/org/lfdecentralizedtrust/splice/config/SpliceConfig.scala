@@ -142,6 +142,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         validatorConfig.parameters.circuitBreakers,
+        validatorConfig.parameters.enabledFeatures,
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -180,6 +181,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         svConfig.parameters.circuitBreakers,
+        svConfig.parameters.enabledFeatures,
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -217,6 +219,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         scanConfig.parameters.circuitBreakers,
+        scanConfig.parameters.enabledFeatures,
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -254,6 +257,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         splitwellConfig.parameters.circuitBreakers,
+        splitwellConfig.parameters.enabledFeatures,
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -411,9 +415,12 @@ object SpliceConfig {
       deriveReader[RateLimitersConfig]
     implicit val spliceRateLimiterConfig: ConfigReader[SpliceRateLimitConfig] =
       deriveReader[SpliceRateLimitConfig]
+    implicit val enabledFeaturesConfigReader: ConfigReader[EnabledFeaturesConfig] =
+      deriveReader[EnabledFeaturesConfig]
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigReader[IngestionConfig] = deriveReader[IngestionConfig]
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
     implicit val LedgerApiClientConfigReader: ConfigReader[LedgerApiClientConfig] =
@@ -682,13 +689,20 @@ object SpliceConfig {
       }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigReader: ConfigReader[ParticipantPruningConfig] =
-      deriveReader[ParticipantPruningConfig]
+    implicit val pruningConfigReader: ConfigReader[PruningConfig] =
+      deriveReader[PruningConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
         val participantIdentifier =
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
+          _ <- Either.cond(
+            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+            ),
+          )
           _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
             (),
@@ -817,6 +831,9 @@ object SpliceConfig {
     implicit val spliceRateLimiterConfig: ConfigWriter[SpliceRateLimitConfig] =
       deriveWriter[SpliceRateLimitConfig]
 
+    implicit val enabledFeaturesConfigWriter: ConfigWriter[EnabledFeaturesConfig] =
+      deriveWriter[EnabledFeaturesConfig]
+
     implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
       new FieldCoproductHint[AuthTokenSourceConfig]("type")
     implicit val authTokenSourceNoneWriter: ConfigWriter[AuthTokenSourceConfig.None] =
@@ -837,6 +854,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigWriter[IngestionConfig] = deriveWriter[IngestionConfig]
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
     implicit val LedgerApiClientConfigWriter: ConfigWriter[LedgerApiClientConfig] =
@@ -1013,8 +1031,8 @@ object SpliceConfig {
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigWriter: ConfigWriter[ParticipantPruningConfig] =
-      deriveWriter[ParticipantPruningConfig]
+    implicit val pruningConfigWriter: ConfigWriter[PruningConfig] =
+      deriveWriter[PruningConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

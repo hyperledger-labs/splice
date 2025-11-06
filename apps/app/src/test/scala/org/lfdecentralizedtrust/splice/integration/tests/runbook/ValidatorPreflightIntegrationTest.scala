@@ -11,6 +11,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.console.ValidatorAppClientReference
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
+import org.openqa.selenium.WebElement
 
 import java.net.URI
 import scala.collection.mutable
@@ -188,18 +189,43 @@ abstract class ValidatorPreflightIntegrationTestBase
 
     withFrontEnd("bob-validator") { implicit webDriver =>
       if (isDevNet) {
-        val acceptButton = eventually() {
+        def acceptButton: Option[WebElement] = {
           findAll(className("transfer-offer")).toSeq.headOption match {
             case Some(element) =>
-              element.childWebElement(className("transfer-offer-accept"))
-            case None => fail("failed to find transfer offer")
+              Some(element.childWebElement(className("transfer-offer-accept")))
+            case None => None
           }
         }
 
-        // In preflights we have a higher chance of domain reconnects so we have to account for those
-        actAndCheck(2.minutes)(
-          "Accept transfer offer", {
-            click on acceptButton
+        clue("Wait until transfer offer appears and can be accepted") {
+          eventually() {
+            acceptButton should not be None
+          }
+        }
+
+        // Note: the transfer offer is visible in the UI as soon as the offer is ingested by the validator app.
+        // However, accepting it requires a BFT read from scan apps, which might not have caught up yet.
+        // When the user clicks the accept button, the UI retries calling the accept endpoint a few times,
+        // but after ~13sec it gives up, returning the button to the original, clickable state.
+        //
+        // In preflights we are more likely to run into delays, hitting the above issue.
+        // We don't want to increase the retry count in the UI, as that would be a bad user experience.
+        // Instead, we retry clicking the accept button here in the test, until we see the button disappear.
+        eventually(2.minutes) {
+          silentActAndCheck(
+            "Accept transfer offer", {
+              click on acceptButton.valueOrFail("Accept button not found")
+            },
+          )(
+            "The accept button disappears",
+            _ => {
+              acceptButton shouldBe None
+            },
+          )
+        }
+
+        actAndCheck(
+          "Navigate to the transaction log", {
             eventuallyClickOn(id("navlink-transactions"))
           },
         )(

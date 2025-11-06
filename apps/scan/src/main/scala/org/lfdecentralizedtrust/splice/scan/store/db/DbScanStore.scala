@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.digitalasset.canton.config.{NonNegativeDuration}
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -74,6 +74,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
@@ -97,6 +98,7 @@ class DbScanStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     enableImportUpdateBackfill: Boolean,
+    ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
 )(implicit
@@ -133,6 +135,7 @@ class DbScanStore(
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = enableImportUpdateBackfill,
       BackfillingRequirement.NeedsBackfilling,
+      ingestionConfig,
       Some(storeMetrics.history),
     )
     with ScanStore

@@ -12,7 +12,6 @@ import {
   installSpliceHelmChart,
   loadYamlFromFile,
   LogLevel,
-  lowResourceSequencer,
   sanitizedForPostgres,
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
@@ -108,20 +107,7 @@ abstract class InStackDecentralizedSynchronizerNode
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
             additionalEnvVars: svConfig.sequencer?.additionalEnvVars,
-            resources: lowResourceSequencer
-              ? {
-                  resources: {
-                    limits: {
-                      cpu: '3',
-                      memory: '4Gi',
-                    },
-                    requests: {
-                      cpu: '1',
-                      memory: '2Gi',
-                    },
-                  },
-                }
-              : svConfig.sequencer?.resources,
+            resources: svConfig.sequencer?.resources,
           },
           mediator: {
             ...decentralizedSynchronizerValues.mediator,

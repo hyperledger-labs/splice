@@ -7,8 +7,8 @@ import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
-  SpliceLedgerConnection,
   SequencerAdminConnection,
+  SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.migration.{AcsExporter, DomainMigrationTrigger}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
@@ -19,6 +19,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.config.EnabledFeaturesConfig
 
 import java.nio.file.Path
 import java.time.Instant
@@ -33,8 +34,9 @@ final class DecentralizedSynchronizerMigrationTrigger(
     dsoStore: SvDsoStore,
     ledgerConnection: SpliceLedgerConnection,
     protected val participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection0: SequencerAdminConnection,
+    sequencerAdminConnection: SequencerAdminConnection,
     protected val dumpPath: Path,
+    featureConfig: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -50,16 +52,16 @@ final class DecentralizedSynchronizerMigrationTrigger(
   override protected lazy val context: TriggerContext =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
-  override val sequencerAdminConnection
-      : Some[org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection] = Some(
-    sequencerAdminConnection0
-  )
-
   val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
     participantAdminConnection,
     sequencerAdminConnection,
     dsoStore,
-    new AcsExporter(participantAdminConnection, context.retryProvider, loggerFactory),
+    new AcsExporter(
+      participantAdminConnection,
+      context.retryProvider,
+      featureConfig.enableNewAcsExport,
+      loggerFactory,
+    ),
     context.retryProvider,
     loggerFactory,
   )
