@@ -1,7 +1,5 @@
 CREATE TABLE validator_scan_config
 (
-    id       SERIAL PRIMARY KEY,
-
     sv_name  text NOT NULL,
     scan_url text NOT NULL,
 
