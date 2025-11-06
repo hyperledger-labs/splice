@@ -29,6 +29,7 @@ data TransferConfig unit = TransferConfig with
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked amulet.
+    optDevelopmentFundBeneficiary : Optional Party -- ^ Beneficiary for the Development Fund under CIP-0082.
   deriving (Eq, Show)
 
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
@@ -45,8 +46,6 @@ data AmuletConfig unit = AmuletConfig with
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
-    developmentFundConfig : Optional DevelopmentFundConfig
-      -- ^ Configuration for the development fund mechanics from CIP-0082.
   deriving (Eq, Show)
 
 -- $1/year specified as a daily rate
@@ -63,8 +62,7 @@ validAmuletConfig AmuletConfig
     , tickDuration
     , packageConfig
     , transferPreapprovalFee
-    , featuredAppActivityMarkerAmount
-    , developmentFundConfig }
+    , featuredAppActivityMarkerAmount}
   =
     validTransferConfig transferConfig &&
     validIssuanceCurve issuanceCurve &&
@@ -72,8 +70,7 @@ validAmuletConfig AmuletConfig
     tickDuration > days 0 &&
     validPackageConfig packageConfig &&
     optional True (>= 0.0) transferPreapprovalFee &&
-    optional True (>= 0.0) featuredAppActivityMarkerAmount &&
-    optional True validDevelopmentFundConfig developmentFundConfig
+    optional True (>= 0.0) featuredAppActivityMarkerAmount
 
 validTransferConfig : TransferConfig unit -> Bool
 validTransferConfig TransferConfig
@@ -115,19 +112,6 @@ data PackageConfig = PackageConfig
 validPackageConfig : PackageConfig -> Bool
 validPackageConfig _ = True
 
--- | Configuration for the Development Fund established under CIP-0082.
---
--- See Splice.Scripts.Parameters for concrete values.
-data DevelopmentFundConfig = DevelopmentFundConfig
-  with
-    beneficiary : Optional Party
-    percentage : Decimal
-  deriving (Show, Eq)
-
-validDevelopmentFundConfig : DevelopmentFundConfig -> Bool
-validDevelopmentFundConfig DevelopmentFundConfig { percentage } =
-  percentage >= 0.0 && percentage <= 1.0
-
 instance Patchable (AmuletConfig USD) where
   patch new base current = AmuletConfig with
     transferConfig = patch new.transferConfig base.transferConfig current.transferConfig
@@ -137,7 +121,6 @@ instance Patchable (AmuletConfig USD) where
     packageConfig = patch new.packageConfig base.packageConfig current.packageConfig
     transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
-    developmentFundConfig = patch new.developmentFundConfig base.developmentFundConfig current.developmentFundConfig
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with
@@ -149,6 +132,7 @@ instance Patchable (TransferConfig USD) where
     maxNumInputs = patch new.maxNumInputs base.maxNumInputs current.maxNumInputs
     maxNumOutputs = patch new.maxNumOutputs base.maxNumOutputs current.maxNumOutputs
     maxNumLockHolders = patch new.maxNumLockHolders base.maxNumLockHolders current.maxNumLockHolders
+    optDevelopmentFundBeneficiary = patch new.optDevelopmentFundBeneficiary base.optDevelopmentFundBeneficiary current.optDevelopmentFundBeneficiary
 
 instance Patchable PackageConfig where
   patch new base current = PackageConfig with
@@ -158,8 +142,3 @@ instance Patchable PackageConfig where
     validatorLifecycle = patch new.validatorLifecycle base.validatorLifecycle current.validatorLifecycle
     wallet = patch new.wallet base.wallet current.wallet
     walletPayments = patch new.walletPayments base.walletPayments current.walletPayments
-
-instance Patchable DevelopmentFundConfig where
-  patch new base current = DevelopmentFundConfig with
-    beneficiary = patch new.beneficiary base.beneficiary current.beneficiary
-    percentage = patch new.percentage base.percentage current.percentage
