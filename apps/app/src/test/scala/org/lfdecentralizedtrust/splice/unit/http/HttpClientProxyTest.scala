@@ -8,20 +8,14 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.Http.ServerBinding
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpRequest,
-  StatusCodes,
-  Uri,
-}
+import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.server.Directives.{complete, *}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.lfdecentralizedtrust.splice.auth.RSAVerifier
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.scalatest.wordspec.AsyncWordSpec
 
-import java.net.{InetSocketAddress, URI}
+import java.net.URI
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -91,7 +85,9 @@ class HttpClientProxyTest
     "Ensure jwks URL used in JwkProvider supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
       val user = "user"
       val password = "pass1"
-      withProxy(auth = Some((user, password))) { proxy =>
+      withProxy(
+        auth = Some((user, password))
+      ) { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val proxyHost = "localhost"
           val serverHost = "localhost"
@@ -102,6 +98,9 @@ class HttpClientProxyTest
               .set("http.proxyPort", proxy.port.toString)
               .set("http.proxyUser", user)
               .set("http.proxyPassword", password)
+              // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
+              .set("http.nonProxyHosts", "")
+
           withProperties(props) {
             val jwksUrl = new URI(
               s"http://localhost:${serverPort}/.well-known/jwks.json"
@@ -109,12 +108,6 @@ class HttpClientProxyTest
 
             val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
               .cached(false)
-              .proxied(
-                new java.net.Proxy(
-                  java.net.Proxy.Type.HTTP,
-                  new InetSocketAddress(proxyHost, proxy.port),
-                )
-              )
               .build()
 
             provider.get(Routes.testJwksKeyId).getId shouldBe Routes.testJwksKeyId
@@ -126,7 +119,9 @@ class HttpClientProxyTest
     "Ensure jwks URL used in RSAVerifier supports proxy configuration via http.proxyPort, http.proxyHost, http.proxyUser and http.proxyPassword" in {
       val user = "user"
       val password = "pass1"
-      withProxy(auth = Some((user, password))) { proxy =>
+      withProxy(
+        auth = Some((user, password))
+      ) { proxy =>
         withHttpServer(Routes.respondWithOK) { serverBinding =>
           val proxyHost = "localhost"
           val serverHost = "localhost"
@@ -138,6 +133,8 @@ class HttpClientProxyTest
               .set("http.proxyPort", proxy.port.toString)
               .set("http.proxyUser", user)
               .set("http.proxyPassword", password)
+              // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
+              .set("http.nonProxyHosts", "")
           withProperties(props) {
             val jwksUrl = new URI(
               s"http://localhost:${serverPort}/.well-known/jwks.json"
@@ -280,21 +277,33 @@ trait SystemPropertiesSupport {
     }
   }
 }
-case class SystemProperties(props: Map[String, Option[String]] = Map()) {
+
+case class SystemProperties(previousProps: Map[String, Option[String]] = Map()) {
   def set(key: String, value: String): SystemProperties = {
-    if (props.contains(key)) {
-      throw new IllegalArgumentException(s"System property $key is already set")
+    if (previousProps.contains(key)) {
+      throw new IllegalArgumentException(
+        s"System property $key has already been set through SystemProperties.set"
+      )
     }
+    if (System.getProperty(key) == value) {
+      System.clearProperty(key)
+      throw new IllegalArgumentException(s"System property $key is already set to $value")
+    }
+
     val newProps = SystemProperties(
-      props + (key -> Option(System.getProperty(value)))
+      previousProps + (key -> Option(System.getProperty(key)))
     )
     System.setProperty(key, value)
     newProps
   }
   def reset(): Unit = {
-    props.foreach { case (key, value) =>
-      value.foreach(v => System.setProperty(key, v))
-      if (value.isEmpty) System.clearProperty(key)
+    previousProps.foreach { case (key, value) =>
+      value.foreach { v =>
+        System.setProperty(key, v)
+      }
+      if (value.isEmpty) {
+        System.clearProperty(key)
+      }
     }
   }
 }

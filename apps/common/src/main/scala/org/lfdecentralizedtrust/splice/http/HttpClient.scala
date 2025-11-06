@@ -40,7 +40,7 @@ object HttpClient {
   case class HttpRequestParameters(requestTimeout: NonNegativeDuration)
 
   object ProxySettings {
-    def readFromEnvVars(): Option[ProxySettings] = {
+    def readFromSystemProperties(): Option[ProxySettings] = {
       def host(scheme: String) = s"$scheme.proxyHost"
       def port(scheme: String) = s"$scheme.proxyPort"
       def user(scheme: String) = s"$scheme.proxyUser"
@@ -57,7 +57,7 @@ object HttpClient {
               Some(BasicHttpCredentials(user, password)),
             )
           )
-        case (Some(host), Some(port), None, None) =>
+        case (Some(host), Some(port), _, _) =>
           Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
         case _ => None
       }
@@ -178,7 +178,7 @@ object HttpClient {
 
   private def createClientConnectionSettings()(implicit ac: ActorSystem) = {
 
-    ProxySettings.readFromEnvVars().fold(ClientConnectionSettings(ac)) { proxySettings =>
+    ProxySettings.readFromSystemProperties().fold(ClientConnectionSettings(ac)) { proxySettings =>
       proxySettings.creds.fold(
         ClientConnectionSettings(ac).withTransport(
           ClientTransport.httpsProxy(proxySettings.address)

@@ -4,7 +4,7 @@ import com.digitalasset.canton.concurrent.Threading
 
 import java.io.File
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
+import java.nio.file.{Files, Path, StandardOpenOption}
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.blocking
@@ -117,6 +117,19 @@ trait TinyProxySupport {
     private val process = processBuilder.run(processLogger)
     def stdOutLines: Seq[String] = blocking { synchronized { stdout.toSeq } }
     def stdErrLines: Seq[String] = blocking { synchronized { stderr.toSeq } }
+    def writeOutput(out: Path, err: Path): Unit = blocking {
+      def write(path: Path, lines: Seq[String]) = Files.write(
+        path,
+        lines.mkString("\n").getBytes(StandardCharsets.UTF_8),
+        StandardOpenOption.APPEND,
+      )
+      blocking {
+        synchronized {
+          write(out, stdOutLines)
+          write(err, stdErrLines)
+        }
+      }
+    }
     def hasNoErrors: Boolean = stdErrLines.isEmpty
     def destroy(): Unit = process.destroy()
   }
@@ -136,6 +149,12 @@ trait TinyProxySupport {
 
     /** Whether the proxy has logged handling a CONNECT request to the given host and server port */
     def proxiedConnectRequest(host: String, serverPort: Int): Boolean
+
+    /** Print the stdout of the proxy process to the console */
+    def printStdOut(): Unit = process.stdOutLines.foreach(println)
+
+    /** Print the stderr of the proxy process to the console */
+    def printStdErr(): Unit = process.stdErrLines.foreach(println)
 
     /** Stop the proxy and clean up any resources */
     def stop(): Unit

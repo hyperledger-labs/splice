@@ -8,7 +8,6 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
 import com.digitalasset.canton.config.NonNegativeDuration
-import org.lfdecentralizedtrust.splice.http.HttpClient
 
 import java.net.URL
 import java.util.concurrent.TimeUnit
@@ -54,18 +53,8 @@ trait SignatureVerifier {
 class RSAVerifier(audience: String, jwksUrl: URL, timeoutsConfig: RSAVerifier.TimeoutsConfig)
     extends SignatureVerifier {
   override val expectedAudience: String = audience;
-  private val httpProxySettings = HttpClient.ProxySettings.readFromEnvVars()
 
-  val provider: JwkProvider = httpProxySettings
-    .map { proxySettings =>
-      new JwkProviderBuilder(jwksUrl).proxied(
-        new java.net.Proxy(
-          java.net.Proxy.Type.HTTP,
-          proxySettings.address,
-        )
-      )
-    }
-    .getOrElse(new JwkProviderBuilder(jwksUrl))
+  val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
     .cached(10, 24, TimeUnit.HOURS)
     .rateLimited(10, 1, TimeUnit.MINUTES)
     .timeouts(
