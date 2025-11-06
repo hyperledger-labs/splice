@@ -69,6 +69,24 @@ Create the application namespace within Kubernetes.
     The validator deployment assumes one validator per namespace.
     If you wish to run multiple validators in the same cluster, please create a separate namespace for each.
 
+.. _validator-http-proxy:
+
+HTTP Proxy configuration
+------------------------
+
+If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
+in ``additionalJvmOptions`` in the validator helm chart to use the HTTP proxy for outgoing connections:
+
+.. code-block:: yaml
+
+  additionalJvmOptions: |
+    -Dhttps.proxyHost=your.proxy.host
+    -Dhttps.proxyPort=your_proxy_port
+
+Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
+You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
+Proxy authentication is currently not supported.
+
 .. _validator-postgres-auth:
 
 Configuring PostgreSQL authentication
