@@ -78,7 +78,7 @@ runs:
 
         sudo mkdir -p /cache/nix/${cache_key}
 
-        if [ ! -s cache.tar.gz ]; then
+        if [ -s cache.tar.gz ]; then
           sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
         fi
 
