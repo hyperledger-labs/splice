@@ -82,6 +82,8 @@ the example here. As long as you have docker-compose 2.26.0 or newer you should 
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
+.. _validator-http-proxy-compose:
+
 HTTP Proxy configuration
 ------------------------
 

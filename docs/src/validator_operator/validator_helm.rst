@@ -69,7 +69,7 @@ Create the application namespace within Kubernetes.
     The validator deployment assumes one validator per namespace.
     If you wish to run multiple validators in the same cluster, please create a separate namespace for each.
 
-.. _validator-http-proxy:
+.. _validator-http-proxy-helm:
 
 HTTP Proxy configuration
 ------------------------

@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
-
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.unit.http.{
   SystemPropertiesSupport,
   TinyProxySupport,
 }
+
 import scala.concurrent.duration.*
 
 class ValidatorProxyIntegrationTest
@@ -41,7 +42,6 @@ class ValidatorProxyIntegrationTest
           "validator-proxy-test",
           "JAVA_TOOL_OPTIONS" -> props.toJvmOptionString,
         ) {
-          println("jvm options:" + props.toJvmOptionString)
           aliceValidatorBackend.start()
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
@@ -83,12 +83,9 @@ class ValidatorProxyIntegrationTest
             aliceValidatorBackend.participantClient.config.ledgerApi.port.unwrap,
           ) shouldBe true
 
-          val urlPattern = "^http://.*:(\\d+)$".r
-          val sequencerPort =
-            sv1Backend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl match {
-              case urlPattern(portStr) => portStr.toInt
-              case _ => fail("Could not extract port from sequencer external URL")
-            }
+          val sequencerPort = Uri(
+            sv1Backend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+          ).effectivePort
 
           eventuallySucceeds() {
             proxy.proxiedConnectRequest(
