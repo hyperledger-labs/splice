@@ -7,7 +7,6 @@ import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.auth.OAuthApi.TokenResponse
 import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -74,11 +73,10 @@ case class AuthTokenSourceSelfSigned(
     audience: String,
     user: String,
     secret: String,
-    expiration: NonNegativeFiniteDuration,
 ) extends AuthTokenSource {
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
     Future.successful(
-      Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret, expiration)))
+      Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret)))
     )
 }
 
@@ -117,10 +115,10 @@ object AuthTokenSource {
   )(implicit ec: ExecutionContext, ac: ActorSystem): AuthTokenSource = config match {
     case AuthTokenSourceConfig.None() =>
       new AuthTokenSourceNone()
-    case AuthTokenSourceConfig.Static(token, _, _) =>
+    case AuthTokenSourceConfig.Static(token, _) =>
       new AuthTokenSourceStatic(token)
-    case AuthTokenSourceConfig.SelfSigned(audience, user, secret, _, expiration) =>
-      new AuthTokenSourceSelfSigned(audience, user, secret, expiration)
+    case AuthTokenSourceConfig.SelfSigned(audience, user, secret, _) =>
+      new AuthTokenSourceSelfSigned(audience, user, secret)
     case AuthTokenSourceConfig.ClientCredentials(
           wellKnownConfigUrl,
           clientId,
