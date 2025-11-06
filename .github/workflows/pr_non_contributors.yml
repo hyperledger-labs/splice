@@ -14,7 +14,6 @@ jobs:
     name: "Approve CI for Forks"
     environment: ci-forks
     runs-on: ubuntu-24.04
-    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     steps:
       - name: Wait for environment approval for runs from forks
         run: exit 0
