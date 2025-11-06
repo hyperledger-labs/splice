@@ -120,7 +120,7 @@ validPackageConfig _ = True
 -- See Splice.Scripts.Parameters for concrete values.
 data DevelopmentFundConfig = DevelopmentFundConfig
   with
-    beneficiary : Party
+    beneficiary : Optional Party
     percentage : Decimal
   deriving (Show, Eq)
 
