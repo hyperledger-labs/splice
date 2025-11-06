@@ -1013,7 +1013,7 @@ summarizeAndConsumeInputs csum dso sender inps optFundConfig = do
       case optFundConfig of
         None -> abort "DevelopmentFundCoupon cannot be consumed without AmuletConfig/DevelopmentFundConfig configured"
         Some fundConfig ->
-          require "sender matches the beneficiary defined in AmuletConfig/DevelopmentFundConfig" $
+          require "sender matches development fund beneficiary" $
             sender == fundConfig.beneficiary
       coupon <- fetchAndArchive forDso couponCid
       return TransferInputsSummary with
