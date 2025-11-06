@@ -45,7 +45,8 @@ data AmuletConfig unit = AmuletConfig with
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
-    developmentFundConfig : Optional DevelopmentFundConfig -- ^ Configuration defining the beneficiary and allocation rate for the Development Fund.
+    developmentFundConfig : Optional DevelopmentFundConfig 
+      -- ^ Configuration for the development fund mechanics from CIP-0082.
   deriving (Eq, Show)
 
 -- $1/year specified as a daily rate
