@@ -270,7 +270,17 @@ trait SystemPropertiesSupport {
   }
 }
 
-case class SystemProperties(previousProps: Map[String, Option[String]] = Map()) {
+case class SystemProperties(
+    previousProps: Map[String, Option[String]] = Map(),
+    currentProps: Map[String, Option[String]] = Map(),
+) {
+  def toJvmOptionString: String = {
+    currentProps
+      .map { case (key, _) =>
+        s"-D${key}=${System.getProperty(key)}"
+      }
+      .mkString(" ")
+  }
   def set(key: String, value: String): SystemProperties = {
     if (previousProps.contains(key)) {
       throw new IllegalArgumentException(
@@ -286,7 +296,7 @@ case class SystemProperties(previousProps: Map[String, Option[String]] = Map()) 
       previousProps + (key -> Option(System.getProperty(key)))
     )
     System.setProperty(key, value)
-    newProps
+    newProps.copy(currentProps = currentProps + (key -> Some(value)))
   }
   def reset(): Unit = {
     previousProps.foreach { case (key, value) =>

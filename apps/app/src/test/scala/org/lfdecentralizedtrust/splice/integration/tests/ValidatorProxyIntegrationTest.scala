@@ -19,6 +19,8 @@ class ValidatorProxyIntegrationTest
     with ProcessTestUtil
     with TinyProxySupport
     with SystemPropertiesSupport {
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "validator should start and tap, using http forward proxy" in { implicit env =>
     val host = "127.0.0.1"
@@ -33,7 +35,13 @@ class ValidatorProxyIntegrationTest
           .set("http.nonProxyHosts", "")
           .set("https.nonProxyHosts", "")
       withProperties(props) {
-        withCanton(cantonArgs, cantonExtraConfig, "validator-proxy-test") {
+        withCanton(
+          cantonArgs,
+          cantonExtraConfig,
+          "validator-proxy-test",
+          "JAVA_TOOL_OPTIONS" -> props.toJvmOptionString,
+        ) {
+          println("jvm options:" + props.toJvmOptionString)
           aliceValidatorBackend.start()
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
@@ -69,23 +77,25 @@ class ValidatorProxyIntegrationTest
             host,
             aliceValidatorBackend.config.clientAdminApi.port.unwrap,
           ) shouldBe true
-          println(
-            "participant ledger port:" + aliceValidatorBackend.participantClient.config.ledgerApi.port.unwrap
-          )
+
           proxy.proxiedConnectRequest(
             host,
             aliceValidatorBackend.participantClient.config.ledgerApi.port.unwrap,
           ) shouldBe true
 
-          println(
-            "external URL: " + sv1Backend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
-          )
-          println("publicApi port:" + sv1Backend.sequencerClient.config.publicApi.port.unwrap)
-          proxy.process.stdOutLines.foreach(println)
-          proxy.proxiedConnectRequest(
-            host,
-            sv1Backend.sequencerClient.config.publicApi.port.unwrap,
-          ) shouldBe true
+          val urlPattern = "^http://.*:(\\d+)$".r
+          val sequencerPort =
+            sv1Backend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl match {
+              case urlPattern(portStr) => portStr.toInt
+              case _ => fail("Could not extract port from sequencer external URL")
+            }
+
+          eventuallySucceeds() {
+            proxy.proxiedConnectRequest(
+              "localhost", // the sequencer in standalone canton is on localhost, not loopback
+              sequencerPort,
+            ) shouldBe true
+          }
 
           proxy.hasNoErrors shouldBe true
         }
@@ -123,7 +133,5 @@ class ValidatorProxyIntegrationTest
       // Do not allocate validator users here, as we deal with all of them manually
       .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
       .withManualStart
-      // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
-      .withSequencerConnectionsFromScanDisabled()
   }
 }

@@ -69,7 +69,6 @@ trait TinyProxySupport {
     }
     // Represents a running tinyproxy process, with methods to check its status and stop it
     case class TinyProxy(process: ProxyProcess, port: Int, configFile: File) extends HttpProxy {
-
       def hasNoErrors: Boolean = process.hasNoErrors
       // Verifies that tinyproxy logged that it handled a CONNECT request to proxy to the given server port on localhost
       def proxiedConnectRequest(host: String, serverPort: Int): Boolean = {
