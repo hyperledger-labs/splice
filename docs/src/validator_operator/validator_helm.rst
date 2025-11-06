@@ -75,7 +75,7 @@ HTTP Proxy configuration
 ------------------------
 
 If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
-in ``additionalJvmOptions`` in the validator helm chart to use the HTTP proxy for outgoing connections:
+in ``additionalJvmOptions`` in the validator and participant helm charts to use the HTTP proxy for outgoing connections:
 
 .. code-block:: yaml
 

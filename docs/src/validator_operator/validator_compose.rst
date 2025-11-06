@@ -86,12 +86,22 @@ HTTP Proxy configuration
 ------------------------
 
 If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
-in `JAVA_TOOL_OPTIONS` in ``splice-node/docker-compose/validator/compose.yaml`` to use the HTTP proxy for outgoing connections:
+in `JAVA_TOOL_OPTIONS` in ``splice-node/docker-compose/validator/compose.yaml`` to use the HTTP proxy for outgoing connections.
+You need to do this for both the validator and the participant services:
 
 .. code-block:: yaml
 
   services:
     validator:
+      environment:
+        JAVA_TOOL_OPTIONS: >-
+          -Dhttps.proxyHost=your.proxy.host
+          -Dhttps.proxyPort=your_proxy_port
+
+.. code-block:: yaml
+
+  services:
+    participant:
       environment:
         JAVA_TOOL_OPTIONS: >-
           -Dhttps.proxyHost=your.proxy.host
