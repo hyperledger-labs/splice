@@ -383,7 +383,7 @@ template SvRewardCoupon with
       do return SvRewardCoupon_ArchiveAsBeneficiaryResult
 
 
--- | A coupon for the Foundation’s share of mint emissions under the Development Fund.
+-- | A coupon recording an emission for the Development Fund from CIP-0082.
 template DevelopmentFundCoupon
   with
     dso : Party
