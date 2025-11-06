@@ -1329,7 +1329,7 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this sv
-        result <- exercise amuletRulesCid AmuletRules_MergeDevelopmentFundCoupons with ..
+        result <- exercise amuletRulesCid choiceArg
         return DsoRules_MergeDevelopmentFundCouponsResult with
           developmentFundCoupon = result.developmentFundCouponCid
 
