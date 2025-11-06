@@ -99,6 +99,7 @@ class HttpClientProxyTest
               .set("http.proxyUser", user)
               .set("http.proxyPassword", password)
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
+              // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
 
           withProperties(props) {
@@ -134,6 +135,7 @@ class HttpClientProxyTest
               .set("http.proxyUser", user)
               .set("http.proxyPassword", password)
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
+              // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
           withProperties(props) {
             val jwksUrl = new URI(
