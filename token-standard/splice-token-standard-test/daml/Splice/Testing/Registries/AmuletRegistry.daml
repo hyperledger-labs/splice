@@ -110,6 +110,7 @@ noTransferFeeConfig = TransferConfig with
   maxNumInputs = 100
   maxNumOutputs = 100
   maxNumLockHolders = 10
+  optDevelopmentFundBeneficiary = None
 
 -- | Initialize the mock amulet registry.
 initialize : AmuletRegistryConfig -> Script AmuletRegistry

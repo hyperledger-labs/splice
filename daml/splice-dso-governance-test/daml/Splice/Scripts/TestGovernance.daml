@@ -746,6 +746,7 @@ testAmuletRulesConfigChange = do
         maxNumInputs = 101
         maxNumOutputs = 101
         maxNumLockHolders = 11
+        optDevelopmentFundBeneficiary = None
 
   let defaultBaseRateTrafficLimits2 = BaseRateTrafficLimits with
         burstAmount = 10 * 20 * 1000 + 1
