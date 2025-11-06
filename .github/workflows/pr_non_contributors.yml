@@ -21,7 +21,6 @@ jobs:
 
   ci:
     uses: ./.github/workflows/build.yml
-    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     secrets: inherit
     permissions:
       id-token: write # Required for GCP Workload Identity for failure notifications
