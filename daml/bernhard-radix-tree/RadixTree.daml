@@ -1,0 +1,212 @@
+module Com.Daml.App.Template.RadixTree where
+
+import Com.Daml.App.Template.Model
+import DA.Set qualified as S
+import DA.List (chunksOf, head)
+import DA.Map qualified as M
+import DA.Assert
+import DA.Text as T (sha256, implode, explode, stripPrefix, isPrefixOf) 
+import DA.Foldable (forA_)
+import DA.Text (dropPrefix)
+
+-- Key Type
+type K = Text -- Needs to have a show instance.
+type Path = Text -- Prefix of a hash of a key. 64 chars corresponds to leaf nodes.
+type Children = S.Set Path -- Set of characters in sha256_chars
+-- Value Types
+type V = ContractId NameRecord
+type Values = S.Set V
+-- Entry type
+type Entry = (K, Values)
+-- KVMap Type
+type KVMap = M.Map K Values
+
+data NodePayload
+  = NPPath Children
+  | NPLeaf Entry
+    deriving (Eq, Show)
+
+data Operation
+  = OAdd
+  | OSet
+  | ORemove
+    deriving (Eq, Show, Enum)
+
+sha256_chars : [Text]
+sha256_chars = explode "0123456789abcdef"
+
+pathChunks : Int -> [Text]
+pathChunks chunkSize = map implode $ paths_of_length chunkSize sha256_chars
+
+textChunksOf : Int -> Text -> [Text]
+textChunksOf n t = map implode (chunksOf n (explode t))
+
+paths_of_length : Int -> [a] -> [[a]]
+paths_of_length n elems
+  | n == 0 = [[]]
+  | otherwise =
+    let
+      tails = paths_of_length (n-1) elems
+      combos = map (\e -> map (e::) tails) elems
+    in concat combos
+
+largestCommonPrefix : Path -> Path -> Path
+largestCommonPrefix a b =
+  let
+    paired = zip (explode a) (explode b)
+    init = takeWhile (uncurry (==)) paired
+  in implode $ map fst init
+
+children : NodePayload -> Children
+children np = case np of
+  NPPath cs -> cs
+  _ -> error "Cannot get children of Leaf node."
+
+createRecursive : Party -> Text -> Path -> Int -> [Text] -> Update()
+createRecursive provider idx_name path depth chunks = do
+  let children = if depth == 0 then S.empty else S.fromList chunks
+  create Node with
+    np = NPPath children
+    ..
+  if depth > 0 
+    then forA_ chunks (\ch -> createRecursive provider idx_name (path <> ch) (depth-1) chunks)
+  else return ()
+
+template Index
+  with
+    idx_name : Text
+    provider : Party
+    unique : Bool
+    chunkSize : Int -- Needs to divide 64
+    initialized : Bool
+  where
+    signatory provider
+
+    choice Initialize : ContractId Index
+      with depth : Int
+      controller provider
+      do
+        assertMsg "Already Initialized" (not initialized)
+        let chunks = pathChunks chunkSize
+        createRecursive provider idx_name "" depth chunks
+        create this with initialized = True
+
+    nonconsuming choice Insert : ()
+      with
+        entry : Entry
+        op : Operation
+        nodeCid : ContractId Node
+      controller provider
+      do
+        node <- fetch nodeCid
+        archive nodeCid
+
+        node.idx_name === idx_name
+        node.provider === provider
+
+        case node.np of
+          NPPath children -> do
+            assertMsg "Uniqueness violation" (not unique || S.size entry._2 <= 1)
+            assertMsg "Cannot remove from a path node." (op /= ORemove)
+            
+            let hash = sha256 entry._1
+            case stripPrefix node.path hash of
+              None -> error "Not a valid prefix"
+              Some suffix -> do
+                let 
+                  suffix_chunks = textChunksOf chunkSize suffix
+                  child_prefix = head suffix_chunks
+                  oChild = find (\c -> child_prefix `isPrefixOf` c) (S.toList children)
+                case oChild of
+                  None -> do -- simple attachment
+                    create node with 
+                      np = NPPath (S.insert suffix children)
+                    create node with
+                      np = NPLeaf entry
+                      path = hash
+                    return ()
+                  Some child -> do
+                    assertMsg ("Child already exists.") (child /= suffix)
+                    let 
+                      newchild = largestCommonPrefix child suffix
+                      childsuffix = dropPrefix newchild child
+                      suffixsuffix =  dropPrefix newchild suffix
+                    create node with 
+                      np = NPPath (S.delete child $ S.insert newchild children)
+                    create node with 
+                      np = NPPath (S.insert childsuffix $ S.insert suffixsuffix S.empty)
+                      path = node.path <> newchild
+                    create node with
+                      np = NPLeaf entry
+                      path = hash
+                    return ()
+
+          NPLeaf (k, vs) -> do
+
+            assertMsg "Wrong hash" (node.path == sha256 entry._1)
+            assertMsg "Hash collision" (k == entry._1)
+            let
+              newVal = case op of
+                OAdd -> vs `S.union` entry._2
+                OSet -> entry._2
+                ORemove -> vs `S.difference` entry._2
+            assertMsg "Uniqueness violation" (not unique || S.size newVal <= 1)
+
+            create node with np = NPLeaf (k, newVal)
+            return ()
+
+    nonconsuming choice Remove : ()
+      with
+        nodeCid : ContractId Node
+        ancestorCids : [ContractId Node]
+        force : Bool
+      controller provider
+      do
+        -- Get and validate the node
+        node <- fetch nodeCid
+        archive nodeCid
+        node.idx_name === idx_name
+        node.provider === provider
+
+        let parentCid::ancestorCids' = ancestorCids
+        -- Get and validate the parent
+        parent <- fetch parentCid
+        archive parentCid
+        parent.idx_name === idx_name
+        parent.provider === provider
+
+        -- Check the relationship
+        let
+          nodePath = node.path
+          parentPath = parent.path
+          parentChildren = children parent.np
+          suffix = dropPrefix parentPath nodePath
+        assertMsg "Parent is not an ancestor." (parentPath `isPrefixOf` nodePath)
+        assertMsg "Parent is not the direct parent." (suffix `S.member` parentChildren)
+
+        -- Check that the node is empty
+        case node.np of
+          NPLeaf (_, vs) -> assertMsg "Leaf not empty. Use force if you still want to remove it." (force || vs == S.empty)
+          NPPath children -> assertMsg "Cannot remove intermediate node with children." (children == S.empty)
+
+        -- Recreate the parent with the node removed.
+        newParentCid <- create parent with 
+          np = NPPath (S.delete suffix parentChildren)
+
+        -- Recurse as needed
+        case ancestorCids' of
+          [] -> return ()
+          _ -> exercise self Remove 
+            with
+              nodeCid = newParentCid
+              ancestorCids = ancestorCids'
+              ..
+
+template Node
+  with
+    idx_name : Text
+    provider : Party
+    np : NodePayload
+    path : Path
+  where
+    signatory provider
