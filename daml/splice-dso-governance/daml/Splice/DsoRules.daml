@@ -1036,8 +1036,10 @@ template DsoRules with
          let mergedWeight = if null weights then None else Some (minimum weights)
 
          -- Calculate merged kind: use OperatorLicense if any license has None or Some OperatorLicense
-         let hasOperatorLicense license =
-               isNone license.kind || license.kind == Some OperatorLicense
+         let hasOperatorLicense license = case license
+               None -> True
+               Some OperatorLicense -> True
+               Some _ -> False
          let mergedKind = if any hasOperatorLicense validatorLicenses
                           then Some OperatorLicense
                           else Some NonOperatorLicense
