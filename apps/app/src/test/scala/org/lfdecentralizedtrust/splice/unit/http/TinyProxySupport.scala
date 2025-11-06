@@ -151,9 +151,11 @@ trait TinyProxySupport {
     def proxiedConnectRequest(host: String, serverPort: Int): Boolean
 
     /** Print the stdout of the proxy process to the console */
+    @SuppressWarnings(Array("org.wartremover.warts.println"))
     def printStdOut(): Unit = process.stdOutLines.foreach(println)
 
     /** Print the stderr of the proxy process to the console */
+    @SuppressWarnings(Array("org.wartremover.warts.println"))
     def printStdErr(): Unit = process.stdErrLines.foreach(println)
 
     /** Stop the proxy and clean up any resources */
