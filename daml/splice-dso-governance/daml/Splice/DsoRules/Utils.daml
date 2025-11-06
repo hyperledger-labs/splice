@@ -4,6 +4,7 @@
 module Splice.DsoRules.Utils where
 
 import DA.List (dedup, maximumOn)
+import qualified DA.List.Total
 import DA.Optional (catOptionals)
 
 import Splice.ValidatorLicense
@@ -37,8 +38,8 @@ mergeValidatorLicenses licenses = do
           Some fs -> fs.lastReceivedFor) licenses
 
   -- Calculate merged weight: minimum of all non-None weights, or None if all are None
-  let weights = catOptionals $ map (.weight) licenses
-  let mergedWeight = if null weights then None else Some (minimum weights)
+  let nonNoneWeights = catOptionals $ map (.weight) licenses
+  let mergedWeight = DA.List.Total.minimumOn identity nonNoneWeights
 
   -- Calculate merged kind: OperatorLicense if any license has None or Some OperatorLicense
   let hasOperatorLicense kind = case kind of
