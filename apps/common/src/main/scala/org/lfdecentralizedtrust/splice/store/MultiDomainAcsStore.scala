@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 package org.lfdecentralizedtrust.splice.store
-this should break static tests or something idk
+this should break static tests or something
 
 import cats.data.NonEmptyList
 import org.apache.pekko.NotUsed
