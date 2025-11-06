@@ -1324,8 +1324,7 @@ template DsoRules with
     -- Batch merge of of development fund coupons
     nonconsuming choice DsoRules_MergeDevelopmentFundCoupons : DsoRules_MergeDevelopmentFundCouponsResult
       with
-        amuletRulesCid : ContractId AmuletRules
-        developmentFundCouponCids : [ContractId DevelopmentFundCoupon]
+        choiceArg : AmuletRules_MergeDevelopmentFundCoupons
         sv : Optional Party
       controller sv
       do
