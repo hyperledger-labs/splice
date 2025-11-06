@@ -100,7 +100,6 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary optDevelop
       amuletsToIssueToDevelopmentFund
   where
     developmentFundPercentage = fromOptional 0.0 optDevelopmentFundPercentage
-    remainingEmissionPercentage = 1.0 - developmentFundPercentage
 
     amuletsToIssueToSvs =
       amuletsToIssueInRound * remainingEmissionPercentage
