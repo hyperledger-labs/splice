@@ -45,7 +45,7 @@ data AmuletConfig unit = AmuletConfig with
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
-    developmentFundConfig : Optional DevelopmentFundConfig 
+    developmentFundConfig : Optional DevelopmentFundConfig
       -- ^ Configuration for the development fund mechanics from CIP-0082.
   deriving (Eq, Show)
 
@@ -115,8 +115,7 @@ data PackageConfig = PackageConfig
 validPackageConfig : PackageConfig -> Bool
 validPackageConfig _ = True
 
--- | The development fund config defines the beneficiary party and
--- the percentage of each mint emission allocated to the Foundation-governed fund.
+-- | Configuration for the Development Fund established under CIP-0082.
 --
 -- See Splice.Scripts.Parameters for concrete values.
 data DevelopmentFundConfig = DevelopmentFundConfig
