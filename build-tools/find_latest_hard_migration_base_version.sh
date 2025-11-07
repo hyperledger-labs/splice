@@ -8,5 +8,7 @@
 
 set -euo pipefail
 
-latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
-echo "release-line-${latest_release}"
+# TODO(DACH-NY/canton-network-internal#2179) revert to normal once MainNet is on 0.5.x
+# latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
+# echo "release-line-${latest_release}"
+echo "release-line-0.4.23"
