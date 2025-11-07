@@ -50,7 +50,7 @@ class DockerComposeFullNetworkFrontendIntegrationTest
           )
           actAndCheck(
             "onboard alice",
-            click on "onboard-button",
+            eventuallyClickOn(id("onboard-button")),
           )(
             "Alice is logged in",
             _ => seleniumText(find(id("logged-in-user"))) should not be "",

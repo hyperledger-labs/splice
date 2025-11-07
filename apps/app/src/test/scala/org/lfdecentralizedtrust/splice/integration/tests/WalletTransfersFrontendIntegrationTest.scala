@@ -297,7 +297,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
 
         actAndCheck(
           "Alice accepts the offer", {
-            click on className("transfer-offer-accept")
+            eventuallyClickOn(className("transfer-offer-accept"))
           },
         )(
           "Alice sees no more pending transfer offers",
@@ -357,7 +357,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
 
         actAndCheck(
           "Alice rejects the offer", {
-            click on className("transfer-offer-reject")
+            eventuallyClickOn(className("transfer-offer-reject"))
           },
         )(
           "Alice sees no more pending transfer offers",
