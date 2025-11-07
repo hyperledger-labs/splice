@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningTr
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
-import org.scalatest.concurrent.PatienceConfiguration
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
@@ -117,19 +116,12 @@ class PruningIntegrationTest
         )
       }
 
-      eventually() {
+      eventually(timeUntilSuccess = 70.seconds) {
         sv1Backend.svAutomation
           .connection(Low)
           // returns 0 when participant pruning is disabled
           .latestPrunedOffset()
-          .futureValue(timeout =
-            PatienceConfiguration.Timeout(
-              FiniteDuration(
-                70,
-                "seconds",
-              )
-            )
-          ) should be > 0L
+          .futureValue should be > 0L
       }
     }
   }
