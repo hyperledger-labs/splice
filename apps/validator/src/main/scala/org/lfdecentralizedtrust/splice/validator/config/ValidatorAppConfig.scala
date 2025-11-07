@@ -187,10 +187,10 @@ case class ValidatorAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
-    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // If observation latency is set to 10s, time proofs will be created 10s in the future so if a node receives an event within those 10s
     // it will never send a time proof.
     timeTrackerObservationLatency: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(5),
+      NonNegativeFiniteDuration.ofSeconds(10),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
     participantPruningSchedule: Option[PruningConfig] = None,
