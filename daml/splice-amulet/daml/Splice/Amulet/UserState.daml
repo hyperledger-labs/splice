@@ -1,0 +1,47 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | State of a user of Amulet.
+module Splice.Amulet.UserState where
+
+import Splice.Types (Round(..))
+
+template AmuletUserState
+  with
+    dso : Party
+    user : Party
+    totalMintedRewards : Decimal
+    totalAvailableRewards : Decimal
+
+
+    -- QUESTION: how important is it to distinguish between the different kinds of rewards in here?
+    -- I'd wager it is important for all parties that have multiple sources of rewards.
+    --
+    -- I'd be inclined to use a `TextMap Decimal` for the different sources with "v", "sv", "df", "a" as the identifiers
+    lastIncreasedIn : Round
+  where
+    signatory dso
+    observer state.user
+
+
+-- | The source of truth for the DSO about a user's available rewards.
+-- Separated from `AmuletUserState` so that the DSO can update it independently of the user's vetting state,
+-- and the user's choice to consumer the user state.
+template DsoUserState
+  with
+    dso : Party
+    user : Party
+    totalAvailableRewards : Decimal
+    -- Note: using a motonically increasing number here and in the user state to avoid
+    -- having to update the `DsoUserState` when propagating its info to the user state,
+    -- which would introduce contention on the rewards distribution path.
+    lastIncreasedIn : Round
+  where
+    signatory dso
+
+    -- user is intentionally not an observer here so the DSO party can update this record
+    -- independently of the vetting state of the user
+
+
+instance HasCheckedFetch AmuletUserState ForOwner where
+  contractGroupId AmuletUserState{..} = ForOwner with dso; owner = user
