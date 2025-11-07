@@ -198,7 +198,7 @@ spec:
   targetLabels:
       - server
 {{- end }}
-{{- define "splice-util-lib.log-level" -}}
+{{- define "splice-util-lib.log-level" }}
 - name: LOG_LEVEL_CANTON
   value: {{ .logLevel | default "INFO" }}
 - name: LOG_LEVEL_STDOUT

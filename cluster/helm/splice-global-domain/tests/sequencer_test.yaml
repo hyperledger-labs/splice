@@ -90,7 +90,7 @@ tests:
   - it: "sets log-level environment variables correctly when only logLevel is provided"
     set:
       # Set log level for testing
-      logLevel: INFO
+      logLevel: WARN
     documentSelector:
       path: kind
       value: Deployment
@@ -99,12 +99,12 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: LOG_LEVEL_CANTON
-            value: INFO
+            value: WARN
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: LOG_LEVEL_STDOUT
-            value: INFO
+            value: DEBUG
   - it: "sets log-level environment variables correctly when both logLevel and logLevelStdout are provided"
     set:
       # Set log levels for testing
