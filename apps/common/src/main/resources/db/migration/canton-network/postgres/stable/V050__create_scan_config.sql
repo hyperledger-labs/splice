@@ -1,9 +1,6 @@
-CREATE TABLE validator_scan_config
+CREATE TABLE validator_internal_config
 (
-    sv_name       text NOT NULL,
-    scan_url      text NOT NULL,
-    restart_count int  NOT NULL,
-
-
-    CONSTRAINT uc_scan_config UNIQUE (scan_url, sv_name, restart_count)
+    config_key   text primary key not null,
+    config_value jsonb            not null,
+    CONSTRAINT uc_scan_config UNIQUE (config_key)
 );

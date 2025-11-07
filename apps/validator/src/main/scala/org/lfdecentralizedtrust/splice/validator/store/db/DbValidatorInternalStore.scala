@@ -3,22 +3,39 @@
 
 package org.lfdecentralizedtrust.splice.validator.store.db
 
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.resource.DbStorage.DbAction
-import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
-import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorInternalTables.{
-  ScanConfigRow,
-  tableName,
-}
-import slick.jdbc.PositionedParameters
-
-import scala.concurrent.{ExecutionContext, Future}
-import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import slick.jdbc.GetResult
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
+import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorInternalTables.*
+import slick.jdbc.{GetResult, JdbcProfile}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import scala.concurrent.{ExecutionContext, Future}
 
-import com.digitalasset.canton.resource.DbStorage.Profile.Postgres
+object DbValidatorInternalStore {
+
+  implicit val getResultValidatorInternalConfig: GetResult[ValidatorInternalConfig] = GetResult {
+    r =>
+      val _ = r.nextString() // cannot ignore this because we have to update the cursor
+      val jsonString = r.nextString()
+
+      io.circe.parser.parse(jsonString) match {
+        case Left(err) => throw new Exception(s"Failed to parse jsonb string '$jsonString': $err")
+        case Right(json) =>
+          ValidatorInternalConfig
+            .fromJson(json)
+            .fold(
+              err =>
+                throw new Exception(
+                  s"Failed to decode JSON to ValidatorInternalConfig: ${err.getMessage}"
+                ),
+              identity,
+            )
+      }
+  }
+}
 
 class DbValidatorInternalStore(
     storage: DbStorage,
@@ -27,73 +44,40 @@ class DbValidatorInternalStore(
 )(implicit val ec: ExecutionContext)
     extends ValidatorInternalStore {
 
-  import storage.api.*
+  import DbValidatorInternalStore.*
 
-  private val setScanConfigRow: PositionedParameters => ScanConfigRow => Unit = pp =>
-    row => {
-      pp.setString(row.svName)
-      pp.setString(row.scanUrl)
-      pp.setInt(row.restartCount)
-    }
+  val tableName = "validator_internal_config"
 
-  private implicit val getScanConfigRow: GetResult[ScanConfigRow] = GetResult { r =>
-    ScanConfigRow(
-      svName = r.nextString(),
-      scanUrl = r.nextString(),
-      restartCount = r.nextInt(),
-    )
+  val profile: JdbcProfile = storage.profile.jdbc
+
+  override def setConfig(key: String, values: Map[String, String])(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    val configData: ValidatorInternalConfig =
+      ValidatorInternalTables.ValidatorInternalConfig(key, values)
+
+    val jsonString: String = configData.toJson.noSpaces
+
+    val action = sql"""INSERT INTO #$tableName (config_key, config_value)
+        VALUES ($key, $jsonString::jsonb)
+        ON CONFLICT (config_key) DO UPDATE
+        SET config_value = excluded.config_value""".asUpdate
+
+    val f = storage.update(action, "set-validator-config")
+    FutureUnlessShutdownUtil.futureUnlessShutdownToFuture(f).map(_ => ())
   }
 
-  private def toFuture[A](
-      fus: com.digitalasset.canton.lifecycle.FutureUnlessShutdown[A]
-  ): Future[A] =
-    fus.unwrap.map {
-      case UnlessShutdown.Outcome(value) => value
-      case UnlessShutdown.AbortedDueToShutdown =>
-        throw new RuntimeException("Operation aborted due to shutdown.")
-    }
+  override def getConfig(key: String)(implicit tc: TraceContext): Future[Map[String, String]] = {
 
-  override def setScanConfigs(rows: Seq[ScanConfigRow])(implicit tc: TraceContext): Future[Unit] = {
-
-    val insertSql =
-      s"""INSERT INTO $tableName(sv_name, scan_url, restart_count)
-         |VALUES (?, ?, ?)
-         |ON CONFLICT (scan_url, sv_name, restart_count) DO NOTHING
-         |""".stripMargin
-
-    val bulkAction: DbAction.All[Unit] = DbStorage.bulkOperation_(
-      insertSql,
-      rows,
-      storage.profile,
-    )(setScanConfigRow)
-
-    val transactionalAction: DBIOAction[Unit, slick.dbio.NoStream, slick.dbio.Effect.All] =
-      bulkAction.transactionally
-
-    val futureUnlessShutdown: FutureUnlessShutdown[Unit] = storage.profile match {
-      case _: Postgres =>
-        storage.queryAndUpdate(transactionalAction, s"bulk-upsert-$tableName-configs")
-      case other =>
-        throw new UnsupportedOperationException(
-          s"DbValidatorInternalStore is only supported for Postgres, but found $other"
-        )
-    }
-    toFuture(futureUnlessShutdown)
-  }
-
-  override def getScanConfigs()(implicit tc: TraceContext): Future[Seq[ScanConfigRow]] = {
-    val action: DbAction.ReadTransactional[Vector[ScanConfigRow]] =
-      sql"""
-        SELECT sv_name, scan_url, restart_count
+    val queryAction = sql"""SELECT config_key, config_value
         FROM #$tableName
-        WHERE restart_count = (
-          SELECT MAX(restart_count) FROM #$tableName
-        )
-        ORDER BY sv_name ASC
-      """.as[ScanConfigRow]
+        WHERE config_key = $key
+      """.as[ValidatorInternalConfig].headOption
 
-    toFuture(
-      storage.query(action, s"get-all-active-$tableName-configs")
-    ).map(_.toSeq)
+    val validatorConfigF = storage.querySingle(queryAction, "get-validator-config")
+
+    FutureUnlessShutdownUtil.futureUnlessShutdownToFuture(validatorConfigF.value).map {
+      _.map(_.values).getOrElse(Map.empty[String, String])
+    }
   }
 }

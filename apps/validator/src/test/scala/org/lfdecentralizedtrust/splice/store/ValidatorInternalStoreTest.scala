@@ -4,19 +4,18 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorInternalTables.ScanConfigRow
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
-import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Future
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 
 abstract class ValidatorInternalStoreTest
     extends AsyncWordSpec
@@ -25,78 +24,59 @@ abstract class ValidatorInternalStoreTest
 
   protected def mkStore(): Future[ValidatorInternalStore]
 
-  "ValidatorInternalStore" should {
+  "DbValidatorInternalStore" should {
+    implicit val tc: TraceContext = TraceContext.empty
 
-    "getScanConfigs" should {
-      "return empty sequence if no records exist" in {
-        for {
-          store <- mkStore()
-          result <- store.getScanConfigs()(TraceContext.empty)
-        } yield {
-          result shouldBe Seq.empty
-        }
+    val configKey = "test-config-key"
+    val initialValues = Map("sv1" -> "url1", "sv2" -> "url2")
+    val updatedValues = Map("sv1" -> "url3", "sv2" -> "url4")
+    val otherKey = "other-config"
+    val otherValues = Map("user" -> "admin")
+
+    "set and get a configuration successfully" in {
+      for {
+        store <- mkStore()
+        _ <- store.setConfig(configKey, initialValues)
+        retrievedValues <- store.getConfig(configKey)
+      } yield {
+        retrievedValues shouldEqual initialValues
       }
     }
 
-    "setScanConfigs and getScanConfigs" should {
-
-      "correctly upsert data and retrieve only rows with the highest restart_count" in {
-        val tc = TraceContext.empty
-
-        val configsR1 = Seq(
-          ScanConfigRow("SV1", "url-a", 1),
-          ScanConfigRow("SV2", "url-b", 1),
-        )
-
-        val configsR2 = Seq(
-          ScanConfigRow("SV1", "url-a", 2),
-          ScanConfigRow("SV2", "url-b", 2),
-          ScanConfigRow("SV3", "url-c", 2),
-        )
-
-        val configsR3 = Seq(
-          ScanConfigRow("SV1", "url-d", 3),
-          ScanConfigRow("SV2", "url-a", 3),
-        )
-
-        for {
-          store <- mkStore()
-
-          _ <- store.setScanConfigs(configsR1)(tc)
-          result1 <- store.getScanConfigs()(tc)
-
-          _ <- store.setScanConfigs(configsR2)(tc)
-          result2 <- store.getScanConfigs()(tc)
-
-          _ <- store.setScanConfigs(configsR3)(tc)
-          result3 <- store.getScanConfigs()(tc)
-
-        } yield {
-
-          result1 should contain theSameElementsAs configsR1
-          result2 should contain theSameElementsAs configsR2
-          result3 should contain theSameElementsAs configsR3
-        }
-      }
-
-      "handle idempotent writes of the same max count correctly" in {
-        val tc = TraceContext.empty
-
-        val configs = Seq(
-          ScanConfigRow("SV1", "url-a", 5),
-          ScanConfigRow("SV2", "url-b", 5),
-        )
-
-        for {
-          store <- mkStore()
-          _ <- store.setScanConfigs(configs)(tc)
-          _ <- store.setScanConfigs(configs)(tc)
-          result <- store.getScanConfigs()(tc)
-        } yield {
-          result should contain theSameElementsAs configs
-        }
+    "return an empty map for a non-existent key" in {
+      for {
+        store <- mkStore()
+        retrievedValues <- store.getConfig("non-existent-key")
+      } yield {
+        retrievedValues shouldEqual Map.empty[String, String]
       }
     }
+
+    "update an existing configuration on conflict" in {
+      for {
+        store <- mkStore()
+        _ <- store.setConfig(configKey, initialValues)
+        _ <- store.setConfig(configKey, updatedValues)
+        retrievedValues <- store.getConfig(configKey)
+      } yield {
+        retrievedValues shouldEqual updatedValues
+      }
+    }
+
+    "handle multiple different keys independently" in {
+      for {
+        store <- mkStore()
+        _ <- store.setConfig(configKey, initialValues)
+        _ <- store.setConfig(otherKey, otherValues)
+
+        mainKeyValues <- store.getConfig(configKey)
+        otherKeyValues <- store.getConfig(otherKey)
+      } yield {
+        mainKeyValues shouldEqual initialValues
+        otherKeyValues shouldEqual otherValues
+      }
+    }
+
   }
 }
 
@@ -107,17 +87,6 @@ class DbValidatorInternalStoreTest
 
   override protected def timeouts = new ProcessingTimeout
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
-
-  def resetValidatorInternalTables(
-      storage: DbStorage
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    import storage.api.*
-
-    storage.update_(
-      sqlu"DELETE FROM validator_scan_config",
-      "reset-validator-scan-config-table",
-    )
-  }
 
   override protected def mkStore(): Future[ValidatorInternalStore] = Future.successful {
     val elc = ErrorLoggingContext(
@@ -136,7 +105,6 @@ class DbValidatorInternalStoreTest
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetValidatorInternalTables(
-    storage
-  )
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
+
 }

@@ -4,13 +4,12 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorInternalTables.ScanConfigRow
 
 import scala.concurrent.Future
 
 trait ValidatorInternalStore {
 
-  def setScanConfigs(rows: Seq[ScanConfigRow])(implicit tc: TraceContext): Future[Unit]
+  def setConfig(key: String, values: Map[String, String])(implicit tc: TraceContext): Future[Unit]
 
-  def getScanConfigs()(implicit tc: TraceContext): Future[Seq[ScanConfigRow]]
+  def getConfig(key: String)(implicit tc: TraceContext): Future[Map[String, String]]
 }
