@@ -14,11 +14,12 @@ Release Notes
 .. important::
 
     Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
-    For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_.
+    For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_
+    as well as the respective documentation pages for :ref:`validators <validator-upgrades>` and :ref:`SVs <sv-upgrades>`.
 
 - Deployment
 
-    - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+    - **Breaking**: Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
 
 - Validator
 
