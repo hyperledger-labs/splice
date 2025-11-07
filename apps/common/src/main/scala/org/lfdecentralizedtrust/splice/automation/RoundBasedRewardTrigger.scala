@@ -143,7 +143,10 @@ abstract class RoundBasedRewardTrigger[T <: RoundBasedTask: Pretty]()(implicit
             }
           })
         }
-      } else Future.successful(Seq.empty)
+      } else {
+        logger.trace(s"Not running trigger yet for state ${triggerState.get()}")
+        Future.successful(Seq.empty)
+      }
     } else {
       retrieveAvailableTasksForRound()
     }
