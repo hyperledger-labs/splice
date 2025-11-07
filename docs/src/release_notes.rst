@@ -19,6 +19,8 @@ Upcoming
 
       - ``/v0/admin/users/offboard``:
         Offboarding a user now also deletes the ledger API user in the participant node.
+      - If you need to use an HTTP proxy in your environment, you can now use `https.proxyHost` and `https.proxyPort` Java system properties.
+        Please see :ref:`HTTP Proxy configuration <validator-http-proxy-helm>` for Kubernetes-Based deployment and :ref:`HTTP Proxy configuration <validator-http-proxy-compose>` for Docker Compose-Based deployment.
 
   - Scan
 
