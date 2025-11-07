@@ -61,11 +61,6 @@ object SvUtil {
   // Assumption: the sv1 node is run by the foundation
   val DefaultSV1Weight: Long = 10_000L
 
-  // We set the reconciliation interval for ACS commitments to 30 mins by default to ensure that
-  // frequent ACS commitments do not eat up the base rate traffic and prevent validators from topping up
-  // (See #12107).
-  val defaultAcsCommitmentReconciliationInterval: PositiveDurationSeconds =
-    PositiveDurationSeconds.ofMinutes(30)
   val defaultAcsCommitmentsCatchUpParameters: AcsCommitmentsCatchUpParameters =
     AcsCommitmentsCatchUpParameters(
       // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.

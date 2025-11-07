@@ -34,6 +34,7 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
 import java.nio.file.Path
@@ -320,6 +321,11 @@ case class SvAppBackendConfig(
     // Defaults to 24h to allow for 24h between preparation and execution of an externally signed transaction
     preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofHours(24),
+    // We set the reconciliation interval for ACS commitments to 30 mins by default to ensure that
+    // frequent ACS commitments do not eat up the base rate traffic and prevent validators from topping up
+    // (See #12107).
+    acsCommitmentReconciliationInterval: PositiveDurationSeconds =
+      PositiveDurationSeconds.ofMinutes(30),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
     // We want to be able to override this for simtime tests
