@@ -27,14 +27,14 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
     // 100 seconds waiting here because we need to wait on the JSON API being ready which is sloooow.
     waitForQuery(id("entry-name-field"), timeUntilSuccess = Some(100.seconds))
 
-    click on "entry-name-field"
+    eventuallyClickOn(id("entry-name-field"))
     textField("entry-name-field").value = entryNameWithoutSuffix
 
     waitForCondition(id("search-entry-button")) { ExpectedConditions.elementToBeClickable(_) }
-    click on "search-entry-button"
+    eventuallyClickOn(id("search-entry-button"))
 
     waitForQuery(id("request-entry-with-sub-button"))
-    click on "request-entry-with-sub-button"
+    eventuallyClickOn(id("request-entry-with-sub-button"))
   }
 
   def reserveAnsNameFor(
@@ -57,7 +57,7 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
         findAll(className("sub-request-accept-button")) should have size 1
       }
 
-      click on className("sub-request-accept-button")
+      eventuallyClickOn(className("sub-request-accept-button"))
 
       // And then back to ans, where they are already logged in
 
