@@ -24,7 +24,7 @@ abstract class ValidatorInternalStoreTest
 
   protected def mkStore(): Future[ValidatorInternalStore]
 
-  "DbValidatorInternalStore" should {
+  "ValidatorInternalStore" should {
     implicit val tc: TraceContext = TraceContext.empty
 
     val configKey = "test-config-key"
