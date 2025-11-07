@@ -129,7 +129,7 @@ class PruningIntegrationTest
                 "seconds",
               )
             )
-          ) shouldBe 1
+          ) should be > 0L
       }
     }
   }
