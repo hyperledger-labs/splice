@@ -1,12 +1,13 @@
 package org.lfdecentralizedtrust.splice.unit.http
 
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.logging.NamedLogging
 
 import java.io.File
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path, StandardOpenOption}
+import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.concurrent.blocking
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.sys.process.{Process, ProcessLogger}
@@ -14,7 +15,7 @@ import scala.concurrent.duration.*
 
 /** Support trait to start and manage a tinyproxy HTTP proxy for use in tests.
   */
-trait TinyProxySupport {
+trait TinyProxySupport extends NamedLogging {
   object HttpProxy {
 
     /** Create and start a tinyproxy process with a basic configuration.
@@ -25,6 +26,7 @@ trait TinyProxySupport {
       * @return the HttpProxy instance representing the started proxy.
       */
     def apply(maxStartupTime: Duration, auth: Option[(String, String)]): HttpProxy = {
+      noTracingLogger.debug("Starting tinyproxy process")
       val configFile = File.createTempFile("tinyproxy", ".conf")
       val proxyPort = 3128
       createConfig(configFile, proxyPort, auth)
@@ -47,7 +49,10 @@ trait TinyProxySupport {
               .mkString("\n")
           )
       }
+      noTracingLogger.debug("Waiting for tinyproxy process to start")
       waitUntilStarted(maxStartupTime.toMillis)
+      noTracingLogger.debug(s"tinyproxy started successfully, listening on $proxyPort")
+
       TinyProxy(proxyProcess, proxyPort, configFile)
     }
     // creates a basic config file that allows localhost to connect, and optionally sets required basic auth
@@ -61,10 +66,9 @@ trait TinyProxySupport {
            |Port ${proxyPort}
            |Listen 0.0.0.0
            |Timeout 600
-           |Allow 127.0.0.1
-           |Allow localhost
            |${auth.map { case (u, p) => s"BasicAuth $u $p" }.getOrElse("")}
            |""".stripMargin
+      noTracingLogger.debug(s"tinyproxy config:\n$config\n\n")
       Files.write(configFile.toPath, config.getBytes(StandardCharsets.UTF_8))
     }
     // Represents a running tinyproxy process, with methods to check its status and stop it
@@ -87,8 +91,10 @@ trait TinyProxySupport {
         ).forall(_ == true)
       }
       def stop(): Unit = {
+        noTracingLogger.debug("Stopping tinyproxy process")
         process.destroy()
         configFile.delete()
+        noTracingLogger.debug("Stopped tinyproxy process.")
       }
     }
   }
@@ -97,37 +103,42 @@ trait TinyProxySupport {
   class ProxyProcess(configFile: File) {
     private val cmd = s"tinyproxy -d -c ${configFile.getAbsolutePath}"
     private val processBuilder = Process(cmd)
-    private val stdout = mutable.Buffer[String]()
-    private val stderr = mutable.Buffer[String]()
+    private val stdout = new AtomicReference(Vector.empty[String])
+    private val stderr = new AtomicReference(Vector.empty[String])
+    @tailrec
+    private def append(ref: AtomicReference[Vector[String]], line: String): Unit = {
+      val current = ref.get()
+      val updated = current :+ line
+      if (!ref.compareAndSet(current, updated)) {
+        append(ref, line)
+      }
+    }
+
     private val processLogger = ProcessLogger(
-      out =>
-        blocking {
-          synchronized {
-            stdout.append(out)
-          }
-        },
-      err =>
-        blocking {
-          synchronized {
-            stderr.append(err)
-          }
-        },
+      out => append(stdout, out),
+      err => append(stderr, err),
     )
     private val process = processBuilder.run(processLogger)
-    def stdOutLines: Seq[String] = blocking { synchronized { stdout.toSeq } }
-    def stdErrLines: Seq[String] = blocking { synchronized { stderr.toSeq } }
+
+    sys.addShutdownHook {
+      if (process.isAlive()) process.destroy()
+    }
+
+    def stdOutLines: Seq[String] = stdout.get
+    def stdErrLines: Seq[String] = stderr.get
     def writeOutput(out: Path, err: Path): Unit = blocking {
-      def write(path: Path, lines: Seq[String]) = Files.write(
-        path,
-        lines.mkString("\n").getBytes(StandardCharsets.UTF_8),
-        StandardOpenOption.APPEND,
-      )
-      blocking {
-        synchronized {
-          write(out, stdOutLines)
-          write(err, stdErrLines)
+      def write(path: Path, lines: Seq[String]): Unit = {
+        if (lines.nonEmpty) {
+          Files.write(
+            path,
+            lines.mkString("\n").getBytes(StandardCharsets.UTF_8),
+            StandardOpenOption.CREATE,
+            StandardOpenOption.APPEND,
+          )
         }
       }
+      write(out, stdOutLines)
+      write(err, stdErrLines)
     }
     def hasNoErrors: Boolean = stdErrLines.isEmpty
     def destroy(): Unit = process.destroy()
@@ -168,6 +179,10 @@ trait TinyProxySupport {
     try {
       testCode(proxy)
     } finally {
+      Files.createDirectories(Paths.get("log"))
+      val outFile = Paths.get("log", "tinyproxy-stdout.log")
+      val errFile = Paths.get("log", "tinyproxy-stderr.log")
+      proxy.process.writeOutput(outFile, errFile)
       proxy.stop()
     }
   }
