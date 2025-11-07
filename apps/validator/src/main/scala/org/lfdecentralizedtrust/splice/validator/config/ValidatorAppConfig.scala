@@ -197,8 +197,8 @@ case class ValidatorAppBackendConfig(
     // Participant pruning is enabled by default for all validators and SVs
     participantPruningSchedule: Option[PruningConfig] = Some(
       PruningConfig(
-        cron = "0 5 * * * ?", // Runs daily at 5AM
-        maxDuration = PositiveDurationSeconds.tryFromDuration(15.minutes),
+        cron = "0 /10 * * * ?", // Runs every 10 minutes
+        maxDuration = PositiveDurationSeconds.tryFromDuration(5.minutes),
         retention = PositiveDurationSeconds.tryFromDuration(30.days),
       )
     ),
