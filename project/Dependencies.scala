@@ -38,9 +38,6 @@ object Dependencies {
   lazy val pekko_http_cors =
     "org.apache.pekko" %% "pekko-http-cors" % CantonDependencies.pekko_http_version
 
-  lazy val pekko_connectors =
-    "org.apache.pekko" %% "pekko-connectors-file" % CantonDependencies.pekko_version
-
   lazy val spray_json =
     "io.spray" %% "spray-json" % "1.3.6"
 

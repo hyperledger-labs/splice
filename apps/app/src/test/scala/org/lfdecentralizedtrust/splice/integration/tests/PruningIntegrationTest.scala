@@ -10,16 +10,16 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.util.ShowUtil.*
-import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
   ParticipantClientConfig,
   PruningConfig,
 }
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
-import org.lfdecentralizedtrust.splice.util.{LoggerUtil, ProcessTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import org.scalatest.concurrent.PatienceConfiguration
 import org.slf4j.event.Level
@@ -29,8 +29,7 @@ import scala.concurrent.duration.*
 class PruningIntegrationTest
     extends SvIntegrationTestBase
     with WalletTestUtil
-    with ProcessTestUtil
-    with LoggerUtil {
+    with ProcessTestUtil {
 
   override protected def runEventHistorySanityCheck: Boolean = false
 
@@ -68,7 +67,7 @@ class PruningIntegrationTest
               config.validatorApps.updatedWith(InstanceName.tryCreate("sv1Validator")) {
                 _.map { config =>
                   config.copy(
-                    // schedule needs to be defined to activate pruning
+                    // schedule needs to be defined to activate participant pruning
                     participantPruningSchedule = Some(
                       PruningConfig(
                         "0 /1 * * * ?",
@@ -106,8 +105,6 @@ class PruningIntegrationTest
   "participant can be pruned" should {
 
     "when configured, sv1 participant prunes every minute" in { implicit env =>
-      implicit val actorSystem: ActorSystem = env.actorSystem
-
       initDsoWithSv1Only()
 
       clue("Check sv1 participant has the expected smallest pruning schedule") {
@@ -120,14 +117,20 @@ class PruningIntegrationTest
         )
       }
 
-      findExpectedLogInFile(
-        "Pruned up to Offset.*participant=sv1Participant",
-        "log/canton.clog",
-        logger,
-      )
-        .futureValue(timeout =
-          PatienceConfiguration.Timeout(FiniteDuration(70, "seconds"))
-        ) shouldBe true
+      eventually() {
+        sv1Backend.svAutomation
+          .connection(Low)
+          // returns 0 when participant pruning is disabled
+          .latestPrunedOffset()
+          .futureValue(timeout =
+            PatienceConfiguration.Timeout(
+              FiniteDuration(
+                70,
+                "seconds",
+              )
+            )
+          ) shouldBe 1
+      }
     }
   }
 
