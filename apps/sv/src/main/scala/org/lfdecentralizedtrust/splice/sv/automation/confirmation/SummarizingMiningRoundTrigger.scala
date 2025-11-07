@@ -201,7 +201,10 @@ object SummarizingMiningRoundTrigger {
         featuredAppRewardCoupons.bigDecimal,
         unfeaturedAppRewardCoupons.bigDecimal,
         svRewardCouponsWeightSum,
-        Optional.of(validatorLivenessActivityRecords),
+        Optional.empty(), // optTotalValidatorFaucetCoupons (deprecated)
+        Optional.of(
+          java.math.BigDecimal.valueOf(validatorLivenessActivityRecords)
+        ), // optTotalValidatorLivenessActivityRecords
       )
 
     override def pretty: Pretty[this.type] =
