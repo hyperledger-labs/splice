@@ -1,26 +1,26 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{
-  FullClientConfig,
-  NonNegativeFiniteDuration,
-  PositiveDurationSeconds,
-}
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
   ParticipantClientConfig,
   PruningConfig,
 }
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{
+  FullClientConfig,
+  NonNegativeFiniteDuration,
+  PositiveDurationSeconds,
+}
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
@@ -195,4 +195,5 @@ class PruningIntegrationTest
       timeUntilSuccess = 3.minutes,
     )
   }
+
 }
