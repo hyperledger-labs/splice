@@ -18,12 +18,13 @@ import org.apache.pekko.http.scaladsl.model.{
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import com.digitalasset.canton.util.ShowUtil.*
 import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
-import org.apache.pekko.http.scaladsl.settings.ClientConnectionSettings
+import org.apache.pekko.http.scaladsl.settings.{ClientConnectionSettings, HttpsProxySettings}
 
 import java.net.InetSocketAddress
 import javax.net.ssl.SSLContext
 import scala.collection.immutable
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 import scala.util.control.NonFatal
 
 trait HttpClient {
@@ -70,7 +71,7 @@ object HttpClient {
 
   def apply(outerRequestParameters: HttpClient.HttpRequestParameters, logger: TracedLogger)(implicit
       ac: ActorSystem,
-      ec: ExecutionContextExecutor,
+      ec: ExecutionContext,
   ): HttpClient =
     HttpClient(ApiLoggingConfig(), outerRequestParameters, logger)
 
@@ -80,7 +81,7 @@ object HttpClient {
       logger: TracedLogger,
   )(implicit
       ac: ActorSystem,
-      ec: ExecutionContextExecutor,
+      ec: ExecutionContext,
   ): HttpClient =
     new HttpClient {
       override val requestParameters: HttpClient.HttpRequestParameters = outerRequestParameters
@@ -177,17 +178,28 @@ object HttpClient {
   }
 
   private def createClientConnectionSettings()(implicit ac: ActorSystem) = {
-
-    ProxySettings.readFromSystemProperties().fold(ClientConnectionSettings(ac)) { proxySettings =>
-      proxySettings.creds.fold(
+    // if pekko config is set, it overrides what is set in system properties
+    // pekko does not support credentials in `pekko.http.client.proxy`,
+    // so that can't be supported here, if users need this they need to set proxy settings via system properties.
+    Try(HttpsProxySettings(ac.settings.config))
+      .map { _ =>
         ClientConnectionSettings(ac).withTransport(
-          ClientTransport.httpsProxy(proxySettings.address)
-        )
-      ) { creds =>
-        ClientConnectionSettings(ac).withTransport(
-          ClientTransport.httpsProxy(proxySettings.address, creds)
+          ClientTransport.httpsProxy()
         )
       }
-    }
+      .getOrElse {
+        ProxySettings.readFromSystemProperties().fold(ClientConnectionSettings(ac)) {
+          proxySettings =>
+            proxySettings.creds.fold(
+              ClientConnectionSettings(ac).withTransport(
+                ClientTransport.httpsProxy(proxySettings.address)
+              )
+            ) { creds =>
+              ClientConnectionSettings(ac).withTransport(
+                ClientTransport.httpsProxy(proxySettings.address, creds)
+              )
+            }
+        }
+      }
   }
 }
