@@ -54,12 +54,13 @@ object HttpClient {
         case (Some(host), Some(port), Some(user), Some(password)) =>
           Some(
             ProxySettings(
-              InetSocketAddress.createUnresolved(host, port.toInt),
+              host,
+              port.toInt,
               Some(BasicHttpCredentials(user, password)),
             )
           )
         case (Some(host), Some(port), _, _) =>
-          Some(ProxySettings(InetSocketAddress.createUnresolved(host, port.toInt)))
+          Some(ProxySettings(host, port.toInt))
         case _ => None
       }
 
@@ -67,7 +68,9 @@ object HttpClient {
     }
   }
 
-  case class ProxySettings(address: InetSocketAddress, creds: Option[BasicHttpCredentials] = None)
+  case class ProxySettings(host: String, port: Int, creds: Option[BasicHttpCredentials] = None) {
+    val address: InetSocketAddress = InetSocketAddress.createUnresolved(host, port)
+  }
 
   def apply(outerRequestParameters: HttpClient.HttpRequestParameters, logger: TracedLogger)(implicit
       ac: ActorSystem,
@@ -121,7 +124,7 @@ object HttpClient {
           case _ => ConnectionContext.noEncryption()
         }
 
-        val settings = createClientConnectionSettings()
+        val settings = createClientConnectionSettings(logger)
         val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
           Http()
             .outgoingConnectionUsingContext(host, port, connectionContext, settings)
@@ -177,29 +180,44 @@ object HttpClient {
       .getOrElse(TraceContext.empty)
   }
 
-  private def createClientConnectionSettings()(implicit ac: ActorSystem) = {
+  private def createClientConnectionSettings(
+      logger: TracedLogger
+  )(implicit ac: ActorSystem, tc: TraceContext) = {
     // if pekko config is set, it overrides what is set in system properties
     // pekko does not support credentials in `pekko.http.client.proxy`,
     // so that can't be supported here, if users need this they need to set proxy settings via system properties.
     Try(HttpsProxySettings(ac.settings.config))
-      .map { _ =>
+      .map { proxyConf =>
+        logger.debug(
+          s"Configuring pekko-http client from pekko.http.client.proxy config: host = ${proxyConf.host}, port = ${proxyConf.port}"
+        )
         ClientConnectionSettings(ac).withTransport(
           ClientTransport.httpsProxy()
         )
       }
       .getOrElse {
-        ProxySettings.readFromSystemProperties().fold(ClientConnectionSettings(ac)) {
-          proxySettings =>
-            proxySettings.creds.fold(
+        def msgPrefix(proxySettings: ProxySettings) =
+          s"Configuring pekko-http client from system properties, host = ${proxySettings.host}, port = ${proxySettings.port}"
+        ProxySettings
+          .readFromSystemProperties()
+          .fold {
+            logger.debug(
+              s"Not using a http client proxy for pekko-http client. No proxy settings found in system properties."
+            )
+            ClientConnectionSettings(ac)
+          } { proxySettings =>
+            proxySettings.creds.fold {
+              logger.debug(s"${msgPrefix(proxySettings)}, credentials = [redacted]")
               ClientConnectionSettings(ac).withTransport(
                 ClientTransport.httpsProxy(proxySettings.address)
               )
-            ) { creds =>
+            } { creds =>
+              logger.debug(s"${msgPrefix(proxySettings)}, no credentials set")
               ClientConnectionSettings(ac).withTransport(
                 ClientTransport.httpsProxy(proxySettings.address, creds)
               )
             }
-        }
+          }
       }
   }
 }
