@@ -8,35 +8,40 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.5.0
+-----
 
-  - Deployment
+.. important::
 
-      - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+    Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
+    For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_.
 
-  - Validator
+- Deployment
 
-      - ``/v0/admin/users/offboard``:
-        Offboarding a user now also deletes the ledger API user in the participant node.
-      - If you need to use an HTTP proxy in your environment, you can now use `https.proxyHost` and `https.proxyPort` Java system properties.
-        Please see :ref:`HTTP Proxy configuration <validator-http-proxy-helm>` for Kubernetes-Based deployment and :ref:`HTTP Proxy configuration <validator-http-proxy-compose>` for Docker Compose-Based deployment.
+    - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
 
-  - Scan
+- Validator
 
-    - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
-      Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
-      or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
+    - ``/v0/admin/users/offboard``:
+      Offboarding a user now also deletes the ledger API user in the participant node.
+    - If you need to use an HTTP proxy in your environment, you can now use `https.proxyHost` and `https.proxyPort` Java system properties.
+      Please see :ref:`HTTP Proxy configuration <validator-http-proxy-helm>` for Kubernetes-Based deployment and :ref:`HTTP Proxy configuration <validator-http-proxy-compose>` for Docker Compose-Based deployment.
 
-  - Docs
+- Scan
 
-    - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
-    - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
-    - Add a section on :ref:`wallet_how_to_earn_featured_app_rewards`
+  - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
+    Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
+    or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
 
-  - Mediator
+- Docs
 
-    - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
+  - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+  - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
+  - Add a section on :ref:`wallet_how_to_earn_featured_app_rewards`
+
+- Mediator
+
+  - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
 
 0.4.23
 ------
