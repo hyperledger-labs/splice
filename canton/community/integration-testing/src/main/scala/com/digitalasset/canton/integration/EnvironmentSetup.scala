@@ -201,15 +201,17 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
           // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
           // so for now we go for an ad-hoc logic here.
           val shouldRetry = decodedCantonError.exists { err =>
-            val forceRetry = err.code match {
+            val retryableErrorCodes = Seq(
               // Normally "not connected to synchronizer" errors are not retriable because they require operator intervention.
               // In canton network, synchronizer connections are managed by the sv app automation
               // and transient disconnects are normal.
-              case SyncServiceInjectionError.NotConnectedToAnySynchronizer => true
-              case SyncServiceInjectionError.NotConnectedToSynchronizer => true
-              case TransactionRoutingError.TopologyErrors.UnknownInformees => true
-              case _ => false
-            }
+              SyncServiceInjectionError.NotConnectedToAnySynchronizer,
+              SyncServiceInjectionError.NotConnectedToSynchronizer,
+              TransactionRoutingError.TopologyErrors.UnknownInformees,
+            )
+            val forceRetry = retryableErrorCodes.exists(retryableErroCode =>
+              err.code == retryableErroCode.code || err.code.id == retryableErroCode.id // some errors are wrapped in a GenericErrorCode so they lose the type information
+            )
             if (forceRetry) {
               true
             } else {
