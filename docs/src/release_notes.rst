@@ -8,6 +8,16 @@
 Release Notes
 =============
 
+0.4.24
+------
+
+- Canton Participant
+
+  - Fix an issue where after a restart the participant could fail to
+    come up as a query exceeded the 65353 query parameter limit. This
+    should only an issue for SVs or participants with very high
+    traffic.
+
 0.4.23
 ------
 
