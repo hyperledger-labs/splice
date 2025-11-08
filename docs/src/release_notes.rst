@@ -8,8 +8,10 @@
 Release Notes
 =============
 
-0.4.24
+0.4.25
 ------
+
+Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
 
 - Canton Participant
 
