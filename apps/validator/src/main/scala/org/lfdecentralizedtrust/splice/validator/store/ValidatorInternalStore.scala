@@ -4,12 +4,14 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Json
 
 import scala.concurrent.Future
 
 trait ValidatorInternalStore {
 
-  def setConfig(key: String, values: Map[String, String])(implicit tc: TraceContext): Future[Unit]
+  def setConfig(key: String, value: Json)(implicit tc: TraceContext): Future[Unit]
 
-  def getConfig(key: String)(implicit tc: TraceContext): Future[Map[String, String]]
+  def getConfig(key: String)(implicit tc: TraceContext): Future[Json]
+
 }

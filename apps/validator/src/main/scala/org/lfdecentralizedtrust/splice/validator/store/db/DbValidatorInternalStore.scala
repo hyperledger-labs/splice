@@ -7,77 +7,46 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
-import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorInternalTables.*
-import slick.jdbc.{GetResult, JdbcProfile}
+import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+
 import scala.concurrent.{ExecutionContext, Future}
-
-object DbValidatorInternalStore {
-
-  implicit val getResultValidatorInternalConfig: GetResult[ValidatorInternalConfig] = GetResult {
-    r =>
-      val _ = r.nextString() // cannot ignore this because we have to update the cursor
-      val jsonString = r.nextString()
-
-      io.circe.parser.parse(jsonString) match {
-        case Left(err) => throw new Exception(s"Failed to parse jsonb string '$jsonString': $err")
-        case Right(json) =>
-          ValidatorInternalConfig
-            .fromJson(json)
-            .fold(
-              err =>
-                throw new Exception(
-                  s"Failed to decode JSON to ValidatorInternalConfig: ${err.getMessage}"
-                ),
-              identity,
-            )
-      }
-  }
-}
+import io.circe.Json
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 
 class DbValidatorInternalStore(
     storage: DbStorage,
     implicit val loggingContext: ErrorLoggingContext,
     implicit val closeContext: CloseContext,
 )(implicit val ec: ExecutionContext)
-    extends ValidatorInternalStore {
-
-  import DbValidatorInternalStore.*
+    extends ValidatorInternalStore
+    with AcsJdbcTypes {
 
   val tableName = "validator_internal_config"
 
   val profile: JdbcProfile = storage.profile.jdbc
 
-  override def setConfig(key: String, values: Map[String, String])(implicit
-      tc: TraceContext
-  ): Future[Unit] = {
-    val configData: ValidatorInternalConfig =
-      ValidatorInternalTables.ValidatorInternalConfig(key, values)
-
-    val jsonString: String = configData.toJson.noSpaces
-
+  def setConfig(key: String, value: Json)(implicit tc: TraceContext): Future[Unit] = {
     val action = sql"""INSERT INTO #$tableName (config_key, config_value)
-        VALUES ($key, $jsonString::jsonb)
+        VALUES ($key, $value)
         ON CONFLICT (config_key) DO UPDATE
         SET config_value = excluded.config_value""".asUpdate
 
-    val f = storage.update(action, "set-validator-config")
-    FutureUnlessShutdownUtil.futureUnlessShutdownToFuture(f).map(_ => ())
+    storage.update(action, "set-validator-config").map(_ => ())
   }
 
-  override def getConfig(key: String)(implicit tc: TraceContext): Future[Map[String, String]] = {
-
-    val queryAction = sql"""SELECT config_key, config_value
+  override def getConfig(key: String)(implicit tc: TraceContext): Future[Json] = {
+    val queryAction = sql"""SELECT config_value
         FROM #$tableName
         WHERE config_key = $key
-      """.as[ValidatorInternalConfig].headOption
+      """.as[Json].headOption
 
-    val validatorConfigF = storage.querySingle(queryAction, "get-validator-config")
+    val jsonOptionF = storage.querySingle(queryAction, "get-validator-config")
 
-    FutureUnlessShutdownUtil.futureUnlessShutdownToFuture(validatorConfigF.value).map {
-      _.map(_.values).getOrElse(Map.empty[String, String])
+    jsonOptionF.value.map {
+      _.getOrElse(Json.obj())
     }
   }
 }

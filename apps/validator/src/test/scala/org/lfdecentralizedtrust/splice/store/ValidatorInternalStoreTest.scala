@@ -9,6 +9,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
@@ -28,10 +29,9 @@ abstract class ValidatorInternalStoreTest
     implicit val tc: TraceContext = TraceContext.empty
 
     val configKey = "test-config-key"
-    val initialValues = Map("sv1" -> "url1", "sv2" -> "url2")
-    val updatedValues = Map("sv1" -> "url3", "sv2" -> "url4")
+    val initialValues = Json.fromString("payload1")
     val otherKey = "other-config"
-    val otherValues = Map("user" -> "admin")
+    val otherValues = Json.fromString("payload2")
 
     "set and get a configuration successfully" in {
       for {
@@ -43,12 +43,12 @@ abstract class ValidatorInternalStoreTest
       }
     }
 
-    "return an empty map for a non-existent key" in {
+    "return an empty JSON for a non-existent key" in {
       for {
         store <- mkStore()
         retrievedValues <- store.getConfig("non-existent-key")
       } yield {
-        retrievedValues shouldEqual Map.empty[String, String]
+        retrievedValues shouldEqual Json.obj()
       }
     }
 
@@ -56,10 +56,10 @@ abstract class ValidatorInternalStoreTest
       for {
         store <- mkStore()
         _ <- store.setConfig(configKey, initialValues)
-        _ <- store.setConfig(configKey, updatedValues)
+        _ <- store.setConfig(configKey, otherValues)
         retrievedValues <- store.getConfig(configKey)
       } yield {
-        retrievedValues shouldEqual updatedValues
+        retrievedValues shouldEqual otherValues
       }
     }
 
