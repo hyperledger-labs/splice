@@ -10,11 +10,12 @@ Upcoming
 
 - Canton Participant
 
-  - Participants now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers and mediators.
+  - Participants now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers and mediators. Y
     You can overwrite this default value by adding the following env variable in the `additionalEnvVars` helm values of the validator app: `ADDITIONAL_CONFIG_PARTICIPANT_PRUNING`
 
+
 0.5.1
-=====
+-----
 
 - Canton Participant
 
