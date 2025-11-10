@@ -135,6 +135,10 @@ class ScanEventHistoryIntegrationTest
 
     val _ = onboardAliceAndBob()
 
+    // A tap to make sure that the update history advances (the onboarding above does not!).
+    // Meanwhile, the verdicts won't advance as the mediator is stopped before this.
+    sv1WalletClient.tap(1)
+
     def maxVerdictTime =
       sv1ScanBackend.appState.eventStore.verdictStore.maxVerdictRecordTime(0).futureValue
     def maxUpdateTime =

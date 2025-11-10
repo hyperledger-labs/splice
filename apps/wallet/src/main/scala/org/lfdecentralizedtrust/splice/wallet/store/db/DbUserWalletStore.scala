@@ -44,6 +44,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import slick.jdbc.canton.SQLActionBuilder
@@ -58,6 +59,7 @@ class DbUserWalletStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -98,6 +100,7 @@ class DbUserWalletStore(
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = false,
       BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with UserWalletStore
     with AcsTables

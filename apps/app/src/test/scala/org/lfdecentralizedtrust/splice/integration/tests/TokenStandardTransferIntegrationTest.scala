@@ -305,11 +305,15 @@ class TokenStandardTransferIntegrationTest
 
       // TODO(#2254): check the exact balances once the scan backend supports it
 
-      val activityTxs = sv1ScanBackend
-        .listActivity(None, 1000)
-        .filter(t => t.transfer.isDefined || t.abortTransferInstruction.isDefined)
-      // 4 transfer instructions + accept + withdraw + reject
-      activityTxs should have size (7)
+      val activityTxs = eventually() {
+        val activityTxs = sv1ScanBackend
+          .listActivity(None, 1000)
+          .filter(t => t.transfer.isDefined || t.abortTransferInstruction.isDefined)
+        // 4 transfer instructions + accept + withdraw + reject
+        activityTxs should have size (7)
+        activityTxs
+      }
+
       clue("TransferInstruction accept") {
         activityTxs(0).transactionType shouldBe HttpTransactionType.Transfer
         val transfer = activityTxs(0).transfer.value

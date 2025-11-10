@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.store
 
+import cats.data.NonEmptyList
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDamlRecord}
 import com.daml.ledger.javaapi.data.{
@@ -41,6 +42,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentEvent,
   ReassignmentUpdate,
   TransactionTreeUpdate,
+  TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.util.{
@@ -1065,10 +1067,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         )(traceContext)
       )
 
-    override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
+    override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ) = withoutRepeatedIngestionWarning(
-      underlying.ingestUpdate(updateOrCheckpoint)(traceContext)
+      underlying.ingestUpdateBatch(batch)(traceContext)
     )
   }
 
@@ -1412,6 +1414,15 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 }
 
 object StoreTest {
+
+  implicit class IngestSingleElementSink(underlying: MultiDomainAcsStore.IngestionSink) {
+    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] =
+      underlying.ingestUpdateBatch(
+        NonEmptyList.of(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))
+      )
+  }
 
   val dummyDomain = SynchronizerId.tryFromString("dummy::domain")
 

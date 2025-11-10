@@ -10,5 +10,6 @@ export const useSequencerStatus = (): UseQueryResult<NodeStatus> => {
   return useQuery({
     queryKey: ['getSequencerNodeStatus'],
     queryFn: async () => await getSequencerNodeStatus(),
+    refetchInterval: 10_000,
   });
 };

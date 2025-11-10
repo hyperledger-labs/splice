@@ -98,7 +98,7 @@ metrics:
 
 enableAntiAffinity: true
 
-logLevel: debug
+logLevel: info
 mempool:
   # max number of transactions kept in the mempool
   size: 2000

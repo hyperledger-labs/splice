@@ -88,7 +88,7 @@ object BuildCommon {
           // "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
-          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning
+          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpose of that warning
           "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:s",
           "-quickfix:any",
         ),

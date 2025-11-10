@@ -28,6 +28,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
@@ -376,6 +377,7 @@ class DbValidatorStoreTest
         None,
       ),
       participantId = mkParticipantId("ValidatorStoreTest"),
+      IngestionConfig(),
     )
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

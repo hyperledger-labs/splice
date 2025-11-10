@@ -32,6 +32,8 @@ import { ProposalVoteForm } from './ProposalVoteForm';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
 import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
+import { DetailItem } from './proposal-details/DetailItem';
+import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
 
 dayjs.extend(relativeTime);
 
@@ -207,6 +209,14 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                 svToUpdate={proposalDetails.proposal.svToUpdate}
                 currentWeight={proposalDetails.proposal.currentWeight}
                 weightChange={proposalDetails.proposal.weightChange}
+              />
+            )}
+
+            {proposalDetails.action === 'SRARC_CreateUnallocatedUnclaimedActivityRecord' && (
+              <CreateUnallocatedUnclaimedActivityRecordSection
+                beneficiary={proposalDetails.proposal.beneficiary}
+                amount={proposalDetails.proposal.amount}
+                mintBefore={proposalDetails.proposal.mintBefore}
               />
             )}
 
@@ -420,37 +430,6 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           )}
         </Paper>
       </Box>
-    </Box>
-  );
-};
-
-interface DetailItemProps {
-  label: string;
-  value: string | React.ReactNode;
-  labelId?: string;
-  valueId?: string;
-  isPartyId?: boolean;
-}
-
-const DetailItem = ({ label, value, labelId, valueId, isPartyId }: DetailItemProps) => {
-  return (
-    <Box sx={{ py: 1 }}>
-      <Typography
-        variant="subtitle2"
-        color="text.secondary"
-        id={labelId}
-        data-testid={labelId}
-        gutterBottom
-      >
-        {label}
-      </Typography>
-      {isPartyId ? (
-        <PartyId partyId={`${value}`} id={valueId} data-testid={valueId} />
-      ) : (
-        <Typography variant="body1" id={valueId} data-testid={valueId}>
-          {value}
-        </Typography>
-      )}
     </Box>
   );
 };

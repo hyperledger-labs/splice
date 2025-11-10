@@ -5,30 +5,74 @@
 
 .. _release_notes:
 
-Release Notes
-=============
-
 Upcoming
---------
+========
 
-  - Deployment
+- Sequencer connections
 
-      - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+    - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
+    - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
 
-  - Validator
 
-      - ``/v0/admin/users/offboard``:
-        Offboarding a user now also deletes the ledger API user in the participant node.
+0.5.1
+=====
 
-  - Scan
+- Canton Participant
 
-    - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
-      Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
-      or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
+  - Fix an issue where after a restart the participant could fail to
+    come up as a query exceeded the 65353 query parameter limit. This
+    should only an issue for SVs or participants with very high
+    traffic.
 
-  - Docs
 
-    - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+0.5.0
+-----
+
+.. important::
+
+    Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
+    For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_
+    as well as the respective documentation pages for :ref:`validators <validator-upgrades>` and :ref:`SVs <sv-upgrades>`.
+
+- Deployment
+
+    - **Breaking**: Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+
+- Validator
+
+    - ``/v0/admin/users/offboard``:
+      Offboarding a user now also deletes the ledger API user in the participant node.
+    - If you need to use an HTTP proxy in your environment, you can now use `https.proxyHost` and `https.proxyPort` Java system properties.
+      Please see :ref:`HTTP Proxy configuration <validator-http-proxy-helm>` for Kubernetes-Based deployment and :ref:`HTTP Proxy configuration <validator-http-proxy-compose>` for Docker Compose-Based deployment.
+
+- Scan
+
+  - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
+    Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
+    or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
+
+- Docs
+
+  - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+  - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
+  - Add a section on :ref:`wallet_how_to_earn_featured_app_rewards`
+
+- Mediator
+
+  - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
+
+0.4.25
+------
+
+Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
+
+- Canton Participant
+
+  - Fix an issue where after a restart the participant could fail to
+    come up as a query exceeded the 65353 query parameter limit. This
+    should only an issue for SVs or participants with very high
+    traffic.
+
 
 0.4.23
 ------
