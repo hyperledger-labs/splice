@@ -30,6 +30,7 @@ canton.participants.participant_$index = {
       # Use a higher number of in flight batches to increase throughput
       maximum-in-flight-event-batches = 50
       use-new-connection-pool = false
+      enable-amplification-improvements = true
     }
 
     monitoring.grpc-health-server {

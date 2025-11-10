@@ -5,6 +5,15 @@
 
 .. _release_notes:
 
+Upcoming
+========
+
+- Sequencer connections
+
+    - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immedieatly on another node.
+    - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
+
+
 0.5.1
 =====
 
