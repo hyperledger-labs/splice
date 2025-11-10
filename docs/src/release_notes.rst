@@ -5,8 +5,16 @@
 
 .. _release_notes:
 
-Release Notes
-=============
+0.5.1
+=====
+
+- Canton Participant
+
+  - Fix an issue where after a restart the participant could fail to
+    come up as a query exceeded the 65353 query parameter limit. This
+    should only an issue for SVs or participants with very high
+    traffic.
+
 
 0.5.0
 -----
@@ -43,6 +51,19 @@ Release Notes
 - Mediator
 
   - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
+
+0.4.25
+------
+
+Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
+
+- Canton Participant
+
+  - Fix an issue where after a restart the participant could fail to
+    come up as a query exceeded the 65353 query parameter limit. This
+    should only an issue for SVs or participants with very high
+    traffic.
+
 
 0.4.23
 ------
