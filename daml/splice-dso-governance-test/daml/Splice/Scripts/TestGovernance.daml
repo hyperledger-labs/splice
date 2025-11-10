@@ -767,6 +767,8 @@ testAmuletRulesConfigChange = do
         amuletToIssuePerYear = 40e9
         validatorRewardPercentage = 0.05
         appRewardPercentage = 0.15
+        optDevelopmentFundPercentage = Some 0.05
+
 
   let defaultIssuanceCurve2 = Schedule with
         initialValue = issuanceConfig_0p5_1p5_2
