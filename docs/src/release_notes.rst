@@ -13,6 +13,14 @@ Upcoming
   - Participants now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers and mediators. Y
     You can overwrite this default value by adding the following env variable in the `additionalEnvVars` helm values of the validator app: `ADDITIONAL_CONFIG_PARTICIPANT_PRUNING`
 
+    An example value would be:
+    ```
+    canton.validator-apps.validator_backend.participant-pruning-schedule {
+      cron: "0 /10 * * * ?" # Run every 10min
+      max-duration: "5m"
+      retention: "10h" # Keep 10h
+    }
+    ```
 
 0.5.1
 -----
