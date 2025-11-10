@@ -9,12 +9,14 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
 import qualified DA.Map as Map
+import DA.Optional (fromOptional)
 import qualified DA.Set as Set
 import qualified DA.Text as T
 import Daml.Script
 import DA.Time
 
 import Splice.Amulet
+import Splice.AmuletConfig (AmuletConfig(..), USD)
 import Splice.AmuletRules
 import Splice.Issuance
 import Splice.Round
@@ -38,24 +40,26 @@ bpsMultiplier : Int
 bpsMultiplier = 10000
 
 initMainNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
-initMainNet = initDecentralizedSynchronizer False
+initMainNet = initDecentralizedSynchronizer False None
 
 
 initMainNetWithAmuletPrice : Decimal -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initMainNetWithAmuletPrice = initDecentralizedSynchronizerWithAmuletPrice False 0
+initMainNetWithAmuletPrice amuletPrice = initDecentralizedSynchronizerWithAmuletPrice False 0 amuletPrice None
 
 initDevNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDevNet = initDecentralizedSynchronizer True
+initDevNet = initDecentralizedSynchronizer True None
 
+initDevNetWithAmuletConfig : AmuletConfig USD -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDevNetWithAmuletConfig amuletConfig = initDecentralizedSynchronizer True (Some amuletConfig)
 
-initDecentralizedSynchronizer : Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizer isDevNet = initDecentralizedSynchronizerWithAmuletPrice isDevNet 0 1.0
+initDecentralizedSynchronizer : Bool -> Optional (AmuletConfig USD) -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizer isDevNet optAmuletConfig = initDecentralizedSynchronizerWithAmuletPrice isDevNet 0 1.0 optAmuletConfig
 
 initDecentralizedSynchronizerWithNonZeroRound : Bool -> Int -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizerWithNonZeroRound isDevNet initialRound = initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound 1.0
+initDecentralizedSynchronizerWithNonZeroRound isDevNet initialRound = initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound 1.0 None
 
-initDecentralizedSynchronizerWithAmuletPrice : Bool -> Int -> Decimal -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice = do
+initDecentralizedSynchronizerWithAmuletPrice : Bool -> Int -> Decimal -> Optional (AmuletConfig USD) -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice optAmuletConfig = do
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
   dso <- allocateParty "dso-party"
@@ -82,7 +86,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice =
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
         voteCooldownTime = None -- use default value of 1 minute
-  let amuletConfig = defaultAmuletConfig
+  let amuletConfig = fromOptional defaultAmuletConfig optAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
   now <- getTime
