@@ -129,6 +129,7 @@ class NodeInitializer(
               s"Node has identity $id, matching expected identifier $identifierName."
             )
             // fixes previously initialized nodes with messed up keys
+            // TODO(#3115): we probably don't need this anymore; consider removing
             rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
           } else {
             logger.error(
@@ -178,7 +179,15 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[OwnerToKeyMapping]] = {
     for {
-      ownerToKeyMappings <- connection.listOwnerToKeyMapping(nodeIdentity(id))
+      // Canton nodes enable their endpoints one at a time, and return NOT_IMPLEMENTED while an endpoint is not yet enabled.
+      // (Hence the retry here.)
+      ownerToKeyMappings <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
+        "list_owner_to_key_mapping",
+        s"${connection.serviceName} answers the listOwnerToKeyMapping request",
+        connection.listOwnerToKeyMapping(nodeIdentity(id)),
+        logger,
+      )
     } yield ownerToKeyMappings.map(_.mapping).find { mapping =>
       mapping.keys.exists {
         case key: SigningPublicKey =>

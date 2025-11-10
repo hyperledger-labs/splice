@@ -18,6 +18,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
@@ -76,9 +77,27 @@ class UpdateHistorySanityCheckPlugin(
           // This flag should have the same value on all scans
           if (initializedScans.exists(_.config.updateHistoryBackfillEnabled)) {
             initializedScans.foreach(waitUntilBackfillingComplete)
-            compareHistories(initializedScans)
+            val (founders, others) = initializedScans.partition(_.config.isFirstSv)
+            val founder = founders.loneElement
+            val dsoRules =
+              DsoRules.fromJson(founder.getDsoInfo().dsoRules.contract.payload.noSpaces)
+            val (scansInDsoRules, scansNotInDsoRules) = others.partition { otherScan =>
+              val svPartyId = otherScan.getDsoInfo().svPartyId
+              dsoRules.svs.containsKey(svPartyId)
+            }
+            scansNotInDsoRules.foreach { notInDso =>
+              // the SV will not see transactions to the DSO, but will still see transactions involving itself,
+              // so comparison of history & snapshots will be broken if something like this happens:
+              //  - U1: DSO-only
+              //  - U2: Involves SV
+              // founder sees U1, U2 but otherScan only U2
+              logger.info(
+                s"The SV party of Scan ${notInDso.name} (partyId=${notInDso.getDsoInfo().svPartyId}) is not in DsoRules. Ignoring."
+              )
+            }
+            compareHistories(founder, scansInDsoRules)
             if (!skipAcsSnapshotChecks) {
-              compareSnapshots(initializedScans)
+              compareSnapshots(founder, scansInDsoRules)
             }
             initializedScans.foreach(checkScanTxLogScript)
           } else {
@@ -126,10 +145,9 @@ class UpdateHistorySanityCheckPlugin(
   }
 
   private def compareHistories(
-      scans: Seq[ScanAppBackendReference]
+      founder: ScanAppBackendReference,
+      others: Seq[ScanAppBackendReference],
   ): Unit = {
-    val (founders, others) = scans.partition(_.config.isFirstSv)
-    val founder = founders.loneElement
     val founderHistory = paginateHistory(founder, None, Chain.empty).toVector
     forAll(others) { otherScan =>
       withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
@@ -266,9 +284,10 @@ class UpdateHistorySanityCheckPlugin(
     }
   }
 
-  private def compareSnapshots(scans: Seq[ScanAppBackendReference]) = {
-    val (founders, others) = scans.partition(_.config.isFirstSv)
-    val founder = founders.loneElement
+  private def compareSnapshots(
+      founder: ScanAppBackendReference,
+      others: Seq[ScanAppBackendReference],
+  ) = {
     val founderSnapshots = getAllSnapshots(founder, CantonTimestamp.MaxValue, Nil)
     forAll(others) { otherScan =>
       withClue(s"Comparing ${otherScan.name} to ${founder.name}") {

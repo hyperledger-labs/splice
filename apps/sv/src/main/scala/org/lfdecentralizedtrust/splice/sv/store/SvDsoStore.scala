@@ -50,6 +50,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -988,6 +989,7 @@ object SvDsoStore {
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -1002,6 +1004,7 @@ object SvDsoStore {
           retryProvider,
           domainMigrationInfo,
           participantId,
+          ingestionConfig,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }

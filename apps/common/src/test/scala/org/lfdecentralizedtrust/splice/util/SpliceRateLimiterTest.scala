@@ -89,7 +89,7 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
 
   private def withRateLimiter[A](f: (SpliceRateLimitMetrics, SpliceRateLimiter) => A): A = {
     val metricsFactory = new InMemoryMetricsFactory()
-    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory)(MetricsContext.Empty)
+    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory, logger)(MetricsContext.Empty)
     val rateLimiter = new SpliceRateLimiter(
       "test",
       SpliceRateLimitConfig(enabled = true, 10),

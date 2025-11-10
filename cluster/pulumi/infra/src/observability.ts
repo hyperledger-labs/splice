@@ -820,11 +820,11 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
+                monitoringConfig.alerting.alerts.confirmationRequests.perMember.overMinutes.toString()
               )
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
+                monitoringConfig.alerting.alerts.confirmationRequests.perMember.rate.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

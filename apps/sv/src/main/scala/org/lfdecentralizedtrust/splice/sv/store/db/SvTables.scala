@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.store.db
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import org.lfdecentralizedtrust.splice.util.Contract
 
@@ -16,9 +17,21 @@ object SvTables extends AcsTables {
       svCandidateName: Option[String] = None,
   ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "onboarding_secret" -> onboardingSecret.map(lengthLimited),
-      "sv_candidate_name" -> svCandidateName.map(lengthLimited),
+      SvAcsStoreRowData.IndexColumns.onboarding_secret -> onboardingSecret.map(lengthLimited),
+      SvAcsStoreRowData.IndexColumns.sv_candidate_name -> svCandidateName.map(lengthLimited),
     )
+  }
+
+  object SvAcsStoreRowData {
+    implicit val hasIndexColumns: HasIndexColumns[SvAcsStoreRowData] =
+      new HasIndexColumns[SvAcsStoreRowData] {
+        override def indexColumnNames: Seq[String] = IndexColumns.All
+      }
+    private object IndexColumns {
+      val onboarding_secret = "onboarding_secret"
+      val sv_candidate_name = "sv_candidate_name"
+      val All = Seq(onboarding_secret, sv_candidate_name)
+    }
   }
 
 }

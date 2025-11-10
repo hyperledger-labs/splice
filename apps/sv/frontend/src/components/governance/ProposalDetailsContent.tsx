@@ -1,14 +1,25 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import {
+  AmuletRules_ActionRequiringConfirmation,
+  DsoRules_ActionRequiringConfirmation,
+  VoteRequest,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ArrowBack } from '@mui/icons-material';
 import { Box, Button, Chip, Divider, Link, Paper, Tab, Tabs, Typography } from '@mui/material';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { PartyId, theme } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  getAmuletConfigToCompareWith,
+  getDsoConfigToCompareWith,
+  PartyId,
+  PrettyJsonDiff,
+  theme,
+  useVotesHooks,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Link as RouterLink } from 'react-router-dom';
 import {
@@ -19,6 +30,10 @@ import {
 } from '../../utils/types';
 import { ProposalVoteForm } from './ProposalVoteForm';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
+import { JsonDiffAccordion } from './JsonDiffAccordion';
+import { useDsoInfos } from '../../contexts/SvContext';
+import { DetailItem } from './proposal-details/DetailItem';
+import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
 
 dayjs.extend(relativeTime);
 
@@ -37,10 +52,65 @@ const now = () => dayjs();
 export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = props => {
   const { contractId, proposalDetails, votingInformation, votes, currentSvPartyId } = props;
 
+  const votesHooks = useVotesHooks();
+  const dsoInfoQuery = useDsoInfos();
+
   const isEffective =
     votingInformation.voteTakesEffect && dayjs(votingInformation.voteTakesEffect).isBefore(now());
   const isClosed =
     !proposalDetails.isVoteRequest || isEffective || votingInformation.status === 'Rejected';
+
+  const dsoConfigToCompareWith = useMemo(() => {
+    if (proposalDetails.action === 'SRARC_SetConfig') {
+      const dsoAction: DsoRules_ActionRequiringConfirmation = {
+        tag: 'SRARC_SetConfig',
+        value: {
+          baseConfig: proposalDetails.proposal.baseConfig,
+          newConfig: proposalDetails.proposal.newConfig,
+        },
+      };
+      return getDsoConfigToCompareWith(
+        dayjs(votingInformation.voteTakesEffect).toDate(),
+        undefined,
+        votesHooks,
+        dsoAction,
+        dsoInfoQuery
+      );
+    }
+    return undefined;
+  }, [
+    proposalDetails.action,
+    proposalDetails.proposal,
+    votingInformation.voteTakesEffect,
+    votesHooks,
+    dsoInfoQuery,
+  ]);
+
+  const amuletConfigToCompareWith = useMemo(() => {
+    if (proposalDetails.action === 'CRARC_SetConfig') {
+      const dsoAction: AmuletRules_ActionRequiringConfirmation = {
+        tag: 'CRARC_SetConfig',
+        value: {
+          baseConfig: proposalDetails.proposal.baseConfig,
+          newConfig: proposalDetails.proposal.newConfig,
+        },
+      };
+      return getAmuletConfigToCompareWith(
+        dayjs(votingInformation.voteTakesEffect).toDate(),
+        undefined,
+        votesHooks,
+        dsoAction,
+        dsoInfoQuery
+      );
+    }
+    return undefined;
+  }, [
+    proposalDetails.action,
+    proposalDetails.proposal,
+    votingInformation.voteTakesEffect,
+    votesHooks,
+    dsoInfoQuery,
+  ]);
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
 
@@ -142,12 +212,48 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               />
             )}
 
+            {proposalDetails.action === 'SRARC_CreateUnallocatedUnclaimedActivityRecord' && (
+              <CreateUnallocatedUnclaimedActivityRecordSection
+                beneficiary={proposalDetails.proposal.beneficiary}
+                amount={proposalDetails.proposal.amount}
+                mintBefore={proposalDetails.proposal.mintBefore}
+              />
+            )}
+
             {proposalDetails.action === 'CRARC_SetConfig' && (
-              <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
+              <>
+                <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
+                <JsonDiffAccordion>
+                  {amuletConfigToCompareWith ? (
+                    <PrettyJsonDiff
+                      changes={{
+                        newConfig: proposalDetails.proposal.newConfig,
+                        baseConfig:
+                          proposalDetails.proposal.baseConfig || amuletConfigToCompareWith[1],
+                        actualConfig: amuletConfigToCompareWith[1],
+                      }}
+                    />
+                  ) : null}
+                </JsonDiffAccordion>
+              </>
             )}
 
             {proposalDetails.action === 'SRARC_SetConfig' && (
-              <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
+              <>
+                <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
+                <JsonDiffAccordion>
+                  {dsoConfigToCompareWith?.[1] ? (
+                    <PrettyJsonDiff
+                      changes={{
+                        newConfig: proposalDetails.proposal.newConfig,
+                        baseConfig:
+                          proposalDetails.proposal.baseConfig || dsoConfigToCompareWith[1],
+                        actualConfig: dsoConfigToCompareWith[1],
+                      }}
+                    />
+                  ) : null}
+                </JsonDiffAccordion>
+              </>
             )}
 
             <Divider sx={{ my: 1 }} />
@@ -324,37 +430,6 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           )}
         </Paper>
       </Box>
-    </Box>
-  );
-};
-
-interface DetailItemProps {
-  label: string;
-  value: string | React.ReactNode;
-  labelId?: string;
-  valueId?: string;
-  isPartyId?: boolean;
-}
-
-const DetailItem = ({ label, value, labelId, valueId, isPartyId }: DetailItemProps) => {
-  return (
-    <Box sx={{ py: 1 }}>
-      <Typography
-        variant="subtitle2"
-        color="text.secondary"
-        id={labelId}
-        data-testid={labelId}
-        gutterBottom
-      >
-        {label}
-      </Typography>
-      {isPartyId ? (
-        <PartyId partyId={`${value}`} id={valueId} data-testid={valueId} />
-      ) : (
-        <Typography variant="body1" id={valueId} data-testid={valueId}>
-          {value}
-        </Typography>
-      )}
     </Box>
   );
 };

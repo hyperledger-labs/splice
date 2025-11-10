@@ -82,6 +82,37 @@ the example here. As long as you have docker-compose 2.26.0 or newer you should 
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
+.. _validator-http-proxy-compose:
+
+HTTP Proxy configuration
+------------------------
+
+If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
+in `JAVA_TOOL_OPTIONS` in ``splice-node/docker-compose/validator/compose.yaml`` to use the HTTP proxy for outgoing connections.
+You need to do this for both the validator and the participant services:
+
+.. code-block:: yaml
+
+  services:
+    validator:
+      environment:
+        JAVA_TOOL_OPTIONS: >-
+          -Dhttps.proxyHost=your.proxy.host
+          -Dhttps.proxyPort=your_proxy_port
+
+.. code-block:: yaml
+
+  services:
+    participant:
+      environment:
+        JAVA_TOOL_OPTIONS: >-
+          -Dhttps.proxyHost=your.proxy.host
+          -Dhttps.proxyPort=your_proxy_port
+
+Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
+You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
+Proxy authentication is currently not supported.
+
 Deployment
 ++++++++++
 
@@ -217,6 +248,21 @@ you wish to migrate, follow the instructions for associating a user with a party
 :ref:`Users, Parties and Wallets in the Splice Wallet section <validator-users>`, but replace
 the admin party ID with the party ID which you wish to associate with each user.
 
+.. _compose_validator_topup:
+
+Configuring Automatic Traffic Purchases
++++++++++++++++++++++++++++++++++++++++
+
+Your node is configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
+(see :ref:`automatically purchase traffic <traffic_topup>`).
+To tune to your needs, you can set environment variables, for example:
+
+.. code-block:: bash
+
+   export TARGET_TRAFFIC_THROUGHPUT=20000 # target throughput in bytes/second
+   export MIN_TRAFFIC_TOPUP_INTERVAL="1m" # minimum interval between top-ups
+
+.. include:: ../common/traffic_topups.rst
 
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++

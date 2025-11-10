@@ -20,6 +20,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { Link as RouterLink } from 'react-router-dom';
+import { PageSectionHeader } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
 interface ProposalListingSectionProps {
@@ -45,9 +46,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
 
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
-      <Typography variant="h5" sx={{ mb: 2 }} data-testid={`${uniqueId}-section-title`}>
-        {sectionTitle}
-      </Typography>
+      <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
       {data.length === 0 ? (
         <Alert severity="info" data-testid={`${uniqueId}-section-info`}>
