@@ -1297,10 +1297,12 @@ template DsoRules with
         let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
 
         -- expire validator liveness activity records and compute their unclaimed rewards
-        forA_ (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
-          exercise validatorLivenessActivityRecordCid  ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+        expiredValidatorLivenessActivityRecords <- forA (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
+          record <- fetch validatorLivenessActivityRecordCid
+          exercise validatorLivenessActivityRecordCid ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+          return (fromOptional defaultValidatorLicenseWeight record.weight)
 
-        let numValidatorLivenessActivityRecords = optional 0.0 (intToDecimal . length) optValidatorLivenessActivityRecordCids
+        let validatorLivenessActivityRecordsWeight = sum expiredValidatorLivenessActivityRecords
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
@@ -1320,7 +1322,7 @@ template DsoRules with
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
-              (numValidatorFaucetCoupons + numValidatorLivenessActivityRecords) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
+              (numValidatorFaucetCoupons + validatorLivenessActivityRecordsWeight) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
               intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
