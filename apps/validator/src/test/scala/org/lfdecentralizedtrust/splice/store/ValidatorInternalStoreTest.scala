@@ -11,7 +11,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
+import org.lfdecentralizedtrust.splice.validator.store.{
+  ScanUrlInternalConfig,
+  ValidatorInternalStore,
+}
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
@@ -29,51 +32,97 @@ abstract class ValidatorInternalStoreTest
     implicit val tc: TraceContext = TraceContext.empty
 
     val configKey = "test-config-key"
-    val initialValues = Json.fromString("payload1")
+    val initialValue = Json.fromString("payload1")
     val otherKey = "other-config"
-    val otherValues = Json.fromString("payload2")
+    val otherValue = Json.fromString("payload2")
 
-    "set and get a configuration successfully" in {
+    "set and get a json payload successfully" in {
       for {
         store <- mkStore()
-        _ <- store.setConfig(configKey, initialValues)
-        retrievedValues <- store.getConfig(configKey)
+        _ <- store.setConfig(configKey, initialValue)
+        retrievedValue <- store.getConfig(configKey)
       } yield {
-        retrievedValues shouldEqual initialValues
+        retrievedValue shouldEqual initialValue
       }
     }
 
     "return an empty JSON for a non-existent key" in {
       for {
         store <- mkStore()
-        retrievedValues <- store.getConfig("non-existent-key")
+        retrievedValue <- store.getConfig("non-existent-key")
       } yield {
-        retrievedValues shouldEqual Json.obj()
+        retrievedValue shouldEqual Json.obj()
       }
     }
 
-    "update an existing configuration on conflict" in {
+    "update an existing payload" in {
       for {
         store <- mkStore()
-        _ <- store.setConfig(configKey, initialValues)
-        _ <- store.setConfig(configKey, otherValues)
-        retrievedValues <- store.getConfig(configKey)
+        _ <- store.setConfig(configKey, initialValue)
+        _ <- store.setConfig(configKey, otherValue)
+        retrievedValue <- store.getConfig(configKey)
       } yield {
-        retrievedValues shouldEqual otherValues
+        retrievedValue shouldEqual otherValue
       }
     }
 
     "handle multiple different keys independently" in {
       for {
         store <- mkStore()
-        _ <- store.setConfig(configKey, initialValues)
-        _ <- store.setConfig(otherKey, otherValues)
+        _ <- store.setConfig(configKey, initialValue)
+        _ <- store.setConfig(otherKey, otherValue)
 
-        mainKeyValues <- store.getConfig(configKey)
-        otherKeyValues <- store.getConfig(otherKey)
+        mainKeyValue <- store.getConfig(configKey)
+        otherKeyValue <- store.getConfig(otherKey)
       } yield {
-        mainKeyValues shouldEqual initialValues
-        otherKeyValues shouldEqual otherValues
+        mainKeyValue shouldEqual initialValue
+        otherKeyValue shouldEqual otherValue
+      }
+    }
+
+    val scanConfig1: Seq[ScanUrlInternalConfig] = Seq(
+      ScanUrlInternalConfig("sv1", "url1"),
+      ScanUrlInternalConfig("sv2", "url2"),
+      ScanUrlInternalConfig("sv3", "url3"),
+      ScanUrlInternalConfig("sv4", "url4"),
+    )
+
+    val scanConfig2: Seq[ScanUrlInternalConfig] = Seq(
+      ScanUrlInternalConfig("sv1", "url5"),
+      ScanUrlInternalConfig("sv2", "url6"),
+      ScanUrlInternalConfig("sv3", "url7"),
+      ScanUrlInternalConfig("sv4", "url8"),
+    )
+
+    "saves a scan config" in {
+      for {
+        store <- mkStore()
+        _ <- store.setScanUrlInternalConfig(scanConfig1)
+        returnConfig <- store.getScanUrlInternalConfig()
+      } yield {
+        returnConfig shouldEqual scanConfig1
+
+      }
+    }
+    "updates a scan config" in {
+      for {
+        store <- mkStore()
+        _ <- store.setScanUrlInternalConfig(scanConfig1)
+        _ <- store.setScanUrlInternalConfig(scanConfig2)
+        returnConfig <- store.getScanUrlInternalConfig()
+      } yield {
+        returnConfig shouldEqual scanConfig2
+
+      }
+    }
+
+    "retrieves an empty scan config" in {
+      for {
+        store <- mkStore()
+        returnConfig <- store.getScanUrlInternalConfig()
+      } yield {
+        returnConfig shouldEqual Seq.empty[ScanUrlInternalConfig]
+
       }
     }
 

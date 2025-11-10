@@ -5,8 +5,9 @@ package org.lfdecentralizedtrust.splice.validator.store
 
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
-
-import scala.concurrent.Future
+import io.circe.syntax.*
+import io.circe.{Encoder, Decoder}
+import scala.concurrent.{Future, ExecutionContext}
 
 trait ValidatorInternalStore {
 
@@ -14,4 +15,34 @@ trait ValidatorInternalStore {
 
   def getConfig(key: String)(implicit tc: TraceContext): Future[Json]
 
+  private val scanInternalConfigKey = "validator_scan_internal_config_key"
+
+  implicit val scanUrlEncoder: Encoder[ScanUrlInternalConfig] =
+    Encoder.forProduct2("svName", "url")(s => (s.svName, s.url))
+  implicit val scanUrlDecoder: Decoder[ScanUrlInternalConfig] =
+    Decoder.forProduct2("svName", "url")(ScanUrlInternalConfig.apply)
+
+  def setScanUrlInternalConfig(
+      value: Seq[ScanUrlInternalConfig]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    setConfig(scanInternalConfigKey, value.asJson)
+  }
+
+  def getScanUrlInternalConfig(
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[ScanUrlInternalConfig]] = {
+    getConfig(scanInternalConfigKey).map { json =>
+      if (json.isNull || json.asObject.exists(_.isEmpty)) {
+        Seq.empty[ScanUrlInternalConfig]
+      } else {
+        json.as[Seq[ScanUrlInternalConfig]].toOption.getOrElse {
+          Seq.empty[ScanUrlInternalConfig]
+        }
+      }
+    }
+  }
 }
+
+final case class ScanUrlInternalConfig(
+    svName: String,
+    url: String,
+)

@@ -34,7 +34,7 @@ class DbValidatorInternalStore(
         ON CONFLICT (config_key) DO UPDATE
         SET config_value = excluded.config_value""".asUpdate
 
-    storage.update(action, "set-validator-config").map(_ => ())
+    storage.update(action, "set-validator-internal-config").map(_ => ())
   }
 
   override def getConfig(key: String)(implicit tc: TraceContext): Future[Json] = {
@@ -43,7 +43,7 @@ class DbValidatorInternalStore(
         WHERE config_key = $key
       """.as[Json].headOption
 
-    val jsonOptionF = storage.querySingle(queryAction, "get-validator-config")
+    val jsonOptionF = storage.querySingle(queryAction, "get-validator-internal-config")
 
     jsonOptionF.value.map {
       _.getOrElse(Json.obj())
