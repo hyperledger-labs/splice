@@ -4,6 +4,7 @@ import com.auth0.jwk.{JwkProvider, JwkProviderBuilder}
 import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.{BaseTest, FutureHelpers, HasActorSystem, HasExecutionContext}
+import com.typesafe.config.ConfigFactory
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
@@ -196,15 +197,40 @@ class HttpClientProxyTest
         }
       }
     }
+    "support proxy configuration via pekko config (no authentication)" in {
+      withProxy() { proxy =>
+        val sys = ActorSystem(
+          "HttpClientProxyTest",
+          ConfigFactory.parseString(s"""
+          pekko.http.client.proxy {
+            https {
+              host = "localhost"
+              port = ${proxy.port.toString}
+            }
+          }
+          """),
+        )
+        val ec = sys.dispatcher
+        try {
+          withHttpServer(Routes.respondWithOK) { serverBinding =>
+            assertProxiedGetRequest(proxy, serverBinding)(sys, ec)
+          }(sys, ec)
+        } finally {
+          sys.terminate().futureValue
+        }
+      }
+    }
   }
 
-  private def executeRequest(serverBinding: ServerBinding) = {
+  private def executeRequest(
+      serverBinding: ServerBinding
+  )(implicit ac: ActorSystem, ec: ExecutionContext) = {
     val serverPort = serverBinding.localAddress.getPort
     val httpClient = HttpClient(
       ApiLoggingConfig(),
       HttpClient.HttpRequestParameters(NonNegativeDuration(30.seconds)),
       logger,
-    )
+    )(ac, ec)
     val uriString = s"http://localhost:$serverPort"
 
     httpClient
@@ -213,10 +239,13 @@ class HttpClientProxyTest
       )
   }
 
-  private def assertProxiedGetRequest(proxy: HttpProxy, serverBinding: ServerBinding) = {
+  private def assertProxiedGetRequest(proxy: HttpProxy, serverBinding: ServerBinding)(implicit
+      ac: ActorSystem,
+      ec: ExecutionContext,
+  ) = {
     val serverPort = serverBinding.localAddress.getPort
     val host = "localhost"
-    val response = executeRequest(serverBinding).futureValue
+    val response = executeRequest(serverBinding)(ac, ec).futureValue
     response.status shouldBe StatusCodes.OK
     proxy.process.hasNoErrors shouldBe true
     proxy.proxiedConnectRequest(host, serverPort) shouldBe true

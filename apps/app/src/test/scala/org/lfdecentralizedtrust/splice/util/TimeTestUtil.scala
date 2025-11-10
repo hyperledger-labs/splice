@@ -178,7 +178,7 @@ trait TimeTestUtil extends TestCommon {
       .map(_.contract.payload.opensAt)
       .maxOption
       .foreach { opensAt =>
-        val advanceTo = opensAt.plus(defaultTickDuration.asJava.minusSeconds(1))
+        val advanceTo = opensAt.plus(defaultTickDuration.asJava.minusMillis(1))
         logger.info(
           s"Advancing time to $advanceTo from $now for reward automation to run with open time of round $opensAt for open rounds $openRounds "
         )
