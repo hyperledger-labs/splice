@@ -524,7 +524,9 @@ class AppUpgradeIntegrationTest
     }
   }
 
-  private def vettedPackages(participant: ParticipantClientReference)(implicit env: SpliceTestConsoleEnvironment) = {
+  private def vettedPackages(
+      participant: ParticipantClientReference
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     participant.topology.vetted_packages
       .list(
         filterParticipant = participant.id.filterString,
