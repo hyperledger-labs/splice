@@ -181,13 +181,12 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         </TableCell>
       )}
       {showVoteStats && (
-        <TableCell data-testid={`${uniqueId}-row-vote-stats`}>
+        <TableCell data-testid={`${uniqueId}-row-all-votes`}>
           <TableBodyTypography>
-            {/* {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected */}
             <AllVotes
               acceptedVotes={voteStats['accepted']}
               rejectedVotes={voteStats['rejected']}
-              data-testid={`${uniqueId}-row-all-votes`}
+              data-testid={`${uniqueId}-row-all-votes-stats`}
             />
           </TableBodyTypography>
         </TableCell>
@@ -199,7 +198,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       )}
 
       <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-        <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote`} />
+        <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote-stats`} />
       </TableCell>
     </TableRow>
   );
@@ -233,7 +232,7 @@ interface VoteStatsProps {
 const VoteStats: React.FC<VoteStatsProps> = ({ vote, count, 'data-testid': testId }) => {
   if (vote === 'accepted') {
     return (
-      <Stack direction="row" gap="4px" alignItems="center">
+      <Stack direction="row" gap="4px" alignItems="center" data-testid={testId}>
         <CheckCircleOutlineIcon
           fontSize="small"
           color="success"
@@ -246,7 +245,7 @@ const VoteStats: React.FC<VoteStatsProps> = ({ vote, count, 'data-testid': testI
 
   if (vote === 'rejected') {
     return (
-      <Stack direction="row" gap="4px" alignItems="center">
+      <Stack direction="row" gap="4px" alignItems="center" data-testid={testId}>
         <CancelOutlinedIcon
           fontSize="small"
           color="error"
@@ -257,7 +256,7 @@ const VoteStats: React.FC<VoteStatsProps> = ({ vote, count, 'data-testid': testI
     );
   }
 
-  return <TableBodyTypography>No Vote</TableBodyTypography>;
+  return <TableBodyTypography data-testid={testId}>No Vote</TableBodyTypography>;
 };
 
 const TableBodyTypography: React.FC<React.PropsWithChildren> = ({ children }) => (
