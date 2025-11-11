@@ -414,6 +414,17 @@ class SvApp(
             }
           } yield res
       }
+      cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+        SvCantonIdentifierConfig.default(config)
+      )
+      _ <- ParticipantInitializer.ensureInitializedWithRotatedOTK(
+        cantonIdentifierConfig.participant,
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        decentralizedSynchronizer,
+      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection(SpliceLedgerConnectionPriority.Low),

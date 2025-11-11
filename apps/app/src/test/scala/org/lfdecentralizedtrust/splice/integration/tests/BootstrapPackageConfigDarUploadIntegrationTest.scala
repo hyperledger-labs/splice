@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
@@ -45,18 +44,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           _.copy(initialPackageConfig = initialPackageConfig)
         )(config)
       )
-      .addConfigTransform((_, conf) =>
-        conf.copy(validatorApps =
-          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
-            _.map { aliceValidatorConfig =>
-              val withoutExtraSynchronizers = aliceValidatorConfig.domains.copy(extra = Seq.empty)
-              aliceValidatorConfig.copy(
-                domains = withoutExtraSynchronizers
-              )
-            }
-          }
-        )
-      )
+      .withoutAliceValidatorConnectingToSplitwell
       .withCantonNodeNameSuffix("BootstrapDsoPackageConfig")
       .withManualStart
 

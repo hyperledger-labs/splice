@@ -208,6 +208,16 @@ class SV1Initializer(
         retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        Some(localSynchronizerNode),
+        clock,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
+      _ = logger.info("Synchronizer rotated OTK keys that were not signed")
       (dsoParty, svParty, _) <- (
         setupDsoParty(synchronizerId, initConnection, namespace),
         SetupUtil.setupSvParty(
