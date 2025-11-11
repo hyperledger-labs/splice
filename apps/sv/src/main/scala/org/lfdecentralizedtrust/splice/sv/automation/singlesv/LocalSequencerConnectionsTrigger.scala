@@ -108,7 +108,7 @@ class LocalSequencerConnectionsTrigger(
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
             PositiveInt.tryCreate(1),
-            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
             // TODO(#2666) Make the delays configurable.

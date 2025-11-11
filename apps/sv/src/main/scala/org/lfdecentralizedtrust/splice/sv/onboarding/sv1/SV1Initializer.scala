@@ -190,7 +190,7 @@ class SV1Initializer(
               )
             ),
             PositiveInt.one,
-            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
             // TODO(#2666) Make the delays configurable.
