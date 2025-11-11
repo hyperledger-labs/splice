@@ -40,8 +40,6 @@ class ExternalPartyWalletManager(
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
@@ -170,8 +168,6 @@ class ExternalPartyWalletManager(
       partyLoggerFactory,
       domainMigrationInfo,
       participantId,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
     )
     (externalPartyRetryProvider, walletService)

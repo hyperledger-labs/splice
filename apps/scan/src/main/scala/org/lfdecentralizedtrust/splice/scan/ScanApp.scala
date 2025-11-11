@@ -209,8 +209,6 @@ class ScanApp(
         store,
         storage,
         acsSnapshotStore,
-        config.ingestFromParticipantBegin,
-        config.ingestUpdateHistoryFromParticipantBegin,
         serviceUserPrimaryParty,
         svName,
         amuletAppParameters.upgradesConfig,
