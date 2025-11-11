@@ -12,7 +12,6 @@ import {
   TableRow,
   Alert,
   Stack,
-  SxProps,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
@@ -30,41 +29,6 @@ interface ProposalListingSectionProps {
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
 }
-
-interface YourVoteProps {
-  vote: YourVoteStatus;
-  'data-testid': string;
-}
-
-const YourVote: React.FC<YourVoteProps> = ({ vote, 'data-testid': testId }) => {
-  if (vote === 'accepted') {
-    return (
-      <Stack direction="row" gap="6px" alignItems="center">
-        <CheckCircleOutlineIcon
-          fontSize="small"
-          color="success"
-          data-testid={`${testId}-accepted-icon`}
-        />
-        <TableBodyTypography>Accepted</TableBodyTypography>
-      </Stack>
-    );
-  }
-
-  if (vote === 'rejected') {
-    return (
-      <Stack direction="row" gap="6px" alignItems="center">
-        <CancelOutlinedIcon
-          fontSize="small"
-          color="error"
-          data-testid={`${testId}-rejected-icon`}
-        />
-        <TableBodyTypography>Rejected</TableBodyTypography>
-      </Stack>
-    );
-  }
-
-  return <TableBodyTypography sx={{ opacity: 0.5 }}>No Vote</TableBodyTypography>;
-};
 
 const getColumnsCount = (alwaysShown: number, ...sometimesShown: (boolean | undefined)[]) =>
   alwaysShown +
@@ -185,11 +149,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   return (
     <TableRow
       sx={{
-        borderRadius: '4px',
-        border: '1px solid #4F4F4F',
         display: 'grid',
         gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
         alignItems: 'center',
+        borderRadius: '4px',
+        border: '1px solid #4F4F4F',
         paddingBlock: '10px',
       }}
       data-testid={`${uniqueId}-row`}
@@ -214,7 +178,12 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       {showVoteStats && (
         <TableCell data-testid={`${uniqueId}-row-vote-stats`}>
           <TableBodyTypography>
-            {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected
+            {/* {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected */}
+            <AllVotes
+              acceptedVotes={voteStats['accepted']}
+              rejectedVotes={voteStats['rejected']}
+              data-testid={`${uniqueId}-row-all-votes`}
+            />
           </TableBodyTypography>
         </TableCell>
       )}
@@ -225,21 +194,69 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       )}
 
       <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-        <YourVote vote={yourVote} data-testid={`${uniqueId}-row-your-vote`} />
+        <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote`} />
       </TableCell>
     </TableRow>
   );
 };
 
-interface TableBodyTypographyProps {
-  sx?: SxProps;
+interface AllVotesProps {
+  acceptedVotes: number;
+  rejectedVotes: number;
+  'data-testid': string;
 }
 
-const TableBodyTypography: React.FC<React.PropsWithChildren<TableBodyTypographyProps>> = ({
-  children,
-  sx,
-}) => (
-  <Typography fontSize={14} lineHeight={2} color="text.light" sx={sx}>
+const AllVotes: React.FC<AllVotesProps> = ({
+  acceptedVotes,
+  rejectedVotes,
+  'data-testid': testId,
+}) => {
+  return (
+    <Stack>
+      <VoteStats vote="accepted" count={acceptedVotes} data-testid={`${testId}-accepted`} />
+      <VoteStats vote="rejected" count={rejectedVotes} data-testid={`${testId}-rejected`} />
+    </Stack>
+  );
+};
+
+interface VoteStatsProps {
+  vote: YourVoteStatus;
+  count?: number;
+  'data-testid': string;
+}
+
+const VoteStats: React.FC<VoteStatsProps> = ({ vote, count, 'data-testid': testId }) => {
+  if (vote === 'accepted') {
+    return (
+      <Stack direction="row" gap="4px" alignItems="center">
+        <CheckCircleOutlineIcon
+          fontSize="small"
+          color="success"
+          data-testid={`${testId}-accepted-icon`}
+        />
+        <TableBodyTypography>{count} Accepted</TableBodyTypography>
+      </Stack>
+    );
+  }
+
+  if (vote === 'rejected') {
+    return (
+      <Stack direction="row" gap="4px" alignItems="center">
+        <CancelOutlinedIcon
+          fontSize="small"
+          color="error"
+          data-testid={`${testId}-rejected-icon`}
+        />
+        <TableBodyTypography>{count} Rejected</TableBodyTypography>
+      </Stack>
+    );
+  }
+
+  return <TableBodyTypography>No Vote</TableBodyTypography>;
+};
+
+const TableBodyTypography: React.FC<React.PropsWithChildren> = ({ children }) => (
+  <Typography fontFamily="lato" fontSize={14} lineHeight={2} color="text.light">
     {children}
   </Typography>
 );
