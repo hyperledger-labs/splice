@@ -28,6 +28,7 @@ class WalletSurviveCantonRestartIntegrationTest
     Seq(
       "canton.participants.validatorParticipant.ledger-api.port=7501",
       "canton.participants.validatorParticipant.admin-api.port=7502",
+      "canton.participants.validatorParticipant.sequencer-client.use-new-connection-pool=true",
     )
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
@@ -39,8 +40,17 @@ class WalletSurviveCantonRestartIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
+      .addConfigTransforms(
+        (_, conf) => ConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf),
+        (_, conf) =>
+          ConfigTransforms.updateAllValidatorConfigs { case (name, config) =>
+            if (name == "aliceValidatorBackend") {
+              import monocle.macros.syntax.lens.*
+              config.focus(_.parameters.enabledFeatures.newSequencerConnectionPool).replace(true)
+            } else {
+              config
+            }
+          }(conf),
       )
       // Do not allocate validator users here, as we deal with all of them manually
       .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
