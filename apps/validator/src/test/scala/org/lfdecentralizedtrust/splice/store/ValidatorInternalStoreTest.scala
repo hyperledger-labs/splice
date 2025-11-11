@@ -42,16 +42,16 @@ abstract class ValidatorInternalStoreTest
         _ <- store.setConfig(configKey, initialValue)
         retrievedValue <- store.getConfig(configKey)
       } yield {
-        retrievedValue shouldEqual initialValue
+        retrievedValue.getOrElse(Json.Null) shouldEqual initialValue
       }
     }
 
-    "return an empty JSON for a non-existent key" in {
+    "return None for a non-existent key" in {
       for {
         store <- mkStore()
         retrievedValue <- store.getConfig("non-existent-key")
       } yield {
-        retrievedValue shouldEqual Json.obj()
+        retrievedValue shouldEqual None
       }
     }
 
@@ -62,7 +62,7 @@ abstract class ValidatorInternalStoreTest
         _ <- store.setConfig(configKey, otherValue)
         retrievedValue <- store.getConfig(configKey)
       } yield {
-        retrievedValue shouldEqual otherValue
+        retrievedValue.getOrElse(Json.Null) shouldEqual otherValue
       }
     }
 
@@ -75,8 +75,8 @@ abstract class ValidatorInternalStoreTest
         mainKeyValue <- store.getConfig(configKey)
         otherKeyValue <- store.getConfig(otherKey)
       } yield {
-        mainKeyValue shouldEqual initialValue
-        otherKeyValue shouldEqual otherValue
+        mainKeyValue.getOrElse(Json.Null) shouldEqual initialValue
+        otherKeyValue.getOrElse(Json.Null) shouldEqual otherValue
       }
     }
 
@@ -100,7 +100,7 @@ abstract class ValidatorInternalStoreTest
         _ <- store.setScanUrlInternalConfig(scanConfig1)
         returnConfig <- store.getScanUrlInternalConfig()
       } yield {
-        returnConfig shouldEqual scanConfig1
+        returnConfig.getOrElse(None) shouldEqual scanConfig1
 
       }
     }
@@ -111,7 +111,7 @@ abstract class ValidatorInternalStoreTest
         _ <- store.setScanUrlInternalConfig(scanConfig2)
         returnConfig <- store.getScanUrlInternalConfig()
       } yield {
-        returnConfig shouldEqual scanConfig2
+        returnConfig.getOrElse(None) shouldEqual scanConfig2
 
       }
     }
@@ -121,7 +121,7 @@ abstract class ValidatorInternalStoreTest
         store <- mkStore()
         returnConfig <- store.getScanUrlInternalConfig()
       } yield {
-        returnConfig shouldEqual Seq.empty[ScanUrlInternalConfig]
+        returnConfig shouldEqual None
 
       }
     }
@@ -149,6 +149,7 @@ class DbValidatorInternalStoreTest
       storage = storage,
       loggingContext = elc,
       closeContext = cc,
+      loggerFactory = loggerFactory,
     )
   }
 
