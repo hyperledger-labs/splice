@@ -120,7 +120,9 @@ class UpdateHistory(
     }
     (for {
       lastIngestedRecordTime <- newState.lastIngestedRecordTime
-    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)).discard
+    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)(
+      MetricsContext("update_stream_party" -> updateStreamParty.toProtoPrimitive)
+    )).discard
   }
 
   def waitUntilInitialized: Future[Unit] = state.get().initialized.future
