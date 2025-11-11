@@ -73,7 +73,7 @@ private[multihostedparties] trait UseSilentSynchronizerInTest
   ): Instant = {
     sequencers.foreach(
       _.topology.synchronizer_parameters.propose_update(
-        synchronizer.id,
+        synchronizer.logicalSynchronizerId,
         _.update(confirmationRequestsMaxRate = NonNegativeInt.zero),
       )
     )
@@ -114,7 +114,7 @@ private[multihostedparties] trait UseSilentSynchronizerInTest
   ): Unit = {
     sequencers.foreach(
       _.topology.synchronizer_parameters.propose_update(
-        synchronizer.id,
+        synchronizer.logicalSynchronizerId,
         _.update(confirmationRequestsMaxRate =
           DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
         ),

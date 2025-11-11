@@ -71,9 +71,6 @@ case class AutomationConfig(
       * TODO(DACH-NY/canton-network-node#11828) Remove this option
       */
     enableExpireValidatorFaucet: Boolean = false,
-    /** Only intended for testing. Disables the expiration of Amulet.
-      */
-    enableExpireAmulet: Boolean = false,
     /** Only intended for testing. Allows disabling governance automation.
       */
     enableDsoGovernance: Boolean = true,
@@ -101,6 +98,7 @@ case class AutomationConfig(
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
     ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
+    ingestion: IngestionConfig = IngestionConfig(),
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName
@@ -111,3 +109,10 @@ case class AutomationConfig(
   def topupTriggerPollingInterval_ : NonNegativeFiniteDuration =
     topupTriggerPollingInterval.getOrElse(pollingInterval)
 }
+
+case class IngestionConfig(
+    maxBatchSize: Int = 100,
+    maxEntriesPerInsert: Int = 100,
+    maxDeletesPerStatement: Int = 1000,
+    maxLookupsPerStatement: Int = 1000,
+)

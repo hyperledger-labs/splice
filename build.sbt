@@ -33,7 +33,7 @@ lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extens
 lazy val `canton-wartremover-annotations` = BuildCommon.`canton-wartremover-annotations`
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
-lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
+lazy val `canton-util-observability` = BuildCommon.`canton-util-observability`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
 lazy val `canton-scalatest-addon` = BuildCommon.`canton-scalatest-addon`
@@ -103,6 +103,8 @@ lazy val root: Project = (project in file("."))
     `splice-wallet-test-daml`,
     `splice-util-featured-app-proxies-daml`,
     `splice-util-featured-app-proxies-test-daml`,
+    `splice-util-token-standard-wallet-daml`,
+    `splice-util-token-standard-wallet-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -228,6 +230,7 @@ lazy val docs = project
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -794,6 +797,20 @@ lazy val `splice-util-featured-app-proxies-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `splice-util-token-standard-wallet-daml` =
+  project
+    .in(file("daml/splice-util-token-standard-wallet"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `splice-util-featured-app-proxies-test-daml` =
   project
     .in(file("daml/splice-util-featured-app-proxies-test"))
@@ -803,6 +820,19 @@ lazy val `splice-util-featured-app-proxies-test-daml` =
       Compile / damlDependencies :=
         (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-token-standard-wallet-test-daml` =
+  project
+    .in(file("daml/splice-util-token-standard-wallet-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
     .dependsOn(`canton-bindings-java`)
@@ -1668,6 +1698,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("io", "grpc", _*) => MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
+    // Don't really care about the notice file so just take any.
+    case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }
@@ -1854,12 +1886,17 @@ checkErrors := {
 
   splitAndCheckCantonLogFile("canton", usesSimtime = false)
   splitAndCheckCantonLogFile("canton-simtime", usesSimtime = true)
+  splitAndCheckCantonLogFile("canton-missing-signatures", usesSimtime = false)
   import better.files._
   val dir = File("log/")
   if (dir.exists())
     dir
       .glob("canton-standalone-*.clog")
       .map(_.nameWithoutExtension)
+      .map(_.stripSuffix("_before_shutdown"))
+      .map(_.stripSuffix("_after_shutdown"))
+      .toList
+      .distinct
       .foreach { name =>
         splitAndCheckCantonLogFile(
           name,
@@ -1918,7 +1955,8 @@ lazy val `apps-app`: Project =
         CantonDependencies.opentelemetry_zipkin,
         CantonDependencies.opentelemetry_instrumentation_grpc,
         CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
-      ),
+      ) ++ Seq("netty-handler-proxy", "netty-codec-socks")
+        .map("io.netty" % _ % CantonDependencies.netty_version % "test"),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,
@@ -1993,6 +2031,10 @@ updateTestConfigForParallelRuns := {
       "SvOffboardingIntegrationTest",
       "ManualStartIntegrationTest",
     ).exists(name.contains)
+  def isManualSignatureIntegrationTest(name: String): Boolean =
+    Seq(
+      "ManualSignatureIntegrationTest"
+    ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isLocalNetTest(name: String): Boolean =
@@ -2016,6 +2058,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "manual tests with custom canton instance",
+      "test-full-class-names-signatures.log",
+      (t: String) => isManualSignatureIntegrationTest(t),
+    ),
     (
       "Unit tests",
       "test-full-class-names-non-integration.log",

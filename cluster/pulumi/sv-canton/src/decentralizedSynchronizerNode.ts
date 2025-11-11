@@ -13,7 +13,6 @@ import {
   loadYamlFromFile,
   LogLevel,
   sanitizedForPostgres,
-  sequencerResources,
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
@@ -108,7 +107,7 @@ abstract class InStackDecentralizedSynchronizerNode
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
             additionalEnvVars: svConfig.sequencer?.additionalEnvVars,
-            ...sequencerResources,
+            resources: svConfig.sequencer?.resources,
           },
           mediator: {
             ...decentralizedSynchronizerValues.mediator,
@@ -120,6 +119,7 @@ abstract class InStackDecentralizedSynchronizerNode
               ...(dbs.setCoreDbNames ? { databaseName: mediatorDbName } : {}),
             },
             additionalEnvVars: svConfig.mediator?.additionalEnvVars,
+            resources: svConfig.mediator?.resources,
           },
           enablePostgresMetrics: true,
           metrics: {

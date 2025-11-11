@@ -90,6 +90,11 @@ larger rewards and has a higher cap. A *featured application* also
 receives an additional minting weight with a total equivalent value of about
 $1 US (the SuperValidators may adjust this in the future).
 
+.. _how_to_become_a_featured_application:
+
+How to become a featured application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 To become a
 featured application you need an *application provider's party ID* which
 is an input to the application. That process starts by filling in `this

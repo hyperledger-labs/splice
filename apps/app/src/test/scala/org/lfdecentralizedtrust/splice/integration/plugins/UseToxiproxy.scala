@@ -175,6 +175,21 @@ case class UseToxiproxy(
                         BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
                       ),
                     )
+                  case BftScanClientConfig
+                        .BftCustom(
+                          seedUrls,
+                          _,
+                          _,
+                          amuletRulesCacheTimeToLive,
+                          scansRefreshInterval,
+                        ) =>
+                    val newUrl = addScanAppHttpProxy(n.unwrap, seedUrls.head, basePortBump)
+                    (
+                      n,
+                      config.copy(scanClient =
+                        BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
+                      ),
+                    )
                 }
               }
               .toMap
@@ -243,8 +258,8 @@ case class UseToxiproxy(
   def disableConnectionViaProxy(connection: String): Unit = {
     proxies.get(connection) match {
       case Some(p) =>
-        logger.info(s"Disabled $connection")
         p.disable()
+        logger.info(s"Disabled $connection")
       case _ => fail(s"No proxy named ${connection}")
     }
   }

@@ -296,6 +296,7 @@ export const CreateVoteRequest: React.FC = () => {
                   maxDateTime={effectivity}
                   readOnly={false}
                   onChange={d => handleExpirationDateChange(d)}
+                  enableAccessibleFieldDOMStructure={false}
                   slotProps={{
                     textField: {
                       id: 'datetime-picker-vote-request-expiration',
@@ -348,6 +349,7 @@ export const CreateVoteRequest: React.FC = () => {
                     format="YYYY-MM-DD HH:mm"
                     readOnly={false}
                     onChange={d => handleEffectivityDateChange(d)}
+                    enableAccessibleFieldDOMStructure={false}
                     slotProps={{
                       textField: {
                         id: 'datetime-picker-vote-request-effectivity',

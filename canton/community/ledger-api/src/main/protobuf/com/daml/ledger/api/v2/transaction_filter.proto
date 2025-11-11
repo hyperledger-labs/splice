@@ -17,10 +17,10 @@ message Filters {
   // template or wildcard filter means additional events that will match the query.
   // The impact of include_interface_view and include_created_event_blob fields in the filters will
   // also be accumulated.
-  // At least one cumulative filter MUST be specified.
   // A template or an interface SHOULD NOT appear twice in the accumulative field.
   // A wildcard filter SHOULD NOT be defined more than once in the accumulative field.
-  // Optional
+  // Optional, if no ``CumulativeFilter`` defined, the default of a single ``WildcardFilter`` with
+  // include_created_event_blob unset is used.
   repeated CumulativeFilter cumulative = 1;
 }
 
@@ -94,30 +94,6 @@ message TemplateFilter {
   // for submitting it as a disclosed contract with future commands.
   // Optional
   bool include_created_event_blob = 2;
-}
-
-// Provided for backwards compatibility, it will be removed in the Canton version 3.4.0.
-// Used both for filtering create and archive events as well as for filtering transaction trees.
-message TransactionFilter {
-  option deprecated = true;
-  // Each key must be a valid PartyIdString (as described in ``value.proto``).
-  // The interpretation of the filter depends on the transaction-shape being filtered:
-  //
-  // 1. For **transaction trees** (used in GetUpdateTreesResponse for backwards compatibility) all party keys used as
-  //    wildcard filters, and all subtrees whose root has one of the listed parties as an informee are returned.
-  //    If there are ``CumulativeFilter``s, those will control returned ``CreatedEvent`` fields where applicable, but will
-  //    not be used for template/interface filtering.
-  // 2. For **ledger-effects** create and exercise events are returned, for which the witnesses include at least one of
-  //    the listed parties and match the per-party filter.
-  // 3. For **transaction and active-contract-set streams** create and archive events are returned for all contracts whose
-  //    stakeholders include at least one of the listed parties and match the per-party filter.
-  //
-  // Required
-  map<string, Filters> filters_by_party = 1;
-
-  // Wildcard filters that apply to all the parties existing on the participant. The interpretation of the filters is the same
-  // with the per-party filter as described above.
-  Filters filters_for_any_party = 2;
 }
 
 // A format for events which defines both which events should be included

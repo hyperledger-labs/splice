@@ -61,6 +61,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 abstract class ScanStoreTest
     extends StoreTest
@@ -2332,6 +2333,7 @@ class DbScanStoreTest
         None,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
+      IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
     )(parallelExecutionContext, implicitly, implicitly)

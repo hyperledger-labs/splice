@@ -11,6 +11,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   CryptoConfig,
   CryptoProvider,
@@ -219,11 +220,14 @@ class SvApp(
           svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
               CryptoConfig(provider = CryptoProvider.Jce),
-              ProtocolVersion.v33,
+              ProtocolVersion.v34,
+              // TODO(#456) Use the proper serial
+              NonNegativeInt.zero,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
-            ),
+            )
+            .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal),
           svSynchronizerConfig.sequencer.internalApi,
           svSynchronizerConfig.sequencer.externalPublicApiUrl,
           svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
@@ -235,6 +239,7 @@ class SvApp(
             svSynchronizerConfig.sequencer,
             cometBftConfig,
           ),
+          svSynchronizerConfig.mediator.pruning,
         )
       )
     initialize(
@@ -347,6 +352,7 @@ class SvApp(
                 retryProvider,
                 config.spliceInstanceNames,
                 loggerFactory,
+                config.parameters.enabledFeatures,
               )
               initializer.bootstrapDso()
             }
@@ -389,6 +395,7 @@ class SvApp(
               retryProvider,
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
+              config.parameters.enabledFeatures,
             ).migrateDomain()
           }
         case None =>
@@ -407,6 +414,17 @@ class SvApp(
             }
           } yield res
       }
+      cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+        SvCantonIdentifierConfig.default(config)
+      )
+      _ <- ParticipantInitializer.ensureInitializedWithRotatedOTK(
+        cantonIdentifierConfig.participant,
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        decentralizedSynchronizer,
+      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection(SpliceLedgerConnectionPriority.Low),
@@ -464,17 +482,24 @@ class SvApp(
         },
         localSynchronizerNode match {
           case Some(node) =>
-            if (!config.skipSynchronizerInitialization) {
-              appInitStep(
-                "Ensure that the local mediators's sequencer request amplification config is up to date"
-              ) {
-                // Normally we set this up during mediator init
-                // but if the config changed without a mediator reset we need to update it here.
-                node.ensureMediatorSequencerRequestAmplification()
-              }
+            if (!config.shouldSkipSynchronizerInitialization) {
+              for {
+                _ <- appInitStep(
+                  "Ensure that the local mediators's sequencer request amplification config is up to date"
+                ) {
+                  // Normally we set this up during mediator init
+                  // but if the config changed without a mediator reset we need to update it here.
+                  node.ensureMediatorSequencerRequestAmplification()
+                }
+                _ <- appInitStep(
+                  "Ensure that the local mediators's pruning config is up to date"
+                ) {
+                  node.ensureMediatorPruningSchedule()
+                }
+              } yield ()
             } else {
               logger.info(
-                "Skipping mediator sequencer amplification configuration because skipSynchronizerInitialization is enabled"
+                "Skipping mediator configuration because skipSynchronizerInitialization is enabled"
               )
               Future.unit
             }
@@ -544,15 +569,18 @@ class SvApp(
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
-          Some(
-            localSynchronizerNode
-              .getOrElse(
-                sys.error("SV app should always have a sequencer connection for domain migrations")
-              )
-              .sequencerAdminConnection
-          ),
+          localSynchronizerNode
+            .getOrElse(
+              sys.error("SV app should always have a sequencer connection for domain migrations")
+            )
+            .sequencerAdminConnection,
           dsoStore,
-          new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          new AcsExporter(
+            participantAdminConnection,
+            retryProvider,
+            config.parameters.enabledFeatures.enableNewAcsExport,
+            loggerFactory,
+          ),
           retryProvider,
           loggerFactory,
         ),
@@ -565,6 +593,7 @@ class SvApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         metrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
 
       route = cors(
@@ -646,6 +675,7 @@ class SvApp(
         timeouts,
         httpClient,
         templateDecoder,
+        httpRateLimiter,
       )
     }
   }
@@ -788,6 +818,7 @@ object SvApp {
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
       decoder: TemplateJsonDecoder,
+      httpRateLimiter: HttpRateLimiter,
   ) extends FlagCloseableAsync
       with HasHealth {
     override def isHealthy: Boolean =
@@ -811,6 +842,7 @@ object SvApp {
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
         SyncCloseable("admin handler", svAdminHandler.close()),
         SyncCloseable("storage", storage.close()),
+        SyncCloseable("http rate limiter", httpRateLimiter.close()),
       )
   }
 

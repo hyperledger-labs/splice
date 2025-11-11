@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import scala.concurrent.*
 
@@ -30,6 +31,7 @@ class DbExternalPartyWalletStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -39,7 +41,7 @@ class DbExternalPartyWalletStore(
       acsTableName = WalletTables.externalPartyAcsTableName,
       interfaceViewsTableNameOpt = None,
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbExternalPartyWalletStore",
         party = key.externalParty,
         participant = participantId,
@@ -50,7 +52,7 @@ class DbExternalPartyWalletStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
+      ingestionConfig,
     )
     with ExternalPartyWalletStore
     with AcsTables

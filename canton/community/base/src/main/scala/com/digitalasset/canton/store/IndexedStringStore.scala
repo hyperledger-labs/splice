@@ -14,7 +14,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.store.db.DbIndexedStringStore
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 import slick.jdbc.{PositionedParameters, SetParameter}
@@ -48,7 +48,7 @@ abstract class IndexedStringFromDb[A <: IndexedString[B], B] {
 
   def indexed(
       indexedStringStore: IndexedStringStore
-  )(item: B)(implicit ec: ExecutionContext): FutureUnlessShutdown[A] =
+  )(item: B)(implicit ec: ExecutionContext, traceContext: TraceContext): FutureUnlessShutdown[A] =
     indexedStringStore
       .getOrCreateIndex(dbTyp, asString(item))
       .map(buildIndexed(item, _))
@@ -58,16 +58,22 @@ abstract class IndexedStringFromDb[A <: IndexedString[B], B] {
   )(implicit
       ec: ExecutionContext,
       loggingContext: ErrorLoggingContext,
-  ): OptionT[FutureUnlessShutdown, A] =
+  ): OptionT[FutureUnlessShutdown, A] = {
+    implicit val traceContext: TraceContext = loggingContext.traceContext
+
     fromDbIndexET(indexedStringStore)(index).leftMap { err =>
       loggingContext.logger.error(
         s"Corrupt log id: $index for $dbTyp within context $context: $err"
       )(loggingContext.traceContext)
     }.toOption
+  }
 
   def fromDbIndexET(
       indexedStringStore: IndexedStringStore
-  )(index: Int)(implicit ec: ExecutionContext): EitherT[FutureUnlessShutdown, String, A] =
+  )(index: Int)(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): EitherT[FutureUnlessShutdown, String, A] =
     EitherT(indexedStringStore.getForIndex(dbTyp, index).map { strO =>
       for {
         str <- strO.toRight("No entry for given index")
@@ -112,6 +118,51 @@ object IndexedSynchronizer extends IndexedStringFromDb[IndexedSynchronizer, Sync
     SynchronizerId.fromString(str.unwrap).map(checked(tryCreate(_, index)))
 }
 
+final case class IndexedPhysicalSynchronizer private (
+    synchronizerId: PhysicalSynchronizerId,
+    index: Int,
+) extends IndexedString.Impl[PhysicalSynchronizerId](synchronizerId) {
+  require(
+    index > 0,
+    s"Illegal index $index. The index must be positive to prevent clashes with participant event log ids.",
+  )
+}
+
+object IndexedPhysicalSynchronizer
+    extends IndexedStringFromDb[IndexedPhysicalSynchronizer, PhysicalSynchronizerId] {
+
+  /** @throws java.lang.IllegalArgumentException
+    *   if `index <= 0`.
+    */
+  @VisibleForTesting
+  def tryCreate(
+      synchronizerId: PhysicalSynchronizerId,
+      index: Int,
+  ): IndexedPhysicalSynchronizer =
+    IndexedPhysicalSynchronizer(synchronizerId, index)
+
+  override protected def dbTyp: IndexedStringType = IndexedStringType.physicalSynchronizerId
+
+  override protected def buildIndexed(
+      item: PhysicalSynchronizerId,
+      index: Int,
+  ): IndexedPhysicalSynchronizer =
+    // save, because buildIndexed is only called with indices created by IndexedStringStores.
+    // These indices are positive by construction.
+    checked(tryCreate(item, index))
+
+  override protected def asString(item: PhysicalSynchronizerId): String300 =
+    item.toLengthLimitedString
+
+  override protected def fromString(
+      str: String300,
+      index: Int,
+  ): Either[String, IndexedPhysicalSynchronizer] =
+    // save, because fromString is only called with indices created by IndexedStringStores.
+    // These indices are positive by construction.
+    PhysicalSynchronizerId.fromString(str.unwrap).map(checked(tryCreate(_, index)))
+}
+
 final case class IndexedStringType private (source: Int, description: String)
 object IndexedStringType {
 
@@ -130,13 +181,17 @@ object IndexedStringType {
   }
 
   val synchronizerId: IndexedStringType = IndexedStringType(1, "synchronizerId")
-
+  val physicalSynchronizerId: IndexedStringType = IndexedStringType(2, "physicalSynchronizerId")
 }
 
 /** uid index such that we can store integers instead of long strings in our database */
 trait IndexedStringStore extends AutoCloseable {
-  def getOrCreateIndex(dbTyp: IndexedStringType, str: String300): FutureUnlessShutdown[Int]
-  def getForIndex(dbTyp: IndexedStringType, idx: Int): FutureUnlessShutdown[Option[String300]]
+  def getOrCreateIndex(dbTyp: IndexedStringType, str: String300)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Int]
+  def getForIndex(dbTyp: IndexedStringType, idx: Int)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[String300]]
 }
 
 object IndexedStringStore {
@@ -145,10 +200,7 @@ object IndexedStringStore {
       config: CacheConfig,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): IndexedStringStore =
+  )(implicit ec: ExecutionContext): IndexedStringStore =
     storage match {
       case _: MemoryStorage => InMemoryIndexedStringStore()
       case jdbc: DbStorage =>
@@ -164,7 +216,7 @@ class IndexedStringCache(
     parent: IndexedStringStore,
     config: CacheConfig,
     val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, tc: TraceContext)
+)(implicit ec: ExecutionContext)
     extends IndexedStringStore
     with NamedLogging {
 
@@ -203,14 +255,20 @@ class IndexedStringCache(
   override def getForIndex(
       dbTyp: IndexedStringType,
       idx: Int,
-  ): FutureUnlessShutdown[Option[String300]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[String300]] =
     index2strFUS.get((idx, dbTyp))
 
   override def getOrCreateIndex(
       dbTyp: IndexedStringType,
       str: String300,
-  ): FutureUnlessShutdown[Int] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Int] =
     str2Index.get((str, dbTyp))
 
-  override def close(): Unit = parent.close()
+  override def close(): Unit = {
+    str2Index.invalidateAll()
+    str2Index.cleanUp()
+    index2strFUS.invalidateAll()
+    index2strFUS.cleanUp()
+    parent.close()
+  }
 }

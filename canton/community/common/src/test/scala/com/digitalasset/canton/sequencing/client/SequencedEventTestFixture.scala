@@ -21,6 +21,7 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.sequencing.{
   OrdinarySerializedEvent,
+  PostAggregationHandler,
   SequencedSerializedEvent,
   SequencerAggregator,
   SequencerTestUtils,
@@ -37,7 +38,7 @@ import org.scalatest.Assertions.fail
 import org.scalatest.concurrent.{PatienceConfiguration, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class SequencedEventTestFixture(
     loggerFactory: NamedLoggerFactory,
@@ -54,19 +55,14 @@ class SequencedEventTestFixture(
     traceContext,
   )
 
-  lazy val defaultSynchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId
+  lazy val defaultSynchronizerId: PhysicalSynchronizerId =
+    DefaultTestIdentities.physicalSynchronizerId
   lazy val subscriberId: ParticipantId = ParticipantId("participant1-id")
   lazy val sequencerAlice: SequencerId = DefaultTestIdentities.sequencerId
   lazy val subscriberCryptoApi: SynchronizerCryptoClient =
-    TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
-      subscriberId,
-      defaultSynchronizerId,
-    )
+    TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(subscriberId)
   private lazy val sequencerCryptoApi: SynchronizerCryptoClient =
-    TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
-      sequencerAlice,
-      defaultSynchronizerId,
-    )
+    TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(sequencerAlice)
   lazy val updatedCounter: Long = 42L
   val sequencerBob: SequencerId = SequencerId(
     UniqueIdentifier.tryCreate("da2", namespace)
@@ -121,13 +117,16 @@ class SequencedEventTestFixture(
     ).onShutdown(throw new RuntimeException("failed to create carlos event")).futureValue
   )
 
+  // TODO(i27260): cleanup when the new connection pool is stable
+  private val useNewConnectionPool = true
+
   def mkAggregator(
       config: MessageAggregationConfig = MessageAggregationConfig(
-        NonEmptyUtil.fromUnsafe(Set(sequencerAlice)),
+        Option.when(!useNewConnectionPool)(NonEmptyUtil.fromUnsafe(Set(sequencerAlice))),
         PositiveInt.tryCreate(1),
       )
-  ) =
-    new SequencerAggregator(
+  ) = {
+    val aggregator = new SequencerAggregator(
       cryptoPureApi = subscriberCryptoApi.pureCrypto,
       eventInboxSize = PositiveInt.tryCreate(2),
       loggerFactory = loggerFactory,
@@ -135,14 +134,25 @@ class SequencedEventTestFixture(
       updateSendTracker = _ => (),
       timeouts = timeouts,
       futureSupervisor = futureSupervisor,
+      useNewConnectionPool = useNewConnectionPool,
     )
+
+    if (useNewConnectionPool) {
+      aggregator.setPostAggregationHandler(new PostAggregationHandler {
+        override def handlerIsIdleF: Future[Unit] = Future.unit
+        override def signalHandler()(implicit traceContext: TraceContext): Unit = ()
+      })
+    }
+
+    aggregator
+  }
 
   def config(
       expectedSequencers: Set[SequencerId] = Set(sequencerAlice),
       sequencerTrustThreshold: Int = 1,
   ): MessageAggregationConfig =
     MessageAggregationConfig(
-      NonEmptyUtil.fromUnsafe(expectedSequencers),
+      Option.when(!useNewConnectionPool)(NonEmptyUtil.fromUnsafe(expectedSequencers)),
       PositiveInt.tryCreate(sequencerTrustThreshold),
     )
 
@@ -151,14 +161,13 @@ class SequencedEventTestFixture(
   )(implicit executionContext: ExecutionContext): SequencedEventValidatorImpl =
     new SequencedEventValidatorImpl(
       defaultSynchronizerId,
-      testedProtocolVersion,
       syncCryptoApi,
       loggerFactory,
       timeouts,
     )(executionContext)
 
   def createEvent(
-      synchronizerId: SynchronizerId = defaultSynchronizerId,
+      synchronizerId: PhysicalSynchronizerId = defaultSynchronizerId,
       signatureOverride: Option[Signature] = None,
       serializedOverride: Option[ByteString] = None,
       counter: Long = updatedCounter,
@@ -173,7 +182,7 @@ class SequencedEventTestFixture(
     }
     val envelope = ClosedEnvelope.create(
       serializedOverride.getOrElse(
-        EnvelopeContent.tryCreate(message, testedProtocolVersion).toByteString
+        EnvelopeContent(message, testedProtocolVersion).toByteString
       ),
       Recipients.cc(subscriberId),
       Seq.empty,
@@ -186,7 +195,6 @@ class SequencedEventTestFixture(
       MessageId.tryCreate("test").some,
       Batch(List(envelope), testedProtocolVersion),
       topologyTimestamp,
-      testedProtocolVersion,
       Option.empty[TrafficReceipt],
     )
 

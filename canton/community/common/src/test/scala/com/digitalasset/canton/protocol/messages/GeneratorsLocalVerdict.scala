@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.protocol.LocalRejectError.AssignmentRejects.AlreadyCompleted
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
@@ -24,15 +23,20 @@ import com.digitalasset.canton.protocol.LocalRejectError.TimeRejects.{
   PreparationTime,
 }
 import com.digitalasset.canton.protocol.LocalRejectError.UnassignmentRejects.ActivenessCheckFailed
-import com.digitalasset.canton.protocol.{LocalRejectErrorImpl, Malformed}
+import com.digitalasset.canton.protocol.{LocalAbstainError, LocalRejectErrorImpl, Malformed}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{GeneratorsLf, LfPartyId}
 import org.scalacheck.{Arbitrary, Gen}
 
-final case class GeneratorsLocalVerdict(protocolVersion: ProtocolVersion) {
+final case class GeneratorsLocalVerdict(
+    protocolVersion: ProtocolVersion,
+    generatorsLf: GeneratorsLf,
+) {
 
-  import com.digitalasset.canton.GeneratorsLf.lfPartyIdArb
+  import com.digitalasset.canton.Generators.*
+  import generatorsLf.*
 
-  // TODO(#14515) Check that the generator is exhaustive
   private def localVerdictRejectGen: Gen[LocalReject] = {
     val resources = List("resource1", "resource2")
     val details = "details"
@@ -53,7 +57,6 @@ final case class GeneratorsLocalVerdict(protocolVersion: ProtocolVersion) {
       .map(_.toLocalReject(protocolVersion))
   }
 
-  // TODO(#14515) Check that the generator is exhaustive
   private def localVerdictMalformedGen: Gen[LocalReject] = {
     val resources = List("resource1", "resource2")
     val details = "details"
@@ -71,30 +74,36 @@ final case class GeneratorsLocalVerdict(protocolVersion: ProtocolVersion) {
       .map(_.toLocalReject(protocolVersion))
   }
 
-  // TODO(#14515) Check that the generator is exhaustive
   private def localRejectGen: Gen[LocalReject] =
     Gen.oneOf(localVerdictRejectGen, localVerdictMalformedGen)
 
   private def localApproveGen: Gen[LocalApprove] =
     Gen.const(LocalApprove(protocolVersion))
 
+  private def localAbstainGen: Gen[LocalAbstain] =
+    Gen
+      .const(LocalAbstainError.CannotPerformAllValidations.Abstain("Unassignment data not found."))
+      .map(_.toLocalAbstain(protocolVersion))
+
   // If this pattern match is not exhaustive anymore, update the generator below
   {
     ((_: LocalVerdict) match {
       case _: LocalApprove => ()
+      case _: LocalAbstain => ()
       case _: LocalReject => ()
     }).discard
   }
 
   implicit val localVerdictArb: Arbitrary[LocalVerdict] = Arbitrary(
-    Gen.oneOf(localApproveGen, localRejectGen)
+    Gen.oneOf(localApproveGen, localRejectGen, localAbstainGen)
   )
 
-  implicit val participantRejectReasonArb: Arbitrary[(Set[LfPartyId], LocalReject)] =
+  implicit val participantRejectReasonArb: Arbitrary[(Set[LfPartyId], ParticipantId, LocalReject)] =
     Arbitrary(
       for {
-        parties <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+        parties <- boundedSetGen[LfPartyId]
         reject <- localRejectGen
-      } yield (parties, reject)
+        participantId <- generatorsLf.generatorsTopology.participantIdArb.arbitrary
+      } yield (parties, participantId, reject)
     )
 }

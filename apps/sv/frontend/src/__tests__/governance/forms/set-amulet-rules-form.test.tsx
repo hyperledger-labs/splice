@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
@@ -83,44 +83,47 @@ describe('Set Amulet Config Rules Form', () => {
     expect(screen.getByTestId('json-diffs-details')).toBeDefined();
   });
 
-  test('should render errors when submit button is clicked on new form', async () => {
-    const user = userEvent.setup();
+  test(
+    'should render errors when submit button is clicked on new form',
+    async () => {
+      const user = userEvent.setup();
 
-    render(
-      <Wrapper>
-        <SetAmuletConfigRulesForm />
-      </Wrapper>
-    );
+      render(
+        <Wrapper>
+          <SetAmuletConfigRulesForm />
+        </Wrapper>
+      );
 
-    const actionInput = screen.getByTestId('set-amulet-config-rules-action');
-    const submitButton = screen.getByTestId('submit-button');
-    expect(submitButton).toBeDefined();
+      const actionInput = screen.getByTestId('set-amulet-config-rules-action');
+      const submitButton = screen.getByTestId('submit-button');
+      expect(submitButton).toBeDefined();
 
-    await user.click(submitButton);
-    expect(submitButton.getAttribute('disabled')).toBeDefined();
-    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
-      /Unable to perform pointer interaction/
-    );
+      await user.click(submitButton);
+      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      await expect(async () => await user.click(submitButton)).rejects.toThrowError(
+        /Unable to perform pointer interaction/
+      );
 
-    expect(screen.getByText('Summary is required')).toBeDefined();
-    expect(screen.getByText('Invalid URL')).toBeDefined();
+      expect(screen.getByText('Summary is required')).toBeDefined();
+      expect(screen.getByText('Invalid URL')).toBeDefined();
 
-    // completing the form should reenable the submit button
-    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
-    expect(summaryInput).toBeDefined();
-    await user.type(summaryInput, 'Summary of the proposal');
+      // completing the form should reenable the submit button
+      const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+      expect(summaryInput).toBeDefined();
+      await user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
-    expect(urlInput).toBeDefined();
-    await user.type(urlInput, 'https://example.com');
+      const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+      expect(urlInput).toBeDefined();
+      await user.type(urlInput, 'https://example.com');
 
-    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+      await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBeNull();
-  });
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    },
+    { timeout: 10000 }
+  );
 
   test('expiry date must be in the future', async () => {
-    const user = userEvent.setup();
     render(
       <Wrapper>
         <SetAmuletConfigRulesForm />
@@ -133,22 +136,20 @@ describe('Set Amulet Config Rules Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(expiryDateInput, thePast);
+    fireEvent.change(expiryDateInput, { target: { value: thePast } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
+      expect(screen.queryByText('Expiration must be in the future')).toBeInTheDocument();
     });
 
-    await user.type(expiryDateInput, theFuture);
+    fireEvent.change(expiryDateInput, { target: { value: theFuture } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+      expect(screen.queryByText('Expiration must be in the future')).not.toBeInTheDocument();
     });
   });
 
   test('effective date must be after expiry date', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetAmuletConfigRulesForm />
@@ -161,19 +162,25 @@ describe('Set Amulet Config Rules Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-    await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
+    fireEvent.change(expiryDateInput, { target: { value: expiryDate.format(dateTimeFormatISO) } });
+    fireEvent.change(effectiveDateInput, {
+      target: { value: effectiveDate.format(dateTimeFormatISO) },
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).toBeInTheDocument();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(effectiveDateInput, validEffectiveDate);
+    fireEvent.change(effectiveDateInput, { target: { value: validEffectiveDate } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -238,7 +245,7 @@ describe('Set Amulet Config Rules Form', () => {
     expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
   });
 
-  test('should show error on form if submission fails', async () => {
+  test('should show error on form if submission fails', { timeout: 10000 }, async () => {
     server.use(
       rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
         return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));

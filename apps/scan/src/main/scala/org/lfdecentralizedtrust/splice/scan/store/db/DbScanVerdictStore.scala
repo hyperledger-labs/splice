@@ -91,6 +91,8 @@ class DbScanVerdictStore(
 
   private def historyId = updateHistory.historyId
 
+  def waitUntilInitialized: Future[Unit] = updateHistory.waitUntilInitialized
+
   override protected def timeouts = new ProcessingTimeout
 
   private val lastIngestedRecordTimeRef =
@@ -367,16 +369,22 @@ class DbScanVerdictStore(
   ): Future[Option[CantonTimestamp]] = {
     storage
       .query(
-        (sql"select max(record_time) from #${Tables.verdicts} where migration_id = $migrationId").toActionBuilder
+        (sql"""
+          select max(record_time)
+          from   #${Tables.verdicts}
+          where  history_id = $historyId
+          and    migration_id = $migrationId
+          """).toActionBuilder
           .as[Option[CantonTimestamp]],
         "scanVerdict.maxVerdictRecordTime",
       )
       .map(_.headOption.flatten)
   }
 
-  def maxUpdateRecordTime(historyId: Long, migrationId: Long)(implicit
+  def maxUpdateRecordTime(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[CantonTimestamp]] = {
+    val historyId = updateHistory.historyId
     val q = sql"""
       select max(record_time) from (
         select max(record_time) as record_time from update_history_transactions where history_id = $historyId and migration_id = $migrationId

@@ -18,6 +18,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
@@ -41,6 +42,7 @@ import scala.util.control.NonFatal
 class UpdateHistorySanityCheckPlugin(
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
+    skipAcsSnapshotChecks: Boolean,
     protected val loggerFactory: SuppressingLogger,
 ) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
     with Matchers
@@ -59,9 +61,10 @@ class UpdateHistorySanityCheckPlugin(
       config: SpliceConfig,
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
-    TraceContext.withNewTraceContext { implicit tc =>
+    TraceContext.withNewTraceContext("beforeEnvironmentDestroyed") { implicit tc =>
       // A scan might not be initialized if the test uses `manualStart` and it wasn't ever started.
       val initializedScans = environment.scans.local.filter(scan => scan.is_initialized)
+      logger.debug(s"Checking update histories for ${initializedScans.map(_.name)}")
 
       TriggerTestUtil
         .setTriggersWithin(
@@ -74,8 +77,28 @@ class UpdateHistorySanityCheckPlugin(
           // This flag should have the same value on all scans
           if (initializedScans.exists(_.config.updateHistoryBackfillEnabled)) {
             initializedScans.foreach(waitUntilBackfillingComplete)
-            compareHistories(initializedScans)
-            compareSnapshots(initializedScans)
+            val (founders, others) = initializedScans.partition(_.config.isFirstSv)
+            val founder = founders.loneElement
+            val dsoRules =
+              DsoRules.fromJson(founder.getDsoInfo().dsoRules.contract.payload.noSpaces)
+            val (scansInDsoRules, scansNotInDsoRules) = others.partition { otherScan =>
+              val svPartyId = otherScan.getDsoInfo().svPartyId
+              dsoRules.svs.containsKey(svPartyId)
+            }
+            scansNotInDsoRules.foreach { notInDso =>
+              // the SV will not see transactions to the DSO, but will still see transactions involving itself,
+              // so comparison of history & snapshots will be broken if something like this happens:
+              //  - U1: DSO-only
+              //  - U2: Involves SV
+              // founder sees U1, U2 but otherScan only U2
+              logger.info(
+                s"The SV party of Scan ${notInDso.name} (partyId=${notInDso.getDsoInfo().svPartyId}) is not in DsoRules. Ignoring."
+              )
+            }
+            compareHistories(founder, scansInDsoRules)
+            if (!skipAcsSnapshotChecks) {
+              compareSnapshots(founder, scansInDsoRules)
+            }
             initializedScans.foreach(checkScanTxLogScript)
           } else {
             // Just call the /updates endpoint, make sure whatever happened in the test doesn't blow it up,
@@ -122,28 +145,28 @@ class UpdateHistorySanityCheckPlugin(
   }
 
   private def compareHistories(
-      scans: Seq[ScanAppBackendReference]
+      founder: ScanAppBackendReference,
+      others: Seq[ScanAppBackendReference],
   ): Unit = {
-    val (founders, others) = scans.partition(_.config.isFirstSv)
-    val founder = founders.loneElement
     val founderHistory = paginateHistory(founder, None, Chain.empty).toVector
     forAll(others) { otherScan =>
-      val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
-      // One of them might be more advanced than the other.
-      // That's fine, we mostly want to check that backfilling works as expected.
-      val minSize = Math.min(founderHistory.size, otherScanHistory.size)
-      val otherComparable = otherScanHistory
-        .take(minSize)
-      val founderComparable = founderHistory
-        .take(minSize)
-      val different = otherComparable
-        .zip(founderComparable)
-        .collect {
-          case (otherItem, founderItem) if founderItem != otherItem =>
-            otherItem -> founderItem
-        }
-
-      different should be(empty)
+      withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
+        val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
+        // One of them might be more advanced than the other.
+        // That's fine, we mostly want to check that backfilling works as expected.
+        val minSize = Math.min(founderHistory.size, otherScanHistory.size)
+        val otherComparable = otherScanHistory
+          .take(minSize)
+        val founderComparable = founderHistory
+          .take(minSize)
+        val different = otherComparable
+          .zip(founderComparable)
+          .collect {
+            case (otherItem, founderItem) if founderItem != otherItem =>
+              otherItem -> founderItem
+          }
+        different should be(empty)
+      }
     }
   }
 
@@ -261,21 +284,24 @@ class UpdateHistorySanityCheckPlugin(
     }
   }
 
-  private def compareSnapshots(scans: Seq[ScanAppBackendReference]) = {
-    val (founders, others) = scans.partition(_.config.isFirstSv)
-    val founder = founders.loneElement
+  private def compareSnapshots(
+      founder: ScanAppBackendReference,
+      others: Seq[ScanAppBackendReference],
+  ) = {
     val founderSnapshots = getAllSnapshots(founder, CantonTimestamp.MaxValue, Nil)
     forAll(others) { otherScan =>
-      val otherScanSnapshots = getAllSnapshots(otherScan, CantonTimestamp.MaxValue, Nil)
-      // One of them might have more snapshots than the other.
-      val minSize = Math.min(founderSnapshots.size, otherScanSnapshots.size)
-      val otherComparable = otherScanSnapshots.take(minSize).map(toComparableSnapshot)
-      val founderComparable = founderSnapshots.take(minSize).map(toComparableSnapshot)
-      val different = otherComparable.zipWithIndex.collect {
-        case (otherItem, idx) if founderComparable(idx) != otherItem =>
-          otherItem -> founderComparable(idx)
+      withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
+        val otherScanSnapshots = getAllSnapshots(otherScan, CantonTimestamp.MaxValue, Nil)
+        // One of them might have more snapshots than the other.
+        val minSize = Math.min(founderSnapshots.size, otherScanSnapshots.size)
+        val otherComparable = otherScanSnapshots.take(minSize).map(toComparableSnapshot)
+        val founderComparable = founderSnapshots.take(minSize).map(toComparableSnapshot)
+        val different = otherComparable.zipWithIndex.collect {
+          case (otherItem, idx) if founderComparable(idx) != otherItem =>
+            (idx, otherItem, founderComparable(idx))
+        }
+        different should be(empty)
       }
-      different should be(empty)
     }
   }
 

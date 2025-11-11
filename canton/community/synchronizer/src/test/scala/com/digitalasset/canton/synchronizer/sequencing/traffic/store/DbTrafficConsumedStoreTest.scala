@@ -29,8 +29,6 @@ trait DbTrafficConsumedStoreTest extends AsyncWordSpec with BaseTest with Traffi
     timeouts,
     loggerFactory,
     blockSequencerMode = true,
-    useRecipientsTableForReads = false,
-    bufferEventsWithPayloads = false,
     sequencerMember = DefaultTestIdentities.sequencerId,
     cachingConfigs = CachingConfigs(),
     batchingConfig = BatchingConfig(),
@@ -56,6 +54,7 @@ trait DbTrafficConsumedStoreTest extends AsyncWordSpec with BaseTest with Traffi
         timeouts = timeouts,
         loggerFactory = loggerFactory,
         batchingConfig = BatchingConfig(),
+        sequencerStore,
       )
     )
   }

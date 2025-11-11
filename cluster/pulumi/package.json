@@ -45,7 +45,8 @@
         "validator1",
         "splitwell",
         "circleci",
-        "gha"
+        "gha",
+        "policies"
     ],
     "dependencies": {
         "@google-cloud/sql": "^0.20.1",

@@ -177,13 +177,13 @@ class BftScanConnectionTest
   private def testUpdate(n: Int): UpdateHistoryResponse = {
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
-        tree = new javaApi.TransactionTree(
+        tree = new javaApi.Transaction(
           s"updateId$n",
           s"commandId$n",
           s"workflowId$n",
           jtime(n),
+          java.util.Collections.emptyList(),
           n.toLong,
-          java.util.Map.of(),
           synchronizerId.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           jtime(n),
@@ -202,7 +202,7 @@ class BftScanConnectionTest
     new BftScanConnection(
       mock[SpliceLedgerClient],
       NonNegativeFiniteDuration.ofSeconds(1),
-      new BftScanConnection.Bft(
+      new BftScanConnection.AllDsoScansBft(
         initialConnections,
         initialFailedConnections,
         connectionBuilder,

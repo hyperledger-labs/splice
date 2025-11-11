@@ -6,39 +6,27 @@ package com.digitalasset.canton.participant.protocol.submission
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.parallel.*
-import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.SyncCryptoError.{KeyNotAvailable, SyncCryptoEncryptionError}
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.protocol.ViewHash
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.protocol.messages.{EncryptedView, EncryptedViewMessage}
-import com.digitalasset.canton.sequencing.protocol.Recipients
+import com.digitalasset.canton.sequencing.protocol.{MaxRequestSizeToDeserialize, Recipients}
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
-import com.digitalasset.canton.topology.{Member, ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{HexString, MonadUtil}
-import com.digitalasset.canton.version.{HasToByteString, ProtocolVersion}
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
 
 object EncryptedViewMessageFactory {
-
-  // TODO remove this again once we figured out the encryption corruption problem
-  //  https://github.com/DACH-NY/cn-test-failures/issues/4655
-  private val loggerForSessionKeyMapEncryptions: Option[TracedLogger] =
-    Option(System.getProperty("canton.log-session-key-encryptions")).flatMap { config =>
-      Option.when(config.toLowerCase == "true")(
-        NamedLoggerFactory.root.getTracedLogger(this.getClass)
-      )
-    }
 
   final case class ViewHashAndRecipients(
       viewHash: ViewHash,
@@ -77,9 +65,18 @@ object EncryptedViewMessageFactory {
             )
           )
       )
+      maxRequestSize <- EitherT(
+        cryptoSnapshot.ipsSnapshot
+          .findDynamicSynchronizerParameters()
+      ).map(_.parameters.maxRequestSize)
+        .leftMap(error => UnableToGetDynamicSynchronizerParameters(error, cryptoSnapshot.psid))
+
       encryptedView <- EitherT.fromEither[FutureUnlessShutdown](
         EncryptedView
-          .compressed[VT](cryptoSnapshot.pureCrypto, sessionKey, viewType)(viewTree)
+          .compressed[VT](cryptoSnapshot.pureCrypto, sessionKey, viewType)(
+            viewTree,
+            MaxRequestSizeToDeserialize.Limit(maxRequestSize.value),
+          )
           .leftMap[EncryptedViewMessageCreationError](FailedToEncryptViewMessage.apply)
       )
     } yield EncryptedViewMessage[VT](
@@ -257,10 +254,11 @@ object EncryptedViewMessageFactory {
             .leftMap(FailedToCreateEncryptionKey.apply)
         )
         // generates the session key map, which contains the session key randomness encrypted for all informee participants
-        sessionKeyMap <- createDataMap(
+        sessionKeyMap <- createRandomnessMap(
           informeeParticipants.forgetNE.to(LazyList),
           sessionKeyRandomness,
           cryptoSnapshot,
+          cryptoSnapshot.crypto.staticSynchronizerParameters.enableTransparencyChecks,
         ).map(_.values.toSeq)
       } yield ViewKeyData(sessionKeyRandomness, sessionKey, sessionKeyMap)
 
@@ -274,7 +272,7 @@ object EncryptedViewMessageFactory {
       for {
         informeeParticipants <- cryptoSnapshot.ipsSnapshot
           .activeParticipantsOfAll(informeeParties)
-          .leftMap(UnableToDetermineParticipant(_, cryptoSnapshot.synchronizerId))
+          .leftMap(UnableToDetermineParticipant(_, cryptoSnapshot.psid))
         memberEncryptionKeys <- EitherT
           .right[EncryptedViewMessageCreationError](
             cryptoSnapshot.ipsSnapshot
@@ -314,14 +312,6 @@ object EncryptedViewMessageFactory {
           else
             EitherT.rightT[FutureUnlessShutdown, EncryptedViewMessageCreationError] {
               val sessionKeyInfo = sessionKeyStoreSnapshot(recipientGroup)
-              loggerForSessionKeyMapEncryptions.foreach { logger =>
-                sessionKeyInfo.encryptedSessionKeys.foreach { encryption =>
-                  logger.debug(
-                    s"Reusing session key encryption for fingerprint ${encryption.encryptedFor.toProtoPrimitive}: ciphertext=${HexString
-                        .toHexString(encryption.ciphertext)}, spec=${encryption.encryptionAlgorithmSpec.name}"
-                  )
-                }
-              }
               (
                 ViewKeyData(
                   sessionKeyInfo.sessionKeyAndReference.randomness,
@@ -416,82 +406,27 @@ object EncryptedViewMessageFactory {
 
   }
 
-  private def createDataMap[M <: HasToByteString](
+  private def createRandomnessMap(
       participants: LazyList[ParticipantId],
-      data: M,
+      randomness: SecureRandomness,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      deterministicEncryption: Boolean,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, Map[
     ParticipantId,
-    AsymmetricEncrypted[M],
+    AsymmetricEncrypted[SecureRandomness],
   ]] =
-    encryptFor(cryptoSnapshot, data, participants)
+    cryptoSnapshot
+      .encryptFor(randomness, participants, deterministicEncryption)
       .leftMap { case (member, error) =>
         UnableToDetermineKey(
           member,
           error,
-          cryptoSnapshot.synchronizerId,
+          cryptoSnapshot.psid,
         ): EncryptedViewMessageCreationError
       }
-
-  /** Extends com.digitalasset.canton.crypto.SynchronizerSnapshotSyncCryptoApi.encryptFor with
-    * logging
-    */
-  private def encryptFor[M <: HasToByteString](
-      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      message: M,
-      members: Seq[ParticipantId],
-  )(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, (ParticipantId, SyncCryptoError), Map[
-    ParticipantId,
-    AsymmetricEncrypted[M],
-  ]] = {
-    @SuppressWarnings(Array("com.digitalasset.canton.EnforceVisibleForTesting"))
-    def encryptFor(keys: Map[Member, EncryptionPublicKey])(
-        member: ParticipantId
-    ): Either[(ParticipantId, SyncCryptoError), (ParticipantId, AsymmetricEncrypted[M])] = keys
-      .get(member)
-      .toRight(
-        member -> KeyNotAvailable(
-          member,
-          KeyPurpose.Encryption,
-          cryptoSnapshot.ipsSnapshot.timestamp,
-          Seq.empty,
-        )
-      )
-      .flatMap { k =>
-        cryptoSnapshot.pureCrypto
-          .encryptWith(message, k)
-          .bimap(
-            error => member -> SyncCryptoEncryptionError(error),
-            encryption => {
-              loggerForSessionKeyMapEncryptions.foreach {
-                _.debug(
-                  s"Encrypted session key for $member with public key (fingerprint=${k.fingerprint.toProtoPrimitive}, key=${HexString
-                      .toHexString(k.rawKey)}, format=${k.format}, spec=${k.keySpec.name}): ciphertext=${HexString.toHexString(
-                      encryption.ciphertext
-                    )}, algo=${encryption.encryptionAlgorithmSpec.name}, fingerprint=${encryption.encryptedFor.toProtoPrimitive}"
-                )
-              }
-              member -> encryption
-            },
-          )
-      }
-
-    EitherT(
-      cryptoSnapshot.ipsSnapshot
-        .encryptionKey(members)
-        .map { keys =>
-          members
-            .traverse(encryptFor(keys))
-            .map(_.toMap)
-        }
-    )
-  }
 
   sealed trait EncryptedViewMessageCreationError
       extends Product
@@ -511,10 +446,10 @@ object EncryptedViewMessageFactory {
     */
   final case class UnableToDetermineParticipant(
       party: Set[LfPartyId],
-      SynchronizerId: SynchronizerId,
+      physicalSynchronizerId: PhysicalSynchronizerId,
   ) extends EncryptedViewMessageCreationError {
     override protected def pretty: Pretty[UnableToDetermineParticipant] =
-      prettyOfClass(unnamedParam(_.party), unnamedParam(_.SynchronizerId))
+      prettyOfClass(unnamedParam(_.party), unnamedParam(_.physicalSynchronizerId))
   }
 
   /** Indicates that the public key of an informee participant could not be determined.
@@ -522,11 +457,12 @@ object EncryptedViewMessageFactory {
   final case class UnableToDetermineKey(
       participant: ParticipantId,
       cause: SyncCryptoError,
-      SynchronizerId: SynchronizerId,
+      physicalSynchronizerId: PhysicalSynchronizerId,
   ) extends EncryptedViewMessageCreationError {
     override protected def pretty: Pretty[UnableToDetermineKey] = prettyOfClass(
       param("participant", _.participant),
       param("cause", _.cause),
+      param("physical synchronizer id", _.physicalSynchronizerId),
     )
   }
 
@@ -557,6 +493,16 @@ object EncryptedViewMessageFactory {
       extends EncryptedViewMessageCreationError {
     override protected def pretty: Pretty[UnableToDetermineSessionKeyRandomness] = prettyOfClass(
       param("cause", _.cause.unquoted)
+    )
+  }
+
+  final case class UnableToGetDynamicSynchronizerParameters(
+      error: String,
+      synchronizerId: PhysicalSynchronizerId,
+  ) extends EncryptedViewMessageCreationError {
+    override protected def pretty: Pretty[UnableToGetDynamicSynchronizerParameters] = prettyOfClass(
+      param("error", _.error.unquoted),
+      param("physical synchronizer id", _.synchronizerId),
     )
   }
 }

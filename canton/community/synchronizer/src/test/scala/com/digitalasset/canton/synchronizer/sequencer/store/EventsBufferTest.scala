@@ -38,11 +38,6 @@ class EventsBufferTest extends FixtureAnyWordSpec with BaseTest {
 
       metricCounterValue("evictions") shouldBe 4L
       metricCounterValue("evicted_weight") shouldBe notFittingEventsSize.bytes
-
-      val bigEvent = generateEvents(1, BytesUnit(0L), startIndex = 6, numRecipients = 10000)
-      buf.bufferEvents(bigEvent)
-
-      buf.snapshot().loneElement.event.messageId.unwrap shouldBe "6"
     }
 
     "store all events if the memory limit is not hit" in { env =>
@@ -135,26 +130,16 @@ class EventsBufferTest extends FixtureAnyWordSpec with BaseTest {
     }
   }
 
-  private def generateEvents(
-      num: Int,
-      payloadSize: BytesUnit,
-      startIndex: Int = 1,
-      numRecipients: Int = 1,
-  ) = {
+  private def generateEvents(num: Int, payloadSize: BytesUnit, startIndex: Int = 1) = {
     val events = List.tabulate(num) { i =>
       val index = i + startIndex
-      val recipients = NonEmpty
-        .from(
-          (1 to numRecipients).map(SequencerMemberId.apply)
-        )
-        .value
       val ts = CantonTimestamp.Epoch.plusSeconds(index.toLong)
       Sequenced(
         ts,
         DeliverStoreEvent(
           sender = SequencerMemberId(0),
           messageId = MessageId(String73.tryCreate(s"$index")),
-          members = NonEmpty(SortedSet, recipients.head1, recipients.tail*),
+          members = NonEmpty(SortedSet, SequencerMemberId(1)),
           payload =
             BytesPayload(PayloadId(ts), ByteString.copyFrom(Random.nextBytes(payloadSize.toInt))),
           topologyTimestampO = None,

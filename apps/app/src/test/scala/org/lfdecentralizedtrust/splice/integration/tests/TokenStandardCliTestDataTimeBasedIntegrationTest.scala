@@ -10,7 +10,6 @@ import com.daml.ledger.api.v2.transaction_filter.{
   EventFormat,
   Filters,
   InterfaceFilter,
-  TransactionFilter,
   TransactionFormat,
   UpdateFormat,
   WildcardFilter,
@@ -201,6 +200,14 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       aliceValidatorWalletClient.tap(BigDecimal(1000))
       createTransferPreapprovalEnsuringItExists(aliceWalletClient, aliceValidatorBackend)
       createTransferPreapprovalEnsuringItExists(aliceValidatorWalletClient, aliceValidatorBackend)
+      eventually() {
+        sv1ScanBackend.lookupTransferPreapprovalByParty(
+          PartyId.tryFromProtoPrimitive(aliceWalletClient.userStatus().party)
+        ) should be(defined)
+        sv1ScanBackend.lookupTransferPreapprovalByParty(
+          PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
+        ) should be(defined)
+      }
 
       val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
@@ -554,6 +561,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               aliceWalletClient,
               aliceValidatorBackend,
             ) // it was deleted before
+            eventually() {
+              sv1ScanBackend.lookupTransferPreapprovalByParty(
+                PartyId.tryFromProtoPrimitive(aliceWalletClient.userStatus().party)
+              ) should be(defined)
+            }
             charlieWalletClient.transferPreapprovalSend(
               alice.partyId,
               charlieAmount - 11,
@@ -594,7 +606,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
             activeTransferInstructionsResponse should have size 2
 
-            val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequest(
+            val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequestRW(
               GetUpdatesRequest(
                 updateFormat = Some(
                   UpdateFormat(includeTransactions =
@@ -616,7 +628,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val getUpdatesResponse = makeJsonApiV2Request(
               "/v2/updates/flats",
               getUpdatesPayload,
-              io.circe.Decoder.decodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
+              io.circe.Decoder.decodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponseRW),
             )
 
             (activeHoldingsResponse, activeTransferInstructionsResponse, getUpdatesResponse)
@@ -629,9 +641,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         protobuf.timestamp.Timestamp.of(365 * 24 * 3600 + major, 10_000 * minor)
       }
 
-      val replaceTemplateIdR = "^[^:]+".r
-      def stableTemplateId(templateId: String) = {
-        replaceTemplateIdR.replaceFirstIn(templateId, "#package-name")
+      def stableTemplateId(templateId: com.daml.ledger.api.v2.value.Identifier) = {
+        templateId.copy(packageId = "#package-name")
       }
 
       // Only works under the assumption that they always appear in the same order
@@ -744,6 +755,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           case active: JsContractEntry.JsActiveContract =>
             active.copy(
               createdEvent = active.createdEvent.copy(
+                createArgument = active.createdEvent.createArgument.map(replaceStringsInJson),
                 contractId =
                   replaceContractIdWithStableString(active.createdEvent.contractId).toString,
                 templateId = stableTemplateId(active.createdEvent.templateId),
@@ -831,7 +843,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       replaceOrFail(
         "txs.json",
         normalizedUpdates.map(JsGetUpdatesResponse(_)),
-        io.circe.Encoder.encodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
+        io.circe.Encoder.encodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponseRW),
       )
 
       val contractIdsAtStart = contractIds.toVector
@@ -841,7 +853,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           JsEventServiceCodecs.getEventsByContractIdRequestRW(
             event_query_service.GetEventsByContractIdRequest(
               cid,
-              Seq.empty,
               Some(
                 EventFormat(
                   filtersByParty(
@@ -942,12 +953,21 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
   ): Seq[JsGetActiveContractsResponse] = {
     val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
       GetActiveContractsRequest(
-        filter = Some(
-          TransactionFilter(
-            filtersByParty(
-              party.partyId,
-              Seq(interface),
-              includeWildcard = false,
+        eventFormat = Some(
+          EventFormat(
+            filtersByParty = Map(
+              party.partyId.toProtoPrimitive -> Filters(
+                Seq(
+                  CumulativeFilter().withInterfaceFilter(
+                    InterfaceFilter(
+                      Some(
+                        com.daml.ledger.api.v2.value.Identifier.fromJavaProto(interface.toProto)
+                      ),
+                      includeInterfaceView = true,
+                    )
+                  )
+                )
+              )
             )
           )
         ),

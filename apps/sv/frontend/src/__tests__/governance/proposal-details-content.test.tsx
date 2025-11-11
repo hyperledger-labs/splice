@@ -12,6 +12,7 @@ import {
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
+  UnclaimedActivityRecordProposal,
   UpdateSvRewardWeightProposal,
 } from '../../utils/types';
 import userEvent from '@testing-library/user-event';
@@ -220,6 +221,9 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Feature App/);
 
+    const contractId = screen.getByTestId('proposal-details-contractid-value-input');
+    expect(contractId.getAttribute('value')).toBe(voteRequest.contractId);
+
     const featuredAppSection = screen.getByTestId('proposal-details-feature-app-section');
     expect(featuredAppSection).toBeDefined();
 
@@ -296,6 +300,47 @@ describe('Proposal Details Content', () => {
     expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
   });
 
+  test('should render unallocated unclaimed activity record details', () => {
+    const proposalDetails: ProposalDetails = {
+      actionName: 'Create Unclaimed Activity Record',
+      action: 'SRARC_CreateUnallocatedUnclaimedActivityRecord',
+      createdAt: '2025-01-01 13:00',
+      url: 'https://example.com',
+      summary: 'Summary of the proposal',
+      proposal: {
+        beneficiary: 'sv1',
+        amount: '10',
+        mintBefore: '2025-01-01 13:00',
+      } as UnclaimedActivityRecordProposal,
+    };
+
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
+          contractId={voteRequest.contractId}
+          proposalDetails={proposalDetails}
+          votingInformation={voteRequest.votingInformation}
+          votes={voteRequest.votes}
+        />
+      </Wrapper>
+    );
+
+    const action = screen.getByTestId('proposal-details-action-value');
+    expect(action.textContent).toMatch(/Create Unclaimed Activity Record/);
+
+    const beneficiary = screen
+      .getByTestId('proposal-details-beneficiary-input')
+      .getAttribute('value');
+    expect(beneficiary).toMatch(/sv1/);
+
+    const amount = screen.getByTestId('proposal-details-amount-value');
+    expect(amount.textContent).toMatch(/10/);
+
+    const mustMintBefore = screen.getByTestId('proposal-details-must-mint-before-value');
+    expect(mustMintBefore.textContent).toMatch(/2025-01-01 13:00/);
+  });
+
   test('should render amulet rules config proposal details', () => {
     const amuletRulesConfigDetails = {
       actionName: 'Set Amulet Rules Config',
@@ -356,6 +401,8 @@ describe('Proposal Details Content', () => {
 
     const maxNumInputsNewValue = within(changes[1]).getByTestId('config-change-new-value');
     expect(maxNumInputsNewValue.textContent).toBe('4');
+
+    expect(screen.getByTestId('json-diffs-details')).toBeInTheDocument();
   });
 
   test('should render dso rules config changes', () => {
@@ -435,6 +482,8 @@ describe('Proposal Details Content', () => {
       'config-change-new-value'
     );
     expect(dsoNumUnclaimedRewardsThresholdNewValue.textContent).toBe('20');
+
+    expect(screen.getByTestId('json-diffs-details')).toBeInTheDocument();
   });
 });
 
@@ -866,7 +915,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      expect(submitButton.textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
@@ -934,7 +982,6 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeDefined();
-      expect(submitButton.textContent).toMatch(/Submitting/);
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');

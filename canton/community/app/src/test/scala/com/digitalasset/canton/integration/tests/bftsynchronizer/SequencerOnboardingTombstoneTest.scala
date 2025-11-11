@@ -12,10 +12,7 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.util.OnboardsNewSequencerNode
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -98,7 +95,7 @@ trait SequencerOnboardingTombstoneTest
 
     onboardNewSequencer(
       // synchronizerId,
-      initializedSynchronizers(daName).synchronizerId,
+      initializedSynchronizers(daName).physicalSynchronizerId,
       newSequencerReference = sequencer2,
       existingSequencerReference = sequencer1,
       synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
@@ -120,7 +117,9 @@ trait SequencerOnboardingTombstoneTest
       // fetch synchronizer time to ensure participant1's sequencer client is caught up
       // to just before the long-running transaction held up by mediator1 being down before
       // disconnecting from sequencer1.
-      participant1.testing.fetch_synchronizer_time(initializedSynchronizers(daName).synchronizerId)
+      participant1.testing.fetch_synchronizer_time(
+        initializedSynchronizers(daName).physicalSynchronizerId
+      )
       participant1.synchronizers.disconnect_all()
 
       // Start the mediator so the long-running transaction's accept or reject can be sequenced.
@@ -133,6 +132,8 @@ trait SequencerOnboardingTombstoneTest
         participant1,
         sequencer2.sequencerConnection.withAlias(SequencerAlias.tryCreate("seq2x")),
       )
+
+      val usingPool = participant1.config.sequencerClient.useNewConnectionPool
 
       loggerFactory.assertLogsUnorderedOptional(
         {
@@ -187,23 +188,38 @@ trait SequencerOnboardingTombstoneTest
         ),
         (
           LogEntryOptionality.Required,
+          (entry: LogEntry) =>
+            if (usingPool) {
+              entry.loggerName should include("SequencerSubscriptionX")
+              entry.warningMessage should (include(
+                "Permanently closing sequencer subscription due to error"
+              ) and include(
+                "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
+              ))
+            } else {
+              entry.loggerName should include("ResilientSequencerSubscription")
+              entry.warningMessage should (include(
+                "Closing resilient sequencer subscription due to error"
+              ) and include(
+                "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
+              ))
+            },
+        ),
+        (
+          LogEntryOptionality.OptionalMany,
           (entry: LogEntry) => {
-            entry.loggerName should include("ResilientSequencerSubscription")
-            entry.warningMessage should (include(
-              "Closing resilient sequencer subscription due to error"
-            ) and include(
-              "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
-            ))
+            entry.loggerName should include("GrpcConnectionX")
+            entry.warningMessage should include(
+              "Request failed for server-seq2x-0"
+            )
           },
         ),
         (
           LogEntryOptionality.Required,
           (entry: LogEntry) => {
-            entry.loggerName should include("CantonSyncService")
+            entry.loggerName should include("SynchronizerConnectionsManager")
             entry.errorMessage should (include(
               "SYNC_SERVICE_SYNCHRONIZER_DISCONNECTED"
-            ) and include(
-              "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
             ))
           },
         ),
@@ -264,5 +280,5 @@ trait SequencerOnboardingTombstoneTest
 
 class SequencerOnboardingTombstoneTestPostgres extends SequencerOnboardingTombstoneTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

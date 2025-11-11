@@ -16,6 +16,7 @@ import {
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
+import { PageHeader } from '../components/beta';
 import { ProposalListingSection } from '../components/governance/ProposalListingSection';
 import {
   actionTagToTitle,
@@ -161,14 +162,15 @@ export const Governance: React.FC = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Box sx={{ mb: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h2" gutterBottom data-testid="governance-page-title">
-          Governance
-        </Typography>
-        <Button variant="pill" component={RouterLink} to={`/governance-beta/proposals/create`}>
-          Initiate Proposal
-        </Button>
-      </Box>
+      <PageHeader
+        title="Governance"
+        actionElement={
+          <Button variant="pill" component={RouterLink} to={`/governance-beta/proposals/create`}>
+            Initiate Proposal
+          </Button>
+        }
+        data-testid="governance-page-header"
+      />
 
       <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
 
@@ -186,6 +188,8 @@ export const Governance: React.FC = () => {
         data={voteHistory}
         uniqueId="vote-history"
         showStatus
+        showVoteStats
+        showAcceptanceThreshold
       />
     </Box>
   );

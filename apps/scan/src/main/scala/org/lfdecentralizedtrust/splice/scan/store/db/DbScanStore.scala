@@ -50,7 +50,6 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
@@ -75,8 +74,10 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import java.time.Instant
@@ -96,6 +97,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
 )(implicit
@@ -110,7 +112,7 @@ class DbScanStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 2, // TODO (DACH-NY/canton-network-node#13454): bump when it will backfill.
+        version = 3,
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,
@@ -128,7 +130,7 @@ class DbScanStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
+      ingestionConfig,
     )
     with ScanStore
     with AcsTables
@@ -229,9 +231,7 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}""",
+              AmuletRules.COMPANION,
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAmuletRules",
@@ -254,9 +254,7 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  ExternalPartyAmuletRules.TEMPLATE_ID
-                )}""",
+              ExternalPartyAmuletRules.COMPANION,
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupExternalPartyAmuletRules",
@@ -283,9 +281,7 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}""",
+              AnsRules.COMPANION,
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAnsRules",
@@ -314,10 +310,9 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and ans_entry_name ^@ $limitedPrefix
+            AnsEntry.COMPANION,
+            additionalWhere = sql"""
+              and ans_entry_name ^@ $limitedPrefix
               and acs.contract_expires_at >= $now
             """,
             orderLimit = sql"""
@@ -345,10 +340,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
+            AnsEntry.COMPANION,
+            additionalWhere = sql"""
                 and ans_entry_owner = $partyId
                 and ans_entry_name >= ''
                 and acs.contract_expires_at >= $now
@@ -375,10 +368,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
+            AnsEntry.COMPANION,
+            additionalWhere = sql"""
               and ans_entry_name = ${lengthLimited(name)}
               and acs.contract_expires_at >= $now
                  """,
@@ -401,10 +392,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                TransferPreapproval.COMPANION.TEMPLATE_ID
-              )}
+            TransferPreapproval.COMPANION,
+            additionalWhere = sql"""
                 and transfer_preapproval_receiver = $partyId
             """,
             orderLimit = sql"""
@@ -428,10 +417,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                TransferCommandCounter.COMPANION.TEMPLATE_ID
-              )}
+            TransferCommandCounter.COMPANION,
+            additionalWhere = sql"""
                 and wallet_party = $partyId
             """,
             orderLimit = sql"limit 1",
@@ -508,10 +495,8 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-                  template_id_qualified_name = ${QualifiedName(
-                  FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
+              FeaturedAppRight.COMPANION,
+              additionalWhere = sql"""
                     and featured_app_right_provider = $providerPartyId
                  """,
               orderLimit = sql"limit 1",
@@ -801,9 +786,7 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}""",
+            ValidatorLicense.COMPANION,
             orderLimit =
               sql"""order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}""",
           ),
@@ -827,9 +810,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = (sql"""template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID
-              )} and validator in """ ++ validatorPartyIds).toActionBuilder,
+            ValidatorLicense.COMPANION,
+            where = (sql"""validator in """ ++ validatorPartyIds).toActionBuilder,
           ),
           "getValidatorLicenseByValidator",
         )
@@ -852,6 +834,7 @@ class DbScanStore(
                from #${ScanTables.acsTableName}
                where store_id = $acsStoreId
                 and migration_id = $domainMigrationId
+                and package_name = ${MemberTraffic.PACKAGE_NAME}
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
@@ -954,9 +937,8 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-         template_id_qualified_name = ${QualifiedName(templateId)}
-     and sv_party = $svPartyId""",
+              companion,
+              additionalWhere = sql"""and sv_party = $svPartyId""",
               orderLimit = sql"""limit 1""",
             ).headOption,
             s"lookupContractBySvParty[$templateId]",
@@ -1081,23 +1063,21 @@ class DbScanStore(
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
   ): Future[Option[Contract[TCId, T]]] = {
-    val templateId = companionClass.typeId(companion)
-    val packageName = PackageQualifiedName.getFromResources(templateId).packageName
+    val pqn @ PackageQualifiedName(packageName, QualifiedName(moduleName, entityName)) =
+      companionClass.packageQualifiedName(companion)
     for {
       row <- storage
         .querySingle(
           selectFromUpdateCreatesTableResult(
             updateHistory.historyId,
-            where = sql"""template_id_module_name = ${lengthLimited(
-                templateId.getModuleName
-              )} and template_id_entity_name = ${lengthLimited(
-                templateId.getEntityName
-              )} and package_name = ${lengthLimited(packageName)}
+            where = sql"""template_id_module_name = ${lengthLimited(moduleName)}
+              and template_id_entity_name = ${lengthLimited(entityName)}
+              and package_name = ${lengthLimited(packageName)}
               and record_time > $recordTime""",
             // TODO(#934): Order by row_id is suspicious
             orderLimit = sql"""order by row_id asc limit 1""",
           ).headOption,
-          s"lookup[$templateId]",
+          s"lookup[$pqn]",
         )
         .value
     } yield {

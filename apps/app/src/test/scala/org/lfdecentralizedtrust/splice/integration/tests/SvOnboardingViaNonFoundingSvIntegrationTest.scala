@@ -40,10 +40,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
       .withOnboardingParticipantPromotionDelayEnabled() // Test onboarding with participant promotion delay
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       .addConfigTransforms((_, configuration) => {
         val sv1ToSv2Bump = 100
         val sv2OnboardingSvClientUrl =
@@ -137,7 +134,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .connections
               .forgetNE
               .map {
-                inside(_) { case GrpcSequencerConnection(endpoints, _, _, _) =>
+                inside(_) { case GrpcSequencerConnection(endpoints, _, _, _, _) =>
                   endpoints.forgetNE.loneElement
                 }
               }

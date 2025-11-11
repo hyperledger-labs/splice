@@ -24,6 +24,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -191,6 +192,7 @@ object SplitwellStore {
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -204,6 +206,7 @@ object SplitwellStore {
       retryProvider,
       domainMigrationInfo,
       participantId,
+      ingestionConfig,
     )
 
   case class Key(

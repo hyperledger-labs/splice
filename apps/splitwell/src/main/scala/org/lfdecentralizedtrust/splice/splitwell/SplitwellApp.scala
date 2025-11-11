@@ -128,6 +128,7 @@ class SplitwellApp(
       retryProvider,
       migrationInfo,
       participantId,
+      config.automation.ingestion,
     )
     // splitwell does not need to have UpdateHistory
     automation = new SplitwellAutomationService(

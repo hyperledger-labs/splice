@@ -20,6 +20,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { Link as RouterLink } from 'react-router-dom';
+import { PageSectionHeader } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
 interface ProposalListingSectionProps {
@@ -45,9 +46,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
 
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
-      <Typography variant="h5" sx={{ mb: 2 }} data-testid={`${uniqueId}-section-title`}>
-        {sectionTitle}
-      </Typography>
+      <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
       {data.length === 0 ? (
         <Alert severity="info" data-testid={`${uniqueId}-section-info`}>
@@ -62,13 +61,13 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                 {showThresholdDeadline && (
                   <TableCell sx={{ width: '15%' }}>Threshold Deadline</TableCell>
                 )}
-                <TableCell sx={{ width: '15%' }}>Effect At</TableCell>
+                <TableCell sx={{ width: '15%' }}>Effective At</TableCell>
+                {showStatus && <TableCell sx={{ width: '10%' }}>Status</TableCell>}
 
                 {showVoteStats && <TableCell sx={{ width: '20%' }}>Votes</TableCell>}
                 {showAcceptanceThreshold && (
                   <TableCell sx={{ width: '10%' }}>Acceptance Threshold</TableCell>
                 )}
-                {showStatus && <TableCell sx={{ width: '10%' }}>Status</TableCell>}
 
                 <TableCell sx={{ width: '15%' }}>Your Vote</TableCell>
                 <TableCell sx={{ width: '15%' }} align="right"></TableCell>
@@ -144,6 +143,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       )}
       <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>{voteTakesEffect}</TableCell>
 
+      {showStatus && <TableCell data-testid={`${uniqueId}-row-status`}>{status}</TableCell>}
       {showVoteStats && (
         <TableCell data-testid={`${uniqueId}-row-vote-stats`}>
           {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected
@@ -155,7 +155,6 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         </TableCell>
       )}
 
-      {showStatus && <TableCell data-testid={`${uniqueId}-row-status`}>{status}</TableCell>}
       <TableCell data-testid={`${uniqueId}-row-your-vote`}>
         {yourVote === 'accepted' ? (
           <>

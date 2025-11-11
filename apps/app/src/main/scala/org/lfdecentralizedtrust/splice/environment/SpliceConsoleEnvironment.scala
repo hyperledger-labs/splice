@@ -41,7 +41,6 @@ class SpliceConsoleEnvironment(
 
   lazy val httpCommandRunner: ConsoleHttpCommandRunner = new ConsoleHttpCommandRunner(
     environment,
-    environment.config.parameters.timeouts.processing,
     environment.config.parameters.timeouts.console,
     environment.config.parameters.timeouts.requestTimeout,
   )(this.tracer, templateDecoder)

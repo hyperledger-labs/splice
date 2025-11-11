@@ -15,10 +15,12 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Time
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
   AcsJdbcTypes,
@@ -388,12 +390,12 @@ class TxLogBackfillingStoreTest
         // first iteration: processes one regular update and skips the import updates
         workDone1 <- backfillOnce(store2, history2)
         _ = workDone1 shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableNow(
-          DestinationHistory.InsertResult(1L, 1L, CantonTimestamp.assertFromInstant(t(3)))
+          DestinationHistory.InsertResult(1L, 1L, 0L, CantonTimestamp.assertFromInstant(t(3)))
         )
         // second iteration: continues with regular updates from migration 1
         workDone2 <- backfillOnce(store2, history2)
         _ = workDone2 shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableNow(
-          DestinationHistory.InsertResult(2L, 2L, CantonTimestamp.assertFromInstant(t(1)))
+          DestinationHistory.InsertResult(2L, 2L, 0L, CantonTimestamp.assertFromInstant(t(1)))
         )
       } yield succeed
     }
@@ -448,7 +450,7 @@ class TxLogBackfillingStoreTest
   private def backfillOnce(
       store: DbMultiDomainAcsStore[TestTxLogEntry],
       history: UpdateHistory,
-  ): Future[HistoryBackfilling.Outcome] = TraceContext.withNewTraceContext {
+  ): Future[HistoryBackfilling.Outcome] = TraceContext.withNewTraceContext("backfillOnce") {
     implicit traceContext =>
       val backfilling = new TxLogBackfilling(
         store = store,
@@ -462,7 +464,7 @@ class TxLogBackfillingStoreTest
   private def backfillAll(
       store: DbMultiDomainAcsStore[TestTxLogEntry],
       history: UpdateHistory,
-  ): Future[Unit] = TraceContext.withNewTraceContext { implicit traceContext =>
+  ): Future[Unit] = TraceContext.withNewTraceContext("backfillAll") { implicit traceContext =>
     val backfilling = new TxLogBackfilling(
       store = store,
       updateHistory = history,
@@ -506,6 +508,12 @@ class TxLogBackfillingStoreTest
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+  }
+  object GenericAcsRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =
+      new HasIndexColumns[GenericAcsRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
@@ -591,8 +599,8 @@ class TxLogBackfillingStoreTest
         migrationId,
         None,
       ),
-      participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      IngestionConfig(),
     )
   }
 

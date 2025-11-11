@@ -4,38 +4,26 @@
 package com.digitalasset.canton.crypto
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.crypto.SignatureCheckError.UnsupportedKeySpec
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HasToByteString
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 
-/** Wraps the CryptoPureApi to include static synchronizer parameters, ensuring that during
+/** Wraps the [[CryptoPureApi]] to include static synchronizer parameters, ensuring that during
   * signature verification and decryption (both asymmetric and symmetric), the static synchronizer
   * parameters are explicitly checked. This is crucial because a malicious counter participant could
   * potentially use a downgraded scheme. For other methods, such as key generation, signing, or
   * encryption by this (honest) participant, we rely on the synchronizer handshake to ensure that
   * only supported schemes within the synchronizer are used.
-  *
-  * TODO(#20714): decryption checks come in a separate PR
   */
 final class SynchronizerCryptoPureApi(
-    staticSynchronizerParameters: StaticSynchronizerParameters,
-    pureCrypto: CryptoPureApi,
-) extends CryptoPureApi {
-
-  private def checkAgainstStaticSynchronizerParams(
-      keySpec: SigningKeySpec
-  ): Either[SignatureCheckError, Unit] =
-    Either.cond(
-      staticSynchronizerParameters.requiredSigningSpecs.keys.contains(keySpec),
-      (),
-      UnsupportedKeySpec(
-        keySpec,
-        staticSynchronizerParameters.requiredSigningSpecs.keys,
-      ),
-    )
+    override val staticSynchronizerParameters: StaticSynchronizerParameters,
+    @VisibleForTesting
+    val pureCrypto: CryptoPureApi,
+) extends CryptoPureApi
+    with SynchronizerCryptoValidation {
 
   override def verifySignature(
       hash: Hash,
@@ -44,7 +32,13 @@ final class SynchronizerCryptoPureApi(
       usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit traceContext: TraceContext): Either[SignatureCheckError, Unit] =
     for {
-      _ <- checkAgainstStaticSynchronizerParams(publicKey.keySpec)
+      _ <- checkVerifySignature(
+        Some(hash.algorithm),
+        signature.format,
+        publicKey.format,
+        publicKey.keySpec,
+        signature.signingAlgorithmSpec,
+      )
       _ <- pureCrypto.verifySignature(hash, publicKey, signature, usage)
     } yield ()
 
@@ -55,16 +49,30 @@ final class SynchronizerCryptoPureApi(
       usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit traceContext: TraceContext): Either[SignatureCheckError, Unit] =
     for {
-      _ <- checkAgainstStaticSynchronizerParams(publicKey.keySpec)
+      _ <- checkVerifySignature(
+        hashAlgorithmO = None,
+        signature.format,
+        publicKey.format,
+        publicKey.keySpec,
+        signature.signingAlgorithmSpec,
+      )
       _ <- pureCrypto.verifySignature(bytes, publicKey, signature, usage)
     } yield ()
 
-  override protected[crypto] def decryptWithInternal[M](
+  override private[crypto] def decryptWithInternal[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
       deserialize: ByteString => Either[DeserializationError, M]
-  ): Either[DecryptionError, M] = pureCrypto.decryptWithInternal(encrypted, privateKey)(deserialize)
+  ): Either[DecryptionError, M] =
+    for {
+      _ <- checkDecryption(
+        Some(privateKey.format),
+        Some(privateKey.keySpec),
+        encrypted.encryptionAlgorithmSpec,
+      )
+      res <- pureCrypto.decryptWithInternal(encrypted, privateKey)(deserialize)
+    } yield res
 
   override def defaultSymmetricKeyScheme: SymmetricKeyScheme = pureCrypto.defaultSymmetricKeyScheme
 
@@ -77,11 +85,8 @@ final class SynchronizerCryptoPureApi(
       scheme: SymmetricKeyScheme,
   ): Either[EncryptionKeyCreationError, SymmetricKey] = pureCrypto.createSymmetricKey(bytes, scheme)
 
-  override def defaultEncryptionAlgorithmSpec: EncryptionAlgorithmSpec =
-    pureCrypto.defaultEncryptionAlgorithmSpec
-
-  override def supportedEncryptionAlgorithmSpecs: NonEmpty[Set[EncryptionAlgorithmSpec]] =
-    pureCrypto.supportedEncryptionAlgorithmSpecs
+  override def encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec] =
+    pureCrypto.encryptionAlgorithmSpecs
 
   override def encryptWith[M <: HasToByteString](
       message: M,
@@ -106,11 +111,21 @@ final class SynchronizerCryptoPureApi(
       encrypted: Encrypted[M],
       symmetricKey: SymmetricKey,
   )(deserialize: ByteString => Either[DeserializationError, M]): Either[DecryptionError, M] =
-    pureCrypto.decryptWith(encrypted, symmetricKey)(deserialize)
+    for {
+      _ <- checkSymmetricDecryption(symmetricKey.scheme)
+      res <- pureCrypto.decryptWith(encrypted, symmetricKey)(deserialize)
+    } yield res
 
   override def defaultHashAlgorithm: HashAlgorithm = pureCrypto.defaultHashAlgorithm
 
   override protected[crypto] def defaultPbkdfScheme: PbkdfScheme = pureCrypto.defaultPbkdfScheme
+
+  override private[crypto] def computeHmacWithSecretInternal(
+      secret: ByteString,
+      message: ByteString,
+      algorithm: HmacAlgorithm,
+  ): Either[HmacError, Hmac] =
+    pureCrypto.computeHmacWithSecret(secret, message, algorithm)
 
   override def deriveSymmetricKey(
       password: String,
@@ -123,17 +138,14 @@ final class SynchronizerCryptoPureApi(
   override protected[crypto] def generateRandomBytes(length: Int): Array[Byte] =
     pureCrypto.generateRandomBytes(length)
 
-  override def defaultSigningAlgorithmSpec: SigningAlgorithmSpec =
-    pureCrypto.defaultSigningAlgorithmSpec
-
-  override def supportedSigningAlgorithmSpecs: NonEmpty[Set[SigningAlgorithmSpec]] =
-    pureCrypto.supportedSigningAlgorithmSpecs
+  override def signingAlgorithmSpecs: CryptoScheme[SigningAlgorithmSpec] =
+    pureCrypto.signingAlgorithmSpecs
 
   override protected[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
-      signingAlgorithmSpec: SigningAlgorithmSpec = defaultSigningAlgorithmSpec,
+      signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
   )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
     pureCrypto.signBytes(bytes, signingKey, usage, signingAlgorithmSpec)
 }

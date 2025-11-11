@@ -18,7 +18,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
 }
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -66,6 +70,7 @@ class SvDsoAutomationService(
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
+    enabledFeatures: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -222,6 +227,7 @@ class SvDsoAutomationService(
             participantAdminConnection,
             synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
+            enabledFeatures,
           )
         )
       case _ => ()
@@ -233,7 +239,6 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
-        config.topologyChangeDelayDuration,
       )
     )
 
@@ -302,7 +307,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        connection(SpliceLedgerConnectionPriority.Medium),
+        connection(SpliceLedgerConnectionPriority.High),
         config.extraBeneficiaries,
       )
     )

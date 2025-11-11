@@ -14,6 +14,7 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataRestorer(
@@ -26,19 +27,22 @@ class DomainDataRestorer(
 
   /** We assume the domain was not register prior to trying to restore the data.
     */
+  @nowarn("cat=unused&msg=synchronizerId")
   def connectDomainAndRestoreData(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
       dars: Seq[Dar],
-      acsSnapshot: ByteString,
+      acsSnapshot: Seq[ByteString],
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
     def restoreData() = {
       val domainConnectionConfig = SynchronizerConnectionConfig(
         synchronizerAlias,
-        synchronizerId = Some(synchronizerId),
+        synchronizerId = None,
+        // TODO(#19804) Consider whether we can add back the safeguard here.
+        // synchronizerId = Some(synchronizerId),
         sequencerConnections = sequencerConnections,
         manualConnect = true,
         initializeFromTrustedSynchronizer = true,
@@ -89,7 +93,7 @@ class DomainDataRestorer(
       }
   }
 
-  private def importAcs(acs: ByteString)(implicit tc: TraceContext) = {
+  private def importAcs(acs: Seq[ByteString])(implicit tc: TraceContext) = {
     participantAdminConnection.uploadAcsSnapshot(
       acs
     )

@@ -168,7 +168,7 @@ class ScanFrontendTimeBasedIntegrationTest
         actAndCheck(
           "Go to Scan homepage and switch to the Network Info Tab", {
             go to s"http://localhost:${scanUIPort}"
-            click on "navlink-/dso"
+            eventuallyClickOn(id("navlink-/dso"))
           },
         )(
           "The tabs 'DSO Info' and 'Amulet Info' are visible",
@@ -180,7 +180,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
         actAndCheck(
           "Click on DSO Info", {
-            click on "information-tab-dso-info"
+            eventuallyClickOn(id("information-tab-dso-info"))
           },
         )(
           "The DSO info is visible",
@@ -208,7 +208,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
         actAndCheck(
           "Click on Amulet Info", {
-            click on "information-tab-amulet-info"
+            eventuallyClickOn(id("information-tab-amulet-info"))
           },
         )(
           "The Amulet info is visible",
@@ -586,7 +586,7 @@ class ScanFrontendTimeBasedIntegrationTest
           _ => {
             closeVoteModalsIfOpen
 
-            click on "tab-panel-executed"
+            eventuallyClickOn(id("tab-panel-executed"))
             val rows = getAllVoteRows("sv-vote-results-executed-table-body")
 
             forExactly(1, rows) { reviewButton =>
@@ -669,7 +669,7 @@ class ScanFrontendTimeBasedIntegrationTest
         )(
           "a new validator row is added",
           _ => {
-            checkLastValidatorLicenseRow(
+            checkValidatorLicenseRow(
               licenseRows.size.toLong,
               sv1Backend.getDsoInfo().svParty,
               newValidatorParty,

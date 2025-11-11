@@ -7,8 +7,8 @@ import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.FingerprintKeyId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.TopologyActivationTime
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftKeyId,
   BftNodeId,
@@ -19,6 +19,7 @@ import OrderingTopology.{
   NodeTopologyInfo,
   isStrongQuorumReached,
   isWeakQuorumReached,
+  numToleratedFaults,
   strongQuorumSize,
   weakQuorumSize,
 }
@@ -30,6 +31,7 @@ import OrderingTopology.{
   * testing.
   */
 final case class OrderingTopology(
+    // NOTE: make sure to change `toString` when adding useful information
     nodesTopologyInfo: Map[BftNodeId, NodeTopologyInfo],
     sequencingParameters: SequencingParameters,
     maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
@@ -43,9 +45,13 @@ final case class OrderingTopology(
 
   lazy val sortedNodes: Seq[BftNodeId] = nodes.toList.sorted
 
+  lazy val maxToleratedFaults: Int = numToleratedFaults(nodes.size)
+
   lazy val weakQuorum: Int = weakQuorumSize(nodes.size)
 
   lazy val strongQuorum: Int = strongQuorumSize(nodes.size)
+
+  def numFaultsTolerated: Int = numToleratedFaults(nodes.size)
 
   def contains(id: BftNodeId): Boolean = nodes.contains(id)
 
@@ -57,6 +63,22 @@ final case class OrderingTopology(
 
   override def isAuthorized(from: BftNodeId, keyId: BftKeyId): Boolean =
     nodesTopologyInfo.get(from).exists(_.keyIds.contains(keyId))
+
+  override def toString: String = {
+    val nodesWithActivationTime =
+      nodesTopologyInfo.map { case (nodeId, info) =>
+        nodeId -> info.activationTime
+      }
+    s"""OrderingTopology(activation time = $activationTime,
+     | size = $size,
+     | weak quorum = $weakQuorum,
+     | strong quorum = $strongQuorum,
+     | nodes = $nodesWithActivationTime,
+     | sequencing parameters = $sequencingParameters,
+     | max request size to deserialize = $maxRequestSizeToDeserialize,
+     | pending topology changes = $areTherePendingCantonTopologyChanges
+     |)""".stripMargin
+  }
 }
 
 object OrderingTopology {
@@ -68,7 +90,7 @@ object OrderingTopology {
 
   /** A simple constructor for tests so that we don't have to provide timestamps. */
   @VisibleForTesting
-  def forTesting(
+  private[bftordering] def forTesting(
       nodes: Set[BftNodeId],
       sequencingParameters: SequencingParameters = SequencingParameters.Default,
       activationTime: TopologyActivationTime = TopologyActivationTime(CantonTimestamp.MinValue),
@@ -81,7 +103,7 @@ object OrderingTopology {
           node,
           NodeTopologyInfo(
             activationTime = TopologyActivationTime(CantonTimestamp.MinValue),
-            keyIds = Set(FingerprintKeyId.toBftKeyId(Signature.noSignature.signedBy)),
+            keyIds = Set(FingerprintKeyId.toBftKeyId(Signature.noSignature.authorizingLongTermKey)),
           ),
         )
       }.toMap,
@@ -124,7 +146,7 @@ object OrderingTopology {
     validVotes >= weakQuorumSize(nodes)
 
   // F as a function of Ns
-  private def numToleratedFaults(numberOfNodes: Int): Int =
+  def numToleratedFaults(numberOfNodes: Int): Int =
     // N = 3f + 1
     // f = (N - 1) int_div 3
     (numberOfNodes - 1) / 3

@@ -20,9 +20,15 @@ import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.synchronizer.protocol.v30
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
-import com.digitalasset.canton.synchronizer.sequencer.store.DbSequencerStorePruning
+import com.digitalasset.canton.synchronizer.sequencer.store.{
+  DbSequencerStorePruning,
+  RegisteredMember,
+  SequencerStore,
+}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.version.*
 import slick.jdbc.SetParameter
 
@@ -39,6 +45,7 @@ class DbSequencerStateManagerStore(
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val batchingConfig: BatchingConfig,
+    sequencerStore: SequencerStore,
 )(implicit ec: ExecutionContext)
     extends SequencerStateManagerStore
     with DbStore
@@ -51,14 +58,17 @@ class DbSequencerStateManagerStore(
 
   override def readInFlightAggregations(
       timestamp: CantonTimestamp,
-      maxSequencingTimeBound: CantonTimestamp,
+      maxSequencingTimeUpperBound: CantonTimestamp,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[InFlightAggregations] =
-    storage.query(readInFlightAggregationsDBIO(timestamp, maxSequencingTimeBound), functionFullName)
+    storage.query(
+      readInFlightAggregationsDBIO(timestamp, maxSequencingTimeUpperBound),
+      functionFullName,
+    )
 
   /** Compute the state up until (inclusive) the given timestamp. */
   def readInFlightAggregationsDBIO(
       timestamp: CantonTimestamp,
-      maxSequencingTimeBound: CantonTimestamp,
+      maxSequencingTimeUpperBound: CantonTimestamp,
   ): DBIOAction[
     InFlightAggregations,
     NoStream,
@@ -67,23 +77,21 @@ class DbSequencerStateManagerStore(
     val aggregationsQ =
       sql"""
             select aggregation.aggregation_id,
-                   aggregation.first_sequencing_timestamp,
                    aggregation.max_sequencing_time,
                    aggregation.aggregation_rule,
-                   sender.sender,
+                   member.member,
                    sender.sequencing_timestamp,
                    sender.signatures
             from
-              seq_in_flight_aggregation aggregation inner join seq_in_flight_aggregated_sender sender
-                on aggregation.aggregation_id = sender.aggregation_id
+              seq_in_flight_aggregation aggregation
+              inner join seq_in_flight_aggregated_sender sender on aggregation.aggregation_id = sender.aggregation_id
+              inner join sequencer_members member on sender.sender_id = member.id
             where
-            -- Note: filter and field duplication on both tables are necessary to make the query efficient
-              aggregation.max_sequencing_time > $timestamp and aggregation.max_sequencing_time <= $maxSequencingTimeBound and aggregation.first_sequencing_timestamp <= $timestamp
-                and sender.max_sequencing_time > $timestamp and sender.sequencing_timestamp <= $timestamp
+              aggregation.max_sequencing_time > $timestamp and aggregation.max_sequencing_time <= $maxSequencingTimeUpperBound
+                and sender.sequencing_timestamp <= $timestamp
           """.as[
         (
             AggregationId,
-            CantonTimestamp,
             CantonTimestamp,
             AggregationRule,
             Member,
@@ -92,21 +100,20 @@ class DbSequencerStateManagerStore(
         )
       ]
     aggregationsQ.map { aggregations =>
-      val byAggregationId = aggregations.groupBy { case (aggregationId, _, _, _, _, _, _) =>
+      val byAggregationId = aggregations.groupBy { case (aggregationId, _, _, _, _, _) =>
         aggregationId
       }
       byAggregationId.fmap { aggregationsForId =>
         val aggregationsNE = NonEmptyUtil.fromUnsafe(aggregationsForId)
-        val (_, firstSequencingTimestamp, maxSequencingTimestamp, aggregationRule, _, _, _) =
+        val (_, maxSequencingTimestamp, aggregationRule, _, _, _) =
           aggregationsNE.head1
         val aggregatedSenders = aggregationsNE.map {
-          case (_, _, _, _, sender, sequencingTimestamp, signatures) =>
+          case (_, _, _, sender, sequencingTimestamp, signatures) =>
             sender -> AggregationBySender(sequencingTimestamp, signatures.signaturesByEnvelope)
         }.toMap
         InFlightAggregation
           .create(
             aggregatedSenders,
-            firstSequencingTimestamp,
             maxSequencingTimestamp,
             aggregationRule,
           )
@@ -117,21 +124,40 @@ class DbSequencerStateManagerStore(
 
   override def addInFlightAggregationUpdates(updates: InFlightAggregationUpdates)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] =
-    storage.queryAndUpdate(
-      addInFlightAggregationUpdatesDBIO(updates),
-      functionFullName,
-    )
+  ): FutureUnlessShutdown[Unit] = {
+    val uniqueMembers = aggregatedSenders(updates)
+      .map { case (_, aggregatedSender) =>
+        aggregatedSender.sender
+      }
+      .toSeq
+      .distinct
 
-  private[synchronizer] def addInFlightAggregationUpdatesDBIO(updates: InFlightAggregationUpdates)(
-      implicit traceContext: TraceContext
+    for {
+      memberMap <- sequencerStore.lookupMembers(uniqueMembers)
+      _ = if (!uniqueMembers.forall(memberMap.contains))
+        ErrorUtil.invalidState(
+          s"All members must be registered, not registered: ${uniqueMembers.diff(memberMap.keys.toSeq)}."
+        )
+
+      _ <- storage.queryAndUpdate(
+        addInFlightAggregationUpdatesDBIO(updates, MapsUtil.skipEmpty(memberMap)),
+        functionFullName,
+      )
+    } yield ()
+  }
+
+  private[synchronizer] def addInFlightAggregationUpdatesDBIO(
+      updates: InFlightAggregationUpdates,
+      memberMap: Map[Member, RegisteredMember],
+  )(implicit
+      traceContext: TraceContext
   ): DBIO[Unit] = {
     // First add all aggregation ids with their expiry timestamp and rules,
     // then add the information about the aggregated senders.
 
     val addAggregationIdsQ =
-      """insert into seq_in_flight_aggregation(aggregation_id, first_sequencing_timestamp, max_sequencing_time, aggregation_rule)
-         values (?, ?, ?, ?)
+      """insert into seq_in_flight_aggregation(aggregation_id, max_sequencing_time, aggregation_rule)
+         values (?, ?, ?)
          on conflict do nothing"""
     implicit val setParameterAggregationRule: SetParameter[AggregationRule] =
       AggregationRule.getVersionedSetParameter
@@ -145,41 +171,39 @@ class DbSequencerStateManagerStore(
         pp => agg =>
           val (
             aggregationId,
-            FreshInFlightAggregation(firstSequencingTimestamp, maxSequencingTimestamp, rule),
+            FreshInFlightAggregation(maxSequencingTimestamp, rule),
           ) = agg
           pp.>>(aggregationId)
-          pp.>>(firstSequencingTimestamp)
           pp.>>(maxSequencingTimestamp)
           pp.>>(rule)
       }
 
     val addSendersQ =
-      """insert into seq_in_flight_aggregated_sender(aggregation_id, sender, sequencing_timestamp, max_sequencing_time, signatures)
-         values (?, ?, ?, ?, ?)
+      """insert into seq_in_flight_aggregated_sender(aggregation_id, sender_id, sequencing_timestamp, signatures)
+         values (?, ?, ?, ?)
          on conflict do nothing"""
     implicit val setParameterAggregatedSignaturesOfSender
         : SetParameter[AggregatedSignaturesOfSender] =
       AggregatedSignaturesOfSender.getVersionedSetParameter
-    val aggregatedSenders =
-      updates.to(immutable.Iterable).flatMap { case (aggregationId, updateForId) =>
-        updateForId.aggregatedSenders.map(aggregationId -> _).iterator
-      }
-    val addSendersDbIO = DbStorage.bulkOperation_(addSendersQ, aggregatedSenders, storage.profile) {
-      pp => item =>
-        val (aggregationId, AggregatedSender(sender, maxSequencingTime, aggregation)) = item
-        pp.>>(aggregationId)
-        pp.>>(sender)
-        pp.>>(aggregation.sequencingTimestamp)
-        pp.>>(maxSequencingTime)
-        pp.>>(
-          AggregatedSignaturesOfSender(aggregation.signatures)(
-            AggregatedSignaturesOfSender.protocolVersionRepresentativeFor(protocolVersion)
+
+    val addSendersDBIO =
+      DbStorage.bulkOperation_(addSendersQ, aggregatedSenders(updates), storage.profile) {
+        pp => item =>
+          val (aggregationId, AggregatedSender(sender, aggregation)) = item
+          val senderId = memberMap(sender).memberId
+
+          pp.>>(aggregationId)
+          pp.>>(senderId)
+          pp.>>(aggregation.sequencingTimestamp)
+          pp.>>(
+            AggregatedSignaturesOfSender(aggregation.signatures)(
+              AggregatedSignaturesOfSender.protocolVersionRepresentativeFor(protocolVersion)
+            )
           )
-        )
-    }
+      }
 
     // Flatmap instead of zip because we first must insert the aggregations and only later the senders due to the foreign key constraint
-    addAggregationIdsDbio.flatMap(_ => addSendersDbIO)
+    addAggregationIdsDbio.flatMap(_ => addSendersDBIO)
   }
 
   override def pruneExpiredInFlightAggregations(upToInclusive: CantonTimestamp)(implicit
@@ -203,7 +227,7 @@ class DbSequencerStateManagerStore(
 }
 
 object DbSequencerStateManagerStore {
-  private final case class AggregatedSignaturesOfSender(signaturesByEnvelope: Seq[Seq[Signature]])(
+  final case class AggregatedSignaturesOfSender(signaturesByEnvelope: Seq[Seq[Signature]])(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[
         AggregatedSignaturesOfSender.type
       ]
@@ -219,14 +243,14 @@ object DbSequencerStateManagerStore {
       )
   }
 
-  private object AggregatedSignaturesOfSender
+  object AggregatedSignaturesOfSender
       extends VersioningCompanion[AggregatedSignaturesOfSender]
       with ProtocolVersionedCompanionDbHelpers[AggregatedSignaturesOfSender] {
     override def name: String = "AggregatedSignaturesOfSender"
 
     override def versioningTable: VersioningTable = VersioningTable(
       ProtoVersion(30) -> VersionedProtoCodec.storage(
-        ReleaseProtocolVersion(ProtocolVersion.v33),
+        ReleaseProtocolVersion(ProtocolVersion.v34),
         v30.AggregatedSignaturesOfSender,
       )(
         supportedProtoVersion(_)(fromProtoV30),
@@ -247,4 +271,11 @@ object DbSequencerStateManagerStore {
       } yield AggregatedSignaturesOfSender(sigs)(rpv)
     }
   }
+
+  private def aggregatedSenders(
+      updates: InFlightAggregationUpdates
+  ): immutable.Iterable[(AggregationId, AggregatedSender)] =
+    updates.to(immutable.Iterable).flatMap { case (aggregationId, updateForId) =>
+      updateForId.aggregatedSenders.map(aggregationId -> _).iterator
+    }
 }

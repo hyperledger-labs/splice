@@ -286,7 +286,7 @@ Particularly useful are the lag and the catchup speed which let you estimate how
 
 If you need more detailed information, you can also look at the sequencer logs.
 For example, in the logs below you can see SBI acknowledging timestamp `2024-04-29T05:06:06.692783Z` at `2024-04-29 05:35:41.170` so it is roughly lagging 30min behind but the participant is active. A delay of a few seconds is expected, anything larger than a minute will mean that this participant is unable to confirm
-transactions because it sees the confirmation only after the configured `participantResponseTimeout`.
+transactions because it sees the confirmation only after the configured `confirmationResponseTimeout`.
 
 ![SBI lagging](pics/acknowledgement_lag.png)
 
@@ -328,7 +328,7 @@ Network wide issues can come from any of the layers involved in the daml transac
 4. Participants are unable to read the confirmation request.
 5. Participants are unable to submit confirmation requests.
 6. Mediators are unable to read the confirmation request.
-7. Mediators don't get enough confirmations before `participantResponseTimeout`
+7. Mediators don't get enough confirmations before `confirmationResponseTimeout`
 8. Sequencers do not receive enough mediator responses before `mediatorResponseTimeout`
 9. SV apps are not submitting status reports
 

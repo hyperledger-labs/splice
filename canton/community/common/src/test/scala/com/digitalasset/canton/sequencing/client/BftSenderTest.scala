@@ -4,6 +4,7 @@
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdown}
@@ -23,7 +24,8 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
     val promise1 = PromiseUnlessShutdown.unsupervised[Either[String, Int]]()
     val promise2 = PromiseUnlessShutdown.unsupervised[Either[String, Int]]()
     val promise3 = PromiseUnlessShutdown.unsupervised[Either[String, Int]]()
-    val transports: Map[String, MockTransport] = Map(
+    val transports: NonEmpty[Map[String, MockTransport]] = NonEmpty(
+      Map,
       "sequencer1" -> new MockTransport(EitherT(promise1.futureUS)),
       "sequencer2" -> new MockTransport(EitherT(promise2.futureUS)),
       "sequencer3" -> new MockTransport(EitherT(promise3.futureUS)),
@@ -63,11 +65,11 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
       val result = mkRequest(threshold)
 
       checkNotCompleted(result)
-      promise1.outcome(Right(1))
+      promise1.outcome_(Right(1))
       checkNotCompleted(result)
-      promise2.outcome(Right(2))
+      promise2.outcome_(Right(2))
       checkNotCompleted(result)
-      promise3.outcome(Right(1))
+      promise3.outcome_(Right(1))
 
       result.valueOrFailShutdown("result").futureValue shouldBe 1
     }
@@ -79,9 +81,9 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
       val result = mkRequest(threshold)
 
       checkNotCompleted(result)
-      promise1.outcome(Right(1))
+      promise1.outcome_(Right(1))
       checkNotCompleted(result)
-      promise2.outcome(Right(1))
+      promise2.outcome_(Right(1))
 
       result.valueOrFailShutdown("result").futureValue shouldBe 1
     }
@@ -92,7 +94,8 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
       val threshold = PositiveInt.tryCreate(3)
       val promise4 = PromiseUnlessShutdown.unsupervised[Either[String, Int]]()
       val promise5 = PromiseUnlessShutdown.unsupervised[Either[String, Int]]()
-      val transports: Map[String, MockTransport] = Map(
+      val transports: NonEmpty[Map[String, MockTransport]] = NonEmpty(
+        Map,
         "sequencer1" -> new MockTransport(EitherT(promise1.futureUS)),
         "sequencer2" -> new MockTransport(EitherT(promise2.futureUS)),
         "sequencer3" -> new MockTransport(EitherT(promise3.futureUS)),
@@ -113,11 +116,11 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
           val exception = new RuntimeException("BOOM")
 
           checkNotCompleted(result)
-          promise1.outcome(Right(1))
+          promise1.outcome_(Right(1))
           checkNotCompleted(result)
-          promise2.outcome(Right(2))
+          promise2.outcome_(Right(2))
           checkNotCompleted(result)
-          promise3.outcome(Left("failed"))
+          promise3.outcome_(Left("failed"))
           checkNotCompleted(result)
           promise4.failure(exception)
 
@@ -146,9 +149,9 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
       val result = mkRequest(threshold)
 
       checkNotCompleted(result)
-      promise1.outcome(Right(1))
+      promise1.outcome_(Right(1))
       checkNotCompleted(result)
-      promise2.shutdown()
+      promise2.shutdown_()
 
       result.value.unwrap.futureValue shouldBe AbortedDueToShutdown
     }
@@ -160,12 +163,12 @@ class BftSenderTest extends FixtureAnyWordSpec with BaseTest with HasExecutionCo
       val result = mkRequest(threshold)
 
       checkNotCompleted(result)
-      promise1.outcome(Right(1))
+      promise1.outcome_(Right(1))
 
       result.valueOrFailShutdown("result").futureValue shouldBe 1
 
-      promise2.outcome(Right(1))
-      promise3.outcome(Left("failed"))
+      promise2.outcome_(Right(1))
+      promise3.outcome_(Left("failed"))
     }
   }
 }

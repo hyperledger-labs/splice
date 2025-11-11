@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.migration.{
   DomainDataRestorer,
   DomainMigrationInfo,
+  MigrationTimeInfo,
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
@@ -92,6 +93,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.SynchronizerAlias
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -231,7 +233,7 @@ class ValidatorApp(
               case Some(migrationDump) =>
                 for {
                   allSequencerConnections <- domainConnector
-                    .getDecentralizedSynchronizerSequencerConnections(now)
+                    .getDecentralizedSynchronizerSequencerConnections(clock)
                   sequencerConnections = allSequencerConnections.values.toSeq match {
                     case Seq() =>
                       sys.error("Expected at least one sequencer connection but got 0")
@@ -285,7 +287,7 @@ class ValidatorApp(
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
                     domainConnector
-                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(now)
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock)
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
@@ -296,7 +298,18 @@ class ValidatorApp(
             _ <- appInitStep("Vet packages") {
               for {
                 amuletRules <- scanConnection.getAmuletRules()
-                domainId <- scanConnection.getAmuletRulesDomain()(traceContext)
+                globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
+                  traceContext
+                )
+                // vet on extra synchronizers as well
+                // TODO(#2742) make sure we also vet on later connection + on upgrades (and maybe move below logic)
+                extraSynchronizerAliases: Set[SynchronizerAlias] = config.domains.extra
+                  .map(_.alias)
+                  .toSet
+                allConnectedSynchronizers <- participantAdminConnection.listConnectedDomains()
+                extraSynchronizerIds: Seq[SynchronizerId] = allConnectedSynchronizers
+                  .filter(result => extraSynchronizerAliases.contains(result.synchronizerAlias))
+                  .map(_.physicalSynchronizerId.logical)
                 packageVetting = new PackageVetting(
                   ValidatorPackageVettingTrigger.packages,
                   clock,
@@ -304,7 +317,11 @@ class ValidatorApp(
                   loggerFactory,
                   config.latestPackagesOnly,
                 )
-                _ <- packageVetting.vetCurrentPackages(domainId, amuletRules)
+                _ <-
+                  MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
+                    synchronizerId =>
+                      packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
+                  }
               } yield ()
             }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
@@ -411,38 +428,32 @@ class ValidatorApp(
                 }
               }
             }
-            _ <- MonadUtil.sequentialTraverse_(config.participantPruningSchedule.toList) {
-              pruningConfig =>
-                participantAdminConnection.ensurePruningSchedule(
-                  pruningConfig.cron,
-                  pruningConfig.maxDuration,
-                  pruningConfig.retention,
-                )
-            }
+            _ <- participantAdminConnection.ensurePruningSchedule(config.participantPruningSchedule)
           } yield initialSynchronizerTime
         }
     } yield initialSynchronizerTime
 
-  private def readRestoreDump = config.restoreFromMigrationDump.map { path =>
-    if (config.svValidator)
-      throw Status.INVALID_ARGUMENT
-        .withDescription("SV Validator should not be configured with a dump file")
-        .asRuntimeException()
-
-    val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
-      case Failure(exception) =>
+  private def readRestoreDump: Option[DomainMigrationDump] = config.restoreFromMigrationDump.map {
+    path =>
+      if (config.svValidator)
         throw Status.INVALID_ARGUMENT
-          .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+          .withDescription("SV Validator should not be configured with a dump file")
           .asRuntimeException()
-      case Success(value) => value
-    }
-    if (migrationDump.migrationId != config.domainMigrationId)
-      throw Status.INVALID_ARGUMENT
-        .withDescription(
-          s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
-        )
-        .asRuntimeException()
-    migrationDump
+
+      val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
+        case Failure(exception) =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+            .asRuntimeException()
+        case Success(value) => value
+      }
+      if (migrationDump.migrationId != config.domainMigrationId)
+        throw Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
+          )
+          .asRuntimeException()
+      migrationDump
   }
 
   private def getAcsSnapshotFromSingleScan(
@@ -581,6 +592,18 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _) =>
+          seedUrls
+            .traverse { url =>
+              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+              MinimalScanConnection(
+                config,
+                amuletAppParameters.upgradesConfig,
+                retryProvider,
+                loggerFactory,
+              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+            }
+            .map(_ => ())
         case BftScanClientConfig.Bft(seedUrls, _, _) =>
           seedUrls
             .traverse { url =>
@@ -722,13 +745,17 @@ class ValidatorApp(
             )
           }
         } else {
-          val acsTimestamp =
-            readRestoreDump.map(dump => CantonTimestamp.assertFromInstant(dump.acsTimestamp))
+          val dump = readRestoreDump
           Future.successful(
             // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
             DomainMigrationInfo(
               config.domainMigrationId,
-              acsTimestamp,
+              dump.map(d =>
+                MigrationTimeInfo(
+                  CantonTimestamp.assertFromInstant(d.acsTimestamp),
+                  d.synchronizerWasPaused,
+                )
+              ),
             )
           )
         }
@@ -740,6 +767,7 @@ class ValidatorApp(
         retryProvider,
         domainMigrationInfo,
         participantId,
+        config.automation.ingestion,
       )
       validatorUpdateHistory = new UpdateHistory(
         storage,
@@ -779,6 +807,16 @@ class ValidatorApp(
           .toJavaProto(DurationConversion.toProto(config.deduplicationDuration.asJavaApproximation))
       )
       synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+      cantonIdentifierConfig =
+        ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
+      _ <- ParticipantInitializer.ensureInitializedWithRotatedOTK(
+        cantonIdentifierConfig.participant,
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
@@ -874,6 +912,7 @@ class ValidatorApp(
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
+        config.parameters.enabledFeatures,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

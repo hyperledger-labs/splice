@@ -387,11 +387,13 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val partyA = mkPartyId("Alice").toProtoPrimitive
     val partyB = mkPartyId("Bob").toProtoPrimitive
     val partyC = mkPartyId("Charlie").toProtoPrimitive
-
+    val dummyDomainLongString =
+      "global-domain::122015405b2293753a19749682fce0c2a6bb6bf03bcd7d9bde2cd0dce9e426c9a2df"
+    val dummyDomainLong = SynchronizerId.tryFromString(dummyDomainLongString)
     val verdictBase = DbScanVerdictStore.VerdictT(
       rowId = 0L,
       migrationId = 3L,
-      domainId = dummyDomain,
+      domainId = dummyDomainLong,
       recordTime = recordTs,
       finalizationTime = recordTs,
       submittingParticipantUid = mkParticipantId("participant").toProtoPrimitive,
@@ -505,7 +507,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
 
     encodedVerdict.updateId shouldBe verdictBase.updateId
     encodedVerdict.migrationId shouldBe verdictBase.migrationId
-    encodedVerdict.domainId shouldBe dummyDomain.toString
+    encodedVerdict.domainId shouldBe dummyDomainLongString
     encodedVerdict.recordTime should haveMicrosecondPrecision
     encodedVerdict.finalizationTime should haveMicrosecondPrecision
     encodedVerdict.submittingParties shouldBe verdictBase.submittingParties.toVector

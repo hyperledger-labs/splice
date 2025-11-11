@@ -36,6 +36,7 @@ import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.EntryType
 import scala.concurrent.ExecutionContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.scalatest.Assertion
 import slick.jdbc.{GetResult, JdbcProfile}
@@ -977,6 +978,7 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
+      ingestionConfig = IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
       initialRound = initialRound,
     )(parallelExecutionContext, implicitly, implicitly)

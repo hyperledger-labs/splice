@@ -13,7 +13,7 @@ import com.digitalasset.canton.common.sequencer.{
 }
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
@@ -38,7 +38,6 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{DelayUtil, EitherTUtil, ErrorUtil, SingleUseCell}
-import com.digitalasset.canton.version.ProtocolVersion
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -48,16 +47,14 @@ import scala.util.chaining.*
 
 class StoreBasedSynchronizerOutbox(
     synchronizerAlias: SynchronizerAlias,
-    val synchronizerId: SynchronizerId,
     val memberId: Member,
-    val protocolVersion: ProtocolVersion,
     val handle: RegisterTopologyTransactionHandle,
     val targetClient: SynchronizerTopologyClientWithInit,
     val authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
     val targetStore: TopologyStore[TopologyStoreId.SynchronizerStore],
     override protected val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    override protected val crypto: Crypto,
+    override protected val crypto: SynchronizerCrypto,
     override protected val topologyConfig: TopologyConfig,
     maybeObserverCloseable: Option[AutoCloseable] = None,
     override protected val futureSupervisor: FutureSupervisor,
@@ -172,7 +169,7 @@ class StoreBasedSynchronizerOutbox(
   final def startup()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] = {
-    val loadWatermarksF = performUnlessClosingUSF(functionFullName)(for {
+    val loadWatermarksF = synchronizeWithClosing(functionFullName)(for {
       // find the current target watermark
       watermarkTsO <- targetStore.currentDispatchingWatermark
       watermarkTs = watermarkTsO.getOrElse(CantonTimestamp.MinValue)
@@ -210,7 +207,7 @@ class StoreBasedSynchronizerOutbox(
 
   private def kickOffFlush(): Unit =
     if (initialized.get()) {
-      TraceContext.withNewTraceContext(implicit tc => flushAsync())
+      TraceContext.withNewTraceContext("flush")(implicit tc => flushAsync())
     }
 
   private def flushAsync(initialize: Boolean = false)(implicit
@@ -240,7 +237,7 @@ class StoreBasedSynchronizerOutbox(
       if (initialize)
         initialized.set(true)
       if (cur.hasPending) {
-        val pendingAndApplicableF = performUnlessClosingUSF(functionFullName)(for {
+        val pendingAndApplicableF = synchronizeWithClosing(functionFullName)(for {
           // find pending transactions
           pending <- findPendingTransactions(cur)
           // filter out applicable
@@ -253,7 +250,7 @@ class StoreBasedSynchronizerOutbox(
           (pending, applicable) = pendingAndApplicable
           _ = lastDispatched.set(applicable.lastOption)
           // Try to convert if necessary the topology transactions for the required protocol version of the synchronizer
-          convertedTxs <- performUnlessClosingEitherUSF(functionFullName) {
+          convertedTxs <- synchronizeWithClosing(functionFullName) {
             convertTransactions(applicable)
           }
           // dispatch to synchronizer
@@ -325,7 +322,7 @@ class StoreBasedSynchronizerOutbox(
         )
       }.discard
       logger.debug(s"Updating dispatching watermark to $newWatermark")
-      performUnlessClosingUSF(functionFullName)(
+      synchronizeWithClosing(functionFullName)(
         targetStore.updateDispatchingWatermark(newWatermark)
       )
     } else {
@@ -385,6 +382,8 @@ abstract class SynchronizerOutbox extends SynchronizerOutboxHandle {
 
   def targetClient: SynchronizerTopologyClientWithInit
 
+  def psid: PhysicalSynchronizerId = targetClient.psid
+
   def newTransactionsAdded(
       asOf: CantonTimestamp,
       num: Int,
@@ -419,22 +418,22 @@ class SynchronizerOutboxDynamicObserver(val loggerFactory: NamedLoggerFactory)
 }
 
 class SynchronizerOutboxFactory(
-    synchronizerId: SynchronizerId,
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
     synchronizerTopologyManager: SynchronizerTopologyManager,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
     override val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
+  private val psid: PhysicalSynchronizerId = synchronizerTopologyManager.psid
+
   private val authorizedObserverRef = new SingleUseCell[SynchronizerOutboxDynamicObserver]
   private val synchronizerObserverRef = new SingleUseCell[SynchronizerOutboxDynamicObserver]
 
   def create(
-      protocolVersion: ProtocolVersion,
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
       timeTracker: SynchronizerTimeTracker,
@@ -446,12 +445,10 @@ class SynchronizerOutboxFactory(
   ): SynchronizerOutboxHandle = {
     val handle = new SequencerBasedRegisterTopologyTransactionHandle(
       sequencerClient,
-      synchronizerId,
       memberId,
       timeTracker,
       clock,
       topologyConfig,
-      protocolVersion,
       timeouts,
       synchronizerLoggerFactory,
     )
@@ -467,10 +464,8 @@ class SynchronizerOutboxFactory(
       authorizedObserverRef.getOrElse(throw new IllegalStateException("Must have observer"))
 
     val storeBasedSynchronizerOutbox = new StoreBasedSynchronizerOutbox(
-      SynchronizerAlias(synchronizerId.uid.toLengthLimitedString),
-      synchronizerId,
+      SynchronizerAlias(psid.uid.toLengthLimitedString),
       memberId = memberId,
-      protocolVersion = protocolVersion,
       handle = handle,
       targetClient = targetTopologyClient,
       authorizedStore = authorizedTopologyManager.store,
@@ -499,10 +494,8 @@ class SynchronizerOutboxFactory(
 
     val queueBasedSynchronizerOutbox =
       new QueueBasedSynchronizerOutbox(
-        SynchronizerAlias(synchronizerId.uid.toLengthLimitedString),
-        synchronizerId,
+        SynchronizerAlias(psid.uid.toLengthLimitedString),
         memberId = memberId,
-        protocolVersion = protocolVersion,
         handle = handle,
         targetClient = targetTopologyClient,
         synchronizerOutboxQueue = synchronizerTopologyManager.outboxQueue,
@@ -540,17 +533,15 @@ class SynchronizerOutboxFactory(
 }
 
 class SynchronizerOutboxFactorySingleCreate(
-    synchronizerId: SynchronizerId,
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
     synchronizerTopologyManager: SynchronizerTopologyManager,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     override val timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
     loggerFactory: NamedLoggerFactory,
 ) extends SynchronizerOutboxFactory(
-      synchronizerId,
       memberId,
       authorizedTopologyManager,
       synchronizerTopologyManager,
@@ -564,7 +555,6 @@ class SynchronizerOutboxFactorySingleCreate(
   val outboxRef = new SingleUseCell[SynchronizerOutboxHandle]
 
   def createOnlyOnce(
-      protocolVersion: ProtocolVersion,
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
       timeTracker: SynchronizerTimeTracker,
@@ -584,7 +574,6 @@ class SynchronizerOutboxFactorySingleCreate(
     }
 
     create(
-      protocolVersion,
       targetTopologyClient,
       sequencerClient,
       timeTracker,

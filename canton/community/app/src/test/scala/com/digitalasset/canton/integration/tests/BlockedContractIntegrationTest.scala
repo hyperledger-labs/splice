@@ -3,16 +3,14 @@
 
 package com.digitalasset.canton.integration.tests
 
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.daml.ledger.javaapi.data.Command
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.UnknownInformees
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -90,6 +88,7 @@ sealed trait BlockedContractIntegrationTest
         bob,
         removes = List(participant2),
         forceFlags = ForceFlags(DisablePartyWithActiveContracts),
+        store = daId,
       )
 
     // Wait until participant1 observes Bob having been disabled
@@ -124,15 +123,20 @@ sealed trait BlockedContractIntegrationTest
   ): Iou.Contract =
     if (autoSync)
       JavaDecodeUtil
-        .decodeAllCreatedTree(Iou.COMPANION)(
+        .decodeAllCreated(Iou.COMPANION)(
           participantRef.ledger_api.javaapi.commands.submit(Seq(submitter), Seq(command))
         )
         .loneElement
     else
       JavaDecodeUtil
-        .decodeAllCreatedTree(Iou.COMPANION)(
+        .decodeAllCreated(Iou.COMPANION)(
           participantRef.ledger_api.javaapi.commands
-            .submit(Seq(submitter), Seq(command), optTimeout = None)
+            .submit(
+              Seq(submitter),
+              Seq(command),
+              optTimeout = None,
+              transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+            )
         )
         .loneElement
 }
@@ -143,5 +147,5 @@ sealed trait BlockedContractIntegrationTest
 
 class BlockedContractIntegrationTestPostgres extends BlockedContractIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

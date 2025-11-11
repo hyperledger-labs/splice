@@ -23,7 +23,6 @@ import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
   ContractWithState,
-  QualifiedName,
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -31,6 +30,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -44,6 +44,7 @@ class DbSplitwellStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -55,7 +56,7 @@ class DbSplitwellStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbSplitwellStore",
         party = key.providerParty,
         participant = participantId,
@@ -64,7 +65,7 @@ class DbSplitwellStore(
         ),
       ),
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
+      ingestionConfig,
     )
     with AcsTables
     with AcsQueries
@@ -97,10 +98,8 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and assigned_domain = $synchronizerId
-              and install_user = ${user}""",
+            splitwellCodegen.SplitwellInstall.COMPANION,
+            where = sql"""assigned_domain = $synchronizerId and install_user = $user""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupInstallWithOffset",
@@ -130,9 +129,8 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.Group.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and group_owner = ${owner} and group_id = ${lengthLimited(id.unpack)}""",
+            splitwellCodegen.Group.COMPANION,
+            where = sql"""group_owner = $owner and group_id = ${lengthLimited(id.unpack)}""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupInstallWithOffset",
@@ -160,11 +158,7 @@ class DbSplitwellStore(
               SplitwellTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                  splitwellCodegen.Group.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-              """,
+              splitwellCodegen.Group.COMPANION,
             ),
             "listGroups",
           )
@@ -188,11 +182,8 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.GroupInvite.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and group_owner = ${owner}
-              """,
+            splitwellCodegen.GroupInvite.COMPANION,
+            additionalWhere = sql"""and group_owner = $owner""",
           ),
           "listGroupInvites",
         )
@@ -217,10 +208,9 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.AcceptedGroupInvite.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and group_owner = ${owner}
+            splitwellCodegen.AcceptedGroupInvite.COMPANION,
+            additionalWhere = sql"""
+              and group_owner = ${owner}
               and group_id = ${lengthLimited(groupKey(owner, groupId).id.unpack)}
               """,
           ),
@@ -246,10 +236,8 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.BalanceUpdate.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and group_id = ${lengthLimited(key.id.unpack)}
+            splitwellCodegen.BalanceUpdate.COMPANION,
+            additionalWhere = sql""" and group_id = ${lengthLimited(key.id.unpack)}
               """,
             orderLimit = sql"""order by event_number desc""",
           ),
@@ -318,10 +306,9 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and install_user = ${user}
+            splitwellCodegen.SplitwellInstall.COMPANION,
+            additionalWhere = sql"""
+              and install_user = $user
               and assigned_domain is not null
               """,
           ),
@@ -348,10 +335,9 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellRules.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and assigned_domain is not null
+            splitwellCodegen.SplitwellRules.COMPANION,
+            additionalWhere = sql"""
+               and assigned_domain is not null
               """,
           ),
           "listSplitwellRules",
@@ -379,11 +365,8 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellRules.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and assigned_domain = $synchronizerId
-              """,
+            splitwellCodegen.SplitwellRules.COMPANION,
+            where = sql"""assigned_domain = $synchronizerId""",
           ).headOption,
           "lookupSplitwellRules",
         )
@@ -486,10 +469,9 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
+            splitwellCodegen.TransferInProgress.COMPANION,
             where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.TransferInProgress.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and payment_request_contract_id = ${paymentRequest}
+                  payment_request_contract_id = $paymentRequest
               and assigned_domain is not null
               """,
           ).headOption,

@@ -13,10 +13,10 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.util.AcsInspection
 import com.digitalasset.canton.integration.{
@@ -82,7 +82,8 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
 
         participant1.synchronizers.connect_local(sequencer1, alias = synchronizer1)
         participant1.synchronizers.connect_local(sequencer2, alias = synchronizer2)
-        participant1.dars.upload(CantonExamplesPath)
+        participant1.dars.upload(CantonExamplesPath, synchronizerId = daId)
+        participant1.dars.upload(CantonExamplesPath, synchronizerId = acmeId)
 
         participantSeesMediators(participant1, Set(Set(mediator1.id), Set(mediator3.id)))
 
@@ -98,7 +99,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
       }
 
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.H2](
+    new UseReferenceBlockSequencer[DbConfig.H2](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))
@@ -119,7 +120,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
           "reassign-contract",
           participant1.adminParty.toProtoPrimitive,
         ).create.commands.loneElement
-      val tx = participant1.ledger_api.javaapi.commands.submit_flat(
+      val tx = participant1.ledger_api.javaapi.commands.submit(
         Seq(participant1.adminParty),
         Seq(cycle),
         synchronizerId = Some(synchronizer1Id),
@@ -171,7 +172,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
         a[CommandFailure] shouldBe thrownBy {
           participant1.ledger_api.commands.submit_assign(
             participant1.adminParty,
-            unassigned.unassignId,
+            unassigned.reassignmentId,
             synchronizer1Id,
             synchronizer2Id,
           )
@@ -188,7 +189,7 @@ final class MultipleMediatorsMultipleSynchronizersIntegrationTest
 
       participant1.ledger_api.commands.submit_assign(
         participant1.adminParty,
-        unassignedEvent.unassignId,
+        unassignedEvent.reassignmentId,
         synchronizer1Id,
         synchronizer2Id,
       )

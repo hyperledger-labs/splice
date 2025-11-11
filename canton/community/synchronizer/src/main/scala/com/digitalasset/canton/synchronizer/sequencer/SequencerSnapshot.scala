@@ -16,7 +16,7 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus.implicitPrettyString
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 
@@ -41,9 +41,12 @@ final case class SequencerSnapshot(
     def serializeInFlightAggregation(
         args: (AggregationId, InFlightAggregation)
     ): v30.SequencerSnapshot.InFlightAggregationWithId = {
+      // firstSequencingTimestamp is not serialized, because the sequencer that uses the sequencer snapshot to
+      // initialize itself, takes the lowest sequencing timestamp from aggregated senders and stores it as the first
+      // sequencing time for the aggregation.
       val (
         aggregationId,
-        InFlightAggregation(aggregatedSenders, _firstSequencingTimestamp, maxSequencingTime, rule),
+        InFlightAggregation(aggregatedSenders, maxSequencingTime, rule),
       ) = args
       v30.SequencerSnapshot.InFlightAggregationWithId(
         aggregationId.toProtoPrimitive,
@@ -110,7 +113,7 @@ final case class SequencerSnapshot(
 
 object SequencerSnapshot extends VersioningCompanion[SequencerSnapshot] {
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.SequencerSnapshot)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.SequencerSnapshot)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
     )
@@ -188,19 +191,9 @@ object SequencerSnapshot extends VersioningCompanion[SequencerSnapshot] {
               } yield sender -> AggregationBySender(sequencingTimestamp, signatures)
           }
           .map(_.toMap)
-        firstSequencingTimestamp <- aggregatedSenders.values
-          .minByOption(_.sequencingTimestamp)
-          .map(_.sequencingTimestamp)
-          .toRight(
-            ProtoDeserializationError.InvariantViolation(
-              field = Some("aggregatedSenders"),
-              "Aggregated senders must not be empty",
-            )
-          )
         inFlightAggregation <- InFlightAggregation
           .create(
             aggregatedSenders,
-            firstSequencingTimestamp,
             maxSequencingTime,
             aggregationRule,
           )
@@ -242,7 +235,7 @@ object SequencerSnapshot extends VersioningCompanion[SequencerSnapshot] {
 }
 
 final case class SequencerInitialState(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     snapshot: SequencerSnapshot,
     // TODO(#13883,#14504) Revisit whether this still makes sense: For sequencer onboarding, this timestamp
     //  will typically differ between sequencers because they may receive envelopes addressed directly to them
@@ -253,7 +246,7 @@ final case class SequencerInitialState(
 
 object SequencerInitialState {
   def apply(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       snapshot: SequencerSnapshot,
       times: SeqView[(CantonTimestamp, CantonTimestamp)],
   ): SequencerInitialState = {

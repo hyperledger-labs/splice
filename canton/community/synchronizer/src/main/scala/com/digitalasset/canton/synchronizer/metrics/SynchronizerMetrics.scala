@@ -76,6 +76,9 @@ class SequencerMetrics(
   val payloadCache: CacheMetrics =
     new CacheMetrics("payload-cache", openTelemetryMetricsFactory)
 
+  val memberCache: CacheMetrics =
+    new CacheMetrics("member-cache", openTelemetryMetricsFactory)
+
   override def storageMetrics: DbStorageMetrics = dbStorage
 
   val block: BlockMetrics = new BlockMetrics(prefix, openTelemetryMetricsFactory)

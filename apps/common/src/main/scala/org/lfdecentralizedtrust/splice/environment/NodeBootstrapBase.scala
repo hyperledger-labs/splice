@@ -120,27 +120,31 @@ abstract class NodeBootstrapBase[
 
   /** kick off initialisation during startup */
   protected def startInstanceUnlessClosing(
-      instanceET: => EitherT[Future, String, T]
+      instance: => T
   ): EitherT[Future, String, Unit] = {
     if (isInitialized) {
       logger.warn("Will not start instance again as it is already initialised")
       EitherT.pure[Future, String](())
     } else {
-      performUnlessClosingEitherT(functionFullName, "Aborting startup due to shutdown") {
-        if (starting.compareAndSet(false, true))
-          instanceET.map { instance =>
+      val unlessShutdown: com.digitalasset.canton.lifecycle.UnlessShutdown[scala.util.Try[Unit]] =
+        synchronizeWithClosingSync(functionFullName)(scala.util.Try {
+          if (starting.compareAndSet(false, true)) {
             val previous = ref.getAndSet(Some(instance))
             // potentially over-defensive, but ensures a runner will not be set twice.
             // if called twice it indicates a bug in initialization.
             previous.foreach { shouldNotBeThere =>
               logger.error(s"Runner has already been set: $shouldNotBeThere")
             }
+          } else {
+            logger.warn("Will not start instance again as it is already starting up")
+            ()
           }
-        else {
-          logger.warn("Will not start instance again as it is already starting up")
-          EitherT.pure[Future, String](())
-        }
-      }
+        })
+      EitherT.fromEither(
+        unlessShutdown
+          .toRight("Aborting startup due to shutdown")
+          .flatMap(_.toEither.left.map(_.toString))
+      )
     }
   }
 

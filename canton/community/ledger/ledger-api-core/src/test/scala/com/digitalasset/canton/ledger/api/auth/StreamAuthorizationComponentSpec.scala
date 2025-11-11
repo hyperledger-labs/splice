@@ -5,7 +5,13 @@ package com.digitalasset.canton.ledger.api.auth
 
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
-import com.daml.ledger.api.v2.transaction_filter.{Filters, TransactionFilter}
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_ACS_DELTA
+import com.daml.ledger.api.v2.transaction_filter.{
+  EventFormat,
+  Filters,
+  TransactionFormat,
+  UpdateFormat,
+}
 import com.daml.ledger.api.v2.update_service.*
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.{UpdateService, UpdateServiceStub}
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
@@ -19,6 +25,7 @@ import com.digitalasset.canton.auth.{
   ClaimSet,
 }
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.ServerConfig
 import com.digitalasset.canton.ledger.api.UserRight.CanReadAs
 import com.digitalasset.canton.ledger.api.auth.services.UpdateServiceAuthorization
 import com.digitalasset.canton.ledger.api.grpc.StreamingServiceLifecycleManagement
@@ -28,11 +35,11 @@ import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
 import com.digitalasset.canton.logging.SuppressionRule.{FullSuppression, LoggerNameContains}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.apiserver.{ApiServiceOwner, GrpcServer}
+import com.digitalasset.canton.platform.apiserver.{ApiServiceOwner, GrpcServerOwner}
 import com.digitalasset.canton.{BaseTest, UniquePortGenerator}
 import com.digitalasset.daml.lf.data.Ref
 import io.grpc.*
-import io.grpc.netty.NettyChannelBuilder
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder
 import io.grpc.stub.StreamObserver
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.{Done, NotUsed}
@@ -43,12 +50,10 @@ import org.scalatest.matchers.should.Matchers
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.nowarn
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import scala.util.Try
 
-@nowarn("cat=deprecation")
 class StreamAuthorizationComponentSpec
     extends AsyncFlatSpec
     with BaseTest
@@ -268,27 +273,6 @@ class StreamAuthorizationComponentSpec
 
       def notSupported = throw new UnsupportedOperationException()
 
-      override def getUpdateTrees(
-          request: GetUpdatesRequest,
-          responseObserver: StreamObserver[GetUpdateTreesResponse],
-      ): Unit = notSupported
-
-      override def getTransactionTreeByOffset(
-          request: GetTransactionByOffsetRequest
-      ): Future[GetTransactionTreeResponse] = notSupported
-
-      override def getTransactionTreeById(
-          request: GetTransactionByIdRequest
-      ): Future[GetTransactionTreeResponse] = notSupported
-
-      override def getTransactionByOffset(
-          request: GetTransactionByOffsetRequest
-      ): Future[GetTransactionResponse] = notSupported
-
-      override def getTransactionById(
-          request: GetTransactionByIdRequest
-      ): Future[GetTransactionResponse] = notSupported
-
       override def getUpdateByOffset(
           request: GetUpdateByOffsetRequest
       ): Future[GetUpdateResponse] = notSupported
@@ -304,10 +288,11 @@ class StreamAuthorizationComponentSpec
         new UpdateServiceAuthorization(apiTransactionServiceFixture, authorizer)
       )
 
-    def grpcServerOwnerFor(bindableService: BindableService) = GrpcServer.owner(
+    def grpcServerOwnerFor(bindableService: BindableService) = GrpcServerOwner(
       address = None,
       desiredPort = grpcServerPort,
       maxInboundMessageSize = ApiServiceOwner.DefaultMaxInboundMessageSize,
+      maxInboundMetadataSize = ServerConfig.defaultMaxInboundMetadataSize.unwrap,
       sslContext = None,
       interceptors = List(authorizationClaimSetFixtureInterceptor),
       metrics = LedgerApiServerMetrics.ForTesting,
@@ -343,17 +328,27 @@ class StreamAuthorizationComponentSpec
         GetUpdatesRequest(
           beginExclusive = 0,
           endInclusive = None,
-          filter = Some(
-            TransactionFilter(
-              Map(
-                partyId1 -> Filters(Nil),
-                partyId2 -> Filters(Nil),
+          updateFormat = Some(
+            UpdateFormat(
+              includeTransactions = Some(
+                TransactionFormat(
+                  eventFormat = Some(
+                    EventFormat(
+                      filtersByParty = Map(
+                        partyId1 -> Filters(Nil),
+                        partyId2 -> Filters(Nil),
+                      ),
+                      filtersForAnyParty = None,
+                      verbose = false,
+                    )
+                  ),
+                  transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+                )
               ),
-              None,
+              includeReassignments = None,
+              includeTopologyEvents = None,
             )
           ),
-          verbose = false,
-          updateFormat = None,
         ),
       )
     }

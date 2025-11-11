@@ -52,7 +52,7 @@ class DbScanStoreMetrics(
   def registerNewCacheMetrics(
       cacheName: String
   )(implicit tc: TraceContext): UnlessShutdown[CacheMetrics] =
-    performUnlessClosing(s"register cache $cacheName") {
+    synchronizeWithClosingSync(s"register cache $cacheName") {
       cacheOfMetrics.getOrElseUpdate(
         cacheName, {
           logger.info(s"Registering new cache metrics for $cacheName")

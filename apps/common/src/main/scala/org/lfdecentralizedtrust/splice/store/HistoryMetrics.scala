@@ -3,11 +3,17 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Meter}
+import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Meter, Timer}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
-import com.daml.metrics.api.MetricQualification.{Debug, Traffic}
+import com.daml.metrics.api.MetricQualification.{Debug, Latency, Traffic}
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+  TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
 
 class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     metricsContext: MetricsContext
@@ -17,17 +23,15 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
   object UpdateHistoryBackfilling {
     private val historyBackfillingPrefix: MetricName = prefix :+ "backfilling"
 
-    type CantonTimestampMicros =
-      Long // OpenTelemetry Gauges only allow numeric types and there's no way to map it
-    lazy val latestRecordTime: Gauge[CantonTimestampMicros] =
-      metricsFactory.gauge(
-        MetricInfo(
-          name = historyBackfillingPrefix :+ "latest-record-time",
-          summary = "The latest record time that has been backfilled",
-          Traffic,
-        ),
-        initial = CantonTimestamp.MinValue.toMicros,
-      )(metricsContext)
+    lazy val latestRecordTime = SpliceMetrics.cantonTimestampGauge(
+      metricsFactory,
+      MetricInfo(
+        name = historyBackfillingPrefix :+ "latest-record-time",
+        summary = "The latest record time that has been backfilled",
+        Traffic,
+      ),
+      initial = CantonTimestamp.MinValue,
+    )(metricsContext)
 
     val updateCount: Counter =
       metricsFactory.counter(
@@ -61,16 +65,15 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
   object TxLogBackfilling {
     private val historyBackfillingPrefix: MetricName = prefix :+ "txlog-backfilling"
 
-    type CantonTimestampMicros =
-      Long // OpenTelemetry Gauges only allow numeric types and there's no way to map it
-    val latestRecordTime: Gauge[CantonTimestampMicros] =
-      metricsFactory.gauge(
+    val latestRecordTime: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
         MetricInfo(
           name = historyBackfillingPrefix :+ "latest-record-time",
           summary = "The latest record time that has been backfilled",
           Traffic,
         ),
-        initial = CantonTimestamp.MinValue.toMicros,
+        initial = CantonTimestamp.MinValue,
       )(metricsContext)
 
     val updateCount: Counter =
@@ -138,16 +141,15 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
   object CorruptAcsSnapshots {
     private val corruptAcsSnapshotsPrefix: MetricName = prefix :+ "corrupt-acs-snapshots"
 
-    type CantonTimestampMicros =
-      Long // OpenTelemetry Gauges only allow numeric types and there's no way to map it
-    val latestRecordTime: Gauge[CantonTimestampMicros] =
-      metricsFactory.gauge(
+    val latestRecordTime: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
         MetricInfo(
           name = corruptAcsSnapshotsPrefix :+ "latest-record-time",
           summary = "The record time of the latest corrupt snapshot that has been deleted",
           Traffic,
         ),
-        initial = CantonTimestamp.MinValue.toMicros,
+        initial = CantonTimestamp.MinValue,
       )(metricsContext)
 
     val count: Counter =
@@ -198,9 +200,64 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       )
     )(metricsContext)
 
+    val eventCount: Counter =
+      metricsFactory.counter(
+        MetricInfo(
+          name = updateHistoryPrefix :+ "event-count",
+          summary = "The number of events that have been ingested",
+          Traffic,
+        )
+      )(metricsContext)
+
+    lazy val latestRecordTime: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = updateHistoryPrefix :+ "latest-record-time",
+          summary = "The latest record time that has been ingested",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    val latency: Timer =
+      metricsFactory.timer(
+        MetricInfo(
+          name = updateHistoryPrefix :+ "latency",
+          summary = "How long it takes to ingest a single update history entry",
+          qualification = Latency,
+        )
+      )(metricsContext)
+
+  }
+
+  def metricsContextFromUpdate(
+      treeUpdateOrOffsetCheckpoint: TreeUpdateOrOffsetCheckpoint,
+      backfilling: Boolean,
+  ): MetricsContext = {
+    treeUpdateOrOffsetCheckpoint match {
+      case TreeUpdateOrOffsetCheckpoint.Update(treeUpdate, _) =>
+        metricsContextFromUpdate(treeUpdate, backfilling)
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) =>
+        MetricsContext("update_type" -> "Checkpoint", "backfilling" -> backfilling.toString)
+    }
+  }
+
+  def metricsContextFromUpdate(
+      treeUpdate: TreeUpdate,
+      backfilling: Boolean,
+  ): MetricsContext = {
+    val updateType = treeUpdate match {
+      case ReassignmentUpdate(_) =>
+        "ReassignmentUpdate"
+      case TransactionTreeUpdate(_) =>
+        "TransactionTreeUpdate"
+    }
+    MetricsContext("update_type" -> updateType, "backfilling" -> backfilling.toString)
   }
 
   override def close(): Unit = {
+    UpdateHistory.latestRecordTime.close()
     UpdateHistoryBackfilling.completed.close()
     UpdateHistoryBackfilling.latestRecordTime.close()
     TxLogBackfilling.completed.close()

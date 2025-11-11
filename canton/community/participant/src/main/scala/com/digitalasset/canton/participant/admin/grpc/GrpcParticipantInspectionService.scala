@@ -40,13 +40,15 @@ import com.digitalasset.canton.pruning.{
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.store.{IndexedStringStore, IndexedSynchronizer}
 import com.digitalasset.canton.topology.client.IdentityProvidingServiceClient
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils}
+import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils, MonadUtil}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Bytes
 import io.grpc.stub.StreamObserver
 
 import java.io.OutputStream
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcParticipantInspectionService(
@@ -202,14 +204,17 @@ class GrpcParticipantInspectionService(
         request.synchronizerIds.traverse(SynchronizerId.fromProtoPrimitive(_, "synchronizer_id"))
       )
       participants <- wrapErrUS(
-        request.counterParticipantUids.traverse(
-          ParticipantId.fromProtoPrimitive(_, "counter_participant_uid")
+        request.counterParticipantIds.traverse(
+          ParticipantId.fromProtoPrimitive(_, "counter_participant_id")
         )
       )
       intervals <- EitherTUtil
         .fromFuture(
           syncStateInspection
-            .getIntervalsBehindForParticipants(synchronizers, participants),
+            .getIntervalsBehindForParticipants(
+              NonEmpty.from(synchronizers),
+              NonEmpty.from(participants),
+            ),
           err => ParticipantInspectionServiceError.InternalServerError.Error(err.toString),
         )
         .leftWiden[RpcError]
@@ -244,9 +249,9 @@ class GrpcParticipantInspectionService(
           request.timeRanges
             .traverse(dtr => validateSynchronizerTimeRange(dtr))
       result <- for {
-        counterParticipantIds <- request.counterParticipantUids.traverse(pId =>
+        counterParticipantIds <- request.counterParticipantIds.traverse(pId =>
           ParticipantId
-            .fromProtoPrimitive(pId, s"counter_participant_uids")
+            .fromProtoPrimitive(pId, s"counter_participant_ids")
             .leftMap(err => err.message)
         )
         states <- request.commitmentState
@@ -259,7 +264,7 @@ class GrpcParticipantInspectionService(
         } yield syncStateInspection
           .crossSynchronizerSentCommitmentMessages(
             synchronizerSearchPeriods,
-            counterParticipantIds,
+            NonEmpty.from(counterParticipantIds),
             states,
             request.verbose,
           )
@@ -297,9 +302,9 @@ class GrpcParticipantInspectionService(
             .traverse(dtr => validateSynchronizerTimeRange(dtr))
 
       result <- for {
-        counterParticipantIds <- request.counterParticipantUids.traverse(pId =>
+        counterParticipantIds <- request.counterParticipantIds.traverse(pId =>
           ParticipantId
-            .fromProtoPrimitive(pId, s"counter_participant_uids")
+            .fromProtoPrimitive(pId, "counter_participant_ids")
             .leftMap(err => err.message)
         )
         states <- request.commitmentState
@@ -312,7 +317,7 @@ class GrpcParticipantInspectionService(
         } yield syncStateInspection
           .crossSynchronizerReceivedCommitmentMessages(
             synchronizerSearchPeriods,
-            counterParticipantIds,
+            NonEmpty.from(counterParticipantIds),
             states,
             request.verbose,
           )
@@ -334,7 +339,7 @@ class GrpcParticipantInspectionService(
   private def fetchDefaultSynchronizerTimeRanges()(implicit
       traceContext: TraceContext
   ): Either[String, Seq[Future[SynchronizerSearchCommitmentPeriod]]] = {
-    val searchPeriods = synchronizerAliasManager.ids.map(synchronizerId =>
+    val searchPeriods = synchronizerAliasManager.logicalSynchronizerIds.map(synchronizerId =>
       for {
         synchronizerAlias <- synchronizerAliasManager
           .aliasForSynchronizerId(synchronizerId)
@@ -407,7 +412,7 @@ class GrpcParticipantInspectionService(
     }
 
   /** Request metadata about shared contracts used in commitment computation at a specific time
-    * Subject to the data still being available on the participant TODO(#9557) R2
+    * Subject to the data still being available on the participant
     */
   override def openCommitment(
       request: v30.OpenCommitmentRequest,
@@ -428,22 +433,18 @@ class GrpcParticipantInspectionService(
     val result =
       for {
         // 1. Check that the commitment to open matches a sent local commitment
-        synchronizerId <- CantonGrpcUtil.wrapErrUS(
-          SynchronizerId.fromProtoPrimitive(request.synchronizerId, "synchronizerId")
+        psid <- CantonGrpcUtil.wrapErrUS(
+          PhysicalSynchronizerId.fromProtoPrimitive(
+            request.physicalSynchronizerId,
+            "physical_synchronizer_id",
+          )
         )
 
         synchronizerAlias <- EitherT
           .fromOption[FutureUnlessShutdown](
-            synchronizerAliasManager.aliasForSynchronizerId(synchronizerId),
+            synchronizerAliasManager.aliasForSynchronizerId(psid.logical),
             ParticipantInspectionServiceError.IllegalArgumentError
-              .Error(s"Unknown synchronizer id $synchronizerId"),
-          )
-          .leftWiden[RpcError]
-
-        pv <- EitherTUtil
-          .fromFuture(
-            syncStateInspection.getProtocolVersion(synchronizerAlias),
-            err => ParticipantInspectionServiceError.InternalServerError.Error(err.toString),
+              .Error(s"Unknown synchronizer id $psid"),
           )
           .leftWiden[RpcError]
 
@@ -463,28 +464,31 @@ class GrpcParticipantInspectionService(
             )
         )
 
-        computedCmts = syncStateInspection.findComputedCommitments(
-          synchronizerAlias,
-          cantonTickTs,
-          cantonTickTs,
-          Some(counterParticipant),
-        )
-
         // 2. Retrieve the contracts for the synchronizer and the time of the commitment
 
         topologySnapshot <- EitherT.fromOption[FutureUnlessShutdown](
-          ips.forSynchronizer(synchronizerId),
+          ips.forSynchronizer(psid),
           ParticipantInspectionServiceError.InternalServerError.Error(
-            s"Failed to retrieve ips for synchronizer: $synchronizerId"
+            s"Failed to retrieve ips for synchronizer: $psid"
           ),
         )
 
         snapshot <- EitherTUtil
           .fromFuture(
-            topologySnapshot.awaitSnapshot(cantonTickTs),
+            topologySnapshot.awaitSnapshotUSSupervised(
+              s"Await snapshot at $cantonTickTs",
+              warnAfter = 5.seconds,
+            )(cantonTickTs),
             err => ParticipantInspectionServiceError.InternalServerError.Error(err.toString),
           )
           .leftWiden[RpcError]
+
+        computedCmts = syncStateInspection.findComputedCommitments(
+          synchronizerAlias,
+          cantonTickTs.minusMillis(1),
+          cantonTickTs,
+          Some(counterParticipant),
+        )
 
         // Check that the given timestamp is a valid tick. We cannot move this check up, because .get(cantonTickTs)
         // would wait if the timestamp is in the future. Here, we already validated that the timestamp is in the past
@@ -494,7 +498,6 @@ class GrpcParticipantInspectionService(
           .fromFuture(
             SynchronizerParametersLookup
               .forAcsCommitmentSynchronizerParameters(
-                pv,
                 topologySnapshot,
                 loggerFactory,
               )
@@ -516,7 +519,7 @@ class GrpcParticipantInspectionService(
             .leftMap[RpcError](_ =>
               ParticipantInspectionServiceError.IllegalArgumentError.Error(
                 s"""|The participant cannot open commitment ${request.commitment} for participant
-                   |${request.computedForCounterParticipantUid} on synchronizer ${request.synchronizerId} because the given
+                   |${request.computedForCounterParticipantUid} on synchronizer ${request.physicalSynchronizerId} because the given
                    |period end tick ${request.periodEndTick} is not a valid reconciliation interval tick""".stripMargin
               )
             )
@@ -538,7 +541,7 @@ class GrpcParticipantInspectionService(
           (),
           ParticipantInspectionServiceError.IllegalArgumentError.Error(
             s"""|The participant cannot open commitment ${request.commitment} for participant
-            |${request.computedForCounterParticipantUid} on synchronizer ${request.synchronizerId} and period end
+            |${request.computedForCounterParticipantUid} on synchronizer ${request.physicalSynchronizerId} and period end
             |${request.periodEndTick} because the participant has not computed such a commitment at the given tick timestamp for the given counter participant""".stripMargin
           ): RpcError,
         )
@@ -554,10 +557,10 @@ class GrpcParticipantInspectionService(
           )
           .leftWiden[RpcError]
 
-        contractsAndTransferCounter <- EitherTUtil
+        contractsAndReassignmentCounter <- EitherTUtil
           .fromFuture(
             syncStateInspection.activeContractsStakeholdersFilter(
-              synchronizerId,
+              psid,
               TimeOfChange(cantonTickTs),
               counterParticipantParties.map(_.toLf),
             ),
@@ -570,31 +573,33 @@ class GrpcParticipantInspectionService(
           AcsCommitmentProcessor.checkCommitmentMatchesContracts(
             requestCommitment,
             cantonTickTs,
-            contractsAndTransferCounter,
+            contractsAndReassignmentCounter,
             counterParticipant,
           ),
           (),
           ParticipantInspectionServiceError.IllegalArgumentError.Error(
             s"""|The participant computed commitment ${request.commitment} for participant
-                |${request.computedForCounterParticipantUid} on synchronizer ${request.synchronizerId} and period end
+                |${request.computedForCounterParticipantUid} on synchronizer ${request.physicalSynchronizerId} and period end
                 |${request.periodEndTick} does not correspond to the ACS contents at that time""".stripMargin
           ): RpcError,
         )
 
-        commitmentContractsMetadata = contractsAndTransferCounter.map {
-          case (contract, reassignmentCounter) =>
-            CommitmentContractMetadata.create(contract.contractId, reassignmentCounter)(pv)
-        }
+        commitmentContractsMetadata = contractsAndReassignmentCounter
+          .map { case (contract, reassignmentCounter) =>
+            CommitmentContractMetadata.create(contract.contractId, reassignmentCounter)
+          }
 
       } yield {
-        commitmentContractsMetadata.foreach(c => c.writeDelimitedTo(out).foreach(_ => out.flush()))
+        // We serialize with the latest known protocol version, because what matters is that the console can decode the
+        // message. There is no particular need to serialize with the protocol version of the synchronizer
+        commitmentContractsMetadata.foreach(c =>
+          c.writeDelimitedTo(ProtocolVersion.latest, out).foreach(_ => out.flush())
+        )
       }
 
     CantonGrpcUtil.mapErrNewEUS(result)
   }
 
-  /** TODO(#9557) R2
-    */
   override def inspectCommitmentContracts(
       request: v30.InspectCommitmentContractsRequest,
       responseObserver: StreamObserver[v30.InspectCommitmentContractsResponse],
@@ -632,10 +637,11 @@ class GrpcParticipantInspectionService(
           )
         )
 
-        pv <- EitherTUtil
-          .fromFuture(
-            syncStateInspection.getProtocolVersion(expectedSynchronizerAlias),
-            err => ParticipantInspectionServiceError.InternalServerError.Error(err.toString),
+        pv <- EitherT
+          .fromOption[FutureUnlessShutdown](
+            syncStateInspection.latestKnownProtocolVersion(expectedSynchronizerAlias),
+            ParticipantInspectionServiceError.IllegalArgumentError
+              .Error(s"Unable to find protocol version for synchronizer $expectedSynchronizerAlias"),
           )
           .leftWiden[RpcError]
 
@@ -657,15 +663,15 @@ class GrpcParticipantInspectionService(
                 request.downloadPayload,
                 syncStateInspection,
                 indexedStringStore,
-                pv,
               ),
             err => ParticipantInspectionServiceError.InternalServerError.Error(err.toString),
           )
           .leftWiden[RpcError]
 
       } yield {
-        contractStates.foreach(c => c.writeDelimitedTo(out).foreach(_ => out.flush()))
+        contractStates.foreach(_.writeDelimitedTo(pv, out).foreach(_ => out.flush()))
       }
+
     CantonGrpcUtil.mapErrNewEUS(result)
   }
 
@@ -684,20 +690,28 @@ class GrpcParticipantInspectionService(
           .toRight(s"Not able to find synchronizer alias for ${synchronizerId.toString}")
       )
 
-      count <- syncStateInspection.countInFlight(synchronizerAlias)
+      psids = syncStateInspection.syncPersistentStateManager
+        .synchronizerIdsForAlias(synchronizerAlias)
+        .fold(Seq.empty[PhysicalSynchronizerId])(_.forgetNE.toSeq)
+
+      counts <- MonadUtil.sequentialTraverse(psids)(syncStateInspection.countInFlight)
+      count = counts.foldLeft(InFlightCount.zero)(_.+(_))
+
     } yield count
 
-    inFlightCount
-      .fold(
-        err => throw new IllegalArgumentException(err),
-        count =>
-          v30.CountInFlightResponse(
-            count.pendingSubmissions.unwrap,
-            count.pendingTransactions.unwrap,
-          ),
+    EitherTUtil
+      .toFutureUnlessShutdown(
+        inFlightCount
+          .bimap(
+            new IllegalArgumentException(_),
+            count =>
+              v30.CountInFlightResponse(
+                count.pendingSubmissions.unwrap,
+                count.pendingTransactions.unwrap,
+              ),
+          )
       )
       .asGrpcResponse
-
   }
 
 }

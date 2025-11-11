@@ -84,6 +84,7 @@ class UserWalletService(
       retryProvider,
       domainMigrationInfo,
       participantId,
+      automationConfig.ingestion,
     )
 
   val updateHistory: UpdateHistory =

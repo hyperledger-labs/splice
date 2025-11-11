@@ -4,11 +4,13 @@
 package com.digitalasset.canton.sequencing.client.transports
 
 import cats.data.EitherT
+import cats.implicits.toTraverseOps
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -262,6 +264,28 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
 
     EitherT(resultF)
   }
+
+  override def getTime(timeout: Duration)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Option[CantonTimestamp]] =
+    for {
+      response <-
+        CantonGrpcUtil
+          .sendGrpcRequest(sequencerServiceClient, "sequencer")(
+            _.getTime(v30.GetTimeRequest()),
+            requestDescription = s"getTime",
+            timeout = timeout,
+            logger = logger,
+            retryPolicy = retryPolicy(retryOnUnavailable = false),
+          )
+          .leftMap(_.toString)
+      timestampO <-
+        EitherT.fromEither[FutureUnlessShutdown](
+          response.sequencingTimestamp
+            .traverse(CantonTimestamp.fromProtoPrimitive)
+            .leftMap(_.message)
+        )
+    } yield timestampO
 }
 
 trait GrpcClientTransportHelpers {
@@ -320,7 +344,7 @@ class GrpcSequencerClientTransport(
     with SequencerClientTransport {
 
   override def subscribe[E](
-      subscriptionRequest: SubscriptionRequestV2,
+      subscriptionRequest: SubscriptionRequest,
       handler: SequencedEventHandler[E],
   )(implicit traceContext: TraceContext): SequencerSubscription[E] = {
 
@@ -337,7 +361,7 @@ class GrpcSequencerClientTransport(
       )(protocolVersion)
 
     CantonGrpcUtil.serverStreamingRequest(sequencerServiceClient, mkSubscription)(_.observer)(
-      _.subscribeV2(subscriptionRequest.toProtoV30, _)
+      _.subscribe(subscriptionRequest.toProtoV30, _)
     )
   }
 

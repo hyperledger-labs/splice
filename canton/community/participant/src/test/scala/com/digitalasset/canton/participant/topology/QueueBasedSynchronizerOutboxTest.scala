@@ -8,8 +8,8 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
@@ -66,6 +66,8 @@ class QueueBasedSynchronizerOutboxTest
   private lazy val clock = new WallClock(timeouts, loggerFactory)
   private lazy val crypto =
     SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
+  private lazy val synchronizerCrypto =
+    SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters)
   private lazy val publicKey =
     crypto.generateSymbolicSigningKey(usage = SigningKeyUsage.NamespaceOnly)
   private lazy val namespace = Namespace(publicKey.id)
@@ -114,7 +116,7 @@ class QueueBasedSynchronizerOutboxTest
     )
   ] = {
     val target = new InMemoryTopologyStore(
-      TopologyStoreId.SynchronizerStore(DefaultTestIdentities.synchronizerId),
+      TopologyStoreId.SynchronizerStore(DefaultTestIdentities.physicalSynchronizerId),
       testedProtocolVersion,
       loggerFactory,
       timeouts,
@@ -123,10 +125,11 @@ class QueueBasedSynchronizerOutboxTest
     val manager = new SynchronizerTopologyManager(
       participant1.uid,
       clock,
-      crypto,
+      synchronizerCrypto,
       defaultStaticSynchronizerParameters,
       target,
       queue,
+      disableOptionalTopologyChecks = false,
       // we don't need the validation logic to run, because we control the outcome of transactions manually
       exitOnFatalFailures = true,
       timeouts,
@@ -135,7 +138,7 @@ class QueueBasedSynchronizerOutboxTest
     )
     val client = new StoreBasedSynchronizerTopologyClient(
       clock,
-      synchronizerId,
+      defaultStaticSynchronizerParameters,
       store = target,
       packageDependenciesResolver = StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       timeouts = timeouts,
@@ -286,16 +289,14 @@ class QueueBasedSynchronizerOutboxTest
   ): FutureUnlessShutdown[QueueBasedSynchronizerOutbox] = {
     val synchronizerOutbox = new QueueBasedSynchronizerOutbox(
       synchronizer,
-      synchronizerId,
       participant1,
-      testedProtocolVersion,
       handle,
       client,
       manager.outboxQueue,
       target,
       timeouts,
       loggerFactory,
-      crypto,
+      synchronizerCrypto,
       topologyConfig,
     )
     synchronizerOutbox
@@ -445,7 +446,8 @@ class QueueBasedSynchronizerOutboxTest
         (target, manager, handle, client) <-
           mk(
             transactions.size,
-            rejections = Iterator.continually(Some(TopologyTransactionRejection.NotAuthorized)),
+            rejections =
+              Iterator.continually(Some(TopologyTransactionRejection.Authorization.NotAuthorized)),
           )
         _ <- outboxConnected(manager, handle, client, target)
         res <- push(manager, transactions)
@@ -493,7 +495,7 @@ class QueueBasedSynchronizerOutboxTest
         (target, manager, handle, client) <- mk(
           1,
           // drop the first submission, but not the second
-          dropSequencedBroadcast = Iterator(true) ++ Iterator.continually(false),
+          dropSequencedBroadcast = Iterator(true, false),
         )
         _ <- outboxConnected(manager, handle, client, target)
         res1 <- loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(

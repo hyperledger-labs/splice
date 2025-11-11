@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
   NetworkAppClientConfig,
   SpliceInstanceNamesConfig,
   UpgradesConfig,
@@ -25,11 +26,11 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
@@ -81,6 +82,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     retryProvider,
     domainMigrationInfo,
     participantId,
+    config.automation.ingestion,
   )
 
   protected def newSvSvAutomationService(
@@ -125,6 +127,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       retryProvider,
       domainMigrationInfo,
       participantId,
+      config.automation.ingestion,
     )
   }
 
@@ -134,6 +137,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       localSynchronizerNode: Option[LocalSynchronizerNode],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
+      enabledFeatures: EnabledFeaturesConfig,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -157,6 +161,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       spliceInstanceNamesConfig,
       loggerFactory,
       packageVersionSupport,
+      enabledFeatures,
     )
 
   protected def newDsoPartyHosting(
@@ -344,6 +349,33 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
         }
     } yield initialRound
   }
+
+  // Ensure OTK mappings contain only signing keys that are signed
+  protected def ensureCantonNodesOTKRotatedIfNeeded(
+      skipSynchronizerInitialization: Boolean,
+      cantonIdentifierConfig: SvCantonIdentifierConfig,
+      localSynchronizerNode: Option[LocalSynchronizerNode],
+      clock: Clock,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      decentralizedSynchronizerId: SynchronizerId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+    localSynchronizerNode match {
+      case Some(synchronizerNode) if !skipSynchronizerInitialization =>
+        SynchronizerNodeInitializer.rotateCantonNodesOTKIfNeeded(
+          cantonIdentifierConfig,
+          synchronizerNode,
+          clock,
+          loggerFactory,
+          retryProvider,
+          decentralizedSynchronizerId,
+        )
+      case _ =>
+        logger.info(
+          "Skipping OTK keys rotation because skipSynchronizerInitialization is enabled"
+        )
+        Future.unit
+    }
 
   private def setInitialRound(connection: BaseLedgerConnection, initialRound: Long)(implicit
       ec: ExecutionContext,

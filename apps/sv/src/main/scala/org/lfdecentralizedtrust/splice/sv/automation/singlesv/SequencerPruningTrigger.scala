@@ -93,7 +93,7 @@ class SequencerPruningTrigger(
       scanConnection <- createScanConnection()
       recordTimeRangeO <- scanConnection
         .getMigrationInfo(migrationId)
-        .map(_.flatMap(_.recordTimeRange.get(synchronizerId)))
+        .map(_.flatMap(_.recordTimeRange.get(synchronizerId.logical)))
       _ <- recordTimeRangeO match {
         case Some(DomainRecordTimeRange(earliest, latest))
             if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>

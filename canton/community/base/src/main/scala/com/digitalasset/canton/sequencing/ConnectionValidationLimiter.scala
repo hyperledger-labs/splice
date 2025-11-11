@@ -162,7 +162,7 @@ class ConnectionValidationLimiter(
         throwableO match {
           case None =>
             logger.debug("Shutting down scheduled validation")(tc)
-            scheduledP.shutdown()
+            scheduledP.shutdown_()
           case Some(t) =>
             logger.debug("Failing scheduled validation")(tc)
             scheduledP.failure(t)
@@ -178,12 +178,12 @@ class ConnectionValidationLimiter(
 
       case ValidationState.Validating(_tc, promise) =>
         logger.debug("Shutting down current validation")
-        promise.shutdown()
+        promise.shutdown_()
 
       case ValidationState.ValidationPending(_tc, currentP, scheduledP) =>
         logger.debug("Shutting down current and scheduled validations")
-        currentP.shutdown()
-        scheduledP.shutdown()
+        currentP.shutdown_()
+        scheduledP.shutdown_()
     }
   }
 

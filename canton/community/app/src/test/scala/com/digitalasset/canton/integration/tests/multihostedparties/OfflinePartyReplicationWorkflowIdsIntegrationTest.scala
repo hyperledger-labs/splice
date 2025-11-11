@@ -4,30 +4,22 @@
 package com.digitalasset.canton.integration.tests.multihostedparties
 
 import com.daml.ledger.javaapi.data.Command
-import com.digitalasset.canton.HasTempDirectory
 import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
-import com.digitalasset.canton.integration.util.PartyToParticipantDeclarative
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.tests.multihostedparties.PartyActivationFlow.authorizeOnly
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.topology.transaction.ParticipantPermission as PP
 
 import java.util.Collections
 
 sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
-    extends UseSilentSynchronizerInTest
-    with HasTempDirectory {
+    extends OfflinePartyReplicationIntegrationTestBase
+    with UseSilentSynchronizerInTest {
 
-  private val acsSnapshot = tempDirectory.toTempFile(s"${getClass.getSimpleName}.gz")
-  private val acsSnapshotPath: String = acsSnapshot.toString
-
+  // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
   // Party replication to the target participant may trigger ACS commitment mismatch warnings.
   // This is expected behavior. To reduce the frequency of these warnings and avoid associated
   // test flakes, `reconciliationInterval` is set to one year.
@@ -54,10 +46,7 @@ sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
     implicit env =>
       import env.*
 
-      val alice = participant1.parties.enable(
-        "Alice",
-        synchronizeParticipants = Seq(participant2),
-      )
+      alice = participant1.parties.enable("Alice", synchronizeParticipants = Seq(participant2))
 
       // create some IOUs, we'll expect the migration to group together those sharing the
       // ledger time (i.e. they have been created in the same transaction)
@@ -66,17 +55,8 @@ sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
           .submit(actAs = Seq(alice), commands = commands)
       }
 
-      val beforeActivationOffset = participant1.ledger_api.state.end()
-
-      PartyToParticipantDeclarative.forParty(Set(participant1, participant2), daId)(
-        participant1,
-        alice,
-        PositiveInt.one,
-        Set(
-          (participant1, PP.Submission),
-          (participant2, PP.Observation),
-        ),
-      )
+      val beforeActivationOffset =
+        authorizeOnly(alice, daId, source = participant1, target = participant2)
 
       silenceSynchronizerAndAwaitEffectiveness(daId, Seq(sequencer1, sequencer2), participant1)
 
@@ -89,19 +69,9 @@ sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
 
       resumeSynchronizerAndAwaitEffectiveness(daId, Seq(sequencer1, sequencer2), participant1)
 
-      PartyToParticipantDeclarative.forParty(Set(participant1, participant2), daId)(
-        participant1,
-        alice,
-        PositiveInt.one,
-        Set(
-          (participant1, PP.Submission),
-          (participant2, PP.Submission),
-        ),
-      )
-
       // Check that the transactions generated for the migration are actually grouped as
       // expected and that their workflow IDs can be used to correlate those transactions
-      val txs = participant2.ledger_api.javaapi.updates.flat(Set(alice), completeAfter = 4)
+      val txs = participant2.ledger_api.javaapi.updates.transactions(Set(alice), completeAfter = 4)
       withClue("Transactions should be grouped by ledger time") {
         txs.map(_.getTransaction.get().getEffectiveAt.toEpochMilli).distinct should have size 4
       }
@@ -132,27 +102,14 @@ sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
 
     val workflowIdPrefix = "SOME_WORKFLOW_ID_123"
 
-    val bob = participant1.parties.enable(
-      "Bob",
-      synchronizeParticipants = Seq(participant3),
-    )
+    bob = participant1.parties.enable("Bob", synchronizeParticipants = Seq(participant3))
 
     for (commands <- Seq(ious(bob, 1), ious(bob, 1))) {
-      participant1.ledger_api.javaapi.commands
-        .submit(actAs = Seq(bob), commands = commands)
+      participant1.ledger_api.javaapi.commands.submit(actAs = Seq(bob), commands = commands)
     }
 
-    val beforeActivationOffset = participant1.ledger_api.state.end()
-
-    PartyToParticipantDeclarative.forParty(Set(participant1, participant3), daId)(
-      participant1,
-      bob,
-      PositiveInt.one,
-      Set(
-        (participant1, PP.Submission),
-        (participant3, PP.Observation),
-      ),
-    )
+    val beforeActivationOffset =
+      authorizeOnly(bob, daId, participant1, participant3)
 
     silenceSynchronizerAndAwaitEffectiveness(daId, Seq(sequencer1, sequencer2), participant1)
 
@@ -166,18 +123,8 @@ sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
 
     resumeSynchronizerAndAwaitEffectiveness(daId, Seq(sequencer1, sequencer2), participant1)
 
-    PartyToParticipantDeclarative.forParty(Set(participant1, participant3), daId)(
-      participant1,
-      bob,
-      PositiveInt.one,
-      Set(
-        (participant1, PP.Submission),
-        (participant3, PP.Submission),
-      ),
-    )
-
     // Check that the workflow ID prefix is set as specified
-    val txs = participant3.ledger_api.javaapi.updates.flat(Set(bob), completeAfter = 2)
+    val txs = participant3.ledger_api.javaapi.updates.transactions(Set(bob), completeAfter = 2)
     inside(txs) { case Seq(tx1, tx2) =>
       tx1.getTransaction.get().getWorkflowId shouldBe s"$workflowIdPrefix-1-2"
       tx2.getTransaction.get().getWorkflowId shouldBe s"$workflowIdPrefix-2-2"
@@ -227,5 +174,5 @@ sealed trait OfflinePartyReplicationWorkflowIdsIntegrationTest
 final class OfflinePartyReplicationWorkflowIdsIntegrationTestPostgres
     extends OfflinePartyReplicationWorkflowIdsIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

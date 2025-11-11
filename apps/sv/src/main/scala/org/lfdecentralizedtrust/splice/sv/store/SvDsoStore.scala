@@ -50,6 +50,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -957,6 +958,20 @@ trait SvDsoStore
       .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
       .map(_.map(_.contract))
 
+  /** Whether there are more than the given number of featured app activity markers. */
+  def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+      tc: TraceContext
+  ): Future[Boolean]
+
+  def listFeaturedAppActivityMarkersByContractIdHash(
+      contractIdHashLbIncl: Int,
+      contractIdHashUbIncl: Int,
+      limit: Int,
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.amulet.FeaturedAppActivityMarker.ContractId,
+    splice.amulet.FeaturedAppActivityMarker,
+  ]]]
+
   def lookupAmuletConversionRateFeed(
       publisher: PartyId
   )(implicit tc: TraceContext): Future[Option[Contract[
@@ -974,6 +989,7 @@ object SvDsoStore {
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -986,6 +1002,7 @@ object SvDsoStore {
       retryProvider,
       domainMigrationInfo,
       participantId,
+      ingestionConfig,
     )
   }
 

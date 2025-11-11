@@ -18,7 +18,7 @@ import com.digitalasset.canton.participant.store.{
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
@@ -79,7 +79,7 @@ object SubmissionTrackingData
 
   val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec
-      .storage(ReleaseProtocolVersion(ProtocolVersion.v33), v30.SubmissionTrackingData)(
+      .storage(ReleaseProtocolVersion(ProtocolVersion.v34), v30.SubmissionTrackingData)(
         supportedProtoVersion(_)(fromProtoV30),
         _.toProtoV30,
       )
@@ -103,13 +103,13 @@ object SubmissionTrackingData
 final case class TransactionSubmissionTrackingData(
     completionInfo: CompletionInfo,
     rejectionCause: TransactionSubmissionTrackingData.RejectionCause,
-    synchronizerId: SynchronizerId,
-)(
-    override val representativeProtocolVersion: RepresentativeProtocolVersion[
-      SubmissionTrackingData.type
-    ]
+    synchronizerId: PhysicalSynchronizerId,
 ) extends SubmissionTrackingData
     with HasLoggerName {
+
+  override val representativeProtocolVersion: RepresentativeProtocolVersion[
+    SubmissionTrackingData.type
+  ] = SubmissionTrackingData.protocolVersionRepresentativeFor(synchronizerId.protocolVersion)
 
   override def rejectionEvent(
       recordTime: CantonTimestamp,
@@ -123,7 +123,7 @@ final case class TransactionSubmissionTrackingData(
       // notification will be tracked based on this as a non-sequenced in-flight reference
       completionInfo,
       reasonTemplate,
-      synchronizerId,
+      synchronizerId.logical,
       recordTime,
       messageUuid,
     )
@@ -134,9 +134,7 @@ final case class TransactionSubmissionTrackingData(
   ): Option[UnsequencedSubmission] =
     UnsequencedSubmission(
       timestamp,
-      this.copy(rejectionCause = TransactionSubmissionTrackingData.CauseWithTemplate(reason))(
-        representativeProtocolVersion
-      ),
+      this.copy(rejectionCause = TransactionSubmissionTrackingData.CauseWithTemplate(reason)),
     ).some
 
   protected def toProtoV30: v30.SubmissionTrackingData = {
@@ -144,7 +142,7 @@ final case class TransactionSubmissionTrackingData(
     val transactionTracking = v30.TransactionSubmissionTrackingData(
       completionInfo = completionInfoP.some,
       rejectionCause = rejectionCause.toProtoV30.some,
-      synchronizerId = synchronizerId.toProtoPrimitive,
+      physicalSynchronizerId = synchronizerId.toProtoPrimitive,
     )
     v30.SubmissionTrackingData(v30.SubmissionTrackingData.Tracking.Transaction(transactionTracking))
   }
@@ -156,16 +154,6 @@ final case class TransactionSubmissionTrackingData(
 }
 
 object TransactionSubmissionTrackingData {
-  def apply(
-      completionInfo: CompletionInfo,
-      rejectionCause: TransactionSubmissionTrackingData.RejectionCause,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
-  ): TransactionSubmissionTrackingData =
-    TransactionSubmissionTrackingData(completionInfo, rejectionCause, synchronizerId)(
-      SubmissionTrackingData.protocolVersionRepresentativeFor(protocolVersion)
-    )
-
   def fromProtoV30(
       tracking: v30.TransactionSubmissionTrackingData
   ): ParsingResult[TransactionSubmissionTrackingData] = {
@@ -176,14 +164,16 @@ object TransactionSubmissionTrackingData {
         "completion info",
         completionInfoP,
       )
-      cause <- ProtoConverter.parseRequired(RejectionCause.fromProtoV30, "rejection cause", causeP)
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
-      rpv <- SubmissionTrackingData.protocolVersionRepresentativeFor(ProtoVersion(30))
+      cause <- ProtoConverter.parseRequired(RejectionCause.fromProtoV30, "rejection_cause", causeP)
+      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+        synchronizerIdP,
+        "physical_synchronizer_id",
+      )
     } yield TransactionSubmissionTrackingData(
       completionInfo,
       cause,
       synchronizerId,
-    )(rpv)
+    )
   }
 
   trait RejectionCause extends Product with Serializable with PrettyPrinting {

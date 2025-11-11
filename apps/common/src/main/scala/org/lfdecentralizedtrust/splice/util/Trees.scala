@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Transaction, Event}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -11,15 +11,15 @@ import scala.jdk.CollectionConverters.*
 
 object Trees {
 
-  type StackElement = (TreeEvent, Seq[TreeEvent])
+  type StackElement = (Event, Seq[Event])
 
   @SuppressWarnings(Array("org.wartremover.warts.While", "org.wartremover.warts.Var"))
   def foldTree[State](
-      tree: TransactionTree,
+      tree: Transaction,
       initialState: State,
   )(
-      onCreate: (State, CreatedEvent, Seq[TreeEvent]) => State,
-      onExercise: (State, ExercisedEvent, Seq[TreeEvent]) => State,
+      onCreate: (State, CreatedEvent, Seq[Event]) => State,
+      onExercise: (State, ExercisedEvent, Seq[Event]) => State,
   ): State = {
     var state = initialState
     val stack: mutable.Stack[StackElement] = mutable.Stack()
@@ -42,12 +42,12 @@ object Trees {
 
   /** Returns a map that maps event ids to consecutive numbers, assigned by in-order traversing the transaction tree */
   def getLocalEventIndices(
-      tree: TransactionTree
+      tree: Transaction
   ): Map[Int, Int] = {
     val eventsById = tree.getEventsById.asScala
     @tailrec
     def makeEventIdToNumber(
-        pending: List[TreeEvent],
+        pending: List[Event],
         acc: Map[Int, Int],
     ): Map[Int, Int] = {
       pending match {

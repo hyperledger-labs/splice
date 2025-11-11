@@ -20,7 +20,7 @@ purchasing party. There is no application involved so no
 :ref:`AppRewardCoupon <type-splice-amulet-apprewardcoupon-57229>`
 is created.
 
-To avoid running out of traffic credits, the ability to perform automatic traffic purchases is provided and recommended.   Please see :ref:`helm_validator_topup`.  Alternatively, Daml application code can use :ref:`AmuletRules_BuyMemberTraffic <type-splice-amuletrules-amuletrulesbuymembertraffic-66391>`
+To avoid running out of traffic credits, the ability to perform automatic traffic purchases is provided and recommended.   Please see :ref:`helm_validator_topup` for Kubernetes or :ref:`compose_validator_topup` for Docker-compose.  Alternatively, Daml application code can use :ref:`AmuletRules_BuyMemberTraffic <type-splice-amuletrules-amuletrulesbuymembertraffic-66391>`
 to increase the traffic credit balance.
 
 Note that traffic credits are used whenever a confirmation request for a Daml

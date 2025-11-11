@@ -48,6 +48,7 @@ import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.scalatest.{Assertion, Succeeded}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll as scForAll
 
@@ -1558,6 +1559,7 @@ class DbUserWalletStoreTest
         None,
       ),
       participantId = mkParticipantId("UserWalletStoreTest"),
+      IngestionConfig(),
     )
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

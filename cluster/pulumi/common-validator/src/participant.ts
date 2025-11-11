@@ -6,7 +6,6 @@ import {
   Auth0Config,
   auth0UserNameEnvVarSource,
   ChartValues,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
@@ -17,6 +16,7 @@ import {
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
   spliceConfig,
+  getLedgerApiAudience,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
@@ -68,7 +68,7 @@ export function installParticipant(
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: getLedgerApiAudience(auth0Config, xns.logicalName),
     },
   };
 

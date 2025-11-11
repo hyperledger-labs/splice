@@ -18,7 +18,7 @@ trait ExampleTransaction {
   /** Set of parties who are informees of an action (root or not) in the transaction */
   def allInformees: Set[LfPartyId] = fullInformeeTree.allInformees
 
-  /** The transaction with unsuffixed contract IDs and the transaction version */
+  /** The transaction with unsuffixed contract IDs and the serialization version */
   def versionedUnsuffixedTransaction: LfVersionedTransaction
 
   /** Map from the nodes of the transaction to their seed if they need a seed */
@@ -31,7 +31,7 @@ trait ExampleTransaction {
     *   if [[versionedUnsuffixedTransaction]] is malformed
     */
   def wellFormedUnsuffixedTransaction: WellFormedTransaction[WithoutSuffixes] =
-    WellFormedTransaction.normalizeAndAssert(
+    WellFormedTransaction.checkOrThrow(
       versionedUnsuffixedTransaction,
       metadata,
       WithoutSuffixes,
@@ -51,12 +51,12 @@ trait ExampleTransaction {
     */
   def viewWithSubviews: Seq[(TransactionView, Seq[TransactionView])]
 
-  def inputContracts: Map[LfContractId, SerializableContract] =
+  def inputContracts: Map[LfContractId, GenContractInstance] =
     transactionViewTrees.flatMap(_.viewParticipantData.coreInputs).toMap.fmap(_.contract)
 
   def transactionTree: GenTransactionTree
 
-  def transactionId: TransactionId = transactionTree.transactionId
+  def transactionId: UpdateId = transactionTree.transactionId
 
   def fullInformeeTree: FullInformeeTree
 
@@ -85,14 +85,16 @@ trait ExampleTransaction {
   /** Transaction view trees for root views, in execution order */
   def rootTransactionViewTrees: Seq[FullTransactionViewTree]
 
-  /** The transaction with suffixed contract ids and the transaction version. */
+  /** The transaction with suffixed contract ids and the serialization version. */
   def versionedSuffixedTransaction: LfVersionedTransaction
 
   /** @throws IllegalArgumentException
     *   if [[versionedSuffixedTransaction]] is malformed
     */
   def wellFormedSuffixedTransaction: WellFormedTransaction[WithSuffixes] =
-    WellFormedTransaction.normalizeAndAssert(versionedSuffixedTransaction, metadata, WithSuffixes)
+    WellFormedTransaction.checkOrThrow(versionedSuffixedTransaction, metadata, WithSuffixes)
+
+  def usedAndCreated: UsedAndCreatedContracts
 
   /** Yields brief description of this example, which must be suitable for naming test cases.as part
     * of usable to identify

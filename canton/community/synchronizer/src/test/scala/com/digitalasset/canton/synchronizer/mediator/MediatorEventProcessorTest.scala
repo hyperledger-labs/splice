@@ -21,7 +21,11 @@ import com.digitalasset.canton.sequencing.{
   WithCounter,
 }
 import com.digitalasset.canton.topology.DefaultTestIdentities.*
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{
+  DefaultTestIdentities,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{BaseTestWordSpec, HasExecutionContext, SequencerCounter}
@@ -84,19 +88,18 @@ class MediatorEventProcessorTest
         Deliver.create(
           previousTimestamp = None, // not relevant
           timestamp = ts,
-          synchronizerId = synchronizerId,
+          synchronizerId = physicalSynchronizerId,
           messageIdO = None, // not relevant
           batch = Batch(envelopes.toList, testedProtocolVersion),
           topologyTimestampO = None, // not relevant
           trafficReceipt = None, // not relevant
-          protocolVersion = testedProtocolVersion,
         )
-      )(TraceContext.createNew()),
+      )(TraceContext.createNew("test")),
     )
 
   private def mkMediatorRequest(
       uuid: UUID,
-      synchronizerId: SynchronizerId = synchronizerId,
+      synchronizerId: PhysicalSynchronizerId = DefaultTestIdentities.physicalSynchronizerId,
   ): OpenEnvelope[MediatorConfirmationRequest] = {
     import Pretty.*
 
@@ -117,7 +120,7 @@ class MediatorEventProcessorTest
     val confirmationResponses = ConfirmationResponses.tryCreate(
       RequestId(CantonTimestamp.now()),
       RootHash(TestHash.digest("txid3")),
-      synchronizerId,
+      physicalSynchronizerId,
       participant1,
       NonEmpty.mk(
         Seq,
@@ -133,9 +136,8 @@ class MediatorEventProcessorTest
     )
 
     val message = SignedProtocolMessage(
-      TypedSignedProtocolMessageContent(confirmationResponses, testedProtocolVersion),
+      TypedSignedProtocolMessageContent(confirmationResponses),
       NonEmpty(Seq, SymbolicCrypto.emptySignature),
-      testedProtocolVersion,
     )
     mkDefaultOpenEnvelope(message)
   }
@@ -145,8 +147,8 @@ class MediatorEventProcessorTest
       val (processor, deduplicator, handler) = mkEventProcessor()
 
       val matchingSynchronizer = mkMediatorRequest(uuids(0))
-      val mismatchingSynchronizer =
-        mkMediatorRequest(uuids(1), SynchronizerId.tryFromString("invalid::synchronizer"))
+      val invalidSynchronizerId = SynchronizerId.tryFromString("invalid::synchronizer").toPhysical
+      val mismatchingSynchronizer = mkMediatorRequest(uuids(1), invalidSynchronizerId)
 
       val event1 = mkEvent(
         ts(0),
@@ -174,10 +176,10 @@ class MediatorEventProcessorTest
               )
             ),
           _.errorMessage should include(
-            "Received messages with wrong synchronizer ids: List(invalid::synchronizer)"
+            s"Received messages with wrong synchronizer ids: List($invalidSynchronizerId)"
           ),
           _.errorMessage should include(
-            "Received messages with wrong synchronizer ids: List(invalid::synchronizer)"
+            s"Received messages with wrong synchronizer ids: List($invalidSynchronizerId)"
           ),
         )
       filtered.forgetNE should contain theSameElementsInOrderAs Seq(
@@ -357,7 +359,7 @@ class MediatorEventProcessorTest
       val event3 = mkEvent(
         ts(2),
         mkDefaultOpenEnvelope(
-          TopologyTransactionsBroadcast(synchronizerId, Seq.empty, testedProtocolVersion)
+          TopologyTransactionsBroadcast(physicalSynchronizerId, Seq.empty)
         ),
       )
 

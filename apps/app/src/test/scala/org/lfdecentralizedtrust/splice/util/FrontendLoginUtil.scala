@@ -52,6 +52,11 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
     }
     textField("user-id-field").value = ledgerApiUser
     eventuallyClickOn(id("login-button"))
+    clue("Waiting for UI elements to show up that indicate login success or failure") {
+      eventually() {
+        (find(id("logout-button")).isDefined || find(id("loginFailed")).isDefined) shouldBe true
+      }
+    }
   }
 
   protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
@@ -83,13 +88,13 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
   protected def browseToPaymentRequests(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     // Go to app payment requests tab in alice's wallet
     browseToAliceWallet(ledgerApiUser)
-    click on "app-payment-requests-button"
+    eventuallyClickOn(id("app-payment-requests-button"))
   }
 
   protected def browseToSubscriptions(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     // Go to subscriptions tab in alice's wallet
     browseToAliceWallet(ledgerApiUser)
-    click on "subscriptions-button"
+    eventuallyClickOn(id("subscriptions-button"))
   }
 
   protected def withAuth0LoginCheck[A](
@@ -120,7 +125,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
           )
         }
         val userPartyId = if (onboardThroughWalletUI) {
-          actAndCheck("onboard user", click on "onboard-button")(
+          actAndCheck("onboard user", eventuallyClickOn(id("onboard-button")))(
             "user is onboarded",
             _ => {
               val userId = seleniumText(find(id("logged-in-user")))

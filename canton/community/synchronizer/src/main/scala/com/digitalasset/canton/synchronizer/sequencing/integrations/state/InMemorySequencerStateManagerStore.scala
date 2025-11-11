@@ -28,10 +28,13 @@ class InMemorySequencerStateManagerStore(
 
   override def readInFlightAggregations(
       timestamp: CantonTimestamp,
-      maxSequencingTimeBound: CantonTimestamp,
+      maxSequencingTimeUpperBound: CantonTimestamp,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[InFlightAggregations] = {
     val snapshot = state.get()
-    val inFlightAggregations = snapshot.inFlightAggregations.mapFilter(_.project(timestamp))
+    val inFlightAggregations = snapshot.inFlightAggregations
+      .mapFilter(
+        _.project(timestamp).filter(_.maxSequencingTimestamp <= maxSequencingTimeUpperBound)
+      )
     FutureUnlessShutdown.pure(inFlightAggregations)
   }
 

@@ -61,6 +61,7 @@ class ExternalPartyWalletService(
       retryProvider,
       domainMigrationInfo,
       participantId,
+      automationConfig.ingestion,
     )
 
   val updateHistory = new UpdateHistory(

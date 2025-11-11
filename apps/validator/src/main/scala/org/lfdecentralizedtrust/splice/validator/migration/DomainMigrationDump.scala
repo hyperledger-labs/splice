@@ -6,7 +6,11 @@ package org.lfdecentralizedtrust.splice.validator.migration
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import org.lfdecentralizedtrust.splice.migration.{Dar, ParticipantUsersData}
+import org.lfdecentralizedtrust.splice.migration.{
+  Dar,
+  DomainMigrationEncoding,
+  ParticipantUsersData,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.google.protobuf.ByteString
@@ -20,10 +24,12 @@ final case class DomainMigrationDump(
     migrationId: Long,
     participant: NodeIdentitiesDump,
     participantUsers: ParticipantUsersData,
-    acsSnapshot: ByteString,
+    acsSnapshot: Seq[ByteString],
     acsTimestamp: Instant,
     dars: Seq[Dar],
     createdAt: Instant,
+    // true if we exported for a proper migration, false for DR.
+    synchronizerWasPaused: Boolean,
 ) extends PrettyPrinting {
   override def pretty: Pretty[DomainMigrationDump.this.type] =
     Pretty.prettyNode(
@@ -36,12 +42,16 @@ final case class DomainMigrationDump(
       param("acsTimestamp", _.acsTimestamp),
       param("darsSize", _.dars.size),
       param("createdAt", _.createdAt),
+      param("synchronizerWasPaused", _.synchronizerWasPaused),
     )
 
-  def toHttp: http.DomainMigrationDump = http.DomainMigrationDump(
+  // if output directory is specified we use the new format, otherwise the old one.
+  // Only the DR endpoint should use the old one.
+  def toHttp(outputDirectory: Option[String]): http.DomainMigrationDump = http.DomainMigrationDump(
     participant = participant.toHttp,
     participantUsers = participantUsers.toHttp,
-    acsSnapshot = Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
+    acsSnapshot =
+      DomainMigrationEncoding.encode(outputDirectory, acsTimestamp, "acs-snapshot", acsSnapshot),
     acsTimestamp = acsTimestamp.toString,
     dars = dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
@@ -50,14 +60,18 @@ final case class DomainMigrationDump(
     migrationId = migrationId,
     domainId = domainId.toProtoPrimitive,
     createdAt = createdAt.toString,
+    synchronizerWasPaused = Some(synchronizerWasPaused),
+    separatePayloadFiles = Some(outputDirectory.isDefined),
   )
 }
 
 object DomainMigrationDump {
-  implicit val domainMigrationCodec: Codec[DomainMigrationDump] =
+  implicit val decoder: Decoder[DomainMigrationDump] =
+    Decoder[http.DomainMigrationDump] emap fromHttp
+  def codec(outputDirectory: Option[String]): Codec[DomainMigrationDump] =
     Codec.from(
-      Decoder[http.DomainMigrationDump] emap fromHttp,
-      Encoder[http.DomainMigrationDump] contramap (_.toHttp),
+      decoder,
+      Encoder[http.DomainMigrationDump] contramap (_.toHttp(outputDirectory)),
     )
 
   private val base64Decoder = Base64.getDecoder()
@@ -69,10 +83,10 @@ object DomainMigrationDump {
     participantUsers = ParticipantUsersData.fromHttp(response.participantUsers)
     domainId <- SynchronizerId fromString response.domainId
     migrationId = response.migrationId
-    acsSnapshot = {
-      val decoded = base64Decoder.decode(response.acsSnapshot)
-      ByteString.copyFrom(decoded)
-    }
+    acsSnapshot = DomainMigrationEncoding.decode(
+      response.separatePayloadFiles,
+      response.acsSnapshot,
+    )
     dars = response.dars.map { dar =>
       val decoded = base64Decoder.decode(dar.content)
       Dar(dar.hash, ByteString.copyFrom(decoded))
@@ -87,5 +101,6 @@ object DomainMigrationDump {
     acsTimestamp = Instant.parse(response.acsTimestamp),
     dars = dars,
     createdAt = createdAt,
+    synchronizerWasPaused = response.synchronizerWasPaused.getOrElse(false),
   )
 }

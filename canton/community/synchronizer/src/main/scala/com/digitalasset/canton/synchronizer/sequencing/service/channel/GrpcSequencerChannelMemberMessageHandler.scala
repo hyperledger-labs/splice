@@ -114,8 +114,9 @@ private[channel] final class GrpcSequencerChannelMemberMessageHandler(
 
       override def onError(t: Throwable): Unit = {
         implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-        logger.warn(msg(s"Member message handler received error ${t.getMessage}.", "error"))
-        forwardToRecipient(_.receiveOnError(t), s"error ${t.getMessage}")
+        val doubleQuotedError = s"\"${t.getMessage}\""
+        logger.warn(msg(s"Member message handler received error $doubleQuotedError.", "error"))
+        forwardToRecipient(_.receiveOnError(t), s"error $doubleQuotedError")
 
         // An error on the request observer implies that this handler's response observer is already closed
         // so mark the member message handler as complete without sending a response.
@@ -160,7 +161,7 @@ private[channel] final class GrpcSequencerChannelMemberMessageHandler(
   )(implicit traceContext: TraceContext): Unit = recipientMemberMessageHandler.fold {
     onMissingRecipientHandler()
   } { recipientRequestHandler =>
-    performUnlessClosing(s"forward $message to recipient")(
+    synchronizeWithClosingSync(s"forward $message to recipient")(
       callToForward(recipientRequestHandler)
     ).onShutdown(())
   }
@@ -168,7 +169,13 @@ private[channel] final class GrpcSequencerChannelMemberMessageHandler(
   // Methods to receive onNext/onCompleted/onError calls from the other member message handler to
   // this member message handler's response observer.
   private[channel] def receiveOnNext(response: v30.ConnectToSequencerChannelResponse): Unit =
-    responseObserver.onNext(response)
+    if (!responseObserver.isCancelled) {
+      responseObserver.onNext(response)
+    } else {
+      logger.info(s"Not forwarding a message because the response stream is already closed")(
+        TraceContext.empty
+      )
+    }
 
   private[channel] def receiveOnCompleted(): Unit = {
     logger.info("Completing response stream.")(TraceContext.empty)
@@ -176,7 +183,7 @@ private[channel] final class GrpcSequencerChannelMemberMessageHandler(
   }
 
   private[channel] def receiveOnError(t: Throwable): Unit = {
-    logger.warn(s"Request stream error ${t.getMessage} has terminated connection")(
+    logger.warn(s"Request stream error \"${t.getMessage}\" has terminated connection")(
       TraceContext.empty
     )
     complete(_.onError(t))

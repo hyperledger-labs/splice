@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import scala.concurrent.ExecutionContext
 
@@ -22,7 +22,7 @@ abstract class DbTxLogAppStore[TXE](
     acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     txLogStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
-    participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -33,7 +33,7 @@ abstract class DbTxLogAppStore[TXE](
       interfaceViewsTableNameOpt = interfaceViewsTableNameOpt,
       acsStoreDescriptor = acsStoreDescriptor,
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
+      ingestionConfig = ingestionConfig,
     )
     with TxLogAppStore[TXE] {
 
@@ -49,8 +49,8 @@ abstract class DbTxLogAppStore[TXE](
       acsContractFilter,
       txLogConfig,
       domainMigrationInfo,
-      participantId,
       retryProvider,
+      ingestionConfig,
       handleIngestionSummary,
     )
 }
@@ -61,7 +61,7 @@ abstract class DbAppStore(
     interfaceViewsTableNameOpt: Option[String],
     acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
-    participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -85,8 +85,8 @@ abstract class DbAppStore(
       acsContractFilter,
       TxLogStore.Config.empty,
       domainMigrationInfo,
-      participantId,
       retryProvider,
+      ingestionConfig,
       handleIngestionSummary,
     )
 

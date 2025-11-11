@@ -22,6 +22,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -98,12 +99,21 @@ object SvSvStore {
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
   ): SvSvStore =
-    new DbSvSvStore(key, storage, loggerFactory, retryProvider, domainMigrationInfo, participantId)
+    new DbSvSvStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter[

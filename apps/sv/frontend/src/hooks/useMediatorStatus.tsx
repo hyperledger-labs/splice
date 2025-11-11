@@ -10,5 +10,6 @@ export const useMediatorStatus = (): UseQueryResult<NodeStatus> => {
   return useQuery({
     queryKey: ['getMediatorNodeStatus'],
     queryFn: async () => await getMediatorNodeStatus(),
+    refetchInterval: 10_000,
   });
 };

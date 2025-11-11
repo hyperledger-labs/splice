@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
 import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
@@ -155,6 +156,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   def assertUserFullyOffboarded(
       walletAppClient: WalletAppClientReference,
       validatorAppBackend: ValidatorAppBackendReference,
+      endUserParty: PartyId,
   ): org.scalatest.Assertion = {
     // Wallet must report that user is not onboarded
     val status =
@@ -174,15 +176,13 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     status.userOnboarded shouldBe false
     status.userWalletInstalled shouldBe false
 
-    val endUserParty = validatorAppBackend.participantClientWithAdminToken.ledger_api.users
-      .get(walletAppClient.config.ledgerApiUser)
-      .primaryParty
-      .value
+    // Assert that the user is no longer present in the participant's user list
+    val userList = validatorAppBackend.participantClientWithAdminToken.ledger_api.users.list()
+    userList.users.map(_.id) should not contain walletAppClient.config.ledgerApiUser
 
     // Validator user must not have any rights for the end user party
     val ledgerApi = validatorAppBackend.participantClientWithAdminToken.ledger_api
-    val validatorRights = ledgerApi.users.rights
-      .list(validatorAppBackend.config.ledgerApiUser)
+    val validatorRights = ledgerApi.users.rights.list(validatorAppBackend.config.ledgerApiUser)
     validatorRights.readAs should not contain endUserParty
     validatorRights.actAs should not contain endUserParty
 
@@ -921,6 +921,51 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(dsoParty, owner),
         readAs = Seq.empty,
         update = amulet,
+        synchronizerId = synchronizerId,
+      )
+    created.contractId
+  }
+
+  /** Directly creates a new LockedAmulet amulet. Note that the receiver and lock hodlers must be hosted on the same participant as the DSO. */
+  def createLockedAmulet(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      owner: PartyId,
+      lockHolders: Seq[PartyId],
+      amount: BigDecimal = BigDecimal(10),
+      expiredDuration: Duration = Duration.ofMinutes(5),
+      round: Long = 0,
+      holdingFee: BigDecimal = BigDecimal(0.01),
+      synchronizerId: Option[SynchronizerId] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): amuletCodegen.LockedAmulet.ContractId = {
+    val amulet =
+      new amuletCodegen.Amulet(
+        dsoParty.toProtoPrimitive,
+        owner.toProtoPrimitive,
+        new feesCodegen.ExpiringAmount(
+          amount.bigDecimal,
+          new Round(round),
+          new feesCodegen.RatePerRound(holdingFee.bigDecimal),
+        ),
+      )
+    val expiredAt = env.environment.clock.now.add(expiredDuration)
+    val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
+    val lockedAmulet = new LockedAmulet(
+      amulet,
+      new TimeLock(
+        lockHolders.map(_.toProtoPrimitive).asJava,
+        expiration.toInstant,
+        None.toJava,
+      ),
+    )
+    val created = participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(dsoParty, owner),
+        readAs = Seq.empty,
+        update = lockedAmulet.create(),
         synchronizerId = synchronizerId,
       )
     created.contractId

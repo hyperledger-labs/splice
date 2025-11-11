@@ -85,8 +85,7 @@ class InFlightSubmissionTracker(
             )
         }
       )
-      _ <- store.value
-        .delete(trackedReferences)
+      _ <- store.value.delete(trackedReferences)
     } yield ()
 
   /** Create and initialize an InFlightSubmissionSynchronizerTracker for synchronizerId.
@@ -239,6 +238,7 @@ class InFlightSubmissionSynchronizerTracker(
           _.leftMap(SubmissionAlreadyInFlight(submission, _))
             .leftWiden[InFlightSubmissionTrackerError]
         )
+
       // It is safe to request a tick only after persisting the in-flight submission
       // because if we crash in between, crash recovery will request the tick.
       _ = tickCellO.foreach { tickCell =>

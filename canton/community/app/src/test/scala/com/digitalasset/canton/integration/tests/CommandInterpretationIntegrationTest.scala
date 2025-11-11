@@ -5,10 +5,7 @@ package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -23,7 +20,9 @@ import scala.concurrent.duration.*
 
 // This test tests that the daml engine is able to abort a submission if it takes too
 // much time during interpretation.
-trait CommandInterpretationIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
+sealed trait CommandInterpretationIntegrationTest
+    extends CommunityIntegrationTest
+    with SharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
@@ -139,5 +138,5 @@ trait CommandInterpretationIntegrationTest extends CommunityIntegrationTest with
 class CommandInterpretationReferenceIntegrationTestPostgres
     extends CommandInterpretationIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

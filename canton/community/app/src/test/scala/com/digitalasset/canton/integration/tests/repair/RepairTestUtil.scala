@@ -43,7 +43,7 @@ trait RepairTestUtil {
         List.empty.asJava,
       ).create.commands.asScala.toSeq
 
-    val createTx = participant.ledger_api.javaapi.commands.submit_flat(
+    val createTx = participant.ledger_api.javaapi.commands.submit(
       Seq(payer),
       createCmd,
       // do not wait on all participants to observe the transaction (gets confused as we assigned the same id to different participants)
@@ -80,8 +80,11 @@ trait RepairTestUtil {
 
     RepairContract(
       synchronizerId,
-      contract,
+      contract.inst,
       ReassignmentCounter.Genesis,
+      // Contracts read from the PCS have the representative package ID the same as the original package ID
+      // TODO(#24610): Use the Ledger API Active contract service to get the correct representative package ID
+      representativePackageId = contract.templateId.packageId,
     )
   }
 
@@ -123,7 +126,7 @@ trait RepairTestUtil {
     val exerciseCmd = cid.exerciseCall().commands.asScala.toSeq
     val exerciseTx =
       participant.ledger_api.javaapi.commands
-        .submit_flat(Seq(owner), exerciseCmd, optTimeout = None)
+        .submit(Seq(owner), exerciseCmd, optTimeout = None)
     val archives = exerciseTx.getEvents.asScala.toSeq.collect {
       case x if x.toProtoEvent.hasArchived =>
         val contractId = x.toProtoEvent.getArchived.getContractId
