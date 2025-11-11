@@ -26,7 +26,6 @@ let betaTheme = createTheme({
       scratchnet: '#FFFFFF',
     },
   },
-  breakpoints: {},
 });
 
 betaTheme = createTheme(betaTheme, {
