@@ -61,7 +61,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             () => find(id("logout-button")) should not be empty,
           )
 
-          click on "information-tab-cometBft-debug"
+          eventuallyClickOn(id("information-tab-cometBft-debug"))
         },
       )(
         s"We see all other SVs as peers",

@@ -59,7 +59,7 @@ class WalletFrontendTimeBasedIntegrationTest
         browseToAliceWallet(aliceDamlUser)
         actAndCheck(
           "Alice logs out", {
-            click on "logout-button"
+            eventuallyClickOn(id("logout-button"))
           },
         )("Alice sees the login screen again", _ => find(id("login-button")) should not be empty)
       }
