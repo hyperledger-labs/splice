@@ -1,11 +1,11 @@
--- if the only 2 store descriptors belong to the SV app, that means we can truncate the update_history tables
+-- if the only store descriptors belong to the SV app or Splitwell, that means we can truncate the update_history tables
 
 DO $$
 DECLARE
     descriptors TEXT[];
 BEGIN
 
--- array equality (ordered) ensures that exactly these two, no more, no less, are there <=> it's the SV app
+-- array equality (ordered) ensures that exactly the provided descriptors, no more, no less, are there <=> it's the SV app or splitwell
 select array_agg(store_name order by store_name) into descriptors
 from update_history_descriptors;
 
