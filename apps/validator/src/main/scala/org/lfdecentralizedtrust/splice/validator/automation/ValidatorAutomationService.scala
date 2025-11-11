@@ -46,6 +46,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
+import scala.annotation.unused
 import scala.concurrent.ExecutionContextExecutor
 
 class ValidatorAutomationService(
@@ -72,7 +73,7 @@ class ValidatorAutomationService(
     domainMigrationId: Long,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
+    @unused ingestUpdateHistoryFromParticipantBegin: Boolean,
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
@@ -101,10 +102,10 @@ class ValidatorAutomationService(
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
 
-  registerUpdateHistoryIngestion(
-    updateHistory,
-    ingestUpdateHistoryFromParticipantBegin,
-  )
+//  registerUpdateHistoryIngestion(
+//    updateHistory,
+//    ingestUpdateHistoryFromParticipantBegin,
+//  )
 
   automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
     registerTrigger(
