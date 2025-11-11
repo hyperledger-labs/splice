@@ -12,6 +12,7 @@ import {
   TableRow,
   Alert,
   Stack,
+  Link as RouterLink,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
@@ -125,7 +126,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   const {
     acceptanceThreshold,
     actionName,
-    // contractId,
+    contractId,
     status,
     uniqueId,
     voteStats,
@@ -148,6 +149,8 @@ const VoteRow: React.FC<VoteRowProps> = props => {
 
   return (
     <TableRow
+      component={RouterLink}
+      to={`/governance-beta/proposals/${contractId}`}
       sx={{
         display: 'grid',
         gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
@@ -155,6 +158,8 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         borderRadius: '4px',
         border: '1px solid #4F4F4F',
         paddingBlock: '10px',
+        textDecoration: 'none',
+        cursor: 'pointer',
       }}
       data-testid={`${uniqueId}-row`}
     >
