@@ -497,3 +497,56 @@ groups:
         annotations:
           description: '{{ index $labels "namespace" }} had more than 5% contention in the last 30 minutes.'
         isPaused: false
+      - uid: df3t10f23cm68c
+        title: 'Ingestion saturation'
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: histogram_avg(sum by (le, namespace,job,store_name,store_party,synchronizer_id) (rate(splice_store_ingestion_batch_size{namespace=~"sv"}[20m])))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: OK
+        for: 30m
+        annotations:
+          description: |
+            The ingestion batch size has exceeded the expected size for a prolonged time in {{ index $labels "namespace" }}'s {{ index $labels "node_type" }}.
+            This might mean that ingestion is close to not being able to keep up with ledger activity.
+            This can also happen when an SV was just onboarded and is catching up with the ACS.
+          summary: The ingestion batch size has exceeded the expected size for a prolonged time.
+        isPaused: false
