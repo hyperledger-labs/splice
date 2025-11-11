@@ -22,6 +22,11 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      pruning: z.object({
+        participantRetentionDays: z.number(),
+        sequencerRetentionDays: z.number(),
+        mediatorRetentionDays: z.number(),
+      }),
       delegatelessContention: z.object({
         thresholdPerNamespace: z.number(),
       }),

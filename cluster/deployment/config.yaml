@@ -64,6 +64,10 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      pruning:
+        participantRetentionDays: 30
+        sequencerRetentionDays: 30
+        mediatorRetentionDays: 30
       delegatelessContention:
         thresholdPerNamespace: 0.05
       trafficWaste:
