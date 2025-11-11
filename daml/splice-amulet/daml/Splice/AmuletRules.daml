@@ -598,7 +598,7 @@ template AmuletRules
         developmentFundCouponCids : [ContractId DevelopmentFundCoupon]
       controller dso
       do
-        require "More than one development fund coupon contracts" (length developmentFundCouponCids > 1)
+        require "More than one development fund coupon contract" (length developmentFundCouponCids > 1)
 
         -- archive all given coupons
         archivedAmounts <- forA developmentFundCouponCids $ \developmentFundCouponCid -> do
