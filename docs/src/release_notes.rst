@@ -20,6 +20,17 @@ Upcoming
   - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
   - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
 
+- SV app
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+    - Deployment
+
+      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
+        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
+
+
 
 0.5.1
 -----
@@ -123,19 +134,6 @@ Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
       is in catchup mode because there are too many markers.
       Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
 
-Upcoming
---------
-
-  - SV app
-
-    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
-      All updates involving the DSO party will still be stored and returned by Scan.
-
-    - Deployment
-
-      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
-        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
-
 
 0.4.21
 ------
@@ -162,8 +160,12 @@ Upcoming
       Events can be retrieved by ``update_id`` by using ``/v0/events/{update_id}``.
       Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
 
-    - Published conversion rates are now clamped to the configured range and the clamped value is published instead of
-      only logging a warning and not publishing an updated value for out of range values.
+  - SV
+
+    - Published conversion rates are now clamped to the configured range, and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out-of-range values.
+
+    - UI usability improvements.
 
   - Monitoring
 
