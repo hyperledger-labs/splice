@@ -66,6 +66,10 @@ const YourVote: React.FC<YourVoteProps> = ({ vote, 'data-testid': testId }) => {
   return <TableBodyTypography sx={{ opacity: 0.5 }}>No Vote</TableBodyTypography>;
 };
 
+const getColumnsCount = (alwaysShown: number, ...sometimesShown: (boolean | undefined)[]) =>
+  alwaysShown +
+  sometimesShown.reduce((columnsCount, isShown) => columnsCount + (isShown ? 1 : 0), 0);
+
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
     sectionTitle,
@@ -76,6 +80,14 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     showAcceptanceThreshold,
     showStatus,
   } = props;
+
+  const columnsCount = getColumnsCount(
+    3,
+    showThresholdDeadline,
+    showStatus,
+    showVoteStats,
+    showAcceptanceThreshold
+  );
 
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
@@ -89,7 +101,9 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
         <TableContainer data-testid={`${uniqueId}-section-table`}>
           <Table>
             <TableHead>
-              <TableRow sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)' }}>
+              <TableRow
+                sx={{ display: 'grid', gridTemplateColumns: `repeat(${columnsCount}, 1fr)` }}
+              >
                 <TableCell>ACTION</TableCell>
                 {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
                 <TableCell>EFFECTIVE AT</TableCell>
@@ -160,13 +174,21 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     showVoteStats,
   } = props;
 
+  const columnsCount = getColumnsCount(
+    3,
+    showThresholdDeadline,
+    showStatus,
+    showVoteStats,
+    showAcceptanceThreshold
+  );
+
   return (
     <TableRow
       sx={{
         borderRadius: '4px',
         border: '1px solid #4F4F4F',
         display: 'grid',
-        gridTemplateColumns: 'repeat(6, 1fr)',
+        gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
         alignItems: 'center',
         paddingBlock: '10px',
       }}
