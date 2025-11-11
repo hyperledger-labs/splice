@@ -73,7 +73,7 @@ testDevelopmentFundCouponsMerging = do
   developmentFundCouponCids@(cid1 :: _) <- fmap fst <$> query @DevelopmentFundCoupon app.dso
   length developmentFundCouponCids === 5
 
-  -- Unhappy - Requires more than one development fund coupon contracts
+  -- Unhappy path - requires more than one development fund coupon contract.
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_MergeDevelopmentFundCoupons with
       amuletRulesCid
@@ -81,6 +81,7 @@ testDevelopmentFundCouponsMerging = do
         developmentFundCouponCids = [cid1]
       sv = Some sv1
 
+  -- Happy path
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_MergeDevelopmentFundCoupons with
       amuletRulesCid
