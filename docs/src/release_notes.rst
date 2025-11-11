@@ -6,16 +6,23 @@
 .. _release_notes:
 
 Upcoming
-========
+--------
+
+- Canton Participant
+
+  - Participants now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers and mediators.
+    You can overwrite this default value by adding the following env variable in the `additionalEnvVars` helm values of the validator app: `ADDITIONAL_CONFIG_PARTICIPANT_PRUNING`
+
+    An example value would be: ``ADDITIONAL_CONFIG_PARTICIPANT_PRUNING=canton.validator-apps.validator_backend.participant-pruning-schedule {cron: "0 /10 * * * ?", max-duration: "5m", retention: "10h"}``
 
 - Sequencer connections
 
-    - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
-    - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
+  - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
+  - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
 
 
 0.5.1
-=====
+-----
 
 - Canton Participant
 
