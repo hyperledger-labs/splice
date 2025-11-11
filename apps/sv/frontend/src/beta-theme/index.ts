@@ -26,6 +26,7 @@ let betaTheme = createTheme({
       scratchnet: '#FFFFFF',
     },
   },
+  breakpoints: {},
 });
 
 betaTheme = createTheme(betaTheme, {
@@ -236,10 +237,9 @@ betaTheme = createTheme(betaTheme, {
           borderColor: betaTheme.palette.colors.neutral[15],
         },
         head: {
-          ...betaTheme.fonts.monospace,
-          fontSize: '0.8125rem',
+          fontFamily: 'Lato',
+          fontSize: '12px',
           fontWeight: 700,
-          textTransform: 'uppercase',
         },
         variants: {
           props: { variant: 'party' },
@@ -288,6 +288,14 @@ betaTheme = createTheme(betaTheme, {
           },
         },
       },
+    },
+  },
+});
+
+betaTheme = createTheme(betaTheme, {
+  breakpoints: {
+    values: {
+      xl: 1880,
     },
   },
 });

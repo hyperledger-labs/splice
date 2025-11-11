@@ -4,22 +4,20 @@
 import {
   Box,
   Typography,
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Button,
   Alert,
+  Stack,
+  SxProps,
 } from '@mui/material';
-import ArrowForward from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { Link as RouterLink } from 'react-router-dom';
 import { PageSectionHeader } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
@@ -32,6 +30,41 @@ interface ProposalListingSectionProps {
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
 }
+
+interface YourVoteProps {
+  vote: YourVoteStatus;
+  'data-testid': string;
+}
+
+const YourVote: React.FC<YourVoteProps> = ({ vote, 'data-testid': testId }) => {
+  if (vote === 'accepted') {
+    return (
+      <Stack direction="row" gap="6px" alignItems="center">
+        <CheckCircleOutlineIcon
+          fontSize="small"
+          color="success"
+          data-testid={`${testId}-accepted-icon`}
+        />
+        <TableBodyTypography>Accepted</TableBodyTypography>
+      </Stack>
+    );
+  }
+
+  if (vote === 'rejected') {
+    return (
+      <Stack direction="row" gap="6px" alignItems="center">
+        <CancelOutlinedIcon
+          fontSize="small"
+          color="error"
+          data-testid={`${testId}-rejected-icon`}
+        />
+        <TableBodyTypography>Rejected</TableBodyTypography>
+      </Stack>
+    );
+  }
+
+  return <TableBodyTypography sx={{ opacity: 0.5 }}>No Vote</TableBodyTypography>;
+};
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
@@ -53,27 +86,21 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
           No {sectionTitle} available
         </Alert>
       ) : (
-        <TableContainer component={Paper} data-testid={`${uniqueId}-section-table`}>
+        <TableContainer data-testid={`${uniqueId}-section-table`}>
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: '15%' }}>Action</TableCell>
-                {showThresholdDeadline && (
-                  <TableCell sx={{ width: '15%' }}>Threshold Deadline</TableCell>
-                )}
-                <TableCell sx={{ width: '15%' }}>Effective At</TableCell>
-                {showStatus && <TableCell sx={{ width: '10%' }}>Status</TableCell>}
+              <TableRow sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)' }}>
+                <TableCell>ACTION</TableCell>
+                {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
+                <TableCell>EFFECTIVE AT</TableCell>
+                {showStatus && <TableCell>STATUS</TableCell>}
 
-                {showVoteStats && <TableCell sx={{ width: '20%' }}>Votes</TableCell>}
-                {showAcceptanceThreshold && (
-                  <TableCell sx={{ width: '10%' }}>Acceptance Threshold</TableCell>
-                )}
-
-                <TableCell sx={{ width: '15%' }}>Your Vote</TableCell>
-                <TableCell sx={{ width: '15%' }} align="right"></TableCell>
+                {showVoteStats && <TableCell>VOTES</TableCell>}
+                {showAcceptanceThreshold && <TableCell>ACCEPTANCE THRESHOLD</TableCell>}
+                <TableCell>YOUR VOTE</TableCell>
               </TableRow>
             </TableHead>
-            <TableBody>
+            <TableBody sx={{ display: 'contents' }}>
               {data.map((vote, index) => (
                 <VoteRow
                   key={index}
@@ -120,7 +147,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   const {
     acceptanceThreshold,
     actionName,
-    contractId,
+    // contractId,
     status,
     uniqueId,
     voteStats,
@@ -134,61 +161,63 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   } = props;
 
   return (
-    <TableRow data-testid={`${uniqueId}-row`}>
-      <TableCell data-testid={`${uniqueId}-row-action-name`}>{actionName}</TableCell>
+    <TableRow
+      sx={{
+        borderRadius: '4px',
+        border: '1px solid #4F4F4F',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(6, 1fr)',
+        alignItems: 'center',
+        paddingBlock: '10px',
+      }}
+      data-testid={`${uniqueId}-row`}
+    >
+      <TableCell data-testid={`${uniqueId}-row-action-name`}>
+        <TableBodyTypography>{actionName}</TableBodyTypography>
+      </TableCell>
       {showThresholdDeadline && (
         <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
-          {votingThresholdDeadline}
+          <TableBodyTypography>{votingThresholdDeadline}</TableBodyTypography>
         </TableCell>
       )}
-      <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>{voteTakesEffect}</TableCell>
+      <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>
+        <TableBodyTypography>{voteTakesEffect}</TableBodyTypography>
+      </TableCell>
 
-      {showStatus && <TableCell data-testid={`${uniqueId}-row-status`}>{status}</TableCell>}
+      {showStatus && (
+        <TableCell data-testid={`${uniqueId}-row-status`}>
+          <TableBodyTypography>{status}</TableBodyTypography>
+        </TableCell>
+      )}
       {showVoteStats && (
         <TableCell data-testid={`${uniqueId}-row-vote-stats`}>
-          {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected
+          <TableBodyTypography>
+            {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected
+          </TableBodyTypography>
         </TableCell>
       )}
       {showAcceptanceThreshold && (
         <TableCell data-testid={`${uniqueId}-row-acceptance-threshold`}>
-          {acceptanceThreshold.toString()}
+          <TableBodyTypography>{acceptanceThreshold.toString()}</TableBodyTypography>
         </TableCell>
       )}
 
       <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-        {yourVote === 'accepted' ? (
-          <>
-            <CheckCircleOutlineIcon
-              fontSize="small"
-              color="success"
-              data-testid={`${uniqueId}-row-your-vote-accepted-icon`}
-            />
-            <Typography>Accepted</Typography>
-          </>
-        ) : yourVote === 'rejected' ? (
-          <>
-            <CancelOutlinedIcon
-              fontSize="small"
-              color="error"
-              data-testid={`${uniqueId}-row-your-vote-rejected-icon`}
-            />
-            <Typography>Rejected</Typography>
-          </>
-        ) : (
-          <Typography sx={{ opacity: 0.5 }}>No Vote</Typography>
-        )}
-      </TableCell>
-
-      <TableCell align="right" data-testid={`${uniqueId}-row-view-details`}>
-        <Button
-          component={RouterLink}
-          to={`/governance-beta/proposals/${contractId}`}
-          size="small"
-          endIcon={<ArrowForward fontSize="small" />}
-        >
-          Details
-        </Button>
+        <YourVote vote={yourVote} data-testid={`${uniqueId}-row-your-vote`} />
       </TableCell>
     </TableRow>
   );
 };
+
+interface TableBodyTypographyProps {
+  sx?: SxProps;
+}
+
+const TableBodyTypography: React.FC<React.PropsWithChildren<TableBodyTypographyProps>> = ({
+  children,
+  sx,
+}) => (
+  <Typography fontSize={14} lineHeight={2} color="text.light" sx={sx}>
+    {children}
+  </Typography>
+);
