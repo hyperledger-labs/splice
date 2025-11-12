@@ -13,6 +13,7 @@ import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.{
   ScanUrlInternalConfig,
+  ValidatorConfigProvider,
   ValidatorInternalStore,
 }
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
@@ -27,106 +28,101 @@ abstract class ValidatorInternalStoreTest
     with HasExecutionContext {
 
   protected def mkStore(): Future[ValidatorInternalStore]
+  protected def mkProvider(): Future[ValidatorConfigProvider]
 
   "ValidatorInternalStore" should {
     implicit val tc: TraceContext = TraceContext.empty
 
-    val configKey = "test-config-key"
-    val initialValue = Json.fromString("payload1")
-    val otherKey = "other-config"
+    val configKey = "key1"
+    val configValue = Json.fromString("payload1")
+    val otherKey = "key2"
     val otherValue = Json.fromString("payload2")
 
     "set and get a json payload successfully" in {
       for {
         store <- mkStore()
-        _ <- store.setConfig(configKey, initialValue)
-        retrievedValue <- store.getConfig(configKey)
+        _ <- store.setConfig(configKey, configValue)
+        retrievedValue <- store.getConfig(configKey).value
       } yield {
-        retrievedValue.getOrElse(Json.Null) shouldEqual initialValue
+        retrievedValue shouldBe Some(configValue)
       }
     }
 
     "return None for a non-existent key" in {
       for {
         store <- mkStore()
-        retrievedValue <- store.getConfig("non-existent-key")
+        retrievedValue <- store.getConfig("non-existent-key").value
       } yield {
-        retrievedValue shouldEqual None
+        retrievedValue shouldBe None
       }
     }
 
     "update an existing payload" in {
       for {
         store <- mkStore()
-        _ <- store.setConfig(configKey, initialValue)
+        _ <- store.setConfig(configKey, configValue)
         _ <- store.setConfig(configKey, otherValue)
-        retrievedValue <- store.getConfig(configKey)
+        retrievedValue <- store.getConfig(configKey).value
       } yield {
-        retrievedValue.getOrElse(Json.Null) shouldEqual otherValue
+        retrievedValue shouldBe Some(otherValue)
       }
     }
 
     "handle multiple different keys independently" in {
       for {
         store <- mkStore()
-        _ <- store.setConfig(configKey, initialValue)
+        _ <- store.setConfig(configKey, configValue)
         _ <- store.setConfig(otherKey, otherValue)
 
-        mainKeyValue <- store.getConfig(configKey)
-        otherKeyValue <- store.getConfig(otherKey)
+        configKeyValue <- store.getConfig(configKey).value
+        otherKeyValue <- store.getConfig(otherKey).value
       } yield {
-        mainKeyValue.getOrElse(Json.Null) shouldEqual initialValue
-        otherKeyValue.getOrElse(Json.Null) shouldEqual otherValue
+        configKeyValue shouldBe Some(configValue)
+        otherKeyValue shouldBe Some(otherValue)
       }
     }
 
     val scanConfig1: Seq[ScanUrlInternalConfig] = Seq(
       ScanUrlInternalConfig("sv1", "url1"),
       ScanUrlInternalConfig("sv2", "url2"),
-      ScanUrlInternalConfig("sv3", "url3"),
-      ScanUrlInternalConfig("sv4", "url4"),
     )
 
     val scanConfig2: Seq[ScanUrlInternalConfig] = Seq(
-      ScanUrlInternalConfig("sv1", "url5"),
-      ScanUrlInternalConfig("sv2", "url6"),
-      ScanUrlInternalConfig("sv3", "url7"),
-      ScanUrlInternalConfig("sv4", "url8"),
+      ScanUrlInternalConfig("svA", "urlA"),
+      ScanUrlInternalConfig("svB", "urlB"),
     )
 
-    "saves a scan config" in {
+    "CONFIG_PROVIDER set and retrieve a ScanUrlInternalConfig list successfully" in {
       for {
-        store <- mkStore()
-        _ <- store.setScanUrlInternalConfig(scanConfig1)
-        returnConfig <- store.getScanUrlInternalConfig()
+        provider <- mkProvider()
+        _ <- provider.setScanUrlInternalConfig(scanConfig1)
+        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
       } yield {
-        returnConfig.getOrElse(None) shouldEqual scanConfig1
-
-      }
-    }
-    "updates a scan config" in {
-      for {
-        store <- mkStore()
-        _ <- store.setScanUrlInternalConfig(scanConfig1)
-        _ <- store.setScanUrlInternalConfig(scanConfig2)
-        returnConfig <- store.getScanUrlInternalConfig()
-      } yield {
-        returnConfig.getOrElse(None) shouldEqual scanConfig2
-
+        retrievedConfigOption shouldBe Some(scanConfig1)
       }
     }
 
-    "retrieves an empty scan config" in {
+    "CONFIG_PROVIDER update an existing ScanUrlInternalConfig list" in {
       for {
-        store <- mkStore()
-        returnConfig <- store.getScanUrlInternalConfig()
+        provider <- mkProvider()
+        _ <- provider.setScanUrlInternalConfig(scanConfig1)
+        _ <- provider.setScanUrlInternalConfig(scanConfig2) // Overwrite
+        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
       } yield {
-        returnConfig shouldEqual None
-
+        retrievedConfigOption shouldBe Some(scanConfig2)
       }
     }
 
+    "CONFIG_PROVIDER return None when no ScanUrlInternalConfig is found" in {
+      for {
+        provider <- mkProvider()
+        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
+      } yield {
+        retrievedConfigOption shouldBe None
+      }
+    }
   }
+
 }
 
 class DbValidatorInternalStoreTest
@@ -137,7 +133,7 @@ class DbValidatorInternalStoreTest
   override protected def timeouts = new ProcessingTimeout
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
 
-  override protected def mkStore(): Future[ValidatorInternalStore] = Future.successful {
+  private def buildDbStore(): ValidatorInternalStore = {
     val elc = ErrorLoggingContext(
       loggerFactory.getTracedLogger(getClass),
       loggerFactory.properties,
@@ -153,8 +149,16 @@ class DbValidatorInternalStoreTest
     )
   }
 
+  override protected def mkStore(): Future[ValidatorInternalStore] = Future.successful {
+    buildDbStore()
+  }
+
+  override protected def mkProvider(): Future[ValidatorConfigProvider] = Future.successful {
+    val internalStore = buildDbStore()
+    new ValidatorConfigProvider(internalStore)
+  }
+
   override protected def cleanDb(
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
-
 }
