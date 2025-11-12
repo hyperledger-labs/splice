@@ -45,7 +45,7 @@ class ValidatorProxyIntegrationTest
       withProperties(props) {
         withCanton(
           Seq(
-            testResourcesPath / "standalone-participant-extra.conf",
+            testResourcesPath / "standalone-participant-extra.conf"
           ),
           Seq.empty,
           "validator-proxy-test",
