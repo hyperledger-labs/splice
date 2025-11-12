@@ -3,6 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
@@ -17,6 +26,7 @@ import org.lfdecentralizedtrust.splice.config.{
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -33,16 +43,6 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 }
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import monocle.Monocle.toAppliedFocusOps
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor

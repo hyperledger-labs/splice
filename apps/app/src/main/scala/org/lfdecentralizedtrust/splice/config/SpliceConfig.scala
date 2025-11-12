@@ -503,6 +503,17 @@ object SpliceConfig {
       deriveReader[InitialAnsConfig]
     implicit val domainFeesConfigReader: ConfigReader[SynchronizerFeesConfig] =
       deriveReader[SynchronizerFeesConfig]
+    implicit val topologySnapshotConfigHint: FieldCoproductHint[TopologySnapshotConfig] =
+      new FieldCoproductHint[TopologySnapshotConfig]("type")
+    implicit val topologySnapshotConfigDirectoryReader
+        : ConfigReader[TopologySnapshotConfig.Directory] =
+      deriveReader[TopologySnapshotConfig.Directory]
+    implicit val topologySnapshotConfigGcpReader: ConfigReader[TopologySnapshotConfig.Gcp] =
+      deriveReader[TopologySnapshotConfig.Gcp]
+    implicit val topologySnapshotConfigReader: ConfigReader[TopologySnapshotConfig] =
+      deriveReader[TopologySnapshotConfig]
+    implicit val periodicTopologySnapshotConfig: ConfigReader[PeriodicTopologySnapshotConfig] =
+      deriveReader[PeriodicTopologySnapshotConfig]
     implicit val svOnboardingFoundDsoReader: ConfigReader[SvOnboardingConfig.FoundDso] =
       deriveReader[SvOnboardingConfig.FoundDso]
     implicit val svOnboardingJoinWithKeyReader: ConfigReader[SvOnboardingConfig.JoinWithKey] =
@@ -935,6 +946,15 @@ object SpliceConfig {
       deriveWriter[InitialAnsConfig]
     implicit val domainFeesConfigWriter: ConfigWriter[SynchronizerFeesConfig] =
       deriveWriter[SynchronizerFeesConfig]
+    implicit val topologySnapshotConfigDirectoryWriter
+        : ConfigWriter[TopologySnapshotConfig.Directory] =
+      deriveWriter[TopologySnapshotConfig.Directory]
+    implicit val topologySnapshotConfigGcpWriter: ConfigWriter[TopologySnapshotConfig.Gcp] =
+      deriveWriter[TopologySnapshotConfig.Gcp]
+    implicit val topologySnapshotConfigWriter: ConfigWriter[TopologySnapshotConfig] =
+      deriveWriter[TopologySnapshotConfig]
+    implicit val periodicTopologySnapshotConfig: ConfigWriter[PeriodicTopologySnapshotConfig] =
+      deriveWriter[PeriodicTopologySnapshotConfig]
     implicit val svOnboardingFoundDsoWriter: ConfigWriter[SvOnboardingConfig.FoundDso] =
       deriveWriter[SvOnboardingConfig.FoundDso]
     implicit val svOnboardingJoinWithKeyWriter: ConfigWriter[SvOnboardingConfig.JoinWithKey] =
