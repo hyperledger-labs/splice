@@ -521,7 +521,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 80
+                      - $INGESTION_ENTRIES_PER_BATCH_THRESHOLD
                     type: gt
                   operator:
                     type: and
@@ -545,7 +545,7 @@ groups:
         for: 30m
         annotations:
           description: |
-            The ingestion batch size has exceeded the expected size for a prolonged time in {{ index $labels "namespace" }}'s {{ index $labels "node_type" }}.
+            The ingestion batch size has exceeded $INGESTION_ENTRIES_PER_BATCH_THRESHOLD entries/batch for a prolonged time in {{ index $labels "namespace" }}'s {{ index $labels "node_type" }}.
             This might mean that ingestion is close to not being able to keep up with ledger activity.
             This can also happen when an SV was just onboarded and is catching up with the ACS.
           summary: The ingestion batch size has exceeded the expected size for a prolonged time.

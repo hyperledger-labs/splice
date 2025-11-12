@@ -94,7 +94,7 @@
         "legend": {
           "calcs": ["lastNotNull"],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -207,7 +207,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -606,7 +606,7 @@
   },
   "timepicker": {},
   "timezone": "UTC",
-  "title": "Update History",
+  "title": "Update History Ingestion",
   "uid": "ded17fppzdwcgd",
-  "version": 3
+  "version": 4
 }
