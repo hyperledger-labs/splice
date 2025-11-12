@@ -1080,7 +1080,7 @@ lazy val `apps-scan` =
       `splice-dso-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime, jackson_cbor, jackson_scala, jackson_jdk8, jackson_jsr310, aws_s3),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(

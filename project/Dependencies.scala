@@ -57,4 +57,11 @@ object Dependencies {
 
   lazy val parallel_collections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 
+  lazy val jackson_version = "2.18.2"
+  lazy val jackson_jdk8 = "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % jackson_version
+  lazy val jackson_jsr310 = "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % jackson_version
+  lazy val jackson_scala = "com.fasterxml.jackson.module" %% "jackson-module-scala" % jackson_version
+  lazy val jackson_cbor = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % jackson_version
+
+  lazy val aws_s3 = "software.amazon.awssdk" % "s3" % CantonDependencies.aws_version
 }

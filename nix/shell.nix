@@ -21,6 +21,7 @@ in pkgs.mkShell {
     bc
     cabal2nix
     canton
+    cbor-diag
     circleci-cli
     curl
     docker
@@ -60,6 +61,7 @@ in pkgs.mkShell {
     python3
     python3Packages.aiohttp
     python3Packages.auth0-python
+    python3Packages.cbor2
     python3Packages.colorlog
     python3Packages.pycryptodome
     (python3Packages.datadog.overrideAttrs (old: {

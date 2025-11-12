@@ -45,6 +45,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
 }
+import org.lfdecentralizedtrust.splice.scan.store.s3.UpdatesColdStorageStore
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.HasHealth
@@ -193,6 +194,13 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         loggerFactory,
       )
+      _ = UpdatesColdStorageStore(
+        acsSnapshotStore,
+        store.updateHistory,
+        dsoParty,
+        migrationInfo.currentMigrationId,
+        loggerFactory
+      ) // FIXME: do something here
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,
         amuletAppParameters.loggingConfig.api,
