@@ -17,6 +17,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
+import { Link as RouterLink } from 'react-router-dom';
 import { PageSectionHeader } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
@@ -125,7 +126,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   const {
     acceptanceThreshold,
     actionName,
-    // contractId,
+    contractId,
     status,
     uniqueId,
     voteStats,
@@ -147,55 +148,57 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   );
 
   return (
-    <TableRow
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
-        alignItems: 'center',
-        borderRadius: '4px',
-        border: '1px solid #4F4F4F',
-        paddingBlock: '10px',
-      }}
-      data-testid={`${uniqueId}-row`}
-    >
-      <TableCell data-testid={`${uniqueId}-row-action-name`}>
-        <TableBodyTypography>{actionName}</TableBodyTypography>
-      </TableCell>
-      {showThresholdDeadline && (
-        <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
-          <TableBodyTypography>{votingThresholdDeadline}</TableBodyTypography>
+    <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
+      <TableRow
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
+          alignItems: 'center',
+          borderRadius: '4px',
+          border: '1px solid #4F4F4F',
+          paddingBlock: '10px',
+        }}
+        data-testid={`${uniqueId}-row`}
+      >
+        <TableCell data-testid={`${uniqueId}-row-action-name`}>
+          <TableBodyTypography>{actionName}</TableBodyTypography>
         </TableCell>
-      )}
-      <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>
-        <TableBodyTypography>{voteTakesEffect}</TableBodyTypography>
-      </TableCell>
+        {showThresholdDeadline && (
+          <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
+            <TableBodyTypography>{votingThresholdDeadline}</TableBodyTypography>
+          </TableCell>
+        )}
+        <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>
+          <TableBodyTypography>{voteTakesEffect}</TableBodyTypography>
+        </TableCell>
 
-      {showStatus && (
-        <TableCell data-testid={`${uniqueId}-row-status`}>
-          <TableBodyTypography>{status}</TableBodyTypography>
-        </TableCell>
-      )}
-      {showVoteStats && (
-        <TableCell data-testid={`${uniqueId}-row-all-votes`}>
-          <TableBodyTypography>
-            <AllVotes
-              acceptedVotes={voteStats['accepted']}
-              rejectedVotes={voteStats['rejected']}
-              data-testid={`${uniqueId}-row-all-votes-stats`}
-            />
-          </TableBodyTypography>
-        </TableCell>
-      )}
-      {showAcceptanceThreshold && (
-        <TableCell data-testid={`${uniqueId}-row-acceptance-threshold`}>
-          <TableBodyTypography>{acceptanceThreshold.toString()}</TableBodyTypography>
-        </TableCell>
-      )}
+        {showStatus && (
+          <TableCell data-testid={`${uniqueId}-row-status`}>
+            <TableBodyTypography>{status}</TableBodyTypography>
+          </TableCell>
+        )}
+        {showVoteStats && (
+          <TableCell data-testid={`${uniqueId}-row-all-votes`}>
+            <TableBodyTypography>
+              <AllVotes
+                acceptedVotes={voteStats['accepted']}
+                rejectedVotes={voteStats['rejected']}
+                data-testid={`${uniqueId}-row-all-votes-stats`}
+              />
+            </TableBodyTypography>
+          </TableCell>
+        )}
+        {showAcceptanceThreshold && (
+          <TableCell data-testid={`${uniqueId}-row-acceptance-threshold`}>
+            <TableBodyTypography>{acceptanceThreshold.toString()}</TableBodyTypography>
+          </TableCell>
+        )}
 
-      <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-        <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote-stats`} />
-      </TableCell>
-    </TableRow>
+        <TableCell data-testid={`${uniqueId}-row-your-vote`}>
+          <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote-stats`} />
+        </TableCell>
+      </TableRow>
+    </RouterLink>
   );
 };
 
