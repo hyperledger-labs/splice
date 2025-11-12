@@ -1,7 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.apache.pekko.http.scaladsl.model.Uri
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
@@ -10,7 +9,6 @@ import org.lfdecentralizedtrust.splice.unit.http.{
   SystemPropertiesSupport,
   TinyProxySupport,
 }
-
 
 class ValidatorProxyIntegrationTest
     extends IntegrationTest
@@ -27,13 +25,7 @@ class ValidatorProxyIntegrationTest
   override def usesDbs = Seq(dbName) ++ super.usesDbs
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
-    EnvironmentDefinition
-      .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(22000, Seq("aliceValidator"))(conf)
-      )
-      // Splice apps should only start after the Canton instances are started
-      .withManualStart
+    EnvironmentDefinition.simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)
   }
 
   "validator should start and tap, using http forward proxy" in { implicit env =>
@@ -50,17 +42,21 @@ class ValidatorProxyIntegrationTest
           .set("https.nonProxyHosts", "")
       withProperties(props) {
         withCanton(
-          Seq(testResourcesPath / "standalone-participant-extra.conf"),
+          Seq(
+            testResourcesPath / "standalone-participant-extra.conf",
+            // skip extra wiring work to make aliceValidatorLocal use the right auth config
+            testResourcesPath / "standalone-participant-extra-no-auth.conf",
+          ),
           Seq.empty,
           "validator-proxy-test",
-          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> dbName,
           "JAVA_TOOL_OPTIONS" -> props.toJvmOptionString,
         ) {
-          aliceValidatorBackend.startSync()
+          aliceValidatorLocalBackend.startSync()
           actAndCheck(
             "Onboard wallet user",
-            onboardWalletUser(aliceWalletClient, aliceValidatorBackend),
+            onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend),
           )(
             "We can tap and list",
             _ => {
@@ -83,12 +79,12 @@ class ValidatorProxyIntegrationTest
           ) shouldBe true
           proxy.proxiedConnectRequest(
             host,
-            aliceValidatorBackend.config.clientAdminApi.port.unwrap,
+            aliceValidatorLocalBackend.config.clientAdminApi.port.unwrap,
           ) shouldBe true
 
           proxy.proxiedConnectRequest(
             host,
-            aliceValidatorBackend.participantClient.config.ledgerApi.port.unwrap,
+            aliceValidatorLocalBackend.participantClient.config.ledgerApi.port.unwrap,
           ) shouldBe true
 
           val sequencerPort = Uri(

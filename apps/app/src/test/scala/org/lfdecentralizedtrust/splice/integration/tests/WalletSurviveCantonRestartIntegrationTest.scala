@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
@@ -22,13 +21,7 @@ class WalletSurviveCantonRestartIntegrationTest
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
-      .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withPreSetup(_ => ())
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(22000, Seq("aliceValidator"))(conf)
-      )
-      // Splice apps should only start after the Canton instances are started
-      .withManualStart
+      .simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)
       // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
   }
@@ -38,16 +31,18 @@ class WalletSurviveCantonRestartIntegrationTest
       initDso()
       clue("First run of Canton participant") {
         withCanton(
-          Seq(testResourcesPath / "standalone-participant-extra.conf"),
+          Seq(
+            testResourcesPath / "standalone-participant-extra.conf",
+          ),
           Seq.empty,
           "wallet-survive-canton-restarts-1",
-          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> dbName,
         ) {
-          aliceValidatorBackend.startSync()
+          aliceValidatorLocalBackend.startSync()
           actAndCheck(
             "Onboard wallet user",
-            onboardWalletUser(aliceWalletClient, aliceValidatorBackend),
+            onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend),
           )(
             "We can tap and list",
             _ => {
@@ -59,10 +54,12 @@ class WalletSurviveCantonRestartIntegrationTest
       }
       clue("Second run of Canton participant") {
         withCanton(
-          Seq(testResourcesPath / "standalone-participant-extra.conf"),
+          Seq(
+            testResourcesPath / "standalone-participant-extra.conf",
+          ),
           Seq.empty,
           "wallet-survive-canton-restarts-2",
-          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> dbName,
         ) {
           clue("We can tap and list after Canton restart and domain reconnection") {

@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration
 
-import better.files.{File, Resource}
+import better.files.{File, Resource, *}
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
@@ -79,6 +79,14 @@ case class EnvironmentDefinition(
       // that blocks on all apps being initialized.
       .copy(setup = _ => ())
   }
+
+  def withStandardSetup: EnvironmentDefinition =
+    this
+      .withAllocatedUsers()
+      .withInitializedNodes()
+      .withTrafficTopupsEnabled
+      .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
 
   def withAllocatedUsers(
       extraIgnoredSvPrefixes: Seq[String] = Seq.empty,
@@ -478,21 +486,29 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
 
   // Prefer this to `4Svs` for better test performance (unless your really need >1 SV of course).
   def simpleTopology1Sv(testName: String): EnvironmentDefinition = {
-    fromResources(Seq("simple-topology-1sv.conf"), testName)
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
-      .withEagerAppActivityMarkerConversion
+    fromResources(Seq("simple-topology-1sv.conf"), testName).withStandardSetup
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
-    fromResources(Seq("simple-topology.conf"), testName)
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
-      .withEagerAppActivityMarkerConversion
+    fromResources(Seq("simple-topology.conf"), testName).withStandardSetup
+  }
+
+  def simpleTopology1SvWithLocalValidator(testName: String): EnvironmentDefinition = {
+    val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+    fromFiles(
+      testName,
+      testResourcesPath / "simple-topology-1sv.conf",
+      testResourcesPath / "local-validator-node" / "validator-app" / "app.conf",
+    ).withStandardSetup.withManualStart
+  }
+
+  def simpleTopology4SvsWithLocalValidator(testName: String): EnvironmentDefinition = {
+    val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+    fromFiles(
+      testName,
+      testResourcesPath / "simple-topology.conf",
+      testResourcesPath / "local-validator-node" / "validator-app" / "app.conf",
+    ).withStandardSetup.withManualStart
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =
