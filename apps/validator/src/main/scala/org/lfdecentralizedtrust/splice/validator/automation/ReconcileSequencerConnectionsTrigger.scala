@@ -39,6 +39,7 @@ class ReconcileSequencerConnectionsTrigger(
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
     initialSynchronizerTimeO: Option[CantonTimestamp],
+    newSequencerConnectionPool: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -113,6 +114,7 @@ class ReconcileSequencerConnectionsTrigger(
                     alias,
                     sequencerConnectionConfig,
                   ),
+                  newSequencerConnectionPool,
                   modifySequencerConnections(sequencerConnectionConfig),
                   RetryFor.Automation,
                 )
