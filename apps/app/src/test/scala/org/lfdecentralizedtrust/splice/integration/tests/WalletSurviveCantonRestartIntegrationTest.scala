@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
@@ -22,8 +23,17 @@ class WalletSurviveCantonRestartIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)
-      // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
+      .addConfigTransforms((_, conf) =>
+        ConfigTransforms.updateAllValidatorConfigs { case (name, config) =>
+          if (name == "aliceValidatorLocalBackend") {
+            import monocle.macros.syntax.lens.*
+            config.focus(_.parameters.enabledFeatures.newSequencerConnectionPool).replace(true)
+          } else {
+            config
+          }
+        }(conf)
+      )
   }
 
   "Wallet" should {
@@ -32,7 +42,7 @@ class WalletSurviveCantonRestartIntegrationTest
       clue("First run of Canton participant") {
         withCanton(
           Seq(
-            testResourcesPath / "standalone-participant-extra.conf",
+            testResourcesPath / "standalone-participant-extra.conf"
           ),
           Seq.empty,
           "wallet-survive-canton-restarts-1",
@@ -55,9 +65,11 @@ class WalletSurviveCantonRestartIntegrationTest
       clue("Second run of Canton participant") {
         withCanton(
           Seq(
-            testResourcesPath / "standalone-participant-extra.conf",
+            testResourcesPath / "standalone-participant-extra.conf"
           ),
-          Seq.empty,
+          Seq(
+            "canton.participants.validatorParticipant.sequencer-client.use-new-connection-pool=true"
+          ),
           "wallet-survive-canton-restarts-2",
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> dbName,

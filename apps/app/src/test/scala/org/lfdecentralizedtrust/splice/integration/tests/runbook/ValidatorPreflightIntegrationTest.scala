@@ -480,6 +480,11 @@ abstract class ValidatorPreflightIntegrationTestBase
             domainConnectionConfig.sequencerConnections.connections.size
           )
           .value
+        domainConnectionConfig.sequencerConnections.sequencerLivenessMargin shouldBe Thresholds
+          .sequencerConnectionsLivenessMargin(
+            domainConnectionConfig.sequencerConnections.connections.size
+          )
+          .value
         domainConnectionConfig.sequencerConnections.submissionRequestAmplification.factor shouldBe Thresholds
           .sequencerSubmissionRequestAmplification(
             domainConnectionConfig.sequencerConnections.connections.size

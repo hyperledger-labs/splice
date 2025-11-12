@@ -190,7 +190,7 @@ class SV1Initializer(
               )
             ),
             PositiveInt.one,
-            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
             // TODO(#2666) Make the delays configurable.
@@ -203,6 +203,7 @@ class SV1Initializer(
             observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
+        newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
         overwriteExistingConnection =
           false, // The validator will manage sequencer connections after initial setup
         retryFor = RetryFor.WaitingOnInitDependency,
