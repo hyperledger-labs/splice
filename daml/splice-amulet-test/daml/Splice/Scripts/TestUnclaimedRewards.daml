@@ -133,6 +133,60 @@ testUnclaimedRewards_withCoupons = do
   mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
   pure ()
 
+testUnclaimedRewards_validatorLicenseNonDefaultWeight : Script ()
+testUnclaimedRewards_validatorLicenseNonDefaultWeight = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- Create validator liveness activity records with different weights
+  validatorLivenessActivityRecord1 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = alice.primaryParty
+    round = Round 0
+    weight = Some 2.5
+
+  validatorLivenessActivityRecord2 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = provider1Validator.primaryParty
+    round = Round 0
+    weight = Some 0.5
+
+  validatorLivenessActivityRecord3 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = provider2.primaryParty
+    round = Round 0
+    weight = None  -- Default weight (1.0)
+
+  -- Start issuing
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  -- Calculate expected allocated rewards with weights
+  let weightedValidatorLivenessRewards =
+        (2.5 + 0.5 + 1.0) * getValidatorFaucetCap issuanceConfig_0_0p5
+  let allocatedRewards = weightedValidatorLivenessRewards
+  mergeAndCheckUnclaimedRewardAmount app (totalRewardsPerRound - allocatedRewards)
+
+  -- Run issuance to close round 0
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  -- Collect the reward coupons
+  [(closedRoundCid, _)] <- query @ClosedMiningRound app.dso
+  let collect = AmuletRules_ClaimExpiredRewards with
+        closedRoundCid
+        validatorRewardCouponCids = []
+        appCouponCids = []
+        svRewardCouponCids = []
+        optValidatorFaucetCouponCids = None
+        optValidatorLivenessActivityRecordCids = Some [validatorLivenessActivityRecord1, validatorLivenessActivityRecord2, validatorLivenessActivityRecord3]
+  submitExerciseAmuletRulesByKey app [app.dso] [] collect
+
+  -- Check that the weighted addition is done correctly
+  let numIssuingRoundsToDate = 4.0
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
+  pure ()
+
 testNoUnclaimedRewards : Script ()
 testNoUnclaimedRewards = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
