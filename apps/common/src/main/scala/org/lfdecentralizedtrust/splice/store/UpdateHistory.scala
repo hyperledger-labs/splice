@@ -121,7 +121,10 @@ class UpdateHistory(
     (for {
       lastIngestedRecordTime <- newState.lastIngestedRecordTime
     } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)(
-      MetricsContext("update_stream_party" -> updateStreamParty.toProtoPrimitive)
+      MetricsContext(
+        "update_stream_party" -> updateStreamParty.toProtoPrimitive,
+        "store_name" -> storeName,
+      )
     )).discard
   }
 
