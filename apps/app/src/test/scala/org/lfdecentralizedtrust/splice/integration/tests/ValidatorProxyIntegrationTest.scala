@@ -22,6 +22,7 @@ class ValidatorProxyIntegrationTest
   val dbName = s"participant_alice_validator_${dbsSuffix}"
   override def usesDbs = Seq(dbName) ++ super.usesDbs
 
+  // Can sometimes be unhappy when doing funky `withCanton` things; disabling them for simplicity
   override protected def runTokenStandardCliSanityCheck: Boolean = false
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
@@ -45,8 +46,6 @@ class ValidatorProxyIntegrationTest
         withCanton(
           Seq(
             testResourcesPath / "standalone-participant-extra.conf",
-            // skip extra wiring work to make aliceValidatorLocal use the right auth config
-            testResourcesPath / "standalone-participant-extra-no-auth.conf",
           ),
           Seq.empty,
           "validator-proxy-test",

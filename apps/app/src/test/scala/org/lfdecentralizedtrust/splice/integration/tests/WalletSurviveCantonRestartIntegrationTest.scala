@@ -20,6 +20,7 @@ class WalletSurviveCantonRestartIntegrationTest
   val dbName = s"participant_alice_validator_${dbsSuffix}"
   override def usesDbs = Seq(dbName) ++ super.usesDbs
 
+  // Can sometimes be unhappy when doing funky `withCanton` things; disabling them for simplicity
   override protected def runTokenStandardCliSanityCheck: Boolean = false
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
