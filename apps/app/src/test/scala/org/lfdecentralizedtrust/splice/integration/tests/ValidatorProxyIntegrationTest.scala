@@ -17,12 +17,13 @@ class ValidatorProxyIntegrationTest
     with StandaloneCanton
     with TinyProxySupport
     with SystemPropertiesSupport {
-  override protected def runTokenStandardCliSanityCheck: Boolean = false
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def dbsSuffix = "validator_proxy"
   val dbName = s"participant_alice_validator_${dbsSuffix}"
   override def usesDbs = Seq(dbName) ++ super.usesDbs
+
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition.simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)

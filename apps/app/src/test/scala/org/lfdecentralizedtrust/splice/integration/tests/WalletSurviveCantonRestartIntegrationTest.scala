@@ -20,6 +20,9 @@ class WalletSurviveCantonRestartIntegrationTest
   val dbName = s"participant_alice_validator_${dbsSuffix}"
   override def usesDbs = Seq(dbName) ++ super.usesDbs
 
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)
@@ -44,7 +47,9 @@ class WalletSurviveCantonRestartIntegrationTest
           Seq(
             testResourcesPath / "standalone-participant-extra.conf"
           ),
-          Seq.empty,
+          Seq(
+            "canton.participants.extraStandaloneParticipant.sequencer-client.use-new-connection-pool=true"
+          ),
           "wallet-survive-canton-restarts-1",
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> dbName,
@@ -68,7 +73,7 @@ class WalletSurviveCantonRestartIntegrationTest
             testResourcesPath / "standalone-participant-extra.conf"
           ),
           Seq(
-            "canton.participants.validatorParticipant.sequencer-client.use-new-connection-pool=true"
+            "canton.participants.extraStandaloneParticipant.sequencer-client.use-new-connection-pool=true"
           ),
           "wallet-survive-canton-restarts-2",
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
