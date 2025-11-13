@@ -234,6 +234,7 @@ betaTheme = createTheme(betaTheme, {
       styleOverrides: {
         root: {
           borderColor: betaTheme.palette.colors.neutral[15],
+          borderBottom: 'none',
         },
         head: {
           fontFamily: 'Lato',
