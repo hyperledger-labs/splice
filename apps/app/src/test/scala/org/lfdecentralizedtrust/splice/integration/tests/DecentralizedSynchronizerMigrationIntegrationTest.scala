@@ -1416,7 +1416,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             false,
           )
           participant.ledger_api.users.create(
-            s"fake-user-4-${suffix}"
+            s"fake-user-4-${suffix}",
+            Set(),
+            Option(someParties(0)),
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-5-${suffix}"
           )
         }
       },
