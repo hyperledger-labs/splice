@@ -9,6 +9,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery
 
 import java.time.Duration
+import scala.concurrent.duration.*
 
 class RecordTimeToleranceTimeBasedIntegrationTest
     extends IntegrationTest
@@ -65,7 +66,7 @@ class RecordTimeToleranceTimeBasedIntegrationTest
       }
       // We go slightly above 48h as time is not actually completely still in simtime, the microseconds still advance.
       advanceTime(Duration.ofHours(49))
-      eventually() {
+      eventually(4.minutes) {
         sv1Backend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(synchronizerId)
           .preparationTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofHours(24)

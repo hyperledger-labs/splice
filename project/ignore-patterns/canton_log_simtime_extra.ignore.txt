@@ -34,6 +34,7 @@ Request failed for sequencer.*GrpcServiceUnavailable: UNAVAILABLE/Health-check s
 
 # TODO(#2668) Remove once Canton improves the log here.
 Request failed for.*Is the server running.*GrpcConnectionX
+Failed to acknowledge clean timestamp (usually because sequencer is down): ConnectionError(TransportError(Request failed for server-DefaultSequencer-0. Is the server running?
 
 # This kicks in when an interval is skipped which can easily be caused in simtime mode
 # by bumping the time by more than the reconciliation interval.
