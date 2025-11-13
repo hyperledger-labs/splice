@@ -67,7 +67,12 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
-import org.lfdecentralizedtrust.splice.validator.store.{ValidatorInternalStore, ValidatorStore}
+import org.lfdecentralizedtrust.splice.validator.store.{
+  ScanUrlInternalConfig,
+  ValidatorConfigProvider,
+  ValidatorInternalStore,
+  ValidatorStore,
+}
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
@@ -103,10 +108,12 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, Await}
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
+import org.apache.pekko.http.scaladsl.model.Uri
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -199,6 +206,14 @@ class ValidatorApp(
       initialSynchronizerTime <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
+            _ <- Future.unit
+            internalStore = new ValidatorConfigProvider(
+              ValidatorInternalStore(
+                storage,
+                loggerFactory,
+              )
+            )
+
             scanConnection <- appInitStep("Getting BFT scan connection") {
               client.BftScanConnection(
                 ledgerClient,
@@ -207,6 +222,8 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
+                Some(saveScanUrlListBuilder(internalStore)),
+                getPreviousScanList(internalStore),
               )
             }
             domainConnector = new DomainConnector(
@@ -683,6 +700,45 @@ class ValidatorApp(
     )
   }
 
+  private def saveScanUrlListBuilder(
+      validatorConfigProvider: ValidatorConfigProvider
+  )(implicit traceContext: TraceContext): Seq[DsoScan] => Future[Unit] = {
+    (connections: Seq[DsoScan]) =>
+      {
+        val internalConfigs: Seq[ScanUrlInternalConfig] = connections.map { dsoScan =>
+          ScanUrlInternalConfig(
+            svName = dsoScan.svName,
+            url = dsoScan.publicUrl.toString,
+          )
+        }
+        validatorConfigProvider.setScanUrlInternalConfig(internalConfigs)
+      }
+  }
+
+  private def getPreviousScanList(
+      validatorConfigProvider: ValidatorConfigProvider
+  )(implicit traceContext: TraceContext): Option[Seq[DsoScan]] = {
+    val futureOption: Future[Option[Seq[ScanUrlInternalConfig]]] =
+      validatorConfigProvider.getScanUrlInternalConfig().value
+
+    val maybeInternalConfigs: Option[Seq[ScanUrlInternalConfig]] =
+      try {
+        Await.result(futureOption, 10.seconds)
+      } catch {
+        case e: Throwable =>
+          None
+      }
+
+    maybeInternalConfigs.map { internalConfigs =>
+      internalConfigs.map { internalConfig =>
+        DsoScan(
+          publicUrl = Uri.from(internalConfig.url),
+          svName = internalConfig.svName,
+        )
+      }
+    }
+  }
+
   override def initialize(
       ledgerClient: SpliceLedgerClient,
       validatorParty: PartyId,
@@ -708,9 +764,11 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      internalStore = ValidatorInternalStore(
-        storage,
-        loggerFactory,
+      internalStore = new ValidatorConfigProvider(
+        ValidatorInternalStore(
+          storage,
+          loggerFactory,
+        )
       )
 
       scanConnection <- appInitStep("Get scan connection") {
@@ -721,6 +779,8 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
+          Some(saveScanUrlListBuilder(internalStore)),
+          getPreviousScanList(internalStore),
         )
       }
 
@@ -1227,7 +1287,7 @@ object ValidatorApp {
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       store: ValidatorStore,
-      internalStore: ValidatorInternalStore,
+      internalStore: ValidatorConfigProvider,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
       timeouts: ProcessingTimeout,

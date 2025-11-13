@@ -46,6 +46,8 @@ object ScanAggregatesConnection {
       clock,
       retryProvider,
       loggerFactory,
+      None,
+      None,
     )
       .map(bft => new ScanAggregatesConnection(bft, retryProvider, loggerFactory))
   }
