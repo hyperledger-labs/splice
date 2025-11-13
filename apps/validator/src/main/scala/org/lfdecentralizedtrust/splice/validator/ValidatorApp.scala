@@ -67,7 +67,7 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.store.{ValidatorInternalStore, ValidatorStore}
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
@@ -707,6 +707,12 @@ class ValidatorApp(
         config.participantIdentitiesBackup.map(_ -> clock),
         loggerFactory,
       )
+
+      internalStore = ValidatorInternalStore(
+        storage,
+        loggerFactory,
+      )
+
       scanConnection <- appInitStep("Get scan connection") {
         client.BftScanConnection(
           ledgerClient,
@@ -1199,6 +1205,7 @@ class ValidatorApp(
         domainTimeAutomationService,
         domainParamsAutomationService,
         store,
+        internalStore,
         automation,
         walletManagerOpt,
         timeouts,
@@ -1220,6 +1227,7 @@ object ValidatorApp {
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       store: ValidatorStore,
+      internalStore: ValidatorInternalStore,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
       timeouts: ProcessingTimeout,
