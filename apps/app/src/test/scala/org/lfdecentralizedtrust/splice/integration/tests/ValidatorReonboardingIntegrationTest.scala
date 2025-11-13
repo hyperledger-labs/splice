@@ -327,6 +327,16 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
               "not be able to migrate due to an unsupported namespace"
             )
           }
+          forExactly(1, entries) {
+            _.message should include(
+              "Storing parties that will be migrated"
+            )
+          }
+          forExactly(1, entries) {
+            _.message should include(
+              "Clearing parties that were migrated"
+            )
+          }
         },
       )
 
