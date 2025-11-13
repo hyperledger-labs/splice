@@ -23,16 +23,14 @@ object ValidatorInternalStore {
 
   def apply(
       storage: DbStorage,
-      loggingContext: ErrorLoggingContext,
-      closeContext: CloseContext,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      lc: ErrorLoggingContext,
+      cc: CloseContext,
   ): ValidatorInternalStore = {
     new DbValidatorInternalStore(
       storage,
-      loggingContext,
-      closeContext,
       loggerFactory,
     )
   }
