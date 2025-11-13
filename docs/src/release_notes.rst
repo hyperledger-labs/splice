@@ -20,6 +20,9 @@ Upcoming
   - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
   - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
 
+- Validator
+
+  - Fix bug that caused validators to fail on restoring participant users without rights during a synchronizer migration.
 
 0.5.1
 -----
