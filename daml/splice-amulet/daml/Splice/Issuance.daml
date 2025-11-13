@@ -46,8 +46,8 @@ validIssuanceConfig this@IssuanceConfig{..} =
     && validatorRewardCap >= 0.0
     && featuredAppRewardCap >= 0.0
     && unfeaturedAppRewardCap >= 0.0
-    && getValidatorFaucetCap this >= 0.0 &&
-    optional True (\pct -> pct >= 0.0 && pct <= 1.0) optDevelopmentFundPercentage
+    && getValidatorFaucetCap this >= 0.0
+    && optional True (\pct -> pct >= 0.0 && pct <= 1.0) optDevelopmentFundPercentage
 
 
 -- computation of issuance per round
