@@ -45,7 +45,6 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import slick.jdbc.canton.SQLActionBuilder
 
@@ -96,10 +95,6 @@ class DbUserWalletStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
       ingestionConfig,
     )
     with UserWalletStore
@@ -117,7 +112,7 @@ class DbUserWalletStore(
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
-  override protected def acsContractFilter
+  override def acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData,
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsInterfaceViewRowData,

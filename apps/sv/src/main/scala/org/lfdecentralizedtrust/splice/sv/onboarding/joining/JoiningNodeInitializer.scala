@@ -13,7 +13,7 @@ import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnectionPoolDelays,
@@ -94,7 +94,7 @@ class JoiningNodeInitializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,

@@ -1002,14 +1002,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             withClueAndLog("Backfilled history includes ACS import") {
               eventually() {
-                sv1ScanLocalBackend.appState.store.updateHistory.sourceHistory
+                sv1ScanLocalBackend.appState.automation.updateHistory.sourceHistory
                   .migrationInfo(1L)
                   .futureValue
                   .exists(_.complete) should be(true)
               }
 
               val backfilledUpdates =
-                sv1ScanLocalBackend.appState.store.updateHistory
+                sv1ScanLocalBackend.appState.automation.updateHistory
                   .getAllUpdates(None, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {

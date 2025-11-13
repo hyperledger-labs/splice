@@ -20,6 +20,17 @@ Upcoming
   - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
   - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
 
+- SV app
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+    - Deployment
+
+      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
+        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
+
+
 
 0.5.1
 -----
@@ -122,6 +133,7 @@ Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
       many (by default 10k) markers, and that minimizes contention using random sampling of batches when the automation
       is in catchup mode because there are too many markers.
       Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
+
 
 0.4.21
 ------

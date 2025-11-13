@@ -270,7 +270,7 @@ class UpdateHistorySanityCheckPlugin(
             interval = Span(100, Millis),
           )
         eventually {
-          scan.automation.store.updateHistory
+          scan.automation.updateHistory
             .getBackfillingState()
             .futureValue should be(BackfillingState.Complete)
         }(

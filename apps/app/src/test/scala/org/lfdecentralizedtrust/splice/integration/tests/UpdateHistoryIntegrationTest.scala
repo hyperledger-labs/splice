@@ -154,7 +154,7 @@ class UpdateHistoryIntegrationTest
       eventually() {
         compareHistory(
           sv1Backend.participantClient,
-          sv1ScanBackend.appState.store.updateHistory,
+          sv1ScanBackend.appState.automation.updateHistory,
           ledgerBeginSv1,
         )
       }
@@ -179,7 +179,7 @@ class UpdateHistoryIntegrationTest
             .lookupUserWallet(aliceWalletClient.config.ledgerApiUser)
             .futureValue
             .getOrElse(throw new RuntimeException("Alice wallet should exist"))
-            .store
+            .automation
             .updateHistory,
           ledgerBeginAlice,
           true,
@@ -187,22 +187,8 @@ class UpdateHistoryIntegrationTest
       }
       eventually() {
         compareHistory(
-          sv1Backend.participantClient,
-          sv1Backend.appState.svStore.updateHistory,
-          ledgerBeginSv1,
-        )
-      }
-      eventually() {
-        compareHistory(
-          sv1Backend.participantClient,
-          sv1Backend.appState.dsoStore.updateHistory,
-          ledgerBeginSv1,
-        )
-      }
-      eventually() {
-        compareHistory(
           aliceValidatorBackend.participantClient,
-          aliceValidatorBackend.appState.store.updateHistory,
+          aliceValidatorBackend.appState.automation.updateHistory,
           ledgerBeginAlice,
         )
       }

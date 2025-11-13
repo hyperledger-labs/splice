@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -37,7 +37,7 @@ class SvSvAutomationService(
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
-    storage: Storage,
+    storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     localSynchronizerNode: Option[LocalSynchronizerNode],
@@ -56,7 +56,6 @@ class SvSvAutomationService(
       ledgerClient,
       retryProvider,
       config.ingestFromParticipantBegin,
-      config.ingestUpdateHistoryFromParticipantBegin,
       config.parameters,
     ) {
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
@@ -68,6 +67,8 @@ class SvSvAutomationService(
       connection(SpliceLedgerConnectionPriority.Low),
     )
   )
+
+  // notice the absence of UpdateHistory: the history for the sv party is not needed as we don't foresee ever adding TxLog for it
 
   registerTrigger(
     SqlIndexInitializationTrigger(
