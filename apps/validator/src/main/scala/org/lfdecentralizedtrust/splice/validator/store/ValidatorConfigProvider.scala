@@ -6,8 +6,7 @@ package org.lfdecentralizedtrust.splice.validator.store
 import cats.data.OptionT
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
-import scala.concurrent.{ExecutionContext, Future}
-import io.circe.syntax.*
+import scala.concurrent.Future
 
 final case class ScanUrlInternalConfig(
     svName: String,
@@ -26,31 +25,13 @@ class ValidatorConfigProvider(config: ValidatorInternalStore) {
   final def setScanUrlInternalConfig(
       value: Seq[ScanUrlInternalConfig]
   )(implicit tc: TraceContext): Future[Unit] = {
-    config.setConfig(scanInternalConfigKey, value.asJson)
+    config.setConfig[Seq[ScanUrlInternalConfig]](scanInternalConfigKey, value)
   }
 
   final def getScanUrlInternalConfig(
   )(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
+      tc: TraceContext
   ): OptionT[Future, Seq[ScanUrlInternalConfig]] = {
-
-    OptionT(
-      config
-        .getConfig(scanInternalConfigKey)
-        .map { json =>
-          json
-            .as[Seq[ScanUrlInternalConfig]]
-            .fold(
-              failure =>
-                throw new RuntimeException(
-                  s"FATAL: Corrupt configuration data found for $scanInternalConfigKey. Cannot decode.",
-                  failure,
-                ),
-              success => Some(success),
-            )
-        }
-        .getOrElse(None)
-    )
+    config.getConfig[Seq[ScanUrlInternalConfig]](scanInternalConfigKey)
   }
 }

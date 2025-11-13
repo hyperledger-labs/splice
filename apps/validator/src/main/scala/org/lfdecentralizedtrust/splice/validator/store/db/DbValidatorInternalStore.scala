@@ -14,7 +14,8 @@ import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import scala.concurrent.{ExecutionContext, Future}
-import io.circe.Json
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.syntax.*
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 
 class DbValidatorInternalStore(
@@ -29,19 +30,24 @@ class DbValidatorInternalStore(
 
   val profile: JdbcProfile = storage.profile.jdbc
 
-  override def setConfig(key: String, value: Json)(implicit tc: TraceContext): Future[Unit] = {
+  override def setConfig[T: Encoder](key: String, value: T)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    val jsonValue: Json = value.asJson
+
     val action = sql"""INSERT INTO validator_internal_config (config_key, config_value)
-        VALUES ($key, $value)
+        VALUES ($key, $jsonValue)
         ON CONFLICT (config_key) DO UPDATE
         SET config_value = excluded.config_value""".asUpdate
     val updateAction = storage.update(action, "set-validator-internal-config")
+
     logger.debug(
-      s"saving validator config in database with key '$key' and value '${value.noSpaces}'"
+      s"saving validator config in database with key '$key' and value '${jsonValue.noSpaces}'"
     )
     updateAction.map(_ => ())
   }
 
-  override def getConfig(key: String)(implicit tc: TraceContext): OptionT[Future, Json] = {
+  override def getConfig[T: Decoder](key: String)(implicit tc: TraceContext): OptionT[Future, T] = {
     val queryAction = sql"""SELECT config_value
         FROM validator_internal_config
         WHERE config_key = $key
@@ -49,7 +55,19 @@ class DbValidatorInternalStore(
 
     val jsonOptionF: OptionT[FutureUnlessShutdown, Json] =
       storage.querySingle(queryAction, "get-validator-internal-config")
-    val futureOptionJson: Future[Option[Json]] = jsonOptionF.value
-    OptionT(futureOptionJson)
+
+    val typedOptionT: OptionT[FutureUnlessShutdown, T] = jsonOptionF.subflatMap { json =>
+      json.as[T] match {
+        case Right(typedValue) => Some(typedValue)
+        case Left(error) => {
+          logger.error(
+            s"Failed to decode config key '$key' to expected type T: ${error.getMessage}"
+          )
+          None
+        }
+      }
+    }
+
+    OptionT(futureUnlessShutdownToFuture(typedOptionT.value))
   }
 }

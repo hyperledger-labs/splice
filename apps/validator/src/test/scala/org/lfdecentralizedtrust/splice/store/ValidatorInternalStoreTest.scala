@@ -9,7 +9,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.{
   ScanUrlInternalConfig,
@@ -34,15 +33,15 @@ abstract class ValidatorInternalStoreTest
     implicit val tc: TraceContext = TraceContext.empty
 
     val configKey = "key1"
-    val configValue = Json.fromString("payload1")
+    val configValue = "payload1"
     val otherKey = "key2"
-    val otherValue = Json.fromString("payload2")
+    val otherValue = "payload2"
 
-    "set and get a json payload successfully" in {
+    "set and get a payload successfully" in {
       for {
         store <- mkStore()
         _ <- store.setConfig(configKey, configValue)
-        retrievedValue <- store.getConfig(configKey).value
+        retrievedValue <- store.getConfig[String](configKey).value
       } yield {
         retrievedValue shouldBe Some(configValue)
       }
@@ -51,7 +50,7 @@ abstract class ValidatorInternalStoreTest
     "return None for a non-existent key" in {
       for {
         store <- mkStore()
-        retrievedValue <- store.getConfig("non-existent-key").value
+        retrievedValue <- store.getConfig[String]("non-existent-key").value
       } yield {
         retrievedValue shouldBe None
       }
@@ -62,7 +61,7 @@ abstract class ValidatorInternalStoreTest
         store <- mkStore()
         _ <- store.setConfig(configKey, configValue)
         _ <- store.setConfig(configKey, otherValue)
-        retrievedValue <- store.getConfig(configKey).value
+        retrievedValue <- store.getConfig[String](configKey).value
       } yield {
         retrievedValue shouldBe Some(otherValue)
       }
@@ -74,8 +73,8 @@ abstract class ValidatorInternalStoreTest
         _ <- store.setConfig(configKey, configValue)
         _ <- store.setConfig(otherKey, otherValue)
 
-        configKeyValue <- store.getConfig(configKey).value
-        otherKeyValue <- store.getConfig(otherKey).value
+        configKeyValue <- store.getConfig[String](configKey).value
+        otherKeyValue <- store.getConfig[String](otherKey).value
       } yield {
         configKeyValue shouldBe Some(configValue)
         otherKeyValue shouldBe Some(otherValue)
