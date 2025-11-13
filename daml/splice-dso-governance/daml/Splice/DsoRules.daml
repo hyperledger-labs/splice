@@ -1326,7 +1326,7 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_MergeDevelopmentFundCoupons
-        sv : Optional Party
+        sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this sv
