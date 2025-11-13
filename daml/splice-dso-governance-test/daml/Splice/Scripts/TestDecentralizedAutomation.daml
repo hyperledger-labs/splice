@@ -79,7 +79,7 @@ testDevelopmentFundCouponsMerging = do
       amuletRulesCid
       choiceArg = AmuletRules_MergeDevelopmentFundCoupons with
         developmentFundCouponCids = [cid1]
-      sv = Some sv1
+      sv = sv1
 
   -- Happy path
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
@@ -87,7 +87,7 @@ testDevelopmentFundCouponsMerging = do
       amuletRulesCid
       choiceArg = AmuletRules_MergeDevelopmentFundCoupons with
         developmentFundCouponCids
-      sv = Some sv1
+      sv = sv1
 
   developmentFundCoupons <- query @DevelopmentFundCoupon app.dso
   length developmentFundCoupons === 1
