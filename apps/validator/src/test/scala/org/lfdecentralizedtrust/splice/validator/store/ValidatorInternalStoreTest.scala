@@ -1,20 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.store
+package org.lfdecentralizedtrust.splice.validator.store
 
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import org.lfdecentralizedtrust.splice.validator.store.{
-  ScanUrlInternalConfig,
-  ValidatorConfigProvider,
-  ValidatorInternalStore,
-}
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
