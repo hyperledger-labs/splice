@@ -5,22 +5,22 @@ package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.data.OptionT
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.{Decoder, Encoder}
+import io.circe.Codec
 import scala.concurrent.Future
+import io.circe.generic.semiauto.*
 
 final case class ScanUrlInternalConfig(
     svName: String,
     url: String,
 )
 
+object ScanUrlInternalConfig {
+  implicit val scanUrlCodec: Codec[ScanUrlInternalConfig] = deriveCodec[ScanUrlInternalConfig]
+}
+
 class ValidatorConfigProvider(config: ValidatorInternalStore) {
 
   private val scanInternalConfigKey = "validator_scan_internal_config_key"
-
-  implicit val scanUrlEncoder: Encoder[ScanUrlInternalConfig] =
-    Encoder.forProduct2("svName", "url")(s => (s.svName, s.url))
-  implicit val scanUrlDecoder: Decoder[ScanUrlInternalConfig] =
-    Decoder.forProduct2("svName", "url")(ScanUrlInternalConfig.apply)
 
   final def setScanUrlInternalConfig(
       value: Seq[ScanUrlInternalConfig]
