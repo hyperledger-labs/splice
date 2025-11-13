@@ -1329,7 +1329,7 @@ template DsoRules with
         sv : Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        _ <- getAndValidateSvParty this (Some sv)
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_MergeDevelopmentFundCouponsResult with result
 
