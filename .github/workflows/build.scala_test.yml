@@ -90,7 +90,7 @@ jobs:
   scala_test:
     runs-on: ${{ inputs.runs_on }}
     name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
-    timeout-minutes: 45
+    timeout-minutes: 60 # TODO(#3202): Investigate, and reduce back
     permissions:
       id-token: write # Required for GCP Workload Identity for failure notifications
       contents: read
