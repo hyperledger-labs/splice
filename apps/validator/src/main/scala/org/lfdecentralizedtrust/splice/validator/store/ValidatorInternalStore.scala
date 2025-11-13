@@ -9,10 +9,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
-import org.lfdecentralizedtrust.splice.validator.store.db.{
-  DbValidatorInternalStore,
-  DbValidatorStore,
-}
+import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 
 import scala.concurrent.{ExecutionContext, Future}
 
