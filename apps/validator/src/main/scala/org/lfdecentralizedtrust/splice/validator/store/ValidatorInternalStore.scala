@@ -4,13 +4,37 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.data.OptionT
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
+import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait ValidatorInternalStore {
   def setConfig[T: Encoder](key: String, value: T)(implicit tc: TraceContext): Future[Unit]
 
   def getConfig[T: Decoder](key: String)(implicit tc: TraceContext): OptionT[Future, T]
+}
+
+object ValidatorInternalStore {
+
+  def apply(
+      storage: DbStorage,
+      loggingContext: ErrorLoggingContext,
+      closeContext: CloseContext,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext
+  ): ValidatorInternalStore = {
+    new DbValidatorInternalStore(
+      storage,
+      loggingContext,
+      closeContext,
+      loggerFactory,
+    )
+  }
+
 }
