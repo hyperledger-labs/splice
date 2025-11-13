@@ -32,6 +32,9 @@ INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when 
 Request failed for sequencer.*GrpcClientGaveUp: .*/Authentication token refresh failed with grpc error
 Request failed for sequencer.*GrpcServiceUnavailable: UNAVAILABLE/Health-check stream unexpectedly closed
 
+# TODO(#2668) Remove once Canton improves the log here.
+Request failed for.*Is the server running.*GrpcConnectionX
+
 # This kicks in when an interval is skipped which can easily be caused in simtime mode
 # by bumping the time by more than the reconciliation interval.
 ACS_COMMITMENT_DEGRADATION
