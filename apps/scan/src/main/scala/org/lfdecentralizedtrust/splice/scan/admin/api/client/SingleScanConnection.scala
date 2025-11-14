@@ -399,30 +399,21 @@ class SingleScanConnection private[client] (
       closedRoundEffectiveAt <- CantonTimestamp.fromInstant(rt.closedRoundEffectiveAt.toInstant)
       appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
       validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
-      changeToInitialAmountAsOfRoundZero <- Codec
-        .decode(Codec.BigDecimal)(rt.changeToInitialAmountAsOfRoundZero)
-      changeToHoldingFeesRate <- Codec.decode(Codec.BigDecimal)(rt.changeToHoldingFeesRate)
       cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
       cumulativeValidatorRewards <- Codec
         .decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
-      cumulativeChangeToInitialAmountAsOfRoundZero <- Codec
-        .decode(Codec.BigDecimal)(rt.cumulativeChangeToInitialAmountAsOfRoundZero)
-      cumulativeChangeToHoldingFeesRate <- Codec
-        .decode(Codec.BigDecimal)(rt.cumulativeChangeToHoldingFeesRate)
-      totalAmuletBalance <- Codec.decode(Codec.BigDecimal)(rt.totalAmuletBalance)
     } yield {
+      // changeToInitialAmountAsOfRoundZero, changeToHoldingFeesRate, cumulativeChangeToInitialAmountAsOfRoundZero,
+      // cumulativeChangeToHoldingFeesRate and totalAmuletBalance are intentionally left out
+      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
+      // in scan_txlog_store, at a time that can easily differ between SVs.
       ScanAggregator.RoundTotals(
         closedRound = rt.closedRound,
         closedRoundEffectiveAt = closedRoundEffectiveAt,
         appRewards = appRewards,
         validatorRewards = validatorRewards,
-        changeToInitialAmountAsOfRoundZero = changeToInitialAmountAsOfRoundZero,
-        changeToHoldingFeesRate = changeToHoldingFeesRate,
         cumulativeAppRewards = cumulativeAppRewards,
         cumulativeValidatorRewards = cumulativeValidatorRewards,
-        cumulativeChangeToInitialAmountAsOfRoundZero = cumulativeChangeToInitialAmountAsOfRoundZero,
-        cumulativeChangeToHoldingFeesRate = cumulativeChangeToHoldingFeesRate,
-        totalAmuletBalance = totalAmuletBalance,
       )
     })
   }
@@ -436,13 +427,12 @@ class SingleScanConnection private[client] (
       trafficPurchasedCcSpent <- Codec.decode(Codec.BigDecimal)(rt.trafficPurchasedCcSpent)
       cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
       cumulativeValidatorRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
-      cumulativeChangeToInitialAmountAsOfRoundZero <- Codec
-        .decode(Codec.BigDecimal)(rt.cumulativeChangeToInitialAmountAsOfRoundZero)
-      cumulativeChangeToHoldingFeesRate <- Codec
-        .decode(Codec.BigDecimal)(rt.cumulativeChangeToHoldingFeesRate)
       cumulativeTrafficPurchasedCcSpent <- Codec
         .decode(Codec.BigDecimal)(rt.cumulativeTrafficPurchasedCcSpent)
     } yield {
+      // cumulativeChangeToInitialAmountAsOfRoundZero and cumulativeChangeToHoldingFeesRate are intentionally left out
+      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
+      // in scan_txlog_store, at a time that can easily differ between SVs.
       ScanAggregator.RoundPartyTotals(
         closedRound = rt.closedRound,
         party = rt.party,
@@ -453,8 +443,6 @@ class SingleScanConnection private[client] (
         trafficNumPurchases = rt.trafficNumPurchases,
         cumulativeAppRewards = cumulativeAppRewards,
         cumulativeValidatorRewards = cumulativeValidatorRewards,
-        cumulativeChangeToInitialAmountAsOfRoundZero = cumulativeChangeToInitialAmountAsOfRoundZero,
-        cumulativeChangeToHoldingFeesRate = cumulativeChangeToHoldingFeesRate,
         cumulativeTrafficPurchased = rt.cumulativeTrafficPurchased,
         cumulativeTrafficPurchasedCcSpent = cumulativeTrafficPurchasedCcSpent,
         cumulativeTrafficNumPurchases = rt.cumulativeTrafficNumPurchases,
