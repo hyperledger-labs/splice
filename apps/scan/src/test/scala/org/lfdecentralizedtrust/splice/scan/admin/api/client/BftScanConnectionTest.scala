@@ -42,7 +42,6 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationI
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
-  Codec,
   Contract,
   ContractWithState,
   DomainRecordTimeRange,
@@ -926,7 +925,7 @@ class BftScanConnectionTest
       result shouldBe Some(roundAggregate)
     }
 
-    "get BFT round aggregates from scans that report having the round aggregate ignoring balance fields" in {
+    "get BFT round aggregates from scans, ignoring balance fields" in {
       val round = 0L
       def randomValue = BigDecimal(Random.nextInt(50) + 1)
       def mkRoundTotals() = RoundTotals(
