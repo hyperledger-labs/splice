@@ -3,56 +3,48 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import org.lfdecentralizedtrust.splice.config.{
-  EnabledFeaturesConfig,
-  NetworkAppClientConfig,
-  SpliceInstanceNamesConfig,
-  UpgradesConfig,
-}
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  PackageVersionSupport,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerClient,
-}
-import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{
-  DomainTimeSynchronization,
-  DomainUnpausedSynchronization,
-}
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
-import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
-import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
-import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
-
-import scala.jdk.CollectionConverters.*
-import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  NetworkAppClientConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   DomainMigration,
   FoundDso,
   JoinWithKey,
 }
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNodeConfigClient {
 
@@ -108,6 +100,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       participantAdminConnection,
       localSynchronizerNode,
       retryProvider,
+      config.topologySnapshotConfig,
       loggerFactory,
     )
 

@@ -84,6 +84,8 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
   initialRound?: string;
+  periodicTopologySnapshot?: boolean;
+  periodicTopologySnapshotConfig?: BackupConfig;
 }
 
 export const SvConfigSchema = z.object({
