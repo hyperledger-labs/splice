@@ -124,17 +124,17 @@ describe('Inflight Vote Requests', () => {
     const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
     expect(voteTakesEffect.textContent).toBe(data.voteTakesEffect);
 
-    const voteStats = screen.getByTestId(`${uniqueId}-row-vote-stats`);
-    expect(voteStats.textContent).toBe('2 Accepted / 3 Rejected');
+    const acceptedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-accepted`);
+    expect(acceptedVoteStats.textContent).toBe('2 Accepted');
+
+    const rejectedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-rejected`);
+    expect(rejectedVoteStats.textContent).toBe('3 Rejected');
 
     const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
     expect(acceptanceThreshold.textContent).toBe('11');
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/No Vote/);
-
-    const viewDetails = screen.getByTestId(`${uniqueId}-row-view-details`);
-    expect(viewDetails).toBeDefined();
   });
 
   test('should render Accepted inflight vote request', () => {
@@ -161,9 +161,9 @@ describe('Inflight Vote Requests', () => {
     );
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
-    const acceptedIcon = screen.getByTestId(`${uniqueId}-row-your-vote-accepted-icon`);
+    const acceptedIcon = screen.getByTestId(`${uniqueId}-row-your-vote-stats-accepted-icon`);
 
-    expect(acceptedIcon).toBeDefined();
+    expect(acceptedIcon).toBeInTheDocument();
     expect(yourVote.textContent).toMatch(/Accepted/);
   });
 
@@ -191,9 +191,9 @@ describe('Inflight Vote Requests', () => {
     );
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
-    const rejectedIcon = screen.getByTestId(`${uniqueId}-row-your-vote-rejected-icon`);
+    const rejectedIcon = screen.getByTestId(`${uniqueId}-row-your-vote-stats-rejected-icon`);
 
-    expect(rejectedIcon).toBeDefined();
+    expect(rejectedIcon).toBeInTheDocument();
     expect(yourVote.textContent).toMatch(/Rejected/);
   });
 
@@ -280,17 +280,17 @@ describe('Vote history', () => {
     const status = screen.getByTestId(`${uniqueId}-row-status`);
     expect(status.textContent).toBe(data.status);
 
-    const voteStats = screen.getByTestId(`${uniqueId}-row-vote-stats`);
-    expect(voteStats.textContent).toBe('9 Accepted / 2 Rejected');
+    const acceptedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-accepted`);
+    expect(acceptedVoteStats.textContent).toBe('9 Accepted');
+
+    const rejectedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-rejected`);
+    expect(rejectedVoteStats.textContent).toBe('2 Rejected');
 
     const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
     expect(acceptanceThreshold.textContent).toBe('11');
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/Accepted/);
-
-    const viewDetails = screen.getByTestId(`${uniqueId}-row-view-details`);
-    expect(viewDetails).toBeDefined();
   });
 
   test('should show info message when no vote history is available', async () => {

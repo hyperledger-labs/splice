@@ -234,12 +234,12 @@ betaTheme = createTheme(betaTheme, {
       styleOverrides: {
         root: {
           borderColor: betaTheme.palette.colors.neutral[15],
+          borderBottom: 'none',
         },
         head: {
-          ...betaTheme.fonts.monospace,
-          fontSize: '0.8125rem',
+          fontFamily: 'Lato',
+          fontSize: '12px',
           fontWeight: 700,
-          textTransform: 'uppercase',
         },
         variants: {
           props: { variant: 'party' },
@@ -288,6 +288,14 @@ betaTheme = createTheme(betaTheme, {
           },
         },
       },
+    },
+  },
+});
+
+betaTheme = createTheme(betaTheme, {
+  breakpoints: {
+    values: {
+      xl: 1880,
     },
   },
 });
