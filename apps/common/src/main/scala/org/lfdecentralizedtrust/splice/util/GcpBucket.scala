@@ -64,7 +64,9 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
 
   def fileExists(fileName: String): Boolean = {
     val blobId = BlobId.of(config.bucketName, fileName)
-    val blob = storage.get(blobId)
-    blob.exists()
+    storage.get(blobId) match {
+      case blob: Blob => blob.exists()
+      case _ => false
+    }
   }
 }

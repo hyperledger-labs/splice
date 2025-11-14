@@ -26,7 +26,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.config.PeriodicTopologySnapshotConfig
+import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContextExecutor
@@ -43,7 +43,7 @@ class SvSvAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
-    topologySnapshotConfig: Option[PeriodicTopologySnapshotConfig],
+    topologySnapshotConfig: Option[PeriodicBackupDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -78,16 +78,18 @@ class SvSvAutomationService(
     )
   )
 
-  topologySnapshotConfig.foreach(config =>
+  topologySnapshotConfig.foreach(topologySnapshotConfig =>
     registerTrigger(
       new PeriodicTopologySnapshotTrigger(
-        config,
+        config.domains.global.alias,
+        topologySnapshotConfig,
         triggerContext,
         localSynchronizerNode
           .getOrElse(
             sys.error("Cannot take topology snapshot with no localSynchronizerNode")
           )
           .sequencerAdminConnection,
+        participantAdminConnection,
       )
     )
   )

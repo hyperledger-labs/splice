@@ -22,9 +22,11 @@ import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.GenesisStateV2Response
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
-import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
+import com.digitalasset.canton.topology.store.TimeQuery.HeadState
+import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -79,6 +81,25 @@ class SequencerAdminConnection(
           observer = responseObserver,
         )
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
+  }
+
+  def getSummaryOfTransactions(store: TopologyStoreId)(implicit
+      traceContext: TraceContext
+  ): Future[Map[TopologyMapping.Code, Int]] = {
+    runCmd(
+      TopologyAdminCommands.Read.ListAll(
+        query = BaseQuery(
+          store = store,
+          proposals = false,
+          timeQuery = HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterNamespace = "",
+        excludeMappings = Seq.empty,
+      )
+    ).map(_.result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _))
   }
 
   def getOnboardingState(sequencerId: SequencerId)(implicit

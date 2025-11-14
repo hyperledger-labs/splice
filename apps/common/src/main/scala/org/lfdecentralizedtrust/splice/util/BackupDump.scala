@@ -7,6 +7,7 @@ import better.files.File
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Decoder
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 
 import java.io.FileNotFoundException
@@ -59,6 +60,22 @@ object BackupDump {
   def fileExists(path: Path): Boolean = {
     import better.files.File
     File(path).exists
+  }
+
+  def bucketExists(
+      config: BackupDumpConfig,
+      fileName: String,
+      loggerFactory: NamedLoggerFactory,
+  ): Boolean = {
+    config match {
+      case conf: BackupDumpConfig.Gcp =>
+        val gcpBucket = new GcpBucket(conf.bucket, loggerFactory)
+        gcpBucket.fileExists(fileName)
+      case _ =>
+        throw Status.UNIMPLEMENTED
+          .withDescription("Topology snapshot works only with GCP buckets")
+          .asRuntimeException()
+    }
   }
 
   def readFromPath[T: Decoder](path: Path): Try[T] = Try {
