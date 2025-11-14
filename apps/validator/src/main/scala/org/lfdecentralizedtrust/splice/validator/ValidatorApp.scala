@@ -222,8 +222,8 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
-                Some(saveScanUrlListBuilder(internalStore)),
-                getPreviousScanList(internalStore),
+                Some(persistScanUrlListBuilder(internalStore)),
+                getPersistedScanList(internalStore),
               )
             }
             domainConnector = new DomainConnector(
@@ -700,7 +700,7 @@ class ValidatorApp(
     )
   }
 
-  private def saveScanUrlListBuilder(
+  private def persistScanUrlListBuilder(
       validatorConfigProvider: ValidatorConfigProvider
   )(implicit traceContext: TraceContext): Seq[DsoScan] => Future[Unit] = {
     (connections: Seq[DsoScan]) =>
@@ -715,7 +715,7 @@ class ValidatorApp(
       }
   }
 
-  private def getPreviousScanList(
+  private def getPersistedScanList(
       validatorConfigProvider: ValidatorConfigProvider
   )(implicit traceContext: TraceContext): Option[Seq[DsoScan]] = {
     val futureOption: Future[Option[Seq[ScanUrlInternalConfig]]] =
@@ -723,7 +723,7 @@ class ValidatorApp(
 
     val maybeInternalConfigs: Option[Seq[ScanUrlInternalConfig]] =
       try {
-        Await.result(futureOption, 10.seconds)
+        Await.result(futureOption, 10.seconds) // what is the max waiting time?
       } catch {
         case e: Throwable =>
           None
@@ -779,8 +779,8 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
-          Some(saveScanUrlListBuilder(internalStore)),
-          getPreviousScanList(internalStore),
+          Some(persistScanUrlListBuilder(internalStore)),
+          getPersistedScanList(internalStore),
         )
       }
 
