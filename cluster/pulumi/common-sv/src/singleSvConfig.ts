@@ -72,6 +72,7 @@ const SvAppConfigSchema = z
     // defaults to {svName}-cometbft-governance-key if not set
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
     resources: K8sResourceSchema,
+    periodicTopologySnapshot: z.boolean().optional(),
   })
   .strict();
 const ScanAppConfigSchema = z

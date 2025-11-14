@@ -151,6 +151,8 @@ svs:
           memory: '12Gi'
         limits:
           memory: '18Gi'
+    svApp:
+      periodicTopologySnapshot: false
     validatorApp:
       additionalEnvVars:
         # enable https://github.com/hyperledger-labs/splice/pull/2499
