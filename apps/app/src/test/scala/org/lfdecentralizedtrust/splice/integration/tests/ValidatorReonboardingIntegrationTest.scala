@@ -30,6 +30,7 @@ import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.validator.migration.ParticipantPartyMigrator
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
@@ -319,6 +320,7 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
     ) {
       loggerFactory.assertLogsSeq(
         SuppressionRule.forLogger[ParticipantPartyMigrator] || SuppressionRule
+          .forLogger[ValidatorConfigProvider] || SuppressionRule
           .LevelAndAbove(Level.WARN)
       )(
         {
@@ -333,7 +335,7 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
           }
           forExactly(1, entries) {
             _.message should include(
-              "Storing parties that will be migrated"
+              "Storing all the hosted parties (4) in the database to recover in case of failures"
             )
           }
           forExactly(1, entries) {
