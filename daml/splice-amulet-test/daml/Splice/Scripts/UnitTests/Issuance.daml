@@ -53,7 +53,8 @@ summaryExample1 = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 10000.0
   totalFeaturedAppRewardCoupons = 400.0
   totalUnfeaturedAppRewardCoupons = 9600.0
-  optTotalValidatorFaucetCoupons = Some 50
+  optTotalValidatorFaucetCoupons = None
+  optTotalValidatorLivenessActivityRecords = Some 50.0
   totalSvRewardWeight = 100
 
 expectedParameters_E1_0_0p5 : IssuingRoundParameters
@@ -130,7 +131,8 @@ summaryExamplNoActivity = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 0.0
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
-  optTotalValidatorFaucetCoupons = Some 0
+  optTotalValidatorFaucetCoupons = None
+  optTotalValidatorLivenessActivityRecords = Some 0.0
   totalSvRewardWeight = 0
 
 expectedParameters_NoActivity_0_0p5 : IssuingRoundParameters
@@ -159,7 +161,8 @@ summaryExample3 = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 200.0
   totalFeaturedAppRewardCoupons = 100.0
   totalUnfeaturedAppRewardCoupons = 100.0
-  optTotalValidatorFaucetCoupons = Some 50
+  optTotalValidatorFaucetCoupons = None
+  optTotalValidatorLivenessActivityRecords = Some 50.0
   totalSvRewardWeight = 2
 
 
@@ -190,7 +193,8 @@ summaryExampleLargeSvRewardWeight = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 0.0
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
-  optTotalValidatorFaucetCoupons = Some 0
+  optTotalValidatorFaucetCoupons = None
+  optTotalValidatorLivenessActivityRecords = Some 0.0
   totalSvRewardWeight = 240 * 10000  -- total weight is 240 and it is represented in basis points
 
 expectedParameters_LargeSvRewardWeight_10plus : IssuingRoundParameters
@@ -210,6 +214,3 @@ testLargeSvRewardWeight = script do
 
   let actual = computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExampleLargeSvRewardWeight
   expectedParameters_LargeSvRewardWeight_10plus === actual
-
-
-
