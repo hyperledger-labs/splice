@@ -17,18 +17,35 @@ import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandExce
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{holdingv1, metadatav1, transferinstructionv1}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  holdingv1,
+  metadatav1,
+  transferinstructionv1,
+}
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
-import org.lfdecentralizedtrust.splice.environment.{BaseAppConnection, RetryProvider, SpliceLedgerClient}
+import org.lfdecentralizedtrust.splice.environment.{
+  BaseAppConnection,
+  RetryProvider,
+  SpliceLedgerClient,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{DomainScans, DsoScan}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  DomainScans,
+  DsoScan,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, DomainRecordTimeRange, FactoryChoiceWithDisclosures, SpliceUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  ContractWithState,
+  DomainRecordTimeRange,
+  FactoryChoiceWithDisclosures,
+  SpliceUtil,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind
 import org.mockito.exceptions.base.MockitoAssertionError
 import org.scalatest.wordspec.AsyncWordSpec
