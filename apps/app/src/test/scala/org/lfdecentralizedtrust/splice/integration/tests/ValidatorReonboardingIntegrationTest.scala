@@ -316,7 +316,7 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> newParticipantDb,
     ) {
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         {
           aliceValidatorLocalBackend.startSync()
         },
