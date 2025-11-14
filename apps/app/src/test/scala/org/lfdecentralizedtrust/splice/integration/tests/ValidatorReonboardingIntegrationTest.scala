@@ -421,7 +421,7 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
   }
 }
 
-class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
+class ValidatorReonboardingWithPartiesToMigrateFromDbIntegrationTest
     extends ValidatorReonboardingIntegrationTestBase {
 
   // avoid db collisions; ptm := partiesToMigrate
@@ -434,7 +434,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
   // (which will fail unless we migrate all parties) despite migrating the operator party.
   // This can only work if there is no collision between the participant admin party and
   // the validator operator party.
-  override val aliceValidatorParticipantNameHint = s"${aliceValidatorPartyHint}-participant";
+  override val aliceValidatorParticipantNameHint = s"$aliceValidatorPartyHint-participant";
 
   // we bootstrap from dump so we can predict the party IDs
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
@@ -475,7 +475,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
         testResourcesPath / "standalone-participant-extra-no-auth.conf",
       ),
       Seq.empty,
-      "alice-participant",
+      "alice-reonboard-from-key-database",
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> oldParticipantDb,
     ) {
@@ -546,6 +546,144 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
       "EXTRA_PARTICIPANT_DB" -> newParticipantDb,
     ) {
       aliceValidatorLocalBackend.startSync()
+
+      clue("onboard migrated user on the new validator") {
+        onboardWalletUser(aliceLocalWalletClient, aliceValidatorLocalBackend) shouldBe aliceParty
+      }
+
+      Seq(
+        aliceValidatorWalletParty -> aliceValidatorLocalWalletClient,
+        aliceParty -> aliceLocalWalletClient,
+      ).foreach { case (partyId, walletAppClient) =>
+        clue(s"check mapping and amulet balance of $partyId") {
+          assertMapping(
+            partyId,
+            aliceValidatorLocalBackend.participantClient.id,
+          )
+
+          aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
+          aliceValidatorLocalBackend.participantClient.id.uid.identifier.unwrap shouldBe "aliceValidatorLocalNewForValidatorReonboardingIT"
+
+          clue(s"party $partyId amulet balance is preserved") {
+            val expectedAmulets: Range = 99 to 100
+            checkWallet(
+              partyId,
+              walletAppClient,
+              Seq(
+                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
+              ),
+            )
+          }
+        }
+      }
+      clue(s"party $charlieParty is still hosted on the old participant") {
+        assertMapping(
+          charlieParty,
+          aliceValidatorBackend.participantClient.id,
+        )
+      }
+    }
+  }
+}
+
+class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
+    extends ValidatorReonboardingIntegrationTestBase {
+
+  // avoid db collisions; ptm := partiesToMigrate
+  override def dbsSuffix = "validator_reonboard_ptm_db"
+  override def oldParticipantDb = "participant_alice_validator_ptm_db"
+  override def newParticipantDb = "participant_alice_validator_reonboard_new_ptm_db"
+  override def appsDb = "splice_apps_reonboard_ptm_db"
+
+  // For this test we want to test that we won't try to revoke the domain trust certificate
+  // (which will fail unless we migrate all parties) despite migrating the operator party.
+  // This can only work if there is no collision between the participant admin party and
+  // the validator operator party.
+  override val aliceValidatorParticipantNameHint = s"${aliceValidatorPartyHint}-participant2";
+
+  // we bootstrap from dump so we can predict the party IDs
+  val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
+  // we use a dedicated dump for this test to avoid conflicts with other tests
+  val oldParticipantDumpFile = testDumpDir.resolve("alice-plaintext-id-identity-dump-3.json")
+
+  override val participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = Some(
+    ParticipantBootstrapDumpConfig.File(
+      oldParticipantDumpFile,
+      Some(aliceValidatorParticipantNameHint),
+    )
+  )
+
+  "re-onboard validator with partiesToMigrate" in { implicit env =>
+    initDsoWithSv1Only()
+    // We need a standalone instance to avoid breaking the long-running nodes.
+    val (dump, aliceValidatorWalletParty, aliceParty, charlieParty) = withCanton(
+      Seq(
+        testResourcesPath / "standalone-participant-extra.conf",
+        testResourcesPath / "standalone-participant-extra-no-auth.conf",
+      ),
+      Seq.empty,
+      "alice-participant-rdb",
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_DB" -> oldParticipantDb,
+    ) {
+      aliceValidatorBackend.startSync()
+      val aliceValidatorWalletParty =
+        PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
+      val aliceParticipantId = aliceValidatorBackend.participantClient.id
+      aliceValidatorWalletClient.tap(100)
+
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(100)
+      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      charlieWalletClient.tap(100)
+
+      val dump = aliceValidatorBackend.dumpParticipantIdentities()
+
+      val aliceNamespaceSuffix = aliceParticipantId.uid.namespace.toProtoPrimitive
+      val alicePartyHint = aliceWalletClient.config.ledgerApiUser
+        .replace("_", "__")
+      aliceValidatorBackend.appState.configProvider
+        .setPartiesToMigrate(
+          Set(aliceValidatorPartyHint, alicePartyHint).map(hint =>
+            PartyId.tryFromProtoPrimitive(s"$hint::$aliceNamespaceSuffix")
+          )
+        )
+        .futureValue
+      aliceValidatorBackend.stop()
+      (dump, aliceValidatorWalletParty, aliceParty, charlieParty)
+    }
+    better.files
+      .File(dumpPath)
+      .overwrite(
+        dump.toJson.noSpaces
+      )
+    withCanton(
+      Seq(
+        testResourcesPath / "standalone-participant-extra.conf",
+        testResourcesPath / "standalone-participant-extra-no-auth.conf",
+      ),
+      Seq(),
+      "alice-reonboard-participant-stored-in-db",
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_DB" -> newParticipantDb,
+    ) {
+
+      loggerFactory.assertLogsSeq(
+        SuppressionRule.forLogger[ParticipantPartyMigrator] || SuppressionRule
+          .forLogger[ValidatorConfigProvider] || SuppressionRule
+          .LevelAndAbove(Level.WARN)
+      )(
+        {
+          aliceValidatorLocalBackend.startSync()
+        },
+        entries => {
+          forExactly(1, entries) {
+            _.message should include(
+              "hosted parties in the local database, this indicates a retry of the migration process"
+            )
+          }
+        },
+      )
 
       clue("onboard migrated user on the new validator") {
         onboardWalletUser(aliceLocalWalletClient, aliceValidatorLocalBackend) shouldBe aliceParty

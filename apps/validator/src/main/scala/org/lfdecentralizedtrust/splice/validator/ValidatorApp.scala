@@ -324,14 +324,15 @@ class ValidatorApp(
                   .getOrElse(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
+                val configProvider = new ValidatorConfigProvider(
+                  ValidatorInternalStore(storage, loggerFactory),
+                  loggerFactory,
+                )
                 val participantPartyMigrator = new ParticipantPartyMigrator(
                   connection,
                   participantAdminConnection,
                   config.domains.global.alias,
-                  new ValidatorConfigProvider(
-                    ValidatorInternalStore(storage, loggerFactory),
-                    loggerFactory,
-                  ),
+                  configProvider,
                   loggerFactory,
                 )
                 appInitStep("Migrating party data") {
@@ -805,6 +806,10 @@ class ValidatorApp(
         readOnlyLedgerConnection,
         loggerFactory,
       )
+      configProvider = new ValidatorConfigProvider(
+        ValidatorInternalStore(storage, loggerFactory),
+        loggerFactory,
+      )
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
@@ -1194,6 +1199,7 @@ class ValidatorApp(
         domainTimeAutomationService,
         domainParamsAutomationService,
         store,
+        configProvider,
         automation,
         walletManagerOpt,
         timeouts,
@@ -1215,6 +1221,7 @@ object ValidatorApp {
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       store: ValidatorStore,
+      configProvider: ValidatorConfigProvider,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
       timeouts: ProcessingTimeout,
