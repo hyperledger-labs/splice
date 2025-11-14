@@ -20,11 +20,12 @@ import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 
 class DbValidatorInternalStore(
     storage: DbStorage,
-    implicit val loggingContext: ErrorLoggingContext,
-    implicit val closeContext: CloseContext,
-    protected val loggerFactory: NamedLoggerFactory,
-)(implicit val ec: ExecutionContext)
-    extends ValidatorInternalStore
+    val loggerFactory: NamedLoggerFactory,
+)(implicit
+    val ec: ExecutionContext,
+    val loggingContext: ErrorLoggingContext,
+    val closeContext: CloseContext,
+) extends ValidatorInternalStore
     with AcsJdbcTypes
     with NamedLogging {
 
