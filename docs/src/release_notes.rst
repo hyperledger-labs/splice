@@ -24,6 +24,14 @@ Upcoming
 
   - Fix bug that caused validators to fail on restoring participant users without rights during a synchronizer migration.
 
+- Scan
+
+  - The round-based aggregates for balance values (changes to holding fees and initial amounts since round zero)
+    have diverged between scans because of the way amulet expiration is counted in rounds.
+    The balance values recorded in the round aggregates are effectively not depended upon anymore by scan APIs,
+    and are now set to zero to avoid consensus problems when an SV reads aggregates
+    from the rest of the network when first joining.
+
 0.5.1
 -----
 
