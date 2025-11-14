@@ -29,7 +29,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerClient,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  ErrorResponse,
+  RoundPartyTotals as HttpRoundPartyTotals,
+  RoundTotals as HttpRoundTotals,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   DomainScans,
@@ -40,6 +44,7 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationI
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
+  Codec,
   Contract,
   ContractWithState,
   DomainRecordTimeRange,
@@ -54,6 +59,7 @@ import org.slf4j.event.Level
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 // mock verification triggers this
 @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
@@ -920,6 +926,126 @@ class BftScanConnectionTest
         new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
       val result = con.getRoundAggregate(round).futureValue
       result shouldBe Some(roundAggregate)
+    }
+
+    "get BFT round aggregates from scans that report having the round aggregate ignoring balance fields" in {
+      val round = 0L
+      def randomValue = BigDecimal(Random.nextInt(50) + 1)
+      def mkRoundTotals() = RoundTotals(
+        closedRound = round,
+        closedRoundEffectiveAt = CantonTimestamp.MinValue,
+        appRewards = BigDecimal(100),
+        validatorRewards = BigDecimal(150),
+        changeToInitialAmountAsOfRoundZero = randomValue,
+        changeToHoldingFeesRate = randomValue,
+        cumulativeAppRewards = BigDecimal(1100),
+        cumulativeValidatorRewards = BigDecimal(1150),
+        cumulativeChangeToInitialAmountAsOfRoundZero = randomValue,
+        cumulativeChangeToHoldingFeesRate = randomValue,
+        totalAmuletBalance = randomValue,
+      )
+      def encodeRoundTotals(rt: RoundTotals) = {
+        HttpRoundTotals(
+          closedRound = rt.closedRound,
+          closedRoundEffectiveAt = Codec.OffsetDateTime.instance.encode(rt.closedRoundEffectiveAt),
+          appRewards = Codec.encode(rt.appRewards),
+          validatorRewards = Codec.encode(rt.validatorRewards),
+          changeToInitialAmountAsOfRoundZero = Codec.encode(rt.changeToInitialAmountAsOfRoundZero),
+          changeToHoldingFeesRate = Codec.encode(rt.changeToHoldingFeesRate),
+          cumulativeAppRewards = Codec.encode(rt.cumulativeAppRewards),
+          cumulativeValidatorRewards = Codec.encode(rt.cumulativeValidatorRewards),
+          cumulativeChangeToInitialAmountAsOfRoundZero =
+            Codec.encode(rt.cumulativeChangeToInitialAmountAsOfRoundZero),
+          cumulativeChangeToHoldingFeesRate = Codec.encode(rt.cumulativeChangeToHoldingFeesRate),
+          totalAmuletBalance = Codec.encode(rt.totalAmuletBalance),
+        )
+      }
+      def encodeRoundPartyTotals(rpt: RoundPartyTotals) = {
+        HttpRoundPartyTotals(
+          closedRound = rpt.closedRound,
+          party = rpt.party,
+          appRewards = Codec.encode(rpt.appRewards),
+          validatorRewards = Codec.encode(rpt.validatorRewards),
+          trafficPurchased = rpt.trafficPurchased,
+          trafficPurchasedCcSpent = Codec.encode(rpt.trafficPurchasedCcSpent),
+          trafficNumPurchases = rpt.trafficNumPurchases,
+          cumulativeAppRewards = Codec.encode(rpt.cumulativeAppRewards),
+          cumulativeValidatorRewards = Codec.encode(rpt.cumulativeValidatorRewards),
+          cumulativeChangeToInitialAmountAsOfRoundZero =
+            Codec.encode(rpt.cumulativeChangeToInitialAmountAsOfRoundZero),
+          cumulativeChangeToHoldingFeesRate = Codec.encode(rpt.cumulativeChangeToHoldingFeesRate),
+          cumulativeTrafficPurchased = rpt.cumulativeTrafficPurchased,
+          cumulativeTrafficPurchasedCcSpent = Codec.encode(rpt.cumulativeTrafficPurchasedCcSpent),
+          cumulativeTrafficNumPurchases = rpt.cumulativeTrafficNumPurchases,
+        )
+      }
+      def mkRoundPartyTotals() = RoundPartyTotals(
+        closedRound = round,
+        party = "party-id",
+        appRewards = BigDecimal(10),
+        validatorRewards = BigDecimal(20),
+        trafficPurchased = 10L,
+        trafficPurchasedCcSpent = BigDecimal(30),
+        trafficNumPurchases = 30L,
+        cumulativeAppRewards = BigDecimal(40),
+        cumulativeValidatorRewards = BigDecimal(50),
+        cumulativeChangeToInitialAmountAsOfRoundZero = randomValue,
+        cumulativeChangeToHoldingFeesRate = randomValue,
+        cumulativeTrafficPurchased = 50L,
+        cumulativeTrafficPurchasedCcSpent = BigDecimal(70),
+        cumulativeTrafficNumPurchases = 70L,
+      )
+      def mkRoundAggregateUsingDecoder() = RoundAggregate(
+        ScanRoundAggregatesDecoder.decodeRoundTotal(encodeRoundTotals(mkRoundTotals())).value,
+        Vector(
+          ScanRoundAggregatesDecoder
+            .decodeRoundPartyTotals(encodeRoundPartyTotals(mkRoundPartyTotals()))
+            .value
+        ),
+      )
+      def mkRoundAggregateWithoutDecoder() = RoundAggregate(
+        mkRoundTotals(),
+        Vector(mkRoundPartyTotals()),
+      )
+      val roundAggregateZeroBalanceValues = mkRoundAggregateWithoutDecoder().copy(
+        roundTotals = mkRoundAggregateWithoutDecoder().roundTotals.copy(
+          changeToInitialAmountAsOfRoundZero = zero,
+          changeToHoldingFeesRate = zero,
+          cumulativeChangeToInitialAmountAsOfRoundZero = zero,
+          cumulativeChangeToHoldingFeesRate = zero,
+          totalAmuletBalance = zero,
+        ),
+        roundPartyTotals = mkRoundAggregateWithoutDecoder().roundPartyTotals.map(
+          _.copy(
+            cumulativeChangeToInitialAmountAsOfRoundZero = zero,
+            cumulativeChangeToHoldingFeesRate = zero,
+          )
+        ),
+      )
+
+      def getConnections(roundAggregateResponse: () => RoundAggregate) = {
+        val connections = getMockedConnections(n = 10)
+        connections.foreach { mock =>
+          when(mock.getAggregatedRounds())
+            .thenReturn(Future.successful(Some(RoundRange(round, round))))
+          when(mock.getRoundAggregate(round))
+            .thenReturn(Future.successful(Some(roundAggregateResponse())))
+        }
+        connections
+      }
+
+      val bft = getBft(getConnections(() => mkRoundAggregateUsingDecoder()))
+      val con =
+        new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
+      val result = con.getRoundAggregate(round).futureValue
+      result shouldBe Some(roundAggregateZeroBalanceValues)
+
+      // not using the decoder should fail on the randomized balance values.
+      val bftFail = getBft(getConnections(() => mkRoundAggregateWithoutDecoder()))
+      val conFail =
+        new ScanAggregatesConnection(bftFail, retryProvider, retryProvider.loggerFactory)
+      val resultFail = conFail.getRoundAggregate(round).failed.futureValue
+      resultFail shouldBe an[BftScanConnection.ConsensusNotReached]
     }
 
     "Not get round aggregates from scans that report having the round aggregate if too many fail" in {

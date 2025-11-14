@@ -99,6 +99,8 @@ class SingleScanConnection private[client] (
     with ScanConnection
     with BackfillingScanConnection
     with HasUrl {
+  import ScanRoundAggregatesDecoder.*
+
   def url = config.adminApi.url
 
   // cached DSO reference. Never changes.
@@ -390,64 +392,6 @@ class SingleScanConnection private[client] (
         ScanAggregator.RoundAggregate(roundTotals = rt, roundPartyTotals = roundPartyTotals)
       }
     }
-  }
-
-  private def decodeRoundTotal(
-      rt: org.lfdecentralizedtrust.splice.http.v0.definitions.RoundTotals
-  ): Either[String, ScanAggregator.RoundTotals] = {
-    (for {
-      closedRoundEffectiveAt <- CantonTimestamp.fromInstant(rt.closedRoundEffectiveAt.toInstant)
-      appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
-      validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
-      cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
-      cumulativeValidatorRewards <- Codec
-        .decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
-    } yield {
-      // changeToInitialAmountAsOfRoundZero, changeToHoldingFeesRate, cumulativeChangeToInitialAmountAsOfRoundZero,
-      // cumulativeChangeToHoldingFeesRate and totalAmuletBalance are intentionally left out
-      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
-      // in scan_txlog_store, at a time that can easily differ between SVs.
-      ScanAggregator.RoundTotals(
-        closedRound = rt.closedRound,
-        closedRoundEffectiveAt = closedRoundEffectiveAt,
-        appRewards = appRewards,
-        validatorRewards = validatorRewards,
-        cumulativeAppRewards = cumulativeAppRewards,
-        cumulativeValidatorRewards = cumulativeValidatorRewards,
-      )
-    })
-  }
-
-  private def decodeRoundPartyTotals(
-      rt: org.lfdecentralizedtrust.splice.http.v0.definitions.RoundPartyTotals
-  ): Either[String, ScanAggregator.RoundPartyTotals] = {
-    (for {
-      appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
-      validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
-      trafficPurchasedCcSpent <- Codec.decode(Codec.BigDecimal)(rt.trafficPurchasedCcSpent)
-      cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
-      cumulativeValidatorRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
-      cumulativeTrafficPurchasedCcSpent <- Codec
-        .decode(Codec.BigDecimal)(rt.cumulativeTrafficPurchasedCcSpent)
-    } yield {
-      // cumulativeChangeToInitialAmountAsOfRoundZero and cumulativeChangeToHoldingFeesRate are intentionally left out
-      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
-      // in scan_txlog_store, at a time that can easily differ between SVs.
-      ScanAggregator.RoundPartyTotals(
-        closedRound = rt.closedRound,
-        party = rt.party,
-        appRewards = appRewards,
-        validatorRewards = validatorRewards,
-        trafficPurchased = rt.trafficPurchased,
-        trafficPurchasedCcSpent = trafficPurchasedCcSpent,
-        trafficNumPurchases = rt.trafficNumPurchases,
-        cumulativeAppRewards = cumulativeAppRewards,
-        cumulativeValidatorRewards = cumulativeValidatorRewards,
-        cumulativeTrafficPurchased = rt.cumulativeTrafficPurchased,
-        cumulativeTrafficPurchasedCcSpent = cumulativeTrafficPurchasedCcSpent,
-        cumulativeTrafficNumPurchases = rt.cumulativeTrafficNumPurchases,
-      )
-    })
   }
 
   override def getMigrationSchedule()(implicit
@@ -865,4 +809,64 @@ class CachedScanConnection private[client] (
       HttpScanAppClient.GetMigrationSchedule(),
     )
   )
+}
+
+object ScanRoundAggregatesDecoder {
+  def decodeRoundTotal(
+      rt: org.lfdecentralizedtrust.splice.http.v0.definitions.RoundTotals
+  ): Either[String, ScanAggregator.RoundTotals] = {
+    (for {
+      closedRoundEffectiveAt <- CantonTimestamp.fromInstant(rt.closedRoundEffectiveAt.toInstant)
+      appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
+      validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
+      cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
+      cumulativeValidatorRewards <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
+    } yield {
+      // changeToInitialAmountAsOfRoundZero, changeToHoldingFeesRate, cumulativeChangeToInitialAmountAsOfRoundZero,
+      // cumulativeChangeToHoldingFeesRate and totalAmuletBalance are intentionally left out
+      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
+      // in scan_txlog_store, at a time that can easily differ between SVs.
+      ScanAggregator.RoundTotals(
+        closedRound = rt.closedRound,
+        closedRoundEffectiveAt = closedRoundEffectiveAt,
+        appRewards = appRewards,
+        validatorRewards = validatorRewards,
+        cumulativeAppRewards = cumulativeAppRewards,
+        cumulativeValidatorRewards = cumulativeValidatorRewards,
+      )
+    })
+  }
+
+  def decodeRoundPartyTotals(
+      rt: org.lfdecentralizedtrust.splice.http.v0.definitions.RoundPartyTotals
+  ): Either[String, ScanAggregator.RoundPartyTotals] = {
+    (for {
+      appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
+      validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
+      trafficPurchasedCcSpent <- Codec.decode(Codec.BigDecimal)(rt.trafficPurchasedCcSpent)
+      cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
+      cumulativeValidatorRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
+      cumulativeTrafficPurchasedCcSpent <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeTrafficPurchasedCcSpent)
+    } yield {
+      // cumulativeChangeToInitialAmountAsOfRoundZero and cumulativeChangeToHoldingFeesRate are intentionally left out
+      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
+      // in scan_txlog_store, at a time that can easily differ between SVs.
+      ScanAggregator.RoundPartyTotals(
+        closedRound = rt.closedRound,
+        party = rt.party,
+        appRewards = appRewards,
+        validatorRewards = validatorRewards,
+        trafficPurchased = rt.trafficPurchased,
+        trafficPurchasedCcSpent = trafficPurchasedCcSpent,
+        trafficNumPurchases = rt.trafficNumPurchases,
+        cumulativeAppRewards = cumulativeAppRewards,
+        cumulativeValidatorRewards = cumulativeValidatorRewards,
+        cumulativeTrafficPurchased = rt.cumulativeTrafficPurchased,
+        cumulativeTrafficPurchasedCcSpent = cumulativeTrafficPurchasedCcSpent,
+        cumulativeTrafficNumPurchases = rt.cumulativeTrafficNumPurchases,
+      )
+    })
+  }
 }
