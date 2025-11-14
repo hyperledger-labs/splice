@@ -29,6 +29,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.validator.migration.ParticipantPartyMigrator
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
@@ -316,7 +317,10 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> newParticipantDb,
     ) {
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      loggerFactory.assertLogsSeq(
+        SuppressionRule.forLogger[ParticipantPartyMigrator] || SuppressionRule
+          .LevelAndAbove(Level.WARN)
+      )(
         {
           aliceValidatorLocalBackend.startSync()
         },
