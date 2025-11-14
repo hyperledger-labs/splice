@@ -4,17 +4,18 @@
 package org.lfdecentralizedtrust.splice.validator.store.db
 
 import cats.data.OptionT
-import cats.~>
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
-import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil
-import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.{
+  futureUnlessShutdownToFuture,
+  optionTfutureUnlessShutdownToFuture,
+}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -50,18 +51,16 @@ class DbValidatorInternalStore(
   override def getConfig[T](
       key: String
   )(implicit tc: TraceContext, decoder: Decoder[T]): OptionT[Future, Decoder.Result[T]] = {
-    storage
-      .querySingle(
-        sql"""SELECT config_value
+    optionTfutureUnlessShutdownToFuture(
+      storage
+        .querySingle(
+          sql"""SELECT config_value
         FROM validator_internal_config
         WHERE config_key = $key
       """.as[Json].headOption,
-        "get-validator-internal-config",
-      )
-      .mapK(new ~>[FutureUnlessShutdown, Future] {
-        def apply[A](fa: FutureUnlessShutdown[A]): Future[A] =
-          FutureUnlessShutdownUtil.futureUnlessShutdownToFuture(fa)
-      })
+          "get-validator-internal-config",
+        )
+    )
       .map(_.as[T])
   }
 
