@@ -3669,6 +3669,8 @@ components:
           "numRoundsMissed",
           "firstCollectedInRound",
           "lastCollectedInRound",
+          "weight",
+          "kind",
         ]
       properties:
         validator:

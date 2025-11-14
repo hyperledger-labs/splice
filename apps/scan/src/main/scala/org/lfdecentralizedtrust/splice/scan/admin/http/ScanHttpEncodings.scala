@@ -854,13 +854,15 @@ object FaucetProcessor {
           license.payload.faucetState.map(_.firstReceivedFor.number.longValue()).orElse(0L),
         lastCollectedInRound =
           license.payload.faucetState.map(_.lastReceivedFor.number.longValue()).orElse(0L),
-        weight = license.payload.weight.toScala.map(_.doubleValue()),
-        kind = license.payload.kind.toScala.map { k =>
-          k.getConstructor() match {
-            case "OperatorLicense" => ValidatorReceivedFaucets.Kind.OperatorLicense
-            case "NonOperatorLicense" => ValidatorReceivedFaucets.Kind.NonOperatorLicense
+        weight = license.payload.weight.toScala.map(_.doubleValue()).getOrElse(1.0),
+        kind = license.payload.kind.toScala
+          .map { k =>
+            k.getConstructor() match {
+              case "OperatorLicense" => ValidatorReceivedFaucets.Kind.OperatorLicense
+              case "NonOperatorLicense" => ValidatorReceivedFaucets.Kind.NonOperatorLicense
+            }
           }
-        },
+          .getOrElse(ValidatorReceivedFaucets.Kind.OperatorLicense),
       )
     }.toVector
   }
