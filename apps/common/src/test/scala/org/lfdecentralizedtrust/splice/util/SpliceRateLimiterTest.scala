@@ -10,7 +10,6 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.stream.testkit.StreamSpec
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
-import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitMetrics, SpliceRateLimiter}
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest.runRateLimited
 
 import scala.concurrent.Future

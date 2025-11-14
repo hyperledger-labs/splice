@@ -1,34 +1,36 @@
-package org.lfdecentralizedtrust.splice.store
+package org.lfdecentralizedtrust.splice.validator.store
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import com.digitalasset.canton.topology.SynchronizerId
-
-import java.time.Instant
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as walletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate as topUpCodegen
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
+  install as walletCodegen,
+  topupstate as topUpCodegen,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
+}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
+import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreTest}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,
 }
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 
+import java.time.Instant
 import scala.concurrent.Future
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 

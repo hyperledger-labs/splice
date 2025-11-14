@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.setup
+package org.lfdecentralizedtrust.splice.validator.migration
 
 import cats.data.EitherT
 import cats.syntax.option.*
@@ -11,9 +11,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
-  TopologyChangeOp,
   ParticipantPermission,
   PartyToParticipant,
+  TopologyChangeOp,
 }
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,6 +27,13 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
+import org.lfdecentralizedtrust.splice.validator.migration.ParticipantPartyMigrator.{
+  ConfigPartiesToMigrate,
+  DbStorePartiesToMigrate,
+  ParticipantHostedPartiesToMigrate,
+  PartiesToMigrate,
+}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -34,6 +41,7 @@ class ParticipantPartyMigrator(
     connection: BaseLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
     decentralizedSynchronizerAlias: SynchronizerAlias,
+    configProvider: ValidatorConfigProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -67,22 +75,22 @@ class ParticipantPartyMigrator(
         synchronizerAlias,
         oldParticipantId,
       )
-      partiesToMigrateFinal <- overridePartiesToMigrate match {
-        case Some(_) =>
-          Future.successful(partiesToMigrate)
-        case None =>
+      partiesToMigrateFinal <- partiesToMigrate match {
+        case configPartiesToMigrate: ConfigPartiesToMigrate =>
+          Future.successful[PartiesToMigrate](configPartiesToMigrate)
+        case _: ParticipantHostedPartiesToMigrate | _: DbStorePartiesToMigrate =>
           // Logs warnings
           filterOutUnsupportedParties(
-            partiesToMigrate,
+            partiesToMigrate.parties,
             synchronizerId,
             participantId,
             oldParticipantId,
-          )
+          ).map(ParticipantHostedPartiesToMigrate(_))
       }
       _ = logger.info(s"Hosting $partiesToMigrate on $participantId")
       _ <- ensurePartiesMigrated(
         synchronizerAlias,
-        partiesToMigrateFinal,
+        partiesToMigrateFinal.parties,
         participantId,
       )
       // There isn't a great way to check if we already imported the ACS so instead we check if the user already has a primary party
@@ -95,7 +103,8 @@ class ParticipantPartyMigrator(
         case None =>
           logger.info(s"Importing ACS for party ids $partiesToMigrateFinal from scan")
           for {
-            _ <- importAcs(partiesToMigrateFinal, getAcsSnapshot)
+            _ <- importAcs(partiesToMigrateFinal.parties, getAcsSnapshot)
+            _ <- configProvider.clearPartiesToMigrate()
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
           } yield ()
       }
@@ -110,30 +119,48 @@ class ParticipantPartyMigrator(
       overridePartiesToMigrate: Option[Seq[PartyId]],
       synchronizerId: SynchronizerId,
       oldParticipantId: ParticipantId,
-  ): Future[Seq[PartyId]] = {
+  ): Future[ParticipantPartyMigrator.PartiesToMigrate] = {
     overridePartiesToMigrate match {
       case Some(parties) =>
         logger.info(s"Using parties to migrate from config: $parties")
-        Future.successful(parties)
+        Future.successful(ConfigPartiesToMigrate(parties.toSet))
       case None =>
         logger.info(
           "No overridden parties to migrate, using all parties still hosted on the old participant"
         )
-        participantAdminConnection
-          .listPartyToParticipant(
-            TopologyStoreId.Synchronizer(synchronizerId).some,
-            filterParticipant = oldParticipantId.uid.toProtoPrimitive,
-          )
-          .map(_.map(_.mapping.partyId))
+        configProvider
+          .getPartiesToMigrate()
+          .foldF[PartiesToMigrate] {
+            participantAdminConnection
+              .listPartyToParticipant(
+                TopologyStoreId.Synchronizer(synchronizerId).some,
+                filterParticipant = oldParticipantId.uid.toProtoPrimitive,
+              )
+              .map(_.map(_.mapping.partyId).toSet)
+              .map(ParticipantHostedPartiesToMigrate.apply)
+              .flatMap { participantHostedParties =>
+                logger.info(
+                  s"Storing all the hosted parties (${participantHostedParties.parties.size}) in the database to recover in case of failures."
+                )
+                configProvider
+                  .setPartiesToMigrate(participantHostedParties.parties)
+                  .map(_ => participantHostedParties)
+              }
+          } { parties =>
+            logger.info(
+              s"Found $parties hosted parties in the local database, this indicates a retry of the migration process."
+            )
+            Future.successful(DbStorePartiesToMigrate(parties))
+          }
     }
   }
 
   private def filterOutUnsupportedParties(
-      parties: Seq[PartyId],
+      parties: Set[PartyId],
       synchronizerId: SynchronizerId,
       participantId: ParticipantId,
       oldParticipantId: ParticipantId,
-  ): Future[Seq[PartyId]] = {
+  ): Future[Set[PartyId]] = {
     for {
       filtered1 <- filterOutMultiHostedParties(parties, synchronizerId)
       filtered2 = filterOutPartiesWithDifferentNamespaces(
@@ -145,9 +172,9 @@ class ParticipantPartyMigrator(
   }
 
   private def filterOutMultiHostedParties(
-      parties: Seq[PartyId],
+      parties: Set[PartyId],
       synchronizerId: SynchronizerId,
-  ): Future[Seq[PartyId]] =
+  ): Future[Set[PartyId]] =
     for {
       mappings <- Future.traverse(parties) { partyId =>
         participantAdminConnection
@@ -167,10 +194,10 @@ class ParticipantPartyMigrator(
     }
 
   private def filterOutPartiesWithDifferentNamespaces(
-      parties: Seq[PartyId],
+      parties: Set[PartyId],
       participantId: ParticipantId,
       oldParticipantId: ParticipantId,
-  ): Seq[PartyId] = {
+  ): Set[PartyId] = {
     val supportedNamespaces = Set(
       participantId.uid.namespace,
       oldParticipantId.uid.namespace,
@@ -181,24 +208,24 @@ class ParticipantPartyMigrator(
     if (ignored.nonEmpty)
       logger.warn(
         "Ignoring parties that we will likely not be able to migrate due to an unsupported namespace: " +
-          s"${ignored}."
+          s"$ignored."
       )
     supported
   }
 
   private def removeDomainTrustCertificateIfNeeded(
-      partiesToMigrate: Seq[PartyId],
+      partiesToMigrate: ParticipantPartyMigrator.PartiesToMigrate,
       synchronizerId: SynchronizerId,
       synchronizerAlias: SynchronizerAlias,
       oldParticipantId: ParticipantId,
   ): Future[Unit] = {
-    partiesToMigrate.find(
+    partiesToMigrate.parties.find(
       _.uid.identifier == oldParticipantId.uid.identifier
     ) match {
       case Some(adminPartyId) =>
         removeDomainTrustCertificate(
           adminPartyId,
-          partiesToMigrate,
+          partiesToMigrate.parties,
           synchronizerId,
           synchronizerAlias,
           oldParticipantId,
@@ -214,13 +241,13 @@ class ParticipantPartyMigrator(
 
   private def removeDomainTrustCertificate(
       adminPartyId: PartyId,
-      partiesToMigrate: Seq[PartyId],
+      partiesToMigrate: Set[PartyId],
       synchronizerId: SynchronizerId,
       synchronizerAlias: SynchronizerAlias,
       oldParticipantId: ParticipantId,
   ): Future[Unit] = {
     logger.info(
-      s"Preparing to remove domain trust certificate because we will be migrating ${adminPartyId}."
+      s"Preparing to remove domain trust certificate because we will be migrating $adminPartyId."
     )
     for {
       // Unhosting all parties first is a prerequisite for removing the domain trust certificate
@@ -230,7 +257,7 @@ class ParticipantPartyMigrator(
           filterParticipant = oldParticipantId.uid.toProtoPrimitive,
         )
         .map(_.map(_.mapping.partyId))
-      missedHostedParties = allHostedParties.filterNot(partiesToMigrate.toSet.contains)
+      missedHostedParties = allHostedParties.filterNot(partiesToMigrate.contains)
       _ = if (missedHostedParties.nonEmpty)
         sys.error(
           s"Parties to migrate $partiesToMigrate include the participant admin party $adminPartyId " +
@@ -266,7 +293,7 @@ class ParticipantPartyMigrator(
 
   private def ensurePartiesMigrated(
       synchronizerAlias: SynchronizerAlias,
-      partyIds: Seq[PartyId],
+      partyIds: Set[PartyId],
       participantId: ParticipantId,
   ): Future[Unit] = {
     Future
@@ -320,7 +347,7 @@ class ParticipantPartyMigrator(
 
   private def ensurePartiesUnhosted(
       synchronizerAlias: SynchronizerAlias,
-      partyIds: Seq[PartyId],
+      partyIds: Set[PartyId],
       participantId: ParticipantId,
   ): Future[Unit] = {
     participantAdminConnection.getSynchronizerId(synchronizerAlias).flatMap { synchronizerId =>
@@ -340,13 +367,13 @@ class ParticipantPartyMigrator(
   }
 
   private def importAcs(
-      partyIds: Seq[PartyId],
+      partyIds: Set[PartyId],
       getAcsSnapshot: PartyId => Future[ByteString],
   ): Future[Unit] = {
     for {
       _ <- participantAdminConnection.disconnectFromAllDomains()
       // ACS exports are expensive so do not change this to be parallel.
-      _ <- MonadUtil.sequentialTraverse(partyIds) { partyId =>
+      _ <- MonadUtil.sequentialTraverse(partyIds.toSeq) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
           _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot))
@@ -357,4 +384,15 @@ class ParticipantPartyMigrator(
       _ = logger.info("ACS import complete")
     } yield ()
   }
+}
+
+object ParticipantPartyMigrator {
+
+  sealed trait PartiesToMigrate {
+    def parties: Set[PartyId]
+  }
+
+  case class ConfigPartiesToMigrate(parties: Set[PartyId]) extends PartiesToMigrate
+  case class ParticipantHostedPartiesToMigrate(parties: Set[PartyId]) extends PartiesToMigrate
+  case class DbStorePartiesToMigrate(parties: Set[PartyId]) extends PartiesToMigrate
 }
