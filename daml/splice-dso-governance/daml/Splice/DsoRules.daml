@@ -1296,7 +1296,10 @@ template DsoRules with
 
         -- expire validator liveness activity records and compute their unclaimed rewards
         expiredValidatorLivenessActivityRecords <- forA (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
-          record <- fetch validatorLivenessActivityRecordCid
+          -- We need to fetch the weight, and would also prefer doing DsoExpire
+          -- We can't do checked fetch as the owner is the validator
+          -- hence can't use either fetchAndArchive or fetchUncheckedAndArchive
+          record <- fetchUncheckedButArchiveLater validatorLivenessActivityRecordCid
           exercise validatorLivenessActivityRecordCid ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
           return (fromOptional defaultValidatorLicenseWeight record.weight)
 
