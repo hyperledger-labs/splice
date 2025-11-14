@@ -29,16 +29,14 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerClient,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  ErrorResponse,
-  RoundPartyTotals as HttpRoundPartyTotals,
-  RoundTotals as HttpRoundTotals,
-}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
+
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   DomainScans,
   DsoScan,
 }
+import org.lfdecentralizedtrust.splice.scan.admin.http.HttpScanHandler
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
@@ -944,41 +942,6 @@ class BftScanConnectionTest
         cumulativeChangeToHoldingFeesRate = randomValue,
         totalAmuletBalance = randomValue,
       )
-      def encodeRoundTotals(rt: RoundTotals) = {
-        HttpRoundTotals(
-          closedRound = rt.closedRound,
-          closedRoundEffectiveAt = Codec.OffsetDateTime.instance.encode(rt.closedRoundEffectiveAt),
-          appRewards = Codec.encode(rt.appRewards),
-          validatorRewards = Codec.encode(rt.validatorRewards),
-          changeToInitialAmountAsOfRoundZero = Codec.encode(rt.changeToInitialAmountAsOfRoundZero),
-          changeToHoldingFeesRate = Codec.encode(rt.changeToHoldingFeesRate),
-          cumulativeAppRewards = Codec.encode(rt.cumulativeAppRewards),
-          cumulativeValidatorRewards = Codec.encode(rt.cumulativeValidatorRewards),
-          cumulativeChangeToInitialAmountAsOfRoundZero =
-            Codec.encode(rt.cumulativeChangeToInitialAmountAsOfRoundZero),
-          cumulativeChangeToHoldingFeesRate = Codec.encode(rt.cumulativeChangeToHoldingFeesRate),
-          totalAmuletBalance = Codec.encode(rt.totalAmuletBalance),
-        )
-      }
-      def encodeRoundPartyTotals(rpt: RoundPartyTotals) = {
-        HttpRoundPartyTotals(
-          closedRound = rpt.closedRound,
-          party = rpt.party,
-          appRewards = Codec.encode(rpt.appRewards),
-          validatorRewards = Codec.encode(rpt.validatorRewards),
-          trafficPurchased = rpt.trafficPurchased,
-          trafficPurchasedCcSpent = Codec.encode(rpt.trafficPurchasedCcSpent),
-          trafficNumPurchases = rpt.trafficNumPurchases,
-          cumulativeAppRewards = Codec.encode(rpt.cumulativeAppRewards),
-          cumulativeValidatorRewards = Codec.encode(rpt.cumulativeValidatorRewards),
-          cumulativeChangeToInitialAmountAsOfRoundZero =
-            Codec.encode(rpt.cumulativeChangeToInitialAmountAsOfRoundZero),
-          cumulativeChangeToHoldingFeesRate = Codec.encode(rpt.cumulativeChangeToHoldingFeesRate),
-          cumulativeTrafficPurchased = rpt.cumulativeTrafficPurchased,
-          cumulativeTrafficPurchasedCcSpent = Codec.encode(rpt.cumulativeTrafficPurchasedCcSpent),
-          cumulativeTrafficNumPurchases = rpt.cumulativeTrafficNumPurchases,
-        )
-      }
       def mkRoundPartyTotals() = RoundPartyTotals(
         closedRound = round,
         party = "party-id",
@@ -996,10 +959,12 @@ class BftScanConnectionTest
         cumulativeTrafficNumPurchases = 70L,
       )
       def mkRoundAggregateUsingDecoder() = RoundAggregate(
-        ScanRoundAggregatesDecoder.decodeRoundTotal(encodeRoundTotals(mkRoundTotals())).value,
+        ScanRoundAggregatesDecoder
+          .decodeRoundTotal(HttpScanHandler.encodeRoundTotals(mkRoundTotals()))
+          .value,
         Vector(
           ScanRoundAggregatesDecoder
-            .decodeRoundPartyTotals(encodeRoundPartyTotals(mkRoundPartyTotals()))
+            .decodeRoundPartyTotals(HttpScanHandler.encodeRoundPartyTotals(mkRoundPartyTotals()))
             .value
         ),
       )

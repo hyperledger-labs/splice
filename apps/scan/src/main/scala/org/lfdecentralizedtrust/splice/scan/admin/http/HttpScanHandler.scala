@@ -95,6 +95,7 @@ import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -125,7 +126,7 @@ class HttpScanHandler(
     with HttpVotesHandler
     with HttpValidatorLicensesHandler
     with HttpFeatureSupportHandler {
-
+  import HttpScanHandler.*
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
@@ -1853,25 +1854,7 @@ class HttpScanHandler(
       ensureValidRange(request.startRound, request.endRound, 200) {
         for {
           roundTotals <- store.getRoundTotals(request.startRound, request.endRound)
-          entries = roundTotals.map { roundTotal =>
-            definitions.RoundTotals(
-              closedRound = roundTotal.closedRound,
-              closedRoundEffectiveAt = java.time.OffsetDateTime
-                .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
-              appRewards = Codec.encode(roundTotal.appRewards),
-              validatorRewards = Codec.encode(roundTotal.validatorRewards),
-              changeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
-              changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
-              cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
-              cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
-              cumulativeChangeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
-              cumulativeChangeToHoldingFeesRate =
-                Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
-              totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
-            )
-          }
+          entries = roundTotals.map(encodeRoundTotals)
         } yield v0.ScanResource.ListRoundTotalsResponse.OK(
           definitions.ListRoundTotalsResponse(entries.toVector)
         )
@@ -1888,27 +1871,7 @@ class HttpScanHandler(
       ensureValidRange(request.startRound, request.endRound, 50) {
         for {
           roundPartyTotals <- store.getRoundPartyTotals(request.startRound, request.endRound)
-          entries = roundPartyTotals.map { roundPartyTotal =>
-            definitions.RoundPartyTotals(
-              closedRound = roundPartyTotal.closedRound,
-              party = roundPartyTotal.party,
-              appRewards = Codec.encode(roundPartyTotal.appRewards),
-              validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
-              trafficPurchased = roundPartyTotal.trafficPurchased,
-              trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
-              trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
-              cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
-              cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
-              cumulativeChangeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
-              cumulativeChangeToHoldingFeesRate =
-                Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
-              cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
-              cumulativeTrafficPurchasedCcSpent =
-                Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
-              cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
-            )
-          }
+          entries = roundPartyTotals.map(encodeRoundPartyTotals)
         } yield v0.ScanResource.ListRoundPartyTotalsResponse.OK(
           definitions.ListRoundPartyTotalsResponse(entries.toVector)
         )
@@ -2303,4 +2266,46 @@ object HttpScanHandler {
   // We expect a handful at most but want to somewhat guard against attacks
   // so we just hardcode a limit of 100.
   private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
+
+  def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
+    definitions.RoundTotals(
+      closedRound = roundTotal.closedRound,
+      closedRoundEffectiveAt = java.time.OffsetDateTime
+        .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
+      appRewards = Codec.encode(roundTotal.appRewards),
+      validatorRewards = Codec.encode(roundTotal.validatorRewards),
+      changeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
+      changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
+      cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
+      cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
+      cumulativeChangeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+      cumulativeChangeToHoldingFeesRate =
+        Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
+      totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
+    )
+  }
+
+  def encodeRoundPartyTotals(roundPartyTotal: RoundPartyTotals): definitions.RoundPartyTotals = {
+    definitions.RoundPartyTotals(
+      closedRound = roundPartyTotal.closedRound,
+      party = roundPartyTotal.party,
+      appRewards = Codec.encode(roundPartyTotal.appRewards),
+      validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
+      trafficPurchased = roundPartyTotal.trafficPurchased,
+      trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
+      trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
+      cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
+      cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
+      cumulativeChangeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+      cumulativeChangeToHoldingFeesRate =
+        Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
+      cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
+      cumulativeTrafficPurchasedCcSpent =
+        Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
+      cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
+    )
+  }
 }
