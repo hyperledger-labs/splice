@@ -729,14 +729,15 @@ class ValidatorApp(
           None
       }
 
-    maybeInternalConfigs.map { internalConfigs => {
-      internalConfigs.map { internalConfig =>
-        DsoScan(
-          publicUrl = Uri(internalConfig.url),
-          svName = internalConfig.svName,
-        )
+    maybeInternalConfigs.map { internalConfigs =>
+      {
+        internalConfigs.map { internalConfig =>
+          DsoScan(
+            publicUrl = Uri(internalConfig.url),
+            svName = internalConfig.svName,
+          )
+        }
       }
-    }
     }
   }
 
