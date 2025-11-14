@@ -86,6 +86,24 @@ describe('SV user can', () => {
     );
   });
 
+  test('grant validator license with party address validation', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    const partyAddressInput = screen.getByTestId('grant-license-party-address');
+    await user.type(partyAddressInput, 'wrong-input');
+
+    expect(screen.getByTestId('grant-validator-license')).toBeDisabled();
+
+    await user.clear(partyAddressInput);
+    await user.type(partyAddressInput, 'validator::1');
+
+    expect(screen.getByTestId('grant-validator-license')).not.toBeDisabled();
+  });
+
   test('validator onboarding info has correct format', () => {
     const validatorOnboardingInfo = onboardingInfo(
       {
