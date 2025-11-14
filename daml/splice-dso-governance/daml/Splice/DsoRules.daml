@@ -1277,8 +1277,6 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
-        -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
-        -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
         let AmuletRules_ClaimExpiredRewards{..} = choiceArg
         -- retrieve round
         closedRound <- fetchReferenceData (ForDso with dso) closedRoundCid

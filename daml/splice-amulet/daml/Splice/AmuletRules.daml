@@ -500,6 +500,7 @@ template AmuletRules
         return AmuletRules_MiningRound_ArchiveResult
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
+    -- __Deprecated__ use `DsoRules_ClaimExpiredRewards` instead.
     nonconsuming choice AmuletRules_ClaimExpiredRewards : AmuletRules_ClaimExpiredRewardsResult
       with
         closedRoundCid : ContractId ClosedMiningRound
@@ -510,56 +511,7 @@ template AmuletRules
         optValidatorLivenessActivityRecordCids : Optional [ContractId ValidatorLivenessActivityRecord]
       controller dso
       do
-        -- retrieve round
-        closedRound <- fetchReferenceData (ForDso with dso) closedRoundCid
-
-        -- expire validator rewards and compute their unclaimed rewards
-        expiredValidatorRewards <- forA validatorRewardCouponCids $ \validatorRewardCouponCid -> do
-          expireResult <- exercise validatorRewardCouponCid ValidatorRewardCoupon_DsoExpire with closedRoundCid
-          return expireResult.amount
-
-        let validatorRewards = sum expiredValidatorRewards
-
-        -- expire validator faucet coupons and compute their unclaimed rewards
-        forA_ (fromOptional [] optValidatorFaucetCouponCids) $ \validatorFaucetCouponCid -> do
-          exercise validatorFaucetCouponCid ValidatorFaucetCoupon_DsoExpire with closedRoundCid
-
-        let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
-
-        -- expire validator liveness activity records and compute their unclaimed rewards
-        expiredValidatorLivenessActivityRecords <- forA (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
-          record <- fetch validatorLivenessActivityRecordCid
-          exercise validatorLivenessActivityRecordCid ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
-          return (fromOptional defaultValidatorLicenseWeight record.weight)
-
-        let validatorLivenessActivityRecordsWeight = sum expiredValidatorLivenessActivityRecords
-
-        -- expire app rewards and compute their unclaimed rewards
-        expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
-          expireResult <- exercise appCouponCid AppRewardCoupon_DsoExpire with closedRoundCid
-          return (expireResult.featured, expireResult.amount)
-
-        let featuredAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, featured ]
-        let unfeaturedAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, not featured ]
-
-        -- expire validator rewards and compute their unclaimed rewards
-        expiredSvRewards <- forA svRewardCouponCids $ \svRewardCouponCid -> do
-          expireResult <- exercise svRewardCouponCid SvRewardCoupon_DsoExpire with closedRoundCid
-          return expireResult.weight
-
-        let svRewardsWeight = sum expiredSvRewards
-
-        -- create unclaimed reward for the total
-        let amount =
-              validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
-              (numValidatorFaucetCoupons + validatorLivenessActivityRecordsWeight) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
-              featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
-              unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
-              intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
-        unclaimedRewardCid <- if (amount <= 0.0)
-              then pure None
-              else Some <$> create UnclaimedReward with dso; amount
-        return AmuletRules_ClaimExpiredRewardsResult with unclaimedRewardCid
+        deprecatedChoice "splice-amulet" "0.1.21" "AmuletRules_ClaimExpiredRewards"
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice AmuletRules_MergeUnclaimedRewards : AmuletRules_MergeUnclaimedRewardsResult
