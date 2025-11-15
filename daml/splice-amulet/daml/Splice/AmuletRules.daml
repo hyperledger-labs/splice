@@ -1117,7 +1117,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
         Some lock -> do
           -- We require the lock to expire before the amulet to allow app authors to
           -- assume that a locked amulet is never archived by standard DSO while the lock is held.
-          require "lock expires before amulet"
+          require ("lock expiry " <> show lock.expiresAt <>  " is before amulet expires")
             (doesLockExpireBeforeAmulet currentOpenRound lock amulet.amount currentOpenRound.tickDuration)
           TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
 

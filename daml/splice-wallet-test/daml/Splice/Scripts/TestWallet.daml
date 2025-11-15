@@ -1109,13 +1109,13 @@ testTokenStandardAllocate = script do
 
   -- provider proposes a trade for alice with herself
   now <- getTime
-  let settleBefore = now `addRelTime` hours 2
+  let settleAt = now `addRelTime` hours 1
   proposalCid <- submit provider $ createCmd OTCTrade with
     venue = provider
     transferLegs = TextMap.fromList [("leg0", aliceLeg)]
-    prepareUntil = now `addRelTime` hours 1
-    settleBefore
+    settleAt
     createdAt = now
+    settlementDeadline = None
 
 
   -- provider initiates settlement

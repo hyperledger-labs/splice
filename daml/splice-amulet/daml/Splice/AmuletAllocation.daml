@@ -3,6 +3,7 @@
 
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
+  allocationAmount,
   allocationToTwoStepTransfer,
 ) where
 
@@ -29,6 +30,7 @@ template AmuletAllocation
     allocation : AllocationSpecification
     sender : Party
     admin : Party
+    expiresAt : Time
   where
     signatory admin, sender
     observer allocation.settlement.executor
@@ -49,6 +51,7 @@ template AmuletAllocation
         meta = emptyMetadata
         senders = [sender]
         requiredReceiverAuth = (defaultAllocationControllers allocation) \\ (sender::allocationControllers allocation)
+        expiresAt = Some expiresAt
 
       allocation_executeTransferImpl self Allocation_ExecuteTransfer{..} = case extraAuth of
         [] ->  transferAmuletAllocation this extraArgs
@@ -98,15 +101,21 @@ allocationReceivers AllocationSpecification{..} =
 -- Allocation usage
 -------------------
 
-allocationToTwoStepTransfer : Party -> Party -> AllocationSpecification -> TwoStepTransfer
-allocationToTwoStepTransfer sender admin allocation =
+allocationAmount : Party -> AllocationSpecification -> Decimal
+allocationAmount sender allocation = sum (map (._2) outputs)
+  where
+    senderLegs = filter (\tl -> tl.sender == sender) $ map snd (TextMap.toList allocation.transferLegs)
+    outputs = map (\tl -> (tl.receiver, tl.amount)) senderLegs
+
+allocationToTwoStepTransfer : Party -> Party -> Time -> AllocationSpecification -> TwoStepTransfer
+allocationToTwoStepTransfer sender admin expiresAt allocation =
   TwoStepTransfer with
     dso = admin
     sender = sender
     outputs
     provider = allocation.settlement.executor
-    transferBefore = allocation.settlement.settleBefore
-    transferBeforeDeadline = "allocation.settlement.settleBefore"
+    transferBefore = expiresAt
+    transferBeforeDeadline = "allocation.expiresAt"
     allowFeaturing = True
     lockContext = Text.implode
       -- We don't show more context to avoid bloating the response here.
@@ -114,6 +123,7 @@ allocationToTwoStepTransfer sender admin allocation =
   where
     senderLegs = filter (\tl -> tl.sender == sender) $ map snd (TextMap.toList allocation.transferLegs)
     outputs = map (\tl -> (tl.receiver, tl.amount)) senderLegs
+
 
 collectAuthAndSettle : ContractId AmuletAllocation -> ExtraArgs -> [ContractId AllocationTransferAuthorization] -> [Party] -> Update Allocation_ExecuteTransferResult
 collectAuthAndSettle allocationCid extraArgs extraAuth extraControllers = do
@@ -128,7 +138,7 @@ collectAuthAndSettle allocationCid extraArgs extraAuth extraControllers = do
 
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.admin amuletAllocation.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
   pure Allocation_ExecuteTransferResult
@@ -139,7 +149,7 @@ transferAmuletAllocation amuletAllocation extraArgs = do
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId Holding]
 unlockAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.admin amuletAllocation.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation
   abortTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
 
 template AmuletAllocationTransferAuthorization

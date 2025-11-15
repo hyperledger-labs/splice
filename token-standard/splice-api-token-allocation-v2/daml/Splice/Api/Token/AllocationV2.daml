@@ -39,22 +39,18 @@ data SettlementInfo = SettlementInfo
     requestedAt : Time
       -- ^ When the settlement was requested. Provided for display and debugging purposes,
       -- but SHOULD be in the past.
-    allocateBefore : Time
-      -- ^ Until when (exclusive) the senders are given time to allocate their assets.
-      -- This field has a particular relevance with respect to instrument versioning / corporate
-      -- actions, in that the settlement pertains to the instrument version resulting from the
-      -- processing of all corporate actions falling strictly before the `allocateBefore` time.
-    settleBefore : Time
-      -- ^ Until when (exclusive) the executor is given time to execute the settlement.
-      --
-      -- SHOULD be strictly after `allocateBefore`.
+    settleAt : Time
+      -- ^ The earliest settlement time. Allocations should be made before this time. Settlement
+      -- happens at any point after this time.
     meta : Metadata
       -- ^ Additional metadata about the settlement, used for extensibility.
     controllerOverride : Optional [Party]
       -- ^ Additional party signatures in addition to executor that need to authorize
       -- choices on the Allocation. Defaults to senders and receivers across all 
       -- transferLegs.
-
+    settlementDeadline : Optional Time
+      -- ^ The latest point at which settlement will occur. This allows registries
+      -- to set appropriate locks and expiries.
   deriving (Show, Eq)
 
 -- | A specification of a transfer of holdings between two parties for the
@@ -104,6 +100,9 @@ data AllocationView = AllocationView with
     requiredReceiverAuth : [Party]
       -- ^ The extra authority this allocation needs for settlement on top of
       -- the controllers specified via allocation.settlement.controllerOverride
+    expiresAt : Optional Time
+    -- ^ A time at which this allocation expires. SHOULD be as close as the
+    -- registry can make it to the settlementInfo's settlementDeadline.
   deriving (Show, Eq)
 
 -- | View of a delegated authority from the signer to the execurot to settle given transfer legs.

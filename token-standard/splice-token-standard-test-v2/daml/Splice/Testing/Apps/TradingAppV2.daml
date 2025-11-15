@@ -20,6 +20,11 @@ import DA.Foldable (mapA_)
 import DA.List.Total (dedup)
 import DA.Assert ((===))
 import qualified DA.Traversable as Traversable
+import DA.Time
+import DA.Date
+
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
 
 template OTCTradeAllocationRequest with
     otcTrade : OTCTrade
@@ -34,10 +39,10 @@ template OTCTradeAllocationRequest with
           executor = otcTrade.venue
           requestedAt = otcTrade.createdAt
           settlementRef = makeTradeRef otcTradeCid
-          allocateBefore = otcTrade.prepareUntil
-          settleBefore = otcTrade.settleBefore
+          settleAt = otcTrade.settleAt
           meta = emptyMetadata
           controllerOverride = Some [] -- We will settle using only executor authority.
+          settlementDeadline = otcTrade.settlementDeadline
         transferLegs = otcTrade.transferLegs
         meta = emptyMetadata
 
@@ -54,8 +59,8 @@ template OTCTrade with
     venue : Party
     transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
     createdAt : Time
-    prepareUntil : Time
-    settleBefore : Time
+    settleAt : Time
+    settlementDeadline : Optional Time
   where
     signatory venue
     observer venue, tradingParties transferLegs
@@ -64,9 +69,6 @@ template OTCTrade with
       with
       controller venue
       do
-        now <- getTime
-        require "Preparation time has not passed" (now < prepareUntil)
-        require "Preparation time before settlement time" (prepareUntil < settleBefore)
         let 
           legsByAdmin =
             map TextMap.fromList $
@@ -84,18 +86,15 @@ template OTCTrade with
         -- Could be safer by validating the requests match the trade, but venue is the only authorizer
         -- so we can assume the checks happened off-ledger. 
         mapA_ archive allocationRequests
-        -- check timing constraints
-        now <- getTime
-        require "Settlement deadline has not passed" (now < settleBefore)
         -- validate and execute transferLegs
         let settlementInfo = SettlementInfo with
               executor = venue
               requestedAt = createdAt
               settlementRef = makeTradeRef self
-              allocateBefore = prepareUntil
-              settleBefore
+              settleAt
               meta = emptyMetadata
               controllerOverride = Some []
+              settlementDeadline
         let expectedAllocations = expectedTradeAllocations settlementInfo transferLegs
         let outerMergedMaps = zipMaps allocationsWithContext expectedAllocations
         exercises <- forMapWithKey outerMergedMaps \admin (optAdminAllocsWithContext,  optExpectedAdminAllocs) -> do

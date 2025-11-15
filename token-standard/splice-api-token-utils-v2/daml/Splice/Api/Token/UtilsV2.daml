@@ -16,6 +16,26 @@ import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructi
 import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructionV2
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+import DA.Time
+import DA.Date
+import DA.Text (parseInt)
+import DA.Optional (fromOptional)
+
+-- Utils
+--------
+epoch : Time
+epoch = time (date 1970 Jan 1) 0 0 0
+
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
+
+encodeTime : Time -> Text
+encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
+
+decodeTime : Text -> Time
+decodeTime t = case parseInt t of
+  Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
+  None -> error ("Cannot parse time " <> t)
 
 -- Holding
 ----------
@@ -71,10 +91,10 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
       executor
       settlementRef = reference_v1_to_v2 settlementRef
       requestedAt
-      allocateBefore
-      settleBefore
+      settleAt = allocateBefore
       meta
-      controllerOverride = None
+      controllerOverride
+      settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
 
 transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> AllocationV2.TransferLeg
 transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} = 
@@ -100,6 +120,7 @@ allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
     meta
     senders
     requiredReceiverAuth
+    expiresAt
   where
     senders = case TextMap.lookup "canton.network/senders" meta.values of
       None -> [allocation.transferLeg.sender]
@@ -107,6 +128,10 @@ allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
     requiredReceiverAuth = case TextMap.lookup "canton.network/requiredReceiverAuth" meta.values of
       None -> []
       Some ol -> [] -- TODO: Parse extra auth list.
+    expiresAt = Some $ optional 
+      (allocation.settlement.settleBefore)
+      decodeTime
+      (TextMap.lookup "canton.network/expiresAt" meta.values)
 
       
 -- Downcast
@@ -121,12 +146,13 @@ settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
         TextMap.insert "canton.network/version" "v2" $
         TextMap.insert "canton.network/controllerOverride" (show controllerOverride) $
         meta.values
+
     v1 = AllocationV1.SettlementInfo with
       executor
       settlementRef = reference_v2_to_v1 settlementRef
       requestedAt
-      allocateBefore
-      settleBefore
+      allocateBefore = settleAt
+      settleBefore = fromOptional maxTime settlementDeadline
       meta = meta'
 
 transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
@@ -159,11 +185,15 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
     holdingCids = map coerceInterfaceContractId holdingCids
     meta = meta'
   where
+    insertOptional k ov m = case ov of
+      None -> m
+      Some v -> TextMap.insert k v m
     meta' = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
-        TextMap.insert "canton.network/senders" (show senders) $
+        TextMap.insert "canton.network/senders" (show senders) $ 
         TextMap.insert "canton.network/requiredReceiverAuth" (show requiredReceiverAuth) $
+        insertOptional "canton.network/expiresAt" (fmap encodeTime expiresAt) $
         meta.values
 
 -- Choices

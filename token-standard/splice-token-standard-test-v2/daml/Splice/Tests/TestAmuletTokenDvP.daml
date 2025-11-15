@@ -18,7 +18,7 @@ import Daml.Script
 import DA.Action (unless)
 import DA.Assert
 import DA.Foldable (forA_, foldMap)
-import DA.Optional (isSome)
+import DA.Optional (fromSome, isSome)
 import DA.TextMap as TextMap hiding (filter)
 import DA.Map as Map hiding (filter)
 import DA.Time
@@ -91,13 +91,14 @@ setupOtcTrade  = do
 
   -- venue creates a trade
   now <- getTime
-  let settleBefore = now `addRelTime` hours 2
+  let settleAt = now `addRelTime` hours 1
+      deadline = now `addRelTime` hours 2
   otcTradeCid <- submit provider $ createCmd OTCTrade with
     venue = provider
     transferLegs = TextMap.fromList [("leg0", aliceLeg), ("leg1", bobLeg)]
-    prepareUntil = now `addRelTime` hours 1
-    settleBefore
+    settleAt
     createdAt = now
+    settlementDeadline = Some deadline
 
   -- venue requests settlement
   [requestCid] <- submit provider $
@@ -146,13 +147,15 @@ setupOtcTrade  = do
   expectBurn result.meta
 
   -- check lock context
-  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  let expectedLock = Some $ Lock with
-        expiresAt = Some settleBefore
+  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId  
+  let expectedLock = Lock with
+        expiresAt = None
         expiresAfter = None
         holders = [registry.dso]
         context = Some "allocation for settlement OTCTradeProposal"
-  lockedHolding.lock === expectedLock
+  ((fromSome lockedHolding.lock) with expiresAt = None) === expectedLock
+  assertMsg "locks expire should be in the future" 
+    (fromSome (fromSome lockedHolding.lock).expiresAt > now)
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
@@ -280,11 +283,9 @@ testDvPCancel = script do
           meta = emptyMetadata
     pure (context.disclosures, (allocCid, extraArgs))
   let disclosures = foldMap fst richAllocationsWithContext
-
   _ <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Cancel with
     allocationsWithContext = Map.values $ fmap snd richAllocationsWithContext
     allocationRequests = [requestCid]
-
   [] <- WalletClient.listLockedHoldings alice registry.instrumentId
   WalletClient.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
 
