@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.1"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
