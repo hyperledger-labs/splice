@@ -15,6 +15,7 @@ import DA.Map as Map
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV2
+import Splice.Api.Token.HoldingV2 (Account)
 import DA.List (groupOn)
 import DA.Foldable (mapA_)
 import DA.List.Total (dedup)
@@ -48,7 +49,14 @@ template OTCTradeAllocationRequest with
 
       allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that assets won't be allocated / that the trade is being rejected.
-        require "Actor is a trader" (F.any (\leg -> actor == leg.sender || actor == leg.receiver) otcTrade.transferLegs)
+        require "Actor is a trader or their account providers" 
+          (F.any 
+            (\leg -> 
+              actor == leg.sender.owner || 
+              actor == leg.receiver.owner || 
+              Some actor == leg.receiver.provider || 
+              Some actor == leg.receiver.provider) 
+            otcTrade.transferLegs)
         pure ChoiceExecutionMetadata with meta = emptyMetadata
 
       allocationRequest_WithdrawImpl _self _extraArgs =
@@ -76,9 +84,9 @@ template OTCTrade with
             TextMap.toList transferLegs
         mapA (\transferLegs -> create (OTCTradeAllocationRequest (this with transferLegs) self)) legsByAdmin
 
-    choice OTCTrade_Settle : Map Party (Map Party Allocation_ExecuteTransferResult)
+    choice OTCTrade_Settle : Map Party (Map Account Allocation_ExecuteTransferResult)
       with
-        allocationsWithContext : Map Party (Map Party (ContractId Allocation, ExtraArgs))
+        allocationsWithContext : Map Party (Map Account (ContractId Allocation, ExtraArgs))
         -- ^ Allocations sorted by admin and sender.
         allocationRequests : [ContractId OTCTradeAllocationRequest]
       controller venue
@@ -158,32 +166,32 @@ template OTCTrade with
 
 expectedTradeAllocations
   : SettlementInfo -> TextMap Api.Token.AllocationV2.TransferLeg
-  -> Map Party (Map Party AllocationSpecification)
+  -> Map Party (Map Account AllocationSpecification)
 expectedTradeAllocations settlementInfo transferLegs = Map.fromList allocsByAdminAndTrader
   where 
     legsByAdmin =
       map (\tls@((_, tl)::_) -> (tl.instrumentId.admin, TextMap.fromList tls)) $
       groupOn (\(_, tl) -> tl.instrumentId.admin) $
       TextMap.toList transferLegs
-    tradersForLegs tls = dedup $ concatMap (\(_, tl) -> [tl.sender, tl.receiver]) (TextMap.toList tls)
-    legsForTrader tls trader = 
+    accountsForLegs tls = dedup $ concatMap (\(_, tl) -> [tl.sender, tl.receiver]) (TextMap.toList tls)
+    legsForAccount tls account = 
       TextMap.fromList $ 
-      Prelude.filter (\(_, tl) -> tl.sender == trader || tl.receiver == trader) $
+      Prelude.filter (\(_, tl) -> tl.sender == account || tl.receiver == account) $
       TextMap.toList tls
-    allocForTraderAndLegs trader tls = AllocationSpecification with
+    allocForAccountAndLegs account tls = AllocationSpecification with
       settlement = settlementInfo
-      transferLegs = legsForTrader tls trader
-    allocsByTrader tls = map 
-      (\trader -> (trader, allocForTraderAndLegs trader $ legsForTrader tls trader))
-      (tradersForLegs tls)
+      transferLegs = legsForAccount tls account
+    allocsByAccount tls = map 
+      (\trader -> (trader, allocForAccountAndLegs trader $ legsForAccount tls trader))
+      (accountsForLegs tls)
     allocsByAdminAndTrader = map 
-      (\(admin, tls) -> (admin, Map.fromList (allocsByTrader tls)))
+      (\(admin, tls) -> (admin, Map.fromList (allocsByAccount tls)))
       legsByAdmin
      
 
 
 tradingParties : TextMap Api.Token.AllocationV2.TransferLeg -> Set.Set Party
-tradingParties = F.foldl (\acc t -> Set.insert t.sender (Set.insert t.receiver acc)) Set.empty
+tradingParties = F.foldl (\acc t -> Set.insert t.sender.owner (Set.insert t.receiver.owner acc)) Set.empty
 
 -- | Check whether a required condition is true. If it's not, abort the
 -- transaction with a message saying that the requirement was not met.

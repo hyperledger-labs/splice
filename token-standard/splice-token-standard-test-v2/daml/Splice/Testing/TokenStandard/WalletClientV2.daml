@@ -47,7 +47,7 @@ listHoldings p instrumentId = do
   let instrumendHoldings = do
         (cid, Some holding) <- holdings
         guard (holding.instrumentId == instrumentId)
-        guard (holding.owner == p)
+        guard (holding.account.owner == p)
         pure (cid, holding)
   pure instrumendHoldings
 
@@ -113,7 +113,7 @@ listTransferOffers p instrumentId = do
         (cid, Some instr) <- instrs
         guard (instr.transfer.instrumentId == instrumentId)
         guard (instr.status == TransferInstructionV2.TransferPendingReceiverAcceptance)
-        guard (p == instr.transfer.sender || p == instr.transfer.receiver)
+        guard (p == instr.transfer.sender.owner || p == instr.transfer.receiver.owner)
         pure (cid, instr)
   pure pendingOffers
 
@@ -128,7 +128,7 @@ listRequestedAllocationsForAdmin p admin = do
         let transferLegs = do
               (tfId, tf) <- TextMap.toList req.transferLegs
               guard (tf.instrumentId.admin ==  admin)
-              guard (p == tf.sender || p == tf.receiver)
+              guard (p == tf.sender.owner || p == tf.receiver.owner)
               return (tfId, tf)
         pure AllocationV2.AllocationSpecification with
           settlement = req.settlement

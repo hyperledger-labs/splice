@@ -78,8 +78,8 @@ setupOtcTrade  = do
   AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
 
   let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
-        sender
-        receiver
+        sender = basicAccount sender
+        receiver = basicAccount receiver
         amount
         instrumentId = amuletId
         meta = emptyMetadata
@@ -109,7 +109,7 @@ setupOtcTrade  = do
   -- Alice sees the allocation request in her wallet
   [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
   let 
-    [(_, tl)] = filter (\(_, tl) -> tl.sender == alice) (TextMap.toList aliceAlloc.transferLegs)
+    [(_, tl)] = filter (\(_, tl) -> tl.sender == basicAccount alice) (TextMap.toList aliceAlloc.transferLegs)
   tl.amount === 100.0
 
   -- alice accepts allocation request directly via her wallet
@@ -160,7 +160,7 @@ setupOtcTrade  = do
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
   let 
-    [(_, tl)] = filter (\(_, tl) -> tl.sender == bob) (TextMap.toList aliceAlloc.transferLegs)
+    [(_, tl)] = filter (\(_, tl) -> tl.sender == basicAccount bob) (TextMap.toList aliceAlloc.transferLegs)
   tl.amount === 20.0
 
   -- bob accepts allocation request directly via her wallet
@@ -325,7 +325,7 @@ testDvPWithdraw = script do
 
 -- | List all allocations matching a particular settlement reference, sorted by their admin and trader.
 -- This function would be run on the trading app provider's backend as part of an automation loop.
-appBackendListAllocations : Party -> Reference -> Script (Map Party (Map Party (ContractId Allocation, AllocationView)))
+appBackendListAllocations : Party -> Reference -> Script (Map Party (Map Account (ContractId Allocation, AllocationView)))
 appBackendListAllocations p ref = do
   allocs <- queryInterface @Allocation p
   let matchingAllocs = do

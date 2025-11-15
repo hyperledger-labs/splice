@@ -279,7 +279,7 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- receiver: validate preapproval if given
   optPreapprovalCid <- lookupFromContextU @(ContractId TransferPreapproval) extraArgs.context transferPreapprovalContextKey
   forA_ optPreapprovalCid \preapprovalCid ->
-    fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
+    fetchChecked (ForOwner with dso; owner = transfer.receiver.owner) preapprovalCid
   -- instrumentId:
   let expectedInstrumentId = amuletInstrumentId this.dso
   require
@@ -294,6 +294,12 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- inputHoldingCids: note that their detailed validation is done in the transfer itself
   require "At least one holding must be provided" (not $ null transfer.inputHoldingCids)
 
+  -- accounts :
+  require "sender account provider must be None" (isNone transfer.sender.provider)
+  require "sender account id must be None" (isNone transfer.sender.id)
+  require "receiver account provider must be None" (isNone transfer.receiver.provider)
+  require "receiver account id must be None" (isNone transfer.receiver.id)
+
   let reason = TextMap.lookup reasonMetaKey transfer.meta.values
 
   -- execute the right kind of transfer
@@ -302,13 +308,13 @@ amulet_transferFactory_transferImpl this _self arg = do
       | transfer.receiver == transfer.sender -> do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
+          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender.owner) paymentContext transfer.inputHoldingCids
           result <- exercisePaymentTransfer dso paymentContext Transfer with
-            sender = transfer.sender
-            provider = transfer.sender
+            sender = transfer.sender.owner
+            provider = transfer.sender.owner
             inputs
             outputs = [ TransferOutput with
-              receiver = transfer.sender
+              receiver = transfer.sender.owner
               amount = transfer.amount
               receiverFeeRatio = 0.0
               lock = None ]
@@ -342,10 +348,10 @@ amulet_transferFactory_transferImpl this _self arg = do
       -- use a payment context with featuring so the preapproval provider can be featured
       paymentContext <- paymentFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
-      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
+      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender.owner) paymentContext transfer.inputHoldingCids
       result <- exercise preapprovalCid TransferPreapproval_Send
         with
-          sender = transfer.sender
+          sender = transfer.sender.owner
           context = paymentContext
           inputs
           amount = transfer.amount
@@ -413,6 +419,12 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
       -- transferLeg.instrumentId
       require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
       -- transferLeg.meta: no check
+
+      -- accounts :
+      require "sender account provider must be None" (isNone transferLeg.sender.provider)
+      require "sender account id must be None" (isNone transferLeg.sender.id)
+      require "receiver account provider must be None" (isNone transferLeg.receiver.provider)
+      require "receiver account id must be None" (isNone transferLeg.receiver.id)
     )
 
   -- requestedAt (of the allocation instruction itself):

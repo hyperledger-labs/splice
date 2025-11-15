@@ -23,6 +23,7 @@ data-dependencies:
 - ../../token-standard/splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
 - ../../token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
 - ../../token-standard/splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
+- ../../token-standard/splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
 
 build-options:
   - --ghc-option=-Wunused-binds

@@ -47,7 +47,7 @@ data ForOwner = ForOwner with
 instance HasCheckedFetch HoldingView ForOwner where
   contractGroupId HoldingView {..} = ForOwner with
     dso = instrumentId.admin
-    owner = owner
+    owner = account.owner
 
 instance HasCheckedFetch TransferInstructionView ForDso where
   contractGroupId TransferInstructionView {..} = ForDso with

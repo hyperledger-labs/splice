@@ -12,9 +12,10 @@ import DA.List (dedup, dedupSort)
 import DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV2 (Holding, InstrumentId)
+import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
 import qualified DA.Foldable as F
 import DA.Assert ((===))
+import DA.Optional (optionalToList)
 
 -- | A generic type to refer to data defined within an app.
 
@@ -56,9 +57,9 @@ data SettlementInfo = SettlementInfo
 -- | A specification of a transfer of holdings between two parties for the
 -- purpose of a settlement, which often requires the atomic execution of multiple legs.
 data TransferLeg = TransferLeg with
-    sender : Party
+    sender : Account
       -- ^ The sender of the transfer.
-    receiver : Party
+    receiver : Account
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
@@ -94,11 +95,11 @@ data AllocationView = AllocationView with
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
-    senders : [Party]
+    senders : [Account]
       -- ^ The senders of this allocation, who could also authorize incoming transfers
       -- through Allocation_AuthorizeIncoming
-    requiredReceiverAuth : [Party]
-      -- ^ The extra authority this allocation needs for settlement on top of
+    requiredReceiverAuth : [Account]
+      -- ^ The extra account authorization this allocation needs for settlement on top of
       -- the controllers specified via allocation.settlement.controllerOverride
     expiresAt : Optional Time
     -- ^ A time at which this allocation expires. SHOULD be as close as the
@@ -109,7 +110,7 @@ data AllocationView = AllocationView with
 -- authorizers are always the signatories so not made available in the viewtype.
 data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView with
   allocation : AllocationSpecification
-  receiver : Party
+  receiver : Account
   admin : Party
   -- ^ the settlement to which this authorization applies. 
 
@@ -123,7 +124,7 @@ data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView w
 -- allocation.
 defaultAllocationControllers : AllocationSpecification -> [Party]
 defaultAllocationControllers AllocationSpecification{..} =
-  dedup $ settlement.executor :: concatMap (\leg -> [leg._2.sender, leg._2.receiver]) (toList transferLegs)
+  dedup $ settlement.executor :: concatMap (\leg -> [leg._2.sender.owner, leg._2.receiver.owner]) (toList transferLegs)
 
 -- | Convenience function read out the overridden allocation controllers.
 allocationControllers : AllocationSpecification -> [Party]
@@ -195,7 +196,7 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).senders
+    controller concatMap (\acc -> acc.owner :: optionalToList acc.provider) (view this).senders
     do allocation_withdrawImpl this self arg
 
 -- AllocationTransferAuthorization

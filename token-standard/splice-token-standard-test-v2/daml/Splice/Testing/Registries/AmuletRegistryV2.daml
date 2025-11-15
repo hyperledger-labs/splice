@@ -219,7 +219,7 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getAmuletRulesTransferContext registry
-  (optPreapproval, preapprovalC) <- lookupPreapprovalWithContext registry arg.transfer.receiver
+  (optPreapproval, preapprovalC) <- lookupPreapprovalWithContext registry arg.transfer.receiver.owner
   featuredAppRightC <- case optPreapproval of
     None -> pure emptyOpenApiChoiceContext
     Some preapproval -> getFeaturedAppRightContext registry preapproval.provider

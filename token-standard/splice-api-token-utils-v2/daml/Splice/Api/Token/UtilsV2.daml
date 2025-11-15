@@ -19,7 +19,7 @@ import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 import DA.Time
 import DA.Date
 import DA.Text (parseInt)
-import DA.Optional (fromOptional)
+import DA.Optional (fromSome, fromOptional)
 
 -- Utils
 --------
@@ -37,6 +37,10 @@ decodeTime t = case parseInt t of
   Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
   None -> error ("Cannot parse time " <> t)
 
+insertOptional : Text -> Optional a -> TextMap.TextMap a -> TextMap.TextMap a
+insertOptional k ov m = case ov of
+  None -> m
+  Some v -> TextMap.insert k v m
 -- Holding
 ----------
 
@@ -51,7 +55,10 @@ holdingv1_to_v2 : HoldingV1.HoldingView -> HoldingV2.HoldingView
 holdingv1_to_v2 v1 = v2
   where
     v2 = HoldingV2.HoldingView with
-      owner = v1.owner
+      account = HoldingV2.Account with
+        provider = (TextMap.lookup "canton.network/account.provider" v1.meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/account.id" v1.meta.values
+        owner = v1.owner
       instrumentId = instrumentId_v1_to_v2 v1.instrumentId
       amount = v1.amount
       lock = fmap lock_v1_to_v2 v1.lock
@@ -67,12 +74,17 @@ lock_v2_to_v1 HoldingV2.Lock{..} = HoldingV1.Lock with ..
 holding_v2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
 holding_v2_to_v1 v2 = v1
   where
+    meta' = Metadata with 
+      values = 
+        insertOptional "canton.network/account.provider" (partyToText <$> v2.account.provider) $
+        insertOptional "canton.network/account.id" (v2.account.id) $
+        v2.meta.values
     v1 = HoldingV1.HoldingView with
-      owner = v2.owner
+      owner = v2.account.owner
       instrumentId = instrumentId_v2_to_v1 v2.instrumentId
       amount = v2.amount
       lock = fmap lock_v2_to_v1 v2.lock
-      meta = v2.meta
+      meta = meta'
 
 -- Allocation
 -------------
@@ -100,7 +112,21 @@ transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> AllocationV2.TransferLeg
 transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} = 
   AllocationV2.TransferLeg with
     instrumentId = instrumentId_v1_to_v2 instrumentId
+    sender = senderAccount
+    receiver = receiverAccount
     ..
+  where
+    senderAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/sender.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/sender.id" meta.values
+        owner = sender
+    receiverAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/receiver.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/receiver.id" meta.values
+        owner = receiver
+
 
 allocation_specification_v1_to_v2 : AllocationV1.AllocationSpecification -> AllocationV2.AllocationSpecification
 allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} = 
@@ -122,9 +148,20 @@ allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
     requiredReceiverAuth
     expiresAt
   where
-    senders = case TextMap.lookup "canton.network/senders" meta.values of
-      None -> [allocation.transferLeg.sender]
-      Some ol -> [allocation.transferLeg.sender] -- TODO: Parse extra auth list.
+    numExtraSenders = TextMap.lookup "canton.network/numExtraSenders" meta.values >>= parseInt
+    sender = HoldingV2.Account with
+      owner = allocation.transferLeg.sender
+      provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
+      id = TextMap.lookup "canton.network/sender.id" meta.values
+    extraSenders = case numExtraSenders of 
+      None -> []
+      Some num -> map
+        (\n -> HoldingV2.Account with
+          owner = fromSome $ TextMap.lookup ("canton.network/sender[" <> show n <> "].owner") meta.values >>= partyFromText
+          provider = TextMap.lookup ("canton.network/sender[" <> show n <> "].provider") meta.values >>= partyFromText
+          id = TextMap.lookup ("canton.network/sender[" <> show n <> "].id") meta.values)
+        [1..num]
+    senders = sender::extraSenders
     requiredReceiverAuth = case TextMap.lookup "canton.network/requiredReceiverAuth" meta.values of
       None -> []
       Some ol -> [] -- TODO: Parse extra auth list.
@@ -159,7 +196,18 @@ transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
 transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} = 
   AllocationV1.TransferLeg with
     instrumentId = instrumentId_v2_to_v1 instrumentId
+    sender = sender.owner
+    receiver = receiver.owner
+    meta = meta'
     ..
+  where
+   meta' = Metadata with 
+      values = 
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
+        insertOptional "canton.network/sender.id" (sender.id) $
+        insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
+        insertOptional "canton.network/receiver.id" (receiver.id) $
+        meta.values
 
 allocation_specification_v2_to_v1 : AllocationV2.AllocationSpecification -> AllocationV1.AllocationSpecification
 allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} = 
@@ -184,17 +232,27 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
     allocation = allocation_specification_v2_to_v1 allocation
     holdingCids = map coerceInterfaceContractId holdingCids
     meta = meta'
-  where
-    insertOptional k ov m = case ov of
-      None -> m
-      Some v -> TextMap.insert k v m
-    meta' = Metadata with
+  where 
+    sender::extraSenders = senders
+    meta0 = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
-        TextMap.insert "canton.network/senders" (show senders) $ 
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
+        insertOptional "canton.network/sender.id" (sender.id) $ 
         TextMap.insert "canton.network/requiredReceiverAuth" (show requiredReceiverAuth) $
         insertOptional "canton.network/expiresAt" (fmap encodeTime expiresAt) $
         meta.values
+    meta' = Metadata with
+      values = foldl
+        (\acc (s, n) ->
+          TextMap.insert ("canton.network/sender[" <> show n <> "].owner") (partyToText s.owner) $
+          insertOptional ("canton.network/sender[" <> show n <> "].provider") (partyToText <$> s.provider) $
+          insertOptional ("canton.network/sender[" <> show n <> "].id") (s.id) $
+          acc
+        )
+        meta0.values
+        (zip extraSenders [1..(length extraSenders)])
+      
 
 -- Choices
 
@@ -371,15 +429,26 @@ allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.Allocatio
 transfer_v1_to_v2 : TransferInstructionV1.Transfer -> TransferInstructionV2.Transfer
 transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
   TransferInstructionV2.Transfer with
-    sender
-    receiver
+    sender = senderAccount
+    receiver = receiverAccount
     amount
     instrumentId = instrumentId_v1_to_v2 instrumentId
     requestedAt
     executeBefore
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     meta
-  
+  where
+    senderAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/sender.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/sender.id" meta.values
+        owner = sender
+    receiverAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/receiver.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/receiver.id" meta.values
+        owner = receiver
+
 transfer_instruction_status_v1_to_v2 : TransferInstructionV1.TransferInstructionStatus -> TransferInstructionV2.TransferInstructionStatus
 transfer_instruction_status_v1_to_v2 tis = case tis of
   TransferInstructionV1.TransferPendingReceiverAcceptance -> 
@@ -400,14 +469,23 @@ transfer_instruction_view_v1_to_v2 TransferInstructionV1.TransferInstructionView
 transfer_v2_to_v1 : TransferInstructionV2.Transfer -> TransferInstructionV1.Transfer
 transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
   TransferInstructionV1.Transfer with
-    sender
-    receiver
+    sender = sender.owner
+    receiver = receiver.owner
     amount
     instrumentId = instrumentId_v2_to_v1 instrumentId
     requestedAt
     executeBefore
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
-    meta
+    meta = meta'
+    ..
+  where
+   meta' = Metadata with 
+      values = 
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
+        insertOptional "canton.network/sender.id" (sender.id) $
+        insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
+        insertOptional "canton.network/receiver.id" (receiver.id) $
+        meta.values
 
 transfer_instruction_status_v2_to_v1 : TransferInstructionV2.TransferInstructionStatus -> TransferInstructionV1.TransferInstructionStatus
 transfer_instruction_status_v2_to_v1 tis = case tis of
@@ -449,15 +527,16 @@ transferInstruction_v1_acceptImpl this self TransferInstructionV1.TransferInstru
   resv2 <- TransferInstructionV2.transferInstruction_acceptImpl 
     this
     (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
-    (TransferInstructionV2.TransferInstruction_Accept{..})
+    (TransferInstructionV2.TransferInstruction_Accept{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
+    
 
 transferInstruction_v1_rejectImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Reject -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_rejectImpl this self TransferInstructionV1.TransferInstruction_Reject{..} = do
   resv2 <- TransferInstructionV2.transferInstruction_rejectImpl 
     this
     (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
-    (TransferInstructionV2.TransferInstruction_Reject{..})
+    (TransferInstructionV2.TransferInstruction_Reject{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
 transferInstruction_v1_withdrawImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Withdraw -> Update TransferInstructionV1.TransferInstructionResult
@@ -465,7 +544,7 @@ transferInstruction_v1_withdrawImpl this self TransferInstructionV1.TransferInst
   resv2 <- TransferInstructionV2.transferInstruction_withdrawImpl 
     this
     (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
-    (TransferInstructionV2.TransferInstruction_Withdraw{..})
+    (TransferInstructionV2.TransferInstruction_Withdraw{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
 transferInstruction_v1_updateImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Update -> Update TransferInstructionV1.TransferInstructionResult
@@ -496,6 +575,7 @@ transfer_factory_transfer_v1_to_v2 TransferInstructionV1.TransferFactory_Transfe
   TransferInstructionV2.TransferFactory_Transfer with
     expectedAdmin
     transfer = transfer_v1_to_v2 transfer
+    actor = None
     extraArgs
 
 transferFactory_v1_transferImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_Transfer -> Update TransferInstructionV1.TransferInstructionResult

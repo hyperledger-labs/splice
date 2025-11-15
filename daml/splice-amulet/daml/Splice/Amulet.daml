@@ -115,7 +115,10 @@ template Amulet
 
     interface instance Api.Token.HoldingV2.Holding for Amulet where
       view = Api.Token.HoldingV2.HoldingView with
-        owner
+        account = Api.Token.HoldingV2.Account with
+          owner
+          provider = None
+          id = None
         instrumentId = amuletInstrumentId dso
         amount = amount.initialAmount
         lock = None
@@ -141,7 +144,10 @@ template LockedAmulet
     
     interface instance Api.Token.HoldingV2.Holding for LockedAmulet where
       view = Api.Token.HoldingV2.HoldingView with
-        owner = amulet.owner
+        account = Api.Token.HoldingV2.Account with
+          owner = amulet.owner
+          provider = None
+          id = None
         instrumentId = amuletInstrumentId amulet.dso
         amount = amulet.amount.initialAmount
         lock = Some Api.Token.HoldingV2.Lock with

@@ -21,8 +21,8 @@ template AmuletTransferInstruction
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for executing the transfer upon acceptance
     transfer : Splice.Api.Token.TransferInstructionV2.Transfer
   where
-    signatory transfer.instrumentId.admin, transfer.sender
-    observer transfer.receiver
+    signatory transfer.instrumentId.admin, transfer.sender.owner
+    observer transfer.receiver.owner
 
     interface instance TransferInstruction for AmuletTransferInstruction where
       view = TransferInstructionView with
@@ -62,13 +62,13 @@ standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV2.Trans
 standardTransferToTwoStepTransfer transfer =
   TwoStepTransfer with
     dso = transfer.instrumentId.admin
-    sender = transfer.sender
-    provider = transfer.sender
-    outputs = [(transfer.receiver, transfer.amount)]
+    sender = transfer.sender.owner
+    provider = transfer.sender.owner
+    outputs = [(transfer.receiver.owner, transfer.amount)]
     transferBefore = transfer.executeBefore
     transferBeforeDeadline = "Transfer.executeBefore"
     allowFeaturing = False -- unfeatured as the sender is serving as its own "app provider"
-    lockContext = "transfer to " <> show transfer.receiver
+    lockContext = "transfer to " <> show transfer.receiver.owner
 
 executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 executeTransferInstr instr extraArgs = do

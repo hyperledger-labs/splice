@@ -8,12 +8,13 @@ import qualified DA.Map as Map
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
+import DA.Optional (fromOptional)
 
 -- | A specification of a transfer of holdings between parties parties.
 data Transfer = Transfer with
-    sender : Party
+    sender : Account
       -- ^ The sender of the transfer.
-    receiver : Party
+    receiver : Account
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
@@ -48,7 +49,7 @@ data TransferInstructionResult = TransferInstructionResult with
      -- ^ The output of the step.
     senderChangeCids : [ContractId Holding]
       -- ^ New holdings owned by the sender created to return "change". Can be used
-      -- by callers to batch creating or updating multiple transfer instructions
+      -- by actors to batch creating or updating multiple transfer instructions
       -- in a single Daml transaction.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
@@ -130,9 +131,11 @@ interface TransferInstruction where
     -- this is not guaranteed. The result of the choice is implementation-specific and MAY
     -- be any of the three possible results.
     with
+      actor : Optional Party
+        -- ^ The party calling Accept, if different from the owner or the recipient account
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.receiver
+    controller fromOptional (view this).transfer.receiver.owner actor
     do transferInstruction_acceptImpl this self arg
 
   choice TransferInstruction_Reject : TransferInstructionResult
@@ -141,17 +144,21 @@ interface TransferInstruction where
     -- This choice is only available if the instruction is in
     -- `TransferPendingReceiverAcceptance` state.
     with
+      actor : Optional Party
+        -- ^ The party calling Reject, if different from the owner or the recipient account
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.receiver
+    controller fromOptional (view this).transfer.receiver.owner actor
     do transferInstruction_rejectImpl this self arg
 
   choice TransferInstruction_Withdraw : TransferInstructionResult
     -- ^ Withdraw the transfer instruction as the sender.
     with
+      actor : Optional Party
+        -- ^ The party calling Withdraw, if different from the owner or the source account
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.sender
+    controller fromOptional (view this).transfer.sender.owner actor
     do transferInstruction_withdrawImpl this self arg
 
   choice TransferInstruction_Update : TransferInstructionResult
@@ -192,9 +199,11 @@ interface TransferFactory where
         -- that check the expected admin party.
       transfer : Transfer
         -- ^ The transfer to execute.
+      actor : Optional Party
+        -- ^ The party instructing the transfer, if different from the owner or the source account
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
-    controller transfer.sender
+    controller fromOptional transfer.sender.owner actor
     do transferFactory_transferImpl this self arg
 
   nonconsuming choice TransferFactory_PublicFetch : TransferFactoryView

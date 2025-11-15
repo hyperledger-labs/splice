@@ -10,7 +10,7 @@ module Splice.AmuletAllocation (
 import DA.Assert((===), (=/=))
 import DA.Text as Text
 import DA.TextMap qualified as TextMap
-import DA.List ((\\), dedupSort)
+import DA.List (dedupSort)
 import DA.Optional(fromSome)
 
 import Splice.Api.Token.MetadataV1
@@ -39,7 +39,7 @@ template AmuletAllocation
       all 
         (\(_,tl) -> (
             -- Sender needs to appear as sender or receiver of each leg.
-            sender `elem` [tl.sender, tl.receiver]) 
+            sender `elem` [tl.sender.owner, tl.receiver.owner]) 
             -- Only one admin Id allowed.
             && tl.instrumentId.admin == admin) 
         (TextMap.toList allocation.transferLegs)
@@ -49,8 +49,8 @@ template AmuletAllocation
         allocation
         holdingCids = [toInterfaceContractId lockedAmulet]
         meta = emptyMetadata
-        senders = [sender]
-        requiredReceiverAuth = (defaultAllocationControllers allocation) \\ (sender::allocationControllers allocation)
+        senders = [basicAccount sender]
+        requiredReceiverAuth = filter (\a -> a.owner /= sender) (map (\(_, tl) -> tl.receiver) (TextMap.toList allocation.transferLegs))
         expiresAt = Some expiresAt
 
       allocation_executeTransferImpl self Allocation_ExecuteTransfer{..} = case extraAuth of
@@ -96,7 +96,7 @@ template AmuletAllocation
 
 allocationReceivers : AllocationSpecification -> [Party]
 allocationReceivers AllocationSpecification{..} =
-  dedupSort $ map ((.receiver) . snd) (TextMap.toList transferLegs)
+  dedupSort $ map ((.receiver.owner) . snd) (TextMap.toList transferLegs)
 
 -- Allocation usage
 -------------------
@@ -104,7 +104,7 @@ allocationReceivers AllocationSpecification{..} =
 allocationAmount : Party -> AllocationSpecification -> Decimal
 allocationAmount sender allocation = sum (map (._2) outputs)
   where
-    senderLegs = filter (\tl -> tl.sender == sender) $ map snd (TextMap.toList allocation.transferLegs)
+    senderLegs = filter (\tl -> tl.sender.owner == sender) $ map snd (TextMap.toList allocation.transferLegs)
     outputs = map (\tl -> (tl.receiver, tl.amount)) senderLegs
 
 allocationToTwoStepTransfer : Party -> Party -> Time -> AllocationSpecification -> TwoStepTransfer
@@ -121,8 +121,8 @@ allocationToTwoStepTransfer sender admin expiresAt allocation =
       -- We don't show more context to avoid bloating the response here.
       ["allocation for settlement ", allocation.settlement.settlementRef.id]
   where
-    senderLegs = filter (\tl -> tl.sender == sender) $ map snd (TextMap.toList allocation.transferLegs)
-    outputs = map (\tl -> (tl.receiver, tl.amount)) senderLegs
+    senderLegs = filter (\tl -> tl.sender.owner == sender) $ map snd (TextMap.toList allocation.transferLegs)
+    outputs = map (\tl -> (tl.receiver.owner, tl.amount)) senderLegs
 
 
 collectAuthAndSettle : ContractId AmuletAllocation -> ExtraArgs -> [ContractId AllocationTransferAuthorization] -> [Party] -> Update Allocation_ExecuteTransferResult
@@ -163,7 +163,10 @@ template AmuletAllocationTransferAuthorization
     interface instance AllocationTransferAuthorization for AmuletAllocationTransferAuthorization where
       view = AllocationTransferAuthorizationView with 
         allocation
-        receiver
+        receiver = Account with
+          owner = receiver
+          provider = None
+          id = None
         admin
 
     choice AmuletAllocationTransferAuthorization_AuthorizeTransfer : Allocation_ExecuteTransferResult

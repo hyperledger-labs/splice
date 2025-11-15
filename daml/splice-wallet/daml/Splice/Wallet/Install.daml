@@ -28,6 +28,7 @@ import Splice.Wallet.TopUpState
 import Splice.Wallet.TransferPreapproval
 import Prelude hiding (forA)
 import Splice.Util
+import Splice.Api.Token.HoldingV2 qualified as HoldingV2 (owner, Account(Account))
 
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
@@ -591,7 +592,7 @@ template WalletAppInstall
         transferArg : Splice.Api.Token.TransferInstructionV2.TransferFactory_Transfer
       controller validatorParty
       do let transfer = transferArg.transfer
-         require ("sender " <> show transfer.sender <> " is endUserParty " <> show endUserParty) (transfer.sender == endUserParty)
+         require ("sender " <> show transfer.sender <> " is endUserParty " <> show endUserParty) (transfer.sender.owner == endUserParty)
          require ("instrumentId " <> show transfer.instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (transfer.instrumentId == amuletInstrumentId dsoParty)
          require ("expected admin " <> show transferArg.expectedAdmin <> " is dso " <> show dsoParty) (transferArg.expectedAdmin == dsoParty)
          exercise transferFactoryCid transferArg
@@ -602,7 +603,7 @@ template WalletAppInstall
         acceptArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Accept
       controller validatorParty
       do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
-         let receiver = (view instruction).transfer.receiver
+         let receiver = (view instruction).transfer.receiver.owner
          require ("receiver " <> show receiver <> " must match endUserParty " <> show endUserParty) (receiver == endUserParty)
          exercise transferInstructionCid acceptArg
 
@@ -612,7 +613,7 @@ template WalletAppInstall
         rejectArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Reject
       controller validatorParty
       do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
-         let receiver = (view instruction).transfer.receiver
+         let receiver = (view instruction).transfer.receiver.owner
          require ("receiver " <> show receiver <> " must match endUserParty " <> show endUserParty) (receiver == endUserParty)
          exercise transferInstructionCid rejectArg
 
@@ -622,7 +623,7 @@ template WalletAppInstall
         withdrawArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Withdraw
       controller validatorParty
       do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
-         let sender = (view instruction).transfer.sender
+         let sender = (view instruction).transfer.sender.owner
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise transferInstructionCid withdrawArg
 
@@ -636,7 +637,7 @@ template WalletAppInstall
       controller validatorParty
       do require ("expected admin " <> show allocateArg.expectedAdmin <> " is dso " <> show dsoParty) (allocateArg.expectedAdmin == dsoParty)
          forA_ allocateArg.allocation.transferLegs (\Splice.Api.Token.AllocationV2.TransferLeg{sender; instrumentId} -> do
-              require ("sender " <> show sender <> " is endUserParty " <> show endUserParty) (sender == endUserParty)
+              require ("sender " <> show sender <> " is endUserParty " <> show endUserParty) (sender.owner == endUserParty)
               require ("instrumentId " <> show instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (instrumentId == amuletInstrumentId dsoParty)
             )
          exercise allocationFactory allocateArg
@@ -648,7 +649,7 @@ template WalletAppInstall
       controller validatorParty
       do allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
           -- Amulet only supports a single sender per allocation
-         let [sender] = (view allocation).senders
+         let [HoldingV2.Account{HoldingV2.owner = sender}] = (view allocation).senders
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise allocationCid withdrawArg
 

@@ -30,6 +30,7 @@ import Splice.Testing.UtilsV2
 import Splice.Testing.Registries.AmuletRegistryV2.Parameters
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
+import qualified Splice.Api.Token.HoldingV2 as HoldingV2
 import qualified Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import qualified Splice.Api.Token.AllocationInstructionV2 as Api.Token.AllocationInstructionV2
 import Splice.Api.Token.TransferInstructionV2 (TransferFactory_Transfer(..))
@@ -1004,8 +1005,8 @@ testTokenStandardTransfer = script do
 
   let
     defaultTransfer = Api.Token.TransferInstructionV2.Transfer with
-      sender = alice
-      receiver = bob
+      sender = HoldingV2.basicAccount alice
+      receiver = HoldingV2.basicAccount bob
       amount = 10.0
       instrumentId = registry.instrumentId
       requestedAt = now
@@ -1014,14 +1015,15 @@ testTokenStandardTransfer = script do
       meta = emptyMetadata
 
   let transfer = defaultTransfer with
-        sender = alice
-        receiver = bob
+        sender = HoldingV2.basicAccount alice
+        receiver = HoldingV2.basicAccount bob
         inputHoldingCids = [coerceInterfaceContractId holdingCid]
 
   enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
+    actor = None
 
   result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
@@ -1036,6 +1038,7 @@ testTokenStandardTransfer = script do
       extraArgs = ExtraArgs with
         context = context.choiceContext
         meta = emptyMetadata
+      actor = None
 
   Api.Token.TransferInstructionV2.TransferInstructionResult_Failed === result.output
   let change2 = result.senderChangeCids
@@ -1047,6 +1050,7 @@ testTokenStandardTransfer = script do
       transfer = enrichedChoice.arg.transfer with
         inputHoldingCids = change1 ++ change2
       extraArgs = enrichedChoice.arg.extraArgs
+      actor = None
 
   Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change3 = result.senderChangeCids
@@ -1057,6 +1061,7 @@ testTokenStandardTransfer = script do
       extraArgs = ExtraArgs with
         context = context.choiceContext
         meta = emptyMetadata
+      actor = None
 
   Api.Token.TransferInstructionV2.TransferInstructionResult_Failed === result.output
   let change4 = result.senderChangeCids
@@ -1068,6 +1073,7 @@ testTokenStandardTransfer = script do
       transfer = enrichedChoice.arg.transfer with
         inputHoldingCids = change3 ++ change4
       extraArgs = enrichedChoice.arg.extraArgs
+      actor = None
 
   Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   context <- RegistryApi.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
@@ -1078,6 +1084,7 @@ testTokenStandardTransfer = script do
       extraArgs = ExtraArgs with
         context = context.choiceContext
         meta = emptyMetadata
+      actor = None
 
   Api.Token.TransferInstructionV2.TransferInstructionResult_Completed _ <- pure result.output
 
@@ -1099,13 +1106,14 @@ testTokenStandardAllocate = script do
     validatorParty = aliceValidator
 
   let amuletId = registry.instrumentId
+  let aliceAccount = HoldingV2.basicAccount alice
   let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
         sender
         receiver
         amount
         instrumentId = amuletId
         meta = emptyMetadata
-  let aliceLeg = mkTransfer alice alice 100.0
+  let aliceLeg = mkTransfer aliceAccount aliceAccount 100.0
 
   -- provider proposes a trade for alice with herself
   now <- getTime
