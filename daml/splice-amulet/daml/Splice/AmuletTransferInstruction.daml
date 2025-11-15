@@ -7,7 +7,9 @@ module Splice.AmuletTransferInstruction (
 ) where
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
@@ -17,10 +19,10 @@ import Splice.Amulet.TwoStepTransfer
 template AmuletTransferInstruction
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for executing the transfer upon acceptance
-    transfer : Splice.Api.Token.TransferInstructionV1.Transfer
+    transfer : Splice.Api.Token.TransferInstructionV2.Transfer
   where
-    signatory transfer.instrumentId.admin, transfer.sender
-    observer transfer.receiver
+    signatory transfer.instrumentId.admin, transfer.sender.owner
+    observer transfer.receiver.owner
 
     interface instance TransferInstruction for AmuletTransferInstruction where
       view = TransferInstructionView with
@@ -41,22 +43,32 @@ template AmuletTransferInstruction
       transferInstruction_withdrawImpl _self arg = do
         abortAmuletTransferInstruction this arg.extraArgs
 
+    interface instance TransferInstructionV1.TransferInstruction for AmuletTransferInstruction where
+      view = transfer_instruction_view_v2_to_v1 (view (toInterface @TransferInstruction this))
+
+      TransferInstructionV1.transferInstruction_acceptImpl = transferInstruction_v1_acceptImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_rejectImpl = transferInstruction_v1_rejectImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_updateImpl = transferInstruction_v1_updateImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_withdrawImpl = transferInstruction_v1_withdrawImpl (toInterface @TransferInstruction this)
+
+
+
+
 
 -- Transfer instruction evolution
 ---------------------------------
 
-standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV1.Transfer-> TwoStepTransfer
+standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV2.Transfer-> TwoStepTransfer
 standardTransferToTwoStepTransfer transfer =
   TwoStepTransfer with
     dso = transfer.instrumentId.admin
-    sender = transfer.sender
-    provider = transfer.sender
-    receiver = transfer.receiver
-    amount = transfer.amount
+    sender = transfer.sender.owner
+    provider = transfer.sender.owner
+    outputs = [(transfer.receiver.owner, transfer.amount)]
     transferBefore = transfer.executeBefore
     transferBeforeDeadline = "Transfer.executeBefore"
     allowFeaturing = False -- unfeatured as the sender is serving as its own "app provider"
-    lockContext = "transfer to " <> show transfer.receiver
+    lockContext = "transfer to " <> show transfer.receiver.owner
 
 executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 executeTransferInstr instr extraArgs = do
@@ -64,9 +76,11 @@ executeTransferInstr instr extraArgs = do
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
-    senderChangeCids = senderHoldingCids
+    -- TODO! This will change once there's a transfer instruction v2
+    senderChangeCids = (map coerceInterfaceContractId senderHoldingCids)
     output = TransferInstructionResult_Completed with
-      receiverHoldingCids
+    -- TODO! This will change once there's a transfer instruction v2
+      receiverHoldingCids = (map coerceInterfaceContractId receiverHoldingCids)
     meta
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
@@ -74,6 +88,7 @@ abortAmuletTransferInstruction instr extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
-    senderChangeCids = senderHoldingCids
+    -- TODO! This will change once there's a transfer instruction v2
+    senderChangeCids = (map coerceInterfaceContractId senderHoldingCids)
     output = TransferInstructionResult_Failed
     meta = emptyMetadata

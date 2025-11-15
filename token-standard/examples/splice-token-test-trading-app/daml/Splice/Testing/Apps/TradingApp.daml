@@ -6,6 +6,7 @@
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
 module Splice.Testing.Apps.TradingApp where
 
+import DA.Assert ((===))
 import DA.Foldable qualified as F
 import DA.Optional (fromOptional, fromSomeNote)
 import DA.Set as Set
@@ -112,7 +113,10 @@ template OTCTrade
           -- fetch and validate the allocation instruction
           instr <- fetch @Allocation allocCid
           let instrView = view @Allocation instr
-          require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
+          case matchAllocationWithMeta expectedAlloc instrView.allocation of
+            Right () -> return ()
+            Left mismatch -> abort
+              ("Submitted allocation does not match expected allocation." <> "\nMismatch: " <> mismatch)
           exercise allocCid (Allocation_ExecuteTransfer extraArgs)
 
 
@@ -144,7 +148,10 @@ template OTCTrade
             let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected leg " <> legId) optExpectedAlloc
             instr <- fetch @Allocation allocCid
             let instrView = view @Allocation instr
-            require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
+            case matchAllocationWithMeta expectedAlloc instrView.allocation of
+              Right () -> return ()
+              Left mismatch -> abort
+                ("Submitted allocation does not match expected allocation." <> "\nMismatch: " <> mismatch)
             exercise allocCid (Allocation_Cancel extraArgs)
 
 
@@ -203,3 +210,39 @@ forTextMapWithKey m f =
     TextMap.fromList <$> mapA f' (TextMap.toList m)
   where
     f' (k, v) = (k,) <$> f k v
+
+-- Utility for matching with metadata
+-------------------------------------
+
+-- If an app has an expected allocation and receives a allocation, it needs
+-- to check whether they match. The received may have extra metadata so a simple
+-- equality check is insufficient. This function checks that the received
+-- has only _additional_ metadata.
+
+matchMeta : Metadata -> Metadata -> Either Text ()
+matchMeta expected received = do
+  F.forA_ (TextMap.toList expected.values) (\(k, v) -> do
+      case TextMap.lookup k received.values of
+        None -> abort ("Entry missing in received metadata: " <> k)
+        Some w
+          | w == v -> return ()
+          | otherwise -> abort ("Matadata entry " <> k <> "doesn't match.\nExpected: " <> v <> "\nReceived: " <> w)
+    )
+
+matchAllocationWithMeta : AllocationSpecification -> AllocationSpecification -> Either Text ()
+matchAllocationWithMeta expected received = do
+  let
+    baseExpected = expected with
+      transferLeg = expected.transferLeg with
+        meta = emptyMetadata
+      settlement = expected.settlement with
+        meta = emptyMetadata
+    baseReceived = received with
+      transferLeg = received.transferLeg with
+        meta = emptyMetadata
+      settlement = received.settlement with
+        meta = emptyMetadata
+  baseExpected === baseReceived
+  matchMeta expected.settlement.meta received.settlement.meta
+  matchMeta expected.transferLeg.meta received.transferLeg.meta
+
