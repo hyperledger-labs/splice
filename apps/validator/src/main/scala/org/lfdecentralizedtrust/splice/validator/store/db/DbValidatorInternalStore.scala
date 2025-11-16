@@ -60,14 +60,12 @@ class DbValidatorInternalStore(
 
     val typedOptionT: OptionT[FutureUnlessShutdown, T] = jsonOptionF.subflatMap { json =>
       json.as[T] match {
-        case Right(typedValue) =>
-          {
-            logger.debug(
-              s"retrieved validator config from database with key '$key' and value '${json.noSpaces}'"
-            )
-            Some(typedValue)
-          }
-
+        case Right(typedValue) => {
+          logger.debug(
+            s"retrieved validator config from database with key '$key' and value '${json.noSpaces}'"
+          )
+          Some(typedValue)
+        }
 
         case Left(error) => {
           logger.error(
