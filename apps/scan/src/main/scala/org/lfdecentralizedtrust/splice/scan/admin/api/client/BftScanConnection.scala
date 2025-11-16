@@ -870,7 +870,7 @@ object BftScanConnection {
     protected val initialScanConnections: Seq[SingleScanConnection]
     protected val initialFailedConnections: Map[Uri, Throwable]
     protected val connectionBuilder: Uri => Future[SingleScanConnection]
-    protected val persistScanUrlCallback: Option[Seq[DsoScan] => Future[Unit]]
+    protected val refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]]
     protected val getScans: BftScanConnection => Future[Seq[DsoScan]]
     val scansRefreshInterval: NonNegativeFiniteDuration
     val retryProvider: RetryProvider
@@ -945,7 +945,7 @@ object BftScanConnection {
 
         filteredScans = filterScans(scansInDsoRules)
 
-        _ = persistScanUrlCallback.map(f => f(filteredScans))
+        _ = refreshScanUrlsCallback.map(f => f(filteredScans))
 
         newState <- computeNewState(retriedCurrentState, filteredScans)
       } yield {
@@ -1066,7 +1066,7 @@ object BftScanConnection {
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
       override val connectionBuilder: Uri => Future[SingleScanConnection],
-      protected val persistScanUrlCallback: Option[Seq[DsoScan] => Future[Unit]],
+      protected val refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
       override val getScans: BftScanConnection => Future[Seq[DsoScan]],
       override val scansRefreshInterval: NonNegativeFiniteDuration,
       override val retryProvider: RetryProvider,
@@ -1093,7 +1093,7 @@ object BftScanConnection {
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
       override val connectionBuilder: Uri => Future[SingleScanConnection],
-      protected val persistScanUrlCallback: Option[Seq[DsoScan] => Future[Unit]],
+      protected val refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
       override val getScans: BftScanConnection => Future[Seq[DsoScan]],
       override val scansRefreshInterval: NonNegativeFiniteDuration,
       override val retryProvider: RetryProvider,
@@ -1185,7 +1185,7 @@ object BftScanConnection {
       loggerFactory: NamedLoggerFactory,
       builder: (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection],
       lastPersistedScanUrlList: Option[Seq[DsoScan]],
-      persistScanUrlCallback: Option[Seq[DsoScan] => Future[Unit]],
+      refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -1193,7 +1193,7 @@ object BftScanConnection {
   ): Future[BftScanConnection] = {
     val logger = loggerFactory.getTracedLogger(getClass)
 
-    val persistedUris: NonEmptyList[Uri] = lastPersistedScanUrlList match {
+    val bootstrapUris: NonEmptyList[Uri] = lastPersistedScanUrlList match {
       case Some(scans) if scans.nonEmpty => {
         val urls = NonEmptyList.fromList(scans.map(_.publicUrl).toList)
         urls.getOrElse { seedUris }
@@ -1202,7 +1202,7 @@ object BftScanConnection {
     }
 
     for {
-      initialSeedConnections <- persistedUris.traverse(uri =>
+      initialSeedConnections <- bootstrapUris.traverse(uri =>
         builder(uri, amuletRulesCacheTimeToLive).transformWith {
           case Success(conn) => Future.successful(Right(conn))
           case Failure(err) => Future.successful(Left(uri -> err))
@@ -1217,7 +1217,7 @@ object BftScanConnection {
           Future.failed(
             Status.UNAVAILABLE
               .withDescription(
-                s"Failed to connect to any seed URLs for bootstrapping: ${persistedUris.toList}"
+                s"Failed to connect to any seed URLs for bootstrapping: ${bootstrapUris.toList}"
               )
               .asRuntimeException()
           )
@@ -1226,7 +1226,7 @@ object BftScanConnection {
             successfulSeedConnections,
             failedSeeds.toMap,
             uri => builder(uri, amuletRulesCacheTimeToLive),
-            persistScanUrlCallback,
+            refreshScanUrlsCallback,
             Bft.getScansInDsoRules,
             scansRefreshInterval,
             retryProvider,
@@ -1254,8 +1254,8 @@ object BftScanConnection {
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
-      persistScanUrlCallback: Option[Seq[DsoScan] => Future[Unit]],
-      lastPersistedScanUrlList: Option[Seq[DsoScan]],
+      refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
+      lastPersistedScanUrlList: Future[Option[List[(String, String)]]],
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -1266,6 +1266,10 @@ object BftScanConnection {
 
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
     val logger = loggerFactory.getTracedLogger(getClass)
+
+    val lastPersistedDsoScansFuture: Future[Option[Seq[DsoScan]]] = lastPersistedScanUrlList.map { rs =>
+      { rs.map(list => list.map { case (url, svName) => DsoScan(Uri(url), svName) }) }
+    }
 
     config match {
       case BftScanClientConfig.TrustSingle(url, ttl) =>
@@ -1287,6 +1291,7 @@ object BftScanConnection {
         // In the future, add a new threshold for how many trusted seed-urls should be there.
 
         for {
+          lastPersistedDsoScans <-lastPersistedDsoScansFuture
           tempBftConnection <- bootstrapWithSeedNodes(
             ts.seedUrls,
             ts.amuletRulesCacheTimeToLive,
@@ -1296,8 +1301,8 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
             builder,
-            lastPersistedScanUrlList,
-            persistScanUrlCallback,
+            lastPersistedDsoScans,
+            refreshScanUrlsCallback,
           )
 
           // Use the temporary connection to get a consensus on the full list of scans
@@ -1338,7 +1343,7 @@ object BftScanConnection {
             connections,
             failed.toMap,
             uri => builder(uri, ts.amuletRulesCacheTimeToLive),
-            persistScanUrlCallback,
+            refreshScanUrlsCallback,
             Bft.getScansInDsoRules,
             ts.scansRefreshInterval,
             retryProvider,
@@ -1375,7 +1380,7 @@ object BftScanConnection {
 
       case bft @ BftScanClientConfig.Bft(_, _, _) =>
         for {
-
+          lastPersistedDsoScans <-lastPersistedDsoScansFuture
           bftConnection <- bootstrapWithSeedNodes(
             bft.seedUrls,
             bft.amuletRulesCacheTimeToLive,
@@ -1385,8 +1390,8 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
             builder,
-            lastPersistedScanUrlList,
-            persistScanUrlCallback,
+            lastPersistedDsoScans,
+            refreshScanUrlsCallback,
           )
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,

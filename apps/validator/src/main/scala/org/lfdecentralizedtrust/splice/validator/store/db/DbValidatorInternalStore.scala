@@ -54,12 +54,21 @@ class DbValidatorInternalStore(
         WHERE config_key = $key
       """.as[Json].headOption
 
-    val jsonOptionF: OptionT[FutureUnlessShutdown, Json] =
+    val jsonOptionF: OptionT[FutureUnlessShutdown, Json] = {
       storage.querySingle(queryAction, "get-validator-internal-config")
+    }
 
     val typedOptionT: OptionT[FutureUnlessShutdown, T] = jsonOptionF.subflatMap { json =>
       json.as[T] match {
-        case Right(typedValue) => Some(typedValue)
+        case Right(typedValue) =>
+          {
+            logger.debug(
+              s"retrieved validator config from database with key '$key' and value '${json.noSpaces}'"
+            )
+            Some(typedValue)
+          }
+
+
         case Left(error) => {
           logger.error(
             s"Failed to decode config key '$key' to expected type T: ${error.getMessage}"

@@ -110,10 +110,8 @@ import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import scala.concurrent.{ExecutionContextExecutor, Future, Await}
-import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
-import org.apache.pekko.http.scaladsl.model.Uri
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -201,19 +199,19 @@ class ValidatorApp(
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: SpliceLedgerClient,
-  )(implicit traceContext: TraceContext): scala.concurrent.Future[Option[CantonTimestamp]] =
+  )(implicit traceContext: TraceContext): scala.concurrent.Future[Option[CantonTimestamp]] = {
+
+    val internalStore = new ValidatorConfigProvider(
+      ValidatorInternalStore(
+        storage,
+        loggerFactory,
+      )
+    )
+
     for {
       initialSynchronizerTime <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
-            _ <- Future.unit
-            internalStore = new ValidatorConfigProvider(
-              ValidatorInternalStore(
-                storage,
-                loggerFactory,
-              )
-            )
-
             scanConnection <- appInitStep("Getting BFT scan connection") {
               client.BftScanConnection(
                 ledgerClient,
@@ -449,6 +447,7 @@ class ValidatorApp(
           } yield initialSynchronizerTime
         }
     } yield initialSynchronizerTime
+  }
 
   private def readRestoreDump: Option[DomainMigrationDump] = config.restoreFromMigrationDump.map {
     path =>
@@ -717,28 +716,16 @@ class ValidatorApp(
 
   private def getPersistedScanList(
       validatorConfigProvider: ValidatorConfigProvider
-  )(implicit traceContext: TraceContext): Option[Seq[DsoScan]] = {
-    val futureOption: Future[Option[Seq[ScanUrlInternalConfig]]] =
-      validatorConfigProvider.getScanUrlInternalConfig().value
+  )(implicit traceContext: TraceContext): Future[Option[List[(String, String)]]] = {
 
-    val maybeInternalConfigs: Option[Seq[ScanUrlInternalConfig]] =
-      try {
-        Await.result(futureOption, 10.seconds) // what is the max waiting time?
-      } catch {
-        case e: Throwable =>
-          None
-      }
+    val optionTConfig = validatorConfigProvider.getScanUrlInternalConfig()
 
-    maybeInternalConfigs.map { internalConfigs =>
-      {
-        internalConfigs.map { internalConfig =>
-          DsoScan(
-            publicUrl = Uri(internalConfig.url),
-            svName = internalConfig.svName,
-          )
-        }
-      }
-    }
+    optionTConfig.map { internalConfigs =>
+      internalConfigs.map { internalConfig =>
+        (internalConfig.url, internalConfig.svName)
+      }.toList
+    }.value
+
   }
 
   override def initialize(
