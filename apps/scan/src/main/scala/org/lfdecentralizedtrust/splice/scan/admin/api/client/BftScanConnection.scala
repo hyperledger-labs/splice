@@ -870,7 +870,7 @@ object BftScanConnection {
     protected val initialScanConnections: Seq[SingleScanConnection]
     protected val initialFailedConnections: Map[Uri, Throwable]
     protected val connectionBuilder: Uri => Future[SingleScanConnection]
-    protected val refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]]
+    protected val refreshScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]]
     protected val getScans: BftScanConnection => Future[Seq[DsoScan]]
     val scansRefreshInterval: NonNegativeFiniteDuration
     val retryProvider: RetryProvider
@@ -945,7 +945,11 @@ object BftScanConnection {
 
         filteredScans = filterScans(scansInDsoRules)
 
-        _ = refreshScanUrlsCallback.map(f => f(filteredScans))
+        dsoScanSeq: Seq[(String, String)] = filteredScans.map(scan =>
+          (scan.svName, scan.publicUrl.toString)
+        )
+
+        _ = refreshScanUrlsCallback.map(f => f(dsoScanSeq))
 
         newState <- computeNewState(retriedCurrentState, filteredScans)
       } yield {
@@ -1066,7 +1070,7 @@ object BftScanConnection {
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
       override val connectionBuilder: Uri => Future[SingleScanConnection],
-      protected val refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
+      protected val refreshScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
       override val getScans: BftScanConnection => Future[Seq[DsoScan]],
       override val scansRefreshInterval: NonNegativeFiniteDuration,
       override val retryProvider: RetryProvider,
@@ -1093,7 +1097,7 @@ object BftScanConnection {
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
       override val connectionBuilder: Uri => Future[SingleScanConnection],
-      protected val refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
+      protected val refreshScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
       override val getScans: BftScanConnection => Future[Seq[DsoScan]],
       override val scansRefreshInterval: NonNegativeFiniteDuration,
       override val retryProvider: RetryProvider,
@@ -1185,7 +1189,7 @@ object BftScanConnection {
       loggerFactory: NamedLoggerFactory,
       builder: (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection],
       lastPersistedScanUrlList: Option[Seq[DsoScan]],
-      refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
+      refreshScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -1254,7 +1258,7 @@ object BftScanConnection {
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
-      refreshScanUrlsCallback: Option[Seq[DsoScan] => Future[Unit]],
+      refreshScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
       lastPersistedScanUrlList: Future[Option[List[(String, String)]]],
   )(implicit
       ec: ExecutionContextExecutor,

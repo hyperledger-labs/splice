@@ -108,7 +108,6 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -701,13 +700,14 @@ class ValidatorApp(
 
   private def persistScanUrlListBuilder(
       validatorConfigProvider: ValidatorConfigProvider
-  )(implicit traceContext: TraceContext): Seq[DsoScan] => Future[Unit] = {
-    (connections: Seq[DsoScan]) =>
+  )(implicit traceContext: TraceContext): Seq[(String, String)] => Future[Unit] = {
+
+    (connections: Seq[(String, String)]) =>
       {
-        val internalConfigs: Seq[ScanUrlInternalConfig] = connections.map { dsoScan =>
+        val internalConfigs: Seq[ScanUrlInternalConfig] = connections.map { case (url, svName) =>
           ScanUrlInternalConfig(
-            svName = dsoScan.svName,
-            url = dsoScan.publicUrl.toString,
+            svName = svName,
+            url = url,
           )
         }
         validatorConfigProvider.setScanUrlInternalConfig(internalConfigs)
