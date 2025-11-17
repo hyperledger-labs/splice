@@ -1267,8 +1267,9 @@ object BftScanConnection {
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
     val logger = loggerFactory.getTracedLogger(getClass)
 
-    val lastPersistedDsoScansFuture: Future[Option[Seq[DsoScan]]] = lastPersistedScanUrlList.map { rs =>
-      { rs.map(list => list.map { case (url, svName) => DsoScan(Uri(url), svName) }) }
+    val lastPersistedDsoScansFuture: Future[Option[Seq[DsoScan]]] = lastPersistedScanUrlList.map {
+      rs =>
+        { rs.map(list => list.map { case (url, svName) => DsoScan(Uri(url), svName) }) }
     }
 
     config match {
@@ -1291,7 +1292,7 @@ object BftScanConnection {
         // In the future, add a new threshold for how many trusted seed-urls should be there.
 
         for {
-          lastPersistedDsoScans <-lastPersistedDsoScansFuture
+          lastPersistedDsoScans <- lastPersistedDsoScansFuture
           tempBftConnection <- bootstrapWithSeedNodes(
             ts.seedUrls,
             ts.amuletRulesCacheTimeToLive,
@@ -1380,7 +1381,7 @@ object BftScanConnection {
 
       case bft @ BftScanClientConfig.Bft(_, _, _) =>
         for {
-          lastPersistedDsoScans <-lastPersistedDsoScansFuture
+          lastPersistedDsoScans <- lastPersistedDsoScansFuture
           bftConnection <- bootstrapWithSeedNodes(
             bft.seedUrls,
             bft.amuletRulesCacheTimeToLive,
