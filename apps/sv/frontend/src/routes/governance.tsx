@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { Box, Button, Typography } from '@mui/material';
+import { Box, Button, Stack, Typography } from '@mui/material';
 import { useMemo } from 'react';
 import {
   ActionRequiredSection,
@@ -26,6 +26,7 @@ import {
 } from '../utils/governance';
 import { SupportedActionTag, ProposalListingData } from '../utils/types';
 import { Link as RouterLink } from 'react-router-dom';
+import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -172,25 +173,67 @@ export const Governance: React.FC = () => {
         data-testid="governance-page-header"
       />
 
-      <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
+      {actionRequiredRequests.length === 0 &&
+      inflightRequests.length === 0 &&
+      voteHistory.length === 0 ? (
+        <StateSection state="error" />
+      ) : (
+        <>
+          <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
 
-      <ProposalListingSection
-        sectionTitle="Inflight Votes"
-        data={inflightRequests}
-        uniqueId="inflight-vote-requests"
-        showVoteStats
-        showAcceptanceThreshold
-        showThresholdDeadline
-      />
+          <ProposalListingSection
+            sectionTitle="Inflight Votes"
+            data={inflightRequests}
+            noDataMessage=""
+            uniqueId="inflight-vote-requests"
+            showVoteStats
+            showAcceptanceThreshold
+            showThresholdDeadline
+          />
 
-      <ProposalListingSection
-        sectionTitle="Vote History"
-        data={voteHistory}
-        uniqueId="vote-history"
-        showStatus
-        showVoteStats
-        showAcceptanceThreshold
-      />
+          <ProposalListingSection
+            sectionTitle="Vote History"
+            data={voteHistory}
+            noDataMessage="No data to show. You can see your vote history here after proposals meet their threshold deadline."
+            uniqueId="vote-history"
+            showStatus
+            showVoteStats
+            showAcceptanceThreshold
+          />
+        </>
+      )}
     </Box>
   );
+};
+
+interface StateSectionProps {
+  state: 'empty' | 'error';
+}
+
+const StateSection: React.FC<StateSectionProps> = ({ state }) => {
+  if (state === 'empty') {
+    return (
+      <Stack mt={11} alignItems="center" gap="14px">
+        <InfoOutlined color="secondary" fontSize="large" />
+        <Typography fontSize={20} fontWeight="bold" mt={1}>
+          No data to show
+        </Typography>
+        <Typography fontSize={16}>
+          This page will automatically update once there are in-flight proposals
+        </Typography>
+      </Stack>
+    );
+  }
+
+  if (state === 'error') {
+    return (
+      <Stack mt={11} alignItems="center" gap="14px">
+        <WarningAmberOutlined color="warning" fontSize="large" />
+        <Typography fontSize={20} fontWeight="bold" mt={1}>
+          Something went wrong
+        </Typography>
+        <Typography fontSize={16}>Please try to reload this page or contact support</Typography>
+      </Stack>
+    );
+  }
 };
