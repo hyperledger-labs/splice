@@ -144,6 +144,10 @@ components:
           description: "The timestamp when the total supply was last computed."
           type: string
           format: date-time
+        logoUrl:
+          description: "Optional URL for a logo for the instrument"
+          type: string
+          format: uri
         decimals:
           description: |
             The number of decimal places used by the instrument.
