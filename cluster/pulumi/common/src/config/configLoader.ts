@@ -1,10 +1,105 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as fs from 'fs';
-import * as yaml from 'js-yaml';
-import { merge } from 'lodash';
+import * as Yaml from 'js-yaml';
+import { existsSync, readFileSync } from 'fs';
+import { merge, mergeWith } from 'lodash';
+import { dirname, resolve } from 'path';
 
 import { spliceEnvConfig } from './envConfig';
+
+export function readAndParseYaml(
+  path: string,
+  context: ConfigLoaderContext = initializeContext()
+): unknown {
+  const resolvedPath =
+    context.pathStack.length === 0
+      ? resolve(path) // resolve against CWD
+      : resolve(dirname(context.pathStack[context.pathStack.length - 1]), path);
+  if (resolvedPath in context.loadedFilesByPath) {
+    return context.loadedFilesByPath[resolvedPath];
+  } else if (context.pathStack.includes(resolvedPath)) {
+    const cycle = [
+      ...context.pathStack.slice(context.pathStack.lastIndexOf(resolvedPath)),
+      resolvedPath,
+    ];
+    reportError(`Cyclical dependency detected: [${cycle.join(' -> ')}].`, context);
+  } else {
+    try {
+      context.pathStack.push(resolvedPath);
+      const config = Yaml.load(readFileSync(resolvedPath, 'utf-8'), { schema: context.schema });
+      context.loadedFilesByPath[resolvedPath] = config;
+      return config;
+    } catch (error) {
+      reportError(`${error}`, context);
+    } finally {
+      context.pathStack.pop();
+    }
+  }
+}
+
+function initializeContext(baseSchema: Yaml.Schema = Yaml.DEFAULT_SCHEMA): ConfigLoaderContext {
+  const context: ConfigLoaderContext = {
+    pathStack: [],
+    loadedFilesByPath: {},
+    schema: baseSchema,
+  };
+  context.schema = context.schema.extend([makeIncludeTagDefinition(context), appendTagDefinition]);
+  return context;
+}
+
+type ConfigLoaderContext = {
+  pathStack: Array<string>;
+  loadedFilesByPath: Partial<Record<string, unknown>>;
+  schema: Yaml.Schema;
+};
+
+function makeIncludeTagDefinition(context: ConfigLoaderContext): Yaml.Type {
+  return new Yaml.Type('!include', {
+    kind: 'mapping',
+    multi: true,
+    construct(data, tag) {
+      const { paths } = parseIncludeTag(tag as string, context); // tag cannot be undefined here
+      const configs = paths.map(path => readAndParseYaml(path, context));
+      return mergeWith({}, ...configs, data, mergeStrategy);
+    },
+  });
+}
+
+function parseIncludeTag(tag: string, context: ConfigLoaderContext): ParsedIncludeTag {
+  const paths =
+    /^!include\((?<paths>[^;]+(?:;[^;]+)*)\)$/.exec(tag)?.groups?.paths?.split(';') ??
+    reportError(`Include [${tag}] is malformed.`, context);
+  return { paths };
+}
+
+type ParsedIncludeTag = {
+  paths: Array<string>;
+};
+
+function mergeStrategy(included: unknown, overrides: unknown): unknown {
+  if (
+    Array.isArray(included) &&
+    Array.isArray(overrides) &&
+    '_append' in overrides &&
+    overrides._append
+  ) {
+    return [...included, ...overrides];
+  }
+  return undefined; // apply default mergeStrategy
+}
+
+const appendTagDefinition = new Yaml.Type('!append', {
+  kind: 'sequence',
+  construct(data) {
+    data._append = true;
+    return data;
+  },
+});
+
+function reportError(message: string, context: ConfigLoaderContext): never {
+  const currentPath = context.pathStack[context.pathStack.length - 1];
+  throw new Error(`Config loading failed while loading [${currentPath}]. ${message}`);
+}
 
 function loadClusterYamlConfig(): unknown {
   const baseConfig = readAndParseYaml(
@@ -13,23 +108,13 @@ function loadClusterYamlConfig(): unknown {
   // Load an additional common overrides config if it exists;
   // if the file is identical to the base config for some reason, loading it will not change anything.
   const commonOverridesConfigPath = `${spliceEnvConfig.context.clusterPath()}/../config.yaml`;
-  const commonOverridesConfig = fs.existsSync(commonOverridesConfigPath)
+  const commonOverridesConfig = existsSync(commonOverridesConfigPath)
     ? readAndParseYaml(commonOverridesConfigPath)
     : {};
   const clusterOverridesConfig = readAndParseYaml(
     `${spliceEnvConfig.context.clusterPath()}/config.yaml`
   );
   return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
-}
-
-export function readAndParseYaml(filePath: string): unknown {
-  try {
-    const fileContents = fs.readFileSync(filePath, 'utf8');
-    return yaml.load(fileContents);
-  } catch (error) {
-    console.error(`Error reading or parsing YAML file: ${filePath}`, error);
-    throw error;
-  }
 }
 
 export const clusterYamlConfig: unknown = loadClusterYamlConfig();
