@@ -353,6 +353,14 @@ class SvAppBackendReference(
       )
     }
 
+  @Help.Summary("Grant a ValidatorLicense to a validator party (via admin API)")
+  def grantValidatorLicense(partyId: PartyId): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.GrantValidatorLicense(partyId)
+      )
+    }
+
   @Help.Summary("Update CC price vote (via admin API)")
   def updateAmuletPriceVote(amuletPrice: BigDecimal): Unit =
     consoleEnvironment.run {
