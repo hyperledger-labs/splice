@@ -142,6 +142,26 @@ test_ValidatorFaucetWithWeight0 = do
         bobExpectedMin = aliceExpectedMin * bobWeight
         bobExpectedMax = aliceExpectedMax * bobWeight
 
+-- ValidatorLicense_RecordValidatorLivenessActivity should fail for weight 0
+test_RecordValidatorLivenessActivityFailsForWeight0: Script ()
+test_RecordValidatorLivenessActivityFailsForWeight0 = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+    [(bobLicenseCid, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
+
+    -- Update bob's license to have weight 0.0
+    submit app.dso $ archiveCmd bobLicenseCid
+    bobLicenseCid <- submitMulti [bobValidator.primaryParty, app.dso] [] $ createCmd bobLicense with
+      weight = Some 0.0
+
+    rounds <- getOpenRoundsSorted app
+    let (round0Cid, _) = head rounds
+
+    submitMultiMustFail [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+
+    return ()
+
 -- Test that runNextIssuance properly handles ValidatorLicense weights
 -- in the optTotalValidatorLivenessActivityRecords calculation
 -- Bob has been given a large weight to trigger the use of `cappedRewardsToIssue` (in computeIssuanceTranche)
