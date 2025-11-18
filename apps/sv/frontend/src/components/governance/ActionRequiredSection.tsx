@@ -119,7 +119,12 @@ const ActionCard = (props: ActionCardProps) => {
             </Box>
           </Grid>
           <Grid size={2} display="flex" justifyContent="flex-end" alignItems="center">
-            <Stack direction="row" alignItems="center" gap={1}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              gap={1}
+              data-testid="action-required-view-details"
+            >
               <Typography fontWeight={500} color="text.light">
                 View Details
               </Typography>
