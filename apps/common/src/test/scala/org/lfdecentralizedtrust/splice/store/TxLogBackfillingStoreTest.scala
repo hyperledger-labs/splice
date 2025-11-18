@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   DbMultiDomainAcsStore,
   IndexColumnValue,
   SplicePostgresTest,
+  StoreDescriptor,
 }
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -494,7 +495,7 @@ class TxLogBackfillingStoreTest
   private val sync2: SynchronizerId = SynchronizerId.tryFromString("synchronizer2::synchronizer")
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
-    DbMultiDomainAcsStore.StoreDescriptor(
+    StoreDescriptor(
       version = 1,
       name = "DbMultiDomainAcsStoreTest",
       party = dsoParty,

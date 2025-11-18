@@ -38,7 +38,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.showPretty
 
@@ -58,7 +58,6 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
 }
 import org.lfdecentralizedtrust.splice.store.db.AcsTables.ContractStateRowData
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
@@ -2302,39 +2301,6 @@ object DbMultiDomainAcsStore {
       mutable.ArrayBuffer.empty,
       mutable.ArrayBuffer.empty,
     )
-  }
-
-  /** Identifies an instance of a store.
-    *
-    *  @param version    The version of the store.
-    *                    Bumping this number will cause the store to forget all previously ingested data
-    *                    and start from a clean state.
-    *                    Bump this number whenever you make breaking changes in the ingestion filter or
-    *                    TxLog parser, or if you want to reset the store after fixing a bug that lead to
-    *                    data corruption.
-    * @param name        The name of the store, usually the simple name of the corresponding scala class.
-    * @param party       The party that owns the store (i.e., the party that subscribes
-    *                    to the update stream that feeds the store).
-    * @param participant The participant that serves the update stream that feeds this store.
-    * @param key         A set of named values that are used to filter the update stream or
-    *                    can otherwise be used to distinguish between different instances of the store.
-    */
-  case class StoreDescriptor(
-      version: Int,
-      name: String,
-      party: PartyId,
-      participant: ParticipantId,
-      key: Map[String, String],
-  ) {
-    def toJson: io.circe.Json = {
-      Json.obj(
-        "version" -> Json.fromInt(version),
-        "name" -> Json.fromString(name),
-        "party" -> Json.fromString(party.toProtoPrimitive),
-        "participant" -> Json.fromString(participant.toProtoPrimitive),
-        "key" -> Json.obj(key.map { case (k, v) => k -> Json.fromString(v) }.toSeq*),
-      )
-    }
   }
 
   sealed trait BatchStep

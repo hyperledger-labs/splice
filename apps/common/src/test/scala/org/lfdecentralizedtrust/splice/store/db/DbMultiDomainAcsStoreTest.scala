@@ -704,7 +704,7 @@ class DbMultiDomainAcsStoreTest
   }
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
-    DbMultiDomainAcsStore.StoreDescriptor(
+    StoreDescriptor(
       version = 1,
       name = "DbMultiDomainAcsStoreTest",
       party = dsoParty,
