@@ -186,7 +186,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
           borderRadius: '4px',
           border: '1px solid #4F4F4F',
           paddingBlock: '10px',
-          '&:hover': { backgroundColor: '#1B1B1B' },
+          '&:hover': { backgroundColor: '#363636' },
         }}
         data-testid={`${uniqueId}-row`}
       >
