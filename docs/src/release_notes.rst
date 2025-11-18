@@ -5,6 +5,19 @@
 
 .. _release_notes:
 
+Integration branch
+--------
+
+- Daml
+
+  - `ValidatorLicense` now has `weight`, and `kind` fields
+
+- SV
+
+  - `dso_acs_store` requires migration to add a column for storing `ValidatorLivenessActivityRecord` weight
+
+  - SVs can grant `ValidatorLicense` to any arbitrary party. See `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0073/cip-0073.md>` for the motivation.
+
 Upcoming
 --------
 
