@@ -881,62 +881,7 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit
         traceContext: TraceContext
     ): Future[InitializeDescriptorResult[Int]] = {
-      // Notes:
-      // - Postgres JSONB does not preserve white space, does not preserve the order of object keys, and does not keep duplicate object keys
-      // - Postgres JSONB columns have a maximum size of 255MB
-      // - We are using noSpacesSortKeys to insert a canonical serialization of the JSON object, even though this is not necessary for Postgres
-      // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
-      val descriptorStr = String256M.tryCreate(descriptor.toJson.noSpacesSortKeys)
-      for {
-        _ <- storage
-          .update(
-            sql"""
-            insert into store_descriptors (descriptor)
-            values (${descriptorStr}::jsonb)
-            on conflict do nothing
-           """.asUpdate,
-            "initializeDescriptor.1",
-          )
-
-        newStoreId <- storage
-          .querySingle(
-            sql"""
-             select id
-             from store_descriptors
-             where descriptor = ${descriptorStr}::jsonb
-             """.as[Int].headOption,
-            "initializeDescriptor.2",
-          )
-          .getOrRaise(
-            new RuntimeException(s"No row for $descriptor found, which was just inserted!")
-          )
-
-        _ <- storage
-          .update(
-            sql"""
-             insert into store_last_ingested_offsets (store_id, migration_id)
-             values (${newStoreId}, ${domainMigrationId})
-             on conflict do nothing
-             """.asUpdate,
-            "initializeDescriptor.3",
-          )
-        lastIngestedOffset <- storage
-          .querySingle(
-            sql"""
-             select last_ingested_offset
-             from store_last_ingested_offsets
-             where store_id = ${newStoreId} and migration_id = $domainMigrationId
-             """.as[Option[String]].headOption,
-            "initializeDescriptor.4",
-          )
-          .getOrRaise(
-            new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
-          )
-          .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
-      } yield lastIngestedOffset match {
-        case Some(offset) => StoreHasData(newStoreId, offset)
-        case None => StoreHasNoData(newStoreId)
-      }
+      StoreDescriptorManager.initializeDescriptor(descriptor, storage, domainMigrationId)
     }
 
     override def initialize()(implicit traceContext: TraceContext): Future[IngestionStart] = {
