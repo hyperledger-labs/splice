@@ -176,7 +176,7 @@ export const Governance: React.FC = () => {
       {actionRequiredRequests.length === 0 &&
       inflightRequests.length === 0 &&
       voteHistory.length === 0 ? (
-        <StateSection state="error" />
+        <StateSection state="empty" />
       ) : (
         <>
           <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
@@ -184,7 +184,7 @@ export const Governance: React.FC = () => {
           <ProposalListingSection
             sectionTitle="Inflight Votes"
             data={inflightRequests}
-            noDataMessage=""
+            noDataMessage="No proposals are currently in flight. Proposals you have voted on will appear here while awaiting the voting threshold or deadline."
             uniqueId="inflight-vote-requests"
             showVoteStats
             showAcceptanceThreshold

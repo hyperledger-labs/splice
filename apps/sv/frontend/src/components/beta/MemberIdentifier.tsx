@@ -14,7 +14,7 @@ const MemberIdentifier: React.FC<MemberIdentifierProps> = ({
   isYou,
   'data-testid': testId,
 }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+  <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.light' }}>
     <Typography
       variant="body1"
       fontWeight="medium"
