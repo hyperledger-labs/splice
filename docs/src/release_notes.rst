@@ -32,6 +32,13 @@ Upcoming
     and are now set to zero to avoid consensus problems when an SV reads aggregates
     from the rest of the network when first joining.
 
+- Daml
+
+  - Fixed a bug in ``WalletUserProxy_TransferInstruction_Withdraw``, where the controller was
+    required to be the ``receiver`` instead of the ``sender`` of the transfer instruction. Upgrade
+    to ``splice-util-featured-app-proxies`` version ``1.2.1`` or newer to get the fix.
+
+
 0.5.1
 -----
 
