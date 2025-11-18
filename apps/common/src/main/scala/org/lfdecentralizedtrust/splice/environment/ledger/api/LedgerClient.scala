@@ -475,32 +475,28 @@ private[environment] class LedgerClient(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[User] = {
-    if (initialRights.isEmpty) {
-      throw new IllegalArgumentException("createUser requires at least one right")
-    } else {
-      val request = v1User.CreateUserRequest(
-        Some(
-          v1User.User
-            .fromJavaProto(user.toProto)
-            .withIsDeactivated(isDeactivated)
-            .withIdentityProviderId(identityProviderId.getOrElse(""))
-            .withMetadata(
-              object_meta.ObjectMeta.fromJavaProto(
-                ObjectMetaOuterClass.ObjectMeta.newBuilder
-                  .putAllAnnotations(annotations.asJava)
-                  .build
-              )
+    val request = v1User.CreateUserRequest(
+      Some(
+        v1User.User
+          .fromJavaProto(user.toProto)
+          .withIsDeactivated(isDeactivated)
+          .withIdentityProviderId(identityProviderId.getOrElse(""))
+          .withMetadata(
+            object_meta.ObjectMeta.fromJavaProto(
+              ObjectMetaOuterClass.ObjectMeta.newBuilder
+                .putAllAnnotations(annotations.asJava)
+                .build
             )
-        ),
-        initialRights.map(javaRightToV1Right),
-      )
-      for {
-        stub <- withCredentialsAndTraceContext(userManagementServiceStub)
-        res <- stub
-          .createUser(request)
-          .map(r => CreateUserResponse.fromProto(v1User.CreateUserResponse.toJavaProto(r)).getUser)
-      } yield res
-    }
+          )
+      ),
+      initialRights.map(javaRightToV1Right),
+    )
+    for {
+      stub <- withCredentialsAndTraceContext(userManagementServiceStub)
+      res <- stub
+        .createUser(request)
+        .map(r => CreateUserResponse.fromProto(v1User.CreateUserResponse.toJavaProto(r)).getUser)
+    } yield res
   }
 
   private def javaRightToV1Right(right: User.Right) = right match {

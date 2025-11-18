@@ -61,8 +61,12 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   SingleScanConnection,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.setup.{
+  NodeInitializer,
+  ParticipantInitializer,
+  ParticipantPartyMigrator,
+}
+import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetrics, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.*
@@ -93,8 +97,31 @@ import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
-import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.api.util.DurationConversion
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.SynchronizerAlias
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
+import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -104,7 +131,7 @@ class ValidatorApp(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -765,6 +792,18 @@ class ValidatorApp(
         participantId,
         config.automation.ingestion,
       )
+      validatorUpdateHistory = new UpdateHistory(
+        storage,
+        domainMigrationInfo,
+        store.storeName,
+        participantId,
+        store.acsContractFilter.ingestionFilter.primaryParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        loggerFactory,
+        enableissue12777Workaround = false,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(retryProvider.metricsFactory, domainMigrationInfo.currentMigrationId),
+      )
       domainTimeAutomationService = new DomainTimeAutomationService(
         config.domains.global.alias,
         participantAdminConnection,
@@ -820,7 +859,7 @@ class ValidatorApp(
             clock,
             domainTimeAutomationService.domainTimeSync,
             domainParamsAutomationService.domainUnpausedSync,
-            storage: Storage,
+            storage,
             retryProvider,
             loggerFactory,
             domainMigrationInfo,
@@ -874,6 +913,7 @@ class ValidatorApp(
         domainParamsAutomationService.domainUnpausedSync,
         walletManagerOpt,
         store,
+        validatorUpdateHistory,
         storage,
         scanConnection,
         ledgerClient,

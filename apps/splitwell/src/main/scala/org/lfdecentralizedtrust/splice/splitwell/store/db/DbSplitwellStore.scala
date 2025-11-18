@@ -31,7 +31,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -66,10 +65,6 @@ class DbSplitwellStore(
         ),
       ),
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
       ingestionConfig,
     )
     with AcsTables

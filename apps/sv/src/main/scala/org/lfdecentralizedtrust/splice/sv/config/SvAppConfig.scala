@@ -285,7 +285,7 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
-    scan: Option[SvScanConfig],
+    scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,

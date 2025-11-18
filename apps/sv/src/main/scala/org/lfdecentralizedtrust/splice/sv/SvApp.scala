@@ -20,7 +20,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -104,7 +104,7 @@ class SvApp(
     override val name: InstanceName,
     val config: SvAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -806,7 +806,7 @@ object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
       localSynchronizerNode: Option[LocalSynchronizerNode],
-      storage: Storage,
+      storage: DbStorage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       svStore: SvSvStore,

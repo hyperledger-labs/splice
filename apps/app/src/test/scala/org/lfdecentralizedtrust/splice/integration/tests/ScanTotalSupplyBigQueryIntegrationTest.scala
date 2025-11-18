@@ -325,7 +325,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       case db: DbStorage => db
       case s => fail(s"non-DB storage configured, unsupported for BigQuery: ${s.getClass}")
     }
-    val sourceHistoryId = sv1ScanBackend.appState.store.updateHistory.historyId
+    val sourceHistoryId = sv1ScanBackend.appState.automation.updateHistory.historyId
 
     copyTableToBigQuery(
       "update_history_creates",

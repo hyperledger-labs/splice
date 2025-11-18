@@ -60,7 +60,6 @@ import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, Synchro
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -98,10 +97,6 @@ class DbSvDsoStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
       ingestionConfig,
     )
     with SvDsoStore
