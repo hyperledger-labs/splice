@@ -61,7 +61,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
       <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
       {data.length === 0 ? (
-        <InfoBox info={noDataMessage} />
+        <InfoBox info={noDataMessage} data-testid={`${uniqueId}-section-info`} />
       ) : (
         <TableContainer data-testid={`${uniqueId}-section-table`}>
           <Table>
@@ -108,9 +108,10 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
 
 interface InfoBoxProps {
   info: string;
+  'data-testid': string;
 }
 
-const InfoBox: React.FC<InfoBoxProps> = ({ info }) => {
+const InfoBox: React.FC<InfoBoxProps> = ({ info, 'data-testid': testId }) => {
   return (
     <Stack
       gap={1}
@@ -124,6 +125,7 @@ const InfoBox: React.FC<InfoBoxProps> = ({ info }) => {
         borderRadius: '4px',
         p: 2,
       }}
+      data-testid={testId}
     >
       <InfoOutlined color="secondary" fontSize="small" />
       <Typography fontWeight="bold" fontSize={14}>
