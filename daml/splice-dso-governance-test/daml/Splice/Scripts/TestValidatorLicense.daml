@@ -231,9 +231,9 @@ testValidatorLicenseWeightChangeBatch = do
   [(license2Cid, _)] <- query @ValidatorLicense validator2
   [(license3Cid, _)] <- query @ValidatorLicense validator3
 
-  [(instruction1Cid, instruction1)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator1)
-  [(instruction2Cid, instruction2)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator2)
-  [(instruction3Cid, instruction3)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator3)
+  [(instruction1Cid, _)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator1)
+  [(instruction2Cid, _)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator2)
+  [(instruction3Cid, _)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator3)
 
   submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_Execute_ValidatorLicense_Instruction with
     sv = sv1
@@ -272,9 +272,9 @@ testValidatorLicenseWithdrawBatch = do
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
   -- Verify all validator licenses exist
-  [(license1Cid, _)] <- query @ValidatorLicense validator1
-  [(license2Cid, _)] <- query @ValidatorLicense validator2
-  [(license3Cid, _)] <- query @ValidatorLicense validator3
+  [_] <- query @ValidatorLicense validator1
+  [_] <- query @ValidatorLicense validator2
+  [_] <- query @ValidatorLicense validator3
 
   -- Withdraw all three validator licenses in a single vote
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense_Withdraw
@@ -285,9 +285,9 @@ testValidatorLicenseWithdrawBatch = do
   length instructions === 3
 
   -- Execute all three instructions
-  [(instruction1Cid, instruction1)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator1)
-  [(instruction2Cid, instruction2)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator2)
-  [(instruction3Cid, instruction3)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator3)
+  [(instruction1Cid, _)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator1)
+  [(instruction2Cid, _)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator2)
+  [(instruction3Cid, _)] <- queryFilter @ValidatorLicense_Instruction dso (\i -> i.validator == validator3)
 
   [(license1Cid, _)] <- query @ValidatorLicense validator1
   [(license2Cid, _)] <- query @ValidatorLicense validator2
