@@ -97,8 +97,8 @@ class DbValidatorInternalStore(
   override def setConfig[T: Encoder](key: String, value: T): Future[Unit] = {
     val jsonValue: Json = value.asJson
 
-    val action = sql"""INSERT INTO validator_internal_config (config_key, config_value)
-        VALUES ($key, $jsonValue)
+    val action = sql"""INSERT INTO validator_internal_config (config_key, config_value, store_id)
+        VALUES ($key, $jsonValue, $storeId)
         ON CONFLICT (config_key) DO UPDATE
         SET config_value = excluded.config_value""".asUpdate
     val updateAction = storage.update(action, "set-validator-internal-config")
@@ -112,7 +112,7 @@ class DbValidatorInternalStore(
   override def getConfig[T: Decoder](key: String): OptionT[Future, T] = {
     val queryAction = sql"""SELECT config_value
         FROM validator_internal_config
-        WHERE config_key = $key
+        WHERE config_key = $key AND store_id = $storeId
       """.as[Json].headOption
 
     val jsonOptionF: OptionT[FutureUnlessShutdown, Json] =
