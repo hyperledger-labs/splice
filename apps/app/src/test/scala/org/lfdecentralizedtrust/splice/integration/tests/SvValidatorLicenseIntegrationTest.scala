@@ -15,15 +15,17 @@ import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
 }
 import org.slf4j.event.Level
 import scala.jdk.OptionConverters.*
-import scala.util.control.NonFatal
 
-class SvValidatorLicenseIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
+class SvValidatorLicenseIntegrationTest
+    extends SvIntegrationTestBase
+    with TriggerTestUtil
+    with ExternallySignedPartyTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
   "grant validator license and verify merged licenses" in { implicit env =>
-    val info =  = sv1Backend.getDsoInfo();
+    val info = sv1Backend.getDsoInfo()
     val dsoParty = info.dsoParty
     val sv1Party = info.svParty
 
@@ -35,28 +37,9 @@ class SvValidatorLicenseIntegrationTest extends SvIntegrationTestBase with Trigg
         )
     }
 
-    // Allocate a new party on aliceValidator
-    // Specify the decentralized synchronizer ID as alice seems to be connected to multiple domains
-    val synchronizerId = sv1Backend.participantClient.synchronizers
-      .list_connected()
-      .find(_.synchronizerAlias == sv1Backend.config.domains.global.alias)
-      .getOrElse(throw new IllegalStateException("synchronizer not found"))
-      .synchronizerId
-
-    val partyIdHint = "alice-test-party-2"
-    val newParty =
-      try {
-        aliceValidatorBackend.participantClient.ledger_api.parties
-          .allocate(partyIdHint, synchronizerId = Some(synchronizerId))
-          .party
-      } catch {
-        case NonFatal(e) =>
-          aliceValidatorBackend.participantClient.ledger_api.parties
-            .list()
-            .find(_.party.toProtoPrimitive.startsWith(partyIdHint))
-            .getOrElse(fail(e))
-            .party
-      }
+    // Allocate a new external party on aliceValidator
+    val OnboardingResult(newParty, _, _) =
+      onboardExternalParty(aliceValidatorBackend, Some("alice-test-party-2"))
 
     // Test 1: Can allocate license to a new party on aliceValidator
 
