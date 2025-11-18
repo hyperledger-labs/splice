@@ -85,8 +85,6 @@ class SvDsoAutomationService(
       dsoStore,
       ledgerClient,
       retryProvider,
-      config.ingestFromParticipantBegin,
-      config.ingestUpdateHistoryFromParticipantBegin,
       config.parameters,
     ) {
 

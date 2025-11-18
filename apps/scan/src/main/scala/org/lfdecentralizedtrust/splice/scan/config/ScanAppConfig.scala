@@ -43,8 +43,6 @@ case class ScanAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     isFirstSv: Boolean = false,
-    ingestFromParticipantBegin: Boolean = true,
-    ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     acsSnapshotPeriodHours: Int = 3,
     enableForcedAcsSnapshots: Boolean = false,
