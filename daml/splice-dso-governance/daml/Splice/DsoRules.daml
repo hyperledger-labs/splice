@@ -455,16 +455,15 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
-    validatorLicenseInstructionTimeout : Optional RelTime -- ^ The TTL for a `ValidatorLicense_Instruction`
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
 
--- | Read the `validatorLicenseInstructionTimeout` from the `DsoRulesConfig` with a default value of 1 hour.
-getValidatorLicenseInstructionTimeout : DsoRulesConfig -> RelTime
-getValidatorLicenseInstructionTimeout config = fromOptional (hours 1) config.validatorLicenseInstructionTimeout
+-- | The default TTL for a `ValidatorLicense_Instruction` is 1 hour.
+defaultValidatorLicenseInstructionTimeout : RelTime
+defaultValidatorLicenseInstructionTimeout = hours 1
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -1569,7 +1568,7 @@ template DsoRules with
         updates : [ValidatorWeightUpdate]
       controller dso
       do now <- getTime
-         let expiresAt = now `addRelTime` getValidatorLicenseInstructionTimeout config
+         let expiresAt = now `addRelTime` defaultValidatorLicenseInstructionTimeout
          instructionCids <- forA updates $ \update -> do
            require ("Weight is non-negative for " <> show update.validator) (update.weight >= 0.0)
            create ValidatorLicense_Instruction
@@ -1585,7 +1584,7 @@ template DsoRules with
         validators : [Party]
       controller dso
       do now <- getTime
-         let expiresAt = now `addRelTime` getValidatorLicenseInstructionTimeout config
+         let expiresAt = now `addRelTime` defaultValidatorLicenseInstructionTimeout
          instructionCids <- forA validators $ \validator ->
            create ValidatorLicense_Instruction
              with
@@ -1942,7 +1941,6 @@ instance Patchable DsoRulesConfig where
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
-    validatorLicenseInstructionTimeout = patch new.validatorLicenseInstructionTimeout base.validatorLicenseInstructionTimeout current.validatorLicenseInstructionTimeout
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with

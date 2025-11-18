@@ -83,7 +83,6 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice =
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
         voteCooldownTime = None -- use default value of 1 minute
-        validatorLicenseInstructionTimeout = None -- use default value of 1 hour
   let amuletConfig = defaultAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
