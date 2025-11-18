@@ -40,6 +40,16 @@ case class StoreDescriptor(
   }
 }
 
+sealed trait InitializeDescriptorResult[StoreId]
+case class StoreHasData[StoreId](
+    storeId: StoreId,
+    lastIngestedOffset: Long,
+) extends InitializeDescriptorResult[StoreId]
+case class StoreHasNoData[StoreId](
+    storeId: StoreId
+) extends InitializeDescriptorResult[StoreId]
+case class StoreNotUsed[StoreId]() extends InitializeDescriptorResult[StoreId]
+
 object StoreDescriptorManager extends StoreErrors {
 //  sealed trait InitializeDescriptorResult[StoreId]
 //  case class StoreHasData[StoreId](

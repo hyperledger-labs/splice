@@ -876,16 +876,6 @@ final class DbMultiDomainAcsStore[TXE](
   override lazy val ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
 
-    private sealed trait InitializeDescriptorResult[StoreId]
-    private case class StoreHasData[StoreId](
-        storeId: StoreId,
-        lastIngestedOffset: Long,
-    ) extends InitializeDescriptorResult[StoreId]
-    private case class StoreHasNoData[StoreId](
-        storeId: StoreId
-    ) extends InitializeDescriptorResult[StoreId]
-    private case class StoreNotUsed[StoreId]() extends InitializeDescriptorResult[StoreId]
-
     private[this] def initializeDescriptor(
         descriptor: StoreDescriptor
     )(implicit
