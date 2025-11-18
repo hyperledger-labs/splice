@@ -3,6 +3,7 @@
 
 module Splice.Scripts.TestValidatorFaucet where
 
+import DA.Action (void)
 import DA.Assert
 import DA.List (head)
 import DA.Time
@@ -127,6 +128,8 @@ test_ValidatorFaucetWithWeight3 = do
         bobExpectedMax = aliceExpectedMax * bobWeight
 
 -- With weight 0.0, Bob should receive no rewards
+-- Note: it is not possible to create activity records for weight 0.0
+-- This test simply confirms the workings of reward calculation logic
 test_ValidatorFaucetWithWeight0: Script ()
 test_ValidatorFaucetWithWeight0 = do
     let bobWeight = 0.0
@@ -181,8 +184,17 @@ testValidatorFaucetWithWeight_Helper params = do
     _ <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0Cid
 
-    _ <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
-      openRoundCid = round0Cid
+    -- For weight 0, create the activity record directly since the choice has a non-zero requirement
+    if params.bobWeight == 0.0
+      then
+        void $ submit app.dso $ createCmd ValidatorLivenessActivityRecord with
+          dso = app.dso
+          validator = bobValidator.primaryParty
+          round = round0.round
+          weight = Some params.bobWeight
+      else
+        void $ submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+          openRoundCid = round0Cid
 
     -- Verify the activity records were created with correct weights
     aliceRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso
