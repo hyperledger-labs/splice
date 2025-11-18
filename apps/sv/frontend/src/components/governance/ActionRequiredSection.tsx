@@ -76,7 +76,7 @@ const ActionCard = (props: ActionCardProps) => {
           bgcolor: 'background.paper',
           p: 2,
           borderRadius: '4px',
-          '&:hover': { backgroundColor: '#272727' },
+          '&:hover': { backgroundColor: '#363636' },
         }}
         className="action-required-card"
         data-testid="action-required-card"
