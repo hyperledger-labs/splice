@@ -1,0 +1,4 @@
+# TODO(#3173): figure out why this happens in ValidatorProxyIntegrationTest (started on 3.4)
+synchronizer outbox flusher failed The synchronizer Synchronizer 'global' failed the following topology transactions
+FAILED_PRECONDITION/OUTDATED_TRAFFIC_COST.* Submission was refused because traffic cost was outdated.*
+

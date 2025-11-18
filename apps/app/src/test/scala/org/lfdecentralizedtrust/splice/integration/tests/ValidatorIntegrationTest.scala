@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
@@ -152,6 +152,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         .sequencerConnections
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
+      sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.one
       sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
         ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,

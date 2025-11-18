@@ -160,7 +160,6 @@ db_names=()
 if [ $wallclocktime -eq 1 ]; then
   db_names+=(
     "${any_time_db_names[@]}"
-    "self_hosted_participant"
   )
 fi
 

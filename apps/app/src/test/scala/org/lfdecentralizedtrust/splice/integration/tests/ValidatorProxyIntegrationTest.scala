@@ -1,27 +1,34 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import better.files.File
 import org.apache.pekko.http.scaladsl.model.Uri
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.unit.http.{
   SystemProperties,
   SystemPropertiesSupport,
   TinyProxySupport,
 }
 
-import scala.concurrent.duration.*
-
 class ValidatorProxyIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
     with ProcessTestUtil
+    with StandaloneCanton
     with TinyProxySupport
     with SystemPropertiesSupport {
+
+  override def dbsSuffix = "validator_proxy"
+  val dbName = s"participant_alice_validator_${dbsSuffix}"
+  override def usesDbs = Seq(dbName) ++ super.usesDbs
+
+  // Can sometimes be unhappy when doing funky `withCanton` things; disabling them for simplicity
   override protected def runTokenStandardCliSanityCheck: Boolean = false
   override protected def runUpdateHistorySanityCheck: Boolean = false
+
+  override def environmentDefinition: SpliceEnvironmentDefinition = {
+    EnvironmentDefinition.simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)
+  }
 
   "validator should start and tap, using http forward proxy" in { implicit env =>
     val host = "127.0.0.1"
@@ -37,22 +44,19 @@ class ValidatorProxyIntegrationTest
           .set("https.nonProxyHosts", "")
       withProperties(props) {
         withCanton(
-          cantonArgs,
-          cantonExtraConfig,
+          Seq(
+            testResourcesPath / "standalone-participant-extra.conf"
+          ),
+          Seq.empty,
           "validator-proxy-test",
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_DB" -> dbName,
           "JAVA_TOOL_OPTIONS" -> props.toJvmOptionString,
         ) {
-          aliceValidatorBackend.start()
-          clue("Wait for validator initialization") {
-            // Need to wait for the participant node to startup for the user allocation to go through
-            eventuallySucceeds(timeUntilSuccess = 120.seconds) {
-              EnvironmentDefinition.withAllocatedValidatorUser(aliceValidatorBackend)
-            }
-            aliceValidatorBackend.waitForInitialization()
-          }
+          aliceValidatorLocalBackend.startSync()
           actAndCheck(
             "Onboard wallet user",
-            onboardWalletUser(aliceWalletClient, aliceValidatorBackend),
+            onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend),
           )(
             "We can tap and list",
             _ => {
@@ -75,12 +79,12 @@ class ValidatorProxyIntegrationTest
           ) shouldBe true
           proxy.proxiedConnectRequest(
             host,
-            aliceValidatorBackend.config.clientAdminApi.port.unwrap,
+            aliceValidatorLocalBackend.config.clientAdminApi.port.unwrap,
           ) shouldBe true
 
           proxy.proxiedConnectRequest(
             host,
-            aliceValidatorBackend.participantClient.config.ledgerApi.port.unwrap,
+            aliceValidatorLocalBackend.participantClient.config.ledgerApi.port.unwrap,
           ) shouldBe true
 
           val sequencerPort = Uri(
@@ -98,37 +102,5 @@ class ValidatorProxyIntegrationTest
         }
       }
     }
-  }
-
-  val includeTestResourcesPath: File = testResourcesPath / "include"
-
-  val cantonArgs: Seq[File] = Seq(
-    includeTestResourcesPath / "validator-participant.conf",
-    includeTestResourcesPath / "self-hosted-validator-disable-json-api.conf",
-    includeTestResourcesPath / "self-hosted-validator-participant-postgres-storage.conf",
-    includeTestResourcesPath / "storage-postgres.conf",
-  )
-  val cantonExtraConfig: Seq[String] =
-    Seq(
-      "canton.participants.validatorParticipant.ledger-api.port=7501",
-      "canton.participants.validatorParticipant.admin-api.port=7502",
-    )
-  val ParticipantLedgerPort = 7501
-  val ParticipantAdminPort = 7502
-  override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
-    ("ParticipantLedgerApi", ParticipantLedgerPort),
-    ("ParticipantAdminApi", ParticipantAdminPort),
-  )
-
-  override def environmentDefinition: SpliceEnvironmentDefinition = {
-    EnvironmentDefinition
-      .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withPreSetup(_ => ())
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
-      )
-      // Do not allocate validator users here, as we deal with all of them manually
-      .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
-      .withManualStart
   }
 }

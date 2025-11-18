@@ -46,21 +46,22 @@ export class MultiValidator extends MultiNodeDeployment {
       opts
     );
 
-    const migrationEnvVars = decentralizedSynchronizerUpgradeConfig.migratingFromActiveId
-      ? [
-          {
-            name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_INIT_MIGRATION',
-            value:
-              'canton.validator-apps.validator_backend_INDEX.restore-from-migration-dump = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
-          },
-        ]
-      : [
-          {
-            name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH',
-            value:
-              'canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
-          },
-        ];
+    const migrationEnvVars =
+      decentralizedSynchronizerUpgradeConfig.migratingFromActiveId !== undefined
+        ? [
+            {
+              name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_INIT_MIGRATION',
+              value:
+                'canton.validator-apps.validator_backend_INDEX.restore-from-migration-dump = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
+            },
+          ]
+        : [
+            {
+              name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH',
+              value:
+                'canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
+            },
+          ];
     super(
       name,
       {
