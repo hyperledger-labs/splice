@@ -99,7 +99,7 @@ class DbValidatorInternalStore(
 
     val action = sql"""INSERT INTO validator_internal_config (config_key, config_value, store_id)
         VALUES ($key, $jsonValue, $storeId)
-        ON CONFLICT (config_key) DO UPDATE
+        ON CONFLICT (config_key, store_id) DO UPDATE
         SET config_value = excluded.config_value""".asUpdate
     val updateAction = storage.update(action, "set-validator-internal-config")
 

@@ -5,32 +5,33 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.{
   ScanUrlInternalConfig,
   ValidatorConfigProvider,
   ValidatorInternalStore,
+  ValidatorStore,
 }
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Future
 
-abstract class ValidatorInternalStoreTest
-    extends AsyncWordSpec
-    with Matchers
-    with HasExecutionContext {
+abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with HasExecutionContext {
 
   protected def mkStore(): Future[ValidatorInternalStore]
   protected def mkProvider(): Future[ValidatorConfigProvider]
+  private lazy val validator = mkPartyId(s"validator")
+  lazy val storeKey = ValidatorStore.Key(
+    dsoParty = dsoParty,
+    validatorParty = validator,
+  )
 
   "ValidatorInternalStore" should {
-    implicit val tc: TraceContext = TraceContext.empty
 
     val configKey = "key1"
     val configValue = "payload1"
@@ -95,7 +96,7 @@ abstract class ValidatorInternalStoreTest
       for {
         provider <- mkProvider()
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
-        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
+        retrievedConfigOption <- provider.getScanUrlInternalConfig.value
       } yield {
         retrievedConfigOption shouldBe Some(scanConfig1)
       }
@@ -106,7 +107,7 @@ abstract class ValidatorInternalStoreTest
         provider <- mkProvider()
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
         _ <- provider.setScanUrlInternalConfig(scanConfig2) // Overwrite
-        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
+        retrievedConfigOption <- provider.getScanUrlInternalConfig.value
       } yield {
         retrievedConfigOption shouldBe Some(scanConfig2)
       }
@@ -115,7 +116,7 @@ abstract class ValidatorInternalStoreTest
     "CONFIG_PROVIDER return None when no ScanUrlInternalConfig is found" in {
       for {
         provider <- mkProvider()
-        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
+        retrievedConfigOption <- provider.getScanUrlInternalConfig.value
       } yield {
         retrievedConfigOption shouldBe None
       }
@@ -130,28 +131,31 @@ class DbValidatorInternalStoreTest
     with SplicePostgresTest {
 
   override protected def timeouts = new ProcessingTimeout
-  override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
 
-  private def buildDbStore(): ValidatorInternalStore = {
-    implicit val elc = ErrorLoggingContext(
-      loggerFactory.getTracedLogger(getClass),
-      loggerFactory.properties,
-      TraceContext.empty,
+  private def buildDbStore(): Future[ValidatorInternalStore] = {
+
+    val internalStore = new DbValidatorInternalStore(
+      storeKey,
+      DomainMigrationInfo(
+        domainMigrationId,
+        None,
+      ),
+      mkParticipantId("ValidatorInternalStoreTest"),
+      storage,
+      loggerFactory,
     )
 
-    new DbValidatorInternalStore(
-      storage = storage,
-      loggerFactory = loggerFactory,
-    )
+    for {
+      _ <- internalStore.initializeState()
+    } yield internalStore
   }
 
-  override protected def mkStore(): Future[ValidatorInternalStore] = Future.successful {
+  override protected def mkStore(): Future[ValidatorInternalStore] =
     buildDbStore()
-  }
 
-  override protected def mkProvider(): Future[ValidatorConfigProvider] = Future.successful {
+  override protected def mkProvider(): Future[ValidatorConfigProvider] = {
     val internalStore = buildDbStore()
-    new ValidatorConfigProvider(internalStore)
+    internalStore.map(store => new ValidatorConfigProvider(store))
   }
 
   override protected def cleanDb(
