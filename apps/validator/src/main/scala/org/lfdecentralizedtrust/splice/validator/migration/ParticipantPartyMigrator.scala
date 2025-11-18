@@ -125,12 +125,12 @@ class ParticipantPartyMigrator(
         logger.info(s"Using parties to migrate from config: $parties")
         Future.successful(ConfigPartiesToMigrate(parties.toSet))
       case None =>
-        logger.info(
-          "No overridden parties to migrate, using all parties still hosted on the old participant"
-        )
         configProvider
           .getPartiesToMigrate()
           .foldF[PartiesToMigrate] {
+            logger.info(
+              "No overridden parties to migrate, using all parties still hosted on the old participant"
+            )
             participantAdminConnection
               .listPartyToParticipant(
                 TopologyStoreId.Synchronizer(synchronizerId).some,

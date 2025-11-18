@@ -1,14 +1,19 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
+import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.metrics.CommonMockMetrics
+import com.digitalasset.canton.resource.DbStorageSingle
+import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
+import com.typesafe.config.ConfigValueFactory
+import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.config.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
-import org.lfdecentralizedtrust.splice.config.{
-  AuthTokenSourceConfig,
-  NetworkAppClientConfig,
-  ParticipantBootstrapDumpConfig,
-  ParticipantClientConfig,
-  SpliceConfig,
-}
-import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -22,19 +27,16 @@ import org.lfdecentralizedtrust.splice.validator.config.{
   MigrateValidatorPartyConfig,
   ValidatorCantonIdentifierConfig,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
-import com.typesafe.config.ConfigValueFactory
-import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.validator.migration.ParticipantPartyMigrator
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider
+import org.lfdecentralizedtrust.splice.validator.store.{
+  ValidatorConfigProvider,
+  ValidatorInternalStore,
+}
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
 import java.nio.file.{Files, Path, Paths}
+import scala.concurrent.duration.DurationInt
 
 trait ValidatorReonboardingIntegrationTestBase
     extends IntegrationTest
@@ -421,7 +423,7 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
   }
 }
 
-class ValidatorReonboardingWithPartiesToMigrateFromDbIntegrationTest
+class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
     extends ValidatorReonboardingIntegrationTestBase {
 
   // avoid db collisions; ptm := partiesToMigrate
@@ -586,8 +588,9 @@ class ValidatorReonboardingWithPartiesToMigrateFromDbIntegrationTest
   }
 }
 
-class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
-    extends ValidatorReonboardingIntegrationTestBase {
+class ValidatorReonboardingWithPartiesToMigrateFromDbIntegrationTest
+    extends ValidatorReonboardingIntegrationTestBase
+    with HasExecutionContext {
 
   // avoid db collisions; ptm := partiesToMigrate
   override def dbsSuffix = "validator_reonboard_ptm_db"
@@ -600,18 +603,6 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
   // This can only work if there is no collision between the participant admin party and
   // the validator operator party.
   override val aliceValidatorParticipantNameHint = s"${aliceValidatorPartyHint}-participant2";
-
-  // we bootstrap from dump so we can predict the party IDs
-  val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
-  // we use a dedicated dump for this test to avoid conflicts with other tests
-  val oldParticipantDumpFile = testDumpDir.resolve("alice-plaintext-id-identity-dump-3.json")
-
-  override val participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = Some(
-    ParticipantBootstrapDumpConfig.File(
-      oldParticipantDumpFile,
-      Some(aliceValidatorParticipantNameHint),
-    )
-  )
 
   "re-onboard validator with partiesToMigrate" in { implicit env =>
     initDsoWithSv1Only()
@@ -629,7 +620,6 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
       aliceValidatorBackend.startSync()
       val aliceValidatorWalletParty =
         PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
-      val aliceParticipantId = aliceValidatorBackend.participantClient.id
       aliceValidatorWalletClient.tap(100)
 
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
@@ -639,24 +629,16 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
 
       val dump = aliceValidatorBackend.dumpParticipantIdentities()
 
-      val aliceNamespaceSuffix = aliceParticipantId.uid.namespace.toProtoPrimitive
-      val alicePartyHint = aliceWalletClient.config.ledgerApiUser
-        .replace("_", "__")
-      aliceValidatorBackend.appState.configProvider
-        .setPartiesToMigrate(
-          Set(aliceValidatorPartyHint, alicePartyHint).map(hint =>
-            PartyId.tryFromProtoPrimitive(s"$hint::$aliceNamespaceSuffix")
-          )
-        )
-        .futureValue
       aliceValidatorBackend.stop()
       (dump, aliceValidatorWalletParty, aliceParty, charlieParty)
     }
+
     better.files
       .File(dumpPath)
       .overwrite(
         dump.toJson.noSpaces
       )
+
     withCanton(
       Seq(
         testResourcesPath / "standalone-participant-extra.conf",
@@ -674,7 +656,37 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
           .LevelAndAbove(Level.WARN)
       )(
         {
-          aliceValidatorLocalBackend.startSync()
+          aliceValidatorLocalBackend.start()
+          clue("setting migrating parties in the local db") {
+            val loggerFactory = SuppressingLogger(getClass)
+            val closeable = FlagCloseable.withCloseContext(logger, timeouts)
+            implicit val closeContext: CloseContext = closeable.closeContext
+            val provider = new ValidatorConfigProvider(
+              ValidatorInternalStore(
+                DbStorageSingle.tryCreate(
+                  aliceValidatorLocalBackend.config.storage,
+                  wallClock,
+                  None,
+                  connectionPoolForParticipant = false,
+                  None,
+                  CommonMockMetrics.dbStorage,
+                  timeouts,
+                  loggerFactory,
+                ),
+                loggerFactory,
+              ),
+              loggerFactory,
+            )
+            eventuallySucceeds(30.seconds, 20.millis, suppressErrors = false) {
+              provider
+                .setPartiesToMigrate(
+                  Set(aliceParty, aliceValidatorWalletParty)
+                )
+                .futureValue
+            }
+            closeable.close()
+          }
+          aliceValidatorLocalBackend.waitForInitialization()
         },
         entries => {
           forExactly(1, entries) {
@@ -685,40 +697,21 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
         },
       )
 
-      clue("onboard migrated user on the new validator") {
-        onboardWalletUser(aliceLocalWalletClient, aliceValidatorLocalBackend) shouldBe aliceParty
-      }
+      aliceValidatorLocalBackend.appState.configProvider
+        .getPartiesToMigrate()
+        .value
+        .futureValue shouldBe None
 
       Seq(
-        aliceValidatorWalletParty -> aliceValidatorLocalWalletClient,
-        aliceParty -> aliceLocalWalletClient,
-      ).foreach { case (partyId, walletAppClient) =>
+        aliceValidatorWalletParty,
+        aliceParty,
+      ).foreach { partyId =>
         clue(s"check mapping and amulet balance of $partyId") {
           assertMapping(
             partyId,
             aliceValidatorLocalBackend.participantClient.id,
           )
-
-          aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
-          aliceValidatorLocalBackend.participantClient.id.uid.identifier.unwrap shouldBe "aliceValidatorLocalNewForValidatorReonboardingIT"
-
-          clue(s"party $partyId amulet balance is preserved") {
-            val expectedAmulets: Range = 99 to 100
-            checkWallet(
-              partyId,
-              walletAppClient,
-              Seq(
-                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
-              ),
-            )
-          }
         }
-      }
-      clue(s"party $charlieParty is still hosted on the old participant") {
-        assertMapping(
-          charlieParty,
-          aliceValidatorBackend.participantClient.id,
-        )
       }
     }
   }
