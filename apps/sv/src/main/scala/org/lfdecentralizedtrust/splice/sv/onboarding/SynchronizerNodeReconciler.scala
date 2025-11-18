@@ -46,7 +46,7 @@ class SynchronizerNodeReconciler(
       synchronizerId: SynchronizerId,
       state: SynchronizerNodeState,
       migrationId: Long,
-      scan: Option[SvScanConfig],
+      scanConfig: SvScanConfig,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -54,9 +54,7 @@ class SynchronizerNodeReconciler(
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(synchronizerNode, migrationId)
       localMediatorConfig <- SvUtil.getMediatorConfig(synchronizerNode)
-      localScanConfig = scan
-        .map(scanConfig => new ScanConfig(scanConfig.publicUrl.toString()))
-        .toJava
+      localScanConfig = java.util.Optional.of(new ScanConfig(scanConfig.publicUrl.toString()))
       rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
       // TODO(DACH-NY/canton-network-node#4901): do not use default, but reconcile all configured domains
