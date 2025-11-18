@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.data.OptionT
-import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
 import scala.concurrent.Future
 import io.circe.generic.semiauto.*
@@ -24,14 +23,11 @@ class ValidatorConfigProvider(config: ValidatorInternalStore) {
 
   final def setScanUrlInternalConfig(
       value: Seq[ScanUrlInternalConfig]
-  )(implicit tc: TraceContext): Future[Unit] = {
+  ): Future[Unit] = {
     config.setConfig[Seq[ScanUrlInternalConfig]](scanInternalConfigKey, value)
   }
 
-  final def getScanUrlInternalConfig(
-  )(implicit
-      tc: TraceContext
-  ): OptionT[Future, Seq[ScanUrlInternalConfig]] = {
+  final def getScanUrlInternalConfig: OptionT[Future, Seq[ScanUrlInternalConfig]] = {
     config.getConfig[Seq[ScanUrlInternalConfig]](scanInternalConfigKey)
   }
 }

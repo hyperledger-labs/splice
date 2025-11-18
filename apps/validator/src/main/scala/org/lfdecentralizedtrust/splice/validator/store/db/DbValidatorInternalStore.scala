@@ -4,36 +4,97 @@
 package org.lfdecentralizedtrust.splice.validator.store.db
 
 import cats.data.OptionT
-import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
+import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.validator.store.{ValidatorInternalStore, ValidatorStore}
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.syntax.*
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  InitializeDescriptorResult,
+  StoreDescriptor,
+  StoreDescriptorManager,
+  StoreHasNoData,
+}
+import java.util.concurrent.atomic.AtomicReference
 
 class DbValidatorInternalStore(
+    key: ValidatorStore.Key,
+    domainMigrationInfo: DomainMigrationInfo,
+    participantId: ParticipantId,
     storage: DbStorage,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val ec: ExecutionContext,
     val loggingContext: ErrorLoggingContext,
     val closeContext: CloseContext,
+    val traceContext: TraceContext,
 ) extends ValidatorInternalStore
     with AcsJdbcTypes
     with NamedLogging {
 
   val profile: JdbcProfile = storage.profile.jdbc
+  private val storeDescriptor = StoreDescriptor(
+    version = 2,
+    name = "DbValidatorInternalConfigStore",
+    party = key.validatorParty,
+    participant = participantId,
+    key = Map(
+      "validatorParty" -> key.validatorParty.toProtoPrimitive,
+      "dsoParty" -> key.dsoParty.toProtoPrimitive,
+    ),
+  )
 
-  override def setConfig[T: Encoder](key: String, value: T)(implicit
-      tc: TraceContext
-  ): Future[Unit] = {
+  private case class ValidatorInternalStoreState(
+      storeId: Option[Int]
+  )
+
+  private object ValidatorInternalStoreState {
+    def empty(): ValidatorInternalStoreState = ValidatorInternalStoreState(
+      storeId = None
+    )
+  }
+
+  private val internalState =
+    new AtomicReference[ValidatorInternalStoreState](ValidatorInternalStoreState.empty())
+
+  def storeId: Int =
+    internalState
+      .get()
+      .storeId
+      .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
+
+  def initializeState(): Future[Unit] = {
+    val initializedResult: Future[InitializeDescriptorResult[Int]] = StoreDescriptorManager
+      .initializeDescriptor(storeDescriptor, storage, domainMigrationInfo.currentMigrationId)
+    for {
+      result <- initializedResult
+    } yield {
+      result match {
+        case StoreHasNoData(storeId) =>
+          logger.info(
+            s"ValidatorInternalStore for validator party '${key.validatorParty}' and DSO party '${key.dsoParty}' initialized with store ID $storeId."
+          )
+          internalState.updateAndGet(_.copy(storeId = Some(storeId)))
+          ()
+        case _ =>
+          val errorMsg =
+            s"ValidatorInternalStore for validator party '${key.validatorParty}' and DSO party '${key.dsoParty}' initialization failed."
+          logger.error(errorMsg)
+          throw new IllegalStateException(errorMsg)
+      }
+    }
+  }
+
+  override def setConfig[T: Encoder](key: String, value: T): Future[Unit] = {
     val jsonValue: Json = value.asJson
 
     val action = sql"""INSERT INTO validator_internal_config (config_key, config_value)
@@ -48,7 +109,7 @@ class DbValidatorInternalStore(
     updateAction.map(_ => ())
   }
 
-  override def getConfig[T: Decoder](key: String)(implicit tc: TraceContext): OptionT[Future, T] = {
+  override def getConfig[T: Decoder](key: String): OptionT[Future, T] = {
     val queryAction = sql"""SELECT config_value
         FROM validator_internal_config
         WHERE config_key = $key
