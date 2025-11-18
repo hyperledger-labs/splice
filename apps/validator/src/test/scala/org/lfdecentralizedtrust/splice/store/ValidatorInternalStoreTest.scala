@@ -133,17 +133,14 @@ class DbValidatorInternalStoreTest
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
 
   private def buildDbStore(): ValidatorInternalStore = {
-    val elc = ErrorLoggingContext(
+    implicit val elc = ErrorLoggingContext(
       loggerFactory.getTracedLogger(getClass),
       loggerFactory.properties,
       TraceContext.empty,
     )
-    implicit val cc = closeContext
 
     new DbValidatorInternalStore(
       storage = storage,
-      loggingContext = elc,
-      closeContext = cc,
       loggerFactory = loggerFactory,
     )
   }

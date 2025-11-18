@@ -20,11 +20,12 @@ import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 
 class DbValidatorInternalStore(
     storage: DbStorage,
-    implicit val loggingContext: ErrorLoggingContext,
-    implicit val closeContext: CloseContext,
-    protected val loggerFactory: NamedLoggerFactory,
-)(implicit val ec: ExecutionContext)
-    extends ValidatorInternalStore
+    val loggerFactory: NamedLoggerFactory,
+)(implicit
+    val ec: ExecutionContext,
+    val loggingContext: ErrorLoggingContext,
+    val closeContext: CloseContext,
+) extends ValidatorInternalStore
     with AcsJdbcTypes
     with NamedLogging {
 
@@ -58,7 +59,12 @@ class DbValidatorInternalStore(
 
     val typedOptionT: OptionT[FutureUnlessShutdown, T] = jsonOptionF.subflatMap { json =>
       json.as[T] match {
-        case Right(typedValue) => Some(typedValue)
+        case Right(typedValue) => {
+          logger.debug(
+            s"retrieved validator config from database with key '$key' and value '${json.noSpaces}'"
+          )
+          Some(typedValue)
+        }
         case Left(error) => {
           logger.error(
             s"Failed to decode config key '$key' to expected type T: ${error.getMessage}"

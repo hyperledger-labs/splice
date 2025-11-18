@@ -7,10 +7,35 @@ import cats.data.OptionT
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
+import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 
 trait ValidatorInternalStore {
   def setConfig[T: Encoder](key: String, value: T)(implicit tc: TraceContext): Future[Unit]
 
   def getConfig[T: Decoder](key: String)(implicit tc: TraceContext): OptionT[Future, T]
+}
+
+object ValidatorInternalStore {
+
+  def apply(
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext,
+      lc: ErrorLoggingContext,
+      cc: CloseContext,
+  ): ValidatorInternalStore = {
+    storage match {
+      case storage: DbStorage =>
+        new DbValidatorInternalStore(
+          storage,
+          loggerFactory,
+        )
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
+    }
+  }
 }
