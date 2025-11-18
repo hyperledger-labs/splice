@@ -3705,13 +3705,12 @@ components:
         weight:
           description: |
             Weight of the activity records produced by this license. Determined
-            through SV votes. If not set, weight is 1.0
+            through SV votes.
           type: number
           format: double
         kind:
           description: |
-            Type of license: OperatorLicense or NonOperatorLicense. If not set,
-            kind is OperatorLicense
+            Type of license: OperatorLicense or NonOperatorLicense. 
           type: string
           enum: [OperatorLicense, NonOperatorLicense]
     GetBackfillingStatusResponse:

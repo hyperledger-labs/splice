@@ -23,8 +23,9 @@ class SvValidatorLicenseIntegrationTest extends SvIntegrationTestBase with Trigg
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
   "grant validator license and verify merged licenses" in { implicit env =>
-    val dsoParty = sv1Backend.getDsoInfo().dsoParty
-    val sv1Party = sv1Backend.getDsoInfo().svParty
+    val info =  = sv1Backend.getDsoInfo();
+    val dsoParty = info.dsoParty
+    val sv1Party = info.svParty
 
     def getLicensesFromAliceValidator(p: PartyId) = {
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -92,7 +93,7 @@ class SvValidatorLicenseIntegrationTest extends SvIntegrationTestBase with Trigg
       "Grant license to an onboarded validator",
       sv1Backend.grantValidatorLicense(aliceValidatorParty),
     )(
-      "Two ValidatorLicenses exist for Alice",
+      "Two ValidatorLicenses exist for alice validator party",
       _ => {
         val licenses = getLicensesFromAliceValidator(aliceValidatorParty)
 
