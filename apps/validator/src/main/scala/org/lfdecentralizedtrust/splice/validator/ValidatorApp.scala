@@ -207,6 +207,7 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
+                Some(metrics.scanConnections),
               )
             }
             domainConnector = new DomainConnector(
@@ -715,6 +716,7 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
+          Some(metrics.scanConnections),
         )
       }
 

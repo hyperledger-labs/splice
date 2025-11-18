@@ -12,8 +12,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.{
-  CachedAnsRules,
   CachedAmuletRules,
+  CachedAnsRules,
   CachedMiningRounds,
 }
 import org.lfdecentralizedtrust.splice.util.ContractWithState
