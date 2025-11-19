@@ -156,6 +156,9 @@ function buildTransferFeeStepsChanges(
       ?.map((b, i) => {
         const idx = i + 1;
         const a = after?.[idx];
+
+        if (b._2 === '0.0') return [];
+
         return [
           {
             fieldName: `transferFeeSteps${idx}_1`,

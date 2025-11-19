@@ -74,9 +74,10 @@ export function buildAmuletRulesConfigFromChanges(
     futureValues.push({ _1: time, _2: config });
   }
 
+  const transferPreapprovalFee = getValue('transferPreapprovalFee');
   const amuletConfig: AmuletConfig<'USD'> = {
     tickDuration: { microseconds: getValue('tickDuration') },
-    transferPreapprovalFee: getValue('transferPreapprovalFee'),
+    transferPreapprovalFee: transferPreapprovalFee === '' ? null : transferPreapprovalFee,
     featuredAppActivityMarkerAmount: getValue('featuredAppActivityMarkerAmount'),
 
     transferConfig: {
