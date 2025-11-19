@@ -881,7 +881,7 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit
         traceContext: TraceContext
     ): Future[InitializeDescriptorResult[Int]] = {
-      StoreDescripttorStore.initializeDescriptor(descriptor, storage, domainMigrationId)
+      StoreDescriptorStore.initializeDescriptor(descriptor, storage, domainMigrationId)
     }
 
     override def initialize()(implicit traceContext: TraceContext): Future[IngestionStart] = {
