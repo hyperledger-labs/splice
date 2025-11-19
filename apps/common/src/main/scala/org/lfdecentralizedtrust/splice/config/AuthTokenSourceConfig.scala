@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.config
 
+import com.digitalasset.canton.config.NonNegativeDuration
+
 sealed trait AuthTokenSourceConfig {
   // Token that will be used for all commands that need to bypass ledger API auth.
   // Due to the way Canton console is designed, this need to be a static token.
@@ -36,6 +38,7 @@ object AuthTokenSourceConfig {
       clientSecret: String,
       audience: String,
       scope: Option[String],
+      requestTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(30),
       adminToken: Option[String],
   ) extends AuthTokenSourceConfig
 
@@ -47,8 +50,24 @@ object AuthTokenSourceConfig {
       case Static(_, adminToken) => Static(hidden, hide(adminToken))
       case SelfSigned(audience, user, _, adminToken) =>
         SelfSigned(audience, user, hidden, hide(adminToken))
-      case ClientCredentials(wellKnownConfigUrl, clientId, _, audience, scope, adminToken) =>
-        ClientCredentials(wellKnownConfigUrl, clientId, hidden, audience, scope, hide(adminToken))
+      case ClientCredentials(
+            wellKnownConfigUrl,
+            clientId,
+            _,
+            audience,
+            scope,
+            requestTimeout,
+            adminToken,
+          ) =>
+        ClientCredentials(
+          wellKnownConfigUrl,
+          clientId,
+          hidden,
+          audience,
+          scope,
+          requestTimeout,
+          hide(adminToken),
+        )
     }
   }
 }
