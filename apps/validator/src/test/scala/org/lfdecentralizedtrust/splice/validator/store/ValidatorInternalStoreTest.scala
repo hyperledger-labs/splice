@@ -24,9 +24,9 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
   "ValidatorInternalStore" should {
 
     val configKey = "key1"
-    val configValue = "payload1"
+    val configValue = "jsonPayload1"
     val otherKey = "key2"
-    val otherValue = "payload2"
+    val otherValue = "jsonPayload2"
 
     "set and get a payload successfully" in {
       for {
