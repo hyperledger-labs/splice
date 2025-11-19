@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.automation
 
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -19,7 +20,6 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.util.BackupDump
 
 import java.nio.file.Paths
-import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success}
 
@@ -47,23 +47,30 @@ class PeriodicTopologySnapshotTrigger(
           Future.successful(TaskNoop)
         case Failure(e) => Future.failed(e)
         case Success(synchronizerId) =>
-          val utcDate = ZonedDateTime.now(ZoneOffset.UTC).toLocalDate.toString
-          val folderName = s"topology_snapshot_$utcDate"
+          val now = clock.now
+          val utcDate = now.toInstant.toString.split("T").head
+          val folderName = s"topology_snapshot_${now.toInstant}"
           for {
-            snapshotExists <- checkTopologySnapshot(folderName)
+            snapshotExists <- checkTopologySnapshot(startOffset = s"topology_snapshot_$utcDate")
             res <-
               if (!snapshotExists)
-                takeTopologySnapshot(sequencerAdminConnection, folderName, utcDate, synchronizerId)
+                takeTopologySnapshot(
+                  sequencerAdminConnection,
+                  folderName,
+                  now,
+                  utcDate,
+                  synchronizerId,
+                )
               else Future.successful(TaskSuccess("Today's topology snapshot already exists."))
           } yield res
       }
   }
 
-  private def checkTopologySnapshot(folderName: String): Future[Boolean] =
+  private def checkTopologySnapshot(startOffset: String): Future[Boolean] =
     for {
       res <- Future {
         blocking {
-          BackupDump.bucketExists(config.location, s"$folderName/genesis-state", loggerFactory)
+          BackupDump.bucketExists(config.location, startOffset, loggerFactory)
         }
       }
     } yield res
@@ -71,19 +78,25 @@ class PeriodicTopologySnapshotTrigger(
   private def takeTopologySnapshot(
       sequencerAdminConnection: SequencerAdminConnection,
       folderName: String,
+      now: CantonTimestamp,
       utcDate: String,
       synchronizerId: SynchronizerId,
   )(implicit traceContext: TraceContext): Future[TaskSuccess] =
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       // uses onboardingStateV2 so we don't lose information when exporting
-      onboardingState <- sequencerAdminConnection.getOnboardingState(sequencerId)
+      onboardingState <- sequencerAdminConnection.getOnboardingState(Right(now))
       authorizedStore <- sequencerAdminConnection.exportAuthorizedStoreSnapshot(sequencerId.uid)
       // list a summary of the transactions state at the time of the snapshot to validate further imports
       summary <- sequencerAdminConnection.getTopologyTransactionsSummary(
         TopologyStoreId.Synchronizer(synchronizerId),
         clock.now,
       )
+      sequencerId <- sequencerAdminConnection.getSequencerId
+      // we create a single metadata file to store the amounts of the different transactions along the sequencerId
+      metadata = summary.map(e =>
+        (e._1.code, e._2.toString)
+      ) + ("sequencerId" -> sequencerId.toProtoPrimitive)
       _ <- Future {
         blocking {
           val fileDesc =
@@ -104,8 +117,8 @@ class PeriodicTopologySnapshotTrigger(
             ),
             BackupDump.write(
               config.location,
-              Paths.get(s"$folderName/transactions-summary"),
-              summary.toString,
+              Paths.get(s"$folderName/metadata"),
+              metadata.toString(),
               loggerFactory,
             ),
           )

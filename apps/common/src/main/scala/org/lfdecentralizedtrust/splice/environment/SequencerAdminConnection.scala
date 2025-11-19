@@ -102,13 +102,13 @@ class SequencerAdminConnection(
     ).map(_.result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _))
   }
 
-  def getOnboardingState(sequencerId: SequencerId)(implicit
+  def getOnboardingState(sequencerIdOrTimestamp: Either[SequencerId, CantonTimestamp])(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
     val responseObserver =
       new ByteStringStreamObserver[OnboardingStateV2Response](_.onboardingStateForSequencer)
     runCmd(
-      SequencerAdminCommands.OnboardingStateV2(responseObserver, Left(sequencerId))
+      SequencerAdminCommands.OnboardingStateV2(responseObserver, sequencerIdOrTimestamp)
     ).flatMap(_ => responseObserver.resultBytes)
   }
 
