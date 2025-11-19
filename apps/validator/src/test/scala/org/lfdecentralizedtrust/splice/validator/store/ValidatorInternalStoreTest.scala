@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.validator.store
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.store.StoreTest
@@ -19,6 +20,7 @@ import scala.concurrent.Future
 abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with HasExecutionContext {
 
   protected def mkStore(name: String): Future[ValidatorInternalStore]
+
   protected def mkProvider(name: String): Future[ValidatorConfigProvider]
 
   "ValidatorInternalStore" should {
@@ -69,6 +71,21 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
       } yield {
         configKeyValue shouldBe Some(Right(configValue))
         otherKeyValue shouldBe Some(Right(otherValue))
+      }
+    }
+
+    "delete single key" in {
+      for {
+        store <- mkStore("alice")
+        _ <- store.setConfig(configKey, configValue)
+        _ <- store.setConfig(otherKey, otherValue)
+
+        _ <- store.deleteConfig(configKey)
+        configKeyValue <- store.getConfig[String](configKey).value
+        otherKeyValue <- store.getConfig[String](otherKey).value
+      } yield {
+        configKeyValue shouldBe None
+        otherKeyValue.value.value shouldBe otherValue
       }
     }
 
@@ -127,6 +144,26 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     }
   }
 
+  "handle migrating parties" should {
+
+    "handle set delete update" in {
+      for {
+        provider <- mkProvider("alice")
+        parties = Set(
+          PartyId.tryFromProtoPrimitive("party::test")
+        )
+        _ <- provider.setPartiesToMigrate(parties)
+        partiesRead <- provider.getPartiesToMigrate().value
+        _ <- provider.clearPartiesToMigrate()
+        partiesReadAfterClear <- provider.getPartiesToMigrate().value
+      } yield {
+        partiesRead shouldBe Some(parties)
+        partiesReadAfterClear shouldBe None
+      }
+
+    }
+
+  }
 }
 
 class DbValidatorInternalStoreTest
