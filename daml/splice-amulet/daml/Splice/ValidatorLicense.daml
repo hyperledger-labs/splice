@@ -81,8 +81,6 @@ template ValidatorLicense with
         openRoundCid : ContractId OpenMiningRound
       controller validator
       do
-        require "weight must be non-zero" (optional True (0.0 <) weight)
-
         now <- getTime
         openRound <- fetchReferenceData (ForDso with dso) openRoundCid
         require "OpenRound is open" (openRound.opensAt <= now)
@@ -212,6 +210,8 @@ template ValidatorLivenessActivityRecord with
   where
     signatory dso
     observer validator
+
+    ensure (optional True (0.0 <) weight)
 
     choice ValidatorLivenessActivityRecord_DsoExpire : ValidatorLivenessActivityRecord_DsoExpireResult
       with
