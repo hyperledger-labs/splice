@@ -31,6 +31,7 @@ import Splice.DsoBootstrap
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DSO.VoteExecution
 import Splice.Scripts.AnsRulesParameters
 import Splice.Util
 
@@ -83,6 +84,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice =
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
         voteCooldownTime = None -- use default value of 1 minute
+        voteExecutionInstructionTimeout = None -- use default value of 1 day
   let amuletConfig = defaultAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
@@ -368,6 +370,25 @@ castVote app sv requestCid vote = do
                 body = ""
             optCastAt = None
     return result.voteRequest
+
+-- | Execute all pending vote execution instructions
+executeAllVoteExecutionInstructions : AmuletApp -> Script ()
+executeAllVoteExecutionInstructions app = do
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
+  let sv = head (Map.keys dsoRules.svs)
+  instructions <- query @VoteExecutionInstruction app.dso
+
+  forA_ instructions $ \(instructionCid, instruction) -> do
+    let validator = case instruction.instruction of
+          EI_ValidatorLicenseChangeWeight {validator} -> validator
+          EI_ValidatorLicenseWithdraw {validator} -> validator
+
+    [(licenseCid, _)] <- query @ValidatorLicense validator
+
+    submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteVoteExecutionInstruction with
+      sv
+      inputs = EII_ValidatorLicense licenseCid
+      instructionCid
 
 -- | Update all currently desired prices to the target price
 updateAgreedAmuletPrice : Party -> Decimal -> Script [ContractId AmuletPriceVote]
