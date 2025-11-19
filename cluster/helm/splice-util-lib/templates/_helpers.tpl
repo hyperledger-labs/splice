@@ -198,17 +198,11 @@ spec:
   targetLabels:
       - server
 {{- end }}
-{{- define "splice-util-lib.log-level" -}}
-{{- if .logLevel }}
+{{- define "splice-util-lib.log-level" }}
 - name: LOG_LEVEL_CANTON
-  value: {{ .logLevel }}
+  value: {{ .logLevel | default "INFO" }}
 - name: LOG_LEVEL_STDOUT
-{{- if .logLevelStdout }}
-  value: {{ .logLevelStdout }}
-{{- else }}
-  value: {{ .logLevel }}
-{{- end }}
-{{- end }}
+  value: {{ .logLevelStdout | default "DEBUG" }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}
 {{- if .serviceAccountName -}}

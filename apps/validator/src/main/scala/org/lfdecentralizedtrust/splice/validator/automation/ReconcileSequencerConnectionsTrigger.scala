@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -40,6 +39,7 @@ class ReconcileSequencerConnectionsTrigger(
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
     initialSynchronizerTimeO: Option[CantonTimestamp],
+    newSequencerConnectionPool: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -97,8 +97,8 @@ class ReconcileSequencerConnectionsTrigger(
                     SequencerConnections.tryMany(
                       nonEmptyConnections.forgetNE,
                       Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-                      // TODO(#2110) Rethink this when we enable sequencer connection pools.
-                      sequencerLivenessMargin = NonNegativeInt.zero,
+                      sequencerLivenessMargin =
+                        Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
                       submissionRequestAmplification = SubmissionRequestAmplification(
                         Thresholds.sequencerSubmissionRequestAmplification(
                           nonEmptyConnections.size
@@ -114,6 +114,7 @@ class ReconcileSequencerConnectionsTrigger(
                     alias,
                     sequencerConnectionConfig,
                   ),
+                  newSequencerConnectionPool,
                   modifySequencerConnections(sequencerConnectionConfig),
                   RetryFor.Automation,
                 )

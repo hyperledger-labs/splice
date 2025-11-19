@@ -1,0 +1,3 @@
+# TODO(#3173): figure out why this is a warning
+synchronizer outbox flusher failed The synchronizer Synchronizer 'global' failed the following topology transactions
+FAILED_PRECONDITION/OUTDATED_TRAFFIC_COST.* Submission was refused because traffic cost was outdated.*

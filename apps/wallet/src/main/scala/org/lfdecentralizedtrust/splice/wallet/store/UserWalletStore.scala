@@ -40,7 +40,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -477,7 +477,7 @@ object UserWalletStore {
 
   def apply(
       key: Key,
-      storage: Storage,
+      storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
@@ -488,19 +488,15 @@ object UserWalletStore {
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): UserWalletStore = {
-    storage match {
-      case dbStorage: DbStorage =>
-        new DbUserWalletStore(
-          key,
-          dbStorage,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-          ingestionConfig,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbUserWalletStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
   }
 
   case class Key(

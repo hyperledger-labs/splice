@@ -86,3 +86,4 @@ validatorWebUi:
 
 # set to true to disable auth (this is highly insecure)
 disableAuth: false
+logLevel: DEBUG

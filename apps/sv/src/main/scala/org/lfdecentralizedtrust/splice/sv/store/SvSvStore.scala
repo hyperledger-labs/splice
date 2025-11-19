@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.sv.store.db.SvTables.SvAcsStoreRowData
 import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
@@ -94,7 +94,7 @@ trait SvSvStore extends AppStore {
 object SvSvStore {
   def apply(
       key: SvStore.Key,
-      storage: Storage,
+      storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
@@ -105,19 +105,15 @@ object SvSvStore {
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
   ): SvSvStore =
-    storage match {
-      case db: DbStorage =>
-        new DbSvSvStore(
-          key,
-          db,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-          ingestionConfig,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbSvSvStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter[

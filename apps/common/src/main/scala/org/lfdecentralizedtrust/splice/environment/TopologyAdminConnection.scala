@@ -454,7 +454,10 @@ abstract class TopologyAdminConnection(
             case Some(mapping) =>
               proposeOwnerToKeyMapping(
                 member,
-                (keys ++ mapping.mapping.keys).distinct,
+                // Canton assumes the most recent keys that should be preferred are at the end
+                // so we add keys at the end.
+                // https://github.com/DACH-NY/canton/blob/1bd259d1364854f4bff5c21721cf351b4ed25cc6/community/base/src/main/scala/com/digitalasset/canton/crypto/CryptoKeys.scala#L228-L229
+                mapping.mapping.keys ++ keys.filterNot(mapping.mapping.keys.contains(_)),
                 mapping.base.serial + PositiveInt.one,
               )
           }).map(_ => ()),
@@ -502,7 +505,7 @@ abstract class TopologyAdminConnection(
       forceChanges = ForceFlags.none,
     )
 
-  def listOwnerToKeyMapping(member: Member)(implicit
+  def listOwnerToKeyMapping(member: Member, timeQuery: TimeQuery = TimeQuery.HeadState)(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[OwnerToKeyMapping]]] =
     runCmd(
@@ -510,7 +513,7 @@ abstract class TopologyAdminConnection(
         BaseQuery(
           store = TopologyStoreId.Authorized,
           proposals = false,
-          timeQuery = TimeQuery.HeadState,
+          timeQuery = timeQuery,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,

@@ -57,3 +57,4 @@ spliceInstanceNames:
 service:
   ui:
     port: 80
+logLevel: DEBUG

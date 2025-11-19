@@ -54,7 +54,7 @@ class RSAVerifier(audience: String, jwksUrl: URL, timeoutsConfig: RSAVerifier.Ti
     extends SignatureVerifier {
   override val expectedAudience: String = audience;
 
-  private val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
+  val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
     .cached(10, 24, TimeUnit.HOURS)
     .rateLimited(10, 1, TimeUnit.MINUTES)
     .timeouts(

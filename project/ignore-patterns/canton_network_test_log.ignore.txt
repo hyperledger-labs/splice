@@ -33,6 +33,7 @@ ErrorBoundary caught an unhandled promise rejection AbortError: The operation wa
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 AbortError: The operation was aborted
 TypeError: NetworkError when attempting to fetch resource
+oidc login error: NetworkError when attempting to fetch resource
 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:
@@ -128,5 +129,8 @@ GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
 Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 
+# See DACH-NY/cn-test-failures#6328: In rare cases, creating an index asynchronously can fail.
+# This is more likely in test code where we run multiple apps against the same database, all trying to create the same index.
+Index .* should be created and is invalid, dropping it
 
 # Make sure to have a trailing newline

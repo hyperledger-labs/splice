@@ -12,6 +12,7 @@ org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
+org.lfdecentralizedtrust.splice.store.DbValidatorInternalStoreTest
 org.lfdecentralizedtrust.splice.store.DbValidatorStoreTest
 org.lfdecentralizedtrust.splice.store.DomainTimeStoreTest
 org.lfdecentralizedtrust.splice.store.InMemorySynchronizerStoreTest
@@ -32,6 +33,7 @@ org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
 org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconcilerSpec
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
+org.lfdecentralizedtrust.splice.unit.http.HttpClientProxyTest
 org.lfdecentralizedtrust.splice.unit.store.db.AcsJdbcTypesTest
 org.lfdecentralizedtrust.splice.util.AmuletConfigScheduleTest
 org.lfdecentralizedtrust.splice.util.PolicyTest

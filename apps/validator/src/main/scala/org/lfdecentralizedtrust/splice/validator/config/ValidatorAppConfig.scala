@@ -21,6 +21,7 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 
 import java.nio.file.Path
+import scala.concurrent.duration.DurationInt
 
 case class AppInstance(
     serviceUser: String,
@@ -187,13 +188,20 @@ case class ValidatorAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
-    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // If observation latency is set to 10s, time proofs will be created 10s in the future so if a node receives an event within those 10s
     // it will never send a time proof.
     timeTrackerObservationLatency: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(5),
+      NonNegativeFiniteDuration.ofSeconds(10),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
-    participantPruningSchedule: Option[PruningConfig] = None,
+    // Participant pruning is enabled by default for all validators and SVs
+    participantPruningSchedule: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Runs every 10 minutes
+        maxDuration = PositiveDurationSeconds.tryFromDuration(5.minutes),
+        retention = PositiveDurationSeconds.tryFromDuration(30.days),
+      )
+    ),
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
