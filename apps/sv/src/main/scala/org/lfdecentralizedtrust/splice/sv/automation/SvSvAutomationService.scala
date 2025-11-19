@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
@@ -49,6 +50,7 @@ class SvSvAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
 ) extends SpliceAppAutomationService(
       config.automation,
       clock,

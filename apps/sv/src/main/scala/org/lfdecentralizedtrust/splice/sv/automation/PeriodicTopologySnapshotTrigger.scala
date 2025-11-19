@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.Clock
@@ -11,6 +12,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{
@@ -35,6 +37,8 @@ class PeriodicTopologySnapshotTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
+    mat: Materializer,
+    esf: ExecutionSequencerFactory,
 ) extends PeriodicTaskTrigger(config.backupInterval, triggerContext) {
 
   override def completeTask(
@@ -81,11 +85,19 @@ class PeriodicTopologySnapshotTrigger(
       now: CantonTimestamp,
       utcDate: String,
       synchronizerId: SynchronizerId,
-  )(implicit traceContext: TraceContext): Future[TaskSuccess] =
+  )(implicit
+      traceContext: TraceContext,
+      esf: ExecutionSequencerFactory,
+      mat: Materializer,
+  ): Future[TaskSuccess] =
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       // uses onboardingStateV2 so we don't lose information when exporting
-      onboardingState <- sequencerAdminConnection.getOnboardingState(Right(now))
+      storageObject <- sequencerAdminConnection.streamOnboardingState(
+        Right(now),
+        config.location,
+        Paths.get(s"$folderName/genesis-state").toString,
+      )
       authorizedStore <- sequencerAdminConnection.exportAuthorizedStoreSnapshot(sequencerId.uid)
       // list a summary of the transactions state at the time of the snapshot to validate further imports
       summary <- sequencerAdminConnection.getTopologyTransactionsSummary(
@@ -105,12 +117,6 @@ class PeriodicTopologySnapshotTrigger(
           val paths = Seq(
             BackupDump.writeBytes(
               config.location,
-              Paths.get(s"$folderName/genesis-state"),
-              onboardingState.toByteArray,
-              loggerFactory,
-            ),
-            BackupDump.writeBytes(
-              config.location,
               Paths.get(s"$folderName/authorized"),
               authorizedStore.toByteArray,
               loggerFactory,
@@ -126,5 +132,7 @@ class PeriodicTopologySnapshotTrigger(
           paths
         }
       }
-    } yield TaskSuccess(s"Took a new topology snapshot for $utcDate")
+    } yield TaskSuccess(
+      s"Took a new topology snapshot on $utcDate, with ${storageObject.name} weighting ${storageObject.size / 1000} KB"
+    )
 }

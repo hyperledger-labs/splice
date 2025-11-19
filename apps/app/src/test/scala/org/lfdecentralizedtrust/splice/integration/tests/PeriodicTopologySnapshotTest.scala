@@ -38,7 +38,7 @@ abstract class PeriodicTopologySnapshotIntegrationTestBase[T <: BackupDumpConfig
   "sv1" should {
     "produces a topology snapshot in the background" in { implicit env =>
       val utcDate = ZonedDateTime.now(ZoneOffset.UTC).toLocalDate.toString
-      clue("topology snapshot is being produced ")(
+      clue("topology snapshot is being produced")(
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
           timeUntilSuccess = 40.seconds,
           within = {
@@ -49,7 +49,7 @@ abstract class PeriodicTopologySnapshotIntegrationTestBase[T <: BackupDumpConfig
               1,
               logEntries,
             )(logEntry =>
-              logEntry.message should (include(s"Took a new topology snapshot for $utcDate") or
+              logEntry.message should (include(s"Took a new topology snapshot on $utcDate") or
                 include("Today's topology snapshot already exists."))
             )
           },

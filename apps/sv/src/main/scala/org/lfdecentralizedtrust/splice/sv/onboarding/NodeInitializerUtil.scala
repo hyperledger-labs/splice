@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -87,6 +88,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContextExecutor,
       mat: Materializer,
       tracer: Tracer,
+      esf: ExecutionSequencerFactory,
   ) =
     new SvSvAutomationService(
       clock,

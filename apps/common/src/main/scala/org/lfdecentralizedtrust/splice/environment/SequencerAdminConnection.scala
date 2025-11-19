@@ -4,6 +4,8 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.implicits.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   SequencerAdminCommands,
@@ -14,10 +16,15 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
+import com.digitalasset.canton.lifecycle.LifeCycle.CloseableChannel
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateV2Response
+import com.digitalasset.canton.sequencer.admin.v30.{
+  OnboardingStateV2Request,
+  OnboardingStateV2Response,
+}
 import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
@@ -29,10 +36,17 @@ import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
 import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.ContentTypes
+import org.apache.pekko.stream.connectors.googlecloud.storage.StorageObject
+import org.apache.pekko.stream.connectors.googlecloud.storage.scaladsl.GCStorage
+import com.google.protobuf.ByteString
+import io.grpc.stub.StreamObserver
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.ByteString as PekkoByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
+import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
@@ -110,6 +124,62 @@ class SequencerAdminConnection(
     runCmd(
       SequencerAdminCommands.OnboardingStateV2(responseObserver, sequencerIdOrTimestamp)
     ).flatMap(_ => responseObserver.resultBytes)
+  }
+
+  /** Streams onboarding state from the gRPC admin service directly to a bucket without writing to memory
+    */
+  def streamOnboardingState(
+      sequencerIdOrTimestamp: Either[SequencerId, CantonTimestamp],
+      backupDumConfig: BackupDumpConfig,
+      fileName: String,
+  )(implicit
+      executionSequencerFactory: ExecutionSequencerFactory,
+      materializer: Materializer,
+  ): Future[StorageObject] = {
+
+    val bucketConfig = backupDumConfig match {
+      case BackupDumpConfig.Gcp(bucketConfig, _) =>
+        bucketConfig
+      case _ =>
+        throw Status.UNIMPLEMENTED
+          .withDescription("Stream genesis state works only with GCP buckets.")
+          .asRuntimeException()
+    }
+    val sink = GCStorage.resumableUpload(
+      bucketConfig.bucketName,
+      fileName,
+      contentType = ContentTypes.`application/octet-stream`,
+      chunkSize = 256 * 1024, // Upload it in 256KB chunks
+    )
+    // the stream observer acts as intermediate receiver
+    val responseObserver =
+      new ByteStringStreamObserver[OnboardingStateV2Response](_.onboardingStateForSequencer)
+    val request = SequencerAdminCommands.OnboardingStateV2(responseObserver, sequencerIdOrTimestamp)
+    val channel = new CloseableChannel(
+      ClientChannelBuilder.createChannelBuilderToTrustedServer(config).build(),
+      logger,
+      s"$serviceName connection",
+    )
+    // stub acts the client-side proxy to get access to raw grpc commands
+    val stub = request.createService(channel.channel)
+    // bridges the gRPC response stream to a Pekko Source and converts the Protobuf ByteString to a Pekko ByteString
+    val source = ClientAdapter
+      .serverStreaming(
+        request
+          .createRequestInternal()
+          .getOrElse(throw new IllegalStateException("Unable to create internal request.")),
+        (req: OnboardingStateV2Request, obs: StreamObserver[OnboardingStateV2Response]) =>
+          stub.onboardingStateV2(req, obs),
+      )
+      .map { response =>
+        val proto: ByteString = response.onboardingStateForSequencer
+        PekkoByteString(proto.asReadOnlyByteBuffer())
+      }
+    val storageObject = source.runWith(sink)
+    storageObject.onComplete { _ =>
+      channel.close()
+    }
+    storageObject
   }
 
   /** This is used for initializing the sequencer when the domain is first bootstrapped.
