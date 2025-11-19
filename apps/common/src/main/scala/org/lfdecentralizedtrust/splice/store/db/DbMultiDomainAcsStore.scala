@@ -881,7 +881,36 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit
         traceContext: TraceContext
     ): Future[InitializeDescriptorResult[Int]] = {
-      StoreDescriptorStore.initializeDescriptor(descriptor, storage, domainMigrationId)
+      for {
+        newStoreId <- StoreDescriptorStore.getStoreIdForDescriptor(descriptor, storage)
+
+        _ <- storage
+          .update(
+            sql"""
+             insert into store_last_ingested_offsets (store_id, migration_id)
+             values (${newStoreId}, ${domainMigrationId})
+             on conflict do nothing
+             """.asUpdate,
+            "initializeDescriptor.3",
+          )
+
+        lastIngestedOffset <- storage
+          .querySingle(
+            sql"""
+             select last_ingested_offset
+             from store_last_ingested_offsets
+             where store_id = ${newStoreId} and migration_id = $domainMigrationId
+             """.as[Option[String]].headOption,
+            "initializeDescriptor.4",
+          )
+          .getOrRaise(
+            new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
+          )
+          .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
+      } yield lastIngestedOffset match {
+        case Some(offset) => StoreHasData(newStoreId, offset)
+        case None => StoreHasNoData(newStoreId)
+      }
     }
 
     override def initialize()(implicit traceContext: TraceContext): Future[IngestionStart] = {

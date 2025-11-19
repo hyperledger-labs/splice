@@ -10,7 +10,6 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.StoreErrors
-import org.lfdecentralizedtrust.splice.util.LegacyOffset
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 
@@ -58,15 +57,15 @@ case class StoreHasNoData[StoreId](
 case class StoreNotUsed[StoreId]() extends InitializeDescriptorResult[StoreId]
 
 object StoreDescriptorStore extends StoreErrors {
-  def initializeDescriptor(
+
+  def getStoreIdForDescriptor(
       descriptor: StoreDescriptor,
       storage: DbStorage,
-      domainMigrationId: Long,
   )(implicit
       traceContext: TraceContext,
       executionContext: scala.concurrent.ExecutionContext,
       closeContext: CloseContext,
-  ): FutureUnlessShutdown[InitializeDescriptorResult[Int]] = {
+  ): FutureUnlessShutdown[Int] = {
     // Notes:
     // - Postgres JSONB does not preserve white space, does not preserve the order of object keys, and does not keep duplicate object keys
     // - Postgres JSONB columns have a maximum size of 255MB
@@ -97,31 +96,6 @@ object StoreDescriptorStore extends StoreErrors {
           new RuntimeException(s"No row for $descriptor found, which was just inserted!")
         )
 
-      _ <- storage
-        .update(
-          sql"""
-             insert into store_last_ingested_offsets (store_id, migration_id)
-             values (${newStoreId}, ${domainMigrationId})
-             on conflict do nothing
-             """.asUpdate,
-          "initializeDescriptor.3",
-        )
-      lastIngestedOffset <- storage
-        .querySingle(
-          sql"""
-             select last_ingested_offset
-             from store_last_ingested_offsets
-             where store_id = ${newStoreId} and migration_id = $domainMigrationId
-             """.as[Option[String]].headOption,
-          "initializeDescriptor.4",
-        )
-        .getOrRaise(
-          new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
-        )
-        .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
-    } yield lastIngestedOffset match {
-      case Some(offset) => StoreHasData(newStoreId, offset)
-      case None => StoreHasNoData(newStoreId)
-    }
+    } yield newStoreId
   }
 }

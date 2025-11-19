@@ -16,19 +16,15 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.syntax.*
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsJdbcTypes,
-  InitializeDescriptorResult,
   StoreDescriptor,
   StoreDescriptorStore,
-  StoreHasNoData,
 }
 import java.util.concurrent.atomic.AtomicReference
 
 class DbValidatorInternalStore(
     key: ValidatorStore.Key,
-    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     storage: DbStorage,
     val loggerFactory: NamedLoggerFactory,
@@ -71,24 +67,13 @@ class DbValidatorInternalStore(
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
   def initializeState()(implicit tc: TraceContext): Future[Unit] = {
-    val initializedResult: Future[InitializeDescriptorResult[Int]] = StoreDescriptorStore
-      .initializeDescriptor(storeDescriptor, storage, domainMigrationInfo.currentMigrationId)
+    val initializedResult: Future[Int] = StoreDescriptorStore
+      .getStoreIdForDescriptor(storeDescriptor, storage)
     for {
       result <- initializedResult
     } yield {
-      result match {
-        case StoreHasNoData(storeId) =>
-          logger.info(
-            s"ValidatorInternalStore for validator party '${key.validatorParty}' and DSO party '${key.dsoParty}' initialized with store ID $storeId."
-          )
-          internalState.updateAndGet(_.copy(storeId = Some(storeId)))
-          ()
-        case _ =>
-          val errorMsg =
-            s"ValidatorInternalStore for validator party '${key.validatorParty}' and DSO party '${key.dsoParty}' initialization failed."
-          logger.error(errorMsg)
-          throw new IllegalStateException(errorMsg)
-      }
+      internalState.updateAndGet(_.copy(storeId = Some(result)))
+      ()
     }
   }
 

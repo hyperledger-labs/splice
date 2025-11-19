@@ -8,7 +8,6 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.{
   ScanUrlInternalConfig,
@@ -150,10 +149,6 @@ class DbValidatorInternalStoreTest
 
     val internalStore = new DbValidatorInternalStore(
       storeKey,
-      DomainMigrationInfo(
-        domainMigrationId,
-        None,
-      ),
       mkParticipantId("ValidatorInternalStoreTest:" + name),
       storage,
       loggerFactory,

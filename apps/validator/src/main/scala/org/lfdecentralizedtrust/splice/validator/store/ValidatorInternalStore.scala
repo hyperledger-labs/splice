@@ -10,9 +10,8 @@ import io.circe.{Decoder, Encoder}
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.resource.{DbStorage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 
 trait ValidatorInternalStore {
@@ -26,7 +25,6 @@ object ValidatorInternalStore {
 
   def apply(
       key: ValidatorStore.Key,
-      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
@@ -39,7 +37,6 @@ object ValidatorInternalStore {
       case storage: DbStorage =>
         new DbValidatorInternalStore(
           key,
-          domainMigrationInfo,
           participantId,
           storage,
           loggerFactory,
