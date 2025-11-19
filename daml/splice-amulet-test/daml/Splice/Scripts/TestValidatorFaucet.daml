@@ -3,6 +3,7 @@
 
 module Splice.Scripts.TestValidatorFaucet where
 
+import DA.Action (void)
 import DA.Assert
 import DA.List (head)
 import DA.Time
@@ -126,18 +127,25 @@ test_ValidatorFaucetWithWeight3 = do
         bobExpectedMin = aliceExpectedMin * bobWeight
         bobExpectedMax = aliceExpectedMax * bobWeight
 
--- With weight 0.0, Bob should receive no rewards
-test_ValidatorFaucetWithWeight0: Script ()
-test_ValidatorFaucetWithWeight0 = do
-    let bobWeight = 0.0
-        aliceExpectedMin = 2.85
-        aliceExpectedMax = 3.0
-    testValidatorFaucetWithWeight_Helper ValidatorWeightTestParams with
-        bobWeight = bobWeight
-        aliceExpectedMin = aliceExpectedMin
-        aliceExpectedMax = aliceExpectedMax
-        bobExpectedMin = aliceExpectedMin * bobWeight
-        bobExpectedMax = aliceExpectedMax * bobWeight
+-- ValidatorLicense_RecordValidatorLivenessActivity should fail for weight 0
+test_RecordValidatorLivenessActivityFailsForWeight0: Script ()
+test_RecordValidatorLivenessActivityFailsForWeight0 = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+    [(bobLicenseCid, bobLicense)] <- query @ValidatorLicense bobValidator.primaryParty
+
+    -- Update bob's license to have weight 0.0
+    submit app.dso $ archiveCmd bobLicenseCid
+    bobLicenseCid <- submitMulti [bobValidator.primaryParty, app.dso] [] $ createCmd bobLicense with
+      weight = Some 0.0
+
+    rounds <- getOpenRoundsSorted app
+    let (round0Cid, _) = head rounds
+
+    submitMultiMustFail [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0Cid
+
+    return ()
 
 -- Test that runNextIssuance properly handles ValidatorLicense weights
 -- in the optTotalValidatorLivenessActivityRecords calculation
@@ -181,7 +189,7 @@ testValidatorFaucetWithWeight_Helper params = do
     _ <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd aliceLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0Cid
 
-    _ <- submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
+    void $ submitMulti [bobValidator.primaryParty] [app.dso] $ exerciseCmd bobLicenseCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0Cid
 
     -- Verify the activity records were created with correct weights

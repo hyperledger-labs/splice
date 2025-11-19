@@ -33,6 +33,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DSO.VoteExecution
 import Splice.DsoRules.Utils
 import Splice.Schedule
 import Splice.Util
@@ -115,6 +116,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_ModifyValidatorLicenses ValidatorLicensesModification
+    -- ^ Voted action to change weights or withdraw validator licenses.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -144,6 +147,21 @@ data DsoSummary = DsoSummary with
     numSvs : Int
     requiredNumVotes : Int
       -- ^ The number of votes required for considering a confirmation, or a request for a vote
+  deriving (Eq, Show)
+
+-- | Actions possible on a validator license via vote
+data ValidatorLicenseChange
+  = VLC_ChangeWeight with
+      validator : Party
+      weight : Decimal
+  | VLC_Withdraw with
+      validator : Party
+  deriving (Eq, Show)
+
+-- | A modification of the set of validator licenses,
+-- which allows for single vote to modify many licenses.
+data ValidatorLicensesModification = ValidatorLicensesModification with
+    changes : [ValidatorLicenseChange]
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -298,6 +316,18 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data DsoRules_ModifyValidatorLicensesResult = DsoRules_ModifyValidatorLicensesResult with
+    instructionCids : [ContractId VoteExecutionInstruction]
+  deriving (Show, Eq)
+
+data DsoRules_ExecuteVoteExecutionInstructionResult = DsoRules_ExecuteVoteExecutionInstructionResult with
+    dummyUnitField : ()
+  deriving (Eq, Show)
+
+data DsoRules_ExpireVoteExecutionInstructionResult = DsoRules_ExpireVoteExecutionInstructionResult with
+    dummyUnitField : ()
+  deriving (Eq, Show)
+
 
 -- Workflow templates
 ---------------------
@@ -425,11 +455,20 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
+    voteExecutionInstructionTimeout : Optional RelTime -- ^ The TTL for vote execution instruction contracts
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
+
+-- | Read the `voteExecutionInstructionTimeout` from the `DsoRulesConfig` with a default value of 1 day.
+-- We choose 1 day as the default to balance the need for prompt cleanup of instructions
+-- that are impossible to execute with the expectation that instructions
+-- are always executed. During normal operations, vote instruction execution
+-- should be prompt and happen within less than a minute after their creation.
+getVoteExecutionInstructionTimeout : DsoRulesConfig -> RelTime
+getVoteExecutionInstructionTimeout config = fromOptional (days 1) config.voteExecutionInstructionTimeout
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -667,7 +706,7 @@ template DsoRules with
           assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation dso self amuletRulesCid action
+        executeActionRequiringConfirmation dso self amuletRulesCid action None
         return DsoRules_ExecuteConfirmedActionResult
 
 
@@ -798,7 +837,7 @@ template DsoRules with
 
                     Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action (Some requestCid)
                         pure $ VRO_Accepted with
                           effectiveAt = effectiveTime
                       catch
@@ -816,7 +855,7 @@ template DsoRules with
 
                     None | numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action (Some requestCid)
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
                         -- TODO(#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
@@ -1296,10 +1335,7 @@ template DsoRules with
 
         -- expire validator liveness activity records and compute their unclaimed rewards
         expiredValidatorLivenessActivityRecords <- forA (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
-          -- We need to fetch the weight, and would also prefer doing 'Expire'
-          -- We can't do checked fetch as the owner is the validator
-          -- hence can't use either fetchAndArchive or fetchUncheckedAndArchive
-          record <- fetchUncheckedButArchiveLater validatorLivenessActivityRecordCid
+          record <- fetchButArchiveLater (ForDso with dso) validatorLivenessActivityRecordCid
           exercise validatorLivenessActivityRecordCid ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
           return (fromOptional defaultValidatorLicenseWeight record.weight)
 
@@ -1532,6 +1568,46 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
+    nonconsuming choice DsoRules_ModifyValidatorLicenses : DsoRules_ModifyValidatorLicensesResult
+      with
+        modification : ValidatorLicensesModification
+        voteRequest : ContractId VoteRequest
+      controller dso
+      do now <- getTime
+         let expiresAt = now `addRelTime` getVoteExecutionInstructionTimeout config
+         let voteRequestAny = coerceContractId voteRequest
+         instructionCids <- forA modification.changes $ \c -> do
+           case c of
+             VLC_ChangeWeight {validator, weight} -> do
+               let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
+               create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
+             VLC_Withdraw {validator} -> do
+               let instruction = EI_ValidatorLicenseWithdraw with validator
+               create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
+         return DsoRules_ModifyValidatorLicensesResult with instructionCids
+
+    nonconsuming choice DsoRules_ExecuteVoteExecutionInstruction : DsoRules_ExecuteVoteExecutionInstructionResult
+      with
+        sv : Party
+        inputs : ExecutionInstructionInputs
+        instructionCid : ContractId VoteExecutionInstruction
+      controller sv
+      do _ <- getAndValidateSvParty this (Some sv)
+         voteInstruction <- fetchAndArchive (ForDso dso) instructionCid
+         executeVoteExecutionInstruction dso voteInstruction inputs
+         return DsoRules_ExecuteVoteExecutionInstructionResult with dummyUnitField = ()
+
+    nonconsuming choice DsoRules_ExpireVoteExecutionInstruction : DsoRules_ExpireVoteExecutionInstructionResult
+      with
+        instructionCid : ContractId VoteExecutionInstruction
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        fetchChecked (ForDso with dso) instructionCid
+        exercise instructionCid VoteExecutionInstruction_Expire
+        return DsoRules_ExpireVoteExecutionInstructionResult with dummyUnitField = ()
+
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1563,8 +1639,8 @@ summarizeDso dsoRules = DsoSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act of
+executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Optional (ContractId VoteRequest) -> Update ()
+executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act voteRequestCid = case act of
   ARC_AmuletRules with .. ->
     case amuletRulesCid of
       None -> error "amuletRulesCid was not defined."
@@ -1591,6 +1667,9 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ModifyValidatorLicenses modification -> case voteRequestCid of
+        None -> error "voteRequestCid is required for SRARC_ModifyValidatorLicenses"
+        Some voteRequest -> void $ exercise dsoRulesCid DsoRules_ModifyValidatorLicenses with modification; voteRequest
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -1818,6 +1897,7 @@ instance Patchable DsoRulesConfig where
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
+    voteExecutionInstructionTimeout = patch new.voteExecutionInstructionTimeout base.voteExecutionInstructionTimeout current.voteExecutionInstructionTimeout
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with

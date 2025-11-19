@@ -2239,6 +2239,7 @@ trait AmuletTransferUtil { self: StoreTest =>
         ),
         Optional.empty(),
         Optional.empty(), // voteCooldownTime
+        Optional.empty(), // voteExecutionInstructionTimeout
       ),
       Collections.emptyMap(),
       true,

@@ -266,6 +266,7 @@ object SvUtil {
     ), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
     voteCooldownTime.map(t => new RelTime(t.duration.toMicros)).toJava,
+    Optional.empty(), // voteExecutionInstructionTimeout
   )
 
   def keyPairMatches(
