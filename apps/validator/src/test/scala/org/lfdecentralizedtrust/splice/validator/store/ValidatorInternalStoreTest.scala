@@ -1,20 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.store
+package org.lfdecentralizedtrust.splice.validator.store
 
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.store.StoreTest
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import org.lfdecentralizedtrust.splice.validator.store.{
-  ScanUrlInternalConfig,
-  ValidatorConfigProvider,
-  ValidatorInternalStore,
-  ValidatorStore,
-}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 import org.scalatest.matchers.should.Matchers
 
@@ -24,11 +20,6 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
   protected def mkStore(name: String): Future[ValidatorInternalStore]
   protected def mkProvider(name: String): Future[ValidatorConfigProvider]
-  private lazy val validator = mkPartyId(s"validator")
-  lazy val storeKey = ValidatorStore.Key(
-    dsoParty = dsoParty,
-    validatorParty = validator,
-  )
 
   "ValidatorInternalStore" should {
 
@@ -43,7 +34,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         _ <- store.setConfig(configKey, configValue)
         retrievedValue <- store.getConfig[String](configKey).value
       } yield {
-        retrievedValue shouldBe Some(configValue)
+        retrievedValue shouldBe Some(Right(configValue))
       }
     }
 
@@ -63,7 +54,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         _ <- store.setConfig(configKey, otherValue)
         retrievedValue <- store.getConfig[String](configKey).value
       } yield {
-        retrievedValue shouldBe Some(otherValue)
+        retrievedValue shouldBe Some(Right(otherValue))
       }
     }
 
@@ -76,8 +67,8 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         configKeyValue <- store.getConfig[String](configKey).value
         otherKeyValue <- store.getConfig[String](otherKey).value
       } yield {
-        configKeyValue shouldBe Some(configValue)
-        otherKeyValue shouldBe Some(otherValue)
+        configKeyValue shouldBe Some(Right(configValue))
+        otherKeyValue shouldBe Some(Right(otherValue))
       }
     }
 
@@ -95,7 +86,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
       for {
         provider <- mkProvider("alice")
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
-        retrievedConfigOption <- provider.getScanUrlInternalConfig.value
+        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
       } yield {
         retrievedConfigOption shouldBe Some(scanConfig1)
       }
@@ -106,7 +97,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         provider <- mkProvider("alice")
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
         _ <- provider.setScanUrlInternalConfig(scanConfig2) // Overwrite
-        retrievedConfigOption <- provider.getScanUrlInternalConfig.value
+        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
       } yield {
         retrievedConfigOption shouldBe Some(scanConfig2)
       }
@@ -115,7 +106,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     "CONFIG_PROVIDER return None when no ScanUrlInternalConfig is found" in {
       for {
         provider <- mkProvider("alice")
-        retrievedConfigOption <- provider.getScanUrlInternalConfig.value
+        retrievedConfigOption <- provider.getScanUrlInternalConfig().value
       } yield {
         retrievedConfigOption shouldBe None
       }
@@ -127,8 +118,8 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         provider2 <- mkProvider("bob")
         _ <- provider1.setScanUrlInternalConfig(scanConfig1)
         _ <- provider2.setScanUrlInternalConfig(scanConfig2)
-        retrievedConfigOption1 <- provider1.getScanUrlInternalConfig.value
-        retrievedConfigOption2 <- provider2.getScanUrlInternalConfig.value
+        retrievedConfigOption1 <- provider1.getScanUrlInternalConfig().value
+        retrievedConfigOption2 <- provider2.getScanUrlInternalConfig().value
       } yield {
         retrievedConfigOption1 shouldBe Some(scanConfig1)
         retrievedConfigOption2 shouldBe Some(scanConfig2)
@@ -148,8 +139,10 @@ class DbValidatorInternalStoreTest
   private def buildDbStore(name: String): Future[ValidatorInternalStore] = {
 
     val internalStore = new DbValidatorInternalStore(
-      storeKey,
-      mkParticipantId("ValidatorInternalStoreTest:" + name),
+      ValidatorStore.Key(
+        dsoParty = dsoParty,
+        validatorParty = mkPartyId(name),
+      ),
       storage,
       loggerFactory,
     )
@@ -164,7 +157,7 @@ class DbValidatorInternalStoreTest
 
   override protected def mkProvider(name: String): Future[ValidatorConfigProvider] = {
     val internalStore = buildDbStore(name)
-    internalStore.map(store => new ValidatorConfigProvider(store))
+    internalStore.map(store => new ValidatorConfigProvider(store, loggerFactory))
   }
 
   override protected def cleanDb(

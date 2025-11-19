@@ -61,6 +61,7 @@ describe('Inflight Vote Requests', () => {
         <ProposalListingSection
           sectionTitle="Inflight Vote Requests"
           data={inflightVoteRequests}
+          noDataMessage="No Inflight Vote Requests available"
           uniqueId="inflight-vote-request"
           showStatus
         />
@@ -77,6 +78,7 @@ describe('Inflight Vote Requests', () => {
         <ProposalListingSection
           sectionTitle="Inflight Vote Requests"
           data={inflightVoteRequests}
+          noDataMessage="No Inflight Vote Requests available"
           uniqueId="inflight-vote-request"
           showStatus
         />
@@ -104,6 +106,7 @@ describe('Inflight Vote Requests', () => {
         <ProposalListingSection
           sectionTitle="Inflight Vote Requests"
           data={[data]}
+          noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showVoteStats
           showAcceptanceThreshold
@@ -154,6 +157,7 @@ describe('Inflight Vote Requests', () => {
         <ProposalListingSection
           sectionTitle="Inflight Vote Requests"
           data={[data]}
+          noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showStatus
         />
@@ -184,6 +188,7 @@ describe('Inflight Vote Requests', () => {
         <ProposalListingSection
           sectionTitle="Inflight Vote Requests"
           data={[data]}
+          noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showStatus
         />
@@ -205,6 +210,7 @@ describe('Inflight Vote Requests', () => {
         <ProposalListingSection
           sectionTitle="Inflight Vote Requests"
           data={[]}
+          noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showStatus
         />
@@ -220,7 +226,12 @@ describe('Vote history', () => {
   test('should render vote history section', async () => {
     render(
       <MemoryRouter>
-        <ProposalListingSection sectionTitle="Vote History" data={[]} uniqueId="vote-history" />
+        <ProposalListingSection
+          sectionTitle="Vote History"
+          data={[]}
+          noDataMessage="No Vote History available"
+          uniqueId="vote-history"
+        />
       </MemoryRouter>
     );
 
@@ -234,6 +245,7 @@ describe('Vote history', () => {
         <ProposalListingSection
           sectionTitle="Vote History"
           data={voteHistory}
+          noDataMessage="No Vote History available"
           uniqueId="vote-history"
         />
       </MemoryRouter>
@@ -260,6 +272,7 @@ describe('Vote history', () => {
         <ProposalListingSection
           sectionTitle="Vote History"
           data={[data]}
+          noDataMessage="No Vote History available"
           uniqueId={uniqueId}
           showStatus
           showVoteStats
@@ -297,8 +310,9 @@ describe('Vote history', () => {
     render(
       <MemoryRouter>
         <ProposalListingSection
-          sectionTitle="Voting History"
+          sectionTitle="Vote History"
           data={[]}
+          noDataMessage="No Vote History available"
           showStatus
           uniqueId="voting-history"
         />
@@ -307,6 +321,6 @@ describe('Vote history', () => {
 
     const alertInfo = screen.getByTestId('voting-history-section-info');
     expect(alertInfo).toBeDefined();
-    expect(alertInfo.textContent).toMatch(/No Voting History available/);
+    expect(alertInfo.textContent).toMatch(/No Vote History available/);
   });
 });

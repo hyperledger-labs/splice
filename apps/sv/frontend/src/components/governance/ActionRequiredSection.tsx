@@ -3,7 +3,7 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
-import { Alert, Box, Button, Card, Grid, Stack, Typography } from '@mui/material';
+import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
@@ -70,17 +70,16 @@ const ActionCard = (props: ActionCardProps) => {
   const { action, createdAt, contractId, votingEnds, requester, isYou } = props;
 
   return (
-    <Card
-      sx={{ bgcolor: 'background.paper' }}
-      className="action-required-card"
-      data-testid="action-required-card"
-    >
+    <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
       <Box
         sx={{
+          bgcolor: 'background.paper',
           p: 2,
-          display: 'flex',
-          justifyContent: 'space-between',
+          borderRadius: '4px',
+          '&:hover': { backgroundColor: '#363636' },
         }}
+        className="action-required-card"
+        data-testid="action-required-card"
       >
         <Grid flexGrow={1} container spacing={1}>
           <Grid size={2}>
@@ -120,21 +119,21 @@ const ActionCard = (props: ActionCardProps) => {
             </Box>
           </Grid>
           <Grid size={2} display="flex" justifyContent="flex-end" alignItems="center">
-            <Button
-              component={RouterLink}
-              to={`/governance-beta/proposals/${contractId}`}
-              endIcon={<East fontSize="small" color="secondary" />}
-              size="large"
-              color="secondary"
-              sx={{ fontWeight: 500, color: 'text.light' }}
+            <Stack
+              direction="row"
+              alignItems="center"
+              gap={1}
               data-testid="action-required-view-details"
             >
-              View Details
-            </Button>
+              <Typography fontWeight={500} color="text.light">
+                View Details
+              </Typography>
+              <East fontSize="small" color="secondary" />
+            </Stack>
           </Grid>
         </Grid>
       </Box>
-    </Card>
+    </RouterLink>
   );
 };
 

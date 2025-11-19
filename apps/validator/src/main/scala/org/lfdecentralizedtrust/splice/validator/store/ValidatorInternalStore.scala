@@ -4,28 +4,36 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.data.OptionT
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
-
-import scala.concurrent.{ExecutionContext, Future}
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.ParticipantId
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
+import scala.concurrent.{ExecutionContext, Future}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 trait ValidatorInternalStore {
 
-  def setConfig[T: Encoder](key: String, value: T)(implicit tc: TraceContext): Future[Unit]
+  def setConfig[T](key: String, value: T)(implicit
+      tc: TraceContext,
+      encoder: Encoder[T],
+  ): Future[Unit]
 
-  def getConfig[T: Decoder](key: String)(implicit tc: TraceContext): OptionT[Future, T]
+  def getConfig[T](
+      key: String
+  )(implicit tc: TraceContext, decoder: Decoder[T]): OptionT[Future, Decoder.Result[T]]
+
+  def deleteConfig(key: String)(implicit
+      tc: TraceContext
+  ): Future[Unit]
+
 }
 
 object ValidatorInternalStore {
 
   def apply(
       key: ValidatorStore.Key,
-      participantId: ParticipantId,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -37,7 +45,6 @@ object ValidatorInternalStore {
       case storage: DbStorage =>
         new DbValidatorInternalStore(
           key,
-          participantId,
           storage,
           loggerFactory,
         )
