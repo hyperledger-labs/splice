@@ -9,7 +9,7 @@ ALTER TABLE validator_internal_config
 
 ALTER TABLE validator_internal_config
     ADD CONSTRAINT uc_validator_internal_config
-        PRIMARY KEY (config_key, store_id);
+        PRIMARY KEY (store_id, config_key);
 
 ALTER TABLE validator_internal_config
     ADD CONSTRAINT fk_store_id
