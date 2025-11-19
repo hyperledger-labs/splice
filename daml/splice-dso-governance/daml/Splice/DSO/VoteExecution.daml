@@ -68,7 +68,7 @@ executeVoteInstruction dso voteInstruction inputs = do
       pure ()
 
     (EI_ValidatorLicenseWithdraw {validator}, EII_ValidatorLicense validatorLicenseCid) -> do
-      license <- fetchButArchiveLater (ForOwner with dso; owner = validator) validatorLicenseCid
+      _ <- fetchButArchiveLater (ForOwner with dso; owner = validator) validatorLicenseCid
       exercise validatorLicenseCid ValidatorLicense_Withdraw with reason = "revoked by governance decision"
       pure ()
 
