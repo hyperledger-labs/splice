@@ -48,8 +48,7 @@ class DbValidatorInternalStore(
     party = key.validatorParty,
     participant = participantId,
     key = Map(
-      "validatorParty" -> key.validatorParty.toProtoPrimitive,
-      "dsoParty" -> key.dsoParty.toProtoPrimitive,
+      "validatorParty" -> key.validatorParty.toProtoPrimitive
     ),
   )
 
