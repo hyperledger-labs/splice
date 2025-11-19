@@ -120,7 +120,7 @@ const SingleSvConfigSchema = z
         appsAsync: z.boolean().default(false),
         cantonLogLevel: LogLevelSchema,
         cantonStdoutLogLevel: LogLevelSchema.optional(),
-        cantonAsync: z.boolean().default(true),
+        cantonAsync: z.boolean().default(false),
         cometbftLogLevel: CometbftLogLevelSchema.optional(),
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
