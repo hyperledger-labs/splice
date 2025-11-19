@@ -57,7 +57,7 @@ case class StoreHasNoData[StoreId](
 ) extends InitializeDescriptorResult[StoreId]
 case class StoreNotUsed[StoreId]() extends InitializeDescriptorResult[StoreId]
 
-object StoreDescriptorManager extends StoreErrors {
+object StoreDescripttorStore extends StoreErrors {
   def initializeDescriptor(
       descriptor: StoreDescriptor,
       storage: DbStorage,

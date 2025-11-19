@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   AcsJdbcTypes,
   InitializeDescriptorResult,
   StoreDescriptor,
-  StoreDescriptorManager,
+  StoreDescripttorStore,
   StoreHasNoData,
 }
 import java.util.concurrent.atomic.AtomicReference
@@ -73,7 +73,7 @@ class DbValidatorInternalStore(
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
   def initializeState(): Future[Unit] = {
-    val initializedResult: Future[InitializeDescriptorResult[Int]] = StoreDescriptorManager
+    val initializedResult: Future[InitializeDescriptorResult[Int]] = StoreDescripttorStore
       .initializeDescriptor(storeDescriptor, storage, domainMigrationInfo.currentMigrationId)
     for {
       result <- initializedResult

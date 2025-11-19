@@ -23,8 +23,8 @@ import scala.concurrent.Future
 
 abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with HasExecutionContext {
 
-  protected def mkStore(): Future[ValidatorInternalStore]
-  protected def mkProvider(): Future[ValidatorConfigProvider]
+  protected def mkStore(name: String): Future[ValidatorInternalStore]
+  protected def mkProvider(name: String): Future[ValidatorConfigProvider]
   private lazy val validator = mkPartyId(s"validator")
   lazy val storeKey = ValidatorStore.Key(
     dsoParty = dsoParty,
@@ -40,7 +40,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "set and get a payload successfully" in {
       for {
-        store <- mkStore()
+        store <- mkStore("alice")
         _ <- store.setConfig(configKey, configValue)
         retrievedValue <- store.getConfig[String](configKey).value
       } yield {
@@ -50,7 +50,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "return None for a non-existent key" in {
       for {
-        store <- mkStore()
+        store <- mkStore("alice")
         retrievedValue <- store.getConfig[String]("non-existent-key").value
       } yield {
         retrievedValue shouldBe None
@@ -59,7 +59,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "update an existing payload" in {
       for {
-        store <- mkStore()
+        store <- mkStore("alice")
         _ <- store.setConfig(configKey, configValue)
         _ <- store.setConfig(configKey, otherValue)
         retrievedValue <- store.getConfig[String](configKey).value
@@ -70,7 +70,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "handle multiple different keys independently" in {
       for {
-        store <- mkStore()
+        store <- mkStore("alice")
         _ <- store.setConfig(configKey, configValue)
         _ <- store.setConfig(otherKey, otherValue)
 
@@ -94,7 +94,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "CONFIG_PROVIDER set and retrieve a ScanUrlInternalConfig list successfully" in {
       for {
-        provider <- mkProvider()
+        provider <- mkProvider("alice")
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
         retrievedConfigOption <- provider.getScanUrlInternalConfig.value
       } yield {
@@ -104,7 +104,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "CONFIG_PROVIDER update an existing ScanUrlInternalConfig list" in {
       for {
-        provider <- mkProvider()
+        provider <- mkProvider("alice")
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
         _ <- provider.setScanUrlInternalConfig(scanConfig2) // Overwrite
         retrievedConfigOption <- provider.getScanUrlInternalConfig.value
@@ -115,10 +115,24 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
 
     "CONFIG_PROVIDER return None when no ScanUrlInternalConfig is found" in {
       for {
-        provider <- mkProvider()
+        provider <- mkProvider("alice")
         retrievedConfigOption <- provider.getScanUrlInternalConfig.value
       } yield {
         retrievedConfigOption shouldBe None
+      }
+    }
+
+    "CONFIG_PROVIDER for two different store descriptors should not collide" in {
+      for {
+        provider1 <- mkProvider("alice")
+        provider2 <- mkProvider("bob")
+        _ <- provider1.setScanUrlInternalConfig(scanConfig1)
+        _ <- provider2.setScanUrlInternalConfig(scanConfig2)
+        retrievedConfigOption1 <- provider1.getScanUrlInternalConfig.value
+        retrievedConfigOption2 <- provider2.getScanUrlInternalConfig.value
+      } yield {
+        retrievedConfigOption1 shouldBe Some(scanConfig1)
+        retrievedConfigOption2 shouldBe Some(scanConfig2)
       }
     }
   }
@@ -132,7 +146,7 @@ class DbValidatorInternalStoreTest
 
   override protected def timeouts = new ProcessingTimeout
 
-  private def buildDbStore(): Future[ValidatorInternalStore] = {
+  private def buildDbStore(name: String): Future[ValidatorInternalStore] = {
 
     val internalStore = new DbValidatorInternalStore(
       storeKey,
@@ -140,7 +154,7 @@ class DbValidatorInternalStoreTest
         domainMigrationId,
         None,
       ),
-      mkParticipantId("ValidatorInternalStoreTest"),
+      mkParticipantId("ValidatorInternalStoreTest:" + name),
       storage,
       loggerFactory,
     )
@@ -150,11 +164,11 @@ class DbValidatorInternalStoreTest
     } yield internalStore
   }
 
-  override protected def mkStore(): Future[ValidatorInternalStore] =
-    buildDbStore()
+  override protected def mkStore(name: String): Future[ValidatorInternalStore] =
+    buildDbStore(name)
 
-  override protected def mkProvider(): Future[ValidatorConfigProvider] = {
-    val internalStore = buildDbStore()
+  override protected def mkProvider(name: String): Future[ValidatorConfigProvider] = {
+    val internalStore = buildDbStore(name)
     internalStore.map(store => new ValidatorConfigProvider(store))
   }
 
