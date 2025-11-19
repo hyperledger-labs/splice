@@ -23,6 +23,7 @@ export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
       level: LogLevelSchema.optional(),
+      sync: z.boolean().default(true),
     })
     .default({}),
   kms: KmsConfigSchema.optional(),
