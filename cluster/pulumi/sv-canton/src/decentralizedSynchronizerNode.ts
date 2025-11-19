@@ -71,7 +71,7 @@ abstract class InStackDecentralizedSynchronizerNode
     version: CnChartVersion,
     logLevel?: LogLevel,
     logLevelStdout?: LogLevel,
-    immediateFlush?: boolean,
+    logImmediateFlush?: boolean,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -96,7 +96,7 @@ abstract class InStackDecentralizedSynchronizerNode
         ...{
           logLevel: logLevel,
           logLevelStdout: logLevelStdout,
-          immediateFlush: immediateFlush,
+          logImmediateFlush: logImmediateFlush,
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
             persistence: {
