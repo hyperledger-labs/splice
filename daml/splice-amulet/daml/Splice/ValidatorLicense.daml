@@ -230,6 +230,9 @@ instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
 instance HasCheckedFetch ValidatorLivenessActivityRecord ForOwner where
   contractGroupId ValidatorLivenessActivityRecord{..} = ForOwner with dso; owner = validator
 
+instance HasCheckedFetch ValidatorLivenessActivityRecord ForDso where
+  contractGroupId ValidatorLivenessActivityRecord{..} = ForDso with dso
+
 instance HasCheckedFetch ValidatorLicense ForDso where
   contractGroupId ValidatorLicense{..} = ForDso with dso
 
