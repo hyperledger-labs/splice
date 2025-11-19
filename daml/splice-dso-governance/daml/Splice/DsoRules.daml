@@ -33,6 +33,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DSO.VoteExecution
 import Splice.DsoRules.Utils
 import Splice.Schedule
 import Splice.Util
@@ -115,10 +116,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
-  | SRARC_ValidatorLicense_ChangeWeight DsoRules_ValidatorLicense_ChangeWeight
-    -- ^ Voted action to change weights of validator licenses.
-  | SRARC_ValidatorLicense_Withdraw DsoRules_ValidatorLicense_Withdraw
-    -- ^ Voted action to withdraw validator licenses.
+  | SRARC_ValidatorLicense DsoRules_ValidatorLicense
+    -- ^ Voted action to change weights or withdraw validator licenses.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -150,16 +149,13 @@ data DsoSummary = DsoSummary with
       -- ^ The number of votes required for considering a confirmation, or a request for a vote
   deriving (Eq, Show)
 
--- | Helper data types for validator license operations
-data ValidatorWeightUpdate = ValidatorWeightUpdate with
-    validator : Party
-    weight : Decimal
-  deriving (Eq, Show)
-
-data ValidatorLicense_InstructionType
-  = VLI_ChangeWeight with
+-- | Actions possible on a validator license via vote
+data ValidatorLicenseActionKind
+  = VLAK_ChangeWeight with
+      validator : Party
       weight : Decimal
-  | VLI_Withdraw
+  | VLAK_Withdraw with
+      validator : Party
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -314,19 +310,17 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
-data DsoRules_ValidatorLicense_ChangeWeightResult = DsoRules_ValidatorLicense_ChangeWeightResult with
-    instructionCids : [ContractId ValidatorLicense_Instruction]
+data DsoRules_ValidatorLicenseResult = DsoRules_ValidatorLicenseResult with
+    instructionCids : [ContractId VoteExecutionInstruction]
   deriving (Show, Eq)
 
-data DsoRules_ValidatorLicense_WithdrawResult = DsoRules_ValidatorLicense_WithdrawResult with
-    instructionCids : [ContractId ValidatorLicense_Instruction]
-  deriving (Show, Eq)
+data DsoRules_Execute_VoteInstructionResult = DsoRules_Execute_VoteInstructionResult with
+    dummyUnitField : ()
+  deriving (Eq, Show)
 
-data DsoRules_Execute_ValidatorLicense_InstructionResult = DsoRules_Execute_ValidatorLicense_InstructionResult
-
-data ValidatorLicense_Instruction_ExpireResult = ValidatorLicense_Instruction_ExpireResult
-
-data DsoRules_ExpireValidatorLicenseInstructionResult = DsoRules_ExpireValidatorLicenseInstructionResult
+data DsoRules_ExpireVoteInstructionResult = DsoRules_ExpireVoteInstructionResult with
+    dummyUnitField : ()
+  deriving (Eq, Show)
 
 
 -- Workflow templates
@@ -455,15 +449,16 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
+    voteExecutionInstructionTimeout : Optional RelTime -- ^ The TTL for vote execution instruction contracts
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
 
--- | The default TTL for a `ValidatorLicense_Instruction` is 1 hour.
-defaultValidatorLicenseInstructionTimeout : RelTime
-defaultValidatorLicenseInstructionTimeout = hours 1
+-- | Read the `voteExecutionInstructionTimeout` from the `DsoRulesConfig` with a default value of 1 hour.
+getVoteExecutionInstructionTimeout : DsoRulesConfig -> RelTime
+getVoteExecutionInstructionTimeout config = fromOptional (hours 1) config.voteExecutionInstructionTimeout
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -1563,67 +1558,44 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
-    nonconsuming choice DsoRules_ValidatorLicense_ChangeWeight : DsoRules_ValidatorLicense_ChangeWeightResult
+    nonconsuming choice DsoRules_ValidatorLicense : DsoRules_ValidatorLicenseResult
       with
-        updates : [ValidatorWeightUpdate]
+        actions : [ValidatorLicenseActionKind]
       controller dso
       do now <- getTime
-         let expiresAt = now `addRelTime` defaultValidatorLicenseInstructionTimeout
-         instructionCids <- forA updates $ \update -> do
-           require ("Weight is non-negative for " <> show update.validator) (update.weight >= 0.0)
-           create ValidatorLicense_Instruction
-             with
-               dso
-               validator = update.validator
-               instructionType = VLI_ChangeWeight with weight = update.weight
-               expiresAt
-         return DsoRules_ValidatorLicense_ChangeWeightResult with ..
+         let expiresAt = now `addRelTime` getVoteExecutionInstructionTimeout config
+         instructionCids <- forA actions $ \action -> do
+           case action of
+             VLAK_ChangeWeight {validator, weight} -> do
+               require ("Weight is non-negative for " <> show validator) (weight >= 0.0)
+               let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
+               create VoteExecutionInstruction with dso; instruction; expiresAt
+             VLAK_Withdraw {validator} -> do
+               let instruction = EI_ValidatorLicenseWithdraw with validator
+               create VoteExecutionInstruction with dso; instruction; expiresAt
+         return DsoRules_ValidatorLicenseResult with instructionCids
 
-    nonconsuming choice DsoRules_ValidatorLicense_Withdraw : DsoRules_ValidatorLicense_WithdrawResult
-      with
-        validators : [Party]
-      controller dso
-      do now <- getTime
-         let expiresAt = now `addRelTime` defaultValidatorLicenseInstructionTimeout
-         instructionCids <- forA validators $ \validator ->
-           create ValidatorLicense_Instruction
-             with
-               dso
-               validator
-               instructionType = VLI_Withdraw
-               expiresAt
-         return DsoRules_ValidatorLicense_WithdrawResult with ..
-
-    nonconsuming choice DsoRules_Execute_ValidatorLicense_Instruction : DsoRules_Execute_ValidatorLicense_InstructionResult
+    nonconsuming choice DsoRules_Execute_VoteInstruction : DsoRules_Execute_VoteInstructionResult
       with
         sv : Party
-        validatorLicenseCid : ContractId ValidatorLicense
-        instructionCid : ContractId ValidatorLicense_Instruction
+        inputs : ExecutionInstructionInputs
+        instructionCid : ContractId VoteExecutionInstruction
       controller sv
       do _ <- getAndValidateSvParty this (Some sv)
-         license <- fetch validatorLicenseCid
-         instruction <- fetchAndArchive (ForDso dso) instructionCid
-         require ("Party on instruction " <> show instruction.validator <> " matches party on license " <> show license.validator) (license.validator == instruction.validator)
-         case instruction.instructionType of
-           VLI_ChangeWeight weight -> do
-             license <- fetchAndArchive (ForDso dso) validatorLicenseCid
-             _ <- create license with weight = Some weight
-             pure ()
-           VLI_Withdraw -> do
-             exercise validatorLicenseCid ValidatorLicense_Withdraw with reason = "revoked by governance decision"
-             pure ()
-         return DsoRules_Execute_ValidatorLicense_InstructionResult
+         voteInstruction <- fetchAndArchive (ForDso dso) instructionCid
+         executeVoteInstruction dso voteInstruction inputs
+         return DsoRules_Execute_VoteInstructionResult with dummyUnitField = ()
 
-    nonconsuming choice DsoRules_ExpireValidatorLicenseInstruction : DsoRules_ExpireValidatorLicenseInstructionResult
+    nonconsuming choice DsoRules_ExpireVoteInstruction : DsoRules_ExpireVoteInstructionResult
       with
-        staleInstructionCid : ContractId ValidatorLicense_Instruction
+        instructionCid : ContractId VoteExecutionInstruction
         sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        fetchChecked (ForDso with dso) staleInstructionCid
-        exercise staleInstructionCid ValidatorLicense_Instruction_Expire
-        return DsoRules_ExpireValidatorLicenseInstructionResult
+        fetchChecked (ForDso with dso) instructionCid
+        exercise instructionCid VoteExecutionInstruction_Expire
+        return DsoRules_ExpireVoteInstructionResult with dummyUnitField = ()
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
@@ -1684,8 +1656,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
-      SRARC_ValidatorLicense_ChangeWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
-      SRARC_ValidatorLicense_Withdraw choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ValidatorLicense choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -1877,31 +1848,6 @@ template UnallocatedUnclaimedActivityRecord
     signatory dso
     ensure amount > 0.0
 
--- Vote indirections
---------------------
-
--- Vote requests fix the choice arguments. This doesn't work well for choices that need to act on
--- contracts that get cycled frequently, e.g., ValidatorLicense. The contracts here act as an indirection to handle that:
--- The vote is on a choice that creates one of these contracts. Automation then uses those contracts as authorization
--- to exercise the actual action.
-
-template ValidatorLicense_Instruction
-  with
-    dso : Party
-    validator : Party
-    instructionType : ValidatorLicense_InstructionType
-    expiresAt : Time
-  where
-    ensure case instructionType of
-      VLI_ChangeWeight weight -> weight >= 0.0
-      VLI_Withdraw -> True
-    signatory dso
-
-    choice ValidatorLicense_Instruction_Expire : ValidatorLicense_Instruction_ExpireResult
-      controller dso
-      do assertDeadlineExceeded "expiresAt" expiresAt
-         return ValidatorLicense_Instruction_ExpireResult
-
 
 -- instances
 ------------
@@ -1924,9 +1870,6 @@ instance HasCheckedFetch UnallocatedUnclaimedActivityRecord ForDso where
 instance HasCheckedFetch Confirmation ForDso where
   contractGroupId Confirmation {..} = ForDso with dso
 
-instance HasCheckedFetch ValidatorLicense_Instruction ForDso where
-  contractGroupId ValidatorLicense_Instruction {..} = ForDso with dso
-
 instance Patchable DsoRulesConfig where
   patch new base current = DsoRulesConfig with
     numUnclaimedRewardsThreshold = patch new.numUnclaimedRewardsThreshold base.numUnclaimedRewardsThreshold current.numUnclaimedRewardsThreshold
@@ -1941,6 +1884,7 @@ instance Patchable DsoRulesConfig where
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
+    voteExecutionInstructionTimeout = patch new.voteExecutionInstructionTimeout base.voteExecutionInstructionTimeout current.voteExecutionInstructionTimeout
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with
