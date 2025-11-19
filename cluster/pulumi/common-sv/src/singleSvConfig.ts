@@ -117,8 +117,10 @@ const SingleSvConfigSchema = z
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,
+        appsSync: z.boolean().default(true),
         cantonLogLevel: LogLevelSchema,
         cantonStdoutLogLevel: LogLevelSchema.optional(),
+        cantonSync: z.boolean().default(true),
         cometbftLogLevel: CometbftLogLevelSchema.optional(),
         cometbftExtraLogLevelFlags: z.string().optional(),
       })

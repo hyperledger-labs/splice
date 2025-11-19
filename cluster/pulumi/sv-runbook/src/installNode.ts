@@ -329,6 +329,7 @@ async function installSvAndValidator(
     initialAmuletPrice: initialAmuletPrice,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
+    immediateFlush: svConfig.logging?.appsSync,
     additionalEnvVars: svAppAdditionalEnvVars,
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
     resources: svConfig.svApp?.resources,

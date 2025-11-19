@@ -83,6 +83,7 @@ export function installSvParticipant(
       ),
       logLevel: svConfig.logging?.cantonLogLevel,
       logLevelStdout: svConfig.logging?.cantonStdoutLogLevel,
+      immediateFlush: svConfig.logging?.cantonSync,
       participantAdminUserNameFrom,
       metrics: {
         enable: true,

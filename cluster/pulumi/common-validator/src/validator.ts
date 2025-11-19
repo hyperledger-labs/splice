@@ -82,6 +82,7 @@ type BasicValidatorConfig = {
   deduplicationDuration?: string;
   disableAuth?: boolean;
   logLevel?: LogLevel;
+  immediateFlush?: boolean;
   resources?: K8sResourceSchema;
 };
 
@@ -243,6 +244,7 @@ export async function installValidatorApp(
       maxVettingDelay: networkWideConfig?.maxVettingDelay,
       disableAuth: baseConfig.disableAuth || false,
       logLevel: config.logLevel,
+      immediateFlush: config.immediateFlush,
       resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
     },
