@@ -36,7 +36,6 @@ class DbValidatorInternalStore(
     val ec: ExecutionContext,
     val loggingContext: ErrorLoggingContext,
     val closeContext: CloseContext,
-    val traceContext: TraceContext,
 ) extends ValidatorInternalStore
     with AcsJdbcTypes
     with NamedLogging {
@@ -71,7 +70,7 @@ class DbValidatorInternalStore(
       .storeId
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
-  def initializeState(): Future[Unit] = {
+  def initializeState()(implicit tc: TraceContext): Future[Unit] = {
     val initializedResult: Future[InitializeDescriptorResult[Int]] = StoreDescripttorStore
       .initializeDescriptor(storeDescriptor, storage, domainMigrationInfo.currentMigrationId)
     for {
@@ -93,7 +92,9 @@ class DbValidatorInternalStore(
     }
   }
 
-  override def setConfig[T: Encoder](key: String, value: T): Future[Unit] = {
+  override def setConfig[T: Encoder](key: String, value: T)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
     val jsonValue: Json = value.asJson
 
     val action = sql"""INSERT INTO validator_internal_config (config_key, config_value, store_id)
@@ -108,7 +109,9 @@ class DbValidatorInternalStore(
     updateAction.map(_ => ())
   }
 
-  override def getConfig[T: Decoder](key: String): OptionT[Future, T] = {
+  override def getConfig[T: Decoder](
+      key: String
+  )(implicit tc: TraceContext): OptionT[Future, T] = {
     val queryAction = sql"""SELECT config_value
         FROM validator_internal_config
         WHERE config_key = $key AND store_id = $storeId

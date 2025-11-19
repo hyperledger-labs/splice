@@ -17,9 +17,9 @@ import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalSto
 
 trait ValidatorInternalStore {
 
-  def setConfig[T: Encoder](key: String, value: T): Future[Unit]
+  def setConfig[T: Encoder](key: String, value: T)(implicit tc: TraceContext): Future[Unit]
 
-  def getConfig[T: Decoder](key: String): OptionT[Future, T]
+  def getConfig[T: Decoder](key: String)(implicit tc: TraceContext): OptionT[Future, T]
 }
 
 object ValidatorInternalStore {
@@ -34,7 +34,6 @@ object ValidatorInternalStore {
       ec: ExecutionContext,
       lc: ErrorLoggingContext,
       cc: CloseContext,
-      tc: TraceContext,
   ): ValidatorInternalStore = {
     storage match {
       case storage: DbStorage =>
