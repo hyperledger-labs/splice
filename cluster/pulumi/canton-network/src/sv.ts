@@ -377,7 +377,7 @@ async function installValidator(
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
-    immediateFlush: svConfig.logging?.appsSync,
+    logSync: svConfig.logging?.appsSync,
     additionalEnvVars: [
       ...(bftSequencerConnection
         ? []
