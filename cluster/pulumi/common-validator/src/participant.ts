@@ -81,7 +81,7 @@ export function installParticipant(
     {
       ...participantValuesWithSpecifiedAud,
       logLevel: validatorConfig.logging?.level,
-      logImmediateFlush: validatorConfig.logging?.sync,
+      logAsyncFlush: validatorConfig.logging?.async,
       persistence: {
         databaseName: pgName,
         schema: 'participant',

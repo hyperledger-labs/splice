@@ -204,7 +204,7 @@ spec:
 - name: LOG_LEVEL_STDOUT
   value: {{ .logLevelStdout | default "DEBUG" }}
 - name: LOG_IMMEDIATE_FLUSH
-  value: {{ .logImmediateFlush | default "true" | quote }}
+  value: {{ .logAsyncFlush | default false | not | quote }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}
 {{- if .serviceAccountName -}}

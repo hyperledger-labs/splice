@@ -110,7 +110,7 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       maxDarVersion: splitwellConfig?.maxDarVersion,
       logLevel: splitwellConfig.logging?.level,
-      logImmediateFlush: splitwellConfig.logging?.sync,
+      logAsyncFlush: splitwellConfig.logging?.async,
     },
     activeVersion,
     { dependsOn: imagePullDeps }

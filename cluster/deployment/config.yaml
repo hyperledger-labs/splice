@@ -144,9 +144,9 @@ svs:
   default:
     logging:
       appsLogLevel: DEBUG
-      appsSync: true
+      appsAsync: false
       cantonLogLevel: DEBUG
-      cantonSync: true
+      cantonAsync: false
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true
