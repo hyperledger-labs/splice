@@ -11,6 +11,7 @@ import DA.Time
 
 import Splice.ValidatorLicense
 import Splice.DsoRules
+import Splice.DSO.VoteExecution
 import Splice.Scripts.DsoTestUtils
 import Splice.Scripts.Util
 import Splice.Types
@@ -195,3 +196,94 @@ test_ValidatorLivenessWeightInRunNextIssuanceD = do
       abort ("Bob should receive ~15000 times rewards. Expected within: [" <> show bobExpectedMin <> ", " <> show bobExpectedMax <> "], Got: " <> show bobReward)
 
     return ()
+
+-- Test multiple validator license modifications (weight changes and withdrawals) can be done via single vote
+testValidatorLicenseBatchModifications : Script ()
+testValidatorLicenseBatchModifications = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initDevNet
+
+  validator1 <- setupValidator app "validator1"
+  validator2 <- setupValidator app "validator2"
+  validator3 <- setupValidator app "validator3"
+  validator4 <- setupValidator app "validator4"
+  validator5 <- setupValidator app "validator5"
+
+  -- Verify all validators have default weight (None)
+  [(_, license1)] <- query @ValidatorLicense validator1
+  [(_, license2)] <- query @ValidatorLicense validator2
+  [(_, license3)] <- query @ValidatorLicense validator3
+  [(_, license4)] <- query @ValidatorLicense validator4
+  [(_, license5)] <- query @ValidatorLicense validator5
+  license1.weight === None
+  license2.weight === None
+  license3.weight === None
+  license4.weight === None
+  license5.weight === None
+
+  -- Change weights for some validators and withdraw others in a single vote
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ModifyValidatorLicenses
+    (ValidatorLicensesModification with
+      changes = [VLC_ChangeWeight with validator = validator1; weight = 5.0
+               , VLC_ChangeWeight with validator = validator2; weight = 10.0
+               , VLC_ChangeWeight with validator = validator3; weight = 0.0
+               , VLC_Withdraw with validator = validator4
+               , VLC_Withdraw with validator = validator5])))
+
+  executeAllVoteExecutionInstructions app
+
+  -- Verify weights are updated correctly
+  [(_, license1)] <- query @ValidatorLicense validator1
+  [(_, license2)] <- query @ValidatorLicense validator2
+  [(_, license3)] <- query @ValidatorLicense validator3
+  license1.weight === Some 5.0
+  license2.weight === Some 10.0
+  license3.weight === Some 0.0
+
+  -- Verify licenses are withdrawn
+  [] <- query @ValidatorLicense validator4
+  [] <- query @ValidatorLicense validator5
+
+  pure ()
+
+-- Test that VoteExecutionInstructions can be expired only after they expire
+testVoteExecutionInstructionExpire : Script ()
+testVoteExecutionInstructionExpire = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initDevNet
+
+  validator1 <- setupValidator app "validator1"
+  validator2 <- setupValidator app "validator2"
+
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ModifyValidatorLicenses
+    (ValidatorLicensesModification with
+      changes = [VLC_ChangeWeight with validator = validator1; weight = 5.0
+               , VLC_Withdraw with validator = validator2])))
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  instructions <- query @VoteExecutionInstruction app.dso
+  length instructions === 2
+  let [(instruction1Cid, _), (instruction2Cid, _)] = instructions
+
+  -- Cannot expire before timeout (default: 1 day)
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
+      instructionCid = instruction1Cid; sv = sv1
+
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
+      instructionCid = instruction2Cid; sv = sv1
+
+  passTime (days 1)
+
+  -- Can expire after timeout
+  submitMulti [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
+      instructionCid = instruction1Cid; sv = sv1
+
+  submitMulti [sv2] [app.dso] $
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
+      instructionCid = instruction2Cid; sv = sv2
+
+  -- Verify all instructions are now expired
+  [] <- query @VoteExecutionInstruction app.dso
+
+  pure ()

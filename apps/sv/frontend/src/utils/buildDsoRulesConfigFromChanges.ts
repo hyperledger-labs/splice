@@ -47,6 +47,7 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
   const upgradeTime = getValue('nextScheduledSynchronizerUpgradeTime');
   const upgradeMigrationId = getValue('nextScheduledSynchronizerUpgradeMigrationId');
   const voteCooldownTime = getValue('voteCooldownTime');
+  const voteExecutionInstructionTimeout = getValue('voteExecutionInstructionTimeout');
 
   const dsoConfig: DsoRulesConfig = {
     numUnclaimedRewardsThreshold: getValue('numUnclaimedRewardsThreshold'),
@@ -88,6 +89,10 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
         : null,
     voteCooldownTime:
       voteCooldownTime && voteCooldownTime !== '' ? { microseconds: voteCooldownTime } : null,
+    voteExecutionInstructionTimeout:
+      voteExecutionInstructionTimeout && voteExecutionInstructionTimeout !== ''
+        ? { microseconds: voteExecutionInstructionTimeout }
+        : null,
   };
 
   return dsoConfig;
