@@ -6,13 +6,36 @@ package org.lfdecentralizedtrust.splice.validator
 import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.api.util.DurationConversion
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.MonadUtil
+import com.google.protobuf.ByteString
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
+import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
   DomainTimeAutomationService,
 }
-import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
@@ -31,80 +54,48 @@ import org.lfdecentralizedtrust.splice.migration.{
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
   MinimalScanConnection,
   SingleScanConnection,
 }
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.setup.{
-  NodeInitializer,
-  ParticipantInitializer,
-  ParticipantPartyMigrator,
-}
-import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetrics, UpdateHistory}
+import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigSchedule,
-  BackupDump,
-  HasHealth,
-  PackageVetting,
-  SpliceCircuitBreaker,
-}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetrics, UpdateHistory}
+import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
   ValidatorAutomationService,
   ValidatorPackageVettingTrigger,
 }
-import org.lfdecentralizedtrust.splice.validator.config.{
-  AppInstance,
-  MigrateValidatorPartyConfig,
-  ValidatorAppBackendConfig,
-  ValidatorCantonIdentifierConfig,
-  ValidatorOnboardingConfig,
-}
+import org.lfdecentralizedtrust.splice.validator.config.*
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
-import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.migration.{
+  DomainMigrationDump,
+  ParticipantPartyMigrator,
+}
+import org.lfdecentralizedtrust.splice.validator.store.{
+  ValidatorConfigProvider,
+  ValidatorInternalStore,
+  ValidatorStore,
+}
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
-import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
   HttpWalletHandler,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
-import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
+import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.api.util.DurationConversion
-import com.digitalasset.canton.lifecycle.LifeCycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.SynchronizerAlias
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
-import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
-import org.apache.pekko.http.scaladsl.model.HttpMethods
-import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
-import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -334,10 +325,15 @@ class ValidatorApp(
                   .getOrElse(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
+                val configProvider = new ValidatorConfigProvider(
+                  ValidatorInternalStore(storage, loggerFactory),
+                  loggerFactory,
+                )
                 val participantPartyMigrator = new ParticipantPartyMigrator(
                   connection,
                   participantAdminConnection,
                   config.domains.global.alias,
+                  configProvider,
                   loggerFactory,
                 )
                 appInitStep("Migrating party data") {
@@ -823,6 +819,10 @@ class ValidatorApp(
         readOnlyLedgerConnection,
         loggerFactory,
       )
+      configProvider = new ValidatorConfigProvider(
+        ValidatorInternalStore(storage, loggerFactory),
+        loggerFactory,
+      )
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
@@ -1213,6 +1213,7 @@ class ValidatorApp(
         domainTimeAutomationService,
         domainParamsAutomationService,
         store,
+        configProvider,
         automation,
         walletManagerOpt,
         timeouts,
@@ -1234,6 +1235,7 @@ object ValidatorApp {
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       store: ValidatorStore,
+      configProvider: ValidatorConfigProvider,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
       timeouts: ProcessingTimeout,
