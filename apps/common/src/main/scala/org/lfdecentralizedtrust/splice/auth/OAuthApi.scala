@@ -3,13 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
+import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import org.apache.pekko.http.scaladsl.model.{FormData, HttpMethods, HttpRequest, HttpResponse}
 import org.apache.pekko.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.http.HttpClient
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
@@ -63,13 +64,19 @@ trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
 }
 
 class OAuthApi(
-    override protected val loggerFactory: NamedLoggerFactory
+    requestTimeout: NonNegativeDuration,
+    override protected val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem)
     extends OAuthApiJson
     with NamedLogging {
   implicit val ec: ExecutionContext = actorSystem.dispatcher
-
   import OAuthApi.*
+
+  private val httpClient = HttpClient(
+    ApiLoggingConfig(),
+    HttpClient.HttpRequestParameters(requestTimeout),
+    logger,
+  )
 
   private def decodeAndLog[T](res: HttpResponse, description: String)(implicit
       um: Unmarshaller[HttpResponse, T],
@@ -91,7 +98,7 @@ class OAuthApi(
     logger.debug(s"Loading OIDC Well-Known Configuration from $url")
 
     for {
-      res <- Http().singleRequest(
+      res <- httpClient.executeRequest(
         HttpRequest(
           method = HttpMethods.GET,
           uri = url,
@@ -115,7 +122,7 @@ class OAuthApi(
 
     val payload = ClientCredentialRequest(clientId, clientSecret, audience, scope)
 
-    val responseFuture: Future[HttpResponse] = Http().singleRequest(
+    val responseFuture: Future[HttpResponse] = httpClient.executeRequest(
       HttpRequest(
         method = HttpMethods.POST,
         uri = tokenUrl,

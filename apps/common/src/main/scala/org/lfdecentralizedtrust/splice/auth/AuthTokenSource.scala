@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.auth
 
 import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
+import com.digitalasset.canton.config.NonNegativeDuration
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.auth.OAuthApi.TokenResponse
 import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
@@ -86,11 +87,12 @@ case class AuthTokenSourceOAuthClientCredentials(
     clientSecret: String,
     audience: String,
     scope: Option[String],
+    requestTimeout: NonNegativeDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, ac: ActorSystem)
     extends AuthTokenSource
     with NamedLogging {
-  private val oauth = new OAuthApi(loggerFactory)
+  private val oauth = new OAuthApi(requestTimeout, loggerFactory)
 
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] = {
     for {
@@ -125,6 +127,7 @@ object AuthTokenSource {
           clientSecret,
           audience,
           scope,
+          requestTimeout,
           _,
         ) =>
       new AuthTokenSourceOAuthClientCredentials(
@@ -134,6 +137,7 @@ object AuthTokenSource {
         loggerFactory = loggerFactory,
         audience = audience,
         scope = scope,
+        requestTimeout = requestTimeout,
       )
   }
 }

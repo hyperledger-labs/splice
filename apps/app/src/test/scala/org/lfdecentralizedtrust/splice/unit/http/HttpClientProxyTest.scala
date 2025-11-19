@@ -12,7 +12,8 @@ import org.apache.pekko.http.scaladsl.Http.ServerBinding
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.server.Directives.{complete, *}
 import org.apache.pekko.http.scaladsl.server.Route
-import org.lfdecentralizedtrust.splice.auth.RSAVerifier
+import org.lfdecentralizedtrust.splice.auth.OAuthApi.WellKnownResponse
+import org.lfdecentralizedtrust.splice.auth.{OAuthApi, RSAVerifier}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -146,6 +147,35 @@ class HttpClientProxyTest
         }
       }
     }
+    "Ensure OAuthApi supports proxy configuration via http.proxyPort, http.proxyHost" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val proxyHost = "localhost"
+          val serverHost = "localhost"
+          val serverPort = serverBinding.localAddress.getPort
+          val props =
+            SystemProperties()
+              .set("http.proxyHost", proxyHost)
+              .set("http.proxyPort", proxy.port.toString)
+              // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
+              // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
+              .set("http.nonProxyHosts", "")
+              .set("https.nonProxyHosts", "")
+
+          withProperties(props) {
+            val wellKnownUrlString =
+              s"http://localhost:${serverPort}/.well-known/openid-configuration"
+            val api =
+              new OAuthApi(
+                NonNegativeDuration.ofSeconds(20),
+                loggerFactory,
+              )
+            api.getWellKnown(wellKnownUrlString).futureValue shouldBe an[WellKnownResponse]
+            proxy.proxiedConnectRequest(serverHost, serverPort) shouldBe true
+          }
+        }
+      }
+    }
 
     "support proxy configuration via https.proxyPort, https.proxyHost, https.proxyUser and https.proxyPassword" in {
       val user = "user"
@@ -255,12 +285,28 @@ class HttpClientProxyTest
 object Routes {
   val testJwksKeyId = "test-key"
   def respondWithOK: Route = get {
-    // fake JWKS response to make sure http.proxy settings are used when RSAVerifier fetches JWKS
-    pathPrefix(".well-known" / "jwks.json") {
+    // fake OAuthApi.WellKnownResponse for testing OAuthApi http requests.
+    pathPrefix(".well-known" / "openid-configuration") {
       complete(
         HttpEntity(
           ContentTypes.`application/json`,
           s"""
+             |{
+             | "issuer" : "fake",
+             | "authorization_endpoint" : "fake",
+             | "token_endpoint" : "fake",
+             | "jwks_uri" : "fake"
+             |}
+          """.stripMargin,
+        )
+      )
+    } ~
+      // fake JWKS response to make sure http.proxy settings are used when RSAVerifier fetches JWKS
+      pathPrefix(".well-known" / "jwks.json") {
+        complete(
+          HttpEntity(
+            ContentTypes.`application/json`,
+            s"""
             |{
             |  "keys":
             |  [
@@ -280,9 +326,9 @@ object Routes {
             |  ]
             |}
           """.stripMargin,
+          )
         )
-      )
-    } ~
+      } ~
       pathEnd {
         complete(StatusCodes.OK)
       }
