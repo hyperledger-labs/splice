@@ -48,7 +48,7 @@ Upcoming
     - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
       All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
 
-- Documentation
+- Docs
 
   - Improvements to validator docs on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
 

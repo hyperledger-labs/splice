@@ -182,11 +182,11 @@ Once you confirmed that your validator is caught up, as explained above, confirm
 If the migration dump has been created, proceed with the following steps:
 
 * Stop the validator, using ``./stop.sh``.
-* In case of an actual version upgrade (not just a test migration), upgrade your validator to the target version by updating the bundle and adjusting the ``IMAGE_TAG`` like during a :ref:`minor upgrade <validator-upgrades>`.
+* In case of an actual version upgrade (not just a test migration), upgrade your validator to the target version by updating the bundle and adjusting the ``IMAGE_TAG`` as you would during a :ref:`minor upgrade <validator-upgrades>`.
 * Restart the validator, while updating the migration ID in the ``-m <migration ID>`` argument,
   and also including ``-M`` to instruct the validator to perform the actual migration
   to the new migration ID. Note that ``-M`` is required only in the first startup after the migration,
-  to instruct the validator to perform the actual migration. Followup restarts should keep the
+  to instruct the validator to perform the actual migration. Follow-up restarts should keep the
   ``-m <migration ID>``, but omit the ``-M``.
 * See :ref:`validator_health` for pointers on determining the status of your validator after the migration.
   In case of issues, check your logs for warnings and errors and consult :ref:`validator-migration-troubleshooting` below.
@@ -210,7 +210,7 @@ If any of the steps above fail, double check the following:
 - You have deployed a fresh Canton participant as part of the upgrade and that participant was configured to use a fresh (empty) database.
   By correctly setting the migration ID while following the deployment steps above, this should be the case.
 - The correct (incremented) ``MIGRATION_ID`` has been set *after* the upgrade.
-- If you get an error like ``Migration ID was incremented (to 1) but no migration dump for restoring from was specified.`` you are missing the ``migrating: true`` flag (for Helm) or ``-M`` argument (for docker compose).
+- If you get an error like ``Migration ID was incremented (to 1) but no migration dump for restoring from was specified.`` you are missing the ``migrating: true`` flag (for Helm) or ``-M`` argument (for Docker compose).
 
 .. _validator-upgrade-failure-cleanup:
 
