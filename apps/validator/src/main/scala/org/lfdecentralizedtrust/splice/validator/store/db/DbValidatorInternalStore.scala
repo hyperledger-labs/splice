@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.store.db.{StoreDescriptor, StoreDescripto
 import java.util.concurrent.atomic.AtomicReference
 
 class DbValidatorInternalStore(
+    participant: ParticipantId,
     key: ValidatorStore.Key,
     storage: DbStorage,
     val loggerFactory: NamedLoggerFactory,
@@ -38,7 +39,7 @@ class DbValidatorInternalStore(
     version = 2,
     name = "DbValidatorInternalConfigStore",
     party = key.validatorParty,
-    participant = ParticipantId.tryFromProtoPrimitive("PAR::dummy::dummy"),
+    participant = participant,
     key = Map(
       "validatorParty" -> key.validatorParty.toProtoPrimitive
     ),

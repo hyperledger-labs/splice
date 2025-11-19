@@ -176,6 +176,7 @@ class DbValidatorInternalStoreTest
   private def buildDbStore(name: String): Future[ValidatorInternalStore] = {
 
     val internalStore = new DbValidatorInternalStore(
+      mkParticipantId("ValidatorInternalStoreTest"),
       ValidatorStore.Key(
         dsoParty = dsoParty,
         validatorParty = mkPartyId(name),
