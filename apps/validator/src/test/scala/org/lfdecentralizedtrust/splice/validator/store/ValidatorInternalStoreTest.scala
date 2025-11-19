@@ -36,7 +36,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         _ <- store.setConfig(configKey, configValue)
         retrievedValue <- store.getConfig[String](configKey).value
       } yield {
-        retrievedValue shouldBe Some(Right(configValue))
+        retrievedValue.value.value shouldBe configValue
       }
     }
 
@@ -56,7 +56,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         _ <- store.setConfig(configKey, otherValue)
         retrievedValue <- store.getConfig[String](configKey).value
       } yield {
-        retrievedValue shouldBe Some(Right(otherValue))
+        retrievedValue.value.value shouldBe otherValue
       }
     }
 
@@ -70,7 +70,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
         otherKeyValue <- store.getConfig[String](otherKey).value
       } yield {
         configKeyValue shouldBe Some(Right(configValue))
-        otherKeyValue shouldBe Some(Right(otherValue))
+        otherKeyValue.value.value shouldBe otherValue
       }
     }
 
