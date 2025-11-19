@@ -1776,6 +1776,18 @@
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
+        "periodicTopologySnapshotConfig": {
+          "backupInterval": "24h",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-topology-snapshots"
+            },
+            "prefix": "mock/sv-1"
+          }
+        },
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,

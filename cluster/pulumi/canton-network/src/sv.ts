@@ -43,6 +43,7 @@ import {
   approvedSvIdentities,
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
+  configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   installSvLoopback,
@@ -146,10 +147,14 @@ export async function installSvNode(
       }
     : undefined;
 
-  const periodicTopologySnapshotConfig: BackupConfig | undefined =
-    baseConfig.periodicTopologySnapshot
-      ? await topologySnapshotConfig(`${CLUSTER_BASENAME}/${xns.logicalName}`)
-      : undefined;
+  const svConfig = configForSv(baseConfig.nodeName);
+  const periodicTopologySnapshotConfig: BackupConfig | undefined = svConfig.periodicSnapshots
+    ?.topology
+    ? await topologySnapshotConfig(
+        svConfig.periodicSnapshots?.topology,
+        `${CLUSTER_BASENAME}/${xns.logicalName}`
+      )
+    : undefined;
 
   const identitiesBackupLocation = {
     ...baseConfig.identitiesBackupLocation,

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.automation
 
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,12 +23,15 @@ import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success}
 
+/** As taking a topology snapshot is not a cheap operation, we limit this trigger to produce at most one snapshot per day.
+  */
 class PeriodicTopologySnapshotTrigger(
     synchronizerAlias: SynchronizerAlias,
     config: PeriodicBackupDumpConfig,
     triggerContext: TriggerContext,
     sequencerAdminConnection: SequencerAdminConnection,
     participantAdminConnection: ParticipantAdminConnection,
+    clock: Clock,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -72,11 +76,13 @@ class PeriodicTopologySnapshotTrigger(
   )(implicit traceContext: TraceContext): Future[TaskSuccess] =
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
+      // uses onboardingStateV2 so we don't lose information when exporting
       onboardingState <- sequencerAdminConnection.getOnboardingState(sequencerId)
       authorizedStore <- sequencerAdminConnection.exportAuthorizedStoreSnapshot(sequencerId.uid)
       // list a summary of the transactions state at the time of the snapshot to validate further imports
-      summary <- sequencerAdminConnection.getSummaryOfTransactions(
-        TopologyStoreId.Synchronizer(synchronizerId)
+      summary <- sequencerAdminConnection.getTopologyTransactionsSummary(
+        TopologyStoreId.Synchronizer(synchronizerId),
+        clock.now,
       )
       _ <- Future {
         blocking {
@@ -84,16 +90,16 @@ class PeriodicTopologySnapshotTrigger(
             s"dumping current topology state into gcp bucket"
           logger.debug(s"Attempting to write $fileDesc")
           val paths = Seq(
-            BackupDump.write(
+            BackupDump.writeBytes(
               config.location,
               Paths.get(s"$folderName/genesis-state"),
-              onboardingState.toStringUtf8,
+              onboardingState.toByteArray,
               loggerFactory,
             ),
-            BackupDump.write(
+            BackupDump.writeBytes(
               config.location,
               Paths.get(s"$folderName/authorized"),
-              authorizedStore.toStringUtf8,
+              authorizedStore.toByteArray,
               loggerFactory,
             ),
             BackupDump.write(

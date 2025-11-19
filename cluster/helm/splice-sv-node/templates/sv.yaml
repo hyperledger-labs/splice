@@ -365,8 +365,8 @@ spec:
                   location {
                     type = gcp
                     bucket {
-                      project-id = {{ .location.bucket.projectId }}
-                      bucket-name = {{ .location.bucket.bucketName }}
+                      project-id = {{ .location.bucket.projectId | quote }}
+                      bucket-name = {{ .location.bucket.bucketName | quote }}
                       credentials {
                         type = service-account
                         json-credentials = ${SPLICE_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
@@ -374,7 +374,7 @@ spec:
                     }
                     prefix = {{ .location.prefix | quote }}
                   }
-                  backup-interval = {{ .backupInterval }}
+                  backup-interval = {{ .backupInterval | quote }}
                 }
             - name: SPLICE_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
               valueFrom:

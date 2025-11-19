@@ -25,7 +25,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.GenesisStateV2Response
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
-import com.digitalasset.canton.topology.store.TimeQuery.HeadState
+import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
 import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -83,7 +83,7 @@ class SequencerAdminConnection(
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
   }
 
-  def getSummaryOfTransactions(store: TopologyStoreId)(implicit
+  def getTopologyTransactionsSummary(store: TopologyStoreId, now: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Future[Map[TopologyMapping.Code, Int]] = {
     runCmd(
@@ -91,7 +91,7 @@ class SequencerAdminConnection(
         query = BaseQuery(
           store = store,
           proposals = false,
-          timeQuery = HeadState,
+          timeQuery = Snapshot(now),
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,

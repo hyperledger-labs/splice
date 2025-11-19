@@ -38,6 +38,28 @@ object BackupDump {
         path
     }
 
+  /** Blocking function to write bytes to a file within the given backup dump location.
+    *
+    * Returns the path to the written file as a string.
+    */
+  def writeBytes(
+      config: BackupDumpConfig,
+      filename: Path,
+      content: Array[Byte],
+      loggerFactory: NamedLoggerFactory,
+  )(implicit tc: TraceContext): Path =
+    config match {
+      case BackupDumpConfig.Gcp(bucketConfig, prefix) =>
+        val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
+        val path = prefix.fold(filename)(prefix => Paths.get(prefix).resolve(filename))
+        gcpBucket.dumpBytesToBucket(content, path.toString)
+        path
+      case _ =>
+        throw Status.UNIMPLEMENTED
+          .withDescription("Writing bytes works only with GCP buckets")
+          .asRuntimeException()
+    }
+
   def writeToPath(path: Path, content: String): File = {
     import better.files.File
     val file = File(path)

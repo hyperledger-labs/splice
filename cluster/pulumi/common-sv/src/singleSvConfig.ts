@@ -13,6 +13,8 @@ import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
 
+import { GCPBucketSchema } from './config';
+
 const SvCometbftConfigSchema = z
   .object({
     nodeId: z.string().optional(),
@@ -72,7 +74,6 @@ const SvAppConfigSchema = z
     // defaults to {svName}-cometbft-governance-key if not set
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
     resources: K8sResourceSchema,
-    periodicTopologySnapshot: z.boolean().optional(),
   })
   .strict();
 const ScanAppConfigSchema = z
@@ -124,6 +125,7 @@ const SingleSvConfigSchema = z
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
+    periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
