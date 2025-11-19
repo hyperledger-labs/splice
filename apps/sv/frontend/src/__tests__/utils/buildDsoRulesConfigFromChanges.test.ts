@@ -100,4 +100,24 @@ describe('buildDsoRulesConfigFromChanges', () => {
 
     expect(result.voteCooldownTime).toEqual({ microseconds: '300000' });
   });
+
+  it('should handle voteExecutionInstructionTimeout when not provided', () => {
+    const changes: ConfigChange[] = [];
+    const result = buildDsoRulesConfigFromChanges(changes);
+    expect(result.voteExecutionInstructionTimeout).toBeNull();
+  });
+
+  it('should handle voteExecutionInstructionTimeout when provided', () => {
+    const changes: ConfigChange[] = [
+      {
+        fieldName: 'voteExecutionInstructionTimeout',
+        label: 'Execution Instruction Timeout',
+        currentValue: '',
+        newValue: '86400000000',
+      },
+    ];
+    const result = buildDsoRulesConfigFromChanges(changes);
+
+    expect(result.voteExecutionInstructionTimeout).toEqual({ microseconds: '86400000000' });
+  });
 });

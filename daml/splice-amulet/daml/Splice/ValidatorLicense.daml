@@ -211,6 +211,8 @@ template ValidatorLivenessActivityRecord with
     signatory dso
     observer validator
 
+    ensure (optional True (0.0 <) weight)
+
     choice ValidatorLivenessActivityRecord_DsoExpire : ValidatorLivenessActivityRecord_DsoExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
@@ -230,5 +232,11 @@ instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
 instance HasCheckedFetch ValidatorLivenessActivityRecord ForOwner where
   contractGroupId ValidatorLivenessActivityRecord{..} = ForOwner with dso; owner = validator
 
+instance HasCheckedFetch ValidatorLivenessActivityRecord ForDso where
+  contractGroupId ValidatorLivenessActivityRecord{..} = ForDso with dso
+
 instance HasCheckedFetch ValidatorLicense ForDso where
   contractGroupId ValidatorLicense{..} = ForDso with dso
+
+instance HasCheckedFetch ValidatorLicense ForOwner where
+  contractGroupId ValidatorLicense{..} = ForOwner with dso; owner = validator

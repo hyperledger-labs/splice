@@ -348,6 +348,7 @@ object SpliceUtil {
     ), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
     Optional.empty(), // voteCooldownTime
+    Optional.empty(), // voteExecutionInstructionTimeout
   )
 
   def defaultAmuletConfig(
