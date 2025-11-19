@@ -232,3 +232,6 @@ instance HasCheckedFetch ValidatorLivenessActivityRecord ForOwner where
 
 instance HasCheckedFetch ValidatorLicense ForDso where
   contractGroupId ValidatorLicense{..} = ForDso with dso
+
+instance HasCheckedFetch ValidatorLicense ForOwner where
+  contractGroupId ValidatorLicense{..} = ForOwner with dso; owner = validator
