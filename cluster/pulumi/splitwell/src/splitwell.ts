@@ -172,7 +172,7 @@ export async function installSplitwell(
     validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
     logLevel: splitwellConfig.logging?.level,
-    logSync: splitwellConfig.logging?.sync,
+    logAsync: splitwellConfig.logging?.async,
   });
 }
 
