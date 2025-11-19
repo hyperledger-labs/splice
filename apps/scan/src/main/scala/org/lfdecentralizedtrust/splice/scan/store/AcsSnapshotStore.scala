@@ -20,7 +20,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -480,16 +480,12 @@ object AcsSnapshotStore {
   }
 
   def apply(
-      storage: Storage,
+      storage: DbStorage,
       updateHistory: UpdateHistory,
       dsoParty: PartyId,
       migrationId: Long,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, closeContext: CloseContext): AcsSnapshotStore =
-    storage match {
-      case db: DbStorage =>
-        new AcsSnapshotStore(db, updateHistory, dsoParty, migrationId, loggerFactory)
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new AcsSnapshotStore(storage, updateHistory, dsoParty, migrationId, loggerFactory)
 
 }

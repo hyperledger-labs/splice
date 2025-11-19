@@ -568,6 +568,7 @@ class TxLogBackfillingStoreTest
       loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
+      HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
     )
   }
 

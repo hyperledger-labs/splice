@@ -3,8 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.config
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-
 sealed trait AuthTokenSourceConfig {
   // Token that will be used for all commands that need to bypass ledger API auth.
   // Due to the way Canton console is designed, this need to be a static token.
@@ -20,7 +18,6 @@ object AuthTokenSourceConfig {
   final case class Static(
       token: String,
       adminToken: Option[String],
-      expiration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
   ) extends AuthTokenSourceConfig
 
   /** Settings for generating self-signed tokens. Use for testing purposes only. */
@@ -29,7 +26,6 @@ object AuthTokenSourceConfig {
       user: String,
       secret: String,
       adminToken: Option[String],
-      expiration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
   ) extends AuthTokenSourceConfig
 
   /** Using OAuth client credentials flow to acquire tokens */
@@ -48,9 +44,9 @@ object AuthTokenSourceConfig {
     val hide = (t: Option[String]) => t.map(_ => hidden)
     config match {
       case None() => None()
-      case Static(_, adminToken, expiration) => Static(hidden, hide(adminToken), expiration)
-      case SelfSigned(audience, user, _, adminToken, expiration) =>
-        SelfSigned(audience, user, hidden, hide(adminToken), expiration)
+      case Static(_, adminToken) => Static(hidden, hide(adminToken))
+      case SelfSigned(audience, user, _, adminToken) =>
+        SelfSigned(audience, user, hidden, hide(adminToken))
       case ClientCredentials(wellKnownConfigUrl, clientId, _, audience, scope, adminToken) =>
         ClientCredentials(wellKnownConfigUrl, clientId, hidden, audience, scope, hide(adminToken))
     }
