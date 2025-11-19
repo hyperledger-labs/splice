@@ -33,12 +33,29 @@ const ProjectFilterSchema = z.union([
 
 export type ProjectFilter = z.infer<typeof ProjectFilterSchema>;
 
-const defaultProjectFilters = [
-  'canton-network',
-  'infra',
-  'sv-canton',
-  'validator-runbook',
-] as const;
+function* iterateDefaultProjectFilters(): Generator<ProjectFilter> {
+  yield 'canton-network';
+  yield 'infra';
+  yield 'sv-canton';
+  yield 'validator-runbook';
+
+  // TODO(DACH-NY/canton-network-internal#875): Remove the following env. var. based additions when
+  //   it is certain that all cases of their usage is replaced with explicit configuration.
+  //   Note that their inclusion is purposefully limited to default project filters so that explicit
+  //   configuration always takes precedence to maximize clarity.
+  if (DeploySvRunbook) {
+    yield 'sv-runbook';
+  }
+  if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
+    yield 'multi-validator';
+  }
+  if (mustInstallValidator1) {
+    yield 'validator1';
+  }
+  if (mustInstallSplitwell) {
+    yield 'splitwell';
+  }
+}
 
 export const OperatorDeploymentConfigSchema = z.object({
   operatorDeployment: z.object({
@@ -54,7 +71,7 @@ export const OperatorDeploymentConfigSchema = z.object({
       projectsToDeploy: z.array(ProjectFilterSchema).transform(arr => new Set(arr)),
     })
     .default({
-      projectsToDeploy: [...defaultProjectFilters],
+      projectsToDeploy: [...iterateDefaultProjectFilters()],
     }),
 });
 
@@ -72,18 +89,3 @@ export const PulumiOperatorGracePeriod = 1800;
 export const configForStack = (stackName: string): StackConfig => {
   return merge({}, fullConfig.pulumiStacks.default, fullConfig.pulumiStacks[stackName]);
 };
-
-// TODO(DACH-NY/canton-network-internal#875): Remove the following env. var. based additions when
-//   it is certain that all cases of their usage is replaced with explicit configuration.
-if (DeploySvRunbook) {
-  deploymentConf.projectsToDeploy.add('sv-runbook');
-}
-if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
-  deploymentConf.projectsToDeploy.add('multi-validator');
-}
-if (mustInstallValidator1) {
-  deploymentConf.projectsToDeploy.add('validator1');
-}
-if (mustInstallSplitwell) {
-  deploymentConf.projectsToDeploy.add('splitwell');
-}
