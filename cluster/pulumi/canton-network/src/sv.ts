@@ -512,7 +512,7 @@ function installSvApp(
       delegatelessAutomationExpiredRewardCouponBatchSize,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
-    immediateFlush: config.logging?.appsSync,
+    logImmediateFlush: config.logging?.appsSync,
     additionalEnvVars,
     resources: config.svApp?.resources,
   } as ChartValues;
@@ -584,7 +584,7 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
-    immediateFlush: config.logging?.appsSync,
+    logImmediateFlush: config.logging?.appsSync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
   };
