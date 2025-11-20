@@ -385,7 +385,7 @@ executeAllVoteExecutionInstructions app = do
 
     [(licenseCid, _)] <- query @ValidatorLicense validator
 
-    submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_Execute_VoteInstruction with
+    submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteVoteInstruction with
       sv
       inputs = EII_ValidatorLicense licenseCid
       instructionCid
