@@ -43,15 +43,18 @@ object ValidatorInternalStore {
       ec: ExecutionContext,
       lc: ErrorLoggingContext,
       cc: CloseContext,
+      tc: TraceContext,
   ): ValidatorInternalStore = {
     storage match {
       case storage: DbStorage =>
-        new DbValidatorInternalStore(
+        val dbStore = new DbValidatorInternalStore(
           participant,
           key,
           storage,
           loggerFactory,
         )
+        val _ = dbStore.initializeState()
+        dbStore
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
