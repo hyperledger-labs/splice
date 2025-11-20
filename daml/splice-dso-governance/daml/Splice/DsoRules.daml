@@ -314,7 +314,7 @@ data DsoRules_ValidatorLicenseResult = DsoRules_ValidatorLicenseResult with
     instructionCids : [ContractId VoteExecutionInstruction]
   deriving (Show, Eq)
 
-data DsoRules_Execute_VoteInstructionResult = DsoRules_Execute_VoteInstructionResult with
+data DsoRules_ExecuteVoteInstructionResult = DsoRules_ExecuteVoteInstructionResult with
     dummyUnitField : ()
   deriving (Eq, Show)
 
@@ -1574,7 +1574,7 @@ template DsoRules with
                create VoteExecutionInstruction with dso; instruction; expiresAt
          return DsoRules_ValidatorLicenseResult with instructionCids
 
-    nonconsuming choice DsoRules_Execute_VoteInstruction : DsoRules_Execute_VoteInstructionResult
+    nonconsuming choice DsoRules_ExecuteVoteInstruction : DsoRules_ExecuteVoteInstructionResult
       with
         sv : Party
         inputs : ExecutionInstructionInputs
@@ -1583,7 +1583,7 @@ template DsoRules with
       do _ <- getAndValidateSvParty this (Some sv)
          voteInstruction <- fetchAndArchive (ForDso dso) instructionCid
          executeVoteInstruction dso voteInstruction inputs
-         return DsoRules_Execute_VoteInstructionResult with dummyUnitField = ()
+         return DsoRules_ExecuteVoteInstructionResult with dummyUnitField = ()
 
     nonconsuming choice DsoRules_ExpireVoteInstruction : DsoRules_ExpireVoteInstructionResult
       with
