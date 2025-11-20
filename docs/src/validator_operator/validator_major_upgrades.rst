@@ -61,18 +61,21 @@ Synchronizer upgrades with downtime effectively clone the state of the existing 
   This is realized through exporting and importing a :ref:`migration dump <validator-upgrades-dumps>`.
 - Active ledger state is preserved.
   This is realized through exporting and importing a :ref:`migration dump <validator-upgrades-dumps>`.
-- Historical app state in the validator app (such as transaction history) is preserved. Note however, that the transaction history exposed by the participant is not preserved and the participant will only serve history going forward.
+- Historical app state in the validator app (such as transaction history) is preserved.
   This is realized through persisting and reusing the (PostgreSQL) database of the validator app.
+  The transaction history exposed by *the participant*, however, is *not* preserved and the participant will only serve history going forward.
+  See also :ref:`validator-upgrades-apps`.
 
 For avoiding conflicts across migrations, we use the concept of a migration ID:
 
 - The migration ID is 0 during the initial bootstrapping of a network and incremented after each synchronizer upgrade with downtime.
 - The validator app is aware of the migration ID and uses it for ensuring the consistency of its internal stores and avoiding connections to nodes on the "wrong" synchronizer.
 - The validator Canton participant is **not** directly aware of the migration ID.
-  As part of :ref:`validator-upgrades-deploying`, the validator app will initialize a fresh participant
-  (i.e., a participant starting out with an empty database)
-  based on the migration ID configured in the validator app.
+  As part of :ref:`validator-upgrades-deploying`, you will configure the participant to use a fresh (empty) database.
+  The validator app will initialize the participant from a clean slate based on the migration ID configured in the validator app.
   A fresh participant is needed in order to upgrade across non-backwards-compatible changes to the Canton software.
+
+.. _validator-upgrades-apps:
 
 Implications for Apps and Integrations
 ++++++++++++++++++++++++++++++++++++++
