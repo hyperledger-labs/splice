@@ -217,9 +217,9 @@ testValidatorLicenseWeightChangeBatch = do
   -- Change weights for all three validators in a single vote
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense
     (DsoRules_ValidatorLicense with
-      actions = [VLAK_ChangeWeight with validator = validator1; weight = 5.0
-               , VLAK_ChangeWeight with validator = validator2; weight = 10.0
-               , VLAK_ChangeWeight with validator = validator3; weight = 0.0])))
+      actions = [VLC_ChangeWeight with validator = validator1; weight = 5.0
+               , VLC_ChangeWeight with validator = validator2; weight = 10.0
+               , VLC_ChangeWeight with validator = validator3; weight = 0.0])))
 
   executeAllVoteExecutionInstructions app
 
@@ -250,9 +250,9 @@ testValidatorLicenseWithdrawBatch = do
   -- Withdraw all three validator licenses in a single vote
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense
     (DsoRules_ValidatorLicense with
-      actions = [VLAK_Withdraw with validator = validator1
-               , VLAK_Withdraw with validator = validator2
-               , VLAK_Withdraw with validator = validator3])))
+      actions = [VLC_Withdraw with validator = validator1
+               , VLC_Withdraw with validator = validator2
+               , VLC_Withdraw with validator = validator3])))
 
   executeAllVoteExecutionInstructions app
 
@@ -273,8 +273,8 @@ testVoteExecutionInstructionExpire = do
 
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense
     (DsoRules_ValidatorLicense with
-      actions = [VLAK_ChangeWeight with validator = validator1; weight = 5.0
-               , VLAK_ChangeWeight with validator = validator2; weight = 10.0])))
+      actions = [VLC_ChangeWeight with validator = validator1; weight = 5.0
+               , VLC_ChangeWeight with validator = validator2; weight = 10.0])))
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
   instructions <- query @VoteExecutionInstruction app.dso

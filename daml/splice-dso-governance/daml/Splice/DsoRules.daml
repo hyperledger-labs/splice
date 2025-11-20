@@ -150,11 +150,11 @@ data DsoSummary = DsoSummary with
   deriving (Eq, Show)
 
 -- | Actions possible on a validator license via vote
-data ValidatorLicenseActionKind
-  = VLAK_ChangeWeight with
+data ValidatorLicenseChange
+  = VLC_ChangeWeight with
       validator : Party
       weight : Decimal
-  | VLAK_Withdraw with
+  | VLC_Withdraw with
       validator : Party
   deriving (Eq, Show)
 
@@ -1560,17 +1560,17 @@ template DsoRules with
 
     nonconsuming choice DsoRules_ValidatorLicense : DsoRules_ValidatorLicenseResult
       with
-        actions : [ValidatorLicenseActionKind]
+        actions : [ValidatorLicenseChange]
       controller dso
       do now <- getTime
          let expiresAt = now `addRelTime` getVoteExecutionInstructionTimeout config
          instructionCids <- forA actions $ \action -> do
            case action of
-             VLAK_ChangeWeight {validator, weight} -> do
+             VLC_ChangeWeight {validator, weight} -> do
                require ("Weight is non-negative for " <> show validator) (weight >= 0.0)
                let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
                create VoteExecutionInstruction with dso; instruction; expiresAt
-             VLAK_Withdraw {validator} -> do
+             VLC_Withdraw {validator} -> do
                let instruction = EI_ValidatorLicenseWithdraw with validator
                create VoteExecutionInstruction with dso; instruction; expiresAt
          return DsoRules_ValidatorLicenseResult with instructionCids
