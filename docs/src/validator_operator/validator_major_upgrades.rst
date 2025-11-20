@@ -70,9 +70,9 @@ For avoiding conflicts across migrations, we use the concept of a migration ID:
 - The validator app is aware of the migration ID and uses it for ensuring the consistency of its internal stores and avoiding connections to nodes on the "wrong" synchronizer.
 - The validator Canton participant is **not** directly aware of the migration ID.
   As part of :ref:`validator-upgrades-deploying`, the validator app will initialize a fresh participant
-  (i.e., a newly deployed participant starting out with an empty database)
+  (i.e., a participant starting out with an empty database)
   based on the migration ID configured in the validator app.
-  A fresh participant needs to be deployed in order to upgrade across non-backwards-compatible changes to the Canton software.
+  A fresh participant is needed in order to upgrade across non-backwards-compatible changes to the Canton software.
 
 Implications for Apps and Integrations
 ++++++++++++++++++++++++++++++++++++++
@@ -143,7 +143,7 @@ While doing so, please note the following:
 
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
   Notably, by consistently following through on updating the ``MIGRATION_ID``,
-  you should, in the end, deploy a *new* participant with a *fresh* (empty) database.
+  you should (re-)deploy your participant so that is uses a fresh (empty) database.
   (In case your database setup requires you to create databases manually,
   for example because you want to limit the permissions of the database user used by the participant deployment,
   please ensure that you have created the new database as per the updated ``.persistence.databaseName`` value on the participant chart.)
@@ -160,10 +160,10 @@ In case of issues, check your logs for warnings and errors and consult :ref:`val
 
 Once you have confirmed that the migration has been successful:
 
-* It is recommended to change the ``migration.migrating`` value on the ``validator`` chart back to ``false``
+* Change the ``migration.migrating`` value on the ``validator`` chart back to ``false``
   (**keep** the incremented ``MIGRATION_ID``!) and perform another ``helm upgrade``.
-* The old participant deployment (old ``MIGRATION_ID``) is no longer used and can be decommissioned.
-  We recommend retaining its database (or a current backup thereof) for at least another week after the migration,
+* The old participant database (usually ``participant_<OLD_MIGRATION_ID>``) is no longer used and can be pruned.
+  We recommend retaining it (or a current backup thereof) for at least another week after the migration,
   in case the synchronizer migration needs to be rolled back due to an unexpected major issue.
 
 Deploying the validator App and Participant (Docker-Compose)
@@ -184,12 +184,18 @@ If the migration dump has been created, proceed with the following steps:
 * Stop the validator, using ``./stop.sh``.
 * In case of an actual version upgrade (not just a test migration), upgrade your validator to the target version by updating the bundle and adjusting the ``IMAGE_TAG`` as you would during a :ref:`minor upgrade <validator-upgrades>`.
 * Restart the validator, while updating the migration ID in the ``-m <migration ID>`` argument,
-  and also including ``-M`` to instruct the validator to perform the actual migration
-  to the new migration ID. Note that ``-M`` is required only in the first startup after the migration,
-  to instruct the validator to perform the actual migration. Follow-up restarts should keep the
-  ``-m <migration ID>``, but omit the ``-M``.
-* See :ref:`validator_health` for pointers on determining the status of your validator after the migration.
-  In case of issues, check your logs for warnings and errors and consult :ref:`validator-migration-troubleshooting` below.
+  and also including ``-M`` to instruct the validator to perform the actual migration to the new migration ID.
+
+See :ref:`validator_health` for pointers on determining the status of your validator after the migration.
+In case of issues, check your logs for warnings and errors and consult :ref:`validator-migration-troubleshooting` below.
+
+Once you have confirmed that the migration has been successful:
+
+* Restart the validator app once more, keeping the ``-m <migration ID>`` but omitting the ``-M``.
+  The ``-M`` is required only for the first startup after the migration, to instruct the validator to perform the actual migration.
+* The old participant database (``participant=-<OLD_MIGRATION_ID>``) is no longer used and can be pruned.
+  We recommend retaining it (or a current backup thereof) for at least another week after the migration,
+  in case the synchronizer migration needs to be rolled back due to an unexpected major issue.
 
 .. _validator-migration-troubleshooting:
 
@@ -207,7 +213,7 @@ If any of the steps above fail, double check the following:
   You can inspect the contents of the ``domain-migration-validator-pvc`` PVC (Helm) or ``domain-upgrade-dump`` volume (compose).
   In case a ``domain_migration_dump.json`` exists there and you are unsure about the circumstances of its creation,
   it is recommended to remove it and restart the validator app (on the older version and migration ID) to trigger the creation of a fresh dump.
-- You have deployed a fresh Canton participant as part of the upgrade and that participant was configured to use a fresh (empty) database.
+- The Canton participant (re-)deployed as part of the upgrade uses a fresh (empty) database.
   By correctly setting the migration ID while following the deployment steps above, this should be the case.
 - The correct (incremented) ``MIGRATION_ID`` has been set *after* the upgrade.
 - If you get an error like ``Migration ID was incremented (to 1) but no migration dump for restoring from was specified.`` you are missing the ``migrating: true`` flag (for Helm) or ``-M`` argument (for Docker compose).
