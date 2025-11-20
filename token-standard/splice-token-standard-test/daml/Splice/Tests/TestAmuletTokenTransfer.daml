@@ -402,7 +402,9 @@ test_two_step_withdraw_locked_amulet_gone feesConfig = do
   -- withdraw fails if the time is too early
   context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
   setTime (aliceInstrView.transfer.executeBefore `addRelTime` negate (days 1))
-  submitWithDisclosuresMustFail' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
+  submitWithDisclosuresMustFail''
+    (expectErrorId "stdlib.daml.com/deadline-not-exceeded")
+    alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
@@ -518,7 +520,9 @@ test_no_holdings = script do
     extraArgs = emptyExtraArgs
 
   -- Show that the actual transfer choice fails
-  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  submitWithDisclosuresMustFail''
+    (expectMessageContains "At least one holding must be provided")
+    bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   assertNoFeaturedRewards [alice, bob]
   pure ()
@@ -536,7 +540,9 @@ test_expired = script do
     extraArgs = emptyExtraArgs
 
   -- Show that the actual transfer choice fails
-  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  submitWithDisclosuresMustFail''
+    (expectErrorId "stdlib.daml.com/deadline-exceeded")
+    bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   assertNoFeaturedRewards [alice, bob]
   pure ()
@@ -555,7 +561,9 @@ test_wrong_admin = script do
     extraArgs = emptyExtraArgs
 
   -- Show that the actual transfer choice fails
-  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  submitWithDisclosuresMustFail''
+    (expectUnmetRequirement "Expected admin 'alice' matches actual admin 'dso-party'")
+    bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   assertNoFeaturedRewards [alice, bob]
   pure ()
