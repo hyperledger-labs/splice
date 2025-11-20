@@ -1,10 +1,11 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Support for execution of a voted action
--- The ARC vote requests execution doesn't work well for choices that need to act on
--- contracts that get cycled frequently, e.g., ValidatorLicense.
--- The contracts here act as an indirection to handle such scenarios
+-- | Support for execution of a voted action.
+-- They were built as `ActionRequiringConfirmation` vote request execution
+-- doesn't work well for choices that need to act on contracts that get cycled
+-- frequently, e.g., ValidatorLicense.
+-- The contracts here act as an indirection to handle such scenarios.
 
 module Splice.DSO.VoteExecution where
 
