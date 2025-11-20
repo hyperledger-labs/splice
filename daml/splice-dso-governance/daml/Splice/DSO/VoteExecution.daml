@@ -10,10 +10,10 @@
 module Splice.DSO.VoteExecution where
 
 import DA.Assert (assertDeadlineExceeded)
+import Splice.Api.Token.MetadataV1 (AnyContractId)
 import Splice.Types (ForDso(..), ForOwner(..))
 import Splice.Util
 import Splice.ValidatorLicense
-
 
 -- | Instruction for executing a voted action.
 data ExecutionInstruction
@@ -43,6 +43,8 @@ template VoteExecutionInstruction
     dso : Party
     instruction : ExecutionInstruction
     expiresAt : Time
+    voteRequest : AnyContractId
+      -- ^ This is the `ContractId VoteRequest` for which this instruction exist.
   where
     signatory dso
     ensure validExecutionInstruction instruction
