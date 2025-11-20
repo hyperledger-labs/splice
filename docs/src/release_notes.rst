@@ -32,6 +32,10 @@ Upcoming
     and are now set to zero to avoid consensus problems when an SV reads aggregates
     from the rest of the network when first joining.
 
+   - Please note that ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints are marked for removal, and will be removed in an upcoming release.
+     See the Scan OpenAPI documentation for details: `/v0/total-amulet-balance <app_dev/scan_api/scan_openapi.html#get--v0-total-amulet-balance>`_
+     and `/v0/wallet-balance <app_dev/scan_api/scan_openapi.html#get--v0-wallet-balance>`_.
+
 - Daml
 
   - Fixed a bug in ``WalletUserProxy_TransferInstruction_Withdraw``, where the controller was
