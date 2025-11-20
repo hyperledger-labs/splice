@@ -1567,7 +1567,6 @@ template DsoRules with
          instructionCids <- forA actions $ \action -> do
            case action of
              VLC_ChangeWeight {validator, weight} -> do
-               require ("Weight is non-negative for " <> show validator) (weight >= 0.0)
                let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
                create VoteExecutionInstruction with dso; instruction; expiresAt
              VLC_Withdraw {validator} -> do
