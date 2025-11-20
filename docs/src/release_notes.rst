@@ -5,8 +5,8 @@
 
 .. _release_notes:
 
-Upcoming
---------
+0.5.2
+-----
 
 - Canton Participant
 
