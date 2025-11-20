@@ -83,7 +83,7 @@ As a consequence of :ref:`validator-upgrades-state`, additional considerations m
 
 - A major upgrade only preserves the active contracts but not the update history inside the participant.
   In particular, you will not be able to get transactions from before the major upgrade on the update service on the Ledger API of the newly deployed validator node.
-- Offsets on the upgraded validator node start from ``0`` again.
+- Participant offsets on the upgraded validator node start from ``0`` again.
 - The update history will include special import transactions for the contracts imported from the old synchronizer. They all have record time ``0001-01-01T00:00:00.000000Z``, and represent the creation of the imported contracts.
 
 For a representative example runbook covering the migration of a specific integration use-case,
