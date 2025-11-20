@@ -10,7 +10,6 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import com.digitalasset.canton.topology.ParticipantId
 import org.lfdecentralizedtrust.splice.validator.store.{ValidatorInternalStore, ValidatorStore}
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
@@ -22,7 +21,6 @@ import org.lfdecentralizedtrust.splice.store.db.{StoreDescriptor, StoreDescripto
 import java.util.concurrent.atomic.AtomicReference
 
 class DbValidatorInternalStore(
-    participant: ParticipantId,
     key: ValidatorStore.Key,
     storage: DbStorage,
     val loggerFactory: NamedLoggerFactory,
@@ -39,7 +37,6 @@ class DbValidatorInternalStore(
     version = 2,
     name = "DbValidatorInternalConfigStore",
     party = key.validatorParty,
-    participant = participant,
     key = Map(
       "validatorParty" -> key.validatorParty.toProtoPrimitive
     ),

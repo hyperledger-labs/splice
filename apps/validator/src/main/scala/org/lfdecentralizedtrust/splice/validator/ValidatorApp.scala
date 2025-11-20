@@ -287,7 +287,7 @@ class ValidatorApp(
             }
             // Prevet early to make sure we have the required packages even
             // before the automation kicks in.
-            (key, participantId) <- appInitStep("Vet packages") {
+            (key) <- appInitStep("Vet packages") {
               for {
                 amuletRules <- scanConnection.getAmuletRules()
                 globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
@@ -331,7 +331,7 @@ class ValidatorApp(
                   validatorParty = idValidatorParty,
                   dsoParty = dsoParty,
                 )
-              } yield (key, participantId)
+              } yield (key)
             }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
               case (
@@ -344,7 +344,6 @@ class ValidatorApp(
                   )
                 val configProvider = new ValidatorConfigProvider(
                   ValidatorInternalStore(
-                    participantId,
                     key,
                     storage,
                     loggerFactory,
@@ -842,7 +841,7 @@ class ValidatorApp(
         loggerFactory,
       )
       configProvider = new ValidatorConfigProvider(
-        ValidatorInternalStore(participantId, key, storage, loggerFactory),
+        ValidatorInternalStore(key, storage, loggerFactory),
         loggerFactory,
       )
       walletManagerOpt =
