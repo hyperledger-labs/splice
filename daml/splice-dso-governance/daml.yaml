@@ -6,6 +6,7 @@ dependencies:
   - daml-prim
   - daml-stdlib
 data-dependencies:
+- ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-amulet-name-service/.daml/dist/splice-amulet-name-service-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
