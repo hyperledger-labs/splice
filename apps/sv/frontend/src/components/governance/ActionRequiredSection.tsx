@@ -7,6 +7,7 @@ import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
+import dayjs from 'dayjs';
 
 export interface ActionRequiredData {
   contractId: ContractId<VoteRequest>;
@@ -68,6 +69,7 @@ interface ActionCardProps {
 
 const ActionCard = (props: ActionCardProps) => {
   const { action, createdAt, contractId, votingEnds, requester, isYou } = props;
+  const remainingTime = dayjs(votingEnds).fromNow(true);
 
   return (
     <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
@@ -98,8 +100,8 @@ const ActionCard = (props: ActionCardProps) => {
           </Grid>
           <Grid size={2}>
             <ActionCardSegment
-              title="THRESHOLD DEADLINE"
-              content={votingEnds}
+              title="REMAINING TIME"
+              content={remainingTime}
               data-testid="action-required-voting-closes"
             />
           </Grid>
