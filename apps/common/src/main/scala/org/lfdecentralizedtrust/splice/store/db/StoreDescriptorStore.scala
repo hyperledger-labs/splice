@@ -32,7 +32,7 @@ case class StoreDescriptor(
     version: Int,
     name: String,
     party: PartyId,
-    participant: ParticipantId = ParticipantId.tryFromProtoPrimitive("PAR::name::dummy"),
+    participant: ParticipantId,
     key: Map[String, String],
 ) {
   def toJson: io.circe.Json = {
