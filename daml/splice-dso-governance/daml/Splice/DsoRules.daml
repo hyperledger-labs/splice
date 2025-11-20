@@ -116,7 +116,7 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
-  | SRARC_ValidatorLicense DsoRules_ValidatorLicense
+  | SRARC_ValidatorLicense ValidatorLicensesModification
     -- ^ Voted action to change weights or withdraw validator licenses.
   deriving (Eq, Show)
 
@@ -156,6 +156,10 @@ data ValidatorLicenseChange
       weight : Decimal
   | VLC_Withdraw with
       validator : Party
+  deriving (Eq, Show)
+
+data ValidatorLicensesModification = ValidatorLicensesModification with
+    actions : [ValidatorLicenseChange]
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -696,7 +700,7 @@ template DsoRules with
           assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation dso self amuletRulesCid action
+        executeActionRequiringConfirmation dso self amuletRulesCid action None
         return DsoRules_ExecuteConfirmedActionResult
 
 
@@ -827,7 +831,7 @@ template DsoRules with
 
                     Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action (Some requestCid)
                         pure $ VRO_Accepted with
                           effectiveAt = effectiveTime
                       catch
@@ -845,7 +849,7 @@ template DsoRules with
 
                     None | numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action (Some requestCid)
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
                         -- TODO(#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
@@ -1560,18 +1564,20 @@ template DsoRules with
 
     nonconsuming choice DsoRules_ValidatorLicense : DsoRules_ValidatorLicenseResult
       with
-        actions : [ValidatorLicenseChange]
+        modification : ValidatorLicensesModification
+        voteRequest : ContractId VoteRequest
       controller dso
       do now <- getTime
          let expiresAt = now `addRelTime` getVoteExecutionInstructionTimeout config
-         instructionCids <- forA actions $ \action -> do
+         let voteRequestAny = coerceContractId voteRequest
+         instructionCids <- forA modification.actions $ \action -> do
            case action of
              VLC_ChangeWeight {validator, weight} -> do
                let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
-               create VoteExecutionInstruction with dso; instruction; expiresAt
+               create VoteExecutionInstruction with dso; instruction; expiresAt; voteRequest = voteRequestAny
              VLC_Withdraw {validator} -> do
                let instruction = EI_ValidatorLicenseWithdraw with validator
-               create VoteExecutionInstruction with dso; instruction; expiresAt
+               create VoteExecutionInstruction with dso; instruction; expiresAt; voteRequest = voteRequestAny
          return DsoRules_ValidatorLicenseResult with instructionCids
 
     nonconsuming choice DsoRules_ExecuteVoteInstruction : DsoRules_ExecuteVoteInstructionResult
@@ -1627,8 +1633,8 @@ summarizeDso dsoRules = DsoSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act of
+executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Optional (ContractId VoteRequest) -> Update ()
+executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act voteRequestCid = case act of
   ARC_AmuletRules with .. ->
     case amuletRulesCid of
       None -> error "amuletRulesCid was not defined."
@@ -1655,7 +1661,9 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
-      SRARC_ValidatorLicense choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ValidatorLicense modification -> case voteRequestCid of
+        None -> error "voteRequestCid is required for SRARC_ValidatorLicense"
+        Some voteRequest -> void $ exercise dsoRulesCid DsoRules_ValidatorLicense with modification; voteRequest
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
