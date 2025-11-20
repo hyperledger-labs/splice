@@ -8,6 +8,11 @@
 0.5.2
 -----
 
+- Token Standard Metadata API
+
+  - Added the ``logoUrl`` field to the instrument info, which was added as an amendment
+    of CIP-56 in https://github.com/global-synchronizer-foundation/cips/pull/132
+
 - Canton Participant
 
   - Participants now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers and mediators.
