@@ -65,10 +65,9 @@ class DbValidatorInternalStore(
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
   def initializeState()(implicit tc: TraceContext): Future[Unit] = {
-    val initializedResult: Future[Int] = StoreDescriptorStore
-      .getStoreIdForDescriptor(storeDescriptor, storage)
     for {
-      result <- initializedResult
+      result <- StoreDescriptorStore
+        .getStoreIdForDescriptor(storeDescriptor, storage)
     } yield {
       internalState.updateAndGet(_.copy(storeId = Some(result)))
       ()
