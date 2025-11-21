@@ -42,16 +42,22 @@ import org.apache.pekko.http.scaladsl.model.ContentTypes
 import org.apache.pekko.stream.connectors.googlecloud.storage.StorageObject
 import org.apache.pekko.stream.connectors.googlecloud.storage.scaladsl.GCStorage
 import com.google.protobuf.ByteString
+import com.typesafe.config.ConfigFactory
 import io.grpc.stub.StreamObserver
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.connectors.google.auth.Credentials
+import org.apache.pekko.stream.connectors.google.{GoogleAttributes, GoogleSettings}
 import org.apache.pekko.util.ByteString as PekkoByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
-import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
+import org.lfdecentralizedtrust.splice.config.{BackupDumpConfig, GcpCredentialsConfig}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
+import java.util.{Base64, Collections}
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 /** Connection to the subset of the Canton sequencer admin API that we rely
   * on in our own applications.
@@ -136,6 +142,7 @@ class SequencerAdminConnection(
       executionSequencerFactory: ExecutionSequencerFactory,
       materializer: Materializer,
   ): Future[StorageObject] = {
+    implicit val system: ActorSystem = materializer.system
 
     val bucketConfig = backupDumConfig match {
       case BackupDumpConfig.Gcp(bucketConfig, _) =>
@@ -145,12 +152,59 @@ class SequencerAdminConnection(
           .withDescription("Stream genesis state works only with GCP buckets.")
           .asRuntimeException()
     }
-    val sink = GCStorage.resumableUpload(
-      bucketConfig.bucketName,
-      fileName,
-      contentType = ContentTypes.`application/octet-stream`,
-      chunkSize = 256 * 1024, // Upload it in 256KB chunks
-    )
+
+    val sink = GCStorage
+      .resumableUpload(
+        bucketConfig.bucketName,
+        fileName,
+        contentType = ContentTypes.`application/octet-stream`,
+        chunkSize = 256 * 1024, // Upload it in 256KB chunks
+      )
+      .withAttributes(
+        GoogleAttributes.settings(
+          GoogleSettings().withCredentials(bucketConfig.credentials match {
+            case cred @ GcpCredentialsConfig.User(_) =>
+              val x = cred.credentials
+              Credentials.apply(
+                ConfigFactory.parseMap(
+                  Map[String, AnyRef](
+                    "provider" -> "user-access",
+                    "user-access" -> Map[String, AnyRef](
+                      "client-id" -> x.getClientId,
+                      "client-secret" -> x.getClientSecret,
+                      "refresh-token" -> x.getRefreshToken,
+                      "project-id" -> bucketConfig.projectId,
+                    ).asJava,
+                  ).asJava
+                )
+              )
+            case cred @ GcpCredentialsConfig.ServiceAccount(_) =>
+              val x = cred.credentials
+              val scopes = if (x.getScopes.isEmpty) {
+                Collections.singletonList("https://www.googleapis.com/auth/cloud-platform")
+              } else {
+                new java.util.ArrayList(x.getScopes)
+              }
+              Credentials.apply(
+                ConfigFactory.parseMap(
+                  Map[String, AnyRef](
+                    "provider" -> "service-account",
+                    "service-account" ->
+                      Map[String, AnyRef](
+                        "private-key" -> Base64.getEncoder.encodeToString(
+                          x.getPrivateKey.getEncoded
+                        ),
+                        "client-email" -> x.getClientEmail,
+                        "project-id" -> bucketConfig.projectId,
+                        "scopes" -> scopes,
+                      ).asJava,
+                  ).asJava
+                )
+              )
+          })
+        )
+      )
+
     // the stream observer acts as intermediate receiver
     val responseObserver =
       new ByteStringStreamObserver[OnboardingStateV2Response](_.onboardingStateForSequencer)
