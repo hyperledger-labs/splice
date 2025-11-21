@@ -121,6 +121,45 @@ test('validator licenses are displayed and paginable', async () => {
   expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
 });
 
+test('validator licenses table includes weight and license kind columns', async () => {
+  const user = userEvent.setup();
+  render(<AppWithConfig />);
+  await user.click(screen.getByText('Validators'));
+
+  expect(await screen.findByText('Validator Licenses')).toBeDefined();
+
+  // Verify the table has the Weight and Operator columns
+  expect(screen.getByText('Weight')).toBeDefined();
+  expect(screen.getByText('Operator')).toBeDefined();
+
+  // Verify the table loads data
+  const table = document.querySelector('.validator-licenses-table');
+  expect(table).toBeDefined();
+
+  // Verify weight values are displayed for each license
+  // mock data sets the weights based on index % 4:
+  // - null (indices 0, 4, 8) = 3 licenses
+  // - '1.5' (indices 1, 5, 9) = 3 licenses
+  // - '2.0' (indices 2, 6) = 2 licenses
+  // - '0.0' (indices 3, 7) = 2 licenses
+  const weightsOnePointFive = screen.getAllByText('1.5');
+  expect(weightsOnePointFive.length).toBe(3);
+
+  const weightsTwoPointZero = screen.getAllByText('2.0');
+  expect(weightsTwoPointZero.length).toBe(2);
+
+  const weightsZeroPointZero = screen.getAllByText('0.0');
+  expect(weightsZeroPointZero.length).toBe(2);
+
+  // Verify Operator checkmark is displayed for licenses with kind != 'NonOperatorLicense'
+  // mock data sets the kind based on index % 3:
+  // - null (indices 0, 3, 6, 9) = 4 licenses
+  // - 'OperatorLicense' (indices 1, 4, 7) = 3 licenses
+  // - 'NonOperatorLicense' (indices 2, 5, 8) = 3 licenses
+  const checkIcons = document.querySelectorAll('[data-testid="CheckIcon"]');
+  expect(checkIcons.length).toBe(7);
+});
+
 test('backfilling indicator shows when backfilling', async () => {
   server.use(
     rest.get(`${scanUrl}/v0/backfilling/status`, (_, res, ctx) => {
