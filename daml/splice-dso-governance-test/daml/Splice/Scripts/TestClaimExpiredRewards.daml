@@ -1,0 +1,250 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestClaimExpiredRewards where
+
+import DA.Action (void, when)
+import DA.Assert
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.DsoRules
+import Splice.Issuance
+import Splice.Round
+import Splice.ValidatorLicense
+import Splice.Scripts.Util
+import Splice.Scripts.DsoTestUtils
+import Splice.Testing.Registries.AmuletRegistry.Parameters
+
+-- Note: This tests DsoRules_ClaimExpiredRewards
+-- which is identical to AmuletRules_ClaimExpiredRewards
+-- Hence below tests have been kept mostly identical to the one in
+-- Splice.Scripts.TestUnclaimedRewards
+
+
+totalRewardsPerRound : Decimal
+totalRewardsPerRound = issuanceConfig_0_0p5.amuletToIssuePerYear / (365.0 * 24.0 * 6.0) -- one round every 10'
+
+testClaimExpiredRewards_allCouponTypes : Script ()
+testClaimExpiredRewards_allCouponTypes = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+
+  alice <- allocateParty "alice"
+  provider1 <- allocateParty "provider1"
+  provider2 <- allocateParty "provider2"
+
+  -- Get the first open round to create coupons for
+  [round0, _, _] <- getActiveOpenRoundsSorted app
+  let roundNumber = round0._2.round
+
+  -- bare-create all three kinds of rewards
+  appCoupon1 <- submitMulti [app.dso, provider1] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = provider1
+    beneficiary = None
+    amount = 5.7
+    round = roundNumber
+    featured = True
+
+  appCoupon2 <- submitMulti [app.dso, provider1] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = provider1
+    beneficiary = None
+    amount = 3.3
+    round = roundNumber
+    featured = False
+
+  validatorCoupon1 <- submitMulti [app.dso, alice] [] $ createCmd ValidatorRewardCoupon with
+    dso = app.dso
+    user = alice
+    amount = 2.3
+    round = roundNumber
+
+  validatorFaucet1 <- submitMulti [app.dso, alice] [] $ createCmd ValidatorFaucetCoupon with
+    dso = app.dso
+    validator = alice
+    round = roundNumber
+
+  validatorFaucet2 <- submitMulti [app.dso, provider1] [] $ createCmd ValidatorFaucetCoupon with
+    dso = app.dso
+    validator = provider1
+    round = roundNumber
+
+  validatorLivenessActivityRecord1 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = alice
+    round = roundNumber
+    weight = None
+
+  validatorLivenessActivityRecord2 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = provider1
+    round = roundNumber
+    weight = None
+
+  svRewardCoupon1 <- submitMulti [app.dso, provider2] [] $ createCmd SvRewardCoupon with
+    dso = app.dso
+    sv = provider2
+    beneficiary = provider2
+    round = roundNumber
+    weight = 10
+
+  -- start issuing
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  [(_, issuing)] <- query @IssuingMiningRound app.dso
+
+  -- check size of unclaimed reward issuance
+  let allocatedRewards =
+        5.7 * issuanceConfig_0_0p5.featuredAppRewardCap +
+        3.3 * issuanceConfig_0_0p5.unfeaturedAppRewardCap +
+        2.3 * issuanceConfig_0_0p5.validatorRewardCap +
+        2.0 * getValidatorFaucetCap issuanceConfig_0_0p5 +
+        2.0 * getValidatorFaucetCap issuanceConfig_0_0p5 +
+        10.0 * issuing.issuancePerSvRewardCoupon
+  mergeAndCheckUnclaimedRewardAmount app (totalRewardsPerRound - allocatedRewards)
+
+  -- run another two issuances
+  runNextIssuance app
+  runNextIssuance app
+
+  let numIssuingRoundsToDate = 3.0
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound - allocatedRewards)
+
+  -- run another issuance such that round 0 becomes closed
+  runNextIssuance app
+
+  -- collect the reward coupons
+  [(closedRoundCid, _)] <- queryFilter @ClosedMiningRound app.dso (\r -> r.round == roundNumber)
+
+  let collect = AmuletRules_ClaimExpiredRewards with
+        closedRoundCid
+        validatorRewardCouponCids = [validatorCoupon1]
+        appCouponCids = [appCoupon1, appCoupon2]
+        svRewardCouponCids = [svRewardCoupon1]
+        optValidatorFaucetCouponCids = Some [validatorFaucet1, validatorFaucet2]
+        optValidatorLivenessActivityRecordCids = Some [validatorLivenessActivityRecord1, validatorLivenessActivityRecord2]
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_ClaimExpiredRewards with
+      amuletRulesCid
+      choiceArg = collect
+      sv = Some sv1
+
+  -- check that the addition is done correctly
+  let numIssuingRoundsToDate = 4.0
+  -- note that now the reward coupons have been collected as well, and we thus
+  -- don't have to subtract the allocatedRewards anymore. They've been merged back
+  -- into the `UnclaimedReward`s fund.
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
+
+  -- Also verify that the coupons have been archived
+  validatorCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\r -> r.round == roundNumber)
+  validatorCoupons === []
+
+  appCoupons <- queryFilter @AppRewardCoupon app.dso (\r -> r.round == roundNumber)
+  appCoupons === []
+
+  svCoupons <- queryFilter @SvRewardCoupon app.dso (\r -> r.round == roundNumber)
+  svCoupons === []
+
+  validatorFaucets <- queryFilter @ValidatorFaucetCoupon app.dso (\r -> r.round == roundNumber)
+  validatorFaucets === []
+
+  validatorLivenessRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\r -> r.round == roundNumber)
+  validatorLivenessRecords === []
+
+  pure ()
+
+testClaimExpiredRewards_validatorLicenseNonDefaultWeight : Script ()
+testClaimExpiredRewards_validatorLicenseNonDefaultWeight = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+
+  alice <- allocateParty "alice"
+  provider1 <- allocateParty "provider1"
+  provider2 <- allocateParty "provider2"
+
+  -- Get the first open round to create coupons for
+  [round0, _, _] <- getActiveOpenRoundsSorted app
+  let roundNumber = round0._2.round
+
+  -- Create validator liveness activity records with different weights
+  validatorLivenessActivityRecord1 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = alice
+    round = roundNumber
+    weight = Some 2.5
+
+  validatorLivenessActivityRecord2 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = provider1
+    round = roundNumber
+    weight = Some 0.5
+
+  validatorLivenessActivityRecord3 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = provider2
+    round = roundNumber
+    weight = None  -- Default weight (1.0)
+
+  -- Start issuing
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  -- Calculate expected allocated rewards with weights
+  let weightedValidatorLivenessRewards =
+        (2.5 + 0.5 + 1.0) * getValidatorFaucetCap issuanceConfig_0_0p5
+  let allocatedRewards = weightedValidatorLivenessRewards
+  mergeAndCheckUnclaimedRewardAmount app (totalRewardsPerRound - allocatedRewards)
+
+  -- Run issuance to close round 0
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  -- Collect the reward coupons
+  [(closedRoundCid, _)] <- queryFilter @ClosedMiningRound app.dso (\r -> r.round == roundNumber)
+  let collect = AmuletRules_ClaimExpiredRewards with
+        closedRoundCid
+        validatorRewardCouponCids = []
+        appCouponCids = []
+        svRewardCouponCids = []
+        optValidatorFaucetCouponCids = None
+        optValidatorLivenessActivityRecordCids = Some [validatorLivenessActivityRecord1, validatorLivenessActivityRecord2, validatorLivenessActivityRecord3]
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_ClaimExpiredRewards with
+      amuletRulesCid
+      choiceArg = collect
+      sv = Some sv1
+
+  -- Check that the weighted addition is done correctly
+  let numIssuingRoundsToDate = 4.0
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
+  pure ()
+
+mergeAndCheckUnclaimedRewardAmount : AmuletApp -> Decimal -> Script ()
+mergeAndCheckUnclaimedRewardAmount app expectedAmount = do
+  mergeUnclaimedRewards app
+  -- check target amount
+  [(_, unclaimed)] <- query @UnclaimedReward app.dso
+  unclaimed === UnclaimedReward with
+    dso = app.dso
+    amount = expectedAmount
+
+
+-- | Merge all unclaimed reward contracts.
+mergeUnclaimedRewards : AmuletApp -> Script ()
+mergeUnclaimedRewards app  = do
+  unclaimedRewards <- query @UnclaimedReward app.dso
+  when (length unclaimedRewards > 1) $
+    void $ submitExerciseAmuletRulesByKey app [app.dso] []
+      AmuletRules_MergeUnclaimedRewards with
+        unclaimedRewardCids = map fst unclaimedRewards
