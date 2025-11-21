@@ -313,9 +313,9 @@ Note that the entire command must be quoted in this case, especially if it has s
 - `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors.
 - `updateTestConfigForParallelRuns`: Updates the test configuration files that drive how tests are executed in parallel in CI. You need to run this when you add a new unit or integration test, and commit the changes to the test-*.log files that it saves, otherwise the static checks will fail in CI.
 Test:
-- `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
-  `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
-  `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
+- `apps-app/testOnly myWildcard`: runs all tests matching wildcard, e.g.,
+  `apps-app/testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
+  `apps-app/testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
 - `test`: Note that it is [not currently advisable](https://github.com/DACH-NY/canton-network-node/issues/2098) to use this command. Use the `testOnly` commands described above to run specific tests and use the CI to run all tests.
 - `damlTest`: run the Daml script tests included with the apps' Daml files
 

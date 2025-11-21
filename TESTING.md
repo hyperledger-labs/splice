@@ -136,7 +136,7 @@ You can do so as follows:
 Frontend integration tests are either run with _sbt_ against local canton and Splice instances from the repository root directory using:
 - `./start-canton.sh` to start canton,
 - `./start-frontends.sh` to start the UIs,
-- `sbt testOnly *FrontendIntegrationTest*` to run all Frontend tests, or a more specific selection to run
+- `sbt apps-app/testOnly *FrontendIntegrationTest*` to run all Frontend tests, or a more specific selection to run
   only specific tests (see [SBT commands](DEVELOPMENT.md#sbt-commands)).
 - When done, run `./stop-canton.sh` and `./stop-frontends.sh`.
 
