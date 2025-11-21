@@ -281,7 +281,7 @@ testVoteExecutionInstructionExpire = do
   length instructions === 2
   let [(instruction1Cid, _), (instruction2Cid, _)] = instructions
 
-  -- Cannot expire before timeout (default: 1 hour)
+  -- Cannot expire before timeout (default: 7 days)
   submitMultiMustFail [sv1] [app.dso] $
     exerciseCmd dsoRulesCid DsoRules_ExpireVoteInstruction with
       instructionCid = instruction1Cid; sv = sv1
@@ -290,7 +290,7 @@ testVoteExecutionInstructionExpire = do
     exerciseCmd dsoRulesCid DsoRules_ExpireVoteInstruction with
       instructionCid = instruction2Cid; sv = sv1
 
-  passTime (hours 2)
+  passTime (days 7)
 
   -- Can expire after timeout
   submitMulti [sv1] [app.dso] $
