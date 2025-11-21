@@ -93,7 +93,7 @@ class DbValidatorInternalStore(
     updateAction.map(_ => ())
   }
 
-  def getConfig[T](
+  override def getConfig[T](
       key: String
   )(implicit tc: TraceContext, decoder: Decoder[T]): OptionT[Future, Decoder.Result[T]] = {
 
