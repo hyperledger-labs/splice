@@ -4310,6 +4310,11 @@ async def main():
     global file_handler, LOG
     args = _parse_cli_args()
 
+    # Ensure log directory exists
+    log_directory = os.path.dirname(args.log_file_path)
+    if log_directory and not os.path.exists(log_directory):
+        os.makedirs(log_directory)
+
     LOG = _setup_logger("global", args.loglevel.upper(), args.log_file_path)
     _log_uncaught_exceptions()
 
