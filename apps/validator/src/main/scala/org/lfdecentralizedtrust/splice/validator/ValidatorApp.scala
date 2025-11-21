@@ -79,6 +79,7 @@ import org.lfdecentralizedtrust.splice.validator.migration.{
   DomainMigrationDump,
   ParticipantPartyMigrator,
 }
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
 import org.lfdecentralizedtrust.splice.validator.store.{
   ValidatorConfigProvider,
   ValidatorInternalStore,
@@ -183,6 +184,36 @@ class ValidatorApp(
     }
   } yield ()
 
+  private def persistScanUrlListBuilder(
+      validatorConfigProvider: ValidatorConfigProvider
+  )(implicit traceContext: TraceContext): Seq[(String, String)] => Future[Unit] = {
+
+    (connections: Seq[(String, String)]) =>
+      {
+        val internalConfigs: Seq[ScanUrlInternalConfig] = connections.map { case (svName, url) =>
+          ScanUrlInternalConfig(
+            svName = svName,
+            url = url,
+          )
+        }
+        validatorConfigProvider.setScanUrlInternalConfig(internalConfigs)
+      }
+  }
+
+  private def getPersistedScanList(
+      validatorConfigProvider: ValidatorConfigProvider
+  )(implicit traceContext: TraceContext): Future[Option[List[(String, String)]]] = {
+
+    val optionTConfig = validatorConfigProvider.getScanUrlInternalConfig()
+
+    optionTConfig.map { internalConfigs =>
+      internalConfigs.map { internalConfig =>
+        (internalConfig.svName, internalConfig.url)
+      }.toList
+    }.value
+
+  }
+
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: SpliceLedgerClient,
@@ -191,6 +222,28 @@ class ValidatorApp(
       initialSynchronizerTime <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
+            participantId <- participantAdminConnection.getParticipantId()
+            configProvider = new ValidatorConfigProvider(
+              ValidatorInternalStore(
+                participantId,
+                ValidatorStore.Key(
+                  validatorParty = ParticipantPartyMigrator.toPartyId(
+                    config.validatorPartyHint
+                      .getOrElse(
+                        BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                      ),
+                    participantId,
+                  ),
+                  dsoParty = PartyId.tryFromProtoPrimitive(
+                    "dummy::dummy"
+                  ), // key is only used for the validator internal config store descriptor and hence needs no dsoParty
+                ),
+                storage,
+                loggerFactory,
+              ),
+              loggerFactory,
+            )
+
             scanConnection <- appInitStep("Getting BFT scan connection") {
               client.BftScanConnection(
                 ledgerClient,
@@ -199,6 +252,8 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
+                Some(persistScanUrlListBuilder(configProvider)),
+                getPersistedScanList(configProvider),
               )
             }
             domainConnector = new DomainConnector(
@@ -287,7 +342,7 @@ class ValidatorApp(
             }
             // Prevet early to make sure we have the required packages even
             // before the automation kicks in.
-            (key, participantId) <- appInitStep("Vet packages") {
+            _ <- appInitStep("Vet packages") {
               for {
                 amuletRules <- scanConnection.getAmuletRules()
                 globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
@@ -314,24 +369,7 @@ class ValidatorApp(
                     synchronizerId =>
                       packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
                   }
-
-                participantId <- participantAdminConnection.getParticipantId()
-                idValidatorParty = ParticipantPartyMigrator.toPartyId(
-                  config.validatorPartyHint
-                    .getOrElse(
-                      BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                    ),
-                  participantId,
-                )
-                dsoParty <- appInitStep("Get DSO party id") {
-                  scanConnection.getDsoPartyIdWithRetries()
-                }
-
-                key = ValidatorStore.Key(
-                  validatorParty = idValidatorParty,
-                  dsoParty = dsoParty,
-                )
-              } yield (key, participantId)
+              } yield ()
             }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
               case (
@@ -342,15 +380,7 @@ class ValidatorApp(
                   .getOrElse(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
-                val configProvider = new ValidatorConfigProvider(
-                  ValidatorInternalStore(
-                    participantId,
-                    key,
-                    storage,
-                    loggerFactory,
-                  ),
-                  loggerFactory,
-                )
+
                 val participantPartyMigrator = new ParticipantPartyMigrator(
                   connection,
                   participantAdminConnection,
@@ -726,6 +756,24 @@ class ValidatorApp(
         config.participantIdentitiesBackup.map(_ -> clock),
         loggerFactory,
       )
+
+      participantId <- appInitStep("Get participant id") {
+        participantAdminConnection.getParticipantId()
+      }
+
+      configProvider = new ValidatorConfigProvider(
+        ValidatorInternalStore(
+          participantId,
+          ValidatorStore.Key(
+            validatorParty = validatorParty,
+            dsoParty = PartyId.tryFromProtoPrimitive("dummy::dummy"),
+          ),
+          storage,
+          loggerFactory,
+        ),
+        loggerFactory,
+      )
+
       scanConnection <- appInitStep("Get scan connection") {
         client.BftScanConnection(
           ledgerClient,
@@ -734,6 +782,8 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
+          Some(persistScanUrlListBuilder(configProvider)),
+          getPersistedScanList(configProvider),
         )
       }
 
@@ -748,9 +798,7 @@ class ValidatorApp(
       dsoParty <- appInitStep("Get DSO party id") {
         scanConnection.getDsoPartyIdWithRetries()
       }
-      participantId <- appInitStep("Get participant id") {
-        participantAdminConnection.getParticipantId()
-      }
+
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         dsoParty = dsoParty,
@@ -841,10 +889,7 @@ class ValidatorApp(
         readOnlyLedgerConnection,
         loggerFactory,
       )
-      configProvider = new ValidatorConfigProvider(
-        ValidatorInternalStore(participantId, key, storage, loggerFactory),
-        loggerFactory,
-      )
+
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
