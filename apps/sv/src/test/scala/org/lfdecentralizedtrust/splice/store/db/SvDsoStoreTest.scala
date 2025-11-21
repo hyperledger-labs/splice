@@ -1454,7 +1454,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           newSynchronizerId,
         ),
         Optional.empty(),
-        Optional.empty(), // voteCooldownTime`
+        Optional.empty(), // voteCooldownTime
+        Optional.empty(), // voteExecutionInstructionTimeout
       ),
       Collections.emptyMap(),
       true,

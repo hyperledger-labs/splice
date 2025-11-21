@@ -230,6 +230,7 @@ trait SvTestUtil extends TestCommon {
     dsoRulesConfig.decentralizedSynchronizer,
     domainUpgradeSchedule.toJava,
     dsoRulesConfig.voteCooldownTime,
+    dsoRulesConfig.voteExecutionInstructionTimeout,
   )
 
   def computeAmuletsToIssueToSvs(
