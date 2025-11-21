@@ -7,12 +7,15 @@
 
 .. release-notes:: 0.5.3
 
-- Canton Participant
+  - Canton Participant
 
-  - Remove the default pruning that was enabled in 0.5.2, so that participants **do not** prune any data by default. Pruning can be enabled explicitly by any validator operator. For more information please check the `docs <validator_operator/validator_helm.html#participant-pruning>`_
+    - Remove the default pruning that was enabled in 0.5.2, so that participants **do not** prune any data by default. Pruning can be enabled explicitly by any validator operator. For more information please check the `docs <validator_operator/validator_helm.html#participant-pruning>`_
 
 
 .. release-notes:: 0.5.2
+
+  .. important::
+      This release should be skipped in favour of 0.5.3
 
   - Canton Participant
 
