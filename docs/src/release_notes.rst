@@ -5,17 +5,12 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
+.. release-notes:: 0.5.3
 
-
-.. release-notes:: 0.5.2
-
-  - Canton Participant
-
-    - Participants now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers and mediators.
-      You can overwrite this default value by adding the following env variable in the `additionalEnvVars` helm values of the validator app: `ADDITIONAL_CONFIG_PARTICIPANT_PRUNING`
-
-      An example value would be: ``ADDITIONAL_CONFIG_PARTICIPANT_PRUNING=canton.validator-apps.validator_backend.participant-pruning-schedule {cron: "0 /10 * * * ?", max-duration: "5m", retention: "10h"}``
+  Note: 0.5.2 mistakingly introduced default pruning for Canton participants and should be skipped in favor of 0.5.3.
+  Participants **do not** prune any data by default.
+  Pruning can be enabled explicitly by any validator operator.
+  For more information please check the :ref:`docs <validator_participant_pruning>`.
 
   - Sequencer connections
 
