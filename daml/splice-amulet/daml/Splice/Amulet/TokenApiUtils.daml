@@ -43,7 +43,7 @@ nonZeroMetadata k n m
 
 -- | Add an metadata entry for an optional value if it is non-zero number.
 optionalNonZeroMetadata : (Eq a, Additive a, Show a) => Text -> Optional a -> TextMap Text -> TextMap Text
-optionalNonZeroMetadata k optN m = 
+optionalNonZeroMetadata k optN m =
   case optN of
     None -> m
     Some n -> nonZeroMetadata k n m
@@ -74,6 +74,9 @@ appRewardBeneficiariesMetaKey = amuletPrefix <> "app-reward-beneficiaries"
 
 appRewardBeneficiaryWeightsMetaKey : Text
 appRewardBeneficiaryWeightsMetaKey = amuletPrefix <> "app-reward-beneficiary-weights"
+
+developmentFundAmountMetaKey : Text
+developmentFundAmountMetaKey = amuletPrefix <> "development-fund"
 
 
 -- Splice API Metadata keys

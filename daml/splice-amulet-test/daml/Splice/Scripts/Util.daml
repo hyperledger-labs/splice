@@ -646,6 +646,14 @@ getAmuletConfig app = do
   now <- getTime
   pure $ getValueAsOf now amuletRules.configSchedule
 
+setAmuletConfig : AmuletApp -> AmuletConfig Unit.USD -> AmuletConfig Unit.USD -> Script ()
+setAmuletConfig app baseConfig newConfig = do
+  Some (amuletRulesCid, _) <- queryAmuletRulesByKey app.dso
+  void $ submit app.dso $
+    exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+      newConfig
+      baseConfig
+
 -- Metadata verification
 ------------------------
 
@@ -693,13 +701,16 @@ genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body =
   mint <- case extractSummary result of
     None -> pure 0.0
     Some summary -> do
-      let inputUnclaimedActivityRecordAmount = fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount
+      let
+        inputUnclaimedActivityRecordAmount = fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount
+        inputDevelopmentFundAmountAmount = fromOptional 0.0 summary.inputDevelopmentFundAmount
       expectUnlessZero svRewardAmountMetaKey summary.inputSvRewardAmount
       expectUnlessZero appRewardAmountMetaKey summary.inputAppRewardAmount
       expectUnlessZero validatorRewardAmountMetaKey summary.inputValidatorRewardAmount
       expectUnlessZero unclaimedActivityRecordAmountMetaKey inputUnclaimedActivityRecordAmount
+      expectUnlessZero developmentFundAmountMetaKey inputDevelopmentFundAmountAmount
       pure $ summary.inputAppRewardAmount + summary.inputValidatorRewardAmount + summary.inputSvRewardAmount +
-        inputUnclaimedActivityRecordAmount
+        inputUnclaimedActivityRecordAmount + inputDevelopmentFundAmountAmount
   let expectedBurn = totalHoldingsBefore + mint - totalHoldingsAfter
   -- mints are inferred, and show here as a negative burn
   if (expectedBurn < 0.0)
