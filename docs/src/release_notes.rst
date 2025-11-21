@@ -7,6 +7,10 @@
 
 .. release-notes:: upcoming
 
+- Canton Participant
+
+  - Remove the default pruning that was enabled in 0.5.2. Pruning can be enabled explicitly by any validator operator. For more information please check the `docs <validator_operator/validator_helm.html#participant-pruning>`_
+
 
 .. release-notes:: 0.5.2
 
