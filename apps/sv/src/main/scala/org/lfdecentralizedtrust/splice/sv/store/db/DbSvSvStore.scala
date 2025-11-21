@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.{
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{MultiDomainAcsStore, StoreErrors}
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}

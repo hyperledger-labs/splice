@@ -48,6 +48,8 @@ class ParticipantPartyMigrator(
     traceContext: TraceContext,
 ) extends NamedLogging {
 
+  import ParticipantPartyMigrator.toPartyId
+
   def migrate(
       nodeIdentitiesDump: NodeIdentitiesDump,
       validatorPartyHint: String,
@@ -110,10 +112,6 @@ class ParticipantPartyMigrator(
       }
     } yield ()
   }
-
-  private def toPartyId(partyHint: String, participantId: ParticipantId) = PartyId(
-    UniqueIdentifier.tryCreate(partyHint, participantId.uid.namespace)
-  )
 
   private def getPartiesToMigrate(
       overridePartiesToMigrate: Option[Seq[PartyId]],
@@ -395,4 +393,8 @@ object ParticipantPartyMigrator {
   case class ConfigPartiesToMigrate(parties: Set[PartyId]) extends PartiesToMigrate
   case class ParticipantHostedPartiesToMigrate(parties: Set[PartyId]) extends PartiesToMigrate
   case class DbStorePartiesToMigrate(parties: Set[PartyId]) extends PartiesToMigrate
+
+  def toPartyId(partyHint: String, participantId: ParticipantId) = PartyId(
+    UniqueIdentifier.tryCreate(partyHint, participantId.uid.namespace)
+  )
 }

@@ -287,7 +287,7 @@ class ValidatorApp(
             }
             // Prevet early to make sure we have the required packages even
             // before the automation kicks in.
-            _ <- appInitStep("Vet packages") {
+            (key, participantId) <- appInitStep("Vet packages") {
               for {
                 amuletRules <- scanConnection.getAmuletRules()
                 globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
@@ -314,7 +314,24 @@ class ValidatorApp(
                     synchronizerId =>
                       packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
                   }
-              } yield ()
+
+                participantId <- participantAdminConnection.getParticipantId()
+                idValidatorParty = ParticipantPartyMigrator.toPartyId(
+                  config.validatorPartyHint
+                    .getOrElse(
+                      BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                    ),
+                  participantId,
+                )
+                dsoParty <- appInitStep("Get DSO party id") {
+                  scanConnection.getDsoPartyIdWithRetries()
+                }
+
+                key = ValidatorStore.Key(
+                  validatorParty = idValidatorParty,
+                  dsoParty = dsoParty,
+                )
+              } yield (key, participantId)
             }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
               case (
@@ -326,7 +343,12 @@ class ValidatorApp(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
                 val configProvider = new ValidatorConfigProvider(
-                  ValidatorInternalStore(storage, loggerFactory),
+                  ValidatorInternalStore(
+                    participantId,
+                    key,
+                    storage,
+                    loggerFactory,
+                  ),
                   loggerFactory,
                 )
                 val participantPartyMigrator = new ParticipantPartyMigrator(
@@ -820,7 +842,7 @@ class ValidatorApp(
         loggerFactory,
       )
       configProvider = new ValidatorConfigProvider(
-        ValidatorInternalStore(storage, loggerFactory),
+        ValidatorInternalStore(participantId, key, storage, loggerFactory),
         loggerFactory,
       )
       walletManagerOpt =

@@ -8,10 +8,11 @@ import cats.implicits.{catsSyntaxOptionId, toBifunctorOps}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Codec
+import scala.concurrent.Future
 import io.circe.generic.semiauto.deriveCodec
-import io.circe.{Codec, Decoder}
-
-import scala.concurrent.{ExecutionContext, Future}
+import io.circe.Decoder
+import scala.concurrent.ExecutionContext
 
 class ValidatorConfigProvider(config: ValidatorInternalStore, val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
@@ -68,7 +69,6 @@ class ValidatorConfigProvider(config: ValidatorInternalStore, val loggerFactory:
     logger.info(s"Storing parties that will be migrated $parties")
     config.setConfig(migratingPartiesInternalConfigKey, PartiesBeingMigrated(parties))
   }
-
 }
 
 object ValidatorConfigProvider {
