@@ -84,7 +84,7 @@ def get_version_ids(api_url: str, image_name: str, version_to_delete: str, gh_to
 
     # URL encode the image name
     encoded_image = urllib.parse.quote(image_name)
-    url = f"{api_url}/{encoded_image}/versions?per_page=100"
+    url = f"{api_url}%2F{encoded_image}/versions?per_page=100"
     matching_versions = []
 
     while url:
@@ -169,7 +169,7 @@ def delete_version(version_id: str, api_url: str, image_name: str, gh_token: str
 
     # URL encode the image name
     encoded_image = urllib.parse.quote(image_name)
-    url = f"{api_url}/{encoded_image}/versions/{version_id}"
+    url = f"{api_url}%2F{encoded_image}/versions/{version_id}"
 
     if dry_run:
         print(f"Would delete version {version_id} for {image_name}")
