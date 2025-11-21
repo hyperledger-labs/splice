@@ -1277,8 +1277,6 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
-        -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
-        -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
         let AmuletRules_ClaimExpiredRewards{..} = choiceArg
         -- retrieve round
         closedRound <- fetchReferenceData (ForDso with dso) closedRoundCid
@@ -1297,10 +1295,15 @@ template DsoRules with
         let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
 
         -- expire validator liveness activity records and compute their unclaimed rewards
-        forA_ (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
-          exercise validatorLivenessActivityRecordCid  ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+        expiredValidatorLivenessActivityRecords <- forA (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
+          -- We need to fetch the weight, and would also prefer doing 'Expire'
+          -- We can't do checked fetch as the owner is the validator
+          -- hence can't use either fetchAndArchive or fetchUncheckedAndArchive
+          record <- fetchUncheckedButArchiveLater validatorLivenessActivityRecordCid
+          exercise validatorLivenessActivityRecordCid ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+          return (fromOptional defaultValidatorLicenseWeight record.weight)
 
-        let numValidatorLivenessActivityRecords = optional 0.0 (intToDecimal . length) optValidatorLivenessActivityRecordCids
+        let validatorLivenessActivityRecordsWeight = sum expiredValidatorLivenessActivityRecords
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
@@ -1320,7 +1323,7 @@ template DsoRules with
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
-              (numValidatorFaucetCoupons + numValidatorLivenessActivityRecords) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
+              (numValidatorFaucetCoupons + validatorLivenessActivityRecordsWeight) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
               intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
