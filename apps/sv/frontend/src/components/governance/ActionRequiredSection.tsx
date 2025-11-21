@@ -8,6 +8,9 @@ import { Link as RouterLink } from 'react-router-dom';
 import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+
+dayjs.extend(relativeTime);
 
 export interface ActionRequiredData {
   contractId: ContractId<VoteRequest>;
