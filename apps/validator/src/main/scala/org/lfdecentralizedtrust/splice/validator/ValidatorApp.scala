@@ -223,26 +223,19 @@ class ValidatorApp(
         withParticipantAdminConnection { participantAdminConnection =>
           for {
             participantId <- participantAdminConnection.getParticipantId()
-            configProvider = new ValidatorConfigProvider(
-              ValidatorInternalStore(
-                participantId,
-                ValidatorStore.Key(
-                  validatorParty = ParticipantPartyMigrator.toPartyId(
-                    config.validatorPartyHint
-                      .getOrElse(
-                        BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                      ),
-                    participantId,
+            internalStore <- ValidatorInternalStore(
+              participantId,
+              validatorParty = ParticipantPartyMigrator.toPartyId(
+                config.validatorPartyHint
+                  .getOrElse(
+                    BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   ),
-                  dsoParty = PartyId.tryFromProtoPrimitive(
-                    "dummy::dummy"
-                  ), // key is only used for the validator internal config store descriptor and hence needs no dsoParty
-                ),
-                storage,
-                loggerFactory,
+                participantId,
               ),
+              storage,
               loggerFactory,
             )
+            configProvider = new ValidatorConfigProvider(internalStore, loggerFactory)
 
             scanConnection <- appInitStep("Getting BFT scan connection") {
               client.BftScanConnection(
@@ -760,17 +753,15 @@ class ValidatorApp(
       participantId <- appInitStep("Get participant id") {
         participantAdminConnection.getParticipantId()
       }
+      internalStore <- ValidatorInternalStore(
+        participantId,
+        validatorParty = validatorParty,
+        storage,
+        loggerFactory,
+      )
 
       configProvider = new ValidatorConfigProvider(
-        ValidatorInternalStore(
-          participantId,
-          ValidatorStore.Key(
-            validatorParty = validatorParty,
-            dsoParty = PartyId.tryFromProtoPrimitive("dummy::dummy"),
-          ),
-          storage,
-          loggerFactory,
-        ),
+        internalStore,
         loggerFactory,
       )
 
