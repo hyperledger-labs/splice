@@ -63,12 +63,16 @@ class FeaturedAppActivityMarkerIntegrationTest
     val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val charlie = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-    val aliceFeaturedAppRightCid = aliceWalletClient
-      .selfGrantFeaturedAppRight()
-      .toInterface(featuredapprightv1.FeaturedAppRight.INTERFACE)
-    val bobFeaturedAppRightCid = bobWalletClient
-      .selfGrantFeaturedAppRight()
-      .toInterface(featuredapprightv1.FeaturedAppRight.INTERFACE)
+    val aliceFeaturedAppRightCid = eventuallySucceeds() {
+      aliceWalletClient
+        .selfGrantFeaturedAppRight()
+        .toInterface(featuredapprightv1.FeaturedAppRight.INTERFACE)
+    }
+    val bobFeaturedAppRightCid = eventuallySucceeds() {
+      bobWalletClient
+        .selfGrantFeaturedAppRight()
+        .toInterface(featuredapprightv1.FeaturedAppRight.INTERFACE)
+    }
 
     val markerMultiplier = 10
 
