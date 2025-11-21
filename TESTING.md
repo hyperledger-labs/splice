@@ -220,6 +220,8 @@ The logs from test executions are output to `/log/canton_network_test.clog`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
 
+If you run integration tests using sbt, we recommend running them within `apps-app`, as this speeds up test execution. For example: `apps-app/testOnly org.lfdecentralizedtrust.splice.integration.tests.AnsIntegrationTest`.
+
 Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/README.md).
 If you wish to extend our testing topology please also consult [this README](/apps/app/src/test/resources/README.md) about name and port allocation.
 
