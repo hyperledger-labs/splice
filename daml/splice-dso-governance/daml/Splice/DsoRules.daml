@@ -116,7 +116,7 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
-  | SRARC_ValidatorLicense ValidatorLicensesModification
+  | SRARC_ModifyValidatorLicenses ValidatorLicensesModification
     -- ^ Voted action to change weights or withdraw validator licenses.
   deriving (Eq, Show)
 
@@ -159,7 +159,7 @@ data ValidatorLicenseChange
   deriving (Eq, Show)
 
 data ValidatorLicensesModification = ValidatorLicensesModification with
-    actions : [ValidatorLicenseChange]
+    changes : [ValidatorLicenseChange]
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -314,7 +314,7 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
-data DsoRules_ValidatorLicenseResult = DsoRules_ValidatorLicenseResult with
+data DsoRules_ModifyValidatorLicensesResult = DsoRules_ModifyValidatorLicensesResult with
     instructionCids : [ContractId VoteExecutionInstruction]
   deriving (Show, Eq)
 
@@ -1562,7 +1562,7 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
-    nonconsuming choice DsoRules_ValidatorLicense : DsoRules_ValidatorLicenseResult
+    nonconsuming choice DsoRules_ModifyValidatorLicenses : DsoRules_ModifyValidatorLicensesResult
       with
         modification : ValidatorLicensesModification
         voteRequest : ContractId VoteRequest
@@ -1570,15 +1570,15 @@ template DsoRules with
       do now <- getTime
          let expiresAt = now `addRelTime` getVoteExecutionInstructionTimeout config
          let voteRequestAny = coerceContractId voteRequest
-         instructionCids <- forA modification.actions $ \action -> do
-           case action of
+         instructionCids <- forA modification.changes $ \c -> do
+           case c of
              VLC_ChangeWeight {validator, weight} -> do
                let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
                create VoteExecutionInstruction with dso; instruction; expiresAt; voteRequest = voteRequestAny
              VLC_Withdraw {validator} -> do
                let instruction = EI_ValidatorLicenseWithdraw with validator
                create VoteExecutionInstruction with dso; instruction; expiresAt; voteRequest = voteRequestAny
-         return DsoRules_ValidatorLicenseResult with instructionCids
+         return DsoRules_ModifyValidatorLicensesResult with instructionCids
 
     nonconsuming choice DsoRules_ExecuteVoteInstruction : DsoRules_ExecuteVoteInstructionResult
       with
@@ -1661,9 +1661,9 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act voteReques
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
-      SRARC_ValidatorLicense modification -> case voteRequestCid of
-        None -> error "voteRequestCid is required for SRARC_ValidatorLicense"
-        Some voteRequest -> void $ exercise dsoRulesCid DsoRules_ValidatorLicense with modification; voteRequest
+      SRARC_ModifyValidatorLicenses modification -> case voteRequestCid of
+        None -> error "voteRequestCid is required for SRARC_ModifyValidatorLicenses"
+        Some voteRequest -> void $ exercise dsoRulesCid DsoRules_ModifyValidatorLicenses with modification; voteRequest
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
