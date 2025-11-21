@@ -28,6 +28,11 @@ import sys
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
+# Ensure log directory exists before logger initialization
+log_directory = "log"
+if not os.path.exists(log_directory):
+    os.makedirs(log_directory)
+
 def _default_logger(name, loglevel):
     cli_handler = colorlog.StreamHandler()
     cli_handler.setFormatter(
@@ -180,18 +185,44 @@ class ScanClient:
     url: str
     page_size: int
     call_count: int = 0
+    retry_count: int = 0
 
     async def updates(self, after: Optional[PaginationKey]):
-        self.call_count = self.call_count + 1
         payload = {"page_size": self.page_size}
         if after:
             payload["after"] = after.to_json()
-        response = await self.session.post(
-            f"{self.url}/api/scan/v0/updates", json=payload
+
+        json = await self.__post_with_retry_on_statuses(
+            f"{self.url}/api/scan/v0/updates",
+            payload=payload,
+            max_retries=30,
+            delay_seconds=0.5,
+            statuses={404, 429, 500, 503},
         )
-        response.raise_for_status()
-        json = await response.json()
         return json["transactions"]
+
+    async def __post_with_retry_on_statuses(
+        self, url, payload, max_retries, delay_seconds, statuses
+    ):
+        assert max_retries >= 1
+        retry = 0
+        self.call_count = self.call_count + 1
+        while retry < max_retries:
+            response = await self.session.post(url, json=payload)
+            if response.status in statuses:
+                LOG.debug(
+                    f"Request to {url} with payload {payload} failed with status {response.status}, retrying after {delay_seconds} seconds"
+                )
+                retry += 1
+                if retry < max_retries:
+                    self.retry_count = self.retry_count + 1
+                await asyncio.sleep(delay_seconds)
+            else:
+                break
+        if retry == max_retries:
+            LOG.error(f"Exceeded max retries {max_retries}, giving up")
+        response.raise_for_status()
+        return await response.json()
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -950,7 +981,7 @@ async def main():
 
     duration = time.time() - begin_t
     LOG.info(
-        f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s))"
+        f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s), {scan_client.retry_count} retries)"
     )
     LOG.debug(
         f"active_mining_rounds count: {len(app_state.active_issuing_rounds)}"
