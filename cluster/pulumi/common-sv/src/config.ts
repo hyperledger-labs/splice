@@ -84,7 +84,14 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
   initialRound?: string;
+  periodicTopologySnapshotConfig?: BackupConfig;
 }
+
+export const GCPBucketSchema = z.object({
+  projectId: z.string(),
+  bucketName: z.string(),
+  backupInterval: z.string(),
+});
 
 export const SvConfigSchema = z.object({
   sv: z

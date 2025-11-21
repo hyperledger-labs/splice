@@ -9,6 +9,7 @@ import cats.implicits.{
   catsSyntaxTuple4Semigroupal,
 }
 import cats.syntax.functorFilter.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -126,6 +127,7 @@ class SV1Initializer(
     closeContext: CloseContext,
     mat: Materializer,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
 ) extends NodeInitializerUtil {
 
   import SV1Initializer.bootstrapTransactionOrdering

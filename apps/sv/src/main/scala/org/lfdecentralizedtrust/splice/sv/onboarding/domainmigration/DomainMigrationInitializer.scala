@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
 import cats.syntax.either.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
   SpliceInstanceNamesConfig,
@@ -107,6 +108,7 @@ class DomainMigrationInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
 ) extends NodeInitializerUtil {
 
   private val readOnlyConnection = ledgerClient.readOnlyConnection(
