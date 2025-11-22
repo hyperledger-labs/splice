@@ -67,13 +67,10 @@ class InternalConfigEnabledBftScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
         withClue("Validator should bootstrap with only sv1 scan") {
-          existsUrl(messages, "http://127.0.0.1:5012") && !existsUrl(
-            messages,
-            "http://127.0.0.1:5112",
-          ) && !existsUrl(messages, "http://127.0.0.1:5212") && !existsUrl(
-            messages,
-            "http://127.0.0.1:5312",
-          )
+          existsUrl(messages, "http://localhost:5012") &&
+          !existsUrl(messages, "http://localhost:5112") &&
+          !existsUrl(messages, "http://localhost:5212") &&
+          !existsUrl(messages, "http://localhost:5312")
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
@@ -99,21 +96,19 @@ class InternalConfigEnabledBftScanConnectionIntegrationTest
       },
     )
 
+    aliceValidatorBackend.stop()
+
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
-        aliceValidatorBackend.stop()
         aliceValidatorBackend.startSync()
       },
       logs => {
         val messages = logs.map(_.message)
         withClue("Validator should bootstrap with all scans") {
-          existsUrl(messages, "http://127.0.0.1:5012") && existsUrl(
-            messages,
-            "http://127.0.0.1:5112",
-          ) && existsUrl(messages, "http://127.0.0.1:5212") && existsUrl(
-            messages,
-            "http://127.0.0.1:5312",
-          )
+          existsUrl(messages, "http://localhost:5012") &&
+          existsUrl(messages, "http://localhost:5112") &&
+          existsUrl(messages, "http://localhost:5212") &&
+          existsUrl(messages, "http://localhost:5312")
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
