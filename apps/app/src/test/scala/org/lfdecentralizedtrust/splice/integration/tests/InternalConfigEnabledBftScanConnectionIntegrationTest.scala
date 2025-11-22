@@ -89,9 +89,7 @@ class InternalConfigEnabledBftScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
         withClue("validator should eventually refresh the scan list") {
-          eventuallySucceeds() {
-            messages.exists(_.contains(s"Updated scan list with 4 scans:"))
-          }
+          messages.exists(_.contains(s"Updated scan list with 4 scans:"))
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
