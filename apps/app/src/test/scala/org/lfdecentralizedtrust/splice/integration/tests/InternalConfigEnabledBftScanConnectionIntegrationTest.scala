@@ -96,10 +96,9 @@ class InternalConfigEnabledBftScanConnectionIntegrationTest
       },
     )
 
-    aliceValidatorBackend.stop()
-
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
+        aliceValidatorBackend.stop()
         aliceValidatorBackend.startSync()
       },
       logs => {
