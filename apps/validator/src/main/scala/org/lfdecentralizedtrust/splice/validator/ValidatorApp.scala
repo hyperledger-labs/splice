@@ -634,7 +634,7 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
-        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _) =>
+        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))
@@ -646,7 +646,7 @@ class ValidatorApp(
               ).flatMap(con => con.checkActive().andThen(_ => con.close()))
             }
             .map(_ => ())
-        case BftScanClientConfig.Bft(seedUrls, _, _) =>
+        case BftScanClientConfig.Bft(seedUrls, _, _, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))
