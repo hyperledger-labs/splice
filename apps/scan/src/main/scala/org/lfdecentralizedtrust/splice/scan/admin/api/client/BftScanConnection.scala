@@ -1206,7 +1206,7 @@ object BftScanConnection {
       case _ => seedUris
     }
 
-    bootstrapUris.toList.foreach(uri => logger.info(s"scan bootstrap URI: $uri"))
+    bootstrapUris.toList.foreach(uri => logger.info(s"Validator bootstrapping with scan URI: $uri"))
 
     for {
       initialSeedConnections <- bootstrapUris.traverse(uri =>

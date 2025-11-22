@@ -25,7 +25,7 @@ class InternalConfigEnabledBftScanConnectionIntegrationTest
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
   private def existsUrl(messages: Seq[String], uri: String) = {
-    messages.exists(_.contains(s"scan bootstrap URI: $uri"))
+    messages.exists(_.contains(s"Validator bootstrapping with scan URI: $uri"))
   }
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
