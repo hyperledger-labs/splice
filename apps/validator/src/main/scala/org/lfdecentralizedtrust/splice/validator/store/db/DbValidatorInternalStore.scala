@@ -10,8 +10,8 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.validator.store.{ValidatorInternalStore, ValidatorStore}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class DbValidatorInternalStore(
     participant: ParticipantId,
-    key: ValidatorStore.Key,
+    validatorParty: PartyId,
     storage: DbStorage,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -38,10 +38,10 @@ class DbValidatorInternalStore(
   private val storeDescriptor = StoreDescriptor(
     version = 2,
     name = "DbValidatorInternalConfigStore",
-    party = key.validatorParty,
+    party = validatorParty,
     participant = participant,
     key = Map(
-      "validatorParty" -> key.validatorParty.toProtoPrimitive
+      "validatorParty" -> validatorParty.toProtoPrimitive
     ),
   )
 
@@ -64,14 +64,14 @@ class DbValidatorInternalStore(
       .storeId
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
-  def initializeState()(implicit tc: TraceContext): Future[Unit] = {
-    for {
-      result <- StoreDescriptorStore
-        .getStoreIdForDescriptor(storeDescriptor, storage)
-    } yield {
-      internalState.updateAndGet(_.copy(storeId = Some(result)))
-      ()
-    }
+  def initialize()(implicit tc: TraceContext): Future[DbValidatorInternalStore] = {
+
+    StoreDescriptorStore
+      .getStoreIdForDescriptor(storeDescriptor, storage)
+      .map(registeredStoreId => {
+        internalState.updateAndGet(_.copy(storeId = Some(registeredStoreId)))
+        this
+      })
   }
 
   override def setConfig[T](key: String, value: T)(implicit

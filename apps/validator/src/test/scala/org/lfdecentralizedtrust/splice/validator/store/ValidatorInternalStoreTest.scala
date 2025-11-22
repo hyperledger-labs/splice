@@ -12,7 +12,6 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.store.StoreTest
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
-import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
@@ -175,19 +174,12 @@ class DbValidatorInternalStoreTest
 
   private def buildDbStore(name: String): Future[ValidatorInternalStore] = {
 
-    val internalStore = new DbValidatorInternalStore(
+    ValidatorInternalStore(
       mkParticipantId("ValidatorInternalStoreTest"),
-      ValidatorStore.Key(
-        dsoParty = dsoParty,
-        validatorParty = mkPartyId(name),
-      ),
+      validatorParty = mkPartyId(name),
       storage,
       loggerFactory,
     )
-
-    for {
-      _ <- internalStore.initializeState()
-    } yield internalStore
   }
 
   override protected def mkStore(name: String): Future[ValidatorInternalStore] =
