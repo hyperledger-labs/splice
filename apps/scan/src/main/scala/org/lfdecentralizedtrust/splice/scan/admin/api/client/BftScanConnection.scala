@@ -954,7 +954,7 @@ object BftScanConnection {
         newState <- computeNewState(retriedCurrentState, filteredScans)
       } yield {
         currentScanConnectionsRef.set(newState)
-        logger.info(s"Updated scan list to $newState")
+        logger.info(s"Updated scan list with ${dsoScanSeq.length} scans: $newState")
 
         val connections = newState.scanConnections
         validateState(newState)
@@ -1205,6 +1205,8 @@ object BftScanConnection {
       }
       case _ => seedUris
     }
+
+    bootstrapUris.toList.foreach(uri => logger.info(s"scan bootstrap URI: $uri"))
 
     for {
       initialSeedConnections <- bootstrapUris.traverse(uri =>
