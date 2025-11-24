@@ -78,7 +78,7 @@ function computeBuckets(testReportsDir: string, testNamesFile: string, splitTota
     // Build a sorted list of test names, sorted by their estimated test time.
     // We first sort alphabetically, so that tests with the same estimated time
     // are sorted in a deterministic way.
-    const sortedTestNames = testNames.sort().sort((a, b) => estimatedTestTimes[a] - estimatedTestTimes[b]);
+    const sortedTestNames = testNames.sort().sort((a, b) => estimatedTestTimes[a] - estimatedTestTimes[b]).reverse();
 
     const buckets = splitTests(sortedTestNames, estimatedTestTimes, splitTotal);
 
