@@ -392,6 +392,22 @@ template UnclaimedDevelopmentFundCoupon
     signatory dso
     ensure amount > 0.0
 
+-- | A coupon recording an emission for the Development Fund under CIP-0082,
+--   which can be collected by the designated beneficiary.
+template DevelopmentFundCoupon
+  with
+    dso : Party
+    beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
+    fundManager : Party -- ^ The party authorized to manage and allocate minting rights from the Development Fund.
+    amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
+  where
+    ensure amount > 0.0
+
+    signatory dso, fundManager
+
+    -- The beneficiary is an observer of the coupon, as they need to be able to claim it.
+    observer beneficiary
+
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
 template UnclaimedReward with
