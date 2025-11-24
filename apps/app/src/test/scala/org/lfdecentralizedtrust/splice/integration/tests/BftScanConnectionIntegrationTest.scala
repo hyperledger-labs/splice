@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, OptionT}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -18,11 +18,13 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.GetTransferInstructionAcceptContextResponse
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetChoiceContextRequest
 import org.slf4j.event.Level
 
+import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -201,6 +203,26 @@ class BftScanConnectionIntegrationTest
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
+
+    val persistedState: OptionT[Future, Seq[ScanUrlInternalConfig]] =
+      aliceValidatorBackend.appState.configProvider.getScanUrlInternalConfig()
+
+    val expectedConfigs = Seq(
+      ScanUrlInternalConfig(getSvName(1), "http://localhost:5012"),
+      ScanUrlInternalConfig(getSvName(2), "http://localhost:5112"),
+      ScanUrlInternalConfig(getSvName(3), "http://localhost:5212"),
+      ScanUrlInternalConfig(getSvName(4), "http://localhost:5312"),
+    )
+
+    withClue("Persisted state should contain the expected four internal scan configurations") {
+      val maybeActualConfigs: Option[Seq[ScanUrlInternalConfig]] = persistedState.value.futureValue
+
+      maybeActualConfigs.fold {
+        fail("The persisted state for scan URLs was None (not found or not persisted).")
+      } { actualConfigs =>
+        actualConfigs should contain theSameElementsAs expectedConfigs
+      }
+    }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
